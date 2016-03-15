@@ -9,6 +9,8 @@ from abc import abstractmethod, abstractproperty
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
+from pants.engine.exp.fs import (DirectoryListing, FileContent, Path, PathLiteral, Paths,
+                                 file_content, list_directory, path_exists)
 from pants.engine.exp.storage import Key
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.objects import datatype
@@ -22,10 +24,19 @@ class ConflictingProducersError(Exception):
     https://github.com/pantsbuild/pants/issues/2526
   """
 
-  def __init__(self, subject, product, matches):
+  @classmethod
+  def create(cls, subject, product, matches):
+    """Factory method to format the error message.
+
+    This is provided as a workaround to http://bugs.python.org/issue17296 to make this exception
+    picklable.
+    """
     msgs = '\n  '.join('{}: {}'.format(k, v) for k, v in matches.items())
-    msg = 'More than one source of {} for {}:\n  {}'.format(product.__name__, subject, msgs)
-    super(ConflictingProducersError, self).__init__(msg)
+    return ConflictingProducersError('More than one source of {} for {}:\n  {}'
+                                     .format(product.__name__, subject, msgs))
+
+  def __init__(self, message):
+    super(ConflictingProducersError, self).__init__(message)
 
 
 class State(object):
@@ -36,17 +47,14 @@ class State(object):
 
 class Noop(datatype('Noop', ['msg']), State):
   """Indicates that a Node did not have the inputs which would be needed for it to execute."""
-  pass
 
 
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
-  pass
 
 
 class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
-  pass
 
 
 class Waiting(datatype('Waiting', ['dependencies']), State):
@@ -55,7 +63,6 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   Some Nodes will return different dependency Nodes based on where they are in their lifecycle,
   but all returned dependencies are recorded for the lifetime of a ProductGraph.
   """
-  pass
 
 
 class Node(object):
@@ -166,7 +173,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
 
     # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
-    dependencies = list(step_context.task_nodes(self.subject_key, self.product, variants))
+    dependencies = list(step_context.gen_nodes(self.subject_key, self.product, variants))
     matches = {}
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
@@ -189,7 +196,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
       # by adding support for "mergeable" products. see:
       #   https://github.com/pantsbuild/pants/issues/2526
-      return Throw(ConflictingProducersError(subject, self.product, matches))
+      return Throw(ConflictingProducersError.create(subject, self.product, matches))
     elif len(matches) == 1:
       return Return(matches.values()[0])
     return Noop('No source of {}.'.format(self))
@@ -333,20 +340,68 @@ class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func
       return Throw(e)
 
 
+class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'variants']), Node):
+  """A native node type for filesystem operations."""
+
+  _FS_PRODUCT_TYPES = {
+      Paths: PathLiteral,
+      FileContent: Path,
+      DirectoryListing: Path,
+    }
+
+  @classmethod
+  def is_filesystem_product(cls, product):
+    return product in cls._FS_PRODUCT_TYPES
+
+  def _input_type(self):
+    return self._FS_PRODUCT_TYPES[self.product]
+
+  def _input_node(self):
+    return SelectNode(self.subject_key, self._input_type(), self.variants, None)
+
+  def step(self, subject, dependency_states, step_context):
+    # Request the relevant input product for the output product.
+    input_node = self._input_node()
+    input_state = dependency_states.get(input_node, None)
+    if input_state is None or type(input_state) == Waiting:
+      return Waiting([input_node])
+    elif type(input_state) == Throw:
+      return input_state
+    elif type(input_state) == Noop:
+      return Noop('Could not compute {} in order to make filesystem request.'.format(input_node))
+    elif type(input_state) != Return:
+      State.raise_unrecognized(input_state)
+
+    # If an input product was available, execute.
+    input_value = input_state.value
+    try:
+      if self.product is Paths:
+        return Return(path_exists(step_context.project_tree, input_value))
+      elif self.product is FileContent:
+        return Return(file_content(step_context.project_tree, input_value))
+      elif self.product is DirectoryListing:
+        return Return(list_directory(step_context.project_tree, input_value))
+      else:
+        return Throw('Mismatched input value {} for {}'.format(input_value, self))
+    except Exception as e:
+      return Throw(e)
+
+
 class StepContext(object):
   """Encapsulates external state and the details of creating Nodes.
 
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, node_builder, subjects):
+  def __init__(self, node_builder, storage, project_tree):
     self._node_builder = node_builder
-    self._subjects = subjects
+    self._storage = storage
+    self.project_tree = project_tree
 
   def introduce_subject(self, subject):
     """Introduces a potentially new Subject, and returns a subject Key."""
-    return self._subjects.put(subject)
+    return self._storage.put(subject)
 
-  def task_nodes(self, subject_key, product, variants):
-    """Yields task Node instances which might be able to provide a value for the given inputs."""
-    return self._node_builder.task_nodes(subject_key, product, variants)
+  def gen_nodes(self, subject_key, product, variants):
+    """Yields Node instances which might be able to provide a value for the given inputs."""
+    return self._node_builder.gen_nodes(subject_key, product, variants)

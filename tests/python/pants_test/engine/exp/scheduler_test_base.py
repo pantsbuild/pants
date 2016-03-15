@@ -9,8 +9,10 @@ import os
 import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.exp.fs import create_fs_tasks
+from pants.engine.exp.engine import LocalSerialEngine
+from pants.engine.exp.nodes import Return
 from pants.engine.exp.parsers import SymbolTable
+from pants.engine.exp.register import create_fs_tasks
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
@@ -47,10 +49,23 @@ class SchedulerTestBase(object):
     else:
       os.mkdir(build_root)
 
-    project_tree_key = storage.put(FileSystemProjectTree(build_root))
-    tasks = list(tasks) + create_fs_tasks(project_tree_key)
-    scheduler = LocalScheduler(goals,
-                               tasks,
-                               storage,
-                               symbol_table_cls)
-    return scheduler, build_root
+    tasks = list(tasks) + create_fs_tasks()
+    project_tree = FileSystemProjectTree(build_root)
+    scheduler = LocalScheduler(goals, tasks, symbol_table_cls, project_tree)
+    return scheduler, storage, build_root
+
+  def execute_request(self, scheduler, storage, product, *subjects):
+    """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
+    request = scheduler.execution_request([product], storage.puts(subjects))
+    res = LocalSerialEngine(scheduler, storage).execute(request)
+    if res.error:
+      raise res.error
+    return request
+
+  def execute(self, scheduler, storage, product, *subjects):
+    """Runs an ExecutionRequest for the given product and subjects, and returns the result value."""
+    request = self.execute_request(scheduler, storage, product, *subjects)
+    states = [storage.get(key) for key in scheduler.root_entries(request).values()]
+    if any(type(state) is not Return for state in states):
+      raise ValueError('At least one request failed: {}'.format(states))
+    return list(state.value for state in states)

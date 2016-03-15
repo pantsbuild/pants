@@ -18,7 +18,8 @@ from pants.option.config import Config
 from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
 from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
                                  BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidAction, InvalidKwarg, NoOptionNames,
+                                 ImplicitValIsNone, InvalidAction, InvalidKwarg,
+                                 MemberTypeNotAllowed, NonScalarMemberType, NoOptionNames,
                                  OptionNameDash, OptionNameDoubleDash, ParseError,
                                  RecursiveSubsystemOption, Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -81,9 +82,9 @@ class OptionsTest(unittest.TestCase):
 
     # Custom types.
     register_global('--dicty', type=dict_option, default='{"a": "b"}')
-    register_global('--listy', type=list_option, default='[1, 2, 3]')
+    register_global('--listy', type=list_option, member_type=int, default='[1, 2, 3]')
     register_global('--target_listy', type=target_list_option, default=[':a', ':b'])
-    register_global('--filey', type=file_option, default='default.txt')
+    register_global('--filey', type=file_option, default=None)
 
     # Implicit value.
     register_global('--implicit-valuey', default='default', implicit_value='implicit')
@@ -169,19 +170,6 @@ class OptionsTest(unittest.TestCase):
     options = self._parse_type_int('./pants ', env={'PANTS_CONFIG_OVERRIDE': "123"})
     self.assertEqual(123, options.for_global_scope().config_override)
 
-  def test_env_bad_override_var(self):
-    """Check for bad PANTS_CONFIG_OVERRIDE values.
-
-    Checks for a case where an environment variable exists like:
-
-        PANTS_CONFIG_OVERRIDE=old_style_pants.ini
-
-    Which was known to throw an unhandled NameError for 'old_style_pants' during the eval().
-    """
-    with self.assertRaisesRegexp(ParseError, 'config.*override'):
-      options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': 'old_style_pants.ini'})
-      options.for_global_scope().config_override
-
   def test_arg_scoping(self):
     # Some basic smoke tests.
     options = self._parse('./pants --verbose')
@@ -226,9 +214,9 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual([''], options.for_global_scope().config_override)
 
     # Test list-typed option.
-    options = self._parse('./pants --listy=\'["c", "d"]\'',
-                          config={'DEFAULT': {'listy': '["a", "b"]'}})
-    self.assertEqual(['c', 'd'], options.for_global_scope().listy)
+    options = self._parse('./pants --listy=\'[1, 2]\'',
+                          config={'DEFAULT': {'listy': '[3, 4]'}})
+    self.assertEqual([1, 2], options.for_global_scope().listy)
 
     # Test dict-typed option.
     options = self._parse('./pants --dicty=\'{"c": "d"}\'')
@@ -313,6 +301,39 @@ class OptionsTest(unittest.TestCase):
       self._parse('./pants', config={'DEFAULT': {'store_true_flag': 'AlmostTrue',
                                                  }}).for_global_scope()
 
+  def test_list_option(self):
+    def check(expected, args_str, env=None, config=None):
+      options = self._parse(args_str=args_str, env=env, config=config)
+      self.assertEqual(expected, options.for_global_scope().listy)
+
+    # Appending to the default.
+    check([1, 2, 3, 4], './pants --listy=4')
+    check([1, 2, 3, 4, 5], './pants --listy=4 --listy=5')
+    check([1, 2, 3, 4, 5], './pants --listy=+[4,5]')
+
+    # Replacing the default.
+    check([4, 5], './pants --listy=[4,5]')
+
+    # Appending across env, config and flags (in the right order).
+    check([1, 2, 3, 4, 5, 6, 7, 8, 9], './pants --listy=+[8,9]',
+          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
+          config={'GLOBAL': {'listy': '+[4,5]'}})
+
+    # Overwriting from env, then appending.
+    check([6, 7, 8, 9], './pants --listy=+[8,9]',
+          env={'PANTS_GLOBAL_LISTY': '[6,7]'},
+          config={'GLOBAL': {'listy': '+[4,5]'}})
+
+    # Overwriting from config, then appending.
+    check([4, 5, 6, 7, 8, 9], './pants --listy=+[8,9]',
+          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
+          config={'GLOBAL': {'listy': '[4,5]'}})
+
+    # Overwriting from flags.
+    check([8, 9], './pants --listy=[8,9]',
+          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
+          config={'GLOBAL': {'listy': '[4,5]'}})
+
   def test_defaults(self):
     # Hard-coded defaults.
     options = self._parse('./pants compile.java -n33')
@@ -383,6 +404,9 @@ class OptionsTest(unittest.TestCase):
     assertError(BooleanOptionType, '--foo', action='store_true', type=int)
     assertError(BooleanOptionImplicitVal, '--foo', action='store_true', implicit_value=False)
     assertError(BooleanOptionNameWithNo, '--no-foo', action='store_true')
+    assertError(MemberTypeNotAllowed, '--foo', member_type=int)
+    assertError(MemberTypeNotAllowed, '--foo', type=dict_option, member_type=int)
+    assertError(NonScalarMemberType, '--foo', type=list_option, member_type=dict_option)
 
   def test_frozen_registration(self):
     options = Options.create(args=[], env={}, config=self._create_config({}),
@@ -484,10 +508,10 @@ class OptionsTest(unittest.TestCase):
   def test_file_spec_args(self):
     with tempfile.NamedTemporaryFile() as tmp:
       tmp.write(dedent(
-        '''
+        """
         foo
         bar
-        '''
+        """
       ))
       tmp.flush()
       cmdline = './pants --target-spec-file={filename} compile morx:tgt fleem:tgt'.format(
@@ -513,7 +537,7 @@ class OptionsTest(unittest.TestCase):
       self.assertEqual(expected_val, val)
 
     check_pants_foo('AAA', {
-      'PANTS_DEFAULT_PANTS_FOO': 'AAA',
+      'PANTS_GLOBAL_PANTS_FOO': 'AAA',
       'PANTS_PANTS_FOO': 'BBB',
       'PANTS_FOO': 'CCC',
     })
@@ -539,7 +563,7 @@ class OptionsTest(unittest.TestCase):
       self.assertEqual(expected_val, val)
 
     check_bar_baz('AAA', {
-      'PANTS_DEFAULT_BAR_BAZ': 'AAA',
+      'PANTS_GLOBAL_BAR_BAZ': 'AAA',
       'PANTS_BAR_BAZ': 'BBB',
       'BAR_BAZ': 'CCC',
     })
@@ -781,7 +805,7 @@ class OptionsTest(unittest.TestCase):
         )
       }
       """))
-    _do_assert_fromfile(dest='listvalue', expected=['a', 1, 2], contents=dedent("""
+    _do_assert_fromfile(dest='listvalue', expected=['a', '1', '2'], contents=dedent("""
       ['a',
        1,
        2]

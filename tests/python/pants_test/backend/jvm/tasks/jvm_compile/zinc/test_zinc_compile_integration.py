@@ -160,3 +160,17 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       extra_args=['--compile-zinc-fatal-warnings-enabled-args=[\'-C-Werror\']'])
     test_combination('fatal', default_fatal_warnings=False, expect_success=False,
       extra_args=['--compile-zinc-fatal-warnings-disabled-args=[\'-S-Xfatal-warnings\']'])
+
+  def test_pool_created_for_fresh_compile_but_not_for_valid_compile(self):
+    with self.temporary_cachedir() as cachedir, self.temporary_workdir() as workdir:
+      # Populate the workdir.
+      first_run = self.run_test_compile(workdir, cachedir,
+                            'testprojects/src/scala/org/pantsbuild/testproject/javasources')
+
+      self.assertIn('isolation-zinc-pool-bootstrap', first_run.stdout_data)
+
+      # Run valid compile.
+      second_run = self.run_test_compile(workdir, cachedir,
+                            'testprojects/src/scala/org/pantsbuild/testproject/javasources')
+
+      self.assertNotIn('isolation-zinc-pool-bootstrap', second_run.stdout_data)

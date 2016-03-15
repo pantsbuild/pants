@@ -313,8 +313,6 @@ class JvmCompile(NailgunTaskBase):
 
     self._size_estimator = self.size_estimator_by_name(self.get_options().size_estimator)
 
-    self._worker_pool = None
-
     self._analysis_tools = self.create_analysis_tools()
 
   @property
@@ -349,16 +347,6 @@ class JvmCompile(NailgunTaskBase):
     if not relevant_targets:
       return
 
-    # This ensures the workunit for the worker pool is set
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
-            as workunit:
-      # This uses workunit.parent as the WorkerPool's parent so that child workunits
-      # of different pools will show up in order in the html output. This way the current running
-      # workunit is on the bottom of the page rather than possibly in the middle.
-      self._worker_pool = WorkerPool(workunit.parent,
-                                     self.context.run_tracker,
-                                     self._worker_count)
-
     # Clone the compile_classpath to the runtime_classpath.
     compile_classpath = self.context.products.get_data('compile_classpath')
     classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
@@ -386,7 +374,7 @@ class JvmCompile(NailgunTaskBase):
       if invalidation_check.invalid_vts:
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
 
-        self.compile_chunk(invalidation_check,
+        self.do_compile(invalidation_check,
                            compile_contexts,
                            invalid_targets,
                            self.extra_compile_time_classpath_elements())
@@ -398,13 +386,25 @@ class JvmCompile(NailgunTaskBase):
           classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
           classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
-  def compile_chunk(self,
-                    invalidation_check,
-                    compile_contexts,
-                    invalid_targets,
-                    extra_compile_time_classpath_elements):
+  def do_compile(self,
+                 invalidation_check,
+                 compile_contexts,
+                 invalid_targets,
+                 extra_compile_time_classpath_elements):
     """Executes compilations for the invalid targets contained in a single chunk."""
     assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
+
+
+    # This ensures the workunit for the worker pool is set before attempting to compile.
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
+            as workunit:
+      # This uses workunit.parent as the WorkerPool's parent so that child workunits
+      # of different pools will show up in order in the html output. This way the current running
+      # workunit is on the bottom of the page rather than possibly in the middle.
+      worker_pool = WorkerPool(workunit.parent,
+                               self.context.run_tracker,
+                               self._worker_count)
+
 
     # Prepare the output directory for each invalid target, and confirm that analysis is valid.
     for target in invalid_targets:
@@ -427,7 +427,7 @@ class JvmCompile(NailgunTaskBase):
 
     exec_graph = ExecutionGraph(jobs)
     try:
-      exec_graph.execute(self._worker_pool, self.context.log)
+      exec_graph.execute(worker_pool, self.context.log)
     except ExecutionFailure as e:
       raise TaskError("Compilation failure: {}".format(e))
 

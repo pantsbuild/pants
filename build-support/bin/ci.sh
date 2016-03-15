@@ -48,7 +48,6 @@ function usage() {
 bootstrap_compile_args=(
   compile.python-eval
   --closure
-  --fail-slow
 )
 
 # No python test sharding (1 shard) by default.
@@ -173,7 +172,7 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
       ./pants.pex list pants-plugins/tests/python:: | \
       xargs ./pants.pex filter --filter-type=python_tests
     ) && \
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow ${targets}
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest ${targets}
   ) || die "Internal backend python test failure"
 fi
 
@@ -188,9 +187,8 @@ if [[ "${skip_python:-false}" == "false" ]]; then
       xargs ./pants.pex --tag='-integration' filter --filter-type=python_tests
     ) && \
     ./pants.pex ${PANTS_ARGS[@]} test.pytest \
-      --fail-slow \
       --coverage=paths:pants/ \
-      --shard=${python_unit_shard} \
+      --test-pytest-test-shard=${python_unit_shard} \
       ${targets}
   ) || die "Core python test failure"
 fi
@@ -202,7 +200,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     # test (ie: pants_test.contrib) namespace packages.
     # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
     #  https://github.com/pantsbuild/pants/issues/1149
-    ./pants.pex ${PANTS_ARGS[@]}  --exclude-target-regexp='.*/testprojects/.*' --ignore-patterns=$SKIP_ANDROID_PATTERN test.pytest --fail-slow --no-fast contrib::
+    ./pants.pex ${PANTS_ARGS[@]}  --exclude-target-regexp='.*/testprojects/.*' --ignore-patterns=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
   ) || die "Contrib python test failure"
 fi
 
@@ -216,7 +214,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
       ./pants.pex list tests/python:: | \
       xargs ./pants.pex --tag='+integration' filter --filter-type=python_tests
     ) && \
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} ${targets}
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --test-pytest-test-shard=${python_intg_shard} ${targets}
   ) || die "Pants Integration test failure"
 fi
 

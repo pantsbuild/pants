@@ -69,6 +69,10 @@ class TestPyStyleTask(PythonTaskTestBase):
     self.style_check = self._create_task()
     self.style_check.options.suppress = None
 
+  def tearDown(self):
+    super(TestPyStyleTask, self).tearDown()
+    PythonCheckStyleTask.clear_plugins()
+
   def test_noqa_line_filter_length(self):
     """Verify the number of lines filtered is what we expect"""
     nits = list(self.style_check.get_nits(self.no_qa_line))

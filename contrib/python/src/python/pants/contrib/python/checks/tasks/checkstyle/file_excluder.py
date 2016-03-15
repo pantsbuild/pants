@@ -29,7 +29,7 @@ class FileExcluder(object):
             }
             log.debug('Exclude pattern: {pattern}'.format(pattern=pattern))
     else:
-      log.debug('No excludes file specified. All scala sources will be checked.')
+      log.debug('No excludes file specified. All python sources will be checked.')
 
   def should_include(self, source_filename, plugin):
     for exclude_rule in self.excludes.values():

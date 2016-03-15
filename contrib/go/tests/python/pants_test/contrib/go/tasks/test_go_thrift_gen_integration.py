@@ -27,8 +27,8 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
         goos = go_dist.create_go_cmd('env', args=['GOOS']).check_output().strip()
         goarch = go_dist.create_go_cmd('env', args=['GOARCH']).check_output().strip()
         expected_files = set([
-          'contrib.go.testprojects.src.thrift.thrifttest.fleem/c4e43b3a84a8/src/go/thrifttest/duck/constants.go',
-          'contrib.go.testprojects.src.thrift.thrifttest.fleem/c4e43b3a84a8/src/go/thrifttest/duck/ttypes.go',
+          'contrib.go.testprojects.src.thrift.thrifttest.fleem/039c5ecb4977/src/go/thrifttest/duck/constants.go',
+          'contrib.go.testprojects.src.thrift.thrifttest.fleem/039c5ecb4977/src/go/thrifttest/duck/ttypes.go',
         ])
 
         #Fetch the hash for task impl version.

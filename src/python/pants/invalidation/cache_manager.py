@@ -154,9 +154,7 @@ class VersionedTarget(VersionedTargetSet):
     :API: public
     """
     def dirname(key):
-      def version_to_string(task_ver):
-        return '.'.join(['_'.join(map(str, x)) for x in task_ver])
-      task_version = version_to_string(self._cache_manager.task_version)
+      task_version = self._cache_manager.task_version
       # TODO: Shorten cache_key hashes in general?
       return os.path.join(
           root_dir,

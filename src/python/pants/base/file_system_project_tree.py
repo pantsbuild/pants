@@ -31,8 +31,10 @@ class FileSystemProjectTree(ProjectTree):
 
   def walk(self, relpath, topdown=True):
     def onerror(error):
-      raise OSError('Failed to walk below {}: {}'.format(relpath, error))
-    for root, dirs, files in safe_walk(os.path.join(self.build_root, relpath), topdown=topdown, onerror=onerror):
+      raise OSError(getattr(error, 'errno', None), 'Failed to walk below {}'.format(relpath), error)
+    for root, dirs, files in safe_walk(os.path.join(self.build_root, relpath),
+                                       topdown=topdown,
+                                       onerror=onerror):
       yield fast_relpath(root, self.build_root), dirs, files
 
   def __eq__(self, other):

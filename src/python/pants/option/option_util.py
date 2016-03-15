@@ -5,6 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.option.custom_types import list_option
 
-def is_boolean_flag(kwargs):
+
+def is_boolean_option(kwargs):
   return kwargs.get('action') in ('store_false', 'store_true')
+
+
+def is_list_option(kwargs):
+  return kwargs.get('action') == 'append' or kwargs.get('type') == list_option

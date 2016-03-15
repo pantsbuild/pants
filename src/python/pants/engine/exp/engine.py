@@ -60,12 +60,20 @@ class Engine(AbstractClass):
       """
       return cls(error=error, root_products=None)
 
-  def __init__(self, scheduler):
+  def __init__(self, scheduler, storage):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
+    :param storage: The storage instance for serializables keyed by their hashes.
+    :type storage: :class:`pants.engine.exp.storage.Storage`
     """
     self._scheduler = scheduler
+    self._storage = storage
+
+  @property
+  def storage(self):
+    """Return the Storage instance for this Engine."""
+    return self._storage
 
   def execute(self, execution_request):
     """Executes the requested build.
@@ -88,7 +96,7 @@ class Engine(AbstractClass):
 
   def close(self):
     """Shutdown this engine instance, releasing resources it was using."""
-    pass
+    self._storage.close()
 
   @abstractmethod
   def reduce(self, execution_request):
@@ -106,13 +114,9 @@ class LocalSerialEngine(Engine):
 
   def reduce(self, execution_request):
     node_builder = self._scheduler.node_builder()
-    subjects = self._scheduler.subjects()
     for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
-        promise.success(step(node_builder, subjects))
-
-  def close(self):
-    self._scheduler.subjects().close()
+        promise.success(step(node_builder, self.storage))
 
 
 def _try_pickle(obj):
@@ -128,14 +132,14 @@ def _try_pickle(obj):
 def _execute_step(debug, process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
 
-  Executes the Step for the given node builder and subjects, and returns a tuple of step id and
+  Executes the Step for the given node builder and storage, and returns a tuple of step id and
   result or exception.
   """
-  node_builder, subjects = process_state
+  node_builder, storage = process_state
 
   step_id = step.step_id
   try:
-    result = step(node_builder, subjects)
+    result = step(node_builder, storage)
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
@@ -150,34 +154,34 @@ def _execute_step(debug, process_state, step):
   return (step_id, result)
 
 
-def _process_initializer(node_builder, subjects):
+def _process_initializer(node_builder, storage):
   """Another picklable top-level function that provides multi-processes' initial states.
 
   States are returned as a tuple. States are `Closable` so they can be cleaned up once
   processes are done.
   """
-  return (node_builder, Storage.clone(subjects))
+  return (node_builder, Storage.clone(storage))
 
 
 class LocalMultiprocessEngine(Engine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, scheduler, pool_size=None, debug=True):
+  def __init__(self, scheduler, storage, pool_size=None, debug=True):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
+    :param storage: The storage instance for serializables keyed by their hashes.
+    :type storage: :class:`pants.engine.exp.storage.Storage`
     :param int pool_size: The number of worker processes to use; by default 2 processes per core will
                           be used.
     :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
-                       TODO: disable by default, and enable in the pantsbuild/pants repo.
     """
-    super(LocalMultiprocessEngine, self).__init__(scheduler)
+    super(LocalMultiprocessEngine, self).__init__(scheduler, storage)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 
     execute_step = functools.partial(_execute_step, debug)
     node_builder = scheduler.node_builder()
-    subjects = scheduler.subjects()
-    process_initializer = functools.partial(_process_initializer, node_builder, subjects)
+    process_initializer = functools.partial(_process_initializer, node_builder, storage)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
@@ -241,5 +245,5 @@ class LocalMultiprocessEngine(Engine):
       await_one()
 
   def close(self):
+    super(LocalMultiprocessEngine, self).close()
     self._pool.close()
-    self._scheduler.subjects().close()

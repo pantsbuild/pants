@@ -61,46 +61,50 @@ def format_color(node, node_state):
   return colors.setdefault(key, (len(colors) % max_colors) + 1)
 
 
-def create_digraph(scheduler, request):
+def create_digraph(scheduler, storage, request):
 
   yield 'digraph plans {'
   yield '  node[colorscheme={}];'.format(colorscheme)
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state), dependency_entries) in scheduler.product_graph.walk(request.roots):
+  for ((node, node_state_key), dependency_entries) in scheduler.product_graph.walk(request.roots):
+    node_state = storage.get(node_state_key)
     node_str = format_node(node, node_state)
 
     yield (' "{node}" [style=filled, fillcolor={color}];'
             .format(color=format_color(node, node_state),
                     node=node_str))
 
-    for (dep, dep_state) in dependency_entries:
+    for (dep, dep_state_key) in dependency_entries:
+      dep_state = storage.get(dep_state_key)
       yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
 
   yield '}'
 
 
-def visualize_execution_graph(scheduler, request):
-  with temporary_file() as fp:
-    for line in create_digraph(scheduler, request):
+def visualize_execution_graph(scheduler, storage, request):
+  with temporary_file(cleanup=False, suffix='.dot') as fp:
+    for line in create_digraph(scheduler, storage, request):
       fp.write(line)
       fp.write('\n')
-    fp.close()
-    with temporary_file_path(cleanup=False, suffix='.svg') as image_file:
-      subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, fp.name), shell=True)
-      binary_util.ui_open(image_file)
+
+  print('dot file saved to: {}'.format(fp.name))
+  with temporary_file_path(cleanup=False, suffix='.svg') as image_file:
+    subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, fp.name), shell=True)
+    print('svg file saved to: {}'.format(image_file))
+    binary_util.ui_open(image_file)
 
 
 def visualize_build_request(build_root, goals, subjects):
-  scheduler = setup_json_scheduler(build_root)
-  execution_request = scheduler.build_request(goals, subjects)
+  scheduler, storage = setup_json_scheduler(build_root)
+  execution_request = scheduler.build_request(goals, storage.puts(subjects))
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
-  engine = LocalSerialEngine(scheduler)
+  engine = LocalSerialEngine(scheduler, storage)
   engine.start()
   try:
     engine.reduce(execution_request)
-    visualize_execution_graph(scheduler, execution_request)
+    visualize_execution_graph(scheduler, storage, execution_request)
     scheduler.validate()
   finally:
     engine.close()
@@ -144,6 +148,6 @@ def main_addresses():
 def main_filespecs():
   build_root, goals, args = pop_build_root_and_goals('[build root path] [filespecs]*', sys.argv[1:])
 
-  # Create a PathGlobs object relative to the buildroot.
-  path_globs = PathGlobs.create('', globs=args)
-  visualize_build_request(build_root, goals, [path_globs])
+  # Create PathGlobs for each arg relative to the buildroot.
+  path_globs = [PathGlobs.create('', globs=[arg]) for arg in args]
+  visualize_build_request(build_root, goals, path_globs)
