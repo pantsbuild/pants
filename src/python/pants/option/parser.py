@@ -329,8 +329,8 @@ class Parser(object):
     'store', 'store_true', 'store_false'
   }
 
-  _scalar_types = {
-    str, int, float
+  _allowed_member_types = {
+    str, int, float, dict
   }
 
   def _validate(self, args, kwargs):
@@ -365,7 +365,7 @@ class Parser(object):
     if 'member_type' in kwargs and kwargs.get('type', str) != list_option:
       error(MemberTypeNotAllowed)
 
-    if kwargs.get('member_type', str) not in self._scalar_types:
+    if kwargs.get('member_type', str) not in self._allowed_member_types:
       error(NonScalarMemberType)
 
     for kwarg in kwargs:

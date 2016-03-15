@@ -83,7 +83,9 @@ class OptionsTest(unittest.TestCase):
     # Custom types.
     register_global('--dicty', type=dict_option, default='{"a": "b"}')
     register_global('--listy', type=list_option, member_type=int, default='[1, 2, 3]')
-    register_global('--target_listy', type=target_list_option, default=[':a', ':b'])
+    register_global('--list-of-dicty', type=list_option, member_type=dict,
+                    default='[{"a": 1, "b": 2}, {"c": 3}]')
+    register_global('--target-listy', type=target_list_option, default=[':a', ':b'])
     register_global('--filey', type=file_option, default=None)
 
     # Implicit value.
@@ -222,8 +224,12 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --dicty=\'{"c": "d"}\'')
     self.assertEqual({'c': 'd'}, options.for_global_scope().dicty)
 
+    # Test list-of-dict-typed option.
+    options = self._parse('./pants --list-of-dicty=\'[{"c": "d"}, {"e": "f"}]\'')
+    self.assertEqual([{'c': 'd'}, {'e': 'f'}], options.for_global_scope().list_of_dicty)
+
     # Test target_list-typed option.
-    options = self._parse('./pants --target_listy=\'["//:foo", "//:bar"]\'')
+    options = self._parse('./pants --target-listy=\'["//:foo", "//:bar"]\'')
     self.assertEqual(['//:foo', '//:bar'], options.for_global_scope().target_listy)
 
     # Test file-typed option.
@@ -333,6 +339,32 @@ class OptionsTest(unittest.TestCase):
     check([8, 9], './pants --listy=[8,9]',
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
           config={'GLOBAL': {'listy': '[4,5]'}})
+
+  def test_list_of_dicts_option(self):
+    def check(expected, args_str, env=None, config=None):
+      options = self._parse(args_str=args_str, env=env, config=config)
+      self.assertEqual(expected, options.for_global_scope().list_of_dicty)
+
+    # Appending to the default.
+    check([{'a': 1, 'b': 2}, {'c': 3}], './pants')
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}],
+          './pants --list-of-dicty=\'{"d": 4, "e": 5}\'')
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
+          './pants --list-of-dicty=\'{"d": 4, "e": 5} --list-of-dicty=\'{"f": 6}\'')
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
+          './pants --list-of-dicty=\'+[{"d": 4, "e": 5}, {"f": 6}]\'')
+
+    # Replacing the default.
+    check([{'d': 4, 'e': 5}, {'f': 6}],
+          './pants --list-of-dicty=\'[{"d": 4, "e": 5}, {"f": 6}]\'')
+
+    # Parsing env var correctly.
+    check([{'d': 4, 'e': 5}, {'f': 6}],
+          './pants', env={'PANTS_GLOBAL_LIST_OF_DICTY': '[{"d": 4, "e": 5}, {"f": 6}]'})
+
+    # Parsing config value correctly.
+    check([{'d': 4, 'e': 5}, {'f': 6}],
+          './pants', config={'GLOBAL': '[{"d": 4, "e": 5}, {"f": 6}]'})
 
   def test_defaults(self):
     # Hard-coded defaults.
