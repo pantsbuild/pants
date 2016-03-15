@@ -23,7 +23,7 @@ public class ExampleAntlr4 {
 
   public static void usage(String message) {
     System.err.println(message);
-    System.err.println("usage: \"expression\" [ \"expresion\" [ ... ] ]");
+    System.err.println("usage: \"expression\" [ \"expression\" [ ... ] ]");
     System.err.println("  Specify a mathematical expression using +, -, *, / and (");
     System.exit(1);
   }
