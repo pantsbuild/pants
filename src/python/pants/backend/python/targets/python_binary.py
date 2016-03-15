@@ -44,7 +44,7 @@ class PythonBinary(PythonTarget):
     :param string entry_point: the default entry point for this binary.  if None, drops into the entry
       point that is defined by source. Something like
       "pants.bin.pants_exe:main", where "pants.bin.pants_exe" is the package
-      name and "main" is the function name (if ommitted, the module is
+      name and "main" is the function name (if omitted, the module is
       executed directly, presuming it has a ``__main.py__``).
     :param sources: Overridden by source. To specify more than one source file,
       use a python_library and have the python_binary depend on that library.
