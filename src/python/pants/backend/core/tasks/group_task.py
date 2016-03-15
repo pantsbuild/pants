@@ -330,7 +330,7 @@ class GroupTask(Task):
 
       # TODO(John Sirois): GroupTask is currently dependent on CheckExclusives but this
       # is wired indirectly in register.py.  Kill the dependency and push the exclusives bit
-      # into the GroupMembers that need it or else find a clean way to programatically depend
+      # into the GroupMembers that need it or else find a clean way to programmatically depend
       # on CheckExclusives.
       exclusives = self.context.products.get_data('exclusives_groups')
       for exclusive_chunk in ExclusivesIterator(exclusives):
