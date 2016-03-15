@@ -352,7 +352,7 @@ migrations = {
   # have elided the option scope (e.g., the scope should have remained jar.jar, not jar, internally), but rather
   # done the elision early, when interpreting scopes in config/cmd-line args etc.
   # TODO: Fix this?  I don't think it would be that difficult, but there might be unintended consequences.
-  # For now we simply avoid it in cases where there's any likelihood of options collision occuring.
+  # For now we simply avoid it in cases where there's any likelihood of options collision occurring.
   # In practice this won't be a problem with cases where there really is only one sensible task in a goal,
   # e.g., the various ConsoleTasks.
   ('jar', 'use_nailgun'): ('jar.create', 'use_nailgun'),
