@@ -2,7 +2,7 @@
  * http://stackoverflow.com/questions/1931307/antlr-is-there-a-simple-example
  * Modified for antlr4
  *
- * Evaluate expressions using the 4 basic math operatiors: +, -, /, * and nest
+ * Evaluate expressions using the 4 basic math operators: +, -, /, * and nest
  * with parenthesis.
  */
 
