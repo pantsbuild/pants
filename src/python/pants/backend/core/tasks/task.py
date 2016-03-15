@@ -362,7 +362,7 @@ class TaskBase(AbstractClass):
       elif isinstance(was_in_cache, UnreadableArtifact):
         self._cache_key_errors.update(was_in_cache.key)
 
-    # Note that while the input vts may represent multiple targets (for tasks that overrride
+    # Note that while the input vts may represent multiple targets (for tasks that override
     # check_artifact_cache_for), the ones we return must represent single targets.
     def flatten(vts):
       return list(itertools.chain.from_iterable([vt.versioned_targets for vt in vts]))
