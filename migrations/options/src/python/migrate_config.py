@@ -436,7 +436,7 @@ notes = {
                                'jvm_options: %(ivy_jvm_options)s',
   ('protobuf-gen', 'version'): 'The behavior of the "version" and "javadeps" parameters '
                                'have changed.\n  '
-                               'The old behavior to was to append the  "version" paraemter to the '
+                               'The old behavior to was to append the  "version" parameter to the '
                                'target name \'protobuf-\' as the default for "javadeps".  Now '
                                '"javadeps" defaults to the value \'protobuf-java\'.',
   ('protobuf-gen', 'plugins'): 'The behavior of the "plugins" parameter has changed. '
