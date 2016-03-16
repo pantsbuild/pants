@@ -6,10 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import cPickle as pickle
-import cStringIO
+import cStringIO as StringIO
 import sys
 from abc import abstractmethod
 from binascii import hexlify
+from contextlib import closing
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
@@ -32,7 +33,7 @@ class Key(object):
   NB: Because `string` is not included in equality comparisons, we cannot just use `datatype` here.
   """
 
-  __slots__ = ['_digest', '_hash', '_string']
+  __slots__ = ['_digest', '_type', '_hash', '_string']
 
   # The digest implementation used for Keys.
   _DIGEST_IMPL = sha1
@@ -43,20 +44,22 @@ class Key(object):
   _32_BIT_STRUCT = StdlibStruct(b'<l' + (b'x' * (_DIGEST_SIZE - 4)))
 
   @classmethod
-  def create(cls, blob, string=None):
+  def create(cls, blob, type_, string=None):
     """Given a blob, hash it to construct a Key.
 
     :param blob: Binary content to hash.
+    :param type_: Type of the object to be hashed.
     :param string: An optional human-readable representation of the blob for debugging purposes.
     """
     digest = cls._DIGEST_IMPL(blob).digest()
-    _hash = cls._32_BIT_STRUCT.unpack(digest)[0]
-    return cls(digest, _hash, string)
+    hash_ = cls._32_BIT_STRUCT.unpack(digest)[0]
+    return cls(digest, type_, hash_, string)
 
-  def __init__(self, digest, _hash, string):
+  def __init__(self, digest, type_, hash_, string):
     """Not for direct use: construct a Key via `create` instead."""
     self._digest = digest
-    self._hash = _hash
+    self._type = type_
+    self._hash = hash_
     self._string = string
 
   @property
@@ -66,6 +69,10 @@ class Key(object):
   @property
   def digest(self):
     return self._digest
+
+  @property
+  def type(self):
+    return self._type
 
   def set_string(self, string):
     """Sets the string for a Key after construction.
@@ -92,6 +99,15 @@ class Key(object):
 
   def __str__(self):
     return repr(self)
+
+  # NB: since we define `__slots__` for space saving as opposed to `__dict__`,
+  # `__getstate__` and` __setstate__` are needed for pickling and unpickling.
+  def __getstate__(self):
+    return zip(self.__slots__, [self._digest, self._type, self._hash, self._string])
+
+  def __setstate__(self, state):
+    for slot, value in state:
+      setattr(self, slot, value)
 
 
 class InvalidKeyError(Exception):
@@ -140,9 +156,19 @@ class Storage(Closable):
     self._protocol = protocol if protocol is not None else 0
 
   def put(self, obj):
-    """Serialize and hash a Serializable, returning a unique key to retrieve it later."""
+    """Serialize and hash a Serializable, returning a unique key to retrieve it later.
+
+    NB: pickle by default memoizes objects by id and pickle repeated objects by references,
+    for example, (A, A) uses less space than (A, A'), A and A' are equal but not identical.
+    For content addressability we need equality. Use `fast` mode to turn off memo.
+    Longer term see https://github.com/pantsbuild/pants/issues/2969
+    """
     try:
-      blob = pickle.dumps(obj, protocol=self._protocol)
+      with closing(StringIO.StringIO()) as buf:
+        pickler = pickle.Pickler(buf, protocol=self._protocol)
+        pickler.fast = 1
+        pickler.dump(obj)
+        blob = buf.getvalue()
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
@@ -150,13 +176,20 @@ class Storage(Closable):
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
     # Hash the blob and store it if it does not exist.
-    if self._debug:
-      key = Key.create(blob, str(obj))
-    else:
-      key = Key.create(blob)
+    key = Key.create(blob, type(obj), str(obj) if self._debug else None)
 
     self._kvs.put(key.digest, blob)
     return key
+
+  def puts(self, objs):
+    """Save objects to storage in bulk.
+
+    Keys are returned as a list, ordering is preserved.
+    """
+    keys = []
+    for obj in objs:
+      keys.append(self.put(obj))
+    return keys
 
   def get(self, key):
     """Given a key, return its deserialized content.
@@ -170,12 +203,20 @@ class Storage(Closable):
     value = self._kvs.get(key.digest)
     if isinstance(value, six.binary_type):
       # loads for string-like values
-      return pickle.loads(value)
+      return self._assert_type(pickle.loads(value), key.type)
     # load for file-like value from buffers
-    return pickle.load(value)
+    return self._assert_type(pickle.load(value), key.type)
 
   def close(self):
     self._kvs.close()
+
+  def _assert_type(self, value, expected_type):
+    """Ensure the type of deserialized object matches the type from key."""
+    actual_type = type(value)
+    if actual_type is not expected_type:
+      raise ValueError('Mismatch value types, expected: {}, actual: {}'
+                       .format(expected_type, actual_type))
+    return value
 
 
 class KeyValueStore(Closable, AbstractClass):
@@ -256,7 +297,7 @@ class Lmdb(KeyValueStore):
     with self._env.begin(buffers=True) as txn:
       value = txn.get(key)
       if value is not None:
-        return cStringIO.StringIO(value)
+        return StringIO.StringIO(value)
       return None
 
   def put(self, key, value):

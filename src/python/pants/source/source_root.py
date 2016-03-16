@@ -148,11 +148,11 @@ class SourceRootConfig(Subsystem):
     'src/main/*',
   ]
 
-  _DEFAULT_TEST_ROOT_PATTERNS = {
+  _DEFAULT_TEST_ROOT_PATTERNS = [
     'test/*',
     'tests/*',
     'src/test/*'
-  }
+  ]
 
   _DEFAULT_SOURCE_ROOTS = {
     # Go requires some special-case handling of source roots.  In particular, go buildgen assumes

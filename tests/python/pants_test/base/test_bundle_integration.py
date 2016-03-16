@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
-import tempfile
 from contextlib import contextmanager
 from shutil import rmtree
 
@@ -122,13 +121,13 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
   def test_exclude_lesser(self):
     self._test_bundle_existences(
         [Bundles.phrase_path + '::', '--exclude-target-regexp=lesser'],
-        set(Bundles.all_bundles) - set([Bundles.lesser_of_two]),
+        set(Bundles.all_bundles) - {Bundles.lesser_of_two},
     )
 
   def test_exclude_thoe(self):
     self._test_bundle_existences(
         [Bundles.phrase_path + '::', r'--exclude-target-regexp=\bth[oe]', ],
-        set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.ten_thousand]),
+        set(Bundles.all_bundles) - {Bundles.there_was_a_duck, Bundles.ten_thousand},
     )
 
   def test_exclude_two(self):
@@ -137,5 +136,5 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
           '--exclude-target-regexp=duck',
           '--exclude-target-regexp=time',
         ],
-        set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.once_upon_a_time]),
+        set(Bundles.all_bundles) - {Bundles.there_was_a_duck, Bundles.once_upon_a_time},
     )

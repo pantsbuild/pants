@@ -1,6 +1,97 @@
 RELEASE HISTORY
 ===============
 
+0.0.76 (03/11/2016)
+-------------------
+
+This release features:
+
+* The removal of the --fail-slow option to pytest.  This is now the default,
+  use --fail-fast for the opposite behavior.
+
+* Moving the Android backend into contrib.
+
+* Support for a special append syntax for list options: +=.
+
+* Tightening up of some aspects of option type conversion. There may be options
+  in plugins that were relying on broken behavior (such as when using a string where an
+  int was expected), and that will now (correctly) break.
+
+* Deprecation of the PANTS_DEFAULT_* env vars in favor of PANTS_GLOBAL_*.
+
+* Lots of engine work.
+
+* A fix to task implementation versions so that bumping the task version
+  will also invalidate artifacts it produced (not just invalidate .pants.d entries).
+
+API Changes
+~~~~~~~~~~~
+
+* Move Android into contrib and remove android special-casing.
+  `RB #3530 <https://rbcommons.com/s/twitter/r/3530>`_
+  `RB #3531 <https://rbcommons.com/s/twitter/r/3531>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix typo introduced in https://rbcommons.com/s/twitter/r/3531/
+  `RB #3531 <https://rbcommons.com/s/twitter/r/3531>`_
+  `RB #3552 <https://rbcommons.com/s/twitter/r/3552>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Reimplement list options to support appending.
+  `RB #3541 <https://rbcommons.com/s/twitter/r/3541>`_
+
+* Initial round of pantsd + new engine + watchman integration.
+  `RB #3524 <https://rbcommons.com/s/twitter/r/3524>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Adds support for golang meta info for imports
+  `Issue #2378 <https://github.com/pantsbuild/pants/issues/2378>`_
+  `RB #3443 <https://rbcommons.com/s/twitter/r/3443>`_
+
+* Update export TODO to point to the relevant intellij-plugin issue; rm ref to non-existent option
+  `RB #3558 <https://rbcommons.com/s/twitter/r/3558>`_
+
+* Use the task implementation version in the fingerprint of a task, to cause cache invalidation for TaskIdentityFingerprintStrategy.
+  `RB #3546 <https://rbcommons.com/s/twitter/r/3546>`_
+
+* Deprecate version_filter from python_requirement
+  `RB #3545 <https://rbcommons.com/s/twitter/r/3545>`_
+
+* Add _copy_target_attributes implementation to antlr
+  `RB #3352 <https://rbcommons.com/s/twitter/r/3352>`_
+  `RB #3402 <https://rbcommons.com/s/twitter/r/3402>`_
+  `RB #3547 <https://rbcommons.com/s/twitter/r/3547>`_
+
+* Make synthetic jar_library targets dependencies of android_binary.
+  `RB #3526 <https://rbcommons.com/s/twitter/r/3526>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Move storage out of scheduler to engine
+  `RB #3554 <https://rbcommons.com/s/twitter/r/3554>`_
+
+* [engine] Add native filesystem node type.
+  `RB #3550 <https://rbcommons.com/s/twitter/r/3550>`_
+
+* [engine] Implement support for recursive path globs
+  `RB #3540 <https://rbcommons.com/s/twitter/r/3540>`_
+
+* [engine] Extract scheduler test setup to a helper
+  `RB #3548 <https://rbcommons.com/s/twitter/r/3548>`_
+
+* [bugfix] Properly opt out of zinc's fingerprinting of Resources.
+  `RB #3185 <https://rbcommons.com/s/twitter/r/3185>`_
+
+* [engine] switch content addressable storage from dict to a embedded db
+  `RB #3517 <https://rbcommons.com/s/twitter/r/3517>`_
+
 0.0.75 (03/07/2016)
 -------------------
 

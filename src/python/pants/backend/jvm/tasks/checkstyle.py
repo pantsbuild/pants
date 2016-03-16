@@ -13,7 +13,7 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import dict_option, file_option
+from pants.option.custom_types import dict_option, file_option, list_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import safe_open
 
@@ -39,7 +39,7 @@ class Checkstyle(NailgunTask):
              help='Path to the checkstyle configuration file.')
     register('--properties', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Dictionary of property mappings to use for checkstyle.properties.')
-    register('--confs', advanced=True, default=['default'],
+    register('--confs', advanced=True, type=list_option, default=['default'],
              help='One or more ivy configurations to resolve for this target.')
     register('--jvm-options', advanced=True, action='append', metavar='<option>...',
              help='Run checkstyle with these extra jvm options.')

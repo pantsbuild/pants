@@ -12,11 +12,12 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
                                           addressable_list)
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
+from pants.engine.exp.graph import ResolvedTypeMismatchError
 from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.nodes import Noop, Return, Throw
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
+from pants.engine.exp.register import create_graph_tasks
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
@@ -88,21 +89,27 @@ class TestTable(SymbolTable):
 class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   _product = Struct
 
+  def setUp(self):
+    super(GraphTestBase, self).setUp()
+    self.storage = Storage.create(in_memory=True)
+
+  def tearDown(self):
+    self.storage.close()
+
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     symbol_table_cls = TestTable
 
-    storage = Storage.create(in_memory=True)
-    address_mapper_key = storage.put(
+    address_mapper_key = self.storage.put(
         AddressMapper(symbol_table_cls=symbol_table_cls,
                       build_pattern=build_pattern,
                       parser_cls=parser_cls))
 
     tasks = create_graph_tasks(address_mapper_key, symbol_table_cls)
     build_root_src = os.path.join(os.path.dirname(__file__), 'examples')
-    scheduler, build_root = self.mk_scheduler(tasks=tasks,
-                                              storage=storage,
-                                              build_root_src=build_root_src,
-                                              symbol_table_cls=symbol_table_cls)
+    scheduler, _, build_root = self.mk_scheduler(tasks=tasks,
+                                                 storage=self.storage,
+                                                 build_root_src=build_root_src,
+                                                 symbol_table_cls=symbol_table_cls)
     return scheduler
 
   def create_json(self):
@@ -110,26 +117,27 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
-    request = scheduler.execution_request(products=[self._product], subjects=[address])
-    LocalSerialEngine(scheduler).reduce(request)
+    request = scheduler.execution_request([self._product],
+                                          self.storage.puts([address]))
+    LocalSerialEngine(scheduler, self.storage).reduce(request)
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     return root_entries[0]
 
   def walk(self, scheduler, address):
-    """Return a list of all (Node, State) tuples reachable from the given Address."""
+    """Return a list of all (Node, Key) tuples reachable from the given Address."""
     root, _ = self._populate(scheduler, address)
     return list(e for e, _ in scheduler.product_graph.walk([root], predicate=lambda _: True))
 
   def resolve_failure(self, scheduler, address):
-    root, state = self._populate(scheduler, address)
-    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
-    return state.exc
+    root, state_key = self._populate(scheduler, address)
+    self.assertEquals(state_key.type, Throw, '{} is not a Throw.'.format(state_key.type))
+    return self.storage.get(state_key).exc
 
   def resolve(self, scheduler, address):
-    root, state = self._populate(scheduler, address)
-    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
-    return state.value
+    root, state_key = self._populate(scheduler, address)
+    self.assertEquals(state_key.type, Return, '{} is not a Return.'.format(state_key.type))
+    return self.storage.get(state_key).value
 
 
 class InlinedGraphTest(GraphTestBase):
@@ -186,14 +194,14 @@ class InlinedGraphTest(GraphTestBase):
 
     nonstrict_address = Address.parse('graph_test:nonstrict')
     nonstrict = self.resolve(scheduler, nonstrict_address)
-    self.assertIs(nonstrict, self.resolve(scheduler, nonstrict_address))
+    self.assertEquals(nonstrict, self.resolve(scheduler, nonstrict_address))
 
     # The already resolved `nonstrict` interior node should be re-used by `java1`.
     java1_address = Address.parse('graph_test:java1')
     java1 = self.resolve(scheduler, java1_address)
-    self.assertIs(nonstrict, java1.configurations[1])
+    self.assertEquals(nonstrict, java1.configurations[1])
 
-    self.assertIs(java1, self.resolve(scheduler, java1_address))
+    self.assertEquals(java1, self.resolve(scheduler, java1_address))
 
   def extract_path_tail(self, cycle_exception, line_count):
     return [l.lstrip() for l in str(cycle_exception).splitlines()[-line_count:]]
@@ -201,8 +209,9 @@ class InlinedGraphTest(GraphTestBase):
   def do_test_cycle(self, scheduler, address_str):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    self.assertEqual(type(walk[0][1]), Throw)
-    self.assertTrue(any('cycle' in state.msg for _, state in walk if type(state) is Noop))
+    self.assertEqual(walk[0][1].type, Throw)
+    states = [self.storage.get(state_key) for node, state_key in walk]
+    self.assertTrue(any('cycle' in state.msg for state in states if type(state) is Noop))
 
   def test_cycle_self(self):
     self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')
@@ -273,14 +282,14 @@ class LazyResolvingGraphTest(GraphTestBase):
     resolved_nonstrict = self.resolve(scheduler, nonstrict_address)
     self.assertEqual(expected_nonstrict, resolved_nonstrict)
     self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
-    self.assertIs(resolved_java1.configurations[1], resolved_nonstrict)
+    self.assertEquals(resolved_java1.configurations[1], resolved_nonstrict)
 
     resolved_public = self.resolve(scheduler, public_address)
     self.assertEqual(expected_public, resolved_public)
     self.assertEqual(expected_public, expected_java1.configurations[0].default_repo)
     self.assertEqual(expected_public, expected_java1.configurations[0].repos['jane'])
-    self.assertIs(resolved_java1.configurations[0].default_repo, resolved_public)
-    self.assertIs(resolved_java1.configurations[0].repos['jane'], resolved_public)
+    self.assertEquals(resolved_java1.configurations[0].default_repo, resolved_public)
+    self.assertEquals(resolved_java1.configurations[0].repos['jane'], resolved_public)
 
     # NB: `dependencies` lists must be explicitly requested by tasks, so we expect an Address.
     thrift1_address = address('thrift1')
