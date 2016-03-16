@@ -6,10 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import cPickle as pickle
-import cStringIO
+import cStringIO as StringIO
 import sys
 from abc import abstractmethod
 from binascii import hexlify
+from contextlib import closing
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
@@ -155,9 +156,19 @@ class Storage(Closable):
     self._protocol = protocol if protocol is not None else 0
 
   def put(self, obj):
-    """Serialize and hash a Serializable, returning a unique key to retrieve it later."""
+    """Serialize and hash a Serializable, returning a unique key to retrieve it later.
+
+    NB: pickle by default memoizes objects by id and pickle repeated objects by references,
+    for example, (A, A) uses less space than (A, A'), A and A' are equal but not identical.
+    For content addressability we need equality. Use `fast` mode to turn off memo.
+    Longer term see https://github.com/pantsbuild/pants/issues/2969
+    """
     try:
-      blob = pickle.dumps(obj, protocol=self._protocol)
+      with closing(StringIO.StringIO()) as buf:
+        pickler = pickle.Pickler(buf, protocol=self._protocol)
+        pickler.fast = 1
+        pickler.dump(obj)
+        blob = buf.getvalue()
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
@@ -286,7 +297,7 @@ class Lmdb(KeyValueStore):
     with self._env.begin(buffers=True) as txn:
       value = txn.get(key)
       if value is not None:
-        return cStringIO.StringIO(value)
+        return StringIO.StringIO(value)
       return None
 
   def put(self, key, value):

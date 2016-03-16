@@ -130,14 +130,6 @@ class SchedulerTest(unittest.TestCase):
     build_request = self.request(['compile'], self.java)
     walk = self.build_and_walk(build_request)
 
-    # TODO: Utter insanity. Pickle only encodes a unique object (ie, `if A is B`) a single
-    # time on the wire. Because the copy of this object that we're comparing to is coming
-    # from a file, the string will be encoded twice. Thus, to match (with pickle) we need
-    # to ensure that `(cl1 is not cl2)` here. See:
-    #   https://github.com/pantsbuild/pants/issues/2969
-    cl1 = 'commons-lang'
-    cl2 = 'commons' + '-lang'
-
     # The subgraph below 'src/thrift/codegen/simple' will be affected by its default variants.
     subjects = [
         self.guava,
@@ -145,7 +137,7 @@ class SchedulerTest(unittest.TestCase):
         self.thrift]
     variant_subjects = [
         Jar(org='org.apache.thrift', name='libthrift', rev='0.9.2', type_alias='jar'),
-        Jar(org=cl1, name=cl2, rev='2.5', type_alias='jar'),
+        Jar(org='commons-lang', name='commons-lang', rev='2.5', type_alias='jar'),
         Address.parse('src/thrift:slf4j-api')]
 
     # Root: expect a DependenciesNode depending on a SelectNode with compilation via javac.
