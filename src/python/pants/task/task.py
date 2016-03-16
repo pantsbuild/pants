@@ -428,7 +428,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       pairs = []
       for vt in invalidation_check.invalid_vts:
         if self._should_cache(vt):
-          pairs.append((vt, [vt.results_dir]))
+          pairs.append((vt, [vt.current_results_dir]))
       self.update_artifact_cache(pairs)
 
   def _launch_background_workdir_cleanup(self, vts):
