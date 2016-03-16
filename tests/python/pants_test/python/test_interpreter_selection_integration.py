@@ -16,7 +16,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
   def test_conflict(self):
-    binary_target = '{}:deliberately_conficting_compatibility'.format(self.testproject)
+    binary_target = '{}:deliberately_conflicting_compatibility'.format(self.testproject)
     pants_run = self._build_pex(binary_target)
     self.assert_failure(pants_run,
                         'Unexpected successful build of {binary}.'.format(binary=binary_target))

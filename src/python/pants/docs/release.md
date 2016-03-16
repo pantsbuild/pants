@@ -29,7 +29,7 @@ script fail:
 
   - Create a pgp signing key if you don't already have one.
 
-    You might use the gpg implemntation of pgp and start here:
+    You might use the gpg implementation of pgp and start here:
     https://www.gnupg.org/gph/en/manual/c14.html
 
   - Configure git to use your pgp key for signing release tags.
@@ -147,8 +147,8 @@ Owners
 The following folks are set up to publish to pypi for
 pantsbuild.pants sdists:
 
-Name             | Email                      | PYPI Usename
------------------|----------------------------|-------------
+Name             | Email                      | PYPI Username
+-----------------|----------------------------|--------------
 John Sirois      | john.sirois@gmail.com      | john.sirois
 Benjy Weinberger | benjyw@gmail.com           | benjyw
 Eric Ayers       | zundel@squareup.com        | ericzundel

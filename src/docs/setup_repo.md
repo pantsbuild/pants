@@ -189,7 +189,7 @@ processed by people invoking pants on this directory only if they have
 the file.
 
 For example, you might work at the Foo Corporation, which maintains a
-fleet of machines to run big test jobs. You might define a humungous
+fleet of machines to run big test jobs. You might define a humongous
 test job as a convenient way to send many many tests to the fleet:
 
     :::python

@@ -125,7 +125,7 @@ class Storage(Closable):
   def create(cls, in_memory=False, debug=True, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
-    :param in_memory: Indicate whether to use the in memory kvs or an embeded database.
+    :param in_memory: Indicate whether to use the in memory kvs or an embedded database.
     :param debug: A flag to store debug information in the key.
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
     """

@@ -201,7 +201,7 @@ def ensure_headings_linkable(soups):
   """
   for soup in soups.values():
     # To avoid re-assigning an existing id, note 'em down.
-    # Case-insensitve because distinguishing links #Foo and #foo would be weird.
+    # Case-insensitive because distinguishing links #Foo and #foo would be weird.
     existing_anchors = find_existing_anchors(soup)
     count = 100
     for tag in soup.find_all(_heading_re):
@@ -247,7 +247,7 @@ def add_here_links(soups):
 
 
 def link_pantsrefs(soups, precomputed):
-  """Transorm soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
+  """Transform soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
   for (page, soup) in soups.items():
     for a in soup.find_all('a'):
       if a.has_attr('pantsref'):

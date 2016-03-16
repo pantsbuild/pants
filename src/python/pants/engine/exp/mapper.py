@@ -39,7 +39,7 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
-    objects they point to in other namespaces or even in the same namespace but from a seperate
+    objects they point to in other namespaces or even in the same namespace but from a separate
     source are left as unresolved pointers.
 
     :param string path: The path to the byte source containing serialized objects.

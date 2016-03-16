@@ -76,7 +76,7 @@ script: |
   java -version
   ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
-# We accept the default travis-ci email author+comitter notification
+# We accept the default travis-ci email author+committer notification
 # for now which is enabled even with no `notifications` config.
 # notifications:
 #   email: ...

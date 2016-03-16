@@ -313,7 +313,7 @@ class UnpickleableResult(object):
 
 def unpickleable_output():
   """Generates an unpickleable output."""
-  # Nested functions like this lambda are unpicklable.
+  # Nested functions like this lambda are unpickleable.
   return lambda: None
 
 

@@ -9,6 +9,6 @@ jvm_binary(name='temperatureservice',
   source='WireTemperatureExample.java',
   main='org.pantsbuild.example.pants.temperatureservice.WireTemperatureExample',
   # TODO: The 'wire' library is not actually defined in a BUILD file: it comes in
-  # via the tool classpath of the sythetic target.
+  # via the tool classpath of the synthetic target.
   strict_deps=False,
 )

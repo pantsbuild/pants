@@ -106,7 +106,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
              deprecated_hint='Option is no longer used, --version is used to specify the major '
                              'version. The runtime is created based on major version. '
                              'The runtime target will be defined at the address //:scala-library '
-                             'unless it is overriden by the option --runtime-spec and a --version '
+                             'unless it is overridden by the option --runtime-spec and a --version '
                              'is set to custom.')
 
     register('--runtime-spec', advanced=True, default='//:scala-library',

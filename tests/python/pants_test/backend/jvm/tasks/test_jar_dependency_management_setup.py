@@ -66,7 +66,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
                                      JarDependency(org='foobar', name='foobar'),
                                    ])
     context = self.context(target_roots=[jar_library])
-    with self._subsystem(default_target='//foo:nonexistant') as manager:
+    with self._subsystem(default_target='//foo:nonexistent') as manager:
       task = self.create_task(context)
       with self.assertRaises(JarDependencyManagementSetup.InvalidDefaultTarget):
         task.execute()

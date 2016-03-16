@@ -1792,7 +1792,7 @@ Bugfixes
 * Fix `BuildFileAddressMapper.scan_addresses`.
   `RB #2974 <https://rbcommons.com/s/twitter/r/2974>`_
 
-* Fix catchall except statments
+* Fix catchall except statements
   `RB #2971 <https://rbcommons.com/s/twitter/r/2971>`_
 
 * Fix pinger cache bug and add test.
@@ -1949,7 +1949,7 @@ Small improvements, Refactoring and Tooling
 * Make sure tests/python/pants_test:all runs all the tests
   `RB #2932 <https://rbcommons.com/s/twitter/r/2932>`_
 
-* Seperate out AddressMapper from Graph.
+* Separate out AddressMapper from Graph.
   `RB #2931 <https://rbcommons.com/s/twitter/r/2931>`_
 
 * Add timeout configuration to Pinger and add unittest.
@@ -2524,7 +2524,7 @@ Small improvements, Refactoring and Tooling
 * Tighten up the node target hierarchy.
   `RB #2736 <https://rbcommons.com/s/twitter/r/2736>`_
 
-* Ensure pipeline failuires fail CI.
+* Ensure pipeline failures fail CI.
   `RB #2731 <https://rbcommons.com/s/twitter/r/2731>`_
 
 * Record the BUILD target alias in BuildFileAddress.
@@ -4712,7 +4712,7 @@ Bugfixes and features
 * Fixup Config to find DEFAULT values for missing sections
   `RB #1851 <https://rbcommons.com/s/twitter/r/1851>`_
 
-* Get published artifact classfier from config
+* Get published artifact classifier from config
   `RB #1857 <https://rbcommons.com/s/twitter/r/1857>`_
 
 * Make Context.targets() include synthetic targets
@@ -5521,7 +5521,7 @@ Bugfixes
   - Dust off the Task Developer's Guide and `rm` the "pagerank" example
   - Add a `sitegen` task, create site with better navigation
   - For 'goal builddict', generate `.rst` and `.html`, not just `.rst`
-  - Narrow setup 'Operating System' classfiers to known-good
+  - Narrow setup 'Operating System' classifiers to known-good
 
   `Issue #16 <https://github.com/pantsbuild/pex/issues/16>`_
   `Issue #461 <https://github.com/pantsbuild/pants/issues/461>`_

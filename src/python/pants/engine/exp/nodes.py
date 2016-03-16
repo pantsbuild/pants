@@ -20,7 +20,7 @@ class ConflictingProducersError(Exception):
   """Indicates that there was more than one source of a product for a given subject.
 
   TODO: This will need to be legal in order to support multiple Planners producing a
-  (mergeable) Classpath for one subject, for example. see:
+  (mergable) Classpath for one subject, for example. see:
     https://github.com/pantsbuild/pants/issues/2526
   """
 
@@ -194,7 +194,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
       return Waiting(dependencies)
     elif len(matches) > 1:
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
-      # by adding support for "mergeable" products. see:
+      # by adding support for "mergable" products. see:
       #   https://github.com/pantsbuild/pants/issues/2526
       return Throw(ConflictingProducersError.create(subject, self.product, matches))
     elif len(matches) == 1:

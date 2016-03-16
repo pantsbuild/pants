@@ -197,7 +197,7 @@ class Node(object):
 
 
 class Edge(object):
-  """Record a set of used products, and a boolean indicating that a depedency edge was declared."""
+  """Record a set of used products, and a boolean indicating that a dependency edge was declared."""
 
   def __init__(self, is_declared=False, products_used=None):
     self.products_used = products_used or set()

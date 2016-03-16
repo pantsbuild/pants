@@ -265,7 +265,7 @@ Our example package had only one dependency (i.e. `containers`) and that
 dependency is already constrained by the `lts-3.1` resolver, so we didn't need
 to specify any other information within our `stack.yaml` file.
 
-`stack` was designed to be backwards compatible with the prevous `cabal-install`
+`stack` was designed to be backwards compatible with the previous `cabal-install`
 build tool and workflow.  This means that there is some duplication of
 information: you can constrain a dependency version both at the package level
 and the project level.  The best practice for open source is to do both to

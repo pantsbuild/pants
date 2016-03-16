@@ -352,7 +352,7 @@ migrations = {
   # have elided the option scope (e.g., the scope should have remained jar.jar, not jar, internally), but rather
   # done the elision early, when interpreting scopes in config/cmd-line args etc.
   # TODO: Fix this?  I don't think it would be that difficult, but there might be unintended consequences.
-  # For now we simply avoid it in cases where there's any likelihood of options collision occuring.
+  # For now we simply avoid it in cases where there's any likelihood of options collision occurring.
   # In practice this won't be a problem with cases where there really is only one sensible task in a goal,
   # e.g., the various ConsoleTasks.
   ('jar', 'use_nailgun'): ('jar.create', 'use_nailgun'),
@@ -424,9 +424,9 @@ notes = {
                                   'and prefixed with -C, or also be included in the jvm-platform '
                                   'args.',
   ('java-compile', 'source'): 'source and target args should be defined using the jvm-platform '
-                              'subsystem, rathern than as arguments to java-compile.',
+                              'subsystem, rather than as arguments to java-compile.',
   ('java-compile', 'target'): 'source and target args should be defined using the jvm-platform '
-                              'subsystem, rathern than as arguments to java-compile.',
+                              'subsystem, rather than as arguments to java-compile.',
   ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
   ('ivy-resolve', 'jvm_args'): 'If needed, this should be repeated in resolve.ivy, '
@@ -436,7 +436,7 @@ notes = {
                                'jvm_options: %(ivy_jvm_options)s',
   ('protobuf-gen', 'version'): 'The behavior of the "version" and "javadeps" parameters '
                                'have changed.\n  '
-                               'The old behavior to was to append the  "version" paraemter to the '
+                               'The old behavior to was to append the  "version" parameter to the '
                                'target name \'protobuf-\' as the default for "javadeps".  Now '
                                '"javadeps" defaults to the value \'protobuf-java\'.',
   ('protobuf-gen', 'plugins'): 'The behavior of the "plugins" parameter has changed. '

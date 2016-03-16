@@ -19,7 +19,7 @@ from pants.util.strutil import ensure_binary
 from pants_test.base_test import BaseTest
 
 
-# TODO(Eric Ayers) Explicit unit tests are missing for registered_alises, parse_spec,
+# TODO(Eric Ayers) Explicit unit tests are missing for registered_aliases, parse_spec,
 # parse_build_file_family
 class ErrorTarget(Target):
 
@@ -379,7 +379,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
     with self.assertRaises(BuildFileParser.ExecuteError):
       self.build_file_parser.parse_build_file(build_file)
 
-  def test_build_file_parser_error_hierarcy(self):
+  def test_build_file_parser_error_hierarchy(self):
     """Exception handling code depends on the fact that all explicit exceptions from BuildFileParser
     are subclassed from the BuildFileParserError base class.
     """

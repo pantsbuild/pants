@@ -60,7 +60,7 @@ class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'depen
   """A product type that holds a Struct which has not yet been hydrated.
 
   A Struct counts as "hydrated" when all of its members (which are not themselves dependencies
-  lists) have been resolved from the graph. This means that hyrating a struct is eager in terms
+  lists) have been resolved from the graph. This means that hydrating a struct is eager in terms
   of inline addressable fields, but lazy in terms of the complete graph walk represented by
   the `dependencies` field of StructWithDeps.
   """
@@ -210,5 +210,5 @@ def addresses_from_address_family(address_family):
 
 
 def addresses_from_address_families(address_families):
-  """Given a list of AddressFamiliess, return an Addresses object containing all addressables."""
+  """Given a list of AddressFamilies, return an Addresses object containing all addressables."""
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))

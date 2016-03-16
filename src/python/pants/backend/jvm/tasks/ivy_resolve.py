@@ -143,7 +143,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                          '{org}-{name}-{conf}.html'.format(org=org, name=name, conf=conf))
       args = ['-IN', xml_path, '-XSL', xsl, '-OUT', out]
 
-      # The ivy-report.xsl genrates tab links to files with extension 'xml' by default, we
+      # The ivy-report.xsl generates tab links to files with extension 'xml' by default, we
       # override that to point to the html files we generate.
       args.extend(['-param', 'extension', 'html'])
 

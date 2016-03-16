@@ -10,6 +10,6 @@ junit_tests(name='usewire',
     'examples/src/wire/org/pantsbuild/example/temperature',
   ],
   # TODO: The 'wire' library is not actually defined in a BUILD file: it comes in
-  # via the tool classpath of the sythetic target.
+  # via the tool classpath of the synthetic target.
   strict_deps=False,
 )

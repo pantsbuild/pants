@@ -44,7 +44,7 @@ class OsutilTest(unittest.TestCase):
       with self.warnings() as warning_list:
         normalize_os_name(name)
         self.assertEqual(0, len(warning_list),
-                         'Recieved unexpected warnings: {}'.format(warning_list))
+                         'Received unexpected warnings: {}'.format(warning_list))
 
   def test_warnings_on_unknown_names(self):
     name = 'I really hope no one ever names an operating system with this string.'
