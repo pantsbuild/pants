@@ -161,10 +161,7 @@ class Storage(Closable):
     self._contents = contents
     self._key_mappings = key_mappings
     self._debug = debug
-    # TODO: Have seen strange inconsistencies with pickle protocol version 1/2 (ie, the
-    # binary versions): in particular, bytes added into the middle of otherwise identical
-    # objects.
-    self._protocol = protocol if protocol is not None else 0
+    self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
 
   def put(self, obj):
     """Serialize and hash a Serializable, returning a unique key to retrieve it later.
