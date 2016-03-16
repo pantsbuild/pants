@@ -10,6 +10,7 @@ import cStringIO as StringIO
 import sys
 from abc import abstractmethod
 from binascii import hexlify
+from collections import Counter
 from contextlib import closing
 from hashlib import sha1
 from struct import Struct as StdlibStruct
@@ -102,6 +103,8 @@ class Key(object):
 
   # NB: since we define `__slots__` for space saving as opposed to `__dict__`,
   # `__getstate__` and` __setstate__` are needed for pickling and unpickling.
+  # TODO (peiyu) it's possible we don't need them under pickle binary protocols,
+  # which currently fail for other reasons.
   def __getstate__(self):
     return zip(self.__slots__, [self._digest, self._type, self._hash, self._string])
 
@@ -119,36 +122,44 @@ class Storage(Closable):
 
   Storage as `Closable`, `close()` can be called either explicitly or through the `with`
   statement in a context.
+
+  Besides contents indexed by their hashed Keys, a secondary index is also provided
+  for mappings between Keys. This allows to establish links between contents that
+  are represented by those keys. Cache for example is such a use case.
   """
+
+  LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
   def create(cls, in_memory=False, debug=True, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
-    :param in_memory: Indicate whether to use the in memory kvs or an embeded database.
+    :param in_memory: Indicate whether to use the in-memory kvs or an embeded database.
     :param debug: A flag to store debug information in the key.
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
     """
     if in_memory:
-      kvs = InMemoryDb()
+      content, key_mappings = InMemoryDb(), InMemoryDb()
     else:
-      kvs = Lmdb()
+      content, key_mappings = Lmdb.create(child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
 
-    return Storage(kvs=kvs, debug=debug, protocol=protocol)
+    return Storage(content, key_mappings, debug=debug, protocol=protocol)
 
   @classmethod
   def clone(cls, storage):
     """Clone a Storage so it can be shared across process boundary."""
-    if isinstance(storage._kvs, InMemoryDb):
-      kvs = storage._kvs
+    if isinstance(storage._contents, InMemoryDb):
+      contents, key_mappings = storage._contents, storage._key_mappings
     else:
-      kvs = Lmdb(storage._kvs.path)
+      contents, key_mappings = Lmdb.create(path=storage._contents.path,
+                                           child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
 
-    return Storage(kvs=kvs, debug=storage._debug, protocol=storage._protocol)
+    return Storage(contents, key_mappings, debug=storage._debug, protocol=storage._protocol)
 
-  def __init__(self, kvs=None, debug=True, protocol=None):
+  def __init__(self, contents, key_mappings, debug=True, protocol=None):
     """Not for direct use: construct a Storage via either `create` or `clone`."""
-    self._kvs = kvs
+    self._contents = contents
+    self._key_mappings = key_mappings
     self._debug = debug
     # TODO: Have seen strange inconsistencies with pickle protocol version 1/2 (ie, the
     # binary versions): in particular, bytes added into the middle of otherwise identical
@@ -178,7 +189,7 @@ class Storage(Closable):
     # Hash the blob and store it if it does not exist.
     key = Key.create(blob, type(obj), str(obj) if self._debug else None)
 
-    self._kvs.put(key.digest, blob)
+    self._contents.put(key.digest, blob)
     return key
 
   def puts(self, objs):
@@ -200,23 +211,121 @@ class Storage(Closable):
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
 
-    value = self._kvs.get(key.digest)
+    value = self._contents.get(key.digest)
     if isinstance(value, six.binary_type):
       # loads for string-like values
-      return self._assert_type(pickle.loads(value), key.type)
+      return self._assert_type_matches(pickle.loads(value), key.type)
     # load for file-like value from buffers
-    return self._assert_type(pickle.load(value), key.type)
+    return self._assert_type_matches(pickle.load(value), key.type)
+
+  def add_mapping(self, from_key, to_key):
+    """Establish one to one relationship from one Key to another Key.
+
+    Content that keys represent should either already exist or the caller must
+    check for existence.
+
+    Unlike content storage, key mappings allows overwriting existing entries,
+    meaning a key can be re-mapped to a different key.
+    """
+    self._key_mappings.put(key=from_key.digest, value=pickle.dumps(to_key))
+
+  def get_mapping(self, from_key):
+    """Retrieve the mapping Key from a given Key.
+
+    Noe is returned if the mapping does not exist.
+    """
+    to_key = self._key_mappings.get(key=from_key.digest)
+
+    if to_key is None:
+      return None
+
+    if isinstance(to_key, six.binary_type):
+      return pickle.loads(to_key)
+    return pickle.load(to_key)
 
   def close(self):
-    self._kvs.close()
+    self._contents.close()
 
-  def _assert_type(self, value, expected_type):
+  def _assert_type_matches(self, value, key_type):
     """Ensure the type of deserialized object matches the type from key."""
-    actual_type = type(value)
-    if actual_type is not expected_type:
-      raise ValueError('Mismatch value types, expected: {}, actual: {}'
-                       .format(expected_type, actual_type))
+    value_type = type(value)
+    if value_type is not key_type:
+      raise ValueError('Mismatch types, key: {}, value: {}'
+                       .format(key_type, value_type))
     return value
+
+
+class Cache(Closable):
+  """Cache StepResult for a given StepRequest."""
+
+  @classmethod
+  def create(cls, storage=None, cache_stats=None):
+    """Create a Cache from a given storage instance."""
+
+    storage = storage or Storage.create()
+    cache_stats = cache_stats or CacheStats()
+    return Cache(storage, cache_stats)
+
+  def __init__(self, storage, cache_stats):
+    """Initialize the cache. Not for direct use, use factory methods `create`.
+
+    :param storage: Main storage for all requests and results.
+    :param cache_stats: Stats for hits and misses.
+    """
+    self._storage = storage
+    self._cache_stats = cache_stats
+
+  def get(self, step_request):
+    """Get the cached StepResult for a given StepRequest."""
+    result_key = self._storage.get_mapping(self._storage.put(step_request))
+    if result_key is None:
+      self._cache_stats.add_miss()
+      return None
+
+    self._cache_stats.add_hit()
+    return self._storage.get(result_key)
+
+  def put(self, step_request, step_result):
+    """Save the StepResult for a given StepResult."""
+    request_key = self._storage.put(step_request)
+    result_key = self._storage.put(step_result)
+    return self._storage.add_mapping(from_key=request_key, to_key=result_key)
+
+  def get_stats(self):
+    return self._cache_stats
+
+  def close(self):
+    self._storage.close()
+
+
+class CacheStats(Counter):
+  """Record cache hits and misses."""
+
+  HIT_KEY = 'hits'
+  MISS_KEY = 'misses'
+
+  def add_hit(self):
+    """Increment hit count by 1."""
+    self[self.HIT_KEY] += 1
+
+  def add_miss(self):
+    """Increment miss count by 1."""
+    self[self.MISS_KEY] += 1
+
+  @property
+  def hits(self):
+    """Raw count for hits."""
+    return self[self.HIT_KEY]
+
+  @property
+  def misses(self):
+    """Raw count for misses."""
+    return self[self.MISS_KEY]
+
+  @property
+  def total(self):
+    """Total count including hits and misses."""
+    return self[self.HIT_KEY] + self[self.MISS_KEY]
 
 
 class KeyValueStore(Closable, AbstractClass):
@@ -272,20 +381,37 @@ class Lmdb(KeyValueStore):
   # See https://lmdb.readthedocs.org/en/release/#writemap-mode
   USE_SPARSE_FILES = sys.platform != 'darwin'
 
-  def __init__(self, path=None):
-    """Initialize the database.
-
-    :param path: database directory location, if `None` a temporary location will be provided
-      and cleaned up upon process exit.
+  @classmethod
+  def create(self, path=None, child_databases=None):
     """
-    self._path = path or safe_mkdtemp()
-    self._env = lmdb.open(self._path, map_size=self.MAX_DATABASE_SIZE,
-                          metasync=False, sync=False, map_async=True,
-                          writemap=self.USE_SPARSE_FILES)
+    :param path: Database directory location, if `None` a temporary location will be provided
+      and cleaned up upon process exit.
+    :param child_databases: Optional child database names.
+    :return: List of Lmdb databases, main database under the path is always created,
+     plus the child databases requested.
+    """
+    path = path if path is not None else safe_mkdtemp()
+    child_databases = child_databases or []
+    env = lmdb.open(path, map_size=self.MAX_DATABASE_SIZE,
+                    metasync=False, sync=False, map_async=True,
+                    writemap=self.USE_SPARSE_FILES,
+                    max_dbs=1+len(child_databases))
+    instances = [Lmdb(env)]
+    for child_db in child_databases:
+      instances.append(Lmdb(env, env.open_db(child_db)))
+    return tuple(instances)
+
+  def __init__(self, env, db=None):
+    """Not for direct use, use factory method `create`.
+
+    db if None represents the main database.
+    """
+    self._env = env
+    self._db = db
 
   @property
   def path(self):
-    return self._path
+    return self._env.path()
 
   def get(self, key):
     """Return the value or `None` if the key does not exist.
@@ -294,7 +420,7 @@ class Lmdb(KeyValueStore):
     is then wrapped with `StringIO` as the more friendly string buffer to allow `pickle.load`
     to read, again no copy involved.
     """
-    with self._env.begin(buffers=True) as txn:
+    with self._env.begin(db=self._db, buffers=True) as txn:
       value = txn.get(key)
       if value is not None:
         return StringIO.StringIO(value)
@@ -302,7 +428,7 @@ class Lmdb(KeyValueStore):
 
   def put(self, key, value):
     """Returning True if the key/value are actually written to the storage."""
-    with self._env.begin(buffers=True, write=True) as txn:
+    with self._env.begin(db=self._db, buffers=True, write=True) as txn:
       return txn.put(key, value, overwrite=False)
 
   def close(self):

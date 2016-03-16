@@ -16,7 +16,7 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants.base.exceptions import TaskError
 from pants.engine.exp.objects import SerializationError
 from pants.engine.exp.processing import StatefulPool
-from pants.engine.exp.storage import Storage
+from pants.engine.exp.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -60,15 +60,19 @@ class Engine(AbstractClass):
       """
       return cls(error=error, root_products=None)
 
-  def __init__(self, scheduler, storage):
+  def __init__(self, scheduler, storage=None, cache=None):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
     :param storage: The storage instance for serializables keyed by their hashes.
     :type storage: :class:`pants.engine.exp.storage.Storage`
+    :param cache: The cache instance for storing execution results, by default it uses the same
+      Storage instance if not specified.
+    :type cache: :class:`pants.engine.exp.storage.Cache`
     """
     self._scheduler = scheduler
-    self._storage = storage
+    self._storage = storage or Storage.create()
+    self._cache = cache or Cache.create(storage)
 
   @property
   def storage(self):
@@ -97,6 +101,7 @@ class Engine(AbstractClass):
   def close(self):
     """Shutdown this engine instance, releasing resources it was using."""
     self._storage.close()
+    self._cache.close()
 
   @abstractmethod
   def reduce(self, execution_request):
@@ -116,7 +121,11 @@ class LocalSerialEngine(Engine):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
-        promise.success(step(node_builder, self.storage))
+        result = self._cache.get(step)
+        if result is None:
+          result = step(node_builder, self.storage)
+          self._cache.put(step, result)
+        promise.success(result)
 
 
 def _try_pickle(obj):
@@ -129,11 +138,12 @@ def _try_pickle(obj):
     raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
-def _execute_step(debug, process_state, step):
+def _execute_step(cache, debug, process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
 
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
-  result or exception.
+  result or exception. Since step execution is only on cache misses, this also saves result
+  to the cache.
   """
   node_builder, storage = process_state
 
@@ -151,6 +161,10 @@ def _execute_step(debug, process_state, step):
       _try_pickle(result)
     except SerializationError as e:
       return (step_id, e)
+
+  # Save result to cache for this step.
+  cache.put(step, result)
+
   return (step_id, result)
 
 
@@ -166,20 +180,23 @@ def _process_initializer(node_builder, storage):
 class LocalMultiprocessEngine(Engine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, scheduler, storage, pool_size=None, debug=True):
+  def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
     :param storage: The storage instance for serializables keyed by their hashes.
     :type storage: :class:`pants.engine.exp.storage.Storage`
+    :param cache: The cache instance for storing execution results, by default it uses the same
+      Storage instance if not specified.
+    :type cache: :class:`pants.engine.exp.storage.Cache`
     :param int pool_size: The number of worker processes to use; by default 2 processes per core will
                           be used.
     :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
     """
-    super(LocalMultiprocessEngine, self).__init__(scheduler, storage)
+    super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 
-    execute_step = functools.partial(_execute_step, debug)
+    execute_step = functools.partial(_execute_step, cache, debug)
     node_builder = scheduler.node_builder()
     process_initializer = functools.partial(_process_initializer, node_builder, storage)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
@@ -202,13 +219,22 @@ class LocalMultiprocessEngine(Engine):
     def submit_until(n):
       """Submit pending while there's capacity, and more than `n` items pending_submission."""
       to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
+      submitted = 0
       for _ in range(to_submit):
         step, promise = pending_submission.pop(last=False)
+
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
-        in_flight[step.step_id] = promise
-        self._submit(step)
-      return to_submit
+
+        result = self._cache.get(step)
+        if result is not None:
+          # Skip in_flight on cache hit.
+          promise.success(result)
+        else:
+          in_flight[step.step_id] = promise
+          self._submit(step)
+          submitted += 1
+      return submitted
 
     def await_one():
       """Await one completed step, and remove it from in_flight."""
@@ -218,7 +244,7 @@ class LocalMultiprocessEngine(Engine):
       if isinstance(result, Exception):
         raise result
       if step_id not in in_flight:
-        raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight.keys()))
+        raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
       in_flight.pop(step_id).success(result)
 
     # The main reduction loop:
@@ -241,7 +267,7 @@ class LocalMultiprocessEngine(Engine):
 
     # Consume all steps.
     while pending_submission or in_flight:
-      submit_to_capacity()
+      submit_until(self._pool_size)
       await_one()
 
   def close(self):

@@ -321,12 +321,6 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   def __hash__(self):
     return hash(self.step_id)
 
-  def __repr__(self):
-    return str(self)
-
-  def __str__(self):
-    return 'StepRequest({}, {})'.format(self.step_id, self.node)
-
 
 class StepResult(datatype('Step', ['state_key', 'dependencies'])):
   """The result of running a Step, passed back to the Scheduler via the Promise class.
@@ -448,7 +442,7 @@ class LocalScheduler(object):
 
     self._graph_validator = GraphValidator(symbol_table_cls)
     self._product_graph = ProductGraph()
-    self._step_id = -1
+    self._step_id = 0
 
   def _create_step(self, node):
     """Creates a Step and Promise with the currently available dependencies of the given Node.
