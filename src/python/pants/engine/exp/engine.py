@@ -130,7 +130,7 @@ class LocalSerialEngine(Engine):
 
 def _try_pickle(obj):
   try:
-    pickle.dumps(obj, protocol=-1)
+    pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
   except Exception as e:
     # Unfortunately, pickle can raise things other than PickleError instances.  For example it
     # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
