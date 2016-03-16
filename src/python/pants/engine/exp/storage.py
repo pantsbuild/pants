@@ -101,17 +101,6 @@ class Key(object):
   def __str__(self):
     return repr(self)
 
-  # NB: since we define `__slots__` for space saving as opposed to `__dict__`,
-  # `__getstate__` and` __setstate__` are needed for pickling and unpickling.
-  # TODO (peiyu) it's possible we don't need them under pickle binary protocols,
-  # which currently fail for other reasons.
-  def __getstate__(self):
-    return zip(self.__slots__, [self._digest, self._type, self._hash, self._string])
-
-  def __setstate__(self, state):
-    for slot, value in state:
-      setattr(self, slot, value)
-
 
 class InvalidKeyError(Exception):
   """Indicate an invalid `Key` entry"""
@@ -224,7 +213,8 @@ class Storage(Closable):
     Unlike content storage, key mappings allows overwriting existing entries,
     meaning a key can be re-mapped to a different key.
     """
-    self._key_mappings.put(key=from_key.digest, value=pickle.dumps(to_key))
+    self._key_mappings.put(key=from_key.digest,
+                           value=pickle.dumps(to_key, protocol=self._protocol))
 
   def get_mapping(self, from_key):
     """Retrieve the mapping Key from a given Key.
