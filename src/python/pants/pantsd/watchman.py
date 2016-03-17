@@ -25,6 +25,12 @@ class Watchman(ProcessManager):
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
   def __init__(self, watchman_path, work_dir, log_level='1'):
+    """
+    :param str watchman_path: The path to the watchman binary.
+    :param str work_dir: The path to the pants work dir.
+    :param str log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging,
+                          '1' for standard logging and '2' for verbose logging.
+    """
     super(Watchman, self).__init__(name='watchman', process_name='watchman', socket_type=str)
     self._watchman_path = self._normalize_watchman_path(watchman_path)
     self._work_dir = os.path.join(work_dir, self.name)

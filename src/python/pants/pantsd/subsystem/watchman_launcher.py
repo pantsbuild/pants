@@ -45,8 +45,7 @@ class WatchmanLauncher(object):
     """
     :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
     :param workdir: The current pants workdir.
-    :param log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging, '1'
-                      for standard logging and '2' for verbose logging.
+    :param log_level: The current log level of pants.
     :param watchman_version: The watchman binary version to retrieve using BinaryUtil.
     :param watchman_supportdir: The supportdir for BinaryUtil.
     """
@@ -58,6 +57,11 @@ class WatchmanLauncher(object):
     self._logger = logging.getLogger(__name__)
     self._watchman = None
 
+  @staticmethod
+  def _convert_log_level(level):
+    """Convert a given pants log level string into a watchman log level string."""
+    return {'warn': '0', 'info': '1', 'debug': '2'}.get(level, '1')
+
   @testable_memoized_property
   def watchman(self):
     watchman_binary = self._binary_util.select_binary(self._watchman_supportdir,
@@ -66,10 +70,6 @@ class WatchmanLauncher(object):
     return Watchman(watchman_binary,
                     self._workdir,
                     self._convert_log_level(self._log_level))
-
-  def _convert_log_level(self, level):
-    """Convert a given pants log level string into a watchman log level string."""
-    return '2' if level == 'debug' else '1'
 
   def maybe_launch(self):
     if not self.watchman.is_alive():
