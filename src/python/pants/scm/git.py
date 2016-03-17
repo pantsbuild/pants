@@ -28,16 +28,11 @@ EMPTY_STRING = ensure_binary("")
 
 
 class Git(Scm):
-  """An Scm implementation backed by git.
-
-  :API: public
-  """
+  """An Scm implementation backed by git."""
 
   @classmethod
   def detect_worktree(cls, binary='git', subdir=None):
     """Detect the git working tree above cwd and return it; else, return None.
-
-    :API: public
 
     :param string binary: The path to the git binary to use, 'git' by default.
     :param string subdir: The path to start searching for a git repo.

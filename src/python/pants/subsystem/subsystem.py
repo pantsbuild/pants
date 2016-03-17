@@ -119,6 +119,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
   def global_instance(cls):
     """Returns the global instance of this subsystem.
 
+    :API: public
+
     :returns: The global subsystem instance.
     :rtype: :class:`pants.subsystem.subsystem.Subsystem`
     """
@@ -127,6 +129,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
   @classmethod
   def scoped_instance(cls, optionable):
     """Returns an instance of this subsystem for exclusive use by the given `optionable`.
+
+    :API: public
 
     :param optionable: An optionable type or instance to scope this subsystem under.
     :type: :class:`pants.option.optionable.Optionable`
@@ -164,6 +168,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     Task code should call scoped_instance() or global_instance() to get a subsystem instance.
     Tests can call this constructor directly though.
+
+    :API: public
     """
     super(Subsystem, self).__init__()
     self._scope = scope

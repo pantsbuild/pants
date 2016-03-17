@@ -13,9 +13,8 @@ from xml.dom import minidom
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.project_info.tasks.ide_gen import IdeGen, Project
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.generator import Generator, TemplateData
-from pants.scm.git import Git
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -219,10 +218,11 @@ class IdeaGen(IdeGen):
     if not os.path.exists(outdir):
       os.makedirs(outdir)
 
+    scm = get_scm()
     configured_project = TemplateData(
       root_dir=get_buildroot(),
       outdir=outdir,
-      git_root=Git.detect_worktree(),
+      git_root=scm.detect_worktree(),
       modules=[configured_module],
       java=TemplateData(
         encoding=self.java_encoding,

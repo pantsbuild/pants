@@ -11,7 +11,10 @@ from pants.util.meta import AbstractClass
 
 
 class Scm(AbstractClass):
-  """Abstracts high-level scm operations needed by pants core and pants tasks."""
+  """Abstracts high-level scm operations needed by pants core and pants tasks.
+
+  :API: public
+  """
 
   class ScmException(Exception):
     """Indicates a problem interacting with the scm."""
@@ -71,6 +74,18 @@ class Scm(AbstractClass):
     present workspace commit for the changes affecting the given files.
 
     If no files are given then the full change log should be produced.
+    """
+
+  @abstractmethod
+  def detect_worktree(cls, binary='git', subdir=None):
+    """Detect the git working tree above cwd and return it; else, return None.
+
+    :API: public
+
+    :param string binary: The path to the git binary to use, 'git' by default.
+    :param string subdir: The path to start searching for a git repo.
+    :returns: path to the directory where the git working tree is rooted.
+    :rtype: string
     """
 
   @abstractmethod
