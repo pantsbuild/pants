@@ -14,7 +14,6 @@ from abc import abstractmethod
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
-from pants.engine.exp.nodes import Node
 from pants.engine.exp.objects import SerializationError
 from pants.engine.exp.processing import StatefulPool
 from pants.engine.exp.storage import Cache, Storage
@@ -105,7 +104,7 @@ class Engine(AbstractClass):
     self._cache.close()
 
   def _should_cache(self, step_request):
-    return Node.is_cacheable(step_request.node)
+    return step_request.node.is_cacheable
 
   def _maybe_cache_get(self, step_request):
     return self._cache.get(step_request) if self._should_cache(step_request) else None

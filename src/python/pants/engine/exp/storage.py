@@ -56,7 +56,7 @@ class Key(object):
     hash_ = cls._32_BIT_STRUCT.unpack(digest)[0]
     return cls(digest, hash_, type_, string)
 
-  def __init__(self, digest, hash_, type_=None, string=None):
+  def __init__(self, digest, hash_, type_, string):
     """Not for direct use: construct a Key via `create` instead."""
     self._digest = digest
     self._hash = hash_
@@ -278,7 +278,8 @@ class Cache(Closable):
       # Construct request key from digest directly because we do not have the
       # request blob.  Type check is intentionally skipped because we do not
       # want to introduce a dependency from `storage` to `scheduler`
-      request_key = Key(digest=digest, hash_=Key._32_BIT_STRUCT.unpack(digest)[0], type_=None)
+      request_key = Key(digest=digest, hash_=Key._32_BIT_STRUCT.unpack(digest)[0],
+                        type_=None, string=None)
       request = self._storage.get(request_key)
       yield request, self.get(request)
 
