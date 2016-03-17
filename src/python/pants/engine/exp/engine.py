@@ -104,6 +104,9 @@ class Engine(AbstractClass):
     self._storage.close()
     self._cache.close()
 
+  def _should_cache(self, step_request):
+    return Node.is_cacheable(step_request.node)
+
   @abstractmethod
   def reduce(self, execution_request):
     """Reduce the given execution graph returning its root products.
@@ -122,10 +125,10 @@ class LocalSerialEngine(Engine):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
-        result = self._cache.get(step) if Node.is_cacheable(step.node) else None
+        result = self._cache.get(step) if self._should_cache(step) else None
         if result is None:
           result = step(node_builder, self.storage)
-          if Node.is_cacheable(step.node):
+          if self._should_cache(step):
             self._cache.put(step, result)
         promise.success(result)
 
@@ -140,7 +143,7 @@ def _try_pickle(obj):
     raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
-def _execute_step(cache, debug, process_state, step):
+def _execute_step(cache, should_cache, debug, process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
 
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
@@ -165,7 +168,7 @@ def _execute_step(cache, debug, process_state, step):
       return (step_id, e)
 
   # Save result to cache for this step.
-  if Node.is_cacheable(step.node):
+  if should_cache(step):
     cache.put(step, result)
 
   return (step_id, result)
@@ -199,7 +202,7 @@ class LocalMultiprocessEngine(Engine):
     super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 
-    execute_step = functools.partial(_execute_step, cache, debug)
+    execute_step = functools.partial(_execute_step, cache, self._should_cache, debug)
     node_builder = scheduler.node_builder()
     process_initializer = functools.partial(_process_initializer, node_builder, storage)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
@@ -229,7 +232,7 @@ class LocalMultiprocessEngine(Engine):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
-        result = self._cache.get(step) if Node.is_cacheable(step) else None
+        result = self._cache.get(step) if self._should_cache(step) else None
         if result is not None:
           # Skip in_flight on cache hit.
           promise.success(result)

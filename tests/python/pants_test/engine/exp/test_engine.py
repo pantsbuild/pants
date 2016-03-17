@@ -82,3 +82,6 @@ class EngineTest(unittest.TestCase):
     self.assertEquals(total, cache_stats.total - total)
     self.assertEquals(misses, cache_stats.misses)
     self.assertTrue(cache_stats.hits > 0)
+
+    for request, result in engine._cache.items():
+      self.assertTrue(engine._should_cache(request))
