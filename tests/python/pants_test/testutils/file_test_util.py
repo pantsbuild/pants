@@ -11,13 +11,12 @@ from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 
 
-def contains_exact_files(directory, expected_files, ignore_links=False):
-  """Check if the only files which directory contains are expected_files.
+def exact_files(directory, ignore_links=False):
+  """Returns the relative files contained in the directory.
 
   :API: public
 
   :param str directory: Path to directory to search.
-  :param set expected_files: Set of filepaths relative to directory to search for.
   :param bool ignore_links: Indicates to ignore any file links.
   """
   found = []
@@ -28,7 +27,20 @@ def contains_exact_files(directory, expected_files, ignore_links=False):
         continue
       found.append(os.path.relpath(p, directory))
 
-  return sorted(expected_files) == sorted(found)
+  return found
+
+
+def contains_exact_files(directory, expected_files, ignore_links=False):
+  """Check if the only files which directory contains are expected_files.
+
+  :API: public
+
+  :param str directory: Path to directory to search.
+  :param set expected_files: Set of filepaths relative to directory to search for.
+  :param bool ignore_links: Indicates to ignore any file links.
+  """
+
+  return sorted(expected_files) == sorted(exact_files(directory, ignore_links=ignore_links))
 
 
 def check_file_content(path, expected_content):

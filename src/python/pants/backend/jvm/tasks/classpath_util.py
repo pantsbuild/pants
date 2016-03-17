@@ -275,12 +275,13 @@ class ClasspathUtil(object):
           # increasing `index` to avoid name collisions.
           _, ext = os.path.splitext(entry.path)
           symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
-          if not os.path.exists(entry.path):
-            raise MissingClasspathEntryError('Could not find {src} when attempting to link '
-                                             'it into the {dst}'
-                                             .format(src=entry.path, dst=symlink_path))
+          real_entry_path = os.path.realpath(entry.path)
+          if not os.path.exists(real_entry_path):
+            raise MissingClasspathEntryError('Could not find {realpath} when attempting to link '
+                                             '{src} into {dst}'
+                                             .format(realpath=real_entry_path, src=entry.path, dst=symlink_path))
 
-          os.symlink(entry.path, symlink_path)
+          os.symlink(real_entry_path, symlink_path)
           canonical_classpath.append(symlink_path)
 
         if save_classpath_file:
