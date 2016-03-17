@@ -85,14 +85,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     targets = self.context.targets()
     compile_classpath = self.context.products.get_data('compile_classpath',
         init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
-    resolve_hash_names = self.resolve(executor=executor,
+    results = self.resolve(executor=executor,
                                       targets=targets,
                                       classpath_products=compile_classpath,
                                       confs=self.get_options().confs,
                                       extra_args=self._args)
     if self._report:
-      for resolve_hash_name in resolve_hash_names:
-        self._generate_ivy_report(resolve_hash_name)
+      for result in results:
+        self._generate_ivy_report(result)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible
@@ -100,7 +100,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
     return [global_vts]
 
-  def _generate_ivy_report(self, resolve_hash_name):
+  def _generate_ivy_report(self, result):
     def make_empty_report(report, organisation, module, conf):
       no_deps_xml_template = dedent("""<?xml version="1.0" encoding="UTF-8"?>
         <?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
@@ -126,7 +126,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
     report = None
     org = IvyUtils.INTERNAL_ORG_NAME
-    name = resolve_hash_name
+    name = result.resolve_hash_name
     xsl = os.path.join(self.ivy_cache_dir, 'ivy-report.xsl')
 
     # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
@@ -134,7 +134,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     safe_mkdir(self._outdir, clean=False)
 
     for conf in self.get_options().confs:
-      xml_path = self._get_report_path(conf, resolve_hash_name)
+      xml_path = result.report_for_conf(conf)
       if not os.path.exists(xml_path):
         # Make it clear that this is not the original report from Ivy by changing its name.
         xml_path = xml_path[:-4] + "-empty.xml"
@@ -164,9 +164,3 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
     if self._open and report:
       binary_util.ui_open(report)
-
-  def _get_report_path(self, conf, resolve_hash_name):
-    try:
-      return IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
-    except IvyUtils.IvyResolveReportError as e:
-      raise self.Error('Failed to generate ivy report: {}'.format(e))

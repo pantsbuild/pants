@@ -98,7 +98,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       # But adding back the deploy_excluded symbols should result in a clean run.
       classpath = [jar_filename,
                    os.path.join(pants_run.workdir,
-                                'ivy/jars/com.google.guava/guava/bundles/guava-18.0.jar')]
+                                'ivy/jars/com.google.guava/guava/jars/guava-18.0.jar')]
 
       self.run_java(java_args=['-cp', os.pathsep.join(classpath),
                                'org.pantsbuild.testproject.deployexcludes.DeployExcludesMain'],

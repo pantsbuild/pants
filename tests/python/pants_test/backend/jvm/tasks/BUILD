@@ -207,13 +207,11 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:ivy_resolve',
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/invalidation',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:base_test',
   ]
 )
 

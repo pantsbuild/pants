@@ -5,22 +5,26 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 import xml.etree.ElementTree as ET
+from collections import namedtuple
 from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.ivy_utils import (IvyInfo, IvyModule, IvyModuleRef, IvyResolveMappingError,
-                                         IvyUtils)
+from pants.backend.jvm.ivy_utils import (FrozenResolution, IvyFetchStep, IvyInfo, IvyModule,
+                                         IvyModuleRef, IvyResolveMappingError, IvyResolveResult,
+                                         IvyResolveStep, IvyUtils)
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.util.contextutil import temporary_dir, temporary_file_path
+from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
@@ -28,6 +32,14 @@ from pants_test.subsystem.subsystem_util import subsystem_instance
 def coord(org, name, classifier=None, rev=None, ext=None):
   rev = rev or '0.0.1'
   return M2Coordinate(org=org, name=name, rev=rev, classifier=classifier, ext=ext)
+
+
+def return_resolve_result_missing_artifacts(*args, **kwargs):
+  return namedtuple('mock_resolve', ['all_linked_artifacts_exist'])(lambda: False)
+
+
+def do_nothing(*args, **kwards):
+  pass
 
 
 class IvyUtilsTestBase(BaseTest):
@@ -470,3 +482,159 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     assert_order([module6, module4, module3, module1 ,module2, module5])
     assert_order([module4, module2, module1, module3, module6, module5])
     assert_order([module4, module2, module5, module6, module1, module3])
+
+  def test_collects_classifiers(self):
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_multiple_classifiers.xml')
+
+    ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
+
+    def collector(r):
+      x = ivy_info.modules_by_ref.get(r)
+      if x:
+        return {x}
+      else:
+        return set()
+
+    result = ivy_info.traverse_dependency_graph(ref, collector, dict())
+
+    self.assertEqual(
+      {IvyModule(ref=IvyModuleRef(org='org1',
+                                  name='name1',
+                                  rev='0.0.1',
+                                  classifier=None,
+                                  ext=u'jar'),
+                 artifact='ivy2cache_path/org1/name1.jar',
+                 callers=(IvyModuleRef(org='toplevel',
+                                       name='toplevelmodule',
+                                       rev='latest',
+                                       classifier=None,
+                                       ext=u'jar'),)),
+       IvyModule(ref=IvyModuleRef(org='org1',
+                                  name='name1',
+                                  rev='0.0.1',
+                                  classifier='wut',
+                                  ext=u'jar'),
+                 artifact='ivy2cache_path/org1/name1-wut.jar',
+                 callers=(IvyModuleRef(org='toplevel',
+                                       name='toplevelmodule',
+                                       rev='latest',
+                                       classifier=None,
+                                       ext=u'jar'),))},
+      result)
+
+  def test_fetch_ivy_xml_requests_url_for_dependency_containing_url(self):
+    with temporary_dir() as temp_dir:
+      ivyxml = os.path.join(temp_dir, 'ivy.xml')
+      IvyUtils.generate_fetch_ivy([JarDependency('org-f', 'name-f', 'rev-f', url='an-url')],
+                                  ivyxml,
+                                  ('default',),
+                                  'some-name')
+
+      with open(ivyxml) as f:
+        self.assertIn('an-url', f.read())
+
+  def test_fetch_requests_classifiers(self):
+    with temporary_dir() as temp_dir:
+      ivyxml = os.path.join(temp_dir, 'ivy.xml')
+      IvyUtils.generate_fetch_ivy([JarDependency('org-f', 'name-f', 'rev-f', classifier='a-classifier')],
+                                  ivyxml,
+                                  ('default',),
+                                  'some-name')
+
+      with open(ivyxml) as f:
+        self.assertIn('a-classifier', f.read())
+
+  def test_fetch_applies_mutable(self):
+    with temporary_dir() as temp_dir:
+      ivyxml = os.path.join(temp_dir, 'ivy.xml')
+      IvyUtils.generate_fetch_ivy([JarDependency('org-f', 'name-f', 'rev-f', mutable=True)],
+                                  ivyxml,
+                                  ('default',),
+                                  'some-name')
+
+      with open(ivyxml) as f:
+        self.assertIn('changing="true"', f.read())
+
+  def test_resolve_ivy_xml_requests_classifiers(self):
+    with temporary_dir() as temp_dir:
+      ivyxml = os.path.join(temp_dir, 'ivy.xml')
+      jar_dep = JarDependency('org-f', 'name-f', 'rev-f', classifier='a-classifier')
+      IvyUtils.generate_ivy(
+        [self.make_target('something', JarLibrary, jars=[jar_dep])],
+        [jar_dep],
+        excludes=[],
+        ivyxml=ivyxml,
+        confs=('default',),
+        resolve_hash_name='some-name',
+        jar_dep_manager=namedtuple('stub_jar_dep_manager', ['resolve_version_conflict'])(lambda x: x))
+
+      with open(ivyxml) as f:
+        self.assertIn('classifier="a-classifier', f.read())
+
+  def test_ivy_resolve_report_copying_fails_when_report_is_missing(self):
+    with temporary_dir() as dir:
+      with self.assertRaises(IvyUtils.IvyError):
+        IvyUtils._copy_ivy_reports({'default': os.path.join(dir, 'to-file')},
+                                   ['default'], dir, 'another-hash-name')
+
+
+class IvyUtilsResolveStepsTest(BaseTest):
+  def test_if_not_all_symlinked_files_exist_after_successful_resolve_fail(self):
+    resolve = IvyResolveStep(
+      ['default'],
+      'hash_name',
+      None,
+      False,
+      'cache_dir',
+      'workdir')
+
+    # Stub resolving and creating the result, returning one missing artifacts.
+    resolve._do_resolve = do_nothing
+    resolve.load = return_resolve_result_missing_artifacts
+
+    with self.assertRaises(IvyResolveMappingError):
+      resolve.exec_and_load(None, None, [], None, None, None)
+
+  def test_if_not_all_symlinked_files_exist_after_successful_fetch_fail(self):
+    fetch = IvyFetchStep(['default'],
+                         'hash_name',
+                         False,
+                         None,
+                         'ivy_cache_dir', 'global_ivy_workdir')
+
+    # Stub resolving and creating the result, returning one missing artifacts.
+    fetch._do_fetch = do_nothing
+    fetch._load_from_fetch = return_resolve_result_missing_artifacts
+
+    with self.assertRaises(IvyResolveMappingError):
+      fetch.exec_and_load(None, None, [], None, None, None)
+
+  def test_missing_symlinked_jar_in_candidates(self):
+    empty_symlink_map = {}
+    result = IvyResolveResult(['non-existent-file-location'], empty_symlink_map, 'hash-name',
+                              {'default':
+                                 self.ivy_report_path('ivy_utils_resources/report_with_diamond.xml')
+                               })
+    with self.assertRaises(IvyResolveMappingError):
+      list(result.resolved_jars_for_each_target('default',
+                                                [self.make_target('t', JarLibrary,
+                                                                  jars=[JarDependency('org1',
+                                                                                      'name1')])
+                                                 ]))
+
+  def ivy_report_path(self, rel_path):
+    return os.path.join('tests/python/pants_test/backend/jvm/tasks', rel_path)
+
+
+class IvyFrozenResolutionTest(BaseTest):
+
+  def test_spec_without_a_real_target(self):
+    with temporary_file() as resolve_file:
+
+      json.dump(
+        {"default":{"coord_to_attrs":{}, "target_to_coords":{"non-existent-target":[]}}},
+        resolve_file)
+      resolve_file.close()
+
+      with self.assertRaises(FrozenResolution.MissingTarget):
+        FrozenResolution.load_from_file(resolve_file.name, [])
