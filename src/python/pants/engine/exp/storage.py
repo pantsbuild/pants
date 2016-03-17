@@ -273,9 +273,13 @@ class Cache(Closable):
     return self._cache_stats
 
   def items(self):
-    for digest, to_key in self._storage._key_mappings.items():
-      from_key = Key(digest, Key._32_BIT_STRUCT.unpack(digest)[0])
-      request = self._storage.get(from_key)
+    """Iterate over all cached request, result for testing purpose."""
+    for digest, _ in self._storage._key_mappings.items():
+      # Construct request key from digest directly because we do not have the
+      # request blob.  Type check is intentionally skipped because we do not
+      # want to introduce a dependency from `storage` to `scheduler`
+      request_key = Key(digest=digest, hash_=Key._32_BIT_STRUCT.unpack(digest)[0], type_=None)
+      request = self._storage.get(request_key)
       yield request, self.get(request)
 
   def close(self):
@@ -337,7 +341,7 @@ class KeyValueStore(Closable, AbstractClass):
   def items(self):
     """Generator to iterate over items.
 
-    For test purpose.
+    For testing purpose.
     """
 
 

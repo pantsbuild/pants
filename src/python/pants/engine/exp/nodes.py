@@ -75,6 +75,7 @@ class Node(object):
 
   @classmethod
   def is_cacheable(cls, node):
+    """Native node should not be cached."""
     return not isinstance(node, FilesystemNode)
 
   @abstractproperty
