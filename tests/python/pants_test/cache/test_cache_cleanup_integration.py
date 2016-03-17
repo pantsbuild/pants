@@ -128,7 +128,9 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test4_dir'))
       safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test5_dir'))
 
-      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 6)
+      # stable symlink, current version directory, and synthetically created directories.
+      self.assertTrue(os.path.exists(os.path.join(target_dir_in_pantsd, 'current')))
+      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 7)
 
       max_entries_per_target = 2
       # 2nd run with --compile-zinc-debug-symbols will invalidate previous build thus triggering the clean up.
@@ -139,8 +141,9 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
                                                  '--workdir-max-build-entries={}'.format(max_entries_per_target)
                                                  ], workdir)
       self.assert_success(pants_run_2)
-      # current and previous builds stay, and 2 newest dirs
-      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 4)
+      # stable, current, previous builds stay, and 2 newest dirs
+      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 5)
+      self.assertTrue(os.path.exists(os.path.join(target_dir_in_pantsd, 'current')))
       self.assertTrue(os.path.exists(os.path.join(target_dir_in_pantsd, 'old_cache_test4_dir')))
       self.assertTrue(os.path.exists(os.path.join(target_dir_in_pantsd, 'old_cache_test5_dir')))
 

@@ -58,7 +58,7 @@ class TaskTest(TaskTestBase):
     return DummyTask
 
   def assertContent(self, vt, content):
-    with open(os.path.join(vt.results_dir, self._filename), 'r') as f:
+    with open(os.path.join(vt.current_results_dir, self._filename), 'r') as f:
       self.assertEquals(f.read(), content)
 
   def _fixture(self, incremental):
@@ -94,12 +94,16 @@ class TaskTest(TaskTestBase):
     vtC = task.execute()
     self.assertContent(vtC, one + one)
 
-    # Confirm that there were two results dirs, and that the second was cloned.
+    # Confirm that there were two unique results dirs, and that the second was cloned.
     self.assertContent(vtA, one + one)
     self.assertContent(vtB, one + two)
     self.assertContent(vtC, one + one)
-    self.assertNotEqual(vtA.results_dir, vtB.results_dir)
-    self.assertEqual(vtA.results_dir, vtC.results_dir)
+    self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
+    self.assertEqual(vtA.current_results_dir, vtC.current_results_dir)
+
+    # And that the results_dir was stable throughout.
+    self.assertEqual(vtA.results_dir, vtB.results_dir)
+    self.assertEqual(vtB.results_dir, vtC.results_dir)
 
   def test_non_incremental(self):
     """Non-incremental should be completely unassociated."""
@@ -115,7 +119,8 @@ class TaskTest(TaskTestBase):
     self._create_clean_file(target, two)
     vtB = task.execute()
 
-    # Confirm two unassociated directories.
+    # Confirm two unassociated current directories with a stable results_dir.
     self.assertContent(vtA, one)
     self.assertContent(vtB, two)
-    self.assertNotEqual(vtA.results_dir, vtB.results_dir)
+    self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
+    self.assertEqual(vtA.results_dir, vtB.results_dir)

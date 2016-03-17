@@ -9,7 +9,7 @@ import os
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
-from pants_test.testutils.file_test_util import contains_exact_files
+from pants_test.testutils.file_test_util import exact_files
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
 
@@ -27,16 +27,16 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
         goos = go_dist.create_go_cmd('env', args=['GOOS']).check_output().strip()
         goarch = go_dist.create_go_cmd('env', args=['GOARCH']).check_output().strip()
         expected_files = set([
-          'contrib.go.testprojects.src.thrift.thrifttest.fleem/039c5ecb4977/src/go/thrifttest/duck/constants.go',
-          'contrib.go.testprojects.src.thrift.thrifttest.fleem/039c5ecb4977/src/go/thrifttest/duck/ttypes.go',
+          'contrib.go.testprojects.src.thrift.thrifttest.fleem/a2a123c192ab/src/go/thrifttest/duck/constants.go',
+          'contrib.go.testprojects.src.thrift.thrifttest.fleem/a2a123c192ab/src/go/thrifttest/duck/ttypes.go',
         ])
 
-        #Fetch the hash for task impl version.
+        # Fetch the hash for task impl version.
         go_thrift_contents = os.listdir(os.path.join(workdir, 'gen', 'go-thrift'))
         self.assertEqual(len(go_thrift_contents), 1)
 
         root = os.path.join(workdir, 'gen', 'go-thrift', go_thrift_contents[0])
-        self.assertTrue(contains_exact_files(root, expected_files, ignore_links=True))
+        self.assertEquals(sorted(expected_files), sorted(exact_files(root, ignore_links=True)))
 
   def test_go_thrift_gen_and_compile(self):
     with self.temporary_workdir() as workdir:
