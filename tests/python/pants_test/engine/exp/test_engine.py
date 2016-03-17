@@ -12,7 +12,7 @@ from contextlib import closing, contextmanager
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
 from pants.engine.exp.examples.planners import Classpath, setup_json_scheduler
-from pants.engine.exp.nodes import Return, SelectNode
+from pants.engine.exp.nodes import Node, Return, SelectNode
 from pants.engine.exp.storage import Cache, Storage
 
 
@@ -69,16 +69,16 @@ class EngineTest(unittest.TestCase):
     self.assert_engine(engine)
 
     cache_stats = engine._cache.get_stats()
-    max_steps, hits, misses = self.scheduler._step_id, cache_stats.hits, cache_stats.misses
 
-    # First run most are cache misses.
-    self.assertEquals(max_steps, cache_stats.total)
+    # Save counts for the first run.
+    max_steps, misses, total = self.scheduler._step_id, cache_stats.misses, cache_stats.total
 
     self.scheduler.product_graph.clear()
     self.scheduler._step_id = 0
     self.assert_engine(engine)
 
-    # Second run executes same number of steps, and are all cache hits.
+    # Second run executes same number of steps, and are all cache hits, no more misses.
     self.assertEquals(max_steps, self.scheduler._step_id)
+    self.assertEquals(total, cache_stats.total - total)
     self.assertEquals(misses, cache_stats.misses)
-    self.assertEquals(hits + max_steps, cache_stats.hits)
+    self.assertTrue(cache_stats.hits > 0)

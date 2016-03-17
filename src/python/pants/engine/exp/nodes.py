@@ -73,6 +73,10 @@ class Node(object):
     if type(node.subject_key) is not Key:
       raise ValueError('Node {} has a non-Key subject.'.format(node))
 
+  @classmethod
+  def is_cacheable(cls, node):
+    return not isinstance(node, FilesystemNode)
+
   @abstractproperty
   def subject_key(self):
     """The subject for this Node."""

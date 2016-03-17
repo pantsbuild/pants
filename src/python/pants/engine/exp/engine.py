@@ -14,6 +14,7 @@ from abc import abstractmethod
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
+from pants.engine.exp.nodes import Node
 from pants.engine.exp.objects import SerializationError
 from pants.engine.exp.processing import StatefulPool
 from pants.engine.exp.storage import Cache, Storage
@@ -121,10 +122,11 @@ class LocalSerialEngine(Engine):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
-        result = self._cache.get(step)
+        result = self._cache.get(step) if Node.is_cacheable(step.node) else None
         if result is None:
           result = step(node_builder, self.storage)
-          self._cache.put(step, result)
+          if Node.is_cacheable(step.node):
+            self._cache.put(step, result)
         promise.success(result)
 
 
@@ -163,7 +165,8 @@ def _execute_step(cache, debug, process_state, step):
       return (step_id, e)
 
   # Save result to cache for this step.
-  cache.put(step, result)
+  if Node.is_cacheable(step.node):
+    cache.put(step, result)
 
   return (step_id, result)
 
@@ -226,7 +229,7 @@ class LocalMultiprocessEngine(Engine):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
-        result = self._cache.get(step)
+        result = self._cache.get(step) if Node.is_cacheable(step) else None
         if result is not None:
           # Skip in_flight on cache hit.
           promise.success(result)
