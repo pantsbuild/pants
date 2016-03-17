@@ -9,7 +9,7 @@ import json
 import os
 import shutil
 
-from pants.option.custom_types import target_list_option
+from pants.option.custom_types import list_option, target_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
 
@@ -25,7 +25,8 @@ class ScalaJSPlatform(Subsystem, NodeResolverBase):
   def register_options(cls, register):
     super(ScalaJSPlatform, cls).register_options(register)
     # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
-    register('--runtime', advanced=True, type=target_list_option, default=['//:scala-js-library'],
+    register('--runtime', advanced=True, type=list_option, member_type=target_option,
+             default=['//:scala-js-library'],
              help='Target specs pointing to the scala-js runtime libraries.')
 
   @classmethod

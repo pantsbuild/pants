@@ -17,13 +17,14 @@ import six
 from pants.base.deprecated import check_deprecated_semver, deprecated_conditional
 from pants.base.revision import Revision
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.custom_types import ListValueComponent, file_option, list_option
+from pants.option.custom_types import (ListValueComponent, dict_option, file_option, list_option,
+                                       target_list_option, target_option)
 from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
                                  BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidAction, InvalidKwarg,
-                                 MemberTypeNotAllowed, NonScalarMemberType, NoOptionNames,
-                                 OptionNameDash, OptionNameDoubleDash, ParseError,
-                                 RecursiveSubsystemOption, Shadowing)
+                                 ImplicitValIsNone, InvalidAction, InvalidKwarg, InvalidMemberType,
+                                 MemberTypeNotAllowed, NoOptionNames, OptionNameDash,
+                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
+                                 Shadowing)
 from pants.option.option_util import is_boolean_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
@@ -290,6 +291,18 @@ class Parser(object):
       kwargs['type'] = list_option
       del kwargs['action']
 
+    # Temporary munging to effectively turn type='target_list_option' options into list options,
+    # with member type 'target_option', for uniform handling.
+    # TODO: Remove after target_list_option deprecation.
+    if kwargs.get('type') == target_list_option:
+      kwargs['type'] = list_option
+      kwargs['member_type'] = target_option
+      deprecated_conditional(lambda: True, '0.0.80',
+                             'target_list_option is deprecated for option {} in scope {}. '
+                             'Use type=list_option, member_type=target_option.'.format(
+                               args[0], self.scope
+                             ))
+
     # Record the args. We'll do the underlying parsing on-demand.
     self._option_registrations.append((args, kwargs))
     if self._parent_parser:
@@ -329,8 +342,8 @@ class Parser(object):
     'store', 'store_true', 'store_false'
   }
 
-  _scalar_types = {
-    str, int, float
+  _allowed_member_types = {
+    str, int, float, dict_option, file_option, target_option
   }
 
   def _validate(self, args, kwargs):
@@ -363,10 +376,10 @@ class Parser(object):
         error(ImplicitValIsNone)
 
     if 'member_type' in kwargs and kwargs.get('type', str) != list_option:
-      error(MemberTypeNotAllowed)
+      error(MemberTypeNotAllowed, type_=kwargs.get('type', str))
 
-    if kwargs.get('member_type', str) not in self._scalar_types:
-      error(NonScalarMemberType)
+    if kwargs.get('member_type', str) not in self._allowed_member_types:
+      error(InvalidMemberType, member_type=kwargs.get('member_type', str))
 
     for kwarg in kwargs:
       if kwarg not in self._allowed_registration_kwargs:
