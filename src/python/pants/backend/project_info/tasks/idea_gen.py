@@ -222,7 +222,7 @@ class IdeaGen(IdeGen):
     configured_project = TemplateData(
       root_dir=get_buildroot(),
       outdir=outdir,
-      git_root=scm.detect_worktree(),
+      git_root=scm.worktree,
       modules=[configured_module],
       java=TemplateData(
         encoding=self.java_encoding,

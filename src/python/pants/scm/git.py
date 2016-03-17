@@ -109,6 +109,10 @@ class Git(Scm):
     return 'HEAD'
 
   @property
+  def worktree(self):
+    return self._worktree
+
+  @property
   def commit_id(self):
     return self._check_output(['rev-parse', 'HEAD'], raise_type=Scm.LocalException)
 

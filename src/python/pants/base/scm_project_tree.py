@@ -21,7 +21,7 @@ class ScmProjectTree(ProjectTree):
     self._scm = scm
     self._rev = rev
     self._reader = scm.repo_reader(rev)
-    self._scm_worktree = os.path.realpath(scm.detect_worktree())
+    self._scm_worktree = os.path.realpath(scm.worktree)
 
   def _scm_relpath(self, build_root_relpath):
     return os.path.relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree)

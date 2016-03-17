@@ -49,6 +49,10 @@ class Scm(AbstractClass):
   def commit_date(self, commit_reference):
     """Returns the commit date of the referenced commit."""
 
+  @abstractproperty
+  def worktree(self):
+    """Returns the worktree for the SCM"""
+
   @abstractmethod
   def changed_files(self, from_commit=None, include_untracked=False, relative_to=None):
     """Returns a list of files with uncommitted changes or else files changed since from_commit.
@@ -74,18 +78,6 @@ class Scm(AbstractClass):
     present workspace commit for the changes affecting the given files.
 
     If no files are given then the full change log should be produced.
-    """
-
-  @abstractmethod
-  def detect_worktree(cls, binary='git', subdir=None):
-    """Detect the git working tree above cwd and return it; else, return None.
-
-    :API: public
-
-    :param string binary: The path to the git binary to use, 'git' by default.
-    :param string subdir: The path to start searching for a git repo.
-    :returns: path to the directory where the git working tree is rooted.
-    :rtype: string
     """
 
   @abstractmethod
