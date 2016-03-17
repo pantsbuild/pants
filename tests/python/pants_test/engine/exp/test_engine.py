@@ -69,8 +69,10 @@ class EngineTest(unittest.TestCase):
     self.assert_engine(engine)
 
     cache_stats = engine._cache.get_stats()
+    # First run all misses.
+    self.assertTrue(cache_stats.hits == 0)
 
-    # Save counts for the first run.
+    # Save counts for the first run to prepare for another run.
     max_steps, misses, total = self.scheduler._step_id, cache_stats.misses, cache_stats.total
 
     self.scheduler.product_graph.clear()
@@ -83,5 +85,6 @@ class EngineTest(unittest.TestCase):
     self.assertEquals(misses, cache_stats.misses)
     self.assertTrue(cache_stats.hits > 0)
 
+    # Ensure we cache no more than what can be cached.
     for request, result in engine._cache.items():
       self.assertTrue(engine._should_cache(request))
