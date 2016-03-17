@@ -100,6 +100,10 @@ class Node(object):
     as an explicit dependency type? Perhaps the "is-a/has-a" checks should be native outside of Node?
     """
 
+  @abstractproperty
+  def is_cacheable(self):
+    """Whether node should be cached or not."""
+
 
 class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', 'variant_key']), Node):
   """A Node that selects a product for a subject.
@@ -110,6 +114,9 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
   selector, which introduces the 'variant' value to restrict the names of values selected by a
   SelectNode.
   """
+
+  def is_cacheable(self):
+    return True
 
   def _variants_node(self):
     # TODO: This super-broad check is crazy expensive. Should reduce to just doing Variants
@@ -212,6 +219,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', '
   order of declaration in the list `field` of the `dep_product`.
   """
 
+  def is_cacheable(self):
+    return True
+
   def _dep_product_node(self):
     return SelectNode(self.subject_key, self.dep_product, self.variants, None)
 
@@ -262,6 +272,9 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
   multi-field projection for the contents of a list). Should be looking for ways to merge them.
   """
 
+  def is_cacheable(self):
+    return True
+
   def _input_node(self):
     return SelectNode(self.subject_key, self.input_product, self.variants, None)
 
@@ -308,6 +321,9 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
 
 class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func', 'clause']), Node):
 
+  def is_cacheable(self):
+    return True
+
   def step(self, subject, dependency_states, step_context):
     # Compute dependencies.
     dep_values = []
@@ -352,6 +368,10 @@ class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'vari
   @classmethod
   def is_filesystem_product(cls, product):
     return product in cls._FS_PRODUCT_TYPES
+
+  def is_cacheable(self):
+    """Native node should not be cached."""
+    return False
 
   def _input_type(self):
     return self._FS_PRODUCT_TYPES[self.product]

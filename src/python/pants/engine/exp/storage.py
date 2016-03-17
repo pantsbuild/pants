@@ -53,14 +53,19 @@ class Key(object):
     :param string: An optional human-readable representation of the blob for debugging purposes.
     """
     digest = cls._DIGEST_IMPL(blob).digest()
-    hash_ = cls._32_BIT_STRUCT.unpack(digest)[0]
-    return cls(digest, type_, hash_, string)
+    hash_ = cls.compute_hash_from_digest(digest)
+    return cls(digest, hash_, type_, string)
 
-  def __init__(self, digest, type_, hash_, string):
+  @classmethod
+  def compute_hash_from_digest(cls, digest):
+    """Extract 32 bit hash from digest."""
+    return cls._32_BIT_STRUCT.unpack(digest)[0]
+
+  def __init__(self, digest, hash_, type_, string):
     """Not for direct use: construct a Key via `create` instead."""
     self._digest = digest
-    self._type = type_
     self._hash = hash_
+    self._type = type_
     self._string = string
 
   @property
@@ -74,15 +79,6 @@ class Key(object):
   @property
   def type(self):
     return self._type
-
-  def set_string(self, string):
-    """Sets the string for a Key after construction.
-
-    Since the string representation is not involved in `eq` or `hash`, this allows the key to be
-    used for lookups before its string representation has been stored, and then only generated
-    it the object will remain in use.
-    """
-    self._string = string
 
   def __hash__(self):
     return self._hash
@@ -236,7 +232,7 @@ class Storage(Closable):
   def _assert_type_matches(self, value, key_type):
     """Ensure the type of deserialized object matches the type from key."""
     value_type = type(value)
-    if value_type is not key_type:
+    if key_type and value_type is not key_type:
       raise ValueError('Mismatch types, key: {}, value: {}'
                        .format(key_type, value_type))
     return value
@@ -280,6 +276,17 @@ class Cache(Closable):
 
   def get_stats(self):
     return self._cache_stats
+
+  def items(self):
+    """Iterate over all cached request, result for testing purpose."""
+    for digest, _ in self._storage._key_mappings.items():
+      # Construct request key from digest directly because we do not have the
+      # request blob.  Type check is intentionally skipped because we do not
+      # want to introduce a dependency from `storage` to `scheduler`
+      request_key = Key(digest=digest, hash_=Key.compute_hash_from_digest(digest),
+                        type_=None, string=None)
+      request = self._storage.get(request_key)
+      yield request, self.get(request)
 
   def close(self):
     self._storage.close()
@@ -336,6 +343,13 @@ class KeyValueStore(Closable, AbstractClass):
       repeated writes of the same key.
     """
 
+  @abstractmethod
+  def items(self):
+    """Generator to iterate over items.
+
+    For testing purpose.
+    """
+
 
 class InMemoryDb(KeyValueStore):
   """An in-memory implementation of the kvs interface."""
@@ -351,6 +365,10 @@ class InMemoryDb(KeyValueStore):
       return False
     self._storage[key] = value
     return True
+
+  def items(self):
+    for k in iter(self._storage):
+      yield k, self._storage.get(k)
 
 
 class Lmdb(KeyValueStore):
@@ -417,6 +435,12 @@ class Lmdb(KeyValueStore):
     """Returning True if the key/value are actually written to the storage."""
     with self._env.begin(db=self._db, buffers=True, write=True) as txn:
       return txn.put(key, value, overwrite=False)
+
+  def items(self):
+    with self._env.begin(db=self._db, buffers=True) as txn:
+      cursor = txn.cursor()
+      for k, v in cursor:
+        yield k, v
 
   def close(self):
     """Close the lmdb environment, calling multiple times has no effect."""
