@@ -17,7 +17,9 @@ from pants.engine.exp.objects import Serializable, SerializableFactory, Validata
 def _normalize_utf8_keys(kwargs):
   """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
   if any(type(key) is six.binary_type for key in kwargs.keys()):
-    return {six.text_type(k): v for k, v in kwargs.items()}
+    # This is to preserve the original dict type for kwargs.
+    dict_type = type(kwargs)
+    return dict_type([(six.text_type(k), v) for k, v in kwargs.items()])
   return kwargs
 
 

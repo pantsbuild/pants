@@ -6,8 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
-import hashlib
-import itertools
 import os
 from collections import defaultdict
 from multiprocessing import cpu_count
@@ -152,6 +150,11 @@ class JvmCompile(NailgunTaskBase):
     register('--capture-log', advanced=True, action='store_true', default=False,
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
+
+    register('--capture-classpath', advanced=True, action='store_true', default=True,
+             fingerprint=True,
+             help='Capture classpath to per-target newline-delimited text files. These files will '
+                  'be packaged into any jar artifacts that are created from the jvm targets.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -431,6 +434,14 @@ class JvmCompile(NailgunTaskBase):
     except ExecutionFailure as e:
       raise TaskError("Compilation failure: {}".format(e))
 
+  def _record_compile_classpath(self, classpath, targets, outdir):
+    text = '\n'.join(classpath)
+    for target in targets:
+      path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
+      safe_mkdir(os.path.dirname(path), clean=False)
+      with open(path, 'w') as f:
+        f.write(text)
+
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
                    log_file, progress_message, settings, fatal_warnings, counter):
     """Compiles sources for the given vts into the given output dir.
@@ -467,6 +478,8 @@ class JvmCompile(NailgunTaskBase):
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
+        if self.get_options().capture_classpath:
+          self._record_compile_classpath(classpath, vts.targets, outdir)
         self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
                      log_file, settings, fatal_warnings)
 

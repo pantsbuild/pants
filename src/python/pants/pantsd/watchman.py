@@ -24,18 +24,24 @@ class Watchman(ProcessManager):
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
-  def __init__(self, work_dir, log_level=1, watchman_path=None):
+  def __init__(self, watchman_path, work_dir, log_level='1'):
+    """
+    :param str watchman_path: The path to the watchman binary.
+    :param str work_dir: The path to the pants work dir.
+    :param str log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging,
+                          '1' for standard logging and '2' for verbose logging.
+    """
     super(Watchman, self).__init__(name='watchman', process_name='watchman', socket_type=str)
-    self._logger = logging.getLogger(__name__)
+    self._watchman_path = self._normalize_watchman_path(watchman_path)
+    self._work_dir = os.path.join(work_dir, self.name)
     self._log_level = log_level
-    self.watchman_path = self._resolve_watchman_path(watchman_path)
 
     # TODO(kwlzn): should these live in .pids or .pants.d? i.e. should watchman survive clean-all?
-    self._work_dir = os.path.join(work_dir, self.name)
     self._state_file = os.path.join(self._work_dir, '{}.state'.format(self.name))
     self._log_file = os.path.join(self._work_dir, '{}.log'.format(self.name))
     self._sock_file = os.path.join(self._work_dir, '{}.sock'.format(self.name))
 
+    self._logger = logging.getLogger(__name__)
     self._watchman_client = None
 
   @property
@@ -51,21 +57,9 @@ class Watchman(ProcessManager):
   def _is_valid_executable(self, binary_path):
     return os.path.isfile(binary_path) and os.access(binary_path, os.X_OK)
 
-  def _find_watchman_in_path(self):
-    for path in os.environ['PATH'].split(os.pathsep):
-      binary_path = os.path.join(path, self.process_name)
-      if self._is_valid_executable(binary_path):
-        return binary_path
-
-  def _resolve_watchman_path(self, watchman_path=None):
-    if watchman_path is not None:
-      if not self._is_valid_executable(watchman_path):
-        raise self.ExecutionError('invalid watchman binary at {}!'.format(watchman_path))
-    else:
-      watchman_path = self._find_watchman_in_path()
-      if not watchman_path:
-        raise self.ExecutionError('could not locate watchman in $PATH!')
-
+  def _normalize_watchman_path(self, watchman_path):
+    if not self._is_valid_executable(watchman_path):
+      raise self.ExecutionError('invalid watchman binary at {}!'.format(watchman_path))
     return os.path.abspath(watchman_path)
 
   def _maybe_init_metadata(self):
@@ -98,7 +92,7 @@ class Watchman(ProcessManager):
 
     This is possible due to watchman's built-in async server startup - no double-forking required.
     """
-    cmd = self._construct_cmd((self.watchman_path, 'get-pid'),
+    cmd = self._construct_cmd((self._watchman_path, 'get-pid'),
                               state_file=self._state_file,
                               sock_file=self._sock_file,
                               log_file=self._log_file,

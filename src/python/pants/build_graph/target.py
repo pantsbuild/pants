@@ -227,6 +227,15 @@ class Target(AbstractTarget):
     """
     return cls.maybe_readable_combine_ids([target.id for target in targets])
 
+  @classmethod
+  def compute_target_id(cls, address):
+    """Computes a target id from the given address."""
+    id_candidate = address.path_safe_spec
+    if len(id_candidate) >= 200:
+      # two dots + 79 char head + 79 char tail + 40 char sha1
+      return '{}.{}.{}'.format(id_candidate[:79], sha1(id_candidate).hexdigest(), id_candidate[-79:])
+    return id_candidate
+
   @staticmethod
   def combine_ids(ids):
     """Generates a combined id for a set of ids.
@@ -564,11 +573,7 @@ class Target(AbstractTarget):
 
     :API: public
     """
-    id_candidate = self.address.path_safe_spec
-    if len(id_candidate) >= 200:
-      # two dots + 79 char head + 79 char tail + 40 char sha1
-      return '{}.{}.{}'.format(id_candidate[:79], sha1(id_candidate).hexdigest(), id_candidate[-79:])
-    return id_candidate
+    return self.compute_target_id(self.address)
 
   @property
   def identifier(self):

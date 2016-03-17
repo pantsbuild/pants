@@ -12,7 +12,6 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.service.pants_service import PantsService
-from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 from pants.pantsd.watchman import Watchman
 
 
@@ -26,9 +25,16 @@ class FSEventService(PantsService):
 
   ZERO_DEPTH = ['depth', 'eq', 0]
 
-  def __init__(self, build_root, worker_count):
+  def __init__(self, watchman, build_root, worker_count):
+    """
+    :param Watchman watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
+    :param str build_root: The current build root.
+    :param int worker_count: The total number of workers to use for the internally managed
+                             ThreadPoolExecutor.
+    """
     super(FSEventService, self).__init__()
     self._logger = logging.getLogger(__name__)
+    self._watchman = watchman
     self._build_root = os.path.realpath(build_root)
     self._worker_count = worker_count
     self._executor = None
@@ -89,21 +95,19 @@ class FSEventService(PantsService):
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
-    # Launch Watchman.
-    watchman = WatchmanLauncher.global_instance().maybe_launch()
 
-    if not (watchman and watchman.is_alive()):
-      raise self.ServiceError('failed to start watchman, bailing!')
+    if not (self._watchman and self._watchman.is_alive()):
+      raise self.ServiceError('watchman is not running, bailing!')
 
     # Enable watchman for the build root.
-    watchman.watch_project(self._build_root)
+    self._watchman.watch_project(self._build_root)
 
     futures = {}
     id_counter = 0
     subscriptions = self._handlers.values()
 
     # Setup subscriptions and begin the main event firing loop.
-    for handler_name, event_data in watchman.subscribed(self._build_root, subscriptions):
+    for handler_name, event_data in self._watchman.subscribed(self._build_root, subscriptions):
       # On death, break from the loop and contextmgr to terminate callback threads.
       if self.is_killed: break
 

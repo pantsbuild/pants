@@ -16,6 +16,7 @@ from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import testable_memoized_property
 
 
 class PantsDaemonLauncher(Subsystem):
@@ -37,6 +38,10 @@ class PantsDaemonLauncher(Subsystem):
              help='The number of workers to use for the filesystem event service executor pool.'
                   ' Experimental.')
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(PantsDaemonLauncher, cls).subsystem_dependencies() + (WatchmanLauncher.Factory,)
+
   def __init__(self, *args, **kwargs):
     super(PantsDaemonLauncher, self).__init__(*args, **kwargs)
     self._logger = logging.getLogger(__name__)
@@ -55,23 +60,18 @@ class PantsDaemonLauncher(Subsystem):
     self._scheduler = None
     self._lock = OwnerPrintingPIDLockFile(os.path.join(self._build_root, '.pantsd.startup'))
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(PantsDaemonLauncher, cls).subsystem_dependencies() + (WatchmanLauncher,)
-
-  @property
+  @testable_memoized_property
   def pantsd(self):
-    if not self._pantsd:
-      self._pantsd = PantsDaemon(self._build_root,
-                                 self._pants_workdir,
-                                 self._log_level,
-                                 self._log_dir)
-    return self._pantsd
+    return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._log_dir)
+
+  @testable_memoized_property
+  def watchman_launcher(self):
+    return WatchmanLauncher.Factory.global_instance().create()
 
   def set_scheduler(self, scheduler):
     self._scheduler = scheduler
 
-  def _setup_services(self):
+  def _setup_services(self, watchman):
     """Initialize pantsd services.
 
     :returns: A tuple of (`tuple` service_instances, `dict` port_map).
@@ -87,7 +87,7 @@ class PantsDaemonLauncher(Subsystem):
     services = [pailgun_service]
 
     if self._fs_event_enabled and self._scheduler:
-      fs_event_service = FSEventService(self._build_root, self._fs_event_workers)
+      fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
       scheduler_service = SchedulerService(self._scheduler, fs_event_service)
       services.extend((fs_event_service, scheduler_service))
 
@@ -98,8 +98,11 @@ class PantsDaemonLauncher(Subsystem):
     return tuple(services), port_map
 
   def _launch_pantsd(self):
+    # Launch Watchman (if so configured).
+    watchman = self.watchman_launcher.maybe_launch() if self._fs_event_enabled else None
+
     # Initialize pantsd services.
-    services, port_map = self._setup_services()
+    services, port_map = self._setup_services(watchman)
 
     # Setup and fork pantsd.
     self.pantsd.set_services(services)
@@ -122,4 +125,4 @@ class PantsDaemonLauncher(Subsystem):
   def terminate(self):
     self.pantsd.terminate()
     if self._fs_event_enabled:
-      WatchmanLauncher.global_instance().terminate()
+      self.watchman_launcher.terminate()

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.memo import memoized, memoized_property, per_instance
+from pants.util.memo import memoized, memoized_property, per_instance, testable_memoized_property
 
 
 class MemoizeTest(unittest.TestCase):
@@ -249,6 +249,26 @@ class MemoizeTest(unittest.TestCase):
     foo2 = Foo(2)
     self.assertEqual(2, foo2.calls)
     self.assertEqual(2, foo2.calls)
+
+    with self.assertRaises(AttributeError):
+      foo2.calls = None
+
+  def test_mutable_memoized_property(self):
+    class Foo(self._Called):
+      @testable_memoized_property
+      def calls(self):
+        return self._called()
+
+    foo1 = Foo(1)
+    self.assertEqual(1, foo1.calls)
+    self.assertEqual(1, foo1.calls)
+
+    foo2 = Foo(2)
+    self.assertEqual(2, foo2.calls)
+    self.assertEqual(2, foo2.calls)
+
+    foo2.calls = None
+    self.assertIsNone(foo2.calls)
 
   def test_memoized_property_forget(self):
     class Foo(self._Called):

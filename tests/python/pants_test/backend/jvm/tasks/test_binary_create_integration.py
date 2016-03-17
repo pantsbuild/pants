@@ -71,7 +71,11 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
   def test_deploy_excludes(self):
     jar_filename = os.path.join('dist', 'deployexcludes.jar')
     safe_delete(jar_filename)
-    command = ['binary', 'testprojects/src/java/org/pantsbuild/testproject/deployexcludes']
+    command = [
+      '--no-compile-zinc-capture-classpath',
+      'binary',
+      'testprojects/src/java/org/pantsbuild/testproject/deployexcludes',
+    ]
     with self.pants_results(command) as pants_run:
       self.assert_success(pants_run)
       # The resulting binary should not contain any guava classes

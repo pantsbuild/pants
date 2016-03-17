@@ -8,44 +8,72 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import time
 
+from pants.binaries.binary_util import BinaryUtil
 from pants.pantsd.watchman import Watchman
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import testable_memoized_property
 
 
-class WatchmanLauncher(Subsystem):
-  """Watchman launcher subsystem."""
+class WatchmanLauncher(object):
+  """Encapsulates access to Watchman."""
 
-  options_scope = 'watchman'
+  class Factory(Subsystem):
+    options_scope = 'watchman'
 
-  @classmethod
-  def register_options(cls, register):
-    # TODO (kwlzn): this will go away quickly once watchman binary embedding happens.
-    register('--path', type=str, advanced=True, default=None, action='store',
-             help='Watchman binary location (defaults to $PATH discovery).')
+    @classmethod
+    def subsystem_dependencies(cls):
+      return (BinaryUtil.Factory,)
 
-  def __init__(self, *args, **kwargs):
-    super(WatchmanLauncher, self).__init__(*args, **kwargs)
+    @classmethod
+    def register_options(cls, register):
+      register('--version', type=str, advanced=True, default='4.5.0', action='store',
+               help='Watchman version.')
+      register('--supportdir', advanced=True, default='bin/watchman',
+               help='Find watchman binaries under this dir. Used as part of the path to lookup '
+                    'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
 
-    options = self.get_options()
-    self._workdir = options.pants_workdir
-    self._watchman_path = options.path
-    # N.B. watchman has 3 log levels: 0 == no logging, 1 == standard logging, 2 == verbose logging.
-    self._watchman_log_level = '2' if options.level == 'debug' else '1'
+    def create(self):
+      binary_util = BinaryUtil.Factory.create()
+      options = self.get_options()
+      return WatchmanLauncher(binary_util,
+                              options.pants_workdir,
+                              options.level,
+                              options.version,
+                              options.supportdir)
 
+  def __init__(self, binary_util, workdir, log_level, watchman_version, watchman_supportdir):
+    """
+    :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
+    :param workdir: The current pants workdir.
+    :param log_level: The current log level of pants.
+    :param watchman_version: The watchman binary version to retrieve using BinaryUtil.
+    :param watchman_supportdir: The supportdir for BinaryUtil.
+    """
+    self._binary_util = binary_util
+    self._workdir = workdir
+    self._watchman_version = watchman_version
+    self._watchman_supportdir = watchman_supportdir
+    self._log_level = log_level
     self._logger = logging.getLogger(__name__)
     self._watchman = None
 
-  @property
+  @staticmethod
+  def _convert_log_level(level):
+    """Convert a given pants log level string into a watchman log level string."""
+    return {'warn': '0', 'info': '1', 'debug': '2'}.get(level, '1')
+
+  @testable_memoized_property
   def watchman(self):
-    if not self._watchman:
-      self._watchman = Watchman(self._workdir,
-                                log_level=self._watchman_log_level,
-                                watchman_path=self._watchman_path)
-    return self._watchman
+    watchman_binary = self._binary_util.select_binary(self._watchman_supportdir,
+                                                      self._watchman_version,
+                                                      'watchman')
+    return Watchman(watchman_binary,
+                    self._workdir,
+                    self._convert_log_level(self._log_level))
 
   def maybe_launch(self):
     if not self.watchman.is_alive():
-      self._logger.info('launching watchman at {path}'.format(path=self.watchman.watchman_path))
+      self._logger.info('launching watchman')
       try:
         self.watchman.launch()
       except (self.watchman.ExecutionError, self.watchman.InvalidCommandOutput) as e:

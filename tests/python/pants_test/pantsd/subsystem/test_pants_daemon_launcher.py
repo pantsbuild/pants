@@ -22,7 +22,7 @@ class PantsDaemonLauncherTest(BaseTest):
                                      pants_workdir='/pants_workdir',
                                      level='info')
     self.mock_pantsd = mock.create_autospec(PantsDaemon, spec_set=True)
-    self.launcher._pantsd = self.mock_pantsd
+    self.launcher.pantsd = self.mock_pantsd
 
   @mock.patch.object(PantsDaemonLauncher, '_setup_services', **PDL_PATCH_OPTS)
   def test_maybe_launch(self, mock_setup_services):
