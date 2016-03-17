@@ -370,6 +370,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'vari
     return product in cls._FS_PRODUCT_TYPES
 
   def is_cacheable(self):
+    """Native node should not be cached."""
     return False
 
   def _input_type(self):
