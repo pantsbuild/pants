@@ -89,8 +89,6 @@ class Git(Scm):
   def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None, log=None):
     """Creates a git scm proxy that assumes the git repository is in the cwd by default.
 
-    :API: public
-
     binary:    The path to the git binary to use, 'git' by default.
     gitdir:    The path to the repository's git metadata directory (typically '.git').
     worktree:  The path to the git repository working tree directory (typically '.').
@@ -137,9 +135,8 @@ class Git(Scm):
 
   @property
   def tag_name(self):
-    """
-    :API: public
-    """
+    # Calls to git describe can have bad performance on large repos.  Be aware
+    # of the performance hit if you use this property.
     tag = self._check_output(['describe', '--tags', '--always'], raise_type=Scm.LocalException)
     return None if b'cannot' in tag else tag
 
