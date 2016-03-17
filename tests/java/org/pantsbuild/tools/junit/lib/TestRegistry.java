@@ -15,9 +15,6 @@ import java.util.List;
  * by pants, and they may catch TestRegistry singleton in uninitialized state.
  */
 final class TestRegistry {
-
-  /** Should be set to true only while tests from FlakyTest is executed from ConsoleRunnerTest */
-  public static boolean consoleRunnerTestRunsFlakyTests = false;
   private static List<String> testsCalled = new ArrayList<String>();
 
   // No instances of this classes can be constructed

@@ -6,7 +6,6 @@ package org.pantsbuild.tools.junit.impl;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Function;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -24,11 +23,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import javax.xml.bind.JAXB;
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementRef;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.XmlValue;
 import org.junit.runner.Description;
 import org.junit.runner.Result;
@@ -45,13 +47,14 @@ class AntJunitXmlReportListener extends RunListener {
    * or an uncaught test exception.
    */
   @XmlRootElement
+  @XmlAccessorType(XmlAccessType.FIELD)
   static class Exception {
-    private final String message;
-    private final String type;
-    private final String stacktrace;
+    @XmlAttribute private final String message;
+    @XmlAttribute private final String type;
+    @XmlValue private final String stacktrace;
 
-    Exception() {
-      // for JAXB
+    // for JAXB
+    private Exception() {
       message = null;
       type = null;
       stacktrace = null;
@@ -63,17 +66,14 @@ class AntJunitXmlReportListener extends RunListener {
       stacktrace = failure.getTrace();
     }
 
-    @XmlAttribute
     public String getMessage() {
       return message;
     }
 
-    @XmlAttribute
     public String getType() {
       return type;
     }
 
-    @XmlValue
     public String getStacktrace() {
       return stacktrace;
     }
@@ -83,41 +83,43 @@ class AntJunitXmlReportListener extends RunListener {
    * A JAXB bean describing an individual test method.
    */
   @XmlRootElement(name = "testcase")
+  @XmlAccessorType(XmlAccessType.FIELD)
   static class TestCase {
-    private final String classname;
-    private final String name;
-    private String time;
-    private Exception failure;
-    private Exception error;
-    private long startNs;
+    @XmlAttribute private final String classname;
+    @XmlAttribute private final String name;
+    @XmlAttribute private String time;
+    @XmlElement private Exception failure;
+    @XmlElement private Exception error;
+    @XmlElement private String skipped;
+    @XmlTransient private long startNs;
 
-    TestCase() {
-      // for JAXB
+    // for JAXB
+    private TestCase() {
       classname = null;
       name = null;
     }
 
     TestCase(Description test) {
       classname = test.getClassName();
-      name = test.getMethodName();
+      if (test.getMethodName() != null) {
+        name = test.getMethodName();
+      } else {
+        name = test.getClassName();
+      }
     }
 
-    @XmlAttribute
     public String getClassname() {
       return classname;
     }
 
-    @XmlAttribute
     public String getName() {
       return name;
     }
 
-    @XmlAttribute
     public String getTime() {
       return time;
     }
 
-    @XmlElement
     public Exception getFailure() {
       return failure;
     }
@@ -126,7 +128,6 @@ class AntJunitXmlReportListener extends RunListener {
       this.failure = failure;
     }
 
-    @XmlElement
     public Exception getError() {
       return error;
     }
@@ -135,12 +136,30 @@ class AntJunitXmlReportListener extends RunListener {
       this.error = error;
     }
 
+    public String getSkipped() {
+      return skipped;
+    }
+
+    public void setSkipped(boolean skipped) {
+      if (skipped) {
+        this.skipped = "";
+        time = "0";
+      } else {
+        this.skipped = null;
+        time = null;
+      }
+    }
+
     public void started() {
       startNs = System.nanoTime();
     }
 
     public void finished() {
-      time = convertTimeSpanNs(System.nanoTime() - startNs);
+      if (startNs != 0) {
+        time = convertTimeSpanNs(System.nanoTime() - startNs);
+      } else {
+        time = "0";
+      }
     }
   }
 
@@ -148,12 +167,13 @@ class AntJunitXmlReportListener extends RunListener {
    * A JAXB bean describing an individual system property.
    */
   @XmlRootElement(name = "property")
+  @XmlAccessorType(XmlAccessType.FIELD)
   static class Property {
-    private final String name;
-    private final String value;
+    @XmlAttribute private final String name;
+    @XmlAttribute private final String value;
 
-    Property() {
-      // for JAXB
+    // for JAXB
+    private Property() {
       name = null;
       value = null;
     }
@@ -163,12 +183,10 @@ class AntJunitXmlReportListener extends RunListener {
       this.value = value;
     }
 
-    @XmlAttribute
     public String getName() {
       return name;
     }
 
-    @XmlAttribute
     public String getValue() {
       return value;
     }
@@ -178,31 +196,36 @@ class AntJunitXmlReportListener extends RunListener {
    * A JAXB bean describing a test class.
    */
   @XmlRootElement(name = "testsuite")
+  @XmlAccessorType(XmlAccessType.FIELD)
   static class TestSuite {
-    private final String name;
-    private final Class<?> testClass;
+    @XmlAttribute private final String name;
+    @XmlTransient private final Class<?> testClass;
 
-    private int errors;
-    private int failures;
-    private String hostname;
-    private int tests;
-    private String time;
-    private String timestamp;
-    private final List<Property> properties = ImmutableList.copyOf(
+    @XmlAttribute private int errors;
+    @XmlAttribute private int failures;
+    @XmlAttribute private int skipped;
+    @XmlAttribute private String hostname;
+    @XmlAttribute private int tests;
+    @XmlAttribute private String time;
+    @XmlAttribute private String timestamp;
+
+    @XmlElementRef
+    @XmlElementWrapper(name = "properties")
+    private final List<Property> properties = Lists.newArrayList(
         Iterables.transform(System.getProperties().entrySet(),
             new Function<Entry<Object, Object>, Property>() {
               @Override public Property apply(Entry<Object, Object> entry) {
                 return new Property(entry.getKey().toString(), entry.getValue().toString());
               }
             }));
-    private final List<TestCase> testCases = Lists.newArrayList();
-    private String out;
-    private String err;
+    @XmlElementRef private final List<TestCase> testCases = Lists.newArrayList();
+    @XmlElement(name = "system-out") private String out;
+    @XmlElement(name = "system-err") private String err;
 
-    private long startNs;
+    @XmlTransient private long startNs;
 
-    TestSuite() {
-      // for JAXB
+    // for JAXB
+    private TestSuite() {
       name = null;
       testClass = null;
     }
@@ -217,53 +240,46 @@ class AntJunitXmlReportListener extends RunListener {
       }
     }
 
-    @XmlAttribute
     public int getErrors() {
       return errors;
     }
 
-    @XmlAttribute
     public int getFailures() {
       return failures;
     }
 
-    @XmlAttribute
+    public int getSkipped() {
+      return skipped;
+    }
+
     public String getHostname() {
       return hostname;
     }
 
-    @XmlAttribute
     public String getName() {
       return Util.sanitizeSuiteName(name);
     }
 
-    @XmlAttribute
     public int getTests() {
       return tests;
     }
 
-    @XmlAttribute
     public String getTime() {
       return time;
     }
 
-    @XmlAttribute
     public String getTimestamp() {
       return timestamp;
     }
 
-    @XmlElementRef
-    @XmlElementWrapper(name = "properties")
     public List<Property> getProperties() {
       return properties;
     }
 
-    @XmlElementRef
     public List<TestCase> getTestCases() {
       return testCases;
     }
 
-    @XmlElement(name = "system-out")
     public String getOut() {
       return out;
     }
@@ -272,7 +288,6 @@ class AntJunitXmlReportListener extends RunListener {
       this.out = out;
     }
 
-    @XmlElement(name = "system-err")
     public String getErr() {
       return err;
     }
@@ -289,8 +304,11 @@ class AntJunitXmlReportListener extends RunListener {
     }
 
     public void finished() {
-      if (++tests == testCases.size()) {
+      tests++;
+      if (startNs != 0) {
         time = convertTimeSpanNs(System.nanoTime() - startNs);
+      } else {
+        time = "0";
       }
     }
 
@@ -300,6 +318,10 @@ class AntJunitXmlReportListener extends RunListener {
 
     public void incrementErrors() {
       errors++;
+    }
+
+    public void incrementSkipped() {
+      skipped++;
     }
 
     public boolean wasStarted() {
@@ -334,7 +356,7 @@ class AntJunitXmlReportListener extends RunListener {
   private void createSuites(Iterable<Description> tests) throws java.lang.Exception {
     for (Description test : tests) {
       createSuites(test.getChildren());
-      if (Util.isRunnable(test)) {
+      if (test.isTest()) {
         String testClass = test.getClassName();
         TestSuite suite = suites.get(testClass);
         if (suite == null) {
@@ -357,12 +379,10 @@ class AntJunitXmlReportListener extends RunListener {
 
   @Override
   public void testFailure(Failure failure) throws java.lang.Exception {
-    Exception exception = new Exception(failure);
     Description description = failure.getDescription();
     boolean isFailure = Util.isAssertionFailure(failure);
-    TestSuite suite = null;
 
-    suite = getTestSuiteFor(description);
+    TestSuite suite = getTestSuiteFor(description);
     if (suite == null) {
       incrementUnknownSuiteFailure(description);
     } else {
@@ -373,9 +393,19 @@ class AntJunitXmlReportListener extends RunListener {
       }
     }
 
+    Exception exception = new Exception(failure);
     TestCase testCase = getTestCaseFor(description);
     if (testCase == null) {
-      incrementUnknownTestCaseFailure(description, exception);
+      testCase = incrementUnknownTestCaseFailure(description, exception);
+      if (description.isSuite()) {
+        // If we get a testFailure callback for a test suite then there is usually a
+        // problem with initialization and we won't get a testFinished callback so
+        // call finish here.
+        testCase.finished();
+        suite.testCases.clear();
+        suite.testCases.add(testCase);
+        suite.finished();
+      }
     } else {
       if (isFailure) {
         testCase.setFailure(exception);
@@ -386,19 +416,42 @@ class AntJunitXmlReportListener extends RunListener {
   }
 
   @Override
+  public void testIgnored(Description description) throws java.lang.Exception {
+    if (!description.isTest()) {
+      return;
+    }
+
+    TestSuite suite = getTestSuiteFor(description);
+    if (suite != null) {
+      suite.incrementSkipped();
+      // Ignored tests don't have testStarted and testFinished callbacks so call finish here.
+      suite.finished();
+    }
+
+    TestCase testCase = getTestCaseFor(description);
+    if (testCase != null) {
+      testCase.setSkipped(true);
+    }
+  }
+
+  @Override
   public void testFinished(Description description) throws java.lang.Exception {
     if (!Util.isRunnable(description)) {
       return;
     }
-    try {
-      getTestCaseFor(description).finished();
-    } catch (NullPointerException e) {
+
+    TestCase testCase = getTestCaseFor(description);
+    if (testCase != null) {
+      testCase.finished();
+    } else {
       throw new RuntimeException("No TestCase for '" + description.getClassName() + "#"
           + description.getMethodName() + "'");
     }
-    try {
-      getTestSuiteFor(description).finished();
-    } catch (NullPointerException e) {
+
+    TestSuite suite = getTestSuiteFor(description);
+    if (suite != null) {
+      suite.finished();
+    } else {
       throw new RuntimeException("No suite for '" + description.getClassName() + "'.");
     }
   }
@@ -406,12 +459,12 @@ class AntJunitXmlReportListener extends RunListener {
   @Override
   public void testRunFinished(Result result) throws java.lang.Exception {
     for (TestSuite suite : suites.values()) {
-      if (suite.wasStarted()) {
-        if (suite.testClass != null) {
-          suite.setOut(new String(streamSource.readOut(suite.testClass), Charsets.UTF_8));
-          suite.setErr(new String(streamSource.readErr(suite.testClass), Charsets.UTF_8));
-        }
+      if (suite.wasStarted() && suite.testClass != null) {
+        suite.setOut(new String(streamSource.readOut(suite.testClass), Charsets.UTF_8));
+        suite.setErr(new String(streamSource.readErr(suite.testClass), Charsets.UTF_8));
+      }
 
+      if (suite.tests > 0) {
         Writer xmlOut = new FileWriter(
             new File(outdir, String.format("TEST-%s.xml", suite.getName())));
 
@@ -491,12 +544,10 @@ class AntJunitXmlReportListener extends RunListener {
    *   string description.
    *
    * @param description description passed to {@link #testFailure(Failure)}
-   * @param exception exception to record.
    */
   private void incrementUnknownSuiteFailure(Description description) {
     if (description == null || description.getClassName() == null) {
-      description = Description.createTestDescription(UnknownFailureSuite.class,
-          "unknown");
+      description = Description.createTestDescription(UnknownFailureSuite.class, "unknown");
     }
     TestSuite unknownSuite = getTestSuiteFor(description);
     if (unknownSuite == null) {
@@ -518,13 +569,14 @@ class AntJunitXmlReportListener extends RunListener {
    * @param description description passed to {@link #testFailure(Failure)}
    * @param exception exception to record.
    */
-  private void incrementUnknownTestCaseFailure(Description description, Exception exception) {
+  private TestCase incrementUnknownTestCaseFailure(Description description, Exception exception) {
     TestCase unknownCase = getTestCaseFor(description);
     if (unknownCase == null) {
       unknownCase = new TestCase(description);
       cases.put(Util.getPantsFriendlyDisplayName(description), unknownCase);
     }
-    unknownCase.setFailure(exception);
+    unknownCase.setError(exception);
+    return unknownCase;
   }
 
   private static String convertTimeSpanNs(long timespanNs) {
