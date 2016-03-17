@@ -19,6 +19,7 @@ python_tests(
   name='zinc_compile_integration',
   sources=['test_zinc_compile_integration.py'],
   dependencies=[
+    'src/python/pants/build_graph',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   tags = {'integration'},
