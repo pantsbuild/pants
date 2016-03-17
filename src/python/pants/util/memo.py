@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 import inspect
+from contextlib import contextmanager
 
 
 # Used as a sentinel that disambiguates tuples passed in *args from coincidentally matching tuples
@@ -49,8 +50,11 @@ def memoized(func=None, key_factory=equal_args, cache_factory=dict):
   so care must be taken to only apply this decorator to functions with single threaded access and
   an expected reasonably small set of unique call parameters.
 
-  Note that the wrapped function comes equipped with 2 helper function attributes:
+  Note that the wrapped function comes equipped with 3 helper function attributes:
 
+  + `put(*args, **kwargs)`: A context manager that takes the same arguments as the memoized
+                            function and yields a setter function to set the value in the
+                            memoization cache.
   + `forget(*args, **kwargs)`: Takes the same arguments as the memoized function and causes the
                                memoization cache to forget the computed value, if any, for those
                                arguments.
@@ -97,6 +101,12 @@ def memoized(func=None, key_factory=equal_args, cache_factory=dict):
     result = func(*args, **kwargs)
     memoized_results[key] = result
     return result
+
+  @contextmanager
+  def put(*args, **kwargs):
+    key = key_func(*args, **kwargs)
+    yield functools.partial(memoized_results.__setitem__, key)
+  memoize.put = put
 
   def forget(*args, **kwargs):
     key = key_func(*args, **kwargs)
@@ -211,3 +221,16 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   """
   getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
   return property(fget=getter, fdel=lambda self: getter.forget(self))
+
+
+def testable_memoized_property(func=None, key_factory=per_instance, **kwargs):
+  """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
+  getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
+
+  def setter(self, val):
+    with getter.put(self) as putter:
+      putter(val)
+
+  return property(fget=getter,
+                  fset=setter,
+                  fdel=lambda self: getter.forget(self))
