@@ -6,9 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import sys
+import threading
 from collections import defaultdict
-
-from wrapt import synchronized
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
@@ -50,7 +49,9 @@ class PartiallyConsumedInputsError(Exception):
 
 class ProductGraph(object):
 
-  def __init__(self):
+  def __init__(self, validator=None):
+    self._validator = validator or Node.validate_node
+
     # A dict from Node to its computed value: if a Node hasn't been computed yet, it will not
     # be present here.
     self._node_results = dict()
@@ -62,7 +63,6 @@ class ProductGraph(object):
     # context specific error messages when they are introduced.
     self._cyclic_dependencies = defaultdict(set)
 
-  @synchronized
   def _set_state(self, node, state_key):
     existing_state_key = self._node_results.get(node, None)
     if existing_state_key is not None:
@@ -72,15 +72,12 @@ class ProductGraph(object):
       raise ValueError('Cannot complete Node {} with state_key {}'.format(node, state_key))
     self._node_results[node] = state_key
 
-  @synchronized
   def is_complete(self, node):
     return node in self._node_results
 
-  @synchronized
   def state(self, node):
     return self._node_results.get(node, None)
 
-  @synchronized
   def update_state(self, node, state_key, dependencies=None):
     """Updates the Node with the given State."""
     if state_key.type in [Return, Throw, Noop]:
@@ -90,7 +87,6 @@ class ProductGraph(object):
     else:
       raise State.raise_unrecognized(state_key)
 
-  @synchronized
   def _detect_cycle(self, src, dest):
     """Given a src and a dest, each of which _might_ already exist in the graph, detect cycles.
 
@@ -118,7 +114,6 @@ class ProductGraph(object):
     parents.add(src)
     return _walk(dest)
 
-  @synchronized
   def _add_dependencies(self, node, dependencies):
     """Adds dependency edges from the given src Node to the given dependency Nodes.
 
@@ -126,7 +121,7 @@ class ProductGraph(object):
     a cycle, then the _source_ Node is marked as a Noop with an error indicating the
     cycle path, and the dependencies are not introduced.
     """
-    Node.validate_node(node)
+    self._validator(node)
     if self.is_complete(node):
       raise ValueError('Node {} is already completed, and cannot be updated.'.format(node))
 
@@ -137,7 +132,7 @@ class ProductGraph(object):
     for dependency in dependencies:
       if dependency in node_dependencies:
         continue
-      Node.validate_node(dependency)
+      self._validator(dependency)
       if self._detect_cycle(node, dependency):
         node_cyclic_dependencies.add(dependency)
       else:
@@ -146,35 +141,27 @@ class ProductGraph(object):
         # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
         self._dependencies[dependency]
 
-  @synchronized
   def completed_nodes(self):
     return self._node_results
 
-  @synchronized
   def dependents(self):
     return self._dependents
 
-  @synchronized
   def dependencies(self):
     return self._dependencies
 
-  @synchronized
   def cyclic_dependencies(self):
     return self._cyclic_dependencies
 
-  @synchronized
   def dependents_of(self, node):
     return self._dependents[node]
 
-  @synchronized
   def dependencies_of(self, node):
     return self._dependencies[node]
 
-  @synchronized
   def cyclic_dependencies_of(self, node):
     return self._cyclic_dependencies[node]
 
-  @synchronized
   def invalidate(self, predicate=None):
     """Invalidate nodes and their subgraph of dependents given a predicate.
 
@@ -184,7 +171,7 @@ class ProductGraph(object):
       del self._node_results[node]
       del self._dependents[node]
       del self._dependencies[node]
-      del self._cyclic_dependencies[node]
+      self._cyclic_dependencies.pop(node, None)
 
     def _sever_root_dependents(roots):
       for root in roots:
@@ -204,12 +191,11 @@ class ProductGraph(object):
       _sever_root_dependents(invalidated_roots)
 
     # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
-    for count, node in enumerate(reversed(invalidated_nodes), 1):
+    for node in invalidated_nodes:
       _delete_node(node)
 
-    return count
+    return len(invalidated_nodes)
 
-  @synchronized
   def walk(self, roots, predicate=None, dependents=False):
     """Yields Nodes depth-first in pre-order, starting from the given roots.
 
@@ -234,6 +220,7 @@ class ProductGraph(object):
       return [entry for entry in all_entries if predicate(entry)]
 
     walked = set()
+    adjacencies = self.dependents_of if dependents else self.dependencies_of
     def _walk(entries):
       for entry in entries:
         node, state_key = entry
@@ -241,8 +228,7 @@ class ProductGraph(object):
           continue
         walked.add(node)
 
-        deps = _filtered_entries(
-          self.dependencies_of(node) if not dependents else self.dependents_of(node))
+        deps = _filtered_entries(adjacencies(node))
         yield (entry, deps)
         for e in _walk(deps):
           yield e
@@ -472,7 +458,7 @@ class GraphValidator(object):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, symbol_table_cls, project_tree):
+  def __init__(self, goals, tasks, symbol_table_cls, project_tree, graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
@@ -487,6 +473,7 @@ class LocalScheduler(object):
 
     self._graph_validator = GraphValidator(symbol_table_cls)
     self._product_graph = ProductGraph()
+    self._product_graph_lock = graph_lock or threading.RLock()
     self._step_id = 0
 
   def _create_step(self, node):
@@ -569,13 +556,20 @@ class LocalScheduler(object):
 
   def root_entries(self, execution_request):
     """Returns the roots for the given ExecutionRequest as a dict from Node to State."""
-    return {root: self._product_graph.state(root) for root in execution_request.roots}
+    with self._product_graph_lock:
+      return {root: self._product_graph.state(root) for root in execution_request.roots}
 
   def _complete_step(self, node, step_result):
     """Given a StepResult for the given Node, complete the step."""
     state_key, dependencies = step_result.state_key, step_result.dependencies
     # Update the Node's state in the graph.
     self._product_graph.update_state(node, state_key, dependencies=dependencies)
+
+  def invalidate(self, predicate=None):
+    """Calls `ProductGraph.invalidate()` against an internal ProductGraph instance under
+    protection of a scheduler-level lock."""
+    with self._product_graph_lock:
+      return self._product_graph.invalidate(predicate)
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -589,63 +583,65 @@ class LocalScheduler(object):
     # Nodes that might need to have Steps created (after any outstanding Step returns).
     candidates = set(execution_request.roots)
 
-    # Yield nodes that are ready, and then compute new ones.
-    scheduling_iterations = 0
-    while True:
-      # Create Steps for candidates that are ready to run, and not already running.
-      ready = dict()
-      for candidate_node in list(candidates):
-        if candidate_node in outstanding:
-          # Node is still a candidate, but is currently running.
-          continue
-        if self._product_graph.is_complete(candidate_node):
-          # Node has already completed.
+    with self._product_graph_lock:
+      # Yield nodes that are ready, and then compute new ones.
+      scheduling_iterations = 0
+      while True:
+        # Create Steps for candidates that are ready to run, and not already running.
+        ready = dict()
+        for candidate_node in list(candidates):
+          if candidate_node in outstanding:
+            # Node is still a candidate, but is currently running.
+            continue
+          if self._product_graph.is_complete(candidate_node):
+            # Node has already completed.
+            candidates.discard(candidate_node)
+            continue
+          # Create a step if all dependencies are available; otherwise, can assume they are
+          # outstanding, and will cause this Node to become a candidate again later.
+          candidate_step = self._create_step(candidate_node)
+          if candidate_step is not None:
+            ready[candidate_node] = candidate_step
           candidates.discard(candidate_node)
-          continue
-        # Create a step if all dependencies are available; otherwise, can assume they are
-        # outstanding, and will cause this Node to become a candidate again later.
-        candidate_step = self._create_step(candidate_node)
-        if candidate_step is not None:
-          ready[candidate_node] = candidate_step
-        candidates.discard(candidate_node)
 
-      if not ready and not outstanding:
-        # Finished.
-        break
-      yield ready.values()
-      scheduling_iterations += 1
-      outstanding.update(ready)
+        if not ready and not outstanding:
+          # Finished.
+          break
+        yield ready.values()
+        scheduling_iterations += 1
+        outstanding.update(ready)
 
-      # Finalize completed Steps.
-      for node, entry in outstanding.items()[:]:
-        step, promise = entry
-        if not promise.is_complete():
-          continue
-        # The step has completed; see whether the Node is completed.
-        outstanding.pop(node)
-        self._complete_step(step.node, promise.get())
-        if self._product_graph.is_complete(step.node):
-          # The Node is completed: mark any of its dependents as candidates for Steps.
-          candidates.update(d for d in self._product_graph.dependents_of(step.node))
-        else:
-          # Waiting on dependencies.
-          incomplete_deps = [d for d in self._product_graph.dependencies_of(step.node)
-                             if not self._product_graph.is_complete(d)]
-          if incomplete_deps:
-            # Mark incomplete deps as candidates for Steps.
-            candidates.update(incomplete_deps)
+        # Finalize completed Steps.
+        for node, entry in outstanding.items()[:]:
+          step, promise = entry
+          if not promise.is_complete():
+            continue
+          # The step has completed; see whether the Node is completed.
+          outstanding.pop(node)
+          self._complete_step(step.node, promise.get())
+          if self._product_graph.is_complete(step.node):
+            # The Node is completed: mark any of its dependents as candidates for Steps.
+            candidates.update(d for d in self._product_graph.dependents_of(step.node))
           else:
-            # All deps are already completed: mark this Node as a candidate for another step.
-            candidates.add(step.node)
+            # Waiting on dependencies.
+            incomplete_deps = [d for d in self._product_graph.dependencies_of(step.node)
+                               if not self._product_graph.is_complete(d)]
+            if incomplete_deps:
+              # Mark incomplete deps as candidates for Steps.
+              candidates.update(incomplete_deps)
+            else:
+              # All deps are already completed: mark this Node as a candidate for another step.
+              candidates.add(step.node)
 
-    print('created {} total nodes in {} scheduling iterations and {} steps, '
-          'with {} nodes in the executed path.'.format(
-            len(self._product_graph.dependencies()),
-            scheduling_iterations,
-            self._step_id,
-            sum(1 for _ in self._product_graph.walk(execution_request.roots))),
-          file=sys.stderr)
+      print('created {} total nodes in {} scheduling iterations and {} steps, '
+            'with {} nodes in the executed path.'.format(
+              len(self._product_graph.dependencies()),
+              scheduling_iterations,
+              self._step_id,
+              sum(1 for _ in self._product_graph.walk(execution_request.roots))),
+            file=sys.stderr)
 
   def validate(self):
     """Validates the generated product graph with the configured GraphValidator."""
-    self._graph_validator.validate(self._product_graph)
+    with self._product_graph_lock:
+      self._graph_validator.validate(self._product_graph)

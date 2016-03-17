@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import itertools
 import os
 import unittest
@@ -17,8 +18,9 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
                                                 Jar, JavaSources, ThriftSources,
                                                 setup_json_scheduler)
 from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
-                                    Throw)
-from pants.engine.exp.scheduler import FilesystemNode, PartiallyConsumedInputsError
+                                    Throw, Waiting)
+from pants.engine.exp.scheduler import PartiallyConsumedInputsError, ProductGraph
+from pants.engine.exp.storage import Key
 
 
 class SchedulerTest(unittest.TestCase):
@@ -28,7 +30,6 @@ class SchedulerTest(unittest.TestCase):
     self.scheduler, storage = setup_json_scheduler(build_root)
     self.storage = storage
     self.engine = LocalSerialEngine(self.scheduler, storage)
-    self.product_graph = self.scheduler.product_graph
 
     self.guava = Address.parse('3rdparty/jvm:guava')
     self.thrift = Address.parse('src/thrift/codegen/simple')
@@ -61,7 +62,7 @@ class SchedulerTest(unittest.TestCase):
     predicate = (lambda _: True) if failures else None
     result = self.engine.execute(build_request)
     self.assertIsNone(result.error)
-    return list(self.product_graph.walk(build_request.roots, predicate=predicate))
+    return list(self.scheduler.product_graph.walk(build_request.roots, predicate=predicate))
 
   def request(self, goals, *addresses):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
@@ -264,84 +265,123 @@ class SchedulerTest(unittest.TestCase):
     # And that an subdirectory address is not.
     self.assertNotIn(self.managed_guava, root_value)
 
+
+# TODO: Expand test coverage here.
+class ProductGraphTest(unittest.TestCase):
+  def setUp(self):
+    self.pg = ProductGraph(validator=lambda _: True)  # Allow for string nodes for testing.
+
   @staticmethod
-  def fsnode_predicate(node):
-    return type(node) is FilesystemNode
+  def _mk_key(state):
+    return Key(None, None, type(state), None)
 
-  def setup_invalidate(self, input_spec='3rdparty/jvm::', goal='ls'):
-    spec = self.spec_parser.parse_spec(input_spec)
-    build_request = self.request_specs([goal], spec)
-    (root_node, _), _ = self.build_and_walk(build_request)[0]
-    return root_node
+  @classmethod
+  def _mk_chain(cls, graph, sequence, states=[Waiting, Return]):
+    """Create a chain of dependencies (e.g. 'A'->'B'->'C'->'D') in the graph from a sequence."""
+    prior_item = sequence[0]
+    for state in states:
+      for item in sequence:
+        graph.update_state(prior_item, cls._mk_key(state([item])), [item])
+        prior_item = item
+    return sequence
 
-  def test_invalidate_clear(self):
-    self.setup_invalidate()
+  def test_dependency_edges(self):
+    self.pg.update_state('A', self._mk_key(Waiting(['B', 'C'])), ['B', 'C'])
+    self.assertEquals({'B', 'C'}, self.pg.dependencies_of('A'))
+    self.assertEquals({'A'}, self.pg.dependents_of('B'))
+    self.assertEquals({'A'}, self.pg.dependents_of('C'))
 
-    self.assertTrue(self.product_graph.completed_nodes())
-    self.assertTrue(self.product_graph.dependents())
-    self.assertTrue(self.product_graph.dependencies())
-    self.assertTrue(self.product_graph.cyclic_dependencies())
+  def test_walk(self):
+    nodes = list('ABCDEF')
+    self._mk_chain(self.pg, nodes)
+    walked_nodes = list((node for (node, _), _ in self.pg.walk(nodes[0])))
+    self.assertEquals(nodes, walked_nodes)
 
-    self.product_graph.invalidate()
+  def test_invalidate_all(self):
+    chain_list = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+    invalidators = (
+      self.pg.invalidate,
+      functools.partial(self.pg.invalidate, lambda node: node == 'Z')
+    )
 
-    self.assertFalse(self.product_graph.completed_nodes())
-    self.assertFalse(self.product_graph.dependents())
-    self.assertFalse(self.product_graph.dependencies())
-    self.assertFalse(self.product_graph.cyclic_dependencies())
+    for invalidator in invalidators:
+      self._mk_chain(self.pg, chain_list)
+
+      self.assertTrue(self.pg.completed_nodes())
+      self.assertTrue(self.pg.dependents())
+      self.assertTrue(self.pg.dependencies())
+      self.assertTrue(self.pg.cyclic_dependencies())
+
+      invalidator()
+
+      self.assertFalse(self.pg.completed_nodes())
+      self.assertFalse(self.pg.dependents())
+      self.assertFalse(self.pg.dependencies())
+      self.assertFalse(self.pg.cyclic_dependencies())
 
   def test_invalidate_partial(self):
-    self.setup_invalidate()
+    comparison_pg = ProductGraph(validator=lambda _: True)
+    chain_a = list('ABCDEF')
+    chain_b = list('GHIJKL')
 
-    self.assertTrue(self.product_graph.completed_nodes())
-    before_fs = list(filter(self.fsnode_predicate, self.product_graph.completed_nodes()))
-    self.assertTrue(before_fs)
+    # Add two dependency chains to the primary graph.
+    self._mk_chain(self.pg, chain_a)
+    self._mk_chain(self.pg, chain_b)
 
-    invalidated_ct = self.product_graph.invalidate(predicate=self.fsnode_predicate)
-    self.assertGreater(invalidated_ct, len(before_fs))
+    # Add only the dependency chain we won't invalidate to the comparison graph.
+    self._mk_chain(comparison_pg, chain_b)
 
-    self.assertTrue(self.product_graph.completed_nodes())
-    self.assertFalse(list(filter(self.fsnode_predicate, self.product_graph.completed_nodes())))
+    # Invalidate one of the chains in the primary graph from the right-most node.
+    self.pg.invalidate(lambda node: node == chain_a[-1])
 
-  @staticmethod
-  def label_tuples(collection, name):
-    for item in collection:
-      yield tuple(list(item) + [name])
+    # Ensure the final state of the primary graph matches the comparison graph.
+    self.assertEquals(self.pg.completed_nodes(), comparison_pg.completed_nodes())
+    self.assertEquals(self.pg.dependents(), comparison_pg.dependents())
+    self.assertEquals(self.pg.dependencies(), comparison_pg.dependencies())
+    self.assertEquals(self.pg.cyclic_dependencies(), comparison_pg.cyclic_dependencies())
+
+  def test_invalidate_count(self):
+    self._mk_chain(self.pg, list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
+    invalidated_count = self.pg.invalidate(lambda node: node == 'I')
+    self.assertEquals(invalidated_count, 9)
 
   def test_invalidate_partial_identity_check(self):
-    root_node = self.setup_invalidate()
+    # Create a graph with a chain from A..Z.
+    chain = self._mk_chain(self.pg, list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
+    self.assertTrue(self.pg.completed_nodes())
 
-    before_fs_nodes = set(filter(self.fsnode_predicate, self.product_graph.completed_nodes()))
+    # Track the pre-invaliation nodes (from A..Q).
+    index_of_q = chain.index('Q')
+    before_nodes = filter(lambda node: node in chain[:index_of_q + 1], self.pg.completed_nodes())
+    self.assertTrue(before_nodes)
 
-    self.product_graph.invalidate(predicate=self.fsnode_predicate)
+    # Invalidate all nodes under Q.
+    self.pg.invalidate(lambda node: node == chain[index_of_q])
+    self.assertTrue(self.pg.completed_nodes())
 
-    self.assertTrue(self.product_graph.completed_nodes())
+    def _label_tuples(collection, name):
+      for item in collection:
+        yield tuple(list(item) + [name])
 
     # Check that the root node and all fs nodes were removed via a identity checks.
-    chain = itertools.chain(self.label_tuples(self.product_graph.completed_nodes().items(),
-                                              'completed_nodes'),
-                            self.label_tuples(self.product_graph.dependents().items(),
-                                              'dependents'),
-                            self.label_tuples(self.product_graph.dependencies().items(),
-                                              'dependencies'),
-                            self.label_tuples(self.product_graph.cyclic_dependencies().items(),
-                                              'cyclic_dependencies'))
+    chain = itertools.chain(
+      _label_tuples(self.pg.completed_nodes().items(), 'completed_nodes'),
+      _label_tuples(self.pg.dependents().items(), 'dependents'),
+      _label_tuples(self.pg.dependencies().items(), 'dependencies'),
+      _label_tuples(self.pg.cyclic_dependencies().items(), 'cyclic_dependencies')
+    )
 
     for node, associated, collection_name in chain:
-      self.assertFalse(node is root_node,
-                       'node:\n{}\nis root_node in {}'.format(node, collection_name))
-      self.assertFalse(node in before_fs_nodes,
-                       'node:\n{}\nis a fs node in {}'.format(node, collection_name))
+      self.assertFalse(
+        node in before_nodes,
+        'node:\n{}\nwasnt properly removed from {}'.format(node, collection_name)
+      )
+
       if isinstance(associated, set):
-        self.assertFalse(
-          root_node in associated,
-          'root node:\n{}\nis still associated with:\n{}\nin {}'.format(root_node,
-                                                                        node,
-                                                                        collection_name)
-        )
         for associated_node in associated:
           self.assertFalse(
-            associated_node in before_fs_nodes,
-            'filesystem node:\n{}\nis still associated with:\n{}\nin {}'.format(associated_node,
-                                                                                node,
-                                                                                collection_name)
+            associated_node in before_nodes,
+            'node:\n{}\nis still associated with:\n{}\nin {}'.format(associated_node,
+                                                                     node,
+                                                                     collection_name)
           )
