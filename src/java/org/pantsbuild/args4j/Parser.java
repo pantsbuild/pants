@@ -126,6 +126,14 @@ public class Parser {
       return Result.failure(cmdLineParser, "Invalid command line:\n\t%s", e.getLocalizedMessage());
     } catch (InvalidCmdLineArgumentException e) {
       return Result.failure(cmdLineParser, "Invalid command line parameter:\n\t%s", e.getMessage());
+    } finally {
+      // Unregister our custom CmdLineParser handlers because the OptionHandlerRegistry
+      // is a global singleton and we don't want to affect other users of CmdLineParser.
+      // This is most common when multiple tests are run at the same time.
+      OptionHandlerRegistry.getRegistry().registerHandler(
+          boolean.class, org.kohsuke.args4j.spi.BooleanOptionHandler.class);
+      OptionHandlerRegistry.getRegistry().registerHandler(
+          Boolean.class, org.kohsuke.args4j.spi.BooleanOptionHandler.class);
     }
   }
 }
