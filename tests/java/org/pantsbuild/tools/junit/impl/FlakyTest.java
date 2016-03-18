@@ -17,6 +17,9 @@ import org.junit.Test;
  */
 public class FlakyTest {
 
+  /** Should be set to true only while tests from FlakyTest is executed from ConsoleRunnerTest */
+  public static boolean flakyTestsShouldFail = false;
+
   public static int numFlaky1Invocations = 0;
   public static int numFlaky2Invocations = 0;
   public static int numFlaky3Invocations = 0;
@@ -47,7 +50,7 @@ public class FlakyTest {
   @Test
   public void flakyMethodSucceedsAfter1Retry() throws Exception {
     numTestMethodInvocationsPerTestInstance++;
-    Assume.assumeTrue(TestRegistry.consoleRunnerTestRunsFlakyTests);
+    Assume.assumeTrue(flakyTestsShouldFail);
     TestRegistry.registerTestCall("flaky1");
     numFlaky1Invocations++;
     if (numFlaky1Invocations < 2) {
@@ -58,7 +61,7 @@ public class FlakyTest {
   @Test
   public void flakyMethodSucceedsAfter2Retries() throws Exception {
     numTestMethodInvocationsPerTestInstance++;
-    Assume.assumeTrue(TestRegistry.consoleRunnerTestRunsFlakyTests);
+    Assume.assumeTrue(flakyTestsShouldFail);
     TestRegistry.registerTestCall("flaky2");
     numFlaky2Invocations++;
     if (numFlaky2Invocations < 3) {
@@ -69,7 +72,7 @@ public class FlakyTest {
   @Test
   public void methodAlwaysFails() throws Exception {
     numTestMethodInvocationsPerTestInstance++;
-    Assume.assumeTrue(TestRegistry.consoleRunnerTestRunsFlakyTests);
+    Assume.assumeTrue(flakyTestsShouldFail);
     TestRegistry.registerTestCall("flaky3");
     numFlaky3Invocations++;
     throw new Exception("flaky3 failed on invocation number " + numFlaky3Invocations);

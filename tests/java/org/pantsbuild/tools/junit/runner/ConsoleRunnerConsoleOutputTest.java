@@ -1,3 +1,6 @@
+// Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 package org.pantsbuild.tools.junit.impl;
 
 import java.io.ByteArrayOutputStream;
@@ -19,9 +22,6 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
 
   final static PrintStream stdout = System.out;
   final static PrintStream stderr = System.err;
-
-  @Rule
-  public TemporaryFolder temporary = new TemporaryFolder();
 
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
