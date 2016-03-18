@@ -4,8 +4,6 @@
 
 # Install the Android SDK for the Pants Android contrib module.
 
-set -xf
-
 # SDK_INSTALL_LOCATION and ANDROID_HOME set in travis.yaml.
 ANDROID_SDK_URL="http://dl.google.com/android/android-sdk_r24.4.1-linux.tgz"
 SDK_FILE=$(basename "$ANDROID_SDK_URL")
@@ -34,10 +32,16 @@ MODULE_LIST=$(join , ${SDK_MODULES[@]})
 echo "Downloading $ANDROID_SDK_URL..."
 SDK_ARCHIVE_LOCATION="$SDK_INSTALL_LOCATION"/"$SDK_FILE"
 
-wget -nc "$ANDROID_SDK_URL" -O "$SDK_ARCHIVE_LOCATION"
-tar -C "$SDK_INSTALL_LOCATION" -xf "$SDK_ARCHIVE_LOCATION"
+if [[ ! -f "$SDK_ARCHIVE_LOCATION" ]]; then
+    wget -nc "$ANDROID_SDK_URL" -O "$SDK_ARCHIVE_LOCATION"
+fi
 
-echo "y" | "$ANDROID_HOME"/tools/android update sdk -u --all --filter "$MODULE_LIST" &>/dev/null
+if [[ ! -d "$SDK_INSTALL_LOCATION" ]]; then
+    tar -C "$SDK_INSTALL_LOCATION" -xf "$SDK_ARCHIVE_LOCATION"
+fi
+
+# Spamming 'y' was failing non-deterministically so sleep between echos.
+( sleep 5 && while [ 1 ]; do sleep 1; echo y; done ) | "$ANDROID_HOME"/tools/android update sdk -u --all --filter "$MODULE_LIST"
 
 # Generate well known debug.keystore if the SDK hasn't created it.
 DEBUG_KEYSTORE="$KEYSTORE_LOCATION"/debug.keystore
