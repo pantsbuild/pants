@@ -92,8 +92,7 @@ class RunInfo(object):
     scm = get_scm()
     if scm:
       revision = scm.commit_id
-      tag = scm.tag_name or 'none'
       branch = scm.branch_name or revision
     else:
-      revision, tag, branch = 'none', 'none', 'none'
-    self.add_infos(('revision', revision), ('tag', tag), ('branch', branch))
+      revision, branch = 'none', 'none'
+    self.add_infos(('revision', revision), ('branch', branch))

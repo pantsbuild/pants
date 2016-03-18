@@ -109,6 +109,10 @@ class Git(Scm):
     return 'HEAD'
 
   @property
+  def worktree(self):
+    return self._worktree
+
+  @property
   def commit_id(self):
     return self._check_output(['rev-parse', 'HEAD'], raise_type=Scm.LocalException)
 
@@ -130,6 +134,8 @@ class Git(Scm):
 
   @property
   def tag_name(self):
+    # Calls to git describe can have bad performance on large repos.  Be aware
+    # of the performance hit if you use this property.
     tag = self._check_output(['describe', '--tags', '--always'], raise_type=Scm.LocalException)
     return None if b'cannot' in tag else tag
 

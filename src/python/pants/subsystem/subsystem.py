@@ -35,6 +35,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
   compile.java task can override those options in scope `cache.compile.java`.
 
   Subsystems may depend on other subsystems, and therefore mix in SubsystemClientMixin.
+
+  :API: public
   """
   options_scope_category = ScopeInfo.SUBSYSTEM
 
@@ -117,6 +119,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
   def global_instance(cls):
     """Returns the global instance of this subsystem.
 
+    :API: public
+
     :returns: The global subsystem instance.
     :rtype: :class:`pants.subsystem.subsystem.Subsystem`
     """
@@ -125,6 +129,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
   @classmethod
   def scoped_instance(cls, optionable):
     """Returns an instance of this subsystem for exclusive use by the given `optionable`.
+
+    :API: public
 
     :param optionable: An optionable type or instance to scope this subsystem under.
     :type: :class:`pants.option.optionable.Optionable`
@@ -162,6 +168,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     Task code should call scoped_instance() or global_instance() to get a subsystem instance.
     Tests can call this constructor directly though.
+
+    :API: public
     """
     super(Subsystem, self).__init__()
     self._scope = scope
@@ -173,5 +181,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return self._scope
 
   def get_options(self):
-    """Returns the option values for this subsystem's scope."""
+    """Returns the option values for this subsystem's scope.
+
+    :API: public
+    """
     return self._scoped_options

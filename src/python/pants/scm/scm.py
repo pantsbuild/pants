@@ -11,7 +11,10 @@ from pants.util.meta import AbstractClass
 
 
 class Scm(AbstractClass):
-  """Abstracts high-level scm operations needed by pants core and pants tasks."""
+  """Abstracts high-level scm operations needed by pants core and pants tasks.
+
+  :API: public
+  """
 
   class ScmException(Exception):
     """Indicates a problem interacting with the scm."""
@@ -45,6 +48,10 @@ class Scm(AbstractClass):
   @abstractmethod
   def commit_date(self, commit_reference):
     """Returns the commit date of the referenced commit."""
+
+  @abstractproperty
+  def worktree(self):
+    """Returns the worktree for the SCM"""
 
   @abstractmethod
   def changed_files(self, from_commit=None, include_untracked=False, relative_to=None):
