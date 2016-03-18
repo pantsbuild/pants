@@ -213,7 +213,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
       self.resolve(spec)
 
     # Success.
-    self.scheduler.product_graph.clear()
+    self.scheduler.product_graph.invalidate()
     resolved = self.resolve(spec)
     self.assertEqual(1, len(resolved))
     self.assertEqual(Struct(name='c', type_alias='struct'), resolved[0].struct)

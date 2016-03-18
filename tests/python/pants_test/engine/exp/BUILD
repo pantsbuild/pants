@@ -90,7 +90,7 @@ python_tests(
 python_tests(
   name='scheduler',
   sources=['test_scheduler.py'],
-  coverage=['pants.engine.exp.nodes'],
+  coverage=['pants.engine.exp.nodes', 'pants.engine.exp.scheduler'],
   dependencies=[
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp/examples:planners',
