@@ -60,7 +60,7 @@ public class ConsoleRunnerTestHelper {
       throws IOException, JAXBException {
     String outdirPath = temporary.newFolder("testOutputDir").getAbsolutePath();
 
-    String[] args = new String[] { testClassName, "-outdir", outdirPath, "-xmlreport"};
+    String[] args = new String[] { testClassName, "-xmlreport", "-outdir", outdirPath};
     if (shouldFail) {
       try {
         ConsoleRunnerImpl.main(args);
