@@ -186,7 +186,9 @@ class ProductGraph(object):
                                                                 predicate=all_predicate,
                                                                 dependents=True))
 
-    # Sever dependee->dependent relationships in the graph for all given invalidated roots.
+    # Sever dependee->dependent relationships in the graph for all given invalidated roots. This
+    # only applies to the outer-most invalidated root nodes due to possible references from non-
+    # invalidated nodes via dependents.
     for root in invalidated_roots:
       _sever_root_dependents(invalidated_roots)
 
@@ -200,7 +202,7 @@ class ProductGraph(object):
     """Yields Nodes depth-first in pre-order, starting from the given roots.
 
     Each node entry is actually a tuple of (Node, State), and each yielded value is
-    a tuple of (node_entry, dependency_node_entries).
+    a tuple of (node_entry, dep_node_entries).
 
     The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
     that don't match it. The default predicate eliminates all `Noop` subgraphs.
@@ -465,6 +467,8 @@ class LocalScheduler(object):
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
     :param project_tree: An instance of ProjectTree for the current build root.
+    :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
+                       instance. Defaults to creating a new threading.RLock().
     """
     self._products_by_goal = goals
     self._tasks = tasks
