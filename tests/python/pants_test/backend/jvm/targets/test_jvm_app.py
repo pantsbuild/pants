@@ -239,6 +239,20 @@ class BundleTest(BaseTest):
     with self.assertRaises(ValueError):
       _bundle(spec_path)(fileset=[globs("z/*")])
 
+  def test_bundle_hash_with_globs(self):
+    spec_path = 'y'
+    globs = _globs(spec_path)
+    self.create_file(os.path.join(spec_path, 'one.xml'))
+    self.create_file(os.path.join(spec_path, 'config/two.xml'))
+    app = self.make_target('y:app',
+                           JvmApp,
+                           dependencies=[],
+                           bundles=[
+                             _bundle(spec_path)(fileset=globs("*"))
+                           ])
+    # Call should be should be successful.
+    app.payload.fingerprint()
+
   def test_rel_path_with_glob_fails(self):
     # Globs are treated as eager, so rel_path doesn't affect their meaning.
     # The effect of this is likely to be confusing, so disallow it.
