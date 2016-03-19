@@ -52,7 +52,7 @@ class ExpGraph(BuildGraph):
       if state_key.type is Throw:
         # TODO: get access to `Storage` instance in order to `to-str` more effectively here.
         raise AddressLookupError(
-            'Build graph construction failed for {}:\n  {}'.format(node.subject_key, state.exc))
+            'Build graph construction failed for {}:\n  {}'.format(node.subject_key, state_key))
       elif state_key.type is not Return:
         State.raise_unrecognized(state_key.type)
       if node.product is not LegacyBuildGraphNode:
