@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.payload import Payload
-from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
+from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes, stable_json_sha1
 from pants.build_graph.target import Target
 
 
@@ -64,7 +64,7 @@ class Page(Target):
 
   class ProvidesTupleField(tuple, PayloadField):
     def _compute_fingerprint(self):
-      return combine_hashes(artifact.fingerprint() for artifact in self)
+      return combine_hashes([stable_json_sha1(artifact.config) for artifact in self])
 
   def __init__(self,
                address=None,
