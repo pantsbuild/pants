@@ -12,6 +12,7 @@ from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
 from contextlib import closing
+from functools import total_ordering
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
@@ -23,6 +24,7 @@ from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
 
+@total_ordering
 class Key(object):
   """Holds the digest for the object, which uniquely identifies it.
 
@@ -86,8 +88,8 @@ class Key(object):
   def __eq__(self, other):
     return type(other) == Key and self._digest == other._digest
 
-  def __ne__(self, other):
-    return not (self == other)
+  def __lt__(self, other):
+    return self._digest < other._digest
 
   def __repr__(self):
     return 'Key({}{})'.format(
@@ -264,7 +266,6 @@ class Cache(Closable):
     """Get the cached StepResult for a given StepRequest."""
     result_key = self._storage.get_mapping(self._compute_key(step_request))
     if result_key is None:
-      print('miss {}'.format(step_request))
       self._cache_stats.add_miss()
       return None
 
