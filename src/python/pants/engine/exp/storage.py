@@ -264,6 +264,7 @@ class Cache(Closable):
     """Get the cached StepResult for a given StepRequest."""
     result_key = self._storage.get_mapping(self._compute_key(step_request))
     if result_key is None:
+      print('miss {}'.format(step_request))
       self._cache_stats.add_miss()
       return None
 
