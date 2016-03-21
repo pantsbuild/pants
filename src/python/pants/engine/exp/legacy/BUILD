@@ -5,6 +5,7 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
+    ':globs',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
     'src/python/pants/engine/exp:fs',
@@ -14,12 +15,22 @@ python_library(
 )
 
 python_library(
+  name='globs',
+  sources=['globs.py'],
+  dependencies=[
+    'src/python/pants/util:meta',
+  ],
+)
+
+python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
     ':parser',
+    ':globs',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/engine/exp:fs',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:selectors',
     'src/python/pants/util:objects',

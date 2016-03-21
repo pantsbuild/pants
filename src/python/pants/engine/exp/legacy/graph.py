@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
+from pants.engine.exp.fs import PathGlobs
 from pants.engine.exp.legacy.parser import TargetAdaptor
+from pants.engine.exp.legacy.globs import Lobs
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
 from pants.engine.exp.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
@@ -73,6 +75,17 @@ class ExpGraph(BuildGraph):
         self._target_dependees_by_address[dependency].add(address)
     return addresses
 
+  def _instantiate_sources(self, target_relpath, sources):
+    """Given a list of literal sources list or SourcesAdaptor instance, instantiate PathGlobs."""
+    if isinstance(sources, Lobs):
+      kwargs = {
+          'relative_to': target_relpath,
+          sources.path_globs_kwarg: sources.patterns
+        }
+      return PathGlobs.create(**kwargs)
+    else:
+      return PathGlobs.create(relative_to=target_relpath, files=sources)
+
   def _instantiate_target(self, target_adaptor):
     """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target.
 
@@ -86,6 +99,10 @@ class ExpGraph(BuildGraph):
       # Pop dependencies, which was already consumed while constructing LegacyBuildGraphNode.
       kwargs = target_adaptor.kwargs()
       kwargs.pop('dependencies')
+      # Replace sources argument with a PathGlobs instance, or None.
+      sources = kwargs.get('sources', None)
+      if sources:
+        kwargs['sources'] = self._instantiate_sources(kwargs['spec_path'], sources)
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:

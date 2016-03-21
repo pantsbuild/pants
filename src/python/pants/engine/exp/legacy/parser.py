@@ -12,13 +12,14 @@ import six
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
-from pants.engine.exp.objects import Serializable
+from pants.engine.exp.legacy.globs import Globs, RGlobs, ZGlobs
+from pants.engine.exp.objects import Locatable, Serializable
 from pants.engine.exp.parsers import Parser
-from pants.engine.exp.struct import StructWithDeps
+from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.util.memo import memoized_method, memoized_property
 
 
-class TargetAdaptor(StructWithDeps):
+class TargetAdaptor(StructWithDeps, Locatable):
   """A Struct to imitate the existing Target.
 
   Extending StructWithDeps causes the class to have a `dependencies` field marked Addressable.
@@ -64,7 +65,13 @@ class LegacyPythonCallbacksParser(Parser):
         else:
           return self._object_type(*args, **kwargs)
 
+    # Compute a single ParseContext for a default path, which we will mutate for each parsed path.
     symbols = {}
+    for alias, target_macro_factory in aliases.target_macro_factories.items():
+      for target_type in target_macro_factory.target_types:
+        symbols[target_type] = TargetAdaptor
+    parse_context = ParseContext(rel_path='', type_aliases=symbols)
+
     for alias, symbol in symbol_table.items():
       registrar = Registrar(alias, symbol)
       symbols[alias] = registrar
@@ -72,12 +79,6 @@ class LegacyPythonCallbacksParser(Parser):
 
     if aliases.objects:
       symbols.update(aliases.objects)
-
-    # Compute a single ParseContext for a default path, which we will mutate for each parsed path.
-    for alias, target_macro_factory in aliases.target_macro_factories.items():
-      for target_type in target_macro_factory.target_types:
-        symbols[target_type] = TargetAdaptor
-    parse_context = ParseContext(rel_path='', type_aliases=symbols)
 
     # Compute "per path" symbols (which will all use the same mutable ParseContext).
     aliases = symbol_table_cls.aliases()
@@ -88,6 +89,12 @@ class LegacyPythonCallbacksParser(Parser):
       symbols[alias] = target_macro_factory.target_macro(parse_context)
       for target_type in target_macro_factory.target_types:
         symbols[target_type] = TargetAdaptor
+
+    # TODO: Replace builtins for paths with objects that will create wrapped PathGlobs objects.
+    symbols['globs'] = Globs
+    symbols['rglobs'] = RGlobs
+    symbols['zglobs'] = ZGlobs
+
     return symbols, parse_context
 
   @classmethod
