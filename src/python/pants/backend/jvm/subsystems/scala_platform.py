@@ -37,13 +37,6 @@ scala_build_info = {
       repl_name='scala_2_11_repl',
       style_name='scalastyle_2_11',
       style_version='0.8.0'),
-  'custom': major_version_info(
-    full_version=None,
-    compiler_name='scalac',
-    runtime_name='runtime_default',
-    repl_name='scala-repl',
-    style_name='scalastyle',
-    style_version=None),
 }
 
 
@@ -124,7 +117,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     # Register Scala compilers.
     register_scala_compiler('2.10')
     register_scala_compiler('2.11')
-    register_scala_compiler('custom')  # This will register default tools.
 
     # Register repl tools.
     jline_dep = JarDependency(
@@ -135,18 +127,17 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
     register_scala_repl('2.10', extra_deps=[jline_dep])
     register_scala_repl('2.11')
-    register_scala_repl('custom', extra_deps=[jline_dep])
 
     # Register Scala style libraries.
     register_style_tool('2.10')
     register_style_tool('2.11')
-    register_style_tool('custom')
 
   def _get_label(self):
     return getattr(self.get_options(), 'version', 'custom')
 
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
+    print("Fetching compiler for version: {}".format(self.get_options().version))
     compiler_name = scala_build_info.get(self._get_label()).compiler_name
     return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
 
