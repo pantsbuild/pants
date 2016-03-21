@@ -262,7 +262,7 @@ class Cache(Closable):
 
   def get(self, step_request):
     """Get the cached StepResult for a given StepRequest."""
-    result_key = self._storage.get_mapping(self._storage.put(step_request))
+    result_key = self._storage.get_mapping(self._compute_key(step_request))
     if result_key is None:
       self._cache_stats.add_miss()
       return None
@@ -272,7 +272,7 @@ class Cache(Closable):
 
   def put(self, step_request, step_result):
     """Save the StepResult for a given StepResult."""
-    request_key = self._storage.put(step_request)
+    request_key = self._compute_key(step_request)
     result_key = self._storage.put(step_result)
     return self._storage.add_mapping(from_key=request_key, to_key=result_key)
 
@@ -292,6 +292,10 @@ class Cache(Closable):
 
   def close(self):
     self._storage.close()
+
+  def _compute_key(self, step_request):
+    step_request_with_id_unset = step_request._replace(step_id=0)
+    return self._storage.put(step_request_with_id_unset)
 
 
 class CacheStats(Counter):
