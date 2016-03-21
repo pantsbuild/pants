@@ -500,10 +500,8 @@ class LocalScheduler(object):
 
     # Ready.
     self._step_id += 1
-    s1 = sorted(deps.items(), key=lambda t: t[0])
-    s2 = sorted(s1, key=lambda t: t[0].subject_key._hash)
-    s3 = sorted(s2, key=lambda t: type(t[0]))
-    sorted_deps = OrderedDict(s3)
+    sorted_deps = OrderedDict(sorted(deps.items(),
+                                     key=lambda t: (type(t[0]), t[0].subject_key._hash, t[0])))
     return (StepRequest(self._step_id, node, sorted_deps, self._project_tree), Promise())
 
   def node_builder(self):
