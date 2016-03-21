@@ -43,7 +43,8 @@ class FilesetWithSpec(object):
 
   @memoized_property
   def files(self):
-    return self._files_calculator()
+    # BUILD file's filespecs should return only files, not folders.
+    return [f for f in self._files_calculator() if os.path.isfile(os.path.join(get_buildroot(), self._rel_root, f))]
 
   def __iter__(self):
     return self.files.__iter__()
