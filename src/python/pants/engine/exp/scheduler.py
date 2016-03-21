@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 import threading
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
@@ -500,7 +500,13 @@ class LocalScheduler(object):
 
     # Ready.
     self._step_id += 1
-    return (StepRequest(self._step_id, node, deps, self._project_tree), Promise())
+
+    # StepRequest is to be hashed as cache key, sort this dependencies map by
+    # keys, i.e, nodes, to eliminate non-determinism. We sort the nodes by
+    # first grouping them on their types, since dependencies may contain
+    # different types of nodes.
+    sorted_deps = OrderedDict(sorted(deps.items(), key=lambda t: (type(t[0]), t[0])))
+    return (StepRequest(self._step_id, node, sorted_deps, self._project_tree), Promise())
 
   def node_builder(self):
     """Return the NodeBuilder instance for this Scheduler.
