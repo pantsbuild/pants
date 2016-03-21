@@ -115,6 +115,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
   SelectNode.
   """
 
+  @property
   def is_cacheable(self):
     return True
 
@@ -219,6 +220,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', '
   order of declaration in the list `field` of the `dep_product`.
   """
 
+  @property
   def is_cacheable(self):
     return True
 
@@ -272,6 +274,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
   multi-field projection for the contents of a list). Should be looking for ways to merge them.
   """
 
+  @property
   def is_cacheable(self):
     return True
 
@@ -321,6 +324,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
 
 class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func', 'clause']), Node):
 
+  @property
   def is_cacheable(self):
     return True
 
@@ -369,6 +373,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'vari
   def is_filesystem_product(cls, product):
     return product in cls._FS_PRODUCT_TYPES
 
+  @property
   def is_cacheable(self):
     """Native node should not be cached."""
     return False
