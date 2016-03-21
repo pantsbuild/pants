@@ -38,12 +38,12 @@ scala_build_info = {
       style_name='scalastyle_2_11',
       style_version='0.8.0'),
   'custom': major_version_info(
-    full_version='2.10.4',
+    full_version=None,
     compiler_name='scalac',
     runtime_name='runtime_default',
     repl_name='scala-repl',
     style_name='scalastyle',
-    style_version='0.3.2'),
+    style_version=None),
 }
 
 
@@ -110,6 +110,12 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                              'is set to custom.')
 
     register('--runtime-spec', advanced=True, default='//:scala-library',
+             help='Address to be used for custom scala runtime.')
+
+    register('--repl-spec', advanced=True, default='//:scala-repl',
+             help='Address to be used for custom scala runtime.')
+
+    register('--scalac-spec', advanced=True, default='//:scalac',
              help='Address to be used for custom scala runtime.')
 
     register('--suffix-version', advanced=True, default=None,
