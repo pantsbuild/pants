@@ -250,7 +250,7 @@ class BundleTest(BaseTest):
                            bundles=[
                              _bundle(spec_path)(fileset=globs("*"))
                            ])
-    # Call should be should be successful.
+    # Call should be successful.
     app.payload.fingerprint()
 
   def test_rel_path_with_glob_fails(self):
