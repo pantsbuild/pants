@@ -116,9 +116,10 @@ class Storage(Closable):
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
-  def create(cls, in_memory=False, debug=True, protocol=None):
+  def create(cls, path=None, in_memory=False, debug=True, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
+    :param path: If in_memory=False, the path to store the database in.
     :param in_memory: Indicate whether to use the in-memory kvs or an embeded database.
     :param debug: A flag to store debug information in the key.
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
@@ -126,7 +127,8 @@ class Storage(Closable):
     if in_memory:
       content, key_mappings = InMemoryDb(), InMemoryDb()
     else:
-      content, key_mappings = Lmdb.create(child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
+      content, key_mappings = Lmdb.create(path=path,
+                                          child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
 
     return Storage(content, key_mappings, debug=debug, protocol=protocol)
 

@@ -44,7 +44,7 @@ def setup():
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
 
-  storage = Storage.create(debug=False, debug=False)
+  storage = Storage.create(path='/tmp/lmdb', debug=False)
   project_tree = FileSystemProjectTree(build_root)
   symbol_table_cls = LegacyTable
 
