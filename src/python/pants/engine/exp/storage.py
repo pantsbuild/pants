@@ -294,6 +294,8 @@ class Cache(Closable):
     self._storage.close()
 
   def _compute_key(self, step_request):
+    # NB: we want to exclude step_id from step_request for fingerprint,
+    # but named tuple is immutable, so make a copy and reset the step_id field.
     step_request_with_id_unset = step_request._replace(step_id=0)
     return self._storage.put(step_request_with_id_unset)
 
