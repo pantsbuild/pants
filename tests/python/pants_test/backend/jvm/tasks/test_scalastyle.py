@@ -101,58 +101,38 @@ class ScalastyleTest(NailgunTaskTestBase):
   @contextmanager
   def scala_platform_setup(self):
     with subsystem_instance(ScalaPlatform):
-      self.make_target(':scalastyle',
+      self.set_options_for_scope(ScalaPlatform.options_scope, version='2.10')
+
+      yield
+
+  @contextmanager
+  def custom_scala_platform_setup(self):
+    with subsystem_instance(ScalaPlatform):
+      self.make_target('//:scalastyle',
                        JarLibrary,
-                       jars=[JarDependency('org.scalastyle', 'scalastyle_2.10', '0.3.2')]
+                       jars=[JarDependency('org.scalastyle', 'scalastyle', '0.3.2')]
       )
-      self.make_target(':scalastyle_211',
-                       JarLibrary,
-                       jars=[JarDependency('org.scalastyle', 'scalastyle_2.11', '0.8.0')]
-      )
-      self.make_target(':scala-compiler',
+      self.make_target('//:scalac',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.10.5')])
-      self.make_target(':scala-compiler_211',
-                       JarLibrary,
-                       jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.11.7')])
 
-      self.make_target(':scala-repl',
+      self.make_target('//:scala-repl',
                  JarLibrary,
                  jars=[
-                   JarDependency(org = 'org.scala-lang',
-                                 name = 'jline',
-                                 rev = '2.10.5'),
-                   JarDependency(org = 'org.scala-lang',
-                                 name = 'scala-compiler',
-                                 rev = '2.10.5')])
+                      JarDependency(org = 'org.scala-lang',
+                                    name = 'jline',
+                                    rev = '2.10.5'),
+                      JarDependency(org = 'org.scala-lang',
+                                    name = 'scala-compiler',
+                                    rev = '2.10.5'),
+                    ])
 
-      self.make_target(':scala-repl_211',
-                 JarLibrary,
-                 jars=[
-                   JarDependency(org = 'org.scala-lang',
-                                 name = 'jline',
-                                 rev = '2.11.7'),
-                   JarDependency(org = 'org.scala-lang',
-                                 name = 'scala-compiler',
-                                 rev = '2.11.7')])
-
-      self.make_target(':scala-library',
+      self.make_target('//:scala-library',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
-      self.set_options_for_scope(ScalaPlatform.options_scope, scalac=':scala-compiler')
 
-      # Scala Platform requires options to be defined for any registered tools in ScalaPlatform,
-      # because all jvm tools are bootstrapped.
       self.set_options_for_scope(ScalaPlatform.options_scope, version='custom')
-      self.set_options_for_scope(ScalaPlatform.options_scope, scalac_2_10=':scala-compiler')
-      self.set_options_for_scope(ScalaPlatform.options_scope, scalac_2_11=':scala-compiler_211')
 
-      self.set_options_for_scope(ScalaPlatform.options_scope, scala_2_10_repl=':scala-repl')
-      self.set_options_for_scope(ScalaPlatform.options_scope, scala_2_11_repl=':scala-repl_211')
-      self.set_options_for_scope(ScalaPlatform.options_scope, scala_repl=':scala-repl')
-
-      self.set_options_for_scope(ScalaPlatform.options_scope, scalastyle_2_10=':scalastyle')
-      self.set_options_for_scope(ScalaPlatform.options_scope, scalastyle_2_11=':scalastyle_211')
       yield
 
   def test_get_non_synthetic_scala_targets(self):
@@ -224,6 +204,27 @@ class ScalastyleTest(NailgunTaskTestBase):
   def test_end_to_end_pass(self):
     # Default scalastyle config (import grouping rule) and no excludes.
     with self.scala_platform_setup():
+      # Create a scala source that would PASS ImportGroupingChecker rule.
+      self.create_file(
+        relpath='a/scala/pass.scala',
+        contents=dedent("""
+          import java.util
+          object HelloWorld {
+             def main(args: Array[String]) {
+                println("Hello, world!")
+             }
+          }
+        """))
+      scala_target = self.make_target('a/scala:pass', ScalaLibrary, sources=['pass.scala'])
+
+      context = self._create_context(scalastyle_config=self._create_scalastyle_config_file(),
+                                     target_roots=[scala_target])
+
+      self.execute(context)
+
+  def test_custom_end_to_end_pass(self):
+    # Default scalastyle config (import grouping rule) and no excludes.
+    with self.custom_scala_platform_setup():
       # Create a scala source that would PASS ImportGroupingChecker rule.
       self.create_file(
         relpath='a/scala/pass.scala',

@@ -111,6 +111,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register('--scalac-spec', advanced=True, default='//:scalac',
              help='Address to be used for custom scala runtime.')
 
+    register('--style-spec', advanced=True, default='//:scalastyle',
+             help='Address to be used for custom scala runtime.')
+
     register('--suffix-version', advanced=True, default=None,
              help='Scala suffix to be used when a custom version is specified.  For example 2.10')
 
@@ -137,14 +140,19 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    print("Fetching compiler for version: {}".format(self.get_options().version))
-    compiler_name = scala_build_info.get(self._get_label()).compiler_name
-    return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
+    if self.get_options().version == 'custom':
+      return self.get_options().scalac_spec
+    else:
+      compiler_name = scala_build_info.get(self._get_label()).compiler_name
+      return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
 
   def style_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    style_name = scala_build_info.get(self._get_label()).style_name
-    return self.tool_classpath_from_products(products, style_name, scope=self.options_scope)
+    if self.get_options().version == 'custom':
+      return self.get_options().style_spec
+    else:
+      style_name = scala_build_info.get(self._get_label()).style_name
+      return self.tool_classpath_from_products(products, style_name, scope=self.options_scope)
 
   @property
   def version(self):
@@ -177,7 +185,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper repl name.
     :return iterator: list with single runtime.
     """
-    return scala_build_info.get(self._get_label()).repl_name
+    if self.get_options().version == 'custom':
+      return self.get_options().repl_spec
+    else:
+      return scala_build_info.get(self._get_label()).repl_name
 
   @property
   def runtime(self):
