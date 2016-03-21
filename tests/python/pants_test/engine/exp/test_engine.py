@@ -78,9 +78,10 @@ class EngineTest(unittest.TestCase):
       self.scheduler.product_graph.invalidate()
       self.assert_engine(engine)
 
+
       # Second run executes same number of steps, and are all cache hits, no more misses.
       self.assertEquals(max_steps * 2, self.scheduler._step_id)
-      self.assertEquals(total, cache_stats.total - total)
+      self.assertEquals(total * 2, cache_stats.total)
       self.assertEquals(misses, cache_stats.misses)
       self.assertTrue(cache_stats.hits > 0)
 

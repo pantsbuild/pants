@@ -185,3 +185,10 @@ class AddressMapper(object):
   def __hash__(self):
     # Compiled regexes are not hashable.
     return hash((self.symbol_table_cls, self.parser_cls))
+
+  def __repr__(self):
+    return 'AddressMapper(parser={}, symbol_table={}, build_pattern={})'.format(
+      self.parser_cls, self.symbol_table_cls, self.build_pattern.pattern)
+
+  def __str__(self):
+    return repr(self)

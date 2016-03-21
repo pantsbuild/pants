@@ -6,7 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from abc import abstractproperty
-from collections import MutableMapping, MutableSequence
+from collections import MutableMapping, MutableSequence, OrderedDict
+from functools import total_ordering
 
 import six
 
@@ -19,11 +20,11 @@ def _normalize_utf8_keys(kwargs):
   """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
   if any(type(key) is six.binary_type for key in kwargs.keys()):
     # This is to preserve the original dict type for kwargs.
-    dict_type = type(kwargs)
-    return dict_type([(six.text_type(k), v) for k, v in kwargs.items()])
+    return OrderedDict([(six.text_type(k), v) for k, v in sorted(kwargs.items())])
   return kwargs
 
 
+@total_ordering
 class Struct(Serializable, SerializableFactory, Validatable):
   """A serializable object.
 
@@ -276,8 +277,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
   def __eq__(self, other):
     return isinstance(other, Struct) and self._key() == other._key()
 
-  def __ne__(self, other):
-    return not (self == other)
+  def __lt__(self, other):
+    return cmp(self._asdict(), other._asdict()) < 0
 
   def __repr__(self):
     classname = type(self).__name__

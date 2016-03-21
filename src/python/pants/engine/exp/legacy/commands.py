@@ -44,7 +44,7 @@ def setup():
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
 
-  storage = Storage.create(debug=False)
+  storage = Storage.create(path='/tmp/lmdb', debug=False)
   project_tree = FileSystemProjectTree(build_root)
   symbol_table_cls = LegacyTable
 
@@ -80,6 +80,8 @@ def dependencies():
     graph = ExpGraph(scheduler, engine, symbol_table_cls)
     for address in graph.inject_specs_closure(spec_roots):
       print(address)
+    stats = engine._cache.get_stats()
+    print('hits={} misses={} total={}'.format(stats.hits, stats.misses, stats.total))
   finally:
     engine.close()
 
