@@ -37,7 +37,7 @@ class FilesetWithSpec(object):
   """
 
   def __init__(self, rel_root, filespec, files_calculator):
-    self._rel_root = rel_root
+    self.rel_root = rel_root
     self.filespec = filespec
     self._files_calculator = files_calculator
 

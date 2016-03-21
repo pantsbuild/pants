@@ -665,6 +665,7 @@ class Target(AbstractTarget):
       return DeferredSourcesField(ref_address=referenced_address)
     elif isinstance(sources, FilesetWithSpec):
       filespec = sources.filespec
+      sources_rel_path = sources.rel_root
     else:
       sources = sources or []
       assert_list(sources, key_arg=key_arg)

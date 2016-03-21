@@ -18,6 +18,9 @@ python_library(
   name='globs',
   sources=['globs.py'],
   dependencies=[
+    'src/python/pants/engine/exp:fs',
+    'src/python/pants/engine/exp:nodes',
+    'src/python/pants/source',
     'src/python/pants/util:meta',
   ],
 )
@@ -30,7 +33,6 @@ python_library(
     ':globs',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'src/python/pants/engine/exp:fs',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:selectors',
     'src/python/pants/util:objects',
@@ -69,6 +71,14 @@ python_library(
 python_binary(
   name='dependencies',
   entry_point='pants.engine.exp.legacy.commands:dependencies',
+  dependencies=[
+    ':commands'
+  ]
+)
+
+python_binary(
+  name='filemap',
+  entry_point='pants.engine.exp.legacy.commands:filemap',
   dependencies=[
     ':commands'
   ]
