@@ -93,3 +93,7 @@ This is the second readme file! Isn't it exciting?
     # the 'README.md' page)
     address = Address.parse('src/docs:readme2', relative_to=get_buildroot())
     self.assertEquals(p._build_graph.get_target(address), self.target('src/docs:readme2'))
+
+  def test_wiki_page_fingerprint(self):
+    # Call should be successful.
+    self.target('src/docs:readme').payload.fingerprint()
