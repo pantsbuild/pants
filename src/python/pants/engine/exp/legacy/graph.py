@@ -96,7 +96,7 @@ class ExpGraph(BuildGraph):
       # Replace the sources argument with a FilesetWithSpecs instance, or None.
       spec_path = kwargs.pop('spec_path')
       sources = kwargs.get('sources', None)
-      if sources:
+      if sources is not None:
         kwargs['sources'] = self._instantiate_sources(spec_path, sources)
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
