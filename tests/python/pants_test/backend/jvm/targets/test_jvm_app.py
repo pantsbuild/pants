@@ -239,19 +239,28 @@ class BundleTest(BaseTest):
     with self.assertRaises(ValueError):
       _bundle(spec_path)(fileset=[globs("z/*")])
 
-  def test_bundle_hash_with_globs(self):
+  def test_jvmapp_fingerprinting(self):
     spec_path = 'y'
     globs = _globs(spec_path)
     self.create_file(os.path.join(spec_path, 'one.xml'))
     self.create_file(os.path.join(spec_path, 'config/two.xml'))
-    app = self.make_target('y:app',
+
+    def calc_fingerprint():
+      # Globs are eagerly, therefore we need to recreate target to recalculate fingerprint.
+      self.reset_build_graph()
+      app = self.make_target('y:app',
                            JvmApp,
                            dependencies=[],
                            bundles=[
                              _bundle(spec_path)(fileset=globs("*"))
                            ])
-    # Call should be successful.
-    app.payload.fingerprint()
+      return app.payload.fingerprint()
+
+    fingerprint_before = calc_fingerprint()
+    os.mkdir(os.path.join(self.build_root, spec_path, 'folder_one'))
+    self.assertEquals(fingerprint_before, calc_fingerprint())
+    self.create_file(os.path.join(spec_path, 'three.xml'))
+    self.assertNotEqual(fingerprint_before, calc_fingerprint())
 
   def test_rel_path_with_glob_fails(self):
     # Globs are treated as eager, so rel_path doesn't affect their meaning.
