@@ -43,8 +43,7 @@ class FilesetWithSpec(object):
 
   @memoized_property
   def files(self):
-    # BUILD file's filespecs should return only files, not folders.
-    return [f for f in self._files_calculator() if os.path.isfile(os.path.join(get_buildroot(), self._rel_root, f))]
+    return self._files_calculator()
 
   def __iter__(self):
     return self.files.__iter__()
@@ -96,7 +95,9 @@ class FilesetRelPathWrapper(object):
         raise ValueError('Invalid glob {}, points outside BUILD file root {}'.format(glob, root))
 
     def files_calculator():
-      result = self.wrapped_fn(root=root, *patterns, **kwargs)
+      # BUILD file's filesets should contain only files, not folders.
+      result = (path for path in self.wrapped_fn(root=root, *patterns, **kwargs)
+                if os.path.isfile(os.path.join(get_buildroot(), rel_root, path)))
 
       for ex in excludes:
         result -= ex
