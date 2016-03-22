@@ -9,6 +9,7 @@ import six
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
+from pants.util.strutil import ensure_text
 
 
 def dict_option(s):
@@ -131,6 +132,8 @@ class ListValueComponent(object):
            member_type.
     :rtype: `ListValueComponent`
     """
+    if isinstance(value, six.string_types):
+      value = ensure_text(value)
     if isinstance(value, cls):  # Ensure idempotency.
       action = value.action
       val = value.val
