@@ -30,6 +30,9 @@ class WikiArtifact(object):
     self.wiki = wiki
     self.config = kwargs
 
+  def fingerprint(self):
+    return combine_hashes([self.wiki.fingerprint(), stable_json_sha1(self.config)])
+
 
 class Wiki(object):
   """Identifies a wiki where pages can be published."""
@@ -40,6 +43,10 @@ class Wiki(object):
     """
     self.name = name
     self.url_builder = url_builder
+
+  def fingerprint(self):
+    # TODO: url_builder is not a part of fingerprint.
+    return stable_json_sha1(self.name)
 
 
 class Page(Target):
@@ -64,7 +71,7 @@ class Page(Target):
 
   class ProvidesTupleField(tuple, PayloadField):
     def _compute_fingerprint(self):
-      return combine_hashes([stable_json_sha1(artifact.config) for artifact in self])
+      return combine_hashes(artifact.fingerprint() for artifact in self)
 
   def __init__(self,
                address=None,
