@@ -22,6 +22,7 @@ python_library(
     'src/python/pants/engine/exp:nodes',
     'src/python/pants/source',
     'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ],
 )
 
@@ -62,6 +63,7 @@ python_library(
   name='register',
   sources=['register.py'],
   dependencies=[
+    ':globs',
     ':graph',
     ':parser',
     'src/python/pants/engine/exp:selectors',

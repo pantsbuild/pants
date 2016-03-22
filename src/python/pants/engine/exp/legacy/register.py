@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.engine.exp.fs import FileContent
+from pants.engine.exp.legacy.globs import FileFingerprint, file_fingerprint
 from pants.engine.exp.legacy.graph import LegacyBuildGraphNode, reify_legacy_graph
 from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.selectors import Select, SelectDependencies
@@ -18,5 +20,10 @@ def create_legacy_graph_tasks():
     (LegacyBuildGraphNode,
      [Select(TargetAdaptor),
       SelectDependencies(LegacyBuildGraphNode, TargetAdaptor)],
-     reify_legacy_graph)
+     reify_legacy_graph),
+    # Given FileContent, compute a FileFingerprint.
+    # NB: See notes on FileFingerprint.
+    (FileFingerprint,
+     [Select(FileContent)],
+     file_fingerprint)
   ]
