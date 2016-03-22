@@ -58,12 +58,6 @@ import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRe
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
  */
 public class ConsoleRunnerImpl {
-  private static final SwappableStream<PrintStream> SWAPPABLE_OUT =
-      new SwappableStream<PrintStream>(System.out);
-
-  private static final SwappableStream<PrintStream> SWAPPABLE_ERR =
-      new SwappableStream<PrintStream>(System.err);
-
   /** Should be set to false for unit testing via {@link #setCallSystemExitOnFinish} */
   private static boolean callSystemExitOnFinish = true;
   /** Intended to be used in unit testing this class */
@@ -217,10 +211,16 @@ public class ConsoleRunnerImpl {
 
     private final File outdir;
     private final OutputMode outputMode;
+    private final SwappableStream<PrintStream> swappableOut;
+    private final SwappableStream<PrintStream> swappableErr;
 
-    StreamCapturingListener(File outdir, OutputMode outputMode) {
+    StreamCapturingListener(File outdir, OutputMode outputMode,
+        SwappableStream<PrintStream> swappableOut,
+        SwappableStream<PrintStream> swappableErr) {
       this.outdir = outdir;
       this.outputMode = outputMode;
+      this.swappableOut = swappableOut;
+      this.swappableErr = swappableErr;
     }
 
     @Override
@@ -267,18 +267,18 @@ public class ConsoleRunnerImpl {
 
       switch (outputMode) {
         case ALL:
-          SWAPPABLE_OUT.swap(new TeeOutputStream(SWAPPABLE_OUT.getOriginal(), suiteOut));
-          SWAPPABLE_ERR.swap(new TeeOutputStream(SWAPPABLE_ERR.getOriginal(), suiteErr));
+          swappableOut.swap(new TeeOutputStream(swappableOut.getOriginal(), suiteOut));
+          swappableErr.swap(new TeeOutputStream(swappableErr.getOriginal(), suiteErr));
           break;
         case FAILURE_ONLY:
           InMemoryStreamCapture caseCapture = new InMemoryStreamCapture();
           caseCaptures.put(description, caseCapture);
-          SWAPPABLE_OUT.swap(new TeeOutputStream(caseCapture.getOutputStream(), suiteOut));
-          SWAPPABLE_ERR.swap(new TeeOutputStream(caseCapture.getErrorStream(), suiteErr));
+          swappableOut.swap(new TeeOutputStream(caseCapture.getOutputStream(), suiteOut));
+          swappableErr.swap(new TeeOutputStream(caseCapture.getErrorStream(), suiteErr));
           break;
         case NONE:
-          SWAPPABLE_OUT.swap(suiteOut);
-          SWAPPABLE_ERR.swap(suiteErr);
+          swappableOut.swap(suiteOut);
+          swappableErr.swap(suiteErr);
           break;
         default:
           throw new IllegalStateException();
@@ -293,8 +293,8 @@ public class ConsoleRunnerImpl {
         if (caseCaptures.containsKey(failure.getDescription())) {
           InMemoryStreamCapture capture = caseCaptures.remove(failure.getDescription());
           capture.close();
-          SWAPPABLE_OUT.getOriginal().append(new String(capture.readOut()));
-          SWAPPABLE_ERR.getOriginal().append(new String(capture.readErr()));
+          swappableOut.getOriginal().append(new String(capture.readOut()));
+          swappableErr.getOriginal().append(new String(capture.readErr()));
         } else {
           // Do nothing.
           // In case of exception in @BeforeClass method testFailure executes without testStarted.
@@ -339,6 +339,8 @@ public class ConsoleRunnerImpl {
   private final int testShard;
   private final int numTestShards;
   private final int numRetries;
+  private final SwappableStream<PrintStream> swappableOut;
+  private final SwappableStream<PrintStream> swappableErr;
 
   ConsoleRunnerImpl(
       boolean failFast,
@@ -350,7 +352,9 @@ public class ConsoleRunnerImpl {
       int parallelThreads,
       int testShard,
       int numTestShards,
-      int numRetries) {
+      int numRetries,
+      PrintStream out,
+      PrintStream err) {
 
     this.failFast = failFast;
     this.outputMode = outputMode;
@@ -362,14 +366,16 @@ public class ConsoleRunnerImpl {
     this.testShard = testShard;
     this.numTestShards = numTestShards;
     this.numRetries = numRetries;
+    this.swappableOut = new SwappableStream<PrintStream>(out);
+    this.swappableErr = new SwappableStream<PrintStream>(err);
   }
 
   void run(Iterable<String> tests) {
-    System.setOut(new PrintStream(SWAPPABLE_OUT));
-    System.setErr(new PrintStream(SWAPPABLE_ERR));
+    System.setOut(new PrintStream(swappableOut));
+    System.setErr(new PrintStream(swappableErr));
 
     List<Request> requests =
-        parseRequests(SWAPPABLE_OUT.getOriginal(), SWAPPABLE_ERR.getOriginal(), tests);
+        parseRequests(swappableOut.getOriginal(), swappableErr.getOriginal(), tests);
 
     if (numTestShards > 0) {
       requests = setFilterForTestShard(requests);
@@ -390,7 +396,7 @@ public class ConsoleRunnerImpl {
         }
       }
       StreamCapturingListener streamCapturingListener =
-        new StreamCapturingListener(outdir, outputMode);
+          new StreamCapturingListener(outdir, outputMode, swappableOut, swappableErr);
       abortableListener.addListener(streamCapturingListener);
 
       AntJunitXmlReportListener xmlReportListener =
@@ -402,15 +408,15 @@ public class ConsoleRunnerImpl {
     // abortableListener gets removed when one of the listener throws exceptions in
     // RunNotifier.java. Other listeners should not get removed.
     if (perTestTimer) {
-      abortableListener.addListener(new PerTestConsoleListener(SWAPPABLE_OUT.getOriginal()));
+      abortableListener.addListener(new PerTestConsoleListener(swappableOut.getOriginal()));
     } else {
-      core.addListener(new ConsoleListener(SWAPPABLE_OUT.getOriginal()));
+      core.addListener(new ConsoleListener(swappableOut.getOriginal()));
     }
 
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
     final Thread abnormalExitHook =
-        createAbnormalExitHook(abortableListener, SWAPPABLE_OUT.getOriginal());
+        createAbnormalExitHook(abortableListener, swappableOut.getOriginal());
     Runtime.getRuntime().addShutdownHook(abnormalExitHook);
     int failures = 0;
     try {
@@ -434,7 +440,6 @@ public class ConsoleRunnerImpl {
     exit(failures);
   }
 
-
   /**
    * Returns a thread that records a system exit to the listener, and then halts(1).
    */
@@ -443,8 +448,7 @@ public class ConsoleRunnerImpl {
       @Override public void run() {
         try {
           listener.abort(new UnknownError("Abnormal VM exit - test crashed."));
-        // We want to trap and log no matter why abort failed for a better end user message.
-        // SUPPRESS CHECKSTYLE RegexpSinglelineJava
+          // We want to trap and log no matter why abort failed for a better end user message.
         } catch (Exception e) {
           out.println(e);
           e.printStackTrace(out);
@@ -466,6 +470,7 @@ public class ConsoleRunnerImpl {
     class TestMethod {
       private final Class<?> clazz;
       private final String name;
+
       TestMethod(Class<?> clazz, String name) {
         this.clazz = clazz;
         this.name = name;
@@ -497,7 +502,6 @@ public class ConsoleRunnerImpl {
         // fail with the test spec so the class failing to link is known.
         notFoundError(spec, out, e);
       // See the comment below for justification.
-      // SUPPRESS CHECKSTYLE RegexpSinglelineJava
       } catch (RuntimeException e) {
         // The class may fail with some variant of RTE in its static initializers, trap these
         // and dump the bad spec in question to help narrow down issue.
@@ -591,12 +595,12 @@ public class ConsoleRunnerImpl {
     TestFilter testFilter = new TestFilter();
     AlphabeticComparator alphaComp = new AlphabeticComparator();
     ArrayList<Request> filteredRequests = new ArrayList<Request>(requests.size());
-    for (Request request: requests) {
+    for (Request request : requests) {
       filteredRequests.add(request.sortWith(alphaComp).filterWith(testFilter));
     }
     // This will iterate over all of the test serially, calling shouldRun() above.
     // It's needed to guarantee stable sharding in all situations.
-    for (Request request: filteredRequests) {
+    for (Request request : filteredRequests) {
       request.getRunner().getDescription();
     }
     return filteredRequests;
@@ -727,7 +731,9 @@ public class ConsoleRunnerImpl {
             options.parallelThreads,
             options.testShard,
             options.numTestShards,
-            options.numRetries);
+            options.numRetries,
+            System.out,
+            System.err);
 
     List<String> tests = Lists.newArrayList();
     for (String test : options.tests) {
