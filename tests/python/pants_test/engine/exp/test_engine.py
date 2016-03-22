@@ -75,7 +75,7 @@ class EngineTest(unittest.TestCase):
     # Save counts for the first run to prepare for another run.
     max_steps, misses, total = self.scheduler._step_id, cache_stats.misses, cache_stats.total
 
-    self.scheduler.product_graph.clear()
+    self.scheduler.product_graph.invalidate()
     self.scheduler._step_id = 0
     self.assert_engine(engine)
 

@@ -15,13 +15,13 @@ from textwrap import dedent
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
-from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
+from pants.option.custom_types import dict_option, file_option, list_option, target_option
 from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
                                  BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidAction, InvalidKwarg,
-                                 MemberTypeNotAllowed, NonScalarMemberType, NoOptionNames,
-                                 OptionNameDash, OptionNameDoubleDash, ParseError,
-                                 RecursiveSubsystemOption, Shadowing)
+                                 ImplicitValIsNone, InvalidAction, InvalidKwarg, InvalidMemberType,
+                                 MemberTypeNotAllowed, NoOptionNames, OptionNameDash,
+                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
+                                 Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
@@ -81,10 +81,15 @@ class OptionsTest(unittest.TestCase):
     register_global('--int-choices', choices=[42, 99], type=int, action='append')
 
     # Custom types.
-    register_global('--dicty', type=dict_option, default='{"a": "b"}')
     register_global('--listy', type=list_option, member_type=int, default='[1, 2, 3]')
-    register_global('--target_listy', type=target_list_option, default=[':a', ':b'])
+    register_global('--dicty', type=dict_option, default='{"a": "b"}')
+    register_global('--dict-listy', type=list_option, member_type=dict_option,
+                    default='[{"a": 1, "b": 2}, {"c": 3}]')
+    register_global('--targety', type=target_option, default='//:a')
+    register_global('--target-listy', type=list_option, member_type=target_option,
+                    default=['//:a', '//:b'])
     register_global('--filey', type=file_option, default=None)
+    register_global('--file-listy', type=list_option, member_type=file_option)
 
     # Implicit value.
     register_global('--implicit-valuey', default='default', implicit_value='implicit')
@@ -222,14 +227,30 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --dicty=\'{"c": "d"}\'')
     self.assertEqual({'c': 'd'}, options.for_global_scope().dicty)
 
-    # Test target_list-typed option.
-    options = self._parse('./pants --target_listy=\'["//:foo", "//:bar"]\'')
+    # Test list-of-dict-typed option.
+    options = self._parse('./pants --dict-listy=\'[{"c": "d"}, {"e": "f"}]\'')
+    self.assertEqual([{'c': 'd'}, {'e': 'f'}], options.for_global_scope().dict_listy)
+
+    # Test target-typed option.
+    options = self._parse('./pants')
+    self.assertEqual('//:a', options.for_global_scope().targety)
+    options = self._parse('./pants --targety=//:foo')
+    self.assertEqual('//:foo', options.for_global_scope().targety)
+
+    # Test list-of-target-typed option.
+    options = self._parse('./pants --target-listy=\'["//:foo", "//:bar"]\'')
     self.assertEqual(['//:foo', '//:bar'], options.for_global_scope().target_listy)
 
     # Test file-typed option.
     with temporary_file_path() as fp:
       options = self._parse('./pants --filey="{}"'.format(fp))
       self.assertEqual(fp, options.for_global_scope().filey)
+
+    # Test list-of-file-typed option.
+    with temporary_file_path() as fp1:
+      with temporary_file_path() as fp2:
+        options = self._parse('./pants --file-listy="{}" --file-listy="{}"'.format(fp1, fp2))
+        self.assertEqual([fp1, fp2], options.for_global_scope().file_listy)
 
   def test_boolean_defaults(self):
     options = self._parse('./pants')
@@ -334,6 +355,72 @@ class OptionsTest(unittest.TestCase):
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
           config={'GLOBAL': {'listy': '[4,5]'}})
 
+  def test_dict_list_option(self):
+    def check(expected, args_str, env=None, config=None):
+      options = self._parse(args_str=args_str, env=env, config=config)
+      self.assertEqual(expected, options.for_global_scope().dict_listy)
+
+    # Appending to the default.
+    check([{'a': 1, 'b': 2}, {'c': 3}], './pants')
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}],
+          './pants --dict-listy=\'{"d": 4, "e": 5}\'')
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
+          './pants --dict-listy=\'{"d": 4, "e": 5}\' --dict-listy=\'{"f": 6}\'')
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
+          './pants --dict-listy=\'+[{"d": 4, "e": 5}, {"f": 6}]\'')
+
+    # Replacing the default.
+    check([{'d': 4, 'e': 5}, {'f': 6}],
+          './pants --dict-listy=\'[{"d": 4, "e": 5}, {"f": 6}]\'')
+
+    # Parsing env var correctly.
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}],
+          './pants', env={'PANTS_GLOBAL_DICT_LISTY': '{"d": 4, "e": 5}'})
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
+          './pants', env={'PANTS_GLOBAL_DICT_LISTY': '+[{"d": 4, "e": 5}, {"f": 6}]'})
+    check([{'d': 4, 'e': 5}, {'f': 6}],
+          './pants', env={'PANTS_GLOBAL_DICT_LISTY': '[{"d": 4, "e": 5}, {"f": 6}]'})
+
+    # Parsing config value correctly.
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}],
+          './pants', config={'GLOBAL': { 'dict_listy': '{"d": 4, "e": 5}'} })
+    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
+          './pants', config={'GLOBAL': { 'dict_listy': '+[{"d": 4, "e": 5}, {"f": 6}]'} })
+    check([{'d': 4, 'e': 5}, {'f': 6}],
+          './pants', config={'GLOBAL': { 'dict_listy': '[{"d": 4, "e": 5}, {"f": 6}]'} })
+
+  def test_target_list_option(self):
+    def check(expected, args_str, env=None, config=None):
+      options = self._parse(args_str=args_str, env=env, config=config)
+      self.assertEqual(expected, options.for_global_scope().target_listy)
+
+    # Appending to the default.
+    check(['//:a', '//:b'], './pants')
+    check(['//:a', '//:b', '//:c', '//:d'],
+          './pants --target-listy=//:c --target-listy=//:d')
+    check(['//:a', '//:b', '//:c', '//:d'],
+          './pants --target-listy=\'+["//:c", "//:d"]\'')
+
+    # Replacing the default.
+    check(['//:c', '//:d'],
+          './pants --target-listy=\'["//:c", "//:d"]\'')
+
+    # Parsing env var correctly.
+    check(['//:a', '//:b', '//:c'],
+          './pants', env={'PANTS_GLOBAL_TARGET_LISTY': '//:c'})
+    check(['//:a', '//:b', '//:c', '//:d'],
+          './pants', env={'PANTS_GLOBAL_TARGET_LISTY': '+["//:c", "//:d"]'})
+    check(['//:c', '//:d'],
+          './pants', env={'PANTS_GLOBAL_TARGET_LISTY': '["//:c", "//:d"]'})
+
+    # Parsing config value correctly.
+    check(['//:a', '//:b', '//:c'],
+          './pants', config={'GLOBAL': {'target_listy': '//:c'} })
+    check(['//:a', '//:b', '//:c', '//:d'],
+          './pants', config={'GLOBAL': {'target_listy': '+["//:c", "//:d"]'} })
+    check(['//:c', '//:d'],
+          './pants', config={'GLOBAL': {'target_listy': '["//:c", "//:d"]'} })
+
   def test_defaults(self):
     # Hard-coded defaults.
     options = self._parse('./pants compile.java -n33')
@@ -406,7 +493,9 @@ class OptionsTest(unittest.TestCase):
     assertError(BooleanOptionNameWithNo, '--no-foo', action='store_true')
     assertError(MemberTypeNotAllowed, '--foo', member_type=int)
     assertError(MemberTypeNotAllowed, '--foo', type=dict_option, member_type=int)
-    assertError(NonScalarMemberType, '--foo', type=list_option, member_type=dict_option)
+    assertError(InvalidMemberType, '--foo', type=list_option, member_type=set)
+    assertError(InvalidMemberType, '--foo', type=list_option, member_type=list)
+    assertError(InvalidMemberType, '--foo', type=list_option, member_type=list_option)
 
   def test_frozen_registration(self):
     options = Options.create(args=[], env={}, config=self._create_config({}),
@@ -782,8 +871,8 @@ class OptionsTest(unittest.TestCase):
 
     pairs = options.get_fingerprintable_for_scope('compile.scala')
     self.assertEquals(len(pairs), 3)
-    self.assertEquals(('', 'blah blah blah'), pairs[0])
-    self.assertEquals(('', True), pairs[1])
+    self.assertEquals((str, 'blah blah blah'), pairs[0])
+    self.assertEquals((str, True), pairs[1])
     self.assertEquals((int, 77), pairs[2])
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):

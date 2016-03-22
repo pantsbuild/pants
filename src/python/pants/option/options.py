@@ -9,6 +9,7 @@ import copy
 import sys
 
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
+from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, enclosing_scope
@@ -302,7 +303,10 @@ class Options(object):
         # scope, to get the right value for recursive options (and because this mirrors what
         # option-using code does).
         val = self.for_scope(scope)[kwargs['dest']]
-        val_type = kwargs.get('type', '')
+        val_type = kwargs.get('type', str)
+        # If we have a list then we delegate to the fingerprinting implementation of the members.
+        if val_type == list_option:
+          val_type = kwargs.get('member_type', str)
         pairs.append((val_type, val))
       registration_scope = (None if registration_scope == ''
                             else enclosing_scope(registration_scope))

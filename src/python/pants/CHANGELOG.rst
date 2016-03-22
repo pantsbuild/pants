@@ -1,6 +1,90 @@
 RELEASE HISTORY
 ===============
 
+0.0.77 (03/18/2016)
+-------------------
+
+Bugfixes
+~~~~~~~~
+
+* Update --pinger-tries option to int
+  `RB #3541 <https://rbcommons.com/s/twitter/r/3541>`_
+  `RB #3561 <https://rbcommons.com/s/twitter/r/3561>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Report @Ignore tests in xml reports from JUnit and create report for tests that fail in initialization
+  `RB #3571 <https://rbcommons.com/s/twitter/r/3571>`_
+
+* Record the compile classpath used to compile jvm targets.
+  `RB #3576 <https://rbcommons.com/s/twitter/r/3576>`_
+
+* Add ignore option to pyflakes check
+  `RB #3569 <https://rbcommons.com/s/twitter/r/3569>`_
+
+* Prepare for a global --shard flag.
+  `RB #3560 <https://rbcommons.com/s/twitter/r/3560>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump junit-runner to 1.0.3
+  `RB #3585 <https://rbcommons.com/s/twitter/r/3585>`_
+
+* Remove unneeded args4j handler registrations that cause failures in
+  tests and rename TestParser
+  
+  `Issue #1727 <https://github.com/pantsbuild/pants/issues/1727>`_
+  `RB #3571 <https://rbcommons.com/s/twitter/r/3571>`_
+  `RB #3583 <https://rbcommons.com/s/twitter/r/3583>`_
+
+* Set public API markers for subsystem, process, reporting and scm
+  `RB #3551 <https://rbcommons.com/s/twitter/r/3551>`_
+
+* Create and use stable symlinks for the target results dir
+  `RB #3553 <https://rbcommons.com/s/twitter/r/3553>`_
+
+* Split Ivy Resolve into Resolve / Fetch steps
+  `Issue #3052 <https://github.com/pantsbuild/pants/issues/3052>`_
+  `Issue #3053 <https://github.com/pantsbuild/pants/issues/3053>`_
+  `Issue #3054 <https://github.com/pantsbuild/pants/issues/3054>`_
+  `Issue #3055 <https://github.com/pantsbuild/pants/issues/3055>`_
+  `RB #3555 <https://rbcommons.com/s/twitter/r/3555>`_
+
+* [pantsd] Add support for fetching watchman via BinaryUtil.
+  `RB #3557 <https://rbcommons.com/s/twitter/r/3557>`_
+
+* Only bootstrap the zinc worker pool if there is work to do
+  `RB #3559 <https://rbcommons.com/s/twitter/r/3559>`_
+
+* Bump pex requirement to 1.1.4.
+  `RB #3568 <https://rbcommons.com/s/twitter/r/3568>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Introduce ProductGraph invalidation.
+  `RB #3578 <https://rbcommons.com/s/twitter/r/3578>`_
+
+* [engine] skip caching for native nodes
+  `RB #3581 <https://rbcommons.com/s/twitter/r/3581>`_
+
+* [engine] More pickle cleanups
+  `RB #3577 <https://rbcommons.com/s/twitter/r/3577>`_
+
+* [engine] cache StepResult under StepRequest
+  `RB #3494 <https://rbcommons.com/s/twitter/r/3494>`_
+
+* [engine] turn off pickle memoization
+  `Issue #2969 <https://github.com/pantsbuild/pants/issues/2969>`_
+  `RB #3574 <https://rbcommons.com/s/twitter/r/3574>`_
+
+* [engine] Add support for directory matches to PathGlobs, and use for inference
+  `RB #3567 <https://rbcommons.com/s/twitter/r/3567>`_
+
+
 0.0.76 (03/11/2016)
 -------------------
 
