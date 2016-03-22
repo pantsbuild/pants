@@ -12,6 +12,7 @@ from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
 from contextlib import closing
+from functools import total_ordering
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
@@ -23,6 +24,7 @@ from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
 
+@total_ordering
 class Key(object):
   """Holds the digest for the object, which uniquely identifies it.
 
@@ -86,8 +88,8 @@ class Key(object):
   def __eq__(self, other):
     return type(other) == Key and self._digest == other._digest
 
-  def __ne__(self, other):
-    return not (self == other)
+  def __lt__(self, other):
+    return self._digest < other._digest
 
   def __repr__(self):
     return 'Key({}{})'.format(
@@ -116,9 +118,10 @@ class Storage(Closable):
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
-  def create(cls, in_memory=False, debug=True, protocol=None):
+  def create(cls, path=None, in_memory=False, debug=True, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
+    :param path: If in_memory=False, the path to store the database in.
     :param in_memory: Indicate whether to use the in-memory kvs or an embeded database.
     :param debug: A flag to store debug information in the key.
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
@@ -126,7 +129,8 @@ class Storage(Closable):
     if in_memory:
       content, key_mappings = InMemoryDb(), InMemoryDb()
     else:
-      content, key_mappings = Lmdb.create(child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
+      content, key_mappings = Lmdb.create(path=path,
+                                          child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
 
     return Storage(content, key_mappings, debug=debug, protocol=protocol)
 
@@ -260,7 +264,7 @@ class Cache(Closable):
 
   def get(self, step_request):
     """Get the cached StepResult for a given StepRequest."""
-    result_key = self._storage.get_mapping(self._storage.put(step_request))
+    result_key = self._storage.get_mapping(self._storage.put(step_request.keyable_fields()))
     if result_key is None:
       self._cache_stats.add_miss()
       return None
@@ -270,7 +274,7 @@ class Cache(Closable):
 
   def put(self, step_request, step_result):
     """Save the StepResult for a given StepResult."""
-    request_key = self._storage.put(step_request)
+    request_key = self._storage.put(step_request.keyable_fields())
     result_key = self._storage.put(step_result)
     return self._storage.add_mapping(from_key=request_key, to_key=result_key)
 
@@ -286,7 +290,7 @@ class Cache(Closable):
       request_key = Key(digest=digest, hash_=Key.compute_hash_from_digest(digest),
                         type_=None, string=None)
       request = self._storage.get(request_key)
-      yield request, self.get(request)
+      yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
 
   def close(self):
     self._storage.close()

@@ -12,7 +12,6 @@ from pants.engine.exp.addressable import Exactly, addressable
 from pants.engine.exp.fs import PathGlobs
 from pants.engine.exp.objects import Locatable
 from pants.engine.exp.struct import Struct
-from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 
 
 class Sources(Struct, Locatable):

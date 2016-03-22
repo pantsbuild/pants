@@ -12,6 +12,7 @@ import six
 
 from pants.engine.exp.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
 from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable, ValidationError
+from pants.util.meta import AbstractClass
 
 
 def _normalize_utf8_keys(kwargs):
@@ -309,7 +310,7 @@ class StructWithDeps(Struct):
     """
 
 
-class HasStructs(object):
+class HasStructs(AbstractClass):
   """A mixin to mark an object as containing a collection of Structs in one of its fields."""
 
   @abstractproperty
