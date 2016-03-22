@@ -166,6 +166,10 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assertIn("ERROR] Invalid option 'invalid_global' under [GLOBAL]", pants_run.stderr_data)
       self.assertIn("ERROR] Invalid option 'another_invalid_global' under [GLOBAL]", pants_run.stderr_data)
 
+  def test_command_line_option_used_by_goals(self):
+    self.assert_success(self.run_pants(['goals', '--bundle-jvm-archive=zip']))
+    self.assert_failure(self.run_pants(['goals', '--jvm-invalid=zip']))
+
   def test_skip_inherited(self):
     pants_run = self.run_pants([
       '--no-colors', '--no-jvm-platform-validate-colors', '--test-junit-colors',
