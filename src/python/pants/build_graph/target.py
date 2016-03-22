@@ -21,7 +21,7 @@ from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
 from pants.source.payload_fields import DeferredSourcesField, SourcesField
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -430,7 +430,9 @@ class Target(AbstractTarget):
   @property
   def _sources_field(self):
     sources_field = self.payload.get_field('sources')
-    return sources_field if sources_field else SourcesField(self.address.spec_path, sources=())
+    if sources_field is not None:
+      return sources_field
+    return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
 
   def has_sources(self, extension=''):
     """
@@ -663,12 +665,11 @@ class Target(AbstractTarget):
           .format(spec=address.spec))
       referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
-    elif isinstance(sources, FilesetWithSpec):
-      filespec = sources.filespec
-      sources_rel_path = sources.rel_root
-    else:
-      sources = sources or []
-      assert_list(sources, key_arg=key_arg)
-      filespec = {'globs': [os.path.join(sources_rel_path, src) for src in (sources or [])]}
+    elif sources is None:
+      sources = FilesetWithSpec.empty(sources_rel_path)
+    elif not isinstance(sources, FilesetWithSpec):
+      # Received a literal sources list: convert to a FilesetWithSpec via Globs (which handles
+      # the case that these sources may not actually exist).
+      sources = Globs.create_fileset_with_spec(sources_rel_path, *sources)
 
-    return SourcesField(sources=sources, sources_rel_path=sources_rel_path, filespec=filespec)
+    return SourcesField(sources=sources)
