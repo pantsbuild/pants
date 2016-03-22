@@ -258,7 +258,7 @@ class BundleTest(BaseTest):
 
     fingerprint_before = calc_fingerprint()
     os.mkdir(os.path.join(self.build_root, spec_path, 'folder_one'))
-    self.assertEquals(fingerprint_before, calc_fingerprint())
+    self.assertEqual(fingerprint_before, calc_fingerprint())
     self.create_file(os.path.join(spec_path, 'three.xml'))
     self.assertNotEqual(fingerprint_before, calc_fingerprint())
 
