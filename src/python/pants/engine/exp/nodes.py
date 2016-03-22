@@ -13,6 +13,7 @@ from pants.engine.exp.fs import (DirectoryListing, FileContent, Path, PathLitera
                                  file_content, list_directory, path_exists)
 from pants.engine.exp.storage import Key
 from pants.engine.exp.struct import HasStructs, Variants
+from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -65,7 +66,7 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   """
 
 
-class Node(object):
+class Node(AbstractClass):
   @classmethod
   def validate_node(cls, node):
     if not isinstance(node, Node):
@@ -85,6 +86,10 @@ class Node(object):
   def variants(self):
     """The variants for this Node."""
 
+  @abstractproperty
+  def is_cacheable(self):
+    """Whether node should be cached or not."""
+
   @abstractmethod
   def step(self, subject, dependency_states, step_context):
     """Given a dict of the dependency States for this Node, returns the current State of the Node.
@@ -100,10 +105,6 @@ class Node(object):
     as an explicit dependency type? Perhaps the "is-a/has-a" checks should be native outside of Node?
     """
 
-  @abstractproperty
-  def is_cacheable(self):
-    """Whether node should be cached or not."""
-
 
 class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', 'variant_key']), Node):
   """A Node that selects a product for a subject.
@@ -115,6 +116,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
   SelectNode.
   """
 
+  @property
   def is_cacheable(self):
     return True
 
@@ -219,6 +221,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', '
   order of declaration in the list `field` of the `dep_product`.
   """
 
+  @property
   def is_cacheable(self):
     return True
 
@@ -272,6 +275,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
   multi-field projection for the contents of a list). Should be looking for ways to merge them.
   """
 
+  @property
   def is_cacheable(self):
     return True
 
@@ -321,6 +325,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
 
 class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func', 'clause']), Node):
 
+  @property
   def is_cacheable(self):
     return True
 
@@ -369,6 +374,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'vari
   def is_filesystem_product(cls, product):
     return product in cls._FS_PRODUCT_TYPES
 
+  @property
   def is_cacheable(self):
     """Native node should not be cached."""
     return False

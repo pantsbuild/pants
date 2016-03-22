@@ -20,7 +20,7 @@ class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.scheduler, self.storage = setup_json_scheduler(build_root, debug=True)
-    self.cache = Cache.create(Storage.create(in_memory=True))
+    self.cache = Cache.create(Storage.create())
 
     self.java = Address.parse('src/java/codegen/simple')
 
@@ -65,26 +65,25 @@ class EngineTest(unittest.TestCase):
         engine.execute(build_request)
 
   def test_rerun_with_cache(self):
-    engine = LocalSerialEngine(self.scheduler, self.storage, self.cache)
-    self.assert_engine(engine)
+    with self.multiprocessing_engine() as engine:
+      self.assert_engine(engine)
 
-    cache_stats = engine._cache.get_stats()
-    # First run all misses.
-    self.assertTrue(cache_stats.hits == 0)
+      cache_stats = engine._cache.get_stats()
+      # First run all misses.
+      self.assertTrue(cache_stats.hits == 0)
 
-    # Save counts for the first run to prepare for another run.
-    max_steps, misses, total = self.scheduler._step_id, cache_stats.misses, cache_stats.total
+      # Save counts for the first run to prepare for another run.
+      max_steps, misses, total = self.scheduler._step_id, cache_stats.misses, cache_stats.total
 
-    self.scheduler.product_graph.invalidate()
-    self.scheduler._step_id = 0
-    self.assert_engine(engine)
+      self.scheduler.product_graph.invalidate()
+      self.assert_engine(engine)
 
-    # Second run executes same number of steps, and are all cache hits, no more misses.
-    self.assertEquals(max_steps, self.scheduler._step_id)
-    self.assertEquals(total, cache_stats.total - total)
-    self.assertEquals(misses, cache_stats.misses)
-    self.assertTrue(cache_stats.hits > 0)
+      # Second run executes same number of steps, and are all cache hits, no more misses.
+      self.assertEquals(max_steps * 2, self.scheduler._step_id)
+      self.assertEquals(total, cache_stats.total - total)
+      self.assertEquals(misses, cache_stats.misses)
+      self.assertTrue(cache_stats.hits > 0)
 
-    # Ensure we cache no more than what can be cached.
-    for request, result in engine._cache.items():
-      self.assertTrue(engine._should_cache(request))
+      # Ensure we cache no more than what can be cached.
+      for request, result in engine._cache.items():
+        self.assertTrue(request[0].is_cacheable)

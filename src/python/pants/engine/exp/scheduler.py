@@ -345,6 +345,19 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
     state_key, dependencies = to_key(state)
     return StepResult(state_key, dependencies)
 
+  def keyable_fields(self):
+    """Return fields for the purpose of computing the cache key of this step request.
+
+    Some special handling are needed to compute cache key for step request.
+    First step_id should be dropped, because it's only an identifier not part
+    of the input for execution. We also want to sort the dependencies map by
+    keys, i.e, nodes, to eliminate non-determinism. We sort the nodes by first
+    grouping them on their types, since dependencies may contain different
+    types of nodes.
+    """
+    sorted_deps = sorted(self.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
+    return (self.node, sorted_deps, self.project_tree)
+
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
 
