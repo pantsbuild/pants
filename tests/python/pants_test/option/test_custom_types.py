@@ -6,9 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
+from textwrap import dedent
 
 from pants.option.custom_types import dict_option, list_option
 from pants.option.errors import ParseError
+from pants.util.strutil import ensure_binary
 
 
 class CustomTypesTest(unittest.TestCase):
@@ -46,3 +48,23 @@ class CustomTypesTest(unittest.TestCase):
     self._do_test(['a', 'b', 'c'], "['a', 'b', 'c']")
     self._do_test([1, 2, 3, 4], '[1, 2] + [3, 4]')
     self._do_test([1, 2, 3, 4], '(1, 2) + (3, 4)')
+
+  def test_unicode_comments(self):
+    """We had a bug where unicode characters in comments would cause the option parser to fail.
+
+    Without the fix to the option parser, this test case reproduces the error:
+
+    UnicodeDecodeError: 'ascii' codec can't decode byte 0xe2 in position 44:
+                       ordinal not in range(128)
+    """
+    self._do_test(
+      ['Hi there!', 'This is an element in a list of strings.'],
+      ensure_binary(dedent(u"""
+      [
+        'Hi there!',
+        # This is a comment with ‘sneaky‘ unicode characters.
+        'This is an element in a list of strings.',
+        # This is a comment with an obvious unicode character ☺.
+        ]
+      """).strip()),
+    )
