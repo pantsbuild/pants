@@ -293,14 +293,14 @@ class NodeBuilder(Closable):
   def __init__(self, tasks):
     self._tasks = tasks
 
-  def gen_nodes(self, subject_key, product, variants):
+  def gen_nodes(self, subject, product, variants):
     # Native filesystem operations.
     if FilesystemNode.is_filesystem_product(product):
-      yield FilesystemNode(subject_key, product, variants)
+      yield FilesystemNode(subject, product, variants)
 
     # Tasks.
     for task, anded_clause in self._tasks[product]:
-      yield TaskNode(subject_key, product, variants, task, anded_clause)
+      yield TaskNode(subject, product, variants, task, anded_clause)
 
 
 class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_tree'])):
@@ -310,7 +310,7 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
 
   :param step_id: A unique id for the step, to ease comparison.
   :param node: The Node instance that will run.
-  :param subject: The Subject referred to by Node.subject_key.
+  :param subject: The Subject referred to by Node.subject.
   :param dependencies: The declared dependencies of the Node from previous Waiting steps.
   :param project_tree: A FileSystemProjectTree instance.
   """
@@ -318,7 +318,6 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   def __call__(self, node_builder, storage):
     def from_keys():
       """Translate keys into subject and states."""
-      subject = storage.get(self.node.subject_key)
       dependencies = {}
       for dep, state_key in self.dependencies.items():
         # This is for the only special case: `Noop` that is introduced in `Scheduler` to
@@ -328,7 +327,7 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
           dependencies[dep] = state_key
         else:
           dependencies[dep] = storage.get(state_key)
-      return subject, dependencies
+      return dependencies
 
     def to_key(state):
       """Introduce a potentially new State, and returns its key and optional dependencies."""
@@ -339,8 +338,8 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, storage, self.project_tree)
 
-    subject, dependencies = from_keys()
-    state = self.node.step(subject, dependencies, step_context)
+    dependencies = from_keys()
+    state = self.node.step(dependencies, step_context)
 
     state_key, dependencies = to_key(state)
     return StepResult(state_key, dependencies)
