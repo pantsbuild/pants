@@ -57,17 +57,6 @@ class SourcesField(PayloadField):
     """Returns the address this sources field refers to (used by some derived classses)"""
     return self._ref_address
 
-  @property
-  def num_chunking_units(self):
-    """For tasks that require chunking, this is the number of chunk units this field represents.
-
-    By default, this is just the number of sources.  Other heuristics might consider the number
-    of bytes or lines in the combined source files.
-    """
-    if self.source_paths:
-      return len(self.source_paths)
-    return 1
-
   def has_sources(self, extension=None):
     if not self.source_paths:
       return False

@@ -61,7 +61,6 @@ class VersionedTargetSet(object):
     self.previous_cache_key = cache_manager.previous_key(self.cache_key)
     self.valid = self.previous_cache_key == self.cache_key
 
-    self.num_chunking_units = self.cache_key.num_chunking_units
     if cache_manager.invalidation_report:
       cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key,
                                                 self.valid, phase='init')

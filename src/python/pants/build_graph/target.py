@@ -322,10 +322,6 @@ class Target(AbstractTarget):
     """
     return self._tags
 
-  @property
-  def num_chunking_units(self):
-    return max(1, len(self.sources_relative_to_buildroot()))
-
   def assert_list(self, maybe_list, expected_type=string_types, key_arg=None):
     """
     :API: public
