@@ -110,7 +110,7 @@ class DeferredSourcesField(SourcesField):
 
   def __init__(self, ref_address):
     self._populated = False
-    super(DeferredSourcesField, self).__init__(sources=[],
+    super(DeferredSourcesField, self).__init__(sources=None,
                                                ref_address=ref_address)
 
   def populate(self, sources, rel_path=None):
@@ -152,3 +152,8 @@ class DeferredSourcesField(SourcesField):
     if not self._populated:
       raise self.NotPopulatedError()
     return super(DeferredSourcesField, self)._compute_fingerprint()
+
+  def _validate_sources(self, sources):
+    """Override `_validate_sources` to allow None."""
+    if self._populated:
+      super(DeferredSourcesField, self)._validate_sources(sources)
