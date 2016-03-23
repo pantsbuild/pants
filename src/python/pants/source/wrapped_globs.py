@@ -7,12 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import fnmatch
 import os
+from abc import abstractproperty
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
 from pants.util.memo import memoized_property
+from pants.util.meta import AbstractClass
 
 
 def globs_matches(path, patterns):
@@ -76,10 +78,16 @@ class FilesetWithSpec(object):
     return self.files[index]
 
 
-class FilesetRelPathWrapper(object):
+class FilesetRelPathWrapper(AbstractClass):
   KNOWN_PARAMETERS = frozenset(['exclude', 'follow_links'])
 
-  wrapped_fn = None   # Subclasses must override.
+  @abstractproperty
+  def wrapped_fn(cls):
+    """The wrapped file calculation function."""
+
+  @abstractproperty
+  def validate_files(cls):
+    """True to validate the existence of files returned by wrapped_fn."""
 
   def __init__(self, parse_context):
     """
@@ -130,7 +138,8 @@ class FilesetRelPathWrapper(object):
         result -= ex
 
       # BUILD file's filesets should contain only files, not folders.
-      return [path for path in result if os.path.isfile(os.path.join(root, path))]
+      return [path for path in result
+              if not cls.validate_files or os.path.isfile(os.path.join(root, path))]
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
@@ -169,7 +178,11 @@ class FilesetRelPathWrapper(object):
 
 
 class Files(FilesetRelPathWrapper):
-  """Matches literal files, _without_ confirming that they exist."""
+  """Matches literal files, _without_ confirming that they exist.
+
+  TODO: This exists as-is for historical reasons: we should add optional validation of the
+  existence of matched files at some point.
+  """
 
   @staticmethod
   def _literal_files(*args, **kwargs):
@@ -179,6 +192,7 @@ class Files(FilesetRelPathWrapper):
     return args
 
   wrapped_fn = _literal_files
+  validate_files = False
 
 
 class Globs(FilesetRelPathWrapper):
@@ -189,6 +203,7 @@ class Globs(FilesetRelPathWrapper):
           except ``.java`` files and ``foo.py``.
   """
   wrapped_fn = Fileset.globs
+  validate_files = True
 
 
 class RGlobs(FilesetRelPathWrapper):
@@ -205,6 +220,7 @@ class RGlobs(FilesetRelPathWrapper):
     return Fileset.rglobs(*globspecs, **kw)
 
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
+  validate_files = True
 
   @classmethod
   def to_filespec(cls, args, root='', excludes=None):
@@ -269,3 +285,4 @@ class ZGlobs(FilesetRelPathWrapper):
     return Fileset.zglobs(*globspecs, **kw)
 
   wrapped_fn = zglobs_following_symlinked_dirs_by_default
+  validate_files = True

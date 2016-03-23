@@ -11,6 +11,7 @@ from hashlib import sha1
 from pants.base.payload_field import PayloadField
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import Files, FilesetWithSpec, matches_filespec
+from pants.util.memo import memoized_property
 
 
 class SourcesField(PayloadField):
@@ -34,18 +35,22 @@ class SourcesField(PayloadField):
 
   @property
   def filespec(self):
-    return self.source_paths.filespec
+    return self.sources.filespec
 
   def matches(self, path):
     return matches_filespec(path, self.filespec)
 
   @property
   def rel_path(self):
-    return self.source_paths.rel_root
+    return self.sources.rel_root
 
   @property
-  def source_paths(self):
+  def sources(self):
     return self._sources
+
+  @memoized_property
+  def source_paths(self):
+    return list(self.sources)
 
   @property
   def address(self):
@@ -77,7 +82,7 @@ class SourcesField(PayloadField):
     hasher.update(self.rel_path)
     for source in sorted(self.relative_to_buildroot()):
       hasher.update(source)
-      hasher.update(self.source_paths.file_content(source))
+      hasher.update(self.sources.file_content(source))
     return hasher.hexdigest()
 
   def _validate_sources(self, sources):
@@ -137,7 +142,7 @@ class DeferredSourcesField(SourcesField):
     return super(DeferredSourcesField, self).rel_path
 
   @property
-  def source_paths(self):
+  def sources(self):
     self._validate_populated()
     return self._sources
 
