@@ -13,7 +13,7 @@ from pants.engine.exp.fs import Path
 from pants.engine.exp.graph import BuildFilePaths
 from pants.engine.exp.nodes import SelectNode
 from pants.engine.exp.scheduler import Return, StepRequest, StepResult
-from pants.engine.exp.storage import Cache, InMemoryDb, InvalidKeyError, Lmdb, Storage
+from pants.engine.exp.storage import Cache, InvalidKeyError, Key, Lmdb, Storage
 from pants.engine.exp.struct import Variants
 
 
@@ -51,10 +51,21 @@ class StorageTest(unittest.TestCase):
       with self.assertRaises(InvalidKeyError):
         self.assertFalse(storage.get(self.TEST_KEY))
 
-      # Verify key and value's types must match.
-      key._type = str
+  def test_type_mismatch(self):
+    """Verify key and value's types must match."""
+    with closing(Storage.create(in_memory=True)) as storage:
+      key = storage.put(self.TEST_PATH)
+      self.assertEquals(self.TEST_PATH, storage.get(key))
+
+      # key != type_mismatched_key, no memoized result, type check fails.
+      type_mismatched_key = Key(key.digest, key._hash, str, None)
+      self.assertNotEqual(key, type_mismatched_key)
       with self.assertRaises(ValueError):
-        storage.get(key)
+        storage.get(type_mismatched_key)
+
+      # Not fail because equality check: key == key would pass, memoized result is returned.
+      key._type = str
+      self.assertEquals(self.TEST_PATH, storage.get(key))
 
   def test_storage_key_mappings(self):
     with closing(Storage.create(in_memory=True)) as storage:
