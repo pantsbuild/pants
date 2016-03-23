@@ -124,7 +124,7 @@ class ExpGraph(BuildGraph):
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
-    request = self._scheduler.execution_request([LegacyBuildGraphNode], self._engine.storage.puts(specs))
+    request = self._scheduler.execution_request([LegacyBuildGraphNode], specs)
     result = self._engine.execute(request)
     if result.error:
       raise result.error
