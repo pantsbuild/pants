@@ -16,14 +16,16 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Lobs(AbstractClass):
+class BaseGlobs(AbstractClass):
+  """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
+
   @abstractproperty
   def path_globs_kwarg(self):
-    pass
+    """The name of the `PathGlobs` parameter corresponding to this BaseGlobs instance."""
 
   @abstractproperty
   def legacy_globs_class(self):
-    pass
+    """The corresponding `wrapped_globs` class for this BaseGlobs."""
 
   def __init__(self, *patterns, **kwargs):
     self.patterns = patterns
@@ -74,21 +76,21 @@ class LazyFilesContent(object):
     return self._file_contents.get(path, None)
 
 
-class Files(Lobs):
+class Files(BaseGlobs):
   path_globs_kwarg = 'files'
   legacy_globs_class = wrapped_globs.Globs
 
 
-class Globs(Lobs):
+class Globs(BaseGlobs):
   path_globs_kwarg = 'globs'
   legacy_globs_class = wrapped_globs.Globs
 
 
-class RGlobs(Lobs):
+class RGlobs(BaseGlobs):
   path_globs_kwarg = 'rglobs'
   legacy_globs_class = wrapped_globs.RGlobs
 
 
-class ZGlobs(Lobs):
+class ZGlobs(BaseGlobs):
   path_globs_kwarg = 'zglobs'
   legacy_globs_class = wrapped_globs.ZGlobs

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
-from pants.engine.exp.legacy.globs import Files, Lobs
+from pants.engine.exp.legacy.globs import Files, BaseGlobs
 from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
 from pants.engine.exp.selectors import Select, SelectDependencies
@@ -75,8 +75,8 @@ class ExpGraph(BuildGraph):
     return addresses
 
   def _instantiate_sources(self, relpath, sources):
-    """Given a list of literal sources list or a Lobs subclass, create a wrapping FilesetWithSpec."""
-    if not isinstance(sources, Lobs):
+    """Given a list of literal sources list or a BaseGlobs subclass, create a wrapping FilesetWithSpec."""
+    if not isinstance(sources, BaseGlobs):
       sources = Files(*sources)
     return sources.to_fileset_with_spec(self._engine, self._scheduler, relpath)
 
