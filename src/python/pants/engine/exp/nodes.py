@@ -89,7 +89,7 @@ class Node(AbstractClass):
     """Whether node should be cached or not."""
 
   @abstractmethod
-  def step(self, subject, dependency_states, step_context):
+  def step(self, dependency_states, step_context):
     """Given a dict of the dependency States for this Node, returns the current State of the Node.
 
     The NodeBuilder parameter provides a way to construct Nodes that require information about
@@ -148,7 +148,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       return item
     return None
 
-  def step(self, subject, dependency_states, step_context):
+  def step(self, dependency_states, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
     variants = self.variants
@@ -174,7 +174,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       variant_value = variant_values[0]
 
     # If the Subject "is a" or "has a" Product, then we're done.
-    literal_value = self._select_literal(subject, variant_value)
+    literal_value = self._select_literal(self.subject, variant_value)
     if literal_value is not None:
       return Return(literal_value)
 
@@ -203,7 +203,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
       # by adding support for "mergeable" products. see:
       #   https://github.com/pantsbuild/pants/issues/2526
-      return Throw(ConflictingProducersError.create(subject, self.product, matches))
+      return Throw(ConflictingProducersError.create(self.subject, self.product, matches))
     elif len(matches) == 1:
       return Return(matches.values()[0])
     return Noop('No source of {}.'.format(self))
@@ -233,9 +233,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
         # If a subject has literal variants for particular dependencies, they win over all else.
         dependency, literal_variants = parse_variants(dependency)
         variants = Variants.merge(variants, literal_variants)
-      yield SelectNode(step_context.introduce_subject(dependency), self.product, variants, None)
+      yield SelectNode(dependency, self.product, variants, None)
 
-  def step(self, subject, dependency_states, step_context):
+  def step(self, dependency_states, step_context):
     # Request the product we need in order to request dependencies.
     dep_product_node = self._dep_product_node()
     dep_product_state = dependency_states.get(dep_product_node, None)
@@ -281,9 +281,9 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     return SelectNode(self.subject, self.input_product, self.variants, None)
 
   def _output_node(self, step_context, projected_subject):
-    return SelectNode(step_context.introduce_subject(projected_subject), self.product, self.variants, None)
+    return SelectNode(projected_subject, self.product, self.variants, None)
 
-  def step(self, subject, dependency_states, step_context):
+  def step(self, dependency_states, step_context):
     # Request the product we need to compute the subject.
     input_node = self._input_node()
     input_state = dependency_states.get(input_node, None)
@@ -327,7 +327,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
   def is_cacheable(self):
     return True
 
-  def step(self, subject, dependency_states, step_context):
+  def step(self, dependency_states, step_context):
     # Compute dependencies.
     dep_values = []
     dependencies = []
@@ -383,7 +383,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def _input_node(self):
     return SelectNode(self.subject, self._input_type(), self.variants, None)
 
-  def step(self, subject, dependency_states, step_context):
+  def step(self, dependency_states, step_context):
     # Request the relevant input product for the output product.
     input_node = self._input_node()
     input_state = dependency_states.get(input_node, None)
@@ -421,10 +421,6 @@ class StepContext(object):
     self._node_builder = node_builder
     self._storage = storage
     self.project_tree = project_tree
-
-  def introduce_subject(self, subject):
-    """Introduces a potentially new Subject, and returns a subject Key."""
-    return self._storage.put(subject)
 
   def gen_nodes(self, subject, product, variants):
     """Yields Node instances which might be able to provide a value for the given inputs."""
