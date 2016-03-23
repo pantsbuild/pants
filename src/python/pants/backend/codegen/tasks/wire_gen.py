@@ -14,16 +14,17 @@ from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 
 
 logger = logging.getLogger(__name__)
 
 
-class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
+class WireGen(NailgunTaskBase, SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
@@ -107,12 +108,13 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     return args
 
   def execute_codegen(self, target, target_workdir):
-    execute_java = DistributionLocator.cached().execute_java
     args = self.format_args_for_target(target, target_workdir)
     if args:
-      result = execute_java(classpath=self.tool_classpath('wire-compiler'),
+      result = self.runjava(classpath=self.tool_classpath('wire-compiler'),
                             main='com.squareup.wire.WireCompiler',
-                            args=args)
+                            args=args,
+                            workunit_name='compile',
+                            workunit_labels=[WorkUnitLabel.TOOL])
       if result != 0:
         raise TaskError('Wire compiler exited non-zero ({0})'.format(result))
 

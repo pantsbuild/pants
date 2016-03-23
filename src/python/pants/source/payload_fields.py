@@ -10,7 +10,7 @@ from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
 from pants.source.source_root import SourceRootConfig
-from pants.source.wrapped_globs import FilesetWithSpec, matches_filespec
+from pants.source.wrapped_globs import FilesetWithSpec, Globs, matches_filespec
 
 
 class SourcesField(PayloadField):
@@ -113,7 +113,7 @@ class DeferredSourcesField(SourcesField):
     super(DeferredSourcesField, self).__init__(sources=None,
                                                ref_address=ref_address)
 
-  def populate(self, sources, rel_path=None):
+  def populate(self, sources, rel_path):
     """Call this method to set the list of files represented by the target.
 
     Intended to be invoked by the DeferredSourcesMapper task.
@@ -123,8 +123,9 @@ class DeferredSourcesField(SourcesField):
     if self._populated:
       raise self.AlreadyPopulatedError("Called with rel_path={rel_path} sources={sources}"
       .format(rel_path=rel_path, sources=sources))
-    self._sources = self._validate_sources(sources)
     self._populated = True
+    sources = Globs.create_fileset_with_spec(rel_path, *sources)
+    self._sources = self._validate_sources(sources)
 
   def _validate_populated(self):
     if not self._populated:
@@ -133,7 +134,7 @@ class DeferredSourcesField(SourcesField):
   @property
   def rel_path(self):
     self._validate_populated()
-    return super(self, DeferredSourcesField).rel_path
+    return super(DeferredSourcesField, self).rel_path
 
   @property
   def source_paths(self):
@@ -149,11 +150,11 @@ class DeferredSourcesField(SourcesField):
     """A subclass must provide an implementation of _compute_fingerprint that can return a valid
     fingerprint even if the sources aren't unpacked yet.
     """
-    if not self._populated:
-      raise self.NotPopulatedError()
+    self._validate_populated()
     return super(DeferredSourcesField, self)._compute_fingerprint()
 
   def _validate_sources(self, sources):
     """Override `_validate_sources` to allow None."""
     if self._populated:
-      super(DeferredSourcesField, self)._validate_sources(sources)
+      return super(DeferredSourcesField, self)._validate_sources(sources)
+    return sources
