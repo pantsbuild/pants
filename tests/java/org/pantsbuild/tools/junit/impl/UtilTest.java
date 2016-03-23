@@ -8,7 +8,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class UtilTest {
-
   @Test
   public void testSanitizeSuiteName() {
     assertEquals("com.foo.bar.ClassName", Util.sanitizeSuiteName("com.foo.bar.ClassName"));
