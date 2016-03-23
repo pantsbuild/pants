@@ -82,7 +82,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
     def register_scala_repl(version, extra_deps=None):
       name, version = scala_build_info[version].repl_name, scala_build_info[version].full_version
-      _register_tool('org.scala-lang', 'scala-repl', name, version, extra_deps)
+      _register_tool('org.scala-lang', 'scala-compiler', name, version, extra_deps)
 
     def register_style_tool(version):
       # Note: Since we can't use ScalaJarDependency without creating a import loop we need to
