@@ -50,15 +50,15 @@ def setup():
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  address_mapper_key = storage.put(AddressMapper(symbol_table_cls=symbol_table_cls,
-                                                 parser_cls=LegacyPythonCallbacksParser))
+  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
+                                 parser_cls=LegacyPythonCallbacksParser)
 
   # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The ExpGraph
   # will explicitly request the products it needs.
   tasks = (
     create_legacy_graph_tasks() +
     create_fs_tasks() +
-    create_graph_tasks(address_mapper_key, symbol_table_cls)
+    create_graph_tasks(address_mapper, symbol_table_cls)
   )
 
   return (

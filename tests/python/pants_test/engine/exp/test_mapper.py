@@ -161,11 +161,10 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     # Set up a scheduler that supports address mapping.
     symbol_table_cls = TargetTable
     self.storage = Storage.create(in_memory=True)
-    address_mapper_key = self.storage.put(
-        AddressMapper(symbol_table_cls=symbol_table_cls,
-                      parser_cls=JsonParser,
-                      build_pattern=r'.+\.BUILD.json$'))
-    tasks = create_graph_tasks(address_mapper_key, symbol_table_cls)
+    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
+                                   parser_cls=JsonParser,
+                                   build_pattern=r'.+\.BUILD.json$')
+    tasks = create_graph_tasks(address_mapper, symbol_table_cls)
 
     build_root_src = os.path.join(os.path.dirname(__file__), 'examples/mapper_test')
     self.scheduler, _, self.build_root = self.mk_scheduler(tasks=tasks,
@@ -183,8 +182,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     self.storage.close()
 
   def resolve(self, spec):
-    request = self.scheduler.execution_request([UnhydratedStruct],
-                                               self.storage.puts([spec]))
+    request = self.scheduler.execution_request([UnhydratedStruct], [spec])
     result = LocalSerialEngine(self.scheduler, self.storage).execute(request)
     if result.error:
       raise result.error

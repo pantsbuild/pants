@@ -29,11 +29,11 @@ class EngineTest(unittest.TestCase):
 
   def request(self, goals, *addresses):
     return self.scheduler.build_request(goals=goals,
-                                        subject_keys=self.storage.puts(addresses))
+                                        subjects=addresses)
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
-    self.assertEqual({SelectNode(self.key(self.java), Classpath, None, None):
+    self.assertEqual({SelectNode(self.java, Classpath, None, None):
                       self.key(Return(Classpath(creator='javac')))},
                      result.root_products)
     self.assertIsNone(result.error)

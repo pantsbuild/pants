@@ -56,7 +56,7 @@ class SchedulerTestBase(object):
 
   def execute_request(self, scheduler, storage, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
-    request = scheduler.execution_request([product], storage.puts(subjects))
+    request = scheduler.execution_request([product], subjects)
     res = LocalSerialEngine(scheduler, storage).execute(request)
     if res.error:
       raise res.error
