@@ -4,7 +4,7 @@ coverage>=3.7,<3.8
 docutils>=0.12,<0.13
 futures==3.0.5
 lmdb==0.89
-lockfile==0.10.2
+lockfile==0.12.2
 Markdown==2.1.1
 mock==1.3.0
 mox==0.5.3
