@@ -108,28 +108,11 @@ class ScalastyleTest(NailgunTaskTestBase):
   @contextmanager
   def custom_scala_platform_setup(self):
     with subsystem_instance(ScalaPlatform):
-      self.make_target('//:scalastyle',
+      # We don't need to specify :scalac or :scala-repl since they are never being fetched.
+      self.make_target(':scalastyle',
                        JarLibrary,
-                       jars=[JarDependency('org.scalastyle', 'scalastyle', '0.3.2')]
+                       jars=[JarDependency('org.scalastyle', 'scalastyle_2.10', '0.3.2')]
       )
-      self.make_target('//:scalac',
-                       JarLibrary,
-                       jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.10.5')])
-
-      self.make_target('//:scala-repl',
-                 JarLibrary,
-                 jars=[
-                      JarDependency(org = 'org.scala-lang',
-                                    name = 'jline',
-                                    rev = '2.10.5'),
-                      JarDependency(org = 'org.scala-lang',
-                                    name = 'scala-compiler',
-                                    rev = '2.10.5'),
-                    ])
-
-      self.make_target('//:scala-library',
-                       JarLibrary,
-                       jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
 
       self.set_options_for_scope(ScalaPlatform.options_scope, version='custom')
 

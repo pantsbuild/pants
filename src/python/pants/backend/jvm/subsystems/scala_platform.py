@@ -37,6 +37,14 @@ scala_build_info = {
       repl_name='scala_2_11_repl',
       style_name='scalastyle_2_11',
       style_version='0.8.0'),
+  'custom':
+    major_version_info(
+      full_version=None,
+      compiler_name='scalac',
+      runtime_name='runtime_default',
+      repl_name='scala_repl',
+      style_name='scalastyle',
+      style_version=None),
 }
 
 
@@ -74,17 +82,19 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
     def register_scala_repl(version, extra_deps=None):
       name, version = scala_build_info[version].repl_name, scala_build_info[version].full_version
-      _register_tool('org.scala-lang', 'scala-compiler', name, version, extra_deps)
+      _register_tool('org.scala-lang', 'scala-repl', name, version, extra_deps)
 
     def register_style_tool(version):
       # Note: Since we can't use ScalaJarDependency without creating a import loop we need to
       # specify the version info in the name.
       name = scala_build_info[version].style_name
       style_version = scala_build_info[version].style_version
-      _register_tool('org.scalastyle', 'scalastyle_{}'.format(version), name, style_version)
+      fullname = 'scalastyle_2.10' if version == 'custom' else 'scalastyle_{}'.format(version)
+      _register_tool('org.scalastyle', fullname, name, style_version)
 
     super(ScalaPlatform, cls).register_options(register)
-    register('--version', advanced=True, default='2.10', choices=['2.10', '2.11', 'custom'],
+    register('--version', advanced=True, default='2.10',
+             choices=['2.10', '2.11', 'custom'], fingerprint=True,
              help='The scala "platform version", which is suffixed onto all published '
                   'libraries. This should match the declared compiler/library versions. '
                   'Version specified will allow the user provide some sane defaults for common '
@@ -108,18 +118,13 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register('--repl-spec', advanced=True, default='//:scala-repl',
              help='Address to be used for custom scala runtime.')
 
-    register('--scalac-spec', advanced=True, default='//:scalac',
-             help='Address to be used for custom scala runtime.')
-
-    register('--style-spec', advanced=True, default='//:scalastyle',
-             help='Address to be used for custom scala runtime.')
-
     register('--suffix-version', advanced=True, default=None,
              help='Scala suffix to be used when a custom version is specified.  For example 2.10')
 
     # Register Scala compilers.
     register_scala_compiler('2.10')
     register_scala_compiler('2.11')
+    register_scala_compiler('custom')
 
     # Register repl tools.
     jline_dep = JarDependency(
@@ -130,29 +135,25 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
     register_scala_repl('2.10', extra_deps=[jline_dep])
     register_scala_repl('2.11')
+    register_scala_repl('custom', extra_deps=[jline_dep])
 
     # Register Scala style libraries.
     register_style_tool('2.10')
     register_style_tool('2.11')
+    register_style_tool('custom')
 
   def _get_label(self):
     return getattr(self.get_options(), 'version', 'custom')
 
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    if self.get_options().version == 'custom':
-      return self.get_options().scalac_spec
-    else:
-      compiler_name = scala_build_info.get(self._get_label()).compiler_name
-      return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
+    compiler_name = scala_build_info.get(self._get_label()).compiler_name
+    return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
 
   def style_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    if self.get_options().version == 'custom':
-      return self.get_options().style_spec
-    else:
-      style_name = scala_build_info.get(self._get_label()).style_name
-      return self.tool_classpath_from_products(products, style_name, scope=self.options_scope)
+    spec = scala_build_info.get(self._get_label()).style_name
+    return self.tool_classpath_from_products(products, spec, scope=self.options_scope)
 
   @property
   def version(self):

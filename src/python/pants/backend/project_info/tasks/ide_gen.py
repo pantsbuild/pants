@@ -349,7 +349,6 @@ class IdeGen(IvyTaskMixin, NailgunTask):
       scalac_classpath = []
     else:
       scalac_classpath = ScalaPlatform.global_instance().compiler_classpath(self.context.products)
-      #self.tool_classpath('scalac', scope='scala-platform')
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
     self.map_internal_jars(targets)
