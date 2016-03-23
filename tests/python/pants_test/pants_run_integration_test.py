@@ -255,3 +255,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
     return ''.join(strip_color(s).split())
+
+  @contextmanager
+  def file_renamed(self, prefix, test_name, real_name):
+    real_path = os.path.join(prefix, real_name)
+    test_path = os.path.join(prefix, test_name)
+    try:
+      os.rename(test_path, real_path)
+      yield
+    finally:
+      os.rename(real_path, test_path)
