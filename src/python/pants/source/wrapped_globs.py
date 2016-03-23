@@ -95,14 +95,13 @@ class FilesetRelPathWrapper(object):
         raise ValueError('Invalid glob {}, points outside BUILD file root {}'.format(glob, root))
 
     def files_calculator():
-      # BUILD file's filesets should contain only files, not folders.
-      result = (path for path in self.wrapped_fn(root=root, *patterns, **kwargs)
-                if os.path.isfile(os.path.join(get_buildroot(), rel_root, path)))
+      result = self.wrapped_fn(root=root, *patterns, **kwargs)
 
       for ex in excludes:
         result -= ex
 
-      return result
+      # BUILD file's filesets should contain only files, not folders.
+      return [path for path in result if os.path.isfile(os.path.join(root, path))]
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
