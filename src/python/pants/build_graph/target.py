@@ -21,7 +21,7 @@ from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
 from pants.source.payload_fields import DeferredSourcesField, SourcesField
-from pants.source.wrapped_globs import FilesetWithSpec, Files
+from pants.source.wrapped_globs import Files, FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
