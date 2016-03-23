@@ -21,6 +21,7 @@ import six
 
 from pants.engine.exp.objects import Closable, SerializationError
 from pants.util.dirutil import safe_mkdtemp
+from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 
 
@@ -86,7 +87,7 @@ class Key(object):
     return self._hash
 
   def __eq__(self, other):
-    return type(other) == Key and self._digest == other._digest
+    return type(other) == Key and self._digest == other._digest and self._type == other._type
 
   def __lt__(self, other):
     return self._digest < other._digest
@@ -188,11 +189,14 @@ class Storage(Closable):
       keys.append(self.put(obj))
     return keys
 
+  @memoized
   def get(self, key):
     """Given a key, return its deserialized content.
 
     Note that since this is not a cache, if we do not have the content for the object, this
     operation fails noisily.
+
+    TODO: use proper lru cache for memoized results.
     """
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
@@ -264,7 +268,7 @@ class Cache(Closable):
 
   def get(self, step_request):
     """Get the cached StepResult for a given StepRequest."""
-    result_key = self._storage.get_mapping(self._storage.put(step_request.keyable_fields()))
+    result_key = self._storage.get_mapping(self._get_request_key(step_request))
     if result_key is None:
       self._cache_stats.add_miss()
       return None
@@ -274,7 +278,7 @@ class Cache(Closable):
 
   def put(self, step_request, step_result):
     """Save the StepResult for a given StepResult."""
-    request_key = self._storage.put(step_request.keyable_fields())
+    request_key = self._get_request_key(step_request)
     result_key = self._storage.put(step_result)
     return self._storage.add_mapping(from_key=request_key, to_key=result_key)
 
@@ -294,6 +298,11 @@ class Cache(Closable):
 
   def close(self):
     self._storage.close()
+
+  @memoized
+  def _get_request_key(self, step_request):
+    """TODO: use proper lru cache for memoized results."""
+    return self._storage.put(step_request.keyable_fields())
 
 
 class CacheStats(Counter):
