@@ -354,8 +354,8 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
     types of nodes.
     """
     # TODO
-    # sorted_deps = sorted(self.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
-    return (self.node, self.dependencies.items(), self.project_tree)
+    sorted_deps = sorted(self.dependencies.items(), key=lambda t: (type(t[0]), type(t[0].subject), t[0]))
+    return (self.node, sorted_deps, self.project_tree)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
