@@ -107,6 +107,10 @@ class FilesetRelPathWrapper(AbstractClass):
     """
     root = os.path.normpath(os.path.join(get_buildroot(), rel_path))
 
+    for pattern in patterns:
+      if not isinstance(pattern, string_types):
+        raise ValueError("Expected string patterns for {}: got {}".format(cls.__name__, patterns))
+
     raw_excludes = kwargs.pop('exclude', [])
     if isinstance(raw_excludes, string_types):
       raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")

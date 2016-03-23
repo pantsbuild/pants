@@ -65,5 +65,5 @@ class PayloadTest(BaseTest):
     fileset = FilesetWithSpec('foo', 'a.txt', lambda: ['a.txt'])
     sf = SourcesField(sources=fileset)
 
-    self.assertIs(fileset, sf.source_paths)
+    self.assertIs(fileset, sf.sources)
     self.assertEqual(['a.txt'], list(sf.source_paths))
