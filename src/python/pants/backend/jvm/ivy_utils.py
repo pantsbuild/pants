@@ -487,7 +487,7 @@ class IvyFetchResolveResult(IvyResolveResult):
     self._frozen_resolutions = frozen_resolutions
 
   def _jar_dependencies_for_target(self, conf, target):
-    return self._frozen_resolutions[conf].target_to_resolved_coordinates.get(target)
+    return self._frozen_resolutions[conf].target_to_resolved_coordinates.get(target, ())
 
 
 NO_RESOLVE_RUN_RESULT = IvyResolveResult([], {}, None, {})
