@@ -129,7 +129,8 @@ class FilesetRelPathWrapper(object):
       for ex in excludes:
         result -= ex
 
-      return result
+      # BUILD file's filesets should contain only files, not folders.
+      return [path for path in result if os.path.isfile(os.path.join(root, path))]
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
