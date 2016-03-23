@@ -168,6 +168,19 @@ class FilesetRelPathWrapper(object):
     return result
 
 
+class Files(FilesetRelPathWrapper):
+  """Matches literal files, _without_ confirming that they exist."""
+
+  @staticmethod
+  def _literal_files(*args, **kwargs):
+    root = kwargs['root']
+    if len(kwargs) > 1:
+      raise ValueError('Literal file globs do not support kwargs other than `root`: {}'.format(kwargs))
+    return args
+
+  wrapped_fn = _literal_files
+
+
 class Globs(FilesetRelPathWrapper):
   """Matches files in the BUILD file's directory.
 

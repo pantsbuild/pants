@@ -10,7 +10,7 @@ from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
 from pants.source.source_root import SourceRootConfig
-from pants.source.wrapped_globs import FilesetWithSpec, Globs, matches_filespec
+from pants.source.wrapped_globs import FilesetWithSpec, Files, matches_filespec
 
 
 class SourcesField(PayloadField):
@@ -124,7 +124,7 @@ class DeferredSourcesField(SourcesField):
       raise self.AlreadyPopulatedError("Called with rel_path={rel_path} sources={sources}"
       .format(rel_path=rel_path, sources=sources))
     self._populated = True
-    sources = Globs.create_fileset_with_spec(rel_path, *sources)
+    sources = Files.create_fileset_with_spec(rel_path, *sources)
     self._sources = self._validate_sources(sources)
 
   def _validate_populated(self):

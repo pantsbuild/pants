@@ -70,10 +70,12 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
     sources = OrderedSet(target.sources_relative_to_buildroot())
 
     relative_sources = OrderedSet()
+    source_roots = set()
     for source in sources:
       source_root = self.context.source_roots.find_by_path(source)
       if not source_root:
         source_root = self.context.source_roots.find(target)
+      source_roots.add(source_root.path)
       relative_source = os.path.relpath(source, source_root.path)
       relative_sources.add(relative_source)
 
@@ -101,8 +103,8 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
     if target.payload.enum_options:
       args.append('--enum_options={0}'.format(','.join(target.payload.enum_options)))
 
-    args.append('--proto_path={0}'.format(os.path.join(get_buildroot(),
-        self.context.source_roots.find(target).path)))
+    for source_root in source_roots:
+      args.append('--proto_path={0}'.format(os.path.join(get_buildroot(), source_root)))
 
     args.extend(relative_sources)
     return args
