@@ -3,9 +3,25 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.PrintStream;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.hamcrest.CoreMatchers;
+import org.junit.Assert;
 import org.junit.Test;
+import org.pantsbuild.tools.junit.lib.FailingTestRunner;
+import org.pantsbuild.tools.junit.lib.FlakyTest;
+import org.pantsbuild.tools.junit.lib.MockTest4;
+import org.pantsbuild.tools.junit.lib.TestRegistry;
+import org.pantsbuild.tools.junit.lib.XmlReportAllIgnoredTest;
+import org.pantsbuild.tools.junit.lib.XmlReportAllPassingTest;
+import org.pantsbuild.tools.junit.lib.XmlReportFailingTestRunnerTest;
+import org.pantsbuild.tools.junit.lib.XmlReportFailInSetupTest;
+import org.pantsbuild.tools.junit.lib.XmlReportFirstTestIngoredTest;
+import org.pantsbuild.tools.junit.lib.XmlReportIgnoredTestSuiteTest;
+import org.pantsbuild.tools.junit.lib.XmlReportTest;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
@@ -20,28 +36,28 @@ import static org.junit.Assert.fail;
  * Tests several recently added features in ConsoleRunner.
  * TODO: cover the rest of ConsoleRunner functionality.
  */
-public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
+public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   @Test
-  public void testNormalTesting() throws Exception {
+  public void testNormalTesting() {
     ConsoleRunnerImpl.main(asArgsArray("MockTest1 MockTest2 MockTest3"));
     assertEquals("test11 test12 test13 test21 test22 test31 test32",
         TestRegistry.getCalledTests());
   }
 
   @Test
-  public void testShardedTesting02() throws Exception {
+  public void testShardedTesting02() {
     ConsoleRunnerImpl.main(asArgsArray("MockTest1 MockTest2 MockTest3 -test-shard 0/2"));
     assertEquals("test11 test13 test22 test32", TestRegistry.getCalledTests());
   }
 
   @Test
-  public void testShardedTesting13() throws Exception {
+  public void testShardedTesting13() {
     ConsoleRunnerImpl.main(asArgsArray("MockTest1 MockTest2 MockTest3 -test-shard 1/3"));
     assertEquals("test12 test22", TestRegistry.getCalledTests());
   }
 
   @Test
-  public void testShardedTesting23() throws Exception {
+  public void testShardedTesting23() {
     // This tests a corner case when no tests from MockTest2 are going to run.
     ConsoleRunnerImpl.main(asArgsArray(
         "MockTest1 MockTest2 MockTest3 -test-shard 2/3"));
@@ -49,14 +65,14 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
   }
 
   @Test
-  public void testShardedTesting12WithParallelThreads() throws Exception {
+  public void testShardedTesting12WithParallelThreads() {
     ConsoleRunnerImpl.main(asArgsArray(
         "MockTest1 MockTest2 MockTest3 -test-shard 1/2 -parallel-threads 4 -default-parallel"));
     assertEquals("test12 test21 test31", TestRegistry.getCalledTests());
   }
 
   @Test
-  public void testShardedTesting23WithParallelThreads() throws Exception {
+  public void testShardedTesting23WithParallelThreads() {
     // This tests a corner case when no tests from MockTest2 are going to run.
     ConsoleRunnerImpl.main(asArgsArray(
         "MockTest1 MockTest2 MockTest3 -test-shard 2/3 -parallel-threads 3 -default-parallel"));
@@ -64,21 +80,17 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
   }
 
   @Test
-  public void testFlakyTests() throws Exception {
+  public void testFlakyTests() {
     FlakyTest.numFlakyTestInstantiations = 0;
     FlakyTest.numExpectedExceptionMethodInvocations = 0;
 
     try {
-      FlakyTest.flakyTestsShouldFail = true;
       ConsoleRunnerImpl.main(asArgsArray("FlakyTest -num-retries 2"));
       fail("Should have failed with RuntimeException due to FlakyTest.methodAlwaysFails");
       // FlakyTest.methodAlwaysFails fails this way - though perhaps that should be fixed to be an
       // RTE subclass.
-      // SUPPRESS CHECKSTYLE RegexpSinglelineJava
     } catch (RuntimeException ex) {
       // Expected due to FlakyTest.methodAlwaysFails()
-    } finally {
-      FlakyTest.flakyTestsShouldFail = false;
     }
 
     assertEquals("expected_ex flaky1 flaky1 flaky2 flaky2 flaky2 flaky3 flaky3 flaky3 "
@@ -94,18 +106,51 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
   }
 
   @Test
-  public void testTestCase() throws Exception {
+  public void testTestCase() {
     ConsoleRunnerImpl.main(asArgsArray("SimpleTestCase"));
     assertEquals("testDummy", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testConsoleOutput() {
+    ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+    PrintStream stdout = System.out;
+    PrintStream stderr = System.err;
+    try {
+      System.setOut(new PrintStream(outContent));
+      System.setErr(new PrintStream(new ByteArrayOutputStream()));
+
+      ConsoleRunnerImpl.main(asArgsArray("MockTest4 -parallel-threads 1 -xmlreport"));
+      Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
+      String output = outContent.toString();
+      assertThat(output, CoreMatchers.containsString("test41"));
+      assertThat(output, CoreMatchers.containsString("start test42"));
+      assertThat(output, CoreMatchers.containsString("end test42"));
+    } finally {
+      System.setOut(stdout);
+      System.setErr(stderr);
+    }
+  }
+
+  @Test
+  public void testOutputDir() throws Exception {
+    String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();
+    ConsoleRunnerImpl.main(asArgsArray(
+        "MockTest4 -parallel-threads 1 -default-parallel -xmlreport -outdir " + outdir));
+    Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
+
+    String testClassName = MockTest4.class.getCanonicalName();
+    String output = FileUtils.readFileToString(new File(outdir, testClassName + ".out.txt"));
+    assertThat(output, CoreMatchers.containsString("test41"));
+    assertThat(output, CoreMatchers.containsString("start test42"));
+    assertThat(output, CoreMatchers.containsString("end test42"));
   }
 
   @Test
   public void testXmlReportAll() throws Exception {
     String testClassName = XmlReportTest.class.getCanonicalName();
 
-    XmlReportTest.failingTestsShouldFail = true;
     AntJunitXmlReportListener.TestSuite testSuite = runTestAndParseXml(testClassName, true);
-    XmlReportTest.failingTestsShouldFail = false;
 
     assertNotNull(testSuite);
     assertEquals(4, testSuite.getTests());
@@ -215,9 +260,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
   public void testXmlReportFailInSetup() throws Exception {
     String testClassName = XmlReportFailInSetupTest.class.getCanonicalName();
 
-    XmlReportFailInSetupTest.shouldFailDuringSetup = true;
     AntJunitXmlReportListener.TestSuite testSuite = runTestAndParseXml(testClassName, true);
-    XmlReportFailInSetupTest.shouldFailDuringSetup = false;
 
     assertNotNull(testSuite);
     assertEquals(2, testSuite.getTests());
@@ -254,12 +297,10 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
   }
 
   @Test
-  public void testXmlFailInCustomTestRunner() throws Exception {
-    String testClassName = XmlReportCustomTestRunnerTest.class.getCanonicalName();
+  public void testXmlErrorInTestRunnerInitialization() throws Exception {
+    String testClassName = XmlReportFailingTestRunnerTest.class.getCanonicalName();
 
-    CustomTestRunner.shouldFailDuringInitialization = true;
     AntJunitXmlReportListener.TestSuite testSuite = runTestAndParseXml(testClassName, true);
-    CustomTestRunner.shouldFailDuringInitialization = false;
 
     assertNotNull(testSuite);
     assertEquals(1, testSuite.getTests());
@@ -280,6 +321,6 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
     assertEquals("failed in getTestRules", testCase.getError().getMessage());
     assertEquals("java.lang.RuntimeException", testCase.getError().getType());
     assertThat(testCase.getError().getStacktrace(),
-        containsString(CustomTestRunner.class.getCanonicalName() + ".getTestRules("));
+        containsString(FailingTestRunner.class.getCanonicalName() + ".getTestRules("));
   }
 }

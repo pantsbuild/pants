@@ -11,19 +11,17 @@ import java.util.List;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
-import org.hamcrest.CoreMatchers;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 import org.pantsbuild.junit.annotations.TestSerial;
+import org.pantsbuild.tools.junit.lib.TestRegistry;
 
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.fail;
 
 @TestSerial
-public class ConsoleRunnerTestHelper {
-
+public abstract class ConsoleRunnerTestBase {
   @Rule
   public TemporaryFolder temporary = new TemporaryFolder();
 
@@ -40,17 +38,11 @@ public class ConsoleRunnerTestHelper {
     ConsoleRunnerImpl.setExitStatus(0);
   }
 
-  protected void assertContainsTestOutput(String output) {
-    assertThat(output, CoreMatchers.containsString("test41"));
-    assertThat(output, CoreMatchers.containsString("start test42"));
-    assertThat(output, CoreMatchers.containsString("end test42"));
-  }
-
   protected String[] asArgsArray(String cmdLine) {
     String[] args = cmdLine.split(" ");
     for (int i = 0; i < args.length; i++) {
       if (args[i].contains("Test")) {
-        args[i] = getClass().getPackage().getName() + '.' + args[i];
+        args[i] = "org.pantsbuild.tools.junit.lib." + args[i];
       }
     }
     return args;
