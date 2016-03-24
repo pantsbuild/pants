@@ -11,7 +11,6 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
 from pants.engine.exp.fs import (DirectoryListing, FileContent, Path, PathLiteral, Paths,
                                  file_content, list_directory, path_exists)
-from pants.engine.exp.storage import Key
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype

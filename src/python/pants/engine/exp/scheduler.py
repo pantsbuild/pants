@@ -488,6 +488,9 @@ class LocalScheduler(object):
     """Creates a Step and Promise with the currently available dependencies of the given Node.
 
     If the dependencies of a Node are not available, returns None.
+
+    TODO: Content addressing node and its dependencies should only happen if node is cacheable
+      or in a multi-process environment.
     """
     Node.validate_node(node)
 
