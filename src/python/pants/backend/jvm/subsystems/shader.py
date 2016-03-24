@@ -18,44 +18,46 @@ from pants.subsystem.subsystem import Subsystem, SubsystemError
 from pants.util.contextutil import open_zip, temporary_file
 
 
+class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
+  """Base class for shading keep and zap rules specifiable in BUILD files."""
+
+  def render(self):
+    return '{name} {pattern}\n'.format(name=self.name, pattern=self.pattern)
+
+
+class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
+  """Base class for shading relocation rules specifiable in BUILD files."""
+
+  _wildcard_pattern = re.compile('[*]+')
+  _starts_with_number_pattern = re.compile('^[0-9]')
+  _illegal_package_char_pattern = re.compile('[^a-z0-9_]', re.I)
+
+  @classmethod
+  def _infer_shaded_pattern_iter(cls, from_pattern, prefix=None):
+    if prefix:
+      yield prefix
+    last = 0
+    for i, match in enumerate(cls._wildcard_pattern.finditer(from_pattern)):
+      yield from_pattern[last:match.start()]
+      yield '@{}'.format(i+1)
+      last = match.end()
+    yield from_pattern[last:]
+
+  @classmethod
+  def new(cls, from_pattern, shade_pattern=None, shade_prefix=None):
+    if not shade_pattern:
+      shade_pattern = ''.join(cls._infer_shaded_pattern_iter(from_pattern, shade_prefix))
+    return cls(from_pattern, shade_pattern)
+
+  def render(self):
+    return 'rule {0} {1}\n'.format(self.from_pattern, self.to_pattern)
+
+
 class Shading(object):
   """Wrapper around relocate and exclude shading rules exposed in BUILD files."""
 
   SHADE_PREFIX = '__shaded_by_pants__.'
   """The default shading package."""
-
-  class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
-    """Base class for shading keep and zap rules specifiable in BUILD files."""
-
-    def render(self):
-      return '{name} {pattern}\n'.format(name=self.name, pattern=self.pattern)
-
-  class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
-    """Base class for shading relocation rules specifiable in BUILD files."""
-
-    _wildcard_pattern = re.compile('[*]+')
-    _starts_with_number_pattern = re.compile('^[0-9]')
-    _illegal_package_char_pattern = re.compile('[^a-z0-9_]', re.I)
-
-    @classmethod
-    def _infer_shaded_pattern_iter(cls, from_pattern, prefix=None):
-      if prefix:
-        yield prefix
-      last = 0
-      for i, match in enumerate(cls._wildcard_pattern.finditer(from_pattern)):
-        yield from_pattern[last:match.start()]
-        yield '@{}'.format(i+1)
-        last = match.end()
-      yield from_pattern[last:]
-
-    @classmethod
-    def new(cls, from_pattern, shade_pattern=None, shade_prefix=None):
-      if not shade_pattern:
-        shade_pattern = ''.join(cls._infer_shaded_pattern_iter(from_pattern, shade_prefix))
-      return cls(from_pattern, shade_pattern)
-
-    def render(self):
-      return 'rule {0} {1}\n'.format(self.from_pattern, self.to_pattern)
 
   @classmethod
   def create_keep(cls, pattern):
@@ -76,7 +78,7 @@ class Shading(object):
       a root. '*' is a wildcard that matches any individual package component, and '**' is a
       wildcard that matches any trailing pattern (ie the rest of the string).
     """
-    return cls.UnaryRule('keep', pattern)
+    return UnaryRule('keep', pattern)
 
   @classmethod
   def create_zap(cls, pattern):
@@ -94,7 +96,7 @@ class Shading(object):
       from the jar. '*' is a wildcard that matches any individual package component, and '**' is a
       wildcard that matches any trailing pattern (ie the rest of the string).
     """
-    return cls.UnaryRule('zap', pattern)
+    return UnaryRule('zap', pattern)
 
   @classmethod
   def create_relocate(cls, from_pattern, shade_pattern=None, shade_prefix=None):
@@ -135,7 +137,7 @@ class Shading(object):
     # NB(gmalmquist): Have have to check "is None" rather than using an or statement, because the
     # empty-string is a valid prefix which should not be replaced by the default prefix.
     shade_prefix = Shading.SHADE_PREFIX if shade_prefix is None else shade_prefix
-    return cls.RelocateRule.new(from_pattern, shade_pattern, shade_prefix)
+    return RelocateRule.new(from_pattern, shade_pattern, shade_prefix)
 
   @classmethod
   def create_exclude(cls, pattern):
