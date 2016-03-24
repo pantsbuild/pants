@@ -7,8 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import contextlib
 import os
+import random
 import re
 import shutil
+import time
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -33,8 +35,11 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     return self.run_pants(full_options)
 
   def setUp(self):
+    # Make sure multiple runs dont step on each other.
+    uniqueness = int(time.time()) + random.randint(0, 99999)
+
     self.target_path = 'testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin/'
-    self.tmp_build_file_path = 'BUILD.CustomScalaIntegTests'
+    self.tmp_build_file_path = 'BUILD.CustomScalaIntegTests.{}'.format(uniqueness)
 
   def test_working_210(self):
     pants_run = self.pants_run(options=['--scala-platform-version=2.10'])
