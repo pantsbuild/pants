@@ -35,11 +35,8 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     return self.run_pants(full_options)
 
   def setUp(self):
-    # Make sure multiple runs dont step on each other.
-    uniqueness = int(time.time()) + random.randint(0, 99999)
-
     self.target_path = 'testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin/'
-    self.tmp_build_file_path = 'BUILD.CustomScalaIntegTests.{}'.format(uniqueness)
+    self.tmp_build_file_path = 'BUILD.CustomScalaIntegTests'
 
   def test_working_210(self):
     pants_run = self.pants_run(options=['--scala-platform-version=2.10'])
@@ -62,7 +59,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
       assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
 
   def test_working_custom_211(self):
-    custom_buildfile = os.path.join(self.target_path, 'custom_211_scalatools.buildcustom_211_scalatools.build')
+    custom_buildfile = os.path.join(self.target_path, 'custom_211_scalatools.build')
     with self.tmp_buildfile(custom_buildfile):
       pants_run = self.pants_run(
         options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.11']
