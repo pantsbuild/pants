@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.address import Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.globs import BaseGlobs, Files
@@ -76,6 +77,8 @@ class ExpGraph(BuildGraph):
 
   def _instantiate_sources(self, relpath, sources):
     """Given a list of literal sources list or a BaseGlobs subclass, create a wrapping FilesetWithSpec."""
+    if isinstance(sources, Addresses):
+      return sources
     if not isinstance(sources, BaseGlobs):
       sources = Files(*sources)
     return sources.to_fileset_with_spec(self._engine, self._scheduler, relpath)
