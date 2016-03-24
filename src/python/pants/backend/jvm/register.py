@@ -15,7 +15,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
-from pants.backend.jvm.targets.credentials import Credentials
+from pants.backend.jvm.targets.credentials import LiteralCredentials, NetrcCredentials
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -68,9 +68,8 @@ def build_file_aliases():
     targets={
       'annotation_processor': AnnotationProcessor,
       'benchmark': Benchmark,
-      'credentials': Credentials,
+      'credentials': LiteralCredentials,
       'jar_library': JarLibrary,
-      'unpacked_jars': UnpackedJars,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'java_tests': JavaTests,
@@ -79,8 +78,10 @@ def build_file_aliases():
       'jvm_binary': JvmBinary,
       'jvm_prep_command' : JvmPrepCommand,
       'managed_jar_dependencies' : ManagedJarDependencies,
+      'netrc_credentials': NetrcCredentials,
       'scala_library': ScalaLibrary,
       'scalac_plugin': ScalacPlugin,
+      'unpacked_jars': UnpackedJars,
     },
     objects={
       'artifact': Artifact,
