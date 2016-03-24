@@ -85,9 +85,6 @@ class GoThriftGen(SimpleCodegenTask):
       return namespace.group(1)
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
-    for source in target.sources_relative_to_buildroot():
-      if self._declares_service(os.path.join(get_buildroot(), source)):
-        return self._service_deps
     return self._deps
 
   def synthetic_target_type(self, target):
@@ -139,9 +136,34 @@ class GoThriftGen(SimpleCodegenTask):
 
     gen_dir = os.path.join(target_workdir, 'gen-go')
     src_dir = os.path.join(target_workdir, 'src')
-    safe_mkdir(src_dir)
+    safe_mkdir(src_dir, clean=True)
     go_dir = os.path.join(target_workdir, 'src', 'go')
     os.rename(gen_dir, go_dir)
+
+    # The thrift generator has a bug in package_prefix handling, so we
+    # need to manually relocate the generated dir from the root to the
+    # appropriate subdirectory.
+    base = self._get_base(target)
+    if base:
+      package_path = os.path.join(go_dir, base)
+
+      # to handle the foo/foo case, we first move everything into _,
+      # which cannot be a valid package, then move from there into base
+      tmp = os.path.join(go_dir, "_")
+      safe_mkdir(tmp)
+
+      for subdir in os.listdir(go_dir):
+        if subdir == '_':
+          continue
+        os.rename(os.path.join(go_dir, subdir), os.path.join(tmp, subdir))
+
+      safe_mkdir(package_path)
+      os.rename(tmp, package_path)
+
+  def _get_base(self, target):
+    all_source_relative_sources = list(target.sources_relative_to_source_root())
+    base = os.path.dirname(all_source_relative_sources[0])
+    return base
 
   @classmethod
   def product_types(cls):
@@ -154,4 +176,9 @@ class GoThriftGen(SimpleCodegenTask):
     all_sources = list(target.sources_relative_to_buildroot())
     source = all_sources[0]
     namespace = self._get_go_namespace(source)
-    return os.path.join(target_workdir, 'src', 'go', namespace.replace(".", os.path.sep))
+    go = os.path.join(target_workdir, 'src', 'go')
+    base = self._get_base(target)
+    if base:
+      return os.path.join(go, base, namespace)
+    else:
+      return os.path.join(go, namespace)

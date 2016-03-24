@@ -48,6 +48,9 @@ class GoThriftGenLibrary(GoTarget):
 
   def __init__(self, sources=None, address=None, payload=None, **kwargs):
     payload = payload or Payload()
+    # Hack out generated "remote" files, since they are in a different
+    # package (main) than the package we are generating.
+    sources = [source for source in sources if not source.endswith("-remote.go")]
     payload.add_fields({
       'sources': self.create_sources_field(sources=sources,
                                            sources_rel_path=address.spec_path,
