@@ -14,13 +14,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
-  def test_ivy_resolve_gives_correct_exception_on_cycles(self):
-    with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'compile', 'testprojects/src/java/org/pantsbuild/testproject/cycle1'], workdir)
-      self.assert_failure(pants_run)
-      self.assertIn('Cycle detected', pants_run.stderr_data)
-
   def test_java_compile_with_ivy_report(self):
     # Ensure the ivy report file gets generated
     with self.temporary_workdir() as workdir:
