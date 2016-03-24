@@ -100,4 +100,3 @@ class LinkifyTest(unittest.TestCase):
   def test_linkify_ignore_many_dots(self):
     url = '.....'
     self._do_test_not_linkified(url)
-
