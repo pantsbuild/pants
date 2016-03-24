@@ -89,6 +89,7 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:objects',
   ]
 )
 
