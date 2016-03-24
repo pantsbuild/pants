@@ -406,7 +406,8 @@ class ExampleTable(SymbolTable):
 def setup_json_scheduler(build_root, debug=True):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
+  :rtype A tuple of :class:`pants.engine.exp.scheduler.LocalScheduler`,
+    :class:`pants.engine.exp.storage.Storage`.
   """
 
   storage = Storage.create(debug=debug)

@@ -316,10 +316,10 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
 
   def __call__(self, node_builder, storage):
     def from_keys():
-      """Translate keys into states."""
+      """Translate keys into dependency nodes and their respective states."""
       dependencies = {}
-      for dep, state_key in self.dependencies.items():
-        dependencies[storage.get(dep)] = storage.get(state_key)
+      for dep_key, state_key in self.dependencies.items():
+        dependencies[storage.get(dep_key)] = storage.get(state_key)
       return dependencies
 
     def to_key(state):
@@ -340,16 +340,12 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   def keyable_fields(self):
     """Return fields for the purpose of computing the cache key of this step request.
 
-    Some special handling are needed to compute cache key for step request.
+    Some special handling is needed to compute cache key for step request.
     First step_id should be dropped, because it's only an identifier not part
     of the input for execution. We also want to sort the dependencies map by
-    keys, i.e, nodes, to eliminate non-determinism. We sort the nodes by first
-    grouping them on their types, since dependencies may contain different
-    types of nodes.
+    keys, i.e, node_keys, to eliminate non-determinism.
     """
-    # TODO
-    sorted_deps = sorted(self.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
-    return (self.node, sorted_deps, self.project_tree)
+    return (self.node, sorted(self.dependencies.items()), self.project_tree)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -472,7 +468,7 @@ class LocalScheduler(object):
            particular (possibly synthetic) product.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
-    :param storage: TODO.
+    :param storage: Content address storage instance, shared with engine.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
                        instance. Defaults to creating a new threading.RLock().
@@ -524,8 +520,9 @@ class LocalScheduler(object):
 
     :param goals: The list of goal names supplied on the command line.
     :type goals: list of string
-    :param subjects: A list of Specs and/or PathGlobs objects in the storage.
-    :type subject_keys: list of :class:`pants.engine.exp.TODO`.
+    :param subjects: A list of Spec and/or PathGlobs objects.
+    :type subject_keys: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+      :class:`pants.engine.exp.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given goals and subjects.
     """
     return self.execution_request([self._products_by_goal[goal_name] for goal_name in goals],
@@ -559,7 +556,7 @@ class LocalScheduler(object):
           elif type(subject) is PathGlobs:
             yield DependenciesNode(subject, product, None, Paths, None)
           else:
-            raise ValueError('Unsupported root subject type: {}'.format(type(subject)))
+            raise ValueError('Unsupported root subject type: {}'.format(subject))
 
     return ExecutionRequest(tuple(roots()))
 
