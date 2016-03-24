@@ -20,12 +20,18 @@ _ABS_PATH_COMPONENT = r'/' + _REL_PATH_COMPONENT
 _ABS_PATH_COMPONENTS = r'({})+'.format(_ABS_PATH_COMPONENT)
 _OPTIONAL_TARGET_SUFFIX = r'(:{})?'.format(_REL_PATH_COMPONENT)  # For /foo/bar:target.
 
+# ivy can print out many many .'s in a row when downloading large jars. evaluating _PATH then
+# becomes ridiculously slow (findall is at least n^3 for this, taking 10+ minutes when there are
+# 100k dots in a row)
+# technically a path could start with 5+ dots. If this happens, it won't be linked.
+_IGNORE_LONG_DOT_CHAINS = r'(?!\.{5})'
+
 # Note that we require at least two path components.
 # We require the last character to be alphanumeric or underscore, because some tools print an
 # ellipsis after file names (I'm looking at you, zinc). None of our files end in a dot in practice,
 # so this is fine.
-_PATH = _PREFIX + _REL_PATH_COMPONENT + _OPTIONAL_PORT + _ABS_PATH_COMPONENTS + \
-        _OPTIONAL_TARGET_SUFFIX + '\w'
+_PATH = _IGNORE_LONG_DOT_CHAINS + _PREFIX + _REL_PATH_COMPONENT + _OPTIONAL_PORT + \
+        _ABS_PATH_COMPONENTS + _OPTIONAL_TARGET_SUFFIX + '\w'
 _PATH_RE = re.compile(_PATH)
 
 _NO_URL = "no url"  # Sentinel value for non-existent files in linkify's memo
