@@ -29,11 +29,11 @@ class EngineTest(unittest.TestCase):
 
   def request(self, goals, *addresses):
     return self.scheduler.build_request(goals=goals,
-                                        subject_keys=self.storage.puts(addresses))
+                                        subjects=addresses)
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
-    self.assertEqual({SelectNode(self.key(self.java), Classpath, None, None):
+    self.assertEqual({SelectNode(self.java, Classpath, None, None):
                       self.key(Return(Classpath(creator='javac')))},
                      result.root_products)
     self.assertIsNone(result.error)
@@ -78,9 +78,10 @@ class EngineTest(unittest.TestCase):
       self.scheduler.product_graph.invalidate()
       self.assert_engine(engine)
 
+
       # Second run executes same number of steps, and are all cache hits, no more misses.
       self.assertEquals(max_steps * 2, self.scheduler._step_id)
-      self.assertEquals(total, cache_stats.total - total)
+      self.assertEquals(total * 2, cache_stats.total)
       self.assertEquals(misses, cache_stats.misses)
       self.assertTrue(cache_stats.hits > 0)
 

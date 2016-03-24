@@ -9,7 +9,7 @@ import os
 import tempfile
 import unittest
 
-from pants.backend.jvm.subsystems.shader import Shader, Shading
+from pants.backend.jvm.subsystems.shader import RelocateRule, Shader, Shading
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import open_zip
@@ -100,7 +100,7 @@ class ShaderTest(unittest.TestCase):
 
   def test_infer_shaded_pattern(self):
     def assert_inference(from_pattern, prefix, to_pattern):
-      result = ''.join(Shading.RelocateRule._infer_shaded_pattern_iter(from_pattern, prefix))
+      result = ''.join(RelocateRule._infer_shaded_pattern_iter(from_pattern, prefix))
       self.assertEqual(to_pattern, result)
 
     assert_inference('com.foo.bar.Main', None, 'com.foo.bar.Main')

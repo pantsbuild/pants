@@ -26,11 +26,10 @@ def format_type(node):
 
 
 def format_subject(node):
-  subject = node.subject_key.string
   if node.variants:
-    return '({})@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
+    return '({})@{}'.format(node.subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
   else:
-    return '({})'.format(subject)
+    return '({})'.format(node.subject)
 
 
 def format_product(node):
@@ -98,7 +97,7 @@ def visualize_execution_graph(scheduler, storage, request):
 
 def visualize_build_request(build_root, goals, subjects):
   scheduler, storage = setup_json_scheduler(build_root)
-  execution_request = scheduler.build_request(goals, storage.puts(subjects))
+  execution_request = scheduler.build_request(goals, subjects)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   engine = LocalSerialEngine(scheduler, storage)
   engine.start()

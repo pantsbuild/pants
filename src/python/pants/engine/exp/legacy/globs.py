@@ -58,7 +58,7 @@ class LazyFilesContent(object):
     # Execute a request for content for the computed PathGlobs.
     # TODO: It might be useful to split requesting FileContent from requesting Paths, but
     # in realistic cases this just populates caches that will be used for followup builds.
-    request = self._scheduler.execution_request([FileContent], [self._engine.storage.put(self._pathglobs)])
+    request = self._scheduler.execution_request([FileContent], [self._pathglobs])
     result = self._engine.execute(request)
     if result.error:
       raise result.error

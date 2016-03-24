@@ -99,12 +99,11 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     symbol_table_cls = TestTable
 
-    address_mapper_key = self.storage.put(
-        AddressMapper(symbol_table_cls=symbol_table_cls,
-                      build_pattern=build_pattern,
-                      parser_cls=parser_cls))
+    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
+                                   build_pattern=build_pattern,
+                                   parser_cls=parser_cls)
 
-    tasks = create_graph_tasks(address_mapper_key, symbol_table_cls)
+    tasks = create_graph_tasks(address_mapper, symbol_table_cls)
     build_root_src = os.path.join(os.path.dirname(__file__), 'examples')
     scheduler, _, build_root = self.mk_scheduler(tasks=tasks,
                                                  storage=self.storage,
@@ -117,8 +116,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
-    request = scheduler.execution_request([self._product],
-                                          self.storage.puts([address]))
+    request = scheduler.execution_request([self._product], [address])
     LocalSerialEngine(scheduler, self.storage).reduce(request)
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
