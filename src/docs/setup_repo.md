@@ -72,29 +72,7 @@ Pants looks in `BUILD.tools` for that target.  Below is an example of BUILD.tool
 the default minor version for 2.10.  For these changes to take effect you would need to set
 --scala-platform-version to 'custom'.
 
-    jar_library(name = 'scalac',
-                jars = [
-                  jar(org = 'org.scala-lang', name = 'scala-compiler', rev = 2.10.3),
-                ])
-
-    jar_library(name = 'scala-library',
-                jars = [
-                  jar(org = 'org.scala-lang', name = 'scala-library', rev = 2.10.3),
-                ])
-
-    jar_library(name = 'scala-repl',
-                jars = [
-                  jar(org = 'org.scala-lang', name = 'jline', rev = 2.10.3, intransitive = True),
-                ],
-                dependencies = [
-                  ':scala-compiler',
-                  ':scala-library',
-                ])
-
-    jar_library(name = 'scalastyle',
-                jars = [
-                  scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
-                ])
+!inc(../../testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin/custom_211_scalatools.build)
 
 Additional tools can be defined as follows in BUILD.tools:
 
@@ -362,7 +340,7 @@ and having set up such a server, set `cache` options in `pants.ini`:
 When building, Pants first tries to read built things from places in `read_from`.
 If it builds something, it caches those built things in places in  `write_to`.
 (It's handy that these are separate settings; if members of your organization can install wacky
-tools on their laptops, you might not want their builds to write to a particular cache, but would 
+tools on their laptops, you might not want their builds to write to a particular cache, but would
 want them to be able to read from it.)
 
 Valid option values include
