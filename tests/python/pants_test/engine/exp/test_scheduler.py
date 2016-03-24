@@ -53,7 +53,7 @@ class SchedulerTest(unittest.TestCase):
     node_type = SelectNode
 
     variants = tuple(variants.items()) if variants else None
-    self.assertEqual({node_type(self.key(subject), product, variants, variant_key) for subject in subjects},
+    self.assertEqual({node_type(subject, product, variants, variant_key) for subject in subjects},
                      {node for (node, _), _ in walk
                       if node.product == product and isinstance(node, node_type) and node.variants == variants})
 
@@ -68,7 +68,7 @@ class SchedulerTest(unittest.TestCase):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
 
   def request_specs(self, goals, *specs):
-    return self.scheduler.build_request(goals=goals, subject_keys=self.storage.puts(specs))
+    return self.scheduler.build_request(goals=goals, subjects=specs)
 
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = self.request(goals, *root_specs)
@@ -119,7 +119,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Root: expect the synthetic GenGoal product.
     self.assert_root(walk,
-                     SelectNode(self.key(self.thrift), GenGoal, None, None),
+                     SelectNode(self.thrift, GenGoal, None, None),
                      GenGoal("non-empty input to satisfy the Goal constructor"))
 
     variants = {'thrift': 'apache_java'}
@@ -145,7 +145,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Root: expect a DependenciesNode depending on a SelectNode with compilation via javac.
     self.assert_root(walk,
-                     SelectNode(self.key(self.java), Classpath, None, None),
+                     SelectNode(self.java, Classpath, None, None),
                      Classpath(creator='javac'))
 
     # Confirm that exactly the expected subjects got Classpaths.
@@ -159,7 +159,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.key(self.consumes_resources), Classpath, None, None),
+                     SelectNode(self.consumes_resources, Classpath, None, None),
                      Classpath(creator='javac'))
 
     # Confirm a classpath for the resources target and other subjects. We know that they are
@@ -176,7 +176,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.key(self.consumes_managed_thirdparty), Classpath, None, None),
+                     SelectNode(self.consumes_managed_thirdparty, Classpath, None, None),
                      Classpath(creator='javac'))
 
     # Confirm that we produced classpaths for the managed jars.
@@ -198,7 +198,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.key(self.inferred_deps), Classpath, None, None),
+                     SelectNode(self.inferred_deps, Classpath, None, None),
                      Classpath(creator='scalac'))
 
     # Confirm that we requested a classpath for the root and inferred targets.
@@ -211,7 +211,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate that the root failed.
     self.assert_root_failed(walk,
-                            SelectNode(self.key(self.java_multi), Classpath, None, None),
+                            SelectNode(self.java_multi, Classpath, None, None),
                             ConflictingProducersError)
 
   def test_no_variant_thrift(self):
@@ -240,7 +240,7 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state_key = walk[0][0]
     root_value = self.storage.get(root_state_key).value
-    self.assertEqual(DependenciesNode(self.key(spec), Address, None, Addresses, None), root)
+    self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that a few expected addresses are in the list.
@@ -257,7 +257,7 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state_key = walk[0][0]
     root_value = self.storage.get(root_state_key).value
-    self.assertEqual(DependenciesNode(self.key(spec), Address, None, Addresses, None), root)
+    self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that an expected address is in the list.

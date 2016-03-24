@@ -52,7 +52,7 @@ class ExpGraph(BuildGraph):
       if state_key.type is Throw:
         # TODO: get access to `Storage` instance in order to `to-str` more effectively here.
         raise AddressLookupError(
-            'Build graph construction failed for {}:\n  {}'.format(node.subject_key, state.exc))
+            'Build graph construction failed for {}:\n  {}'.format(node.subject, state.exc))
       elif state_key.type is not Return:
         State.raise_unrecognized(state_key.type)
       if node.product is not LegacyBuildGraphNode:
@@ -124,7 +124,7 @@ class ExpGraph(BuildGraph):
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
-    request = self._scheduler.execution_request([LegacyBuildGraphNode], self._engine.storage.puts(specs))
+    request = self._scheduler.execution_request([LegacyBuildGraphNode], specs)
     result = self._engine.execute(request)
     if result.error:
       raise result.error

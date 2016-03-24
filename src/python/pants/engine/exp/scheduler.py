@@ -293,14 +293,14 @@ class NodeBuilder(Closable):
   def __init__(self, tasks):
     self._tasks = tasks
 
-  def gen_nodes(self, subject_key, product, variants):
+  def gen_nodes(self, subject, product, variants):
     # Native filesystem operations.
     if FilesystemNode.is_filesystem_product(product):
-      yield FilesystemNode(subject_key, product, variants)
+      yield FilesystemNode(subject, product, variants)
 
     # Tasks.
     for task, anded_clause in self._tasks[product]:
-      yield TaskNode(subject_key, product, variants, task, anded_clause)
+      yield TaskNode(subject, product, variants, task, anded_clause)
 
 
 class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_tree'])):
@@ -310,25 +310,17 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
 
   :param step_id: A unique id for the step, to ease comparison.
   :param node: The Node instance that will run.
-  :param subject: The Subject referred to by Node.subject_key.
   :param dependencies: The declared dependencies of the Node from previous Waiting steps.
   :param project_tree: A FileSystemProjectTree instance.
   """
 
   def __call__(self, node_builder, storage):
     def from_keys():
-      """Translate keys into subject and states."""
-      subject = storage.get(self.node.subject_key)
+      """Translate keys into dependency nodes and their respective states."""
       dependencies = {}
-      for dep, state_key in self.dependencies.items():
-        # This is for the only special case: `Noop` that is introduced in `Scheduler` to
-        # handle circular dependencies. Skip lookup since it is already a `State`.
-        # TODO (peiyu): we should eventually get rid of this special case.
-        if isinstance(state_key, Noop):
-          dependencies[dep] = state_key
-        else:
-          dependencies[dep] = storage.get(state_key)
-      return subject, dependencies
+      for dep_key, state_key in self.dependencies.items():
+        dependencies[storage.get(dep_key)] = storage.get(state_key)
+      return dependencies
 
     def to_key(state):
       """Introduce a potentially new State, and returns its key and optional dependencies."""
@@ -339,8 +331,8 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, storage, self.project_tree)
 
-    subject, dependencies = from_keys()
-    state = self.node.step(subject, dependencies, step_context)
+    dependencies = from_keys()
+    state = self.node.step(dependencies, step_context)
 
     state_key, dependencies = to_key(state)
     return StepResult(state_key, dependencies)
@@ -348,15 +340,12 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   def keyable_fields(self):
     """Return fields for the purpose of computing the cache key of this step request.
 
-    Some special handling are needed to compute cache key for step request.
+    Some special handling is needed to compute cache key for step request.
     First step_id should be dropped, because it's only an identifier not part
     of the input for execution. We also want to sort the dependencies map by
-    keys, i.e, nodes, to eliminate non-determinism. We sort the nodes by first
-    grouping them on their types, since dependencies may contain different
-    types of nodes.
+    keys, i.e, node_keys, to eliminate non-determinism.
     """
-    sorted_deps = sorted(self.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
-    return (self.node, sorted_deps, self.project_tree)
+    return (self.node, sorted(self.dependencies.items()), self.project_tree)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -400,7 +389,7 @@ class GraphValidator(object):
     # Walk into successful nodes for the same subject under this root.
     def predicate(entry):
       node, state_key = entry
-      return root.subject_key == node.subject_key and state_key.type is Return
+      return root.subject == node.subject and state_key.type is Return
     # If a product was successfully selected, record it.
     for ((node, _), _) in product_graph.walk([root], predicate=predicate):
       if type(node) is SelectNode:
@@ -417,7 +406,7 @@ class GraphValidator(object):
     # Walk all nodes for the same subject under this root.
     def predicate(entry):
       node, state_key = entry
-      return root.subject_key == node.subject_key
+      return root.subject == node.subject
     for ((node, state_key), dependencies) in product_graph.walk([root], predicate=predicate):
       # Look for unsatisfied TaskNodes with at least one unsatisfied dependency.
       if type(node) is not TaskNode:
@@ -448,7 +437,7 @@ class GraphValidator(object):
 
       # Found a partially consumed input.
       for used_literal_dep in used_literal_deps:
-        partials[node.subject_key][(used_literal_dep, node.product)].append((node.func, missing_products))
+        partials[node.subject][(used_literal_dep, node.product)].append((node.func, missing_products))
     return partials
 
   def validate(self, product_graph):
@@ -457,7 +446,7 @@ class GraphValidator(object):
     # Locate roots: those who do not have any dependents for the same subject.
     roots = set()
     for node, dependents in product_graph.dependents().items():
-      if any(d.subject_key == node.subject_key for d in dependents):
+      if any(d.subject == node.subject for d in dependents):
         # Node had a dependent for its subject: was not a root.
         continue
       roots.add(node)
@@ -473,18 +462,20 @@ class GraphValidator(object):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, symbol_table_cls, project_tree, graph_lock=None):
+  def __init__(self, goals, tasks, symbol_table_cls, storage, project_tree, graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
+    :param storage: Content address storage instance, shared with engine.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
                        instance. Defaults to creating a new threading.RLock().
     """
     self._products_by_goal = goals
     self._tasks = tasks
+    self._storage = storage
     self._project_tree = project_tree
     self._node_builder = NodeBuilder.create(self._tasks)
 
@@ -497,6 +488,9 @@ class LocalScheduler(object):
     """Creates a Step and Promise with the currently available dependencies of the given Node.
 
     If the dependencies of a Node are not available, returns None.
+
+    TODO: Content addressing node and its dependencies should only happen if node is cacheable
+      or in a multi-process environment.
     """
     Node.validate_node(node)
 
@@ -506,10 +500,11 @@ class LocalScheduler(object):
       state_key = self._product_graph.state(dep)
       if state_key is None:
         return None
-      deps[dep] = state_key
+      deps[self._storage.put(dep)] = state_key
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in self._product_graph.cyclic_dependencies_of(node):
-      deps[dep] = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
+      noop_state = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
+      deps[self._storage.put(dep)] = self._storage.put(noop_state)
 
     # Ready.
     self._step_id += 1
@@ -523,19 +518,20 @@ class LocalScheduler(object):
     """
     return self._node_builder
 
-  def build_request(self, goals, subject_keys):
+  def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
 
     :param goals: The list of goal names supplied on the command line.
     :type goals: list of string
-    :param subject_keys: A list of Keys that reference Spec and/or PathGlobs objects in the storage.
-    :type subject_keys: list of :class:`pants.engine.exp.Key`.
+    :param subjects: A list of Spec and/or PathGlobs objects.
+    :type subject_keys: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+      :class:`pants.engine.exp.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given goals and subjects.
     """
     return self.execution_request([self._products_by_goal[goal_name] for goal_name in goals],
-                                  subject_keys)
+                                  subjects)
 
-  def execution_request(self, products, subject_keys):
+  def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
 
     The resulting ExecutionRequest object will contain keys tied to this scheduler's ProductGraph, and
@@ -554,16 +550,16 @@ class LocalScheduler(object):
 
     # Determine the root Nodes for the products and subjects selected by the goals and specs.
     def roots():
-      for subject_key in subject_keys:
+      for subject in subjects:
         for product in products:
-          if subject_key.type is Address:
-            yield SelectNode(subject_key, product, None, None)
-          elif subject_key.type in [SingleAddress, SiblingAddresses, DescendantAddresses]:
-            yield DependenciesNode(subject_key, product, None, Addresses, None)
-          elif subject_key.type is PathGlobs:
-            yield DependenciesNode(subject_key, product, None, Paths, None)
+          if type(subject) is Address:
+            yield SelectNode(subject, product, None, None)
+          elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
+            yield DependenciesNode(subject, product, None, Addresses, None)
+          elif type(subject) is PathGlobs:
+            yield DependenciesNode(subject, product, None, Paths, None)
           else:
-            raise ValueError('Unsupported root subject type: {}'.format(subject_key.type))
+            raise ValueError('Unsupported root subject type: {}'.format(subject))
 
     return ExecutionRequest(tuple(roots()))
 

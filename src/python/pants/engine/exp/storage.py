@@ -325,6 +325,9 @@ class CacheStats(Counter):
     """Total count including hits and misses."""
     return self[self.HIT_KEY] + self[self.MISS_KEY]
 
+  def __repr__(self):
+    return 'hits={}, misses={}, total={}'.format(self.hits, self.misses, self.total)
+
 
 class KeyValueStore(Closable, AbstractClass):
   @abstractmethod

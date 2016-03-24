@@ -47,7 +47,7 @@ def create_fs_tasks():
   ]
 
 
-def create_graph_tasks(address_mapper_key, symbol_table_cls):
+def create_graph_tasks(address_mapper, symbol_table_cls):
   """Creates tasks used to parse Structs from BUILD files.
 
   :param address_mapper_key: The subject key for an AddressMapper instance.
@@ -66,12 +66,12 @@ def create_graph_tasks(address_mapper_key, symbol_table_cls):
   ] + [
     # BUILD file parsing.
     (AddressFamily,
-     [SelectLiteral(address_mapper_key, AddressMapper),
+     [SelectLiteral(address_mapper, AddressMapper),
       Select(Path),
       SelectProjection(FilesContent, Paths, ('paths',), BuildFilePaths)],
      parse_address_family),
     (BuildFilePaths,
-     [SelectLiteral(address_mapper_key, AddressMapper),
+     [SelectLiteral(address_mapper, AddressMapper),
       Select(DirectoryListing)],
      filter_buildfile_paths),
   ] + [

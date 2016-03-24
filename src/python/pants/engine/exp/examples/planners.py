@@ -406,7 +406,8 @@ class ExampleTable(SymbolTable):
 def setup_json_scheduler(build_root, debug=True):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
+  :rtype A tuple of :class:`pants.engine.exp.scheduler.LocalScheduler`,
+    :class:`pants.engine.exp.storage.Storage`.
   """
 
   storage = Storage.create(debug=debug)
@@ -415,11 +416,11 @@ def setup_json_scheduler(build_root, debug=True):
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  address_mapper_key = storage.put(AddressMapper(symbol_table_cls=symbol_table_cls,
+  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                                   build_pattern=r'^BLD.json$',
-                                                  parser_cls=JsonParser))
-  source_roots_key = storage.put(SourceRoots(('src/java','src/scala')))
-  scrooge_tool_address_key = storage.put(Address.parse('src/scala/scrooge'))
+                                                  parser_cls=JsonParser)
+  source_roots = SourceRoots(('src/java','src/scala'))
+  scrooge_tool_address = Address.parse('src/scala/scrooge')
 
   goals = {
       'compile': Classpath,
@@ -445,12 +446,12 @@ def setup_json_scheduler(build_root, debug=True):
       (ScalaSources,
        [Select(ThriftSources),
         SelectVariant(ScroogeScalaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address_key, Classpath)],
+        SelectLiteral(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
       (JavaSources,
        [Select(ThriftSources),
         SelectVariant(ScroogeJavaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address_key, Classpath)],
+        SelectLiteral(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
     ] + [
       # scala dependency inference
@@ -467,7 +468,7 @@ def setup_json_scheduler(build_root, debug=True):
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),
-        SelectLiteral(source_roots_key, SourceRoots)],
+        SelectLiteral(source_roots, SourceRoots)],
        calculate_package_search_path),
     ] + [
       # Remote dependency resolution
@@ -503,10 +504,10 @@ def setup_json_scheduler(build_root, debug=True):
        [Select(UnpickleableOutput)],
        unpickleable_input),
     ] + (
-      create_graph_tasks(address_mapper_key, symbol_table_cls)
+      create_graph_tasks(address_mapper, symbol_table_cls)
     ) + (
       create_fs_tasks()
     )
 
   project_tree = FileSystemProjectTree(build_root)
-  return LocalScheduler(goals, tasks, symbol_table_cls, project_tree), storage
+  return LocalScheduler(goals, tasks, symbol_table_cls, storage, project_tree), storage
