@@ -62,7 +62,7 @@ def setup():
   )
 
   return (
-    LocalScheduler(dict(), tasks, symbol_table_cls, project_tree),
+    LocalScheduler(dict(), tasks, symbol_table_cls, storage, project_tree),
     storage,
     spec_roots,
     symbol_table_cls

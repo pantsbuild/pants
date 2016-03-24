@@ -319,13 +319,7 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
       """Translate keys into states."""
       dependencies = {}
       for dep, state_key in self.dependencies.items():
-        # This is for the only special case: `Noop` that is introduced in `Scheduler` to
-        # handle circular dependencies. Skip lookup since it is already a `State`.
-        # TODO (peiyu): we should eventually get rid of this special case.
-        if isinstance(state_key, Noop):
-          dependencies[dep] = state_key
-        else:
-          dependencies[dep] = storage.get(state_key)
+        dependencies[storage.get(dep)] = storage.get(state_key)
       return dependencies
 
     def to_key(state):
@@ -354,7 +348,7 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
     types of nodes.
     """
     # TODO
-    sorted_deps = sorted(self.dependencies.items(), key=lambda t: (type(t[0]), type(t[0].subject), t[0]))
+    sorted_deps = sorted(self.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
     return (self.node, sorted_deps, self.project_tree)
 
   def __eq__(self, other):
@@ -472,18 +466,20 @@ class GraphValidator(object):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, symbol_table_cls, project_tree, graph_lock=None):
+  def __init__(self, goals, tasks, symbol_table_cls, storage, project_tree, graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
+    :param storage: TODO.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
                        instance. Defaults to creating a new threading.RLock().
     """
     self._products_by_goal = goals
     self._tasks = tasks
+    self._storage = storage
     self._project_tree = project_tree
     self._node_builder = NodeBuilder.create(self._tasks)
 
@@ -505,10 +501,11 @@ class LocalScheduler(object):
       state_key = self._product_graph.state(dep)
       if state_key is None:
         return None
-      deps[dep] = state_key
+      deps[self._storage.put(dep)] = state_key
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in self._product_graph.cyclic_dependencies_of(node):
-      deps[dep] = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
+      noop_state = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
+      deps[self._storage.put(dep)] = self._storage.put(noop_state)
 
     # Ready.
     self._step_id += 1
