@@ -1,7 +1,7 @@
 // Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-package org.pantsbuild.tools.junit.impl;
+package org.pantsbuild.tools.junit.lib;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,26 +14,26 @@ import java.util.List;
  * to cause more problems than it fixes, since our MockTestX are called independently
  * by pants, and they may catch TestRegistry singleton in uninitialized state.
  */
-final class TestRegistry {
+final public class TestRegistry {
   private static List<String> testsCalled = new ArrayList<String>();
 
   // No instances of this classes can be constructed
   private TestRegistry() { }
 
-  static synchronized void registerTestCall(String testId) {
+  public static synchronized void registerTestCall(String testId) {
     testsCalled.add(testId);
   }
 
-  static synchronized void reset() {
+  public static synchronized void reset() {
     testsCalled.clear();
   }
 
   /** Returns the called tests in sorted order as a single string */
-  static String getCalledTests() {
+  public static String getCalledTests() {
     return getCalledTests(true);
   }
 
-  static synchronized String getCalledTests(boolean sort) {
+  public static synchronized String getCalledTests(boolean sort) {
     if (testsCalled.isEmpty()) {
       return "";
     }

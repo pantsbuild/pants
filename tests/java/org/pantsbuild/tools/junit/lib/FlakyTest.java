@@ -1,25 +1,18 @@
 // Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-package org.pantsbuild.tools.junit.impl;
+package org.pantsbuild.tools.junit.lib;
 
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Contains tests that pass only after some number of retries. Used in
- * ConsoleRunnerTest.testFlakyTests(). Since this test class can also be picked
- * up on its own, independently of testFlakyTests, the flaky tests are disabled
- * by default via the TestRegistry.consoleRunnerTestRunsFlakyTests flag.
+ * This test is intentionally under a java_library() BUILD target so it will not be run
+ * on its own. It is run by the ConsoleRunnerTest suite to test ConsoleRunnerImpl.
  */
 public class FlakyTest {
-
-  /** Should be set to true only while tests from FlakyTest is executed from ConsoleRunnerTest */
-  public static boolean flakyTestsShouldFail = false;
-
   public static int numFlaky1Invocations = 0;
   public static int numFlaky2Invocations = 0;
   public static int numFlaky3Invocations = 0;
@@ -50,7 +43,6 @@ public class FlakyTest {
   @Test
   public void flakyMethodSucceedsAfter1Retry() throws Exception {
     numTestMethodInvocationsPerTestInstance++;
-    Assume.assumeTrue(flakyTestsShouldFail);
     TestRegistry.registerTestCall("flaky1");
     numFlaky1Invocations++;
     if (numFlaky1Invocations < 2) {
@@ -61,7 +53,6 @@ public class FlakyTest {
   @Test
   public void flakyMethodSucceedsAfter2Retries() throws Exception {
     numTestMethodInvocationsPerTestInstance++;
-    Assume.assumeTrue(flakyTestsShouldFail);
     TestRegistry.registerTestCall("flaky2");
     numFlaky2Invocations++;
     if (numFlaky2Invocations < 3) {
@@ -72,7 +63,6 @@ public class FlakyTest {
   @Test
   public void methodAlwaysFails() throws Exception {
     numTestMethodInvocationsPerTestInstance++;
-    Assume.assumeTrue(flakyTestsShouldFail);
     TestRegistry.registerTestCall("flaky3");
     numFlaky3Invocations++;
     throw new Exception("flaky3 failed on invocation number " + numFlaky3Invocations);

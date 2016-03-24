@@ -33,8 +33,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/antlr/pants/backend/python/test:antlr_failure',
       'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files',
       'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:fatal',
-      'testprojects/src/java/org/pantsbuild/testproject/cycle1',
-      'testprojects/src/java/org/pantsbuild/testproject/cycle2',
       'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
       'testprojects/src/java/org/pantsbuild/testproject/junit/beforeclassexception:tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/failing/tests/org/pantsbuild/tmp/tests',
