@@ -27,13 +27,8 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def _testing_build_file(self):
-    test_name = os.path.join(self.project, 'TEST_BUILD')
-    real_name = os.path.join(self.project, 'BUILD')
-    try:
-      os.rename(test_name, real_name)
+    with self.file_renamed(self.project, 'TEST_BUILD', 'BUILD'):
       yield
-    finally:
-      os.rename(real_name, test_name)
 
   def _run_project(self, spec_name, default_target=None, conflict_strategy=None):
     with self._testing_build_file():

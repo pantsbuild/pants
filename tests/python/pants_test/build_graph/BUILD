@@ -62,6 +62,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'build_graph_integration',
+  sources = ['test_build_graph_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'source_mapper',
   sources = ['test_source_mapper.py'],
   dependencies = [
