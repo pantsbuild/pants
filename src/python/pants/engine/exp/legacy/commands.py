@@ -80,7 +80,7 @@ def dependencies():
     graph = ExpGraph(scheduler, engine, symbol_table_cls)
     for address in graph.inject_specs_closure(spec_roots):
       print(address)
-    print('Cache stats: {}'.format(engine._cache.get_stats()))
+    print('Cache stats: {}'.format(engine._cache.get_stats()), file=sys.stderr)
   finally:
     engine.close()
 
