@@ -75,7 +75,11 @@ class ExpGraph(BuildGraph):
     return addresses
 
   def _instantiate_sources(self, relpath, sources):
-    """Given a list of literal sources list or a BaseGlobs subclass, create a wrapping FilesetWithSpec."""
+    """Converts captured `sources` arguments to what is expected by `Target.create_sources_field`.
+
+    For a literal sources list or a BaseGlobs subclass, create a wrapping FilesetWithSpec.
+    For an Addresses object, return as is.
+    """
     if isinstance(sources, Addresses):
       return sources
     if not isinstance(sources, BaseGlobs):

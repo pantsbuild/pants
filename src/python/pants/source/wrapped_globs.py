@@ -190,8 +190,7 @@ class Files(FilesetRelPathWrapper):
 
   @staticmethod
   def _literal_files(*args, **kwargs):
-    root = kwargs['root']
-    if len(kwargs) > 1:
+    if kwargs.keys() != ['root']:
       raise ValueError('Literal file globs do not support kwargs other than `root`: {}'.format(kwargs))
     return args
 
