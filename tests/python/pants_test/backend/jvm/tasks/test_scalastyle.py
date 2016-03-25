@@ -109,11 +109,11 @@ class ScalastyleTest(NailgunTaskTestBase):
   def custom_scala_platform_setup(self):
     with subsystem_instance(ScalaPlatform):
       # We don't need to specify :scalac or :scala-repl since they are never being fetched.
-      self.make_target(':scalastyle',
+      self.make_target('//:scalastyle',
                        JarLibrary,
-                       jars=[JarDependency('org.scalastyle', 'scalastyle_2.10', '0.3.2')]
+                       jars=[JarDependency('org.scalastyle', 'scalastyle_2.10', '0.3.2')],
+                       synthetic=True
       )
-
       self.set_options_for_scope(ScalaPlatform.options_scope, version='custom')
 
       yield
