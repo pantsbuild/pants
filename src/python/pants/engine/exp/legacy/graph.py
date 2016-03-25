@@ -142,7 +142,12 @@ class ExpGraph(BuildGraph):
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
     request = self._scheduler.execution_request([LegacyBuildGraphNode], specs)
-    result = self._engine.execute(request)
+    import cProfile
+    profiler = cProfile.Profile()
+    try:
+      result = profiler.runcall(self._engine.execute, request)
+    finally:
+      profiler.dump_stats('/tmp/profiler.dump')
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
