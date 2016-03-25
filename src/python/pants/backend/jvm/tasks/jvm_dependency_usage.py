@@ -155,42 +155,50 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       for vts in invalidation_check.all_vts:
         target_to_vts[vts.target] = vts
 
-      def _nodes_json(target):
-        return os.path.join(target_to_vts[target].results_dir, 'node.json')
-
       if not self.get_options().use_cached:
-        classes_by_source = self.context.products.get_data('classes_by_source')
-        runtime_classpath = self.context.products.get_data('runtime_classpath')
-        product_deps_by_src = self.context.products.get_data('product_deps_by_src')
-
-        def calculating_node_creator(target):
-          node = self.create_dep_usage_node(target, get_buildroot(),
-                                            classes_by_source, runtime_classpath, product_deps_by_src)
-          vt = target_to_vts[target]
-          with open(_nodes_json(target), mode='w') as fp:
-            json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
-          vt.update()
-          return node
-
-        node_creator = calculating_node_creator
+        node_creator = self.calculating_node_creator(
+          self.context.products.get_data('classes_by_source'),
+          self.context.products.get_data('runtime_classpath'),
+          self.context.products.get_data('product_deps_by_src'),
+          target_to_vts)
       else:
-        def cached_node_creator(target):
-          if target_to_vts[target].valid and os.path.exists(_nodes_json(target)):
-            try:
-              with open(_nodes_json(target)) as fp:
-                return Node.from_cacheable_dict(json.load(fp),
-                                                lambda spec: self.context.resolve(spec).__iter__().next())
-            except Exception:
-              self.context.log.warn("Can't deserialize json for target {}".format(target))
-              return Node(target.concrete_derived_from)
-          else:
-            self.context.log.warn("No cache entry for {}".format(target))
-            return Node(target.concrete_derived_from)
-
-        node_creator = cached_node_creator
+        node_creator = self.cached_node_creator(target_to_vts)
 
       return DependencyUsageGraph(self.create_dep_usage_nodes(targets, node_creator),
                                   self.size_estimators[self.get_options().size_estimator])
+
+  def calculating_node_creator(self, classes_by_source, runtime_classpath, product_deps_by_src,
+                               target_to_vts):
+    def creator(target):
+      node = self.create_dep_usage_node(target, get_buildroot(),
+                                        classes_by_source, runtime_classpath, product_deps_by_src)
+      vt = target_to_vts[target]
+      with open(self.nodes_json(vt.results_dir), mode='w') as fp:
+        json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
+      vt.update()
+      return node
+
+    return creator
+
+  def cached_node_creator(self, target_to_vts):
+    def creator(target):
+      vt = target_to_vts[target]
+      if vt.valid and os.path.exists(self.nodes_json(vt.results_dir)):
+        try:
+          with open(self.nodes_json(vt.results_dir)) as fp:
+            return Node.from_cacheable_dict(json.load(fp),
+                                            lambda spec: self.context.resolve(spec).__iter__().next())
+        except Exception:
+          self.context.log.warn("Can't deserialize json for target {}".format(target))
+          return Node(target.concrete_derived_from)
+      else:
+        self.context.log.warn("No cache entry for {}".format(target))
+        return Node(target.concrete_derived_from)
+
+    return creator
+
+  def nodes_json(self, target_results_dir):
+    return os.path.join(target_results_dir, 'node.json')
 
   def create_dep_usage_nodes(self, targets, node_creator):
     nodes = dict()
