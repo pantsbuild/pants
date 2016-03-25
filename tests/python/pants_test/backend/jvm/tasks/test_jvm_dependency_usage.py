@@ -11,7 +11,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_dependency_usage import DependencyUsageGraph, JvmDependencyUsage
 from pants.util.dirutil import safe_mkdir, touch
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
 class TestJvmDependencyUsage(TaskTestBase):
@@ -115,3 +115,19 @@ class TestJvmDependencyUsage(TaskTestBase):
 
     return DependencyUsageGraph(task.create_dep_usage_nodes(targets, node_creator),
                                 task.size_estimators[task.get_options().size_estimator])
+
+  @ensure_cached(JvmDependencyUsage, expected_num_artifacts=2)
+  def test_cache_write(self):
+    t1 = self.make_java_target(spec=':t1', sources=['a.java'])
+    self.create_file('a.java')
+    t2 = self.make_java_target(spec=':t2', sources=['b.java'], dependencies=[t1])
+    self.create_file('b.java')
+    self.set_options(size_estimator='filecount')
+    dep_usage, product_deps_by_src = self._setup({
+        t1: ['a.class'],
+        t2: ['b.class'],
+      })
+    product_deps_by_src[t1] = {}
+    product_deps_by_src[t2] = {'b.java': ['a.class']}
+
+    dep_usage.create_dep_usage_graph([t1, t2])
