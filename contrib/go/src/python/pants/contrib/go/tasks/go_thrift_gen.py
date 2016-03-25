@@ -148,7 +148,7 @@ class GoThriftGen(SimpleCodegenTask):
       package_path = os.path.join(go_dir, base)
 
       # to handle the foo/foo case, we first move everything into _,
-      # which cannot be a valid package, then move from there into base
+      # which cannot be a valid package, then move from there into foo
       tmp = os.path.join(go_dir, "_")
       safe_mkdir(tmp)
 
@@ -182,3 +182,8 @@ class GoThriftGen(SimpleCodegenTask):
       return os.path.join(go, base, namespace)
     else:
       return os.path.join(go, namespace)
+
+  def exclude_source(self, rel_root, name):
+    # Hack out generated "remote" files, since they are in a different
+    # package (main) than the package we are generating.
+    return name.endswith("-remote.go")
