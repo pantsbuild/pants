@@ -83,7 +83,7 @@ class SchedulerTest(unittest.TestCase):
     ((root, root_state), dependencies) = walk[0]
     self.assertEquals(type(root), DependenciesNode)
     self.assertEquals(Return([return_value]), root_state)
-    self.assertIn((node, self.key(Return(return_value))), dependencies)
+    self.assertIn((node, Return(return_value)), dependencies)
 
   def assert_root_failed(self, walk, node, thrown_type):
     """Asserts that the first Node in a walk was a DependenciesNode with a Throw result."""

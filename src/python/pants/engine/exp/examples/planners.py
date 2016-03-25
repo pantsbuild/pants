@@ -510,4 +510,4 @@ def setup_json_scheduler(build_root, debug=True):
     )
 
   project_tree = FileSystemProjectTree(build_root)
-  return LocalScheduler(goals, tasks, symbol_table_cls, storage, project_tree), storage
+  return LocalScheduler(goals, tasks, symbol_table_cls, project_tree), storage

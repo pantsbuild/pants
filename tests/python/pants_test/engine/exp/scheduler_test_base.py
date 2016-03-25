@@ -51,7 +51,7 @@ class SchedulerTestBase(object):
 
     tasks = list(tasks) + create_fs_tasks()
     project_tree = FileSystemProjectTree(build_root)
-    scheduler = LocalScheduler(goals, tasks, symbol_table_cls, storage, project_tree)
+    scheduler = LocalScheduler(goals, tasks, symbol_table_cls, project_tree)
     return scheduler, storage, build_root
 
   def execute_request(self, scheduler, storage, product, *subjects):

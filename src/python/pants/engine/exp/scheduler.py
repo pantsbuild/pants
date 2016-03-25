@@ -331,7 +331,7 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
     of the input for execution. We also want to sort the dependencies map by
     keys, i.e, node_keys, to eliminate non-determinism.
     """
-    return (self.node, sorted(self.dependencies.items()), self.project_tree)
+    return (self.node, self.dependencies.items(), self.project_tree)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
