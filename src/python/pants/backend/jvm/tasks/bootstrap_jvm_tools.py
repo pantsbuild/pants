@@ -203,9 +203,13 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       raise self._tool_resolve_error(e, dep_spec, jvm_tool)
 
   def _bootstrap_classpath(self, jvm_tool, targets):
+    # NOTE: ScalaPlatform allows a user to specify a custom configuration.  When this is
+    # done all of the targets must be defined by the user and defaults are set as None.
+    # If we catch a case of a scala-platform tool being bootstrapped with no classpath
+    # we need to throw an exception for the user.
     def _no_rev(cp):
       return cp.rev is None
-    if any((_no_rev(cp) for cp in jvm_tool.classpath)):
+    if jvm_tool.scope == 'scala-platform' and any((_no_rev(cp) for cp in jvm_tool.classpath)):
       raise RuntimeError("""
         Unable to bootstrap tool: '{}' because no rev was specified.  This usually
         means that the tool was not defined properly in your build files and no
