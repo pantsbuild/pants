@@ -16,7 +16,7 @@ from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyze
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
-from pants.util.dirutil import fast_relpath, safe_mkdir
+from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
 
 
@@ -167,7 +167,6 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
           node = self.create_dep_usage_node(target, get_buildroot(),
                                             classes_by_source, runtime_classpath, product_deps_by_src)
           vt = target_to_vts[target]
-          safe_mkdir(vt.results_dir)
           with open(_nodes_json(target), mode='w') as fp:
             json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
           vt.update()
