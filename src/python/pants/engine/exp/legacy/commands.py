@@ -11,13 +11,15 @@ from contextlib import contextmanager
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.specs import DescendantAddresses
 from pants.bin.goal_runner import OptionsInitializer
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.fs import create_fs_tasks
+from pants.engine.exp.fs import Path, create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
 from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
 from pants.engine.exp.mapper import AddressMapper
+from pants.engine.exp.nodes import FilesystemNode
 from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
@@ -31,7 +33,7 @@ class LegacyTable(SymbolTable):
   @memoized_method
   def aliases(cls):
     """TODO: This is a nasty escape hatch to pass aliases to LegacyPythonCallbacksParser."""
-    options, build_config = OptionsInitializer(OptionsBootstrapper()).setup()
+    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup()
     return build_config.registered_aliases()
 
   @classmethod
@@ -41,9 +43,10 @@ class LegacyTable(SymbolTable):
 
 
 def setup():
+  options, _ = OptionsInitializer(OptionsBootstrapper()).setup()
   build_root = get_buildroot()
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
-  spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
+  spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
 
   storage = Storage.create(debug=False)
   project_tree = FileSystemProjectTree(build_root)
@@ -65,14 +68,22 @@ def setup():
   return (
     LocalScheduler(dict(), tasks, storage, project_tree),
     storage,
+    options,
     spec_roots,
     symbol_table_cls
   )
 
 
+def maybe_launch_pantsd(options, scheduler):
+  if options.for_global_scope().enable_pantsd:
+    pantsd_launcher = PantsDaemonLauncher.global_instance()
+    pantsd_launcher.set_scheduler(scheduler, (Path, DescendantAddresses), FilesystemNode)
+    pantsd_launcher.maybe_launch()
+
+
 @contextmanager
-def _open_graph():
-  scheduler, storage, spec_roots, symbol_table_cls = setup()
+def _setup_graph():
+  scheduler, storage, options, spec_roots, symbol_table_cls = setup()
 
   # Populate the graph for the given request, and print the resulting Addresses.
   engine = LocalSerialEngine(scheduler, storage)
@@ -80,10 +91,23 @@ def _open_graph():
   try:
     graph = ExpGraph(scheduler, engine, symbol_table_cls)
     addresses = tuple(graph.inject_specs_closure(spec_roots))
-    yield graph, addresses
+    yield graph, addresses, scheduler
+    maybe_launch_pantsd(options, scheduler)
   finally:
     print('Cache stats: {}'.format(engine._cache.get_stats()), file=sys.stderr)
     engine.close()
+
+
+@contextmanager
+def _open_graph():
+  with _setup_graph() as (graph, addresses, _):
+    yield graph, addresses
+
+
+@contextmanager
+def _open_scheduler():
+  with _setup_graph() as (_, _, scheduler):
+    yield scheduler
 
 
 def dependencies():
@@ -102,10 +126,9 @@ def filemap():
         print('{} {}'.format(source, target.address.spec))
 
 
-def pantsd():
-  """Launches pantsd with a LocalScheduler instance for testing."""
-  scheduler = setup()[0]
-  pantsd_launcher = PantsDaemonLauncher.global_instance()
-  pantsd_launcher.set_scheduler(scheduler)
-  print('*** pantsd {} ***'.format('running' if pantsd_launcher.pantsd.is_alive() else 'launched'))
-  pantsd_launcher.maybe_launch()
+def fsnodes():
+  """Prints out all of the FilesystemNodes in the Scheduler for debugging purposes."""
+  with _open_scheduler() as scheduler:
+    for node in scheduler.product_graph.completed_nodes():
+      if type(node) is FilesystemNode:
+        print(node)

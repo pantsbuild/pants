@@ -62,10 +62,10 @@ class FSEventService(PantsService):
         fields=['name'],
         expression=[
           'allof',  # All of the below rules must be true to match.
-          ['type', 'f'],  # Match only files (not dirs, symlinks, character devices etc).
+          ['anyof', ['type', 'f'], ['type', 'l']],  # Match only files and symlinks.
           ['not', ['dirname', 'dist', self.ZERO_DEPTH]],  # Exclude the ./dist dir.
-          # N.B. 'wholename' ensures we match against the absolute ('/x/y/z') vs base path ('z').
-          ['not', ['match', '.*', 'wholename']],  # Exclude files in dotpath dirs (.pants.d/* etc).
+          # N.B. 'wholename' ensures we match against the absolute ('x/y/z') vs base path ('z').
+          ['not', ['pcre', r'^\..*', 'wholename']],  # Exclude files in hidden dirs (.pants.d etc).
           ['not', ['match', '*.pyc']]  # Exclude .pyc files.
           # TODO(kwlzn): Make exclusions here optionable.
           # Related: https://github.com/pantsbuild/pants/issues/2956

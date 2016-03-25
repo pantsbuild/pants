@@ -56,9 +56,11 @@ class PantsDaemonLauncher(Subsystem):
     self._fs_event_enabled = options.fs_event_detection
     self._fs_event_workers = options.fs_event_workers
 
+    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._build_root, '.pantsd.startup'))
     self._pantsd = None
     self._scheduler = None
-    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._build_root, '.pantsd.startup'))
+    self._path_subject_classes = None
+    self._fs_node_type = None
 
   @testable_memoized_property
   def pantsd(self):
@@ -68,8 +70,10 @@ class PantsDaemonLauncher(Subsystem):
   def watchman_launcher(self):
     return WatchmanLauncher.Factory.global_instance().create()
 
-  def set_scheduler(self, scheduler):
+  def set_scheduler(self, scheduler, path_subject_classes, fs_node_type):
     self._scheduler = scheduler
+    self._path_subject_classes = path_subject_classes
+    self._fs_node_type = fs_node_type
 
   def _setup_services(self, watchman):
     """Initialize pantsd services.
@@ -88,7 +92,10 @@ class PantsDaemonLauncher(Subsystem):
 
     if self._fs_event_enabled and self._scheduler:
       fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
-      scheduler_service = SchedulerService(self._scheduler, fs_event_service)
+      scheduler_service = SchedulerService(self._scheduler,
+                                           fs_event_service,
+                                           self._path_subject_classes,
+                                           self._fs_node_type)
       services.extend((fs_event_service, scheduler_service))
 
     # Construct a mapping of named ports used by the daemon's services. In the default case these

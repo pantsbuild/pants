@@ -78,8 +78,8 @@ python_binary(
 )
 
 python_binary(
-  name='pantsd',
-  entry_point='pants.engine.exp.legacy.commands:pantsd',
+  name='fsnodes',
+  entry_point='pants.engine.exp.legacy.commands:fsnodes',
   dependencies=[
     ':commands'
   ]

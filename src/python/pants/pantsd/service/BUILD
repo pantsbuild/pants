@@ -32,6 +32,7 @@ python_library(
   name = 'scheduler_service',
   sources = ['scheduler_service.py'],
   dependencies = [
+    '3rdparty/python:six',
     ':pants_service'
   ]
 )

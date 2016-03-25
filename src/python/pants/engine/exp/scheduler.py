@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import sys
 import threading
 from collections import defaultdict
@@ -20,6 +21,9 @@ from pants.engine.exp.objects import Closable
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class ProductGraph(object):
@@ -169,6 +173,7 @@ class ProductGraph(object):
 
     # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
     for node in invalidated_nodes:
+      logger.debug('invalidating node: %r', node)
       _delete_node(node)
 
     return len(invalidated_nodes)
