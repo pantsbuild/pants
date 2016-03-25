@@ -138,7 +138,6 @@ class GoThriftGen(SimpleCodegenTask):
     src_dir = os.path.join(target_workdir, 'src')
     safe_mkdir(src_dir, clean=True)
     go_dir = os.path.join(target_workdir, 'src', 'go')
-    os.rename(gen_dir, go_dir)
 
     # The thrift generator has a bug in package_prefix handling, so we
     # need to manually relocate the generated dir from the root to the
@@ -146,19 +145,11 @@ class GoThriftGen(SimpleCodegenTask):
     base = self._get_base(target)
     if base:
       package_path = os.path.join(go_dir, base)
-
-      # to handle the foo/foo case, we first move everything into _,
-      # which cannot be a valid package, then move from there into foo
-      tmp = os.path.join(go_dir, "_")
-      safe_mkdir(tmp)
-
-      for subdir in os.listdir(go_dir):
-        if subdir == '_':
-          continue
-        os.rename(os.path.join(go_dir, subdir), os.path.join(tmp, subdir))
-
       safe_mkdir(package_path)
-      os.rename(tmp, package_path)
+      for subdir in os.listdir(gen_dir):
+        os.rename(os.path.join(gen_dir, subdir), os.path.join(package_path, subdir))
+    else:
+      os.rename(gen_dir, go_dir)
 
   def _get_base(self, target):
     all_source_relative_sources = list(target.sources_relative_to_source_root())
