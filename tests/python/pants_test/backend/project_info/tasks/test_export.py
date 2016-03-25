@@ -201,7 +201,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src:alias')
 
     self.assertEqual(
-      None,
+        {'globs': []},
       result['targets']['src:alias']['globs']
     )
 
