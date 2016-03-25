@@ -29,10 +29,6 @@ class MutableBuildGraph(BuildGraph):
     self._derived_from_by_derivative_address = {}
     self.synthetic_addresses = set()
 
-  @property
-  def address_mapper(self):
-    return self._address_mapper
-
   def get_derived_from(self, address):
     parent_address = self._derived_from_by_derivative_address.get(address, address)
     return self.get_target(parent_address)

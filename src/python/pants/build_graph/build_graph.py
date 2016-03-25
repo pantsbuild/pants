@@ -60,13 +60,6 @@ class BuildGraph(AbstractClass):
   def __init__(self):
     self.reset()
 
-  @abstractproperty
-  @deprecated('0.0.78', hint_message='Use context.address_mapper or self.inject_specs_closure.')
-  def address_mapper(self):
-    """
-    :API: public
-    """
-
   def reset(self):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies.
 

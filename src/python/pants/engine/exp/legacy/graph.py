@@ -113,10 +113,6 @@ class ExpGraph(BuildGraph):
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
 
-  @property
-  def address_mapper(self):
-    raise NotImplementedError('Not implemented.')
-
   def get_derived_from(self, address):
     raise NotImplementedError('Not implemented.')
 
