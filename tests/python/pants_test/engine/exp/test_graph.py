@@ -207,7 +207,7 @@ class InlinedGraphTest(GraphTestBase):
   def do_test_cycle(self, scheduler, address_str):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    self.assertEqual(walk[0][1].type, Throw)
+    self.assertEqual(type(walk[0][1]), Throw)
     self.assertTrue(any('cycle' in state.msg for _, state in walk if type(state) is Noop))
 
   def test_cycle_self(self):

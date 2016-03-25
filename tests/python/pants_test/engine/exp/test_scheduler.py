@@ -46,9 +46,6 @@ class SchedulerTest(unittest.TestCase):
     self.managed_resolve_latest = Address.parse('3rdparty/jvm/managed:latest-hadoop')
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
-  def key(self, subject):
-    return self.storage.put(subject)
-
   def assert_select_for_subjects(self, walk, product, subjects, variants=None, variant_key=None):
     node_type = SelectNode
 
@@ -89,9 +86,9 @@ class SchedulerTest(unittest.TestCase):
     """Asserts that the first Node in a walk was a DependenciesNode with a Throw result."""
     ((root, root_state), dependencies) = walk[0]
     self.assertEquals(type(root), DependenciesNode)
-    self.assertEquals(Throw, root_state.type)
-    self.assertIn((node, thrown_type), [(k, type(self.storage.get(v).exc))
-                                        for k, v in dependencies if v.type is Throw])
+    self.assertEquals(Throw, type(root_state))
+    self.assertIn((node, thrown_type), [(k, type(v.exc))
+                                        for k, v in dependencies if type(v) is Throw])
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
@@ -188,7 +185,7 @@ class SchedulerTest(unittest.TestCase):
     # Confirm that the produced jars had the appropriate versions.
     self.assertEquals({Jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
                        Jar('com.google.guava', 'guava', '18.0')},
-                      {self.storage.get(ret).value for (node, ret), _ in walk
+                      {ret.value for (node, ret), _ in walk
                        if node.product == Jar and isinstance(node, SelectNode)})
 
   def test_dependency_inference(self):

@@ -83,7 +83,7 @@ class CacheTest(unittest.TestCase):
     self.dep_state = self.storage.put(Return(None))
 
     self.request = StepRequest(1, self.node, {self.dep_node: self.dep_state}, None)
-    self.result = StepResult(self.storage.put(self.simple), None)
+    self.result = StepResult(self.storage.put(self.simple))
 
   def test_cache(self):
     """Verify get and put."""
