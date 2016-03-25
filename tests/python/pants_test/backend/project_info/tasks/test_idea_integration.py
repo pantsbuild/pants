@@ -48,7 +48,6 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         extra_flags += ['--no-idea-source-jars', '--no-idea-javadoc-jars']
 
       all_flags = ['idea', '--no-open'] + specs + extra_flags
-
       pants_run = self.run_pants(all_flags, config=config)
       self.assert_success(pants_run)
 

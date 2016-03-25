@@ -89,8 +89,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       # specify the version info in the name.
       name = scala_build_info[version].style_name
       style_version = scala_build_info[version].style_version
-      fullname = 'scalastyle_2.10' if version == 'custom' else 'scalastyle_{}'.format(version)
-      _register_tool('org.scalastyle', fullname, name, style_version)
+      _register_tool('org.scalastyle', 'scalastyle_{}'.format(version), name, style_version)
 
     super(ScalaPlatform, cls).register_options(register)
     register('--version', advanced=True, default='2.10',
@@ -152,8 +151,8 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   def style_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    spec = scala_build_info.get(self._get_label()).style_name
-    return self.tool_classpath_from_products(products, spec, scope=self.options_scope)
+    style_name = scala_build_info.get(self._get_label()).style_name
+    return self.tool_classpath_from_products(products, style_name, scope=self.options_scope)
 
   @property
   def version(self):
