@@ -58,6 +58,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
              help='Output destination. When unset, outputs to <stdout>.')
     register('--use-cached', action='store_true',
              help='Use cached data for class products usages between targets, '
+                  'in this case `resolve` and `compile` steps are skipped, '
                   'useful for calculating analysis for a lot of targets,'
                   'results can differ from direct execution because 3rdparty libraries resolve is context-aware.')
 
