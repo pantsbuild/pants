@@ -315,6 +315,7 @@ class StorageIO(Closable):
     return StorageIO(Storage.clone(storageIo._storage), for_multi_process=True)
 
   def key_for_request(self, step_request):
+    """Make keys for the dependency nodes as well as their states."""
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       dependencies[self._maybe_key_for_node(dep)] = self._maybe_key_for_state(state)
@@ -322,10 +323,12 @@ class StorageIO(Closable):
                        dependencies, step_request.project_tree)
 
   def key_for_result(self, step_result):
+    """Make key for result state."""
     state_or_key = self._maybe_key_for_state(step_result.state)
     return StepResult(state_or_key)
 
   def resolve_request(self, step_request):
+    """Optionally resolve keys if they are present int step_request."""
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       if isinstance(dep, Key):
@@ -338,7 +341,9 @@ class StorageIO(Closable):
                        dependencies, step_request.project_tree)
 
   def resolve_result(self, step_result):
-    # This could be a SerializationError
+    """Optionally resolve state key if they are present int step_result."""
+
+    # This could be a SerializationError or other error state.
     if not isinstance(step_result, StepResult):
       return step_result
 
