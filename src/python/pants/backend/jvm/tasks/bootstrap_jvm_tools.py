@@ -203,6 +203,14 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       raise self._tool_resolve_error(e, dep_spec, jvm_tool)
 
   def _bootstrap_classpath(self, jvm_tool, targets):
+    def _no_rev(cp):
+      return cp.rev is None
+    if any((_no_rev(cp) for cp in jvm_tool.classpath)):
+      raise RuntimeError("""
+        Unable to bootstrap tool: '{}' because no rev was specified.  This usually
+        means that the tool was not defined properly in your build files and no
+        default option was provided to use for bootstrap.
+        """.format(jvm_tool.key))
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
     return self.ivy_classpath(targets, silent=True, workunit_name=workunit_name)
 
