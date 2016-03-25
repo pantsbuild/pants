@@ -85,3 +85,7 @@ class EngineTest(unittest.TestCase):
       # Ensure we cache no more than what can be cached.
       for request, result in engine._cache.items():
         self.assertTrue(request[0].is_cacheable)
+
+class StorageIOTest(unittest.TestCase):
+  # TODO
+  pass

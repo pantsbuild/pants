@@ -142,7 +142,7 @@ class LocalSerialEngine(Engine):
         keyed_request = self._storageIo.key_for_request(step)
         result = self._maybe_cache_get(keyed_request)
         if result is None:
-          result = step(node_builder, self._storageIo)
+          result = step(node_builder)
           self._maybe_cache_put(keyed_request, result)
         promise.success(result)
 
@@ -167,8 +167,9 @@ def _execute_step(cache_save, debug, process_state, step):
   node_builder, storageIo = process_state
 
   step_id = step.step_id
+  resolved_request = storageIo.resolve_request(step)
   try:
-    result = step(node_builder, storageIo)
+    result = resolved_request(node_builder)
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
@@ -297,7 +298,7 @@ class LocalMultiprocessEngine(Engine):
 
 
 class StorageIO(Closable):
-  """Control what to be content addresed, content address them (in both ways).
+  """Control what to be content addresed and content address them (in both ways).
 
 
   In multi-process mode, we always content address. In single-process mode, both
