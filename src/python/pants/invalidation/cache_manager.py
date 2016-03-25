@@ -203,10 +203,10 @@ class VersionedTarget(VersionedTargetSet):
 
     # Clone from the previous results_dir if incremental, or initialize.
     if allow_incremental and self.previous_cache_key:
-      self.is_incremental = True
       previous_dir = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
-      self._previous_results_dir = previous_dir
       if os.path.isdir(previous_dir) and not os.path.isdir(current_dir):
+        self.is_incremental = True
+        self._previous_results_dir = previous_dir
         shutil.copytree(previous_dir, current_dir)
     else:
       safe_mkdir(current_dir)
