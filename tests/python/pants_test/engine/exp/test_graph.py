@@ -128,14 +128,14 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     return list(e for e, _ in scheduler.product_graph.walk([root], predicate=lambda _: True))
 
   def resolve_failure(self, scheduler, address):
-    root, state_key = self._populate(scheduler, address)
-    self.assertEquals(state_key.type, Throw, '{} is not a Throw.'.format(state_key.type))
-    return self.storage.get(state_key).exc
+    root, state = self._populate(scheduler, address)
+    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
+    return state.exc
 
   def resolve(self, scheduler, address):
-    root, state_key = self._populate(scheduler, address)
-    self.assertEquals(state_key.type, Return, '{} is not a Return.'.format(state_key.type))
-    return self.storage.get(state_key).value
+    root, state = self._populate(scheduler, address)
+    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
+    return state.value
 
 
 class InlinedGraphTest(GraphTestBase):
@@ -208,8 +208,7 @@ class InlinedGraphTest(GraphTestBase):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     self.assertEqual(walk[0][1].type, Throw)
-    states = [self.storage.get(state_key) for node, state_key in walk]
-    self.assertTrue(any('cycle' in state.msg for state in states if type(state) is Noop))
+    self.assertTrue(any('cycle' in state.msg for _, state in walk if type(state) is Noop))
 
   def test_cycle_self(self):
     self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')

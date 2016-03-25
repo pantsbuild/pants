@@ -80,9 +80,9 @@ class SchedulerTest(unittest.TestCase):
 
   def assert_root(self, walk, node, return_value):
     """Asserts that the first Node in a walk was a DependenciesNode with the single given result."""
-    ((root, root_state_key), dependencies) = walk[0]
+    ((root, root_state), dependencies) = walk[0]
     self.assertEquals(type(root), DependenciesNode)
-    self.assertEquals(Return([return_value]), self.storage.get(root_state_key))
+    self.assertEquals(Return([return_value]), root_state)
     self.assertIn((node, self.key(Return(return_value))), dependencies)
 
   def assert_root_failed(self, walk, node, thrown_type):
@@ -238,8 +238,8 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    root, root_state_key = walk[0][0]
-    root_value = self.storage.get(root_state_key).value
+    root, root_state = walk[0][0]
+    root_value = root_state.value
     self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
@@ -255,8 +255,8 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    root, root_state_key = walk[0][0]
-    root_value = self.storage.get(root_state_key).value
+    root, root_state = walk[0][0]
+    root_value = root_state.value
     self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 

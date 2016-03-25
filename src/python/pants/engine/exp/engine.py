@@ -127,6 +127,9 @@ class Engine(AbstractClass):
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
+  def __init__(self, scheduler, storage, cache=None):
+    super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
+
   def reduce(self, execution_request):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
@@ -294,7 +297,7 @@ class StorageIO(object):
     self._storage = storage
     self._multi_process = multi_process
 
-  def key_request(self, step_request):
+  def key_for_request(self, step_request):
     step_request.node = self._maybe_key_for_node(step_request.node)
     dependencies = {}
     for dep, state in step_request.dependencies.items():
@@ -302,7 +305,7 @@ class StorageIO(object):
     step_request.dependencies = dependencies
     return step_request
 
-  def key_result(self, step_result):
+  def key_for_result(self, step_result):
     step_result.state = self._maybe_key_for_state(step_result.state)
     return step_result
 
