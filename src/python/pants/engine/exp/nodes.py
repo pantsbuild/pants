@@ -44,17 +44,9 @@ class State(object):
   def raise_unrecognized(cls, state):
     raise ValueError('Unrecognized Node State: {}'.format(state))
 
-
-class ContentAddressable(AbstractClass):
-  """
-  """
-
   @abstractproperty
   def is_content_addressable(self):
-    """
-
-    :return:
-    """
+    """Whether state should be content addressed or just leave as is."""
 
 
 class Noop(datatype('Noop', ['msg']), State):

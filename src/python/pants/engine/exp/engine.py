@@ -136,10 +136,13 @@ class LocalSerialEngine(Engine):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
+        # The sole purpose of a keyed request is to get a stable cache key,
+        # so we can sort keyed_request.dependencies by keys as opposed to requiring
+        # dep nodes to support compare.
         keyed_request = self._storageIo.key_for_request(step)
         result = self._maybe_cache_get(keyed_request)
         if result is None:
-          result = keyed_request(node_builder, self._storageIo)
+          result = step(node_builder, self._storageIo)
           self._maybe_cache_put(keyed_request, result)
         promise.success(result)
 
@@ -157,7 +160,7 @@ def _try_pickle(obj):
 def _execute_step(cache_save, debug, process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
 
-  Executes the Step for the given node builder and storage, and returns a tuple of step id and
+  Executes the Step for the given node builder and storageIo, and returns a tuple of step id and
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
   """
@@ -213,7 +216,7 @@ class LocalMultiprocessEngine(Engine):
 
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
     node_builder = scheduler.node_builder()
-    self._storageIo = StorageIO(storage, for_multi_process=False)
+    self._storageIo = StorageIO(storage, for_multi_process=True)
     process_initializer = functools.partial(_process_initializer, node_builder, self._storageIo)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
@@ -294,8 +297,11 @@ class LocalMultiprocessEngine(Engine):
 
 
 class StorageIO(Closable):
-  """
+  """Control what to be content addresed, content address them (in both ways).
 
+
+  In multi-process mode, we always content address. In single-process mode, both
+  `Node` and `State` allow fine granularity content addressing.
   """
 
   def __init__(self, storage, for_multi_process=False):
@@ -304,7 +310,7 @@ class StorageIO(Closable):
 
   @classmethod
   def clone(cls, storageIo):
-    """Clone a Storage so it can be shared across process boundary."""
+    """Clone the underlying Storage so it can be shared across process boundary."""
     return StorageIO(Storage.clone(storageIo._storage), for_multi_process=True)
 
   def key_for_request(self, step_request):
