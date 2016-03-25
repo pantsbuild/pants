@@ -268,22 +268,18 @@ class ProductGraphTest(unittest.TestCase):
   def setUp(self):
     self.pg = ProductGraph(validator=lambda _: True)  # Allow for string nodes for testing.
 
-  @staticmethod
-  def _mk_key(state):
-    return Key(None, None, type(state), None)
-
   @classmethod
   def _mk_chain(cls, graph, sequence, states=[Waiting, Return]):
     """Create a chain of dependencies (e.g. 'A'->'B'->'C'->'D') in the graph from a sequence."""
     prior_item = sequence[0]
     for state in states:
       for item in sequence:
-        graph.update_state(prior_item, cls._mk_key(state([item])), [item])
+        graph.update_state(prior_item, state([item]))
         prior_item = item
     return sequence
 
   def test_dependency_edges(self):
-    self.pg.update_state('A', self._mk_key(Waiting(['B', 'C'])), ['B', 'C'])
+    self.pg.update_state('A', Waiting(['B', 'C']))
     self.assertEquals({'B', 'C'}, self.pg.dependencies_of('A'))
     self.assertEquals({'A'}, self.pg.dependents_of('B'))
     self.assertEquals({'A'}, self.pg.dependents_of('C'))

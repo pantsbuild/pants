@@ -14,7 +14,7 @@ from abc import abstractmethod
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
-from pants.engine.exp.objects import SerializationError
+from pants.engine.exp.objects import Closable, SerializationError
 from pants.engine.exp.processing import StatefulPool
 from pants.engine.exp.scheduler import StepRequest, StepResult
 from pants.engine.exp.storage import Cache, Key, Storage
@@ -138,8 +138,7 @@ class LocalSerialEngine(Engine):
       for step, promise in step_batch:
         result = self._maybe_cache_get(step)
         if result is None:
-          keyed_step = self._storageIo.key_for_request(step)
-          result = self._storageIo.resolve_result(keyed_step(node_builder, self._storageIo))
+          result = step(node_builder)
           self._maybe_cache_put(step, result)
         promise.success(result)
 
@@ -161,11 +160,12 @@ def _execute_step(cache_save, debug, process_state, step):
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
   """
-  node_builder, storage = process_state
+  node_builder, storageIo = process_state
 
   step_id = step.step_id
+  resolved_request = storageIo.resolve_request(step)
   try:
-    result = step(node_builder, storage)
+    result = resolved_request(node_builder)
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
@@ -179,9 +179,8 @@ def _execute_step(cache_save, debug, process_state, step):
       return (step_id, e)
 
   # Save result to cache for this step.
-  cache_save(step, result)
-
-  return (step_id, result)
+  cache_save(resolved_request, result)
+  return (step_id, storageIo.key_for_result(result))
 
 
 def _process_initializer(node_builder, storageIo):
@@ -294,7 +293,7 @@ class LocalMultiprocessEngine(Engine):
     self._pool.close()
 
 
-class StorageIO(object):
+class StorageIO(Closable):
   """
 
   """
@@ -336,6 +335,10 @@ class StorageIO(object):
     return StepRequest(step_request.step_id, node, dependencies, step_request.project_tree)
 
   def resolve_result(self, step_result):
+    # This could be a SerializationError
+    if not isinstance(step_result, StepResult):
+      return step_result
+
     if isinstance(step_result.state, Key):
       state = self._storage.get(step_result.state)
     else:
@@ -357,3 +360,6 @@ class StorageIO(object):
 
   def _is_state_keyable(self, state):
     return self._for_multi_process or state.is_content_addressable
+
+  def close(self):
+    self._storage.close()

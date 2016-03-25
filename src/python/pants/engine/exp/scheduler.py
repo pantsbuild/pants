@@ -314,14 +314,12 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   :param project_tree: A FileSystemProjectTree instance.
   """
 
-  def __call__(self, node_builder, storageIo):
+  def __call__(self, node_builder):
 
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, self.project_tree)
-    step_request = storageIo.resolve_request(self)
-    state = step_request.node.step(step_request.dependencies, step_context)
-
-    return storageIo.key_for_result(StepResult(state,))
+    state = self.node.step(self.dependencies, step_context)
+    return (StepResult(state,))
 
   def keyable_fields(self):
     """Return fields for the purpose of computing the cache key of this step request.
