@@ -6,82 +6,64 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import FilesetWithSpec, Globs
 from pants_test.base_test import BaseTest
 
 
 class PayloadTest(BaseTest):
+  def sources(self, rel_path, *args):
+    return Globs.create_fileset_with_spec(rel_path, *args)
+
   def test_sources_field(self):
     self.create_file('foo/bar/a.txt', 'a_contents')
     self.create_file('foo/bar/b.txt', 'b_contents')
 
     self.assertNotEqual(
       SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
+        sources=self.sources('foo/bar', 'a.txt'),
       ).fingerprint(),
       SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['b.txt'],
+        sources=self.sources('foo/bar', 'b.txt'),
       ).fingerprint(),
     )
 
     self.assertEqual(
       SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
+        sources=self.sources('foo/bar', 'a.txt'),
       ).fingerprint(),
       SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
+        sources=self.sources('foo/bar', 'a.txt'),
       ).fingerprint(),
     )
 
     self.assertEqual(
       SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
+        sources=self.sources('foo/bar', 'a.txt', 'b.txt'),
       ).fingerprint(),
       SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
-      ).fingerprint(),
-    )
-
-    self.assertEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt', 'b.txt'],
-      ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['b.txt', 'a.txt'],
+        sources=self.sources('foo/bar', 'a.txt', 'b.txt'),
       ).fingerprint(),
     )
 
     fp1 = SourcesField(
-            sources_rel_path='foo/bar',
-            sources=['a.txt'],
+            sources=self.sources('foo/bar', 'a.txt'),
           ).fingerprint()
     self.create_file('foo/bar/a.txt', 'a_contents_different')
     fp2 = SourcesField(
-            sources_rel_path='foo/bar',
-            sources=['a.txt'],
+            sources=self.sources('foo/bar', 'a.txt'),
           ).fingerprint()
 
     self.assertNotEqual(fp1, fp2)
 
   def test_fails_on_invalid_sources_kwarg(self):
     with self.assertRaises(ValueError):
-      SourcesField(sources_rel_path='anything',
-                   sources='not-a-list')
+      SourcesField(sources='not-a-list')
 
   def test_passes_fileset_with_spec_through(self):
     self.create_file('foo/a.txt', 'a_contents')
 
     fileset = FilesetWithSpec('foo', 'a.txt', lambda: ['a.txt'])
-    sf = SourcesField(sources_rel_path='foo',
-                      sources=fileset)
+    sf = SourcesField(sources=fileset)
 
-    self.assertIs(fileset, sf.source_paths)
+    self.assertIs(fileset, sf.sources)
     self.assertEqual(['a.txt'], list(sf.source_paths))

@@ -18,5 +18,5 @@ def create_legacy_graph_tasks():
     (LegacyBuildGraphNode,
      [Select(TargetAdaptor),
       SelectDependencies(LegacyBuildGraphNode, TargetAdaptor)],
-     reify_legacy_graph)
+     reify_legacy_graph),
   ]

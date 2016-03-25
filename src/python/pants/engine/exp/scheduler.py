@@ -646,12 +646,12 @@ class LocalScheduler(object):
               # All deps are already completed: mark this Node as a candidate for another step.
               candidates.add(step.node)
 
-      print('created {} total nodes in {} scheduling iterations and {} steps, '
-            'with {} nodes in the executed path.'.format(
-              len(self._product_graph.dependencies()),
+      print('executed {} nodes in {} scheduling iterations. '
+            'there have been {} total steps for {} total nodes.'.format(
+              sum(1 for _ in self._product_graph.walk(execution_request.roots)),
               scheduling_iterations,
               self._step_id,
-              sum(1 for _ in self._product_graph.walk(execution_request.roots))),
+              len(self._product_graph.dependencies())),
             file=sys.stderr)
 
   def validate(self):

@@ -12,6 +12,7 @@ import subprocess
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.file_test_util import exact_files
 
 
 class WireIntegrationTest(PantsRunIntegrationTest):
@@ -22,22 +23,15 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     # force a compile to happen, we count on compile output in this test
     self.assert_success(self.run_pants(['clean-all']))
 
-    pants_run = self.run_pants(['compile',
-                                'examples/src/java/org/pantsbuild/example/wire/temperatureservice'])
-    self.assert_success(pants_run)
+    with self.temporary_workdir() as workdir:
+      cmd = ['compile', 'examples/src/java/org/pantsbuild/example/wire/temperatureservice']
+      pants_run = self.run_pants_with_workdir(cmd, workdir)
+      self.assert_success(pants_run)
 
-    expected_patterns = [
-      '/gen/wire/[^/]*/[^/]*/[^/]*/org/pantsbuild/example/temperature/Temperature.java',
-    ]
-    expected_outputs = [
-      'Compiling proto source file',
-      'Writing generated code',
-    ]
-    for expected_output in expected_outputs:
-      self.assertIn(expected_output, pants_run.stdout_data)
-    for pattern in expected_patterns:
-      self.assertTrue(re.search(pattern, pants_run.stdout_data) is not None, 'Expected pattern: '
-                      '{0}'.format(pattern))
+      pattern = 'gen/wire/[^/]*/[^/]*/[^/]*/org/pantsbuild/example/temperature/Temperature.java'
+      files = exact_files(workdir)
+      self.assertTrue(any(re.match(pattern, f) is not None for f in files),
+                      'Expected pattern: {} in {}'.format(pattern, files))
 
   def test_bundle_wire_normal(self):
     pants_run = self.run_pants(['bundle.jvm',

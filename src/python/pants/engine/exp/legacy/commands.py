@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import sys
+from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -69,8 +70,8 @@ def setup():
   )
 
 
-def dependencies():
-  """Lists the transitive dependencies of targets under the current build root."""
+@contextmanager
+def _open_graph():
   scheduler, storage, spec_roots, symbol_table_cls = setup()
 
   # Populate the graph for the given request, and print the resulting Addresses.
@@ -78,11 +79,27 @@ def dependencies():
   engine.start()
   try:
     graph = ExpGraph(scheduler, engine, symbol_table_cls)
-    for address in graph.inject_specs_closure(spec_roots):
-      print(address)
-    print('Cache stats: {}'.format(engine._cache.get_stats()), file=sys.stderr)
+    addresses = tuple(graph.inject_specs_closure(spec_roots))
+    yield graph, addresses
   finally:
+    print('Cache stats: {}'.format(engine._cache.get_stats()), file=sys.stderr)
     engine.close()
+
+
+def dependencies():
+  """Lists the transitive dependencies of targets under the current build root."""
+  with _open_graph() as (graph, addresses):
+    for address in addresses:
+      print(address)
+
+
+def filemap():
+  """Lists the transitive dependencies of targets under the current build root."""
+  with _open_graph() as (graph, addresses):
+    for address in addresses:
+      target = graph.get_target(address)
+      for source in target.sources_relative_to_buildroot():
+        print('{} {}'.format(source, target.address.spec))
 
 
 def pantsd():

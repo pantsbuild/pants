@@ -21,7 +21,7 @@ from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
 from pants.source.payload_fields import DeferredSourcesField, SourcesField
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import Files, FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -322,10 +322,6 @@ class Target(AbstractTarget):
     """
     return self._tags
 
-  @property
-  def num_chunking_units(self):
-    return max(1, len(self.sources_relative_to_buildroot()))
-
   def assert_list(self, maybe_list, expected_type=string_types, key_arg=None):
     """
     :API: public
@@ -430,7 +426,9 @@ class Target(AbstractTarget):
   @property
   def _sources_field(self):
     sources_field = self.payload.get_field('sources')
-    return sources_field if sources_field else SourcesField(self.address.spec_path, sources=())
+    if sources_field is not None:
+      return sources_field
+    return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
 
   def has_sources(self, extension=''):
     """
@@ -663,11 +661,10 @@ class Target(AbstractTarget):
           .format(spec=address.spec))
       referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
-    elif isinstance(sources, FilesetWithSpec):
-      filespec = sources.filespec
-    else:
-      sources = sources or []
-      assert_list(sources, key_arg=key_arg)
-      filespec = {'globs': [os.path.join(sources_rel_path, src) for src in (sources or [])]}
+    elif sources is None:
+      sources = FilesetWithSpec.empty(sources_rel_path)
+    elif not isinstance(sources, FilesetWithSpec):
+      # Received a literal sources list: convert to a FilesetWithSpec via Files.
+      sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
 
-    return SourcesField(sources=sources, sources_rel_path=sources_rel_path, filespec=filespec)
+    return SourcesField(sources=sources)

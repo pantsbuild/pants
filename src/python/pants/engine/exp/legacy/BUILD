@@ -5,6 +5,7 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
+    ':globs',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
     'src/python/pants/engine/exp:fs',
@@ -14,10 +15,23 @@ python_library(
 )
 
 python_library(
+  name='globs',
+  sources=['globs.py'],
+  dependencies=[
+    'src/python/pants/engine/exp:fs',
+    'src/python/pants/engine/exp:nodes',
+    'src/python/pants/source',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
+  ],
+)
+
+python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
     ':parser',
+    ':globs',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:graph',
@@ -49,6 +63,7 @@ python_library(
   name='register',
   sources=['register.py'],
   dependencies=[
+    ':globs',
     ':graph',
     ':parser',
     'src/python/pants/engine/exp:selectors',
@@ -58,6 +73,14 @@ python_library(
 python_binary(
   name='dependencies',
   entry_point='pants.engine.exp.legacy.commands:dependencies',
+  dependencies=[
+    ':commands'
+  ]
+)
+
+python_binary(
+  name='filemap',
+  entry_point='pants.engine.exp.legacy.commands:filemap',
   dependencies=[
     ':commands'
   ]

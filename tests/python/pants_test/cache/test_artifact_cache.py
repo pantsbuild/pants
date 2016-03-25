@@ -154,7 +154,7 @@ class TestArtifactCache(unittest.TestCase):
         self.do_test_artifact_cache(artifact_cache)
 
   def do_test_artifact_cache(self, artifact_cache):
-    key = CacheKey('muppet_key', 'fake_hash', 42)
+    key = CacheKey('muppet_key', 'fake_hash')
     with self.setup_test_file(artifact_cache.artifact_root) as path:
       # Cache it.
       self.assertFalse(artifact_cache.has(key))
@@ -186,7 +186,7 @@ class TestArtifactCache(unittest.TestCase):
         remote = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), tmp)
         combined = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), local)
 
-        key = CacheKey('muppet_key', 'fake_hash', 42)
+        key = CacheKey('muppet_key', 'fake_hash')
 
         with self.setup_test_file(local.artifact_root) as path:
           # No cache has key.
@@ -222,7 +222,7 @@ class TestArtifactCache(unittest.TestCase):
           self.assertTrue(bool(local.use_cached_files(key)))
 
   def test_multiproc(self):
-    key = CacheKey('muppet_key', 'fake_hash', 42)
+    key = CacheKey('muppet_key', 'fake_hash')
 
     with self.setup_local_cache() as cache:
       self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [False])
@@ -237,7 +237,7 @@ class TestArtifactCache(unittest.TestCase):
       self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [True])
 
   def test_failed_multiproc(self):
-    key = CacheKey('muppet_key', 'fake_hash', 55)
+    key = CacheKey('muppet_key', 'fake_hash')
 
     # Failed requests should return failure status, but not raise exceptions
     with self.setup_rest_cache(return_failed=True) as cache:
@@ -247,7 +247,7 @@ class TestArtifactCache(unittest.TestCase):
       self.assertFalse(map(call_use_cached_files, [(cache, key, None)])[0])
 
   def test_successful_request_cleans_result_dir(self):
-    key = CacheKey('muppet_key', 'fake_hash', 42)
+    key = CacheKey('muppet_key', 'fake_hash')
 
     with self.setup_local_cache() as cache:
       self._do_test_successful_request_cleans_result_dir(cache, key)
@@ -265,7 +265,7 @@ class TestArtifactCache(unittest.TestCase):
           self.assertFalse(os.path.exists(canary))
 
   def test_failed_request_doesnt_clean_result_dir(self):
-    key = CacheKey('muppet_key', 'fake_hash', 55)
+    key = CacheKey('muppet_key', 'fake_hash')
     with temporary_dir() as results_dir:
       with temporary_file_path(root_dir=results_dir) as canary:
         with self.setup_local_cache() as cache:
@@ -281,7 +281,7 @@ class TestArtifactCache(unittest.TestCase):
           self.assertTrue(os.path.exists(canary))
 
   def test_corruptted_cached_file_cleaned_up(self):
-    key = CacheKey('muppet_key', 'fake_hash', 42)
+    key = CacheKey('muppet_key', 'fake_hash')
 
     with self.setup_local_cache() as artifact_cache:
       with self.setup_test_file(artifact_cache.artifact_root) as path:

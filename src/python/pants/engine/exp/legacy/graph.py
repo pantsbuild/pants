@@ -6,8 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.address import Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
+from pants.engine.exp.legacy.globs import BaseGlobs, Files
 from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
 from pants.engine.exp.selectors import Select, SelectDependencies
@@ -50,7 +52,6 @@ class ExpGraph(BuildGraph):
     for ((node, state_key), _) in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyBuildGraphNode values.
       if state_key.type is Throw:
-        # TODO: get access to `Storage` instance in order to `to-str` more effectively here.
         raise AddressLookupError(
             'Build graph construction failed for {}:\n  {}'.format(node.subject, state.exc))
       elif state_key.type is not Return:
@@ -73,6 +74,18 @@ class ExpGraph(BuildGraph):
         self._target_dependees_by_address[dependency].add(address)
     return addresses
 
+  def _instantiate_sources(self, relpath, sources):
+    """Converts captured `sources` arguments to what is expected by `Target.create_sources_field`.
+
+    For a literal sources list or a BaseGlobs subclass, create a wrapping FilesetWithSpec.
+    For an Addresses object, return as is.
+    """
+    if isinstance(sources, Addresses):
+      return sources
+    if not isinstance(sources, BaseGlobs):
+      sources = Files(*sources)
+    return sources.to_fileset_with_spec(self._engine, self._scheduler, relpath)
+
   def _instantiate_target(self, target_adaptor):
     """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target.
 
@@ -86,6 +99,11 @@ class ExpGraph(BuildGraph):
       # Pop dependencies, which was already consumed while constructing LegacyBuildGraphNode.
       kwargs = target_adaptor.kwargs()
       kwargs.pop('dependencies')
+      # Replace the sources argument with a FilesetWithSpecs instance, or None.
+      spec_path = kwargs.pop('spec_path')
+      sources = kwargs.get('sources', None)
+      if sources is not None:
+        kwargs['sources'] = self._instantiate_sources(spec_path, sources)
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:

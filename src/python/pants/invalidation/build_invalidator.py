@@ -20,11 +20,10 @@ from pants.util.dirutil import safe_mkdir
 #  - id identifies the set of targets.
 #  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
 #    determines a given version of the artifacts created when building the target set.
-#  - num_chunking_units: The number of "units" of chunking the payloads together contribute
 #    to the chunking algorithm.  Right now this is used to count the number of source files
 #    in a scala target set for breaking up zinc invocations.
 
-CacheKey = namedtuple('CacheKey', ['id', 'hash', 'num_chunking_units'])
+CacheKey = namedtuple('CacheKey', ['id', 'hash'])
 
 
 # Bump this to invalidate all existing keys in artifact caches across all pants deployments in the
@@ -57,8 +56,7 @@ class CacheKeyGenerator(object):
     else:
       combined_id = Target.maybe_readable_combine_ids(cache_key.id for cache_key in cache_keys)
       combined_hash = hash_all(sorted(cache_key.hash for cache_key in cache_keys))
-      summed_chunking_units = sum([cache_key.num_chunking_units for cache_key in cache_keys])
-      return CacheKey(combined_id, combined_hash, summed_chunking_units)
+      return CacheKey(combined_id, combined_hash)
 
   def __init__(self, cache_key_gen_version=None):
     """
@@ -94,7 +92,7 @@ class CacheKeyGenerator(object):
       target_key = target.invalidation_hash(fingerprint_strategy)
     if target_key is not None:
       full_key = '{target_key}_{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
-      return CacheKey(target.id, full_key, target.num_chunking_units)
+      return CacheKey(target.id, full_key)
     else:
       return None
 
@@ -120,7 +118,7 @@ class BuildInvalidator(object):
     previous_hash = self._read_sha(cache_key)
     if not previous_hash:
       return None
-    return CacheKey(cache_key.id, previous_hash, cache_key.num_chunking_units)
+    return CacheKey(cache_key.id, previous_hash)
 
   def needs_update(self, cache_key):
     """Check if the given cached item is invalid.
