@@ -16,7 +16,7 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants.base.exceptions import TaskError
 from pants.engine.exp.objects import SerializationError
 from pants.engine.exp.processing import StatefulPool
-from pants.engine.exp.storage import Cache, Storage
+from pants.engine.exp.storage import Cache, Key, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -283,3 +283,59 @@ class LocalMultiprocessEngine(Engine):
   def close(self):
     super(LocalMultiprocessEngine, self).close()
     self._pool.close()
+
+
+class StorageIO(object):
+  """
+
+  """
+
+  def __init__(self, storage, multi_process=False):
+    self._storage = storage
+    self._multi_process = multi_process
+
+  def key_request(self, step_request):
+    step_request.node = self._maybe_key_for_node(step_request.node)
+    dependencies = {}
+    for dep, state in step_request.dependencies.items():
+      dependencies[self._maybe_key_for_node(dep)] = self._maybe_key_for_state(state)
+    step_request.dependencies = dependencies
+    return step_request
+
+  def key_result(self, step_result):
+    step_result.state = self._maybe_key_for_state(step_result.state)
+    return step_result
+
+  def resolve_request(self, step_request):
+    if isinstance(step_request.node, Key):
+      step_request.node = self._storage.get(step_request.node)
+
+    dependencies = {}
+    for dep, state in step_request.dependencies.items():
+      if isinstance(dep, Key):
+        dep = self._storage.get(dep)
+      if isinstance(state, Key):
+        state = self._storage.get(state)
+      dependencies[dep] =state
+    step_request.dependencies = dependencies
+
+    return step_request
+
+  def resolve_result(self, step_result):
+    if isinstance(step_result.state, Key):
+      step_result.state = self._storage.get(step_result.state)
+    return step_result
+
+  def _maybe_key_for_node(self, node):
+    if self._is_node_keyable(node):
+      return self._storage.put(node)
+
+  def _maybe_key_for_state(self, state):
+    if self._is_state_keyable(state):
+      return self._storage.put(state)
+
+  def _is_node_keyable(self, node):
+    return self._multi_process or node.is_cacheable
+
+  def _is_state_keyable(self, state):
+    return self._multi_process or state.is_content_addressable

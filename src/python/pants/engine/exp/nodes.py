@@ -45,16 +45,40 @@ class State(object):
     raise ValueError('Unrecognized Node State: {}'.format(state))
 
 
+class ContentAddressable(AbstractClass):
+  """
+  """
+
+  @abstractproperty
+  def is_content_addressable(self):
+    """
+
+    :return:
+    """
+
+
 class Noop(datatype('Noop', ['msg']), State):
   """Indicates that a Node did not have the inputs which would be needed for it to execute."""
+
+  @property
+  def is_content_addressable(self):
+    return False
 
 
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
 
+  @property
+  def is_content_addressable(self):
+    return True
+
 
 class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
+
+  @property
+  def is_content_addressable(self):
+    return False
 
 
 class Waiting(datatype('Waiting', ['dependencies']), State):
@@ -63,6 +87,10 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   Some Nodes will return different dependency Nodes based on where they are in their lifecycle,
   but all returned dependencies are recorded for the lifetime of a ProductGraph.
   """
+
+  @property
+  def is_content_addressable(self):
+    return False
 
 
 class Node(AbstractClass):
