@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.base.deprecated import deprecated
 from pants.base.payload_field import stable_json_sha1
 from pants.base.validation import assert_list
 from pants.util.memo import memoized_property

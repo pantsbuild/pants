@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod, abstractproperty
 
-from pants.engine.exp.nodes import DependenciesNode, ProjectionNode, SelectNode, TaskNode
+from pants.engine.exp.nodes import DependenciesNode, ProjectionNode, SelectNode
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 

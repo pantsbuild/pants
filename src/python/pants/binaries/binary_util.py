@@ -9,7 +9,7 @@ import logging
 import os
 import posixpath
 import subprocess
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 

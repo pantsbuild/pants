@@ -112,16 +112,11 @@ class ClasspathUtilTest(BaseTest):
     a = self.make_target('a/b', JvmTarget)
 
     jar_path = 'ivy/jars/org.x/lib/x-1.0.jar'
-    jar_path_excluded = 'ivy/jars/org.y/lib/y-1.0.jar'
     classpath_products = ClasspathProducts(self.pants_workdir)
 
     resolved_jar = ResolvedJar(M2Coordinate(org='org', name='x', rev='1.0'),
                                cache_path='somewhere',
                                pants_path=self._path(jar_path))
-    # org.y should be excluded from result canonical path
-    resolved_jar_to_exclude = ResolvedJar(M2Coordinate(org='org', name='y', rev='1.0'),
-                                          cache_path='somewhere',
-                                          pants_path=self._path(jar_path_excluded))
 
     classpath_products.add_for_target(a, [('default', self._path('a.jar')),
                                           ('default', self._path('resources'))])

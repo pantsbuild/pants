@@ -7,11 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import select
 import signal
 import socket
 import sys
-import threading
 
 from pants.java.nailgun_io import NailgunStreamReader
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol

@@ -117,7 +117,7 @@ class FSEventService(PantsService):
         futures[future] = handler_name
 
       # Process and log results for completed futures.
-      for completed_future in [future for future in futures if future.done()]:
+      for completed_future in [_future for _future in futures if _future.done()]:
         handler_name = futures.pop(completed_future)
         id_counter += 1
 

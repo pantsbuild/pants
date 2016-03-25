@@ -10,9 +10,7 @@ from pants.build_graph.address import Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.globs import BaseGlobs, Files
-from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
-from pants.engine.exp.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
 
 
@@ -53,7 +51,7 @@ class ExpGraph(BuildGraph):
       # Locate nodes that contain LegacyBuildGraphNode values.
       if state_key.type is Throw:
         raise AddressLookupError(
-            'Build graph construction failed for {}:\n  {}'.format(node.subject, state.exc))
+            'Build graph construction failed for {}:\n  {}'.format(node.subject, state_key.exc))
       elif state_key.type is not Return:
         State.raise_unrecognized(state_key.type)
       if node.product is not LegacyBuildGraphNode:

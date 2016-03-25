@@ -7,12 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheSetup
 from pants.task.task import Task
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -34,7 +33,7 @@ class DummyTask(Task):
     return True
 
   def execute(self):
-    cache_factory = self._cache_factory.get_write_cache()
+    self._cache_factory.get_write_cache()
     with self.invalidated(self.context.targets()) as invalidation:
       return invalidation.all_vts, invalidation.invalid_vts
 

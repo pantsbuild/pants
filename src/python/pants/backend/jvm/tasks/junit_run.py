@@ -31,7 +31,6 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import environment_as
-from pants.util.process_handler import ProcessHandler
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -481,8 +480,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
     if not tests_and_targets:
       return
-
-    bootstrapped_cp = self.tool_classpath('junit')
 
     def compute_complete_classpath():
       return self.classpath(targets)

@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-import shutil
 import subprocess
 
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
@@ -16,13 +15,10 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
-from pants.build_graph.address import Address
-from pants.option.custom_types import list_option
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from twitter.common.collections import OrderedSet
 
-from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.targets.go_thrift_library import GoThriftGenLibrary, GoThriftLibrary
 
 

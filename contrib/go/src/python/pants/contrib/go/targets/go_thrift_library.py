@@ -5,10 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.parse_context import ParseContext
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
-from pants.source.wrapped_globs import Globs
 
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.targets.go_target import GoTarget

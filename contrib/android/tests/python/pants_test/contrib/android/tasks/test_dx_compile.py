@@ -6,11 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
-from pants.goal.products import MultipleRootedProducts
 from pants.util.dirutil import safe_rmtree, touch
 from pants_test.contrib.android.test_android_base import TestAndroidBase, distribution
 

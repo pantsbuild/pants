@@ -71,7 +71,6 @@ class DummyGen(SimpleCodegenTask):
     """
     self._test_case = test_case
     self._all_targets = all_targets
-    cls = type(self)
 
   def is_gentarget(self, target):
     return isinstance(target, DummyLibrary)

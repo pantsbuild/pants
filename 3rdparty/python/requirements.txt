@@ -12,7 +12,7 @@ pathspec==0.3.4
 pep8==1.6.2
 pex==1.1.4
 psutil==3.1.1
-pyflakes==0.9.2
+pyflakes==1.1.0
 Pygments==1.4
 pystache==0.5.3
 pytest-cov>=1.8,<1.9

@@ -543,13 +543,11 @@ class JvmCompile(NailgunTaskBase):
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
 
     # Register a mapping between sources and classfiles (if requested).
     if classes_by_source is not None:
       ccbsbc = self.compute_classes_by_source(compile_contexts).items()
       for compile_context, computed_classes_by_source in ccbsbc:
-        target = compile_context.target
         classes_dir = compile_context.classes_dir
 
         for source in compile_context.sources:

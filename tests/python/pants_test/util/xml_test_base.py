@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import textwrap
 import unittest
 from contextlib import contextmanager
-from xml.dom.minidom import Document
 
 from pants.util.contextutil import temporary_file
 

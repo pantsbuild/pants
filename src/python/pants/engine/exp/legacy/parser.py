@@ -15,7 +15,7 @@ from pants.base.parse_context import ParseContext
 from pants.engine.exp.legacy.globs import Globs, RGlobs, ZGlobs
 from pants.engine.exp.objects import Locatable, Serializable
 from pants.engine.exp.parsers import Parser
-from pants.engine.exp.struct import Struct, StructWithDeps
+from pants.engine.exp.struct import StructWithDeps
 from pants.util.memo import memoized_method, memoized_property
 
 

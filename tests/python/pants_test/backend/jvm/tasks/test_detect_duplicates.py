@@ -233,7 +233,7 @@ class DuplicateDetectorTest(JvmTaskTestBase):
     # Defaults are now overridden
     self.assertFalse(task._is_excluded('NOTICE.txt'))
 
-  def test_is_excluded_files(self):
+  def test_is_excluded_files_again(self):
     self.set_options(exclude_dirs=['org/duplicated'])
     task = self.create_task(self.context())
     self.assertTrue(task._is_excluded('org/duplicated/FOO'))

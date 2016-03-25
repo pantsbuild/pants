@@ -124,7 +124,7 @@ def test_removal_version_bad():
 
   with pytest.raises(BadRemovalVersionError):
     @deprecated(1.0)
-    def test_func():
+    def test_func1():
       pass
 
   with pytest.raises(BadRemovalVersionError):
@@ -132,7 +132,7 @@ def test_removal_version_bad():
 
   with pytest.raises(BadRemovalVersionError):
     @deprecated('1.a.0')
-    def test_func():
+    def test_func1a():
       pass
 
 
