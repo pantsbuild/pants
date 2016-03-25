@@ -136,10 +136,11 @@ class LocalSerialEngine(Engine):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
-        result = self._maybe_cache_get(step)
+        keyed_request = self._storageIo.key_for_request(step)
+        result = self._maybe_cache_get(keyed_request)
         if result is None:
-          result = step(node_builder)
-          self._maybe_cache_put(step, result)
+          result = keyed_request(node_builder, self._storageIo)
+          self._maybe_cache_put(keyed_request, result)
         promise.success(result)
 
 
@@ -163,9 +164,8 @@ def _execute_step(cache_save, debug, process_state, step):
   node_builder, storageIo = process_state
 
   step_id = step.step_id
-  resolved_request = storageIo.resolve_request(step)
   try:
-    result = resolved_request(node_builder)
+    result = step(node_builder, storageIo)
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
@@ -179,7 +179,7 @@ def _execute_step(cache_save, debug, process_state, step):
       return (step_id, e)
 
   # Save result to cache for this step.
-  cache_save(resolved_request, result)
+  cache_save(step, result)
   return (step_id, storageIo.key_for_result(result))
 
 
@@ -242,13 +242,13 @@ class LocalMultiprocessEngine(Engine):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
+        step = self._storageIo.key_for_request(step)
         result = self._maybe_cache_get(step)
         if result is not None:
           # Skip in_flight on cache hit.
           promise.success(result)
         else:
           in_flight[step.step_id] = promise
-          step = self._storageIo.key_for_request(step)
           self._submit(step)
           submitted += 1
       return submitted
@@ -308,22 +308,17 @@ class StorageIO(Closable):
     return StorageIO(Storage.clone(storageIo._storage), for_multi_process=True)
 
   def key_for_request(self, step_request):
-    node_or_key = self._maybe_key_for_node(step_request.node)
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       dependencies[self._maybe_key_for_node(dep)] = self._maybe_key_for_state(state)
-    return StepRequest(step_request.step_id, node_or_key, dependencies, step_request.project_tree)
+    return StepRequest(step_request.step_id, step_request.node,
+                       dependencies, step_request.project_tree)
 
   def key_for_result(self, step_result):
     state_or_key = self._maybe_key_for_state(step_result.state)
     return StepResult(state_or_key)
 
   def resolve_request(self, step_request):
-    if isinstance(step_request.node, Key):
-      node = self._storage.get(step_request.node)
-    else:
-      node = step_request.node
-
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       if isinstance(dep, Key):
@@ -332,7 +327,8 @@ class StorageIO(Closable):
         state = self._storage.get(state)
       dependencies[dep] =state
 
-    return StepRequest(step_request.step_id, node, dependencies, step_request.project_tree)
+    return StepRequest(step_request.step_id, step_request.node,
+                       dependencies, step_request.project_tree)
 
   def resolve_result(self, step_result):
     # This could be a SerializationError

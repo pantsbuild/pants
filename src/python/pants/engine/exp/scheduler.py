@@ -314,11 +314,12 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   :param project_tree: A FileSystemProjectTree instance.
   """
 
-  def __call__(self, node_builder):
+  def __call__(self, node_builder, storageIo):
 
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, self.project_tree)
-    state = self.node.step(self.dependencies, step_context)
+    resolved_step_request = storageIo.resolve_request(self)
+    state = resolved_step_request.node.step(resolved_step_request.dependencies, step_context)
     return (StepResult(state,))
 
   def keyable_fields(self):
@@ -329,7 +330,8 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
     of the input for execution. We also want to sort the dependencies map by
     keys, i.e, node_keys, to eliminate non-determinism.
     """
-    return (self.node, self.dependencies.items(), self.project_tree)
+    sorted_deps = sorted(self.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
+    return (self.node, sorted_deps, self.project_tree)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id

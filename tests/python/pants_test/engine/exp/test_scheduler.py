@@ -20,7 +20,6 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
 from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                     Throw, Waiting)
 from pants.engine.exp.scheduler import PartiallyConsumedInputsError, ProductGraph
-from pants.engine.exp.storage import Key
 
 
 class SchedulerTest(unittest.TestCase):
