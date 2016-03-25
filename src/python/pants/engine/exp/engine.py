@@ -130,7 +130,7 @@ class LocalSerialEngine(Engine):
 
   def __init__(self, scheduler, storage, cache=None):
     super(LocalSerialEngine, self).__init__(scheduler, storage, cache)
-    self._storageIo = StorageIO(storage, for_multi_process=False)
+    self._storageIo = StorageIO(storage)
 
   def reduce(self, execution_request):
     node_builder = self._scheduler.node_builder()
@@ -193,7 +193,7 @@ def _process_initializer(node_builder, storageIo):
   States are returned as a tuple. States are `Closable` so they can be cleaned up once
   processes are done.
   """
-  return (node_builder, StorageIO.clone(storageIo))
+  return (node_builder, StorageIO(Storage.clone(storageIo._storage)))
 
 
 class LocalMultiprocessEngine(Engine):
@@ -217,8 +217,8 @@ class LocalMultiprocessEngine(Engine):
 
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
     node_builder = scheduler.node_builder()
-    self._storageIo = StorageIO(storage, for_multi_process=True)
-    process_initializer = functools.partial(_process_initializer, node_builder, self._storageIo)
+    self._storage_io = StorageIO(storage)
+    process_initializer = functools.partial(_process_initializer, node_builder, self._storage_io)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
@@ -246,7 +246,7 @@ class LocalMultiprocessEngine(Engine):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
-        step = self._storageIo.key_for_request(step)
+        step = self._storage_io.key_for_request(step)
         result = self._maybe_cache_get(step)
         if result is not None:
           # Skip in_flight on cache hit.
@@ -262,7 +262,7 @@ class LocalMultiprocessEngine(Engine):
       if not in_flight:
         raise Exception('Awaited an empty pool!')
       step_id, result = self._pool.await_one_result()
-      result = self._storageIo.resolve_result(result)
+      result = self._storage_io.resolve_result(result)
       if isinstance(result, Exception):
         raise result
       if step_id not in in_flight:
@@ -298,33 +298,22 @@ class LocalMultiprocessEngine(Engine):
 
 
 class StorageIO(Closable):
-  """Control what to be content addresed and content address them (in both ways).
+  """Control what to be content addresed and content address them (in both ways)."""
 
-
-  In multi-process mode, we always content address. In single-process mode, both
-  `Node` and `State` allow fine granularity content addressing.
-  """
-
-  def __init__(self, storage, for_multi_process=False):
+  def __init__(self, storage):
     self._storage = storage
-    self._for_multi_process = for_multi_process
-
-  @classmethod
-  def clone(cls, storageIo):
-    """Clone the underlying Storage so it can be shared across process boundary."""
-    return StorageIO(Storage.clone(storageIo._storage), for_multi_process=True)
 
   def key_for_request(self, step_request):
     """Make keys for the dependency nodes as well as their states."""
     dependencies = {}
     for dep, state in step_request.dependencies.items():
-      dependencies[self._maybe_key_for_node(dep)] = self._maybe_key_for_state(state)
+      dependencies[self._key_for_node(dep)] = self._key_for_state(state)
     return StepRequest(step_request.step_id, step_request.node,
                        dependencies, step_request.project_tree)
 
   def key_for_result(self, step_result):
     """Make key for result state."""
-    state_or_key = self._maybe_key_for_state(step_result.state)
+    state_or_key = self._key_for_state(step_result.state)
     return StepResult(state_or_key)
 
   def resolve_request(self, step_request):
@@ -353,21 +342,11 @@ class StorageIO(Closable):
       state = step_result.state
     return StepResult(state)
 
-  def _maybe_key_for_node(self, node):
-    if self._is_node_keyable(node):
-      return self._storage.put(node)
-    return node
+  def _key_for_node(self, node):
+    return self._storage.put(node) if node.is_cacheable else node
 
-  def _maybe_key_for_state(self, state):
-    if self._is_state_keyable(state):
-      return self._storage.put(state)
-    return state
-
-  def _is_node_keyable(self, node):
-    return self._for_multi_process or node.is_cacheable
-
-  def _is_state_keyable(self, state):
-    return self._for_multi_process or state.is_content_addressable
+  def _key_for_state(self, state):
+    return self._storage.put(state)
 
   def close(self):
     self._storage.close()
