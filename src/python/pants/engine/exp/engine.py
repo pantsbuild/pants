@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
 import functools
 import logging
 import multiprocessing
@@ -16,6 +17,7 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants.base.exceptions import TaskError
 from pants.engine.exp.objects import SerializationError
 from pants.engine.exp.processing import StatefulPool
+from pants.engine.exp.scheduler import StepRequest, StepResult
 from pants.engine.exp.storage import Cache, Key, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -128,7 +130,8 @@ class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
   def __init__(self, scheduler, storage, cache=None):
-    super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
+    super(LocalSerialEngine, self).__init__(scheduler, storage, cache)
+    self._storageIo = StorageIO(storage, for_multi_process=False)
 
   def reduce(self, execution_request):
     node_builder = self._scheduler.node_builder()
@@ -136,7 +139,8 @@ class LocalSerialEngine(Engine):
       for step, promise in step_batch:
         result = self._maybe_cache_get(step)
         if result is None:
-          result = step(node_builder, self.storage)
+          keyed_step = self._storageIo.key_for_request(step)
+          result = self._storageIo.resolve_result(keyed_step(node_builder, self._storageIo))
           self._maybe_cache_put(step, result)
         promise.success(result)
 
@@ -181,13 +185,13 @@ def _execute_step(cache_save, debug, process_state, step):
   return (step_id, result)
 
 
-def _process_initializer(node_builder, storage):
+def _process_initializer(node_builder, storageIo):
   """Another picklable top-level function that provides multi-processes' initial states.
 
   States are returned as a tuple. States are `Closable` so they can be cleaned up once
   processes are done.
   """
-  return (node_builder, Storage.clone(storage))
+  return (node_builder, StorageIO.clone(storageIo))
 
 
 class LocalMultiprocessEngine(Engine):
@@ -211,7 +215,8 @@ class LocalMultiprocessEngine(Engine):
 
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
     node_builder = scheduler.node_builder()
-    process_initializer = functools.partial(_process_initializer, node_builder, storage)
+    self._storageIo = StorageIO(storage, for_multi_process=False)
+    process_initializer = functools.partial(_process_initializer, node_builder, self._storageIo)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
@@ -245,6 +250,7 @@ class LocalMultiprocessEngine(Engine):
           promise.success(result)
         else:
           in_flight[step.step_id] = promise
+          step = self._storageIo.key_for_request(step)
           self._submit(step)
           submitted += 1
       return submitted
@@ -254,6 +260,7 @@ class LocalMultiprocessEngine(Engine):
       if not in_flight:
         raise Exception('Awaited an empty pool!')
       step_id, result = self._pool.await_one_result()
+      result = self._storageIo.resolve_result(result)
       if isinstance(result, Exception):
         raise result
       if step_id not in in_flight:
@@ -293,25 +300,31 @@ class StorageIO(object):
 
   """
 
-  def __init__(self, storage, multi_process=False):
+  def __init__(self, storage, for_multi_process=False):
     self._storage = storage
-    self._multi_process = multi_process
+    self._for_multi_process = for_multi_process
+
+  @classmethod
+  def clone(cls, storageIo):
+    """Clone a Storage so it can be shared across process boundary."""
+    return StorageIO(Storage.clone(storageIo._storage), for_multi_process=True)
 
   def key_for_request(self, step_request):
-    step_request.node = self._maybe_key_for_node(step_request.node)
+    node_or_key = self._maybe_key_for_node(step_request.node)
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       dependencies[self._maybe_key_for_node(dep)] = self._maybe_key_for_state(state)
-    step_request.dependencies = dependencies
-    return step_request
+    return StepRequest(step_request.step_id, node_or_key, dependencies, step_request.project_tree)
 
   def key_for_result(self, step_result):
-    step_result.state = self._maybe_key_for_state(step_result.state)
-    return step_result
+    state_or_key = self._maybe_key_for_state(step_result.state)
+    return StepResult(state_or_key)
 
   def resolve_request(self, step_request):
     if isinstance(step_request.node, Key):
-      step_request.node = self._storage.get(step_request.node)
+      node = self._storage.get(step_request.node)
+    else:
+      node = step_request.node
 
     dependencies = {}
     for dep, state in step_request.dependencies.items():
@@ -320,25 +333,28 @@ class StorageIO(object):
       if isinstance(state, Key):
         state = self._storage.get(state)
       dependencies[dep] =state
-    step_request.dependencies = dependencies
 
-    return step_request
+    return StepRequest(step_request.step_id, node, dependencies, step_request.project_tree)
 
   def resolve_result(self, step_result):
     if isinstance(step_result.state, Key):
-      step_result.state = self._storage.get(step_result.state)
-    return step_result
+      state = self._storage.get(step_result.state)
+    else:
+      state = step_result.state
+    return StepResult(state)
 
   def _maybe_key_for_node(self, node):
     if self._is_node_keyable(node):
       return self._storage.put(node)
+    return node
 
   def _maybe_key_for_state(self, state):
     if self._is_state_keyable(state):
       return self._storage.put(state)
+    return state
 
   def _is_node_keyable(self, node):
-    return self._multi_process or node.is_cacheable
+    return self._for_multi_process or node.is_cacheable
 
   def _is_state_keyable(self, state):
-    return self._multi_process or state.is_content_addressable
+    return self._for_multi_process or state.is_content_addressable

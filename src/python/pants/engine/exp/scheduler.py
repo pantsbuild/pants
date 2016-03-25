@@ -318,8 +318,8 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
 
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, self.project_tree)
-    storageIo.resolve_request(self)
-    state = self.node.step(self.dependencies, step_context)
+    step_request = storageIo.resolve_request(self)
+    state = step_request.node.step(step_request.dependencies, step_context)
 
     return storageIo.key_for_result(StepResult(state,))
 
@@ -447,20 +447,18 @@ class GraphValidator(object):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, symbol_table_cls, storage, project_tree, graph_lock=None):
+  def __init__(self, goals, tasks, symbol_table_cls, project_tree, graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
-    :param storage: Content address storage instance, shared with engine.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
                        instance. Defaults to creating a new threading.RLock().
     """
     self._products_by_goal = goals
     self._tasks = tasks
-    self._storage = storage
     self._project_tree = project_tree
     self._node_builder = NodeBuilder.create(self._tasks)
 
@@ -489,7 +487,7 @@ class LocalScheduler(object):
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in self._product_graph.cyclic_dependencies_of(node):
       noop_state = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
-      deps[self._storage.put(dep)] = self._storage.put(noop_state)
+      deps[dep] = noop_state
 
     # Ready.
     self._step_id += 1
@@ -509,7 +507,7 @@ class LocalScheduler(object):
     :param goals: The list of goal names supplied on the command line.
     :type goals: list of string
     :param subjects: A list of Spec and/or PathGlobs objects.
-    :type subject_keys: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+    :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
       :class:`pants.engine.exp.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given goals and subjects.
     """
@@ -528,8 +526,9 @@ class LocalScheduler(object):
 
     :param products: A list of product types to request for the roots.
     :type products: list of types
-    :param subject_keys: A list of Keys that reference Spec and/or PathGlobs objects in the storage.
-    :type subject_keys: list of :class:`pants.engine.exp.Key`.
+    :param subjects: A list of Spec and/or PathGlobs objects.
+    :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+      :class:`pants.engine.exp.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
 
