@@ -198,7 +198,10 @@ class ExportTask(IvyTaskMixin, PythonTask):
       }
 
       if not current_target.is_synthetic:
-        info['globs'] = current_target.globs_relative_to_buildroot()
+        # If the `globs` are empty, they are encoded as an empty list rather than as a globs object.
+        # Explicitly return `null` in that case for backwards compatibility.
+        globs = current_target.globs_relative_to_buildroot()
+        info['globs'] = globs if globs else None
         if self.get_options().sources:
           info['sources'] = list(current_target.sources_relative_to_buildroot())
 
