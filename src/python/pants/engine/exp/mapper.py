@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import re
+from collections import OrderedDict
 
 from pants.build_graph.address import Address
 from pants.engine.exp.objects import Serializable
@@ -65,7 +66,7 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
                                  'map {!r}'.format(filepath, name, objects_by_name[name], obj))
 
       objects_by_name[name] = obj
-    return cls(filepath, objects_by_name)
+    return cls(filepath, OrderedDict(sorted(objects_by_name.items())))
 
 
 class DifferingFamiliesError(MappingError):
@@ -121,7 +122,8 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
                                            current_path=current_path))
         objects_by_name[name] = (current_path, obj)
     return AddressFamily(namespace=spec_path,
-                         objects_by_name={name: obj for name, (_, obj) in objects_by_name.items()})
+                         objects_by_name=OrderedDict((name, obj) for name, (_, obj)
+                                                     in sorted(objects_by_name.items())))
 
   @memoized_property
   def addressables(self):
