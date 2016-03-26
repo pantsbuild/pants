@@ -9,8 +9,7 @@ import shutil
 import tempfile
 
 from pants.invalidation.build_invalidator import CacheKey, CacheKeyGenerator
-from pants.invalidation.cache_manager import (InvalidationCacheManager, InvalidationCheck,
-                                              VersionedTarget)
+from pants.invalidation.cache_manager import InvalidationCacheManager, VersionedTarget
 from pants_test.base_test import BaseTest
 
 

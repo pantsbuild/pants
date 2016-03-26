@@ -5,12 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
 from pants.util.memo import memoized_property
 
-from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 from pants.contrib.scalajs.targets.scala_js_target import ScalaJSTarget
 
 

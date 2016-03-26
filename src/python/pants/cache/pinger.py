@@ -113,7 +113,7 @@ class BestUrlSelector(object):
     best_url = self.parsed_urls[0]
     try:
       yield best_url
-    except Exception as e:
+    except Exception:
       self.unsuccessful_calls[best_url] += 1
 
       # Not thread-safe but pool used by cache is based on subprocesses, therefore no race.

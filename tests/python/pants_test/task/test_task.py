@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload

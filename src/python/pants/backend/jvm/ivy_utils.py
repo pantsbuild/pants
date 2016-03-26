@@ -1007,7 +1007,7 @@ class IvyUtils(object):
     # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
     #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
     # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    overrides = [cls._generate_override_template(coord) for coord in artifact_set]
+    overrides = [cls._generate_override_template(_coord) for _coord in artifact_set]
 
     excludes = [cls._generate_exclude_template(exclude) for exclude in excludes]
 
@@ -1037,7 +1037,7 @@ class IvyUtils(object):
       jars_by_key.setdefault((jar.org, jar.name, jar.rev), []).append(jar)
 
 
-    dependencies = [cls._generate_fetch_jar_template(jars) for jars in jars_by_key.values()]
+    dependencies = [cls._generate_fetch_jar_template(_jars) for _jars in jars_by_key.values()]
 
     template_data = TemplateData(org=org,
                                  module=name,

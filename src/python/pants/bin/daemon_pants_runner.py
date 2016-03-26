@@ -9,15 +9,13 @@ import datetime
 import os
 import signal
 import socket
-import sys
-import traceback
 from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title
 
 from pants.bin.exiter import Exiter
 from pants.bin.pants_runner import LocalPantsRunner
-from pants.java.nailgun_io import NailgunStreamReader, NailgunStreamWriter
+from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import stdio_as

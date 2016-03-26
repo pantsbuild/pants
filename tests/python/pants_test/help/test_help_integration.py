@@ -35,15 +35,6 @@ class TestHelpIntegration(PantsRunIntegrationTest):
     self.assertIn('test.junit options:', pants_run.stdout_data)
     # Spot check to see that full args for all options are printed
     self.assertIn('--binary-dup-max-dups', pants_run.stdout_data)
-
-  def test_help_all(self):
-    command = ['help-all']
-    pants_run = self.run_pants(command=command)
-    self.assert_success(pants_run)
-    # Spot check to see that scope headings are printed
-    self.assertIn('test.junit options:', pants_run.stdout_data)
-    # Spot check to see that full args for all options are printed
-    self.assertIn('--binary-dup-max-dups', pants_run.stdout_data)
     # Spot check to see that subsystem options are printing
     self.assertIn('--jvm-options', pants_run.stdout_data)
 

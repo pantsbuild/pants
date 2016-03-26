@@ -211,7 +211,7 @@ class UnpackLibraries(Task):
           unpacked_location = self.unpacked_aar_location(coordinate)
           if not os.path.isdir(unpacked_location):
             raise self.MissingElementException('{}: Expected to unpack {} at {} but did not!'
-                                               .format(target, coordinate, unpacked_location))
+                                               .format(library.address.spec, coordinate, unpacked_location))
 
           # The binary is being threaded through because android binaries need the classes.jar on their classpath
           # in jvm_compile.

@@ -175,7 +175,7 @@ class GitTest(unittest.TestCase):
                       sorted(results))
 
     with self.assertRaises(reader.MissingFileException):
-      with reader.listdir('bogus') as f:
+      with reader.listdir('bogus'):
         pass
 
   def test_open(self):
