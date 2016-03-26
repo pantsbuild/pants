@@ -72,13 +72,9 @@ class Engine(AbstractClass):
     :type cache: :class:`pants.engine.exp.storage.Cache`
     """
     self._scheduler = scheduler
-    self._storage = storage or Storage.create()
+    storage = storage or Storage.create()
+    self._storage_io = StorageIO(storage)
     self._cache = cache or Cache.create(storage)
-
-  @property
-  def storage(self):
-    """Return the Storage instance for this Engine."""
-    return self._storage
 
   def execute(self, execution_request):
     """Executes the requested build.
@@ -101,7 +97,7 @@ class Engine(AbstractClass):
 
   def close(self):
     """Shutdown this engine instance, releasing resources it was using."""
-    self._storage.close()
+    self._storage_io.close()
     self._cache.close()
 
   def _should_cache(self, step_request):
@@ -127,10 +123,6 @@ class Engine(AbstractClass):
 
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
-
-  def __init__(self, scheduler, storage, cache=None):
-    super(LocalSerialEngine, self).__init__(scheduler, storage, cache)
-    self._storage_io = StorageIO(storage)
 
   def reduce(self, execution_request):
     node_builder = self._scheduler.node_builder()
@@ -164,10 +156,10 @@ def _execute_step(cache_save, debug, process_state, step):
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
   """
-  node_builder, storageIo = process_state
+  node_builder, storage_io = process_state
 
   step_id = step.step_id
-  resolved_request = storageIo.resolve_request(step)
+  resolved_request = storage_io.resolve_request(step)
   try:
     result = resolved_request(node_builder)
   except Exception as e:
@@ -184,16 +176,16 @@ def _execute_step(cache_save, debug, process_state, step):
 
   # Save result to cache for this step.
   cache_save(step, result)
-  return (step_id, storageIo.key_for_result(result))
+  return (step_id, storage_io.key_for_result(result))
 
 
-def _process_initializer(node_builder, storageIo):
+def _process_initializer(node_builder, storage_io):
   """Another picklable top-level function that provides multi-processes' initial states.
 
   States are returned as a tuple. States are `Closable` so they can be cleaned up once
   processes are done.
   """
-  return (node_builder, StorageIO(Storage.clone(storageIo._storage)))
+  return (node_builder, StorageIO(Storage.clone(storage_io._storage)))
 
 
 class LocalMultiprocessEngine(Engine):
@@ -217,7 +209,6 @@ class LocalMultiprocessEngine(Engine):
 
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
     node_builder = scheduler.node_builder()
-    self._storage_io = StorageIO(storage)
     process_initializer = functools.partial(_process_initializer, node_builder, self._storage_io)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
