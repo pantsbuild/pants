@@ -19,7 +19,6 @@ from pants.base.payload import Payload
 from pants.base.validation import assert_list
 from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
-from pants.option.custom_types import dict_option
 from pants.source.payload_fields import DeferredSourcesField, SourcesField
 from pants.source.wrapped_globs import Files, FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
@@ -150,7 +149,7 @@ class Target(AbstractTarget):
 
     @classmethod
     def register_options(cls, register):
-      register('--ignored', advanced=True, type=dict_option,
+      register('--ignored', advanced=True, type=dict,
                help='Map of target name to a list of keyword arguments that should be ignored if a '
                     'target receives them unexpectedly. Typically used to allow usage of arguments '
                     'in BUILD files that are not yet available in the current version of pants.')

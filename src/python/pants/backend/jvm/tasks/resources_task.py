@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
-from pants.option.custom_types import list_option
 from pants.task.task import Task
 
 
@@ -27,7 +26,7 @@ class ResourcesTask(Task):
   @classmethod
   def register_options(cls, register):
     super(ResourcesTask, cls).register_options(register)
-    register('--confs', advanced=True, type=list_option, default=['default'],
+    register('--confs', advanced=True, type=list, default=['default'],
              help='Prepare resources for these Ivy confs.')
 
   @classmethod

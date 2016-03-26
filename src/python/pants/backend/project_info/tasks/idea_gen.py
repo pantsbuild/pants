@@ -70,7 +70,7 @@ class IdeaGen(IdeGen):
              help="Exclude 'target' directories for directories containing "
                   "pom.xml files.  These directories contain generated code and"
                   "copies of files staged for deployment.")
-    register('--exclude_folders', action='append',
+    register('--exclude_folders', type=list,
              default=[
                '.pants.d/compile',
                '.pants.d/ivy',
@@ -84,7 +84,7 @@ class IdeaGen(IdeGen):
              help='Directory relative to --project-dir to write annotation processor sources.')
     register('--annotation-generated-test-sources-dir', default='generated_tests', advanced=True,
              help='Directory relative to --project-dir to write annotation processor sources.')
-    register('--annotation-processor', action='append', advanced=True,
+    register('--annotation-processor', type=list, advanced=True,
              help='Add a Class name of a specific annotation processor to run.')
 
   def __init__(self, *args, **kwargs):

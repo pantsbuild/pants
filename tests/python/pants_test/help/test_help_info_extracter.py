@@ -10,7 +10,6 @@ import unittest
 from mock import mock
 
 from pants.help.help_info_extracter import HelpInfoExtracter
-from pants.option.custom_types import dict_option, list_option
 
 
 class HelpInfoExtracterTest(unittest.TestCase):
@@ -32,11 +31,26 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {}, ['--foo=<str>'], ['--foo'])
     do_test(['--foo'], {'metavar': 'xx'}, ['--foo=xx'], ['--foo'])
     do_test(['--foo'], {'type': int}, ['--foo=<int>'], ['--foo'])
-    do_test(['--foo'], {'type': list_option}, ['--foo="[\'str1\',\'str2\',...]"'], ['--foo'])
-    do_test(['--foo'], {'type': dict_option}, ['--foo="{\'key1\':val1,\'key2\':val2,...}"'],
+    do_test(['--foo'], {'type': list}, [
+      '--foo=<str> (--foo=<str>) ...',
+      '--foo="[<str>, <str>, ...]"',
+      '--foo="+[<str>, <str>, ...]"'
+    ], ['--foo'])
+    do_test(['--foo'], {'type': list, 'member_type': int},[
+      '--foo=<int> (--foo=<int>) ...',
+      '--foo="[<int>, <int>, ...]"',
+      '--foo="+[<int>, <int>, ...]"'
+    ], ['--foo'])
+    do_test(['--foo'], {'type': list, 'member_type': dict},
+            ['--foo="{\'key1\':val1,\'key2\':val2,...}" '
+             '(--foo="{\'key1\':val1,\'key2\':val2,...}") ...',
+             '--foo="[{\'key1\':val1,\'key2\':val2,...}, '
+             '{\'key1\':val1,\'key2\':val2,...}, ...]"',
+             '--foo="+[{\'key1\':val1,\'key2\':val2,...}, '
+             '{\'key1\':val1,\'key2\':val2,...}, ...]"'],
+            ['--foo'])
+    do_test(['--foo'], {'type': dict}, ['--foo="{\'key1\':val1,\'key2\':val2,...}"'],
                                             ['--foo'])
-    do_test(['--foo'], {'action': 'append'},
-            ['--foo=<str> (--foo=<str>) ...'], ['--foo'])
 
     do_test(['--foo', '--bar'], {}, ['--foo=<str>', '--bar=<str>'], ['--foo', '--bar'])
 
@@ -68,8 +82,8 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': int}, 'None')
     do_test(['--foo'], {'type': int, 'default': r(42)}, '42')
     # TODO: Change these if we change the defaults to empty lists/dicts.
-    do_test(['--foo'], {'type': list_option}, 'None')
-    do_test(['--foo'], {'type': dict_option}, 'None')
+    do_test(['--foo'], {'type': list}, 'None')
+    do_test(['--foo'], {'type': dict}, 'None')
     do_test(['--foo'], {'action': 'append'}, 'None')
 
   def test_deprecated(self):
