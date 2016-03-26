@@ -53,6 +53,9 @@ Refactoring, Improvements, and Tooling
 * Add the Android SDK to the linux CI and turn on Android tests.
   `RB #3538 <https://rbcommons.com/s/twitter/r/3538>`_
 
+* Update pyflakes to 1.1.0, enable pyflakes checks and fix all warnings
+  `RB #3601 <https://rbcommons.com/s/twitter/r/3601>`_
+
 New Engine Work
 ~~~~~~~~~~~~~~~
 
