@@ -16,6 +16,7 @@ import pystache
 from six.moves import range
 
 from pants.base.exceptions import TaskError
+from pants.option.custom_types import list_option
 from pants.task.task import Task
 
 
@@ -43,7 +44,7 @@ class SiteGen(Task):
   @classmethod
   def register_options(cls, register):
     super(SiteGen, cls).register_options(register)
-    register('--config-path', action='append', help='Path to .json file describing site structure')
+    register('--config-path', type=list_option, help='Path to .json file describing site structure')
 
   def execute(self):
     if not self.get_options().config_path:

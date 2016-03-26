@@ -37,9 +37,9 @@ class ThriftLinter(NailgunTask):
              fingerprint=True,
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
-    register('--linter-args', default=[], advanced=True, type=list_option, fingerprint=True,
+    register('--linter-args', type=list_option, default=[], advanced=True, fingerprint=True,
              help='Additional options passed to the linter.')
-    register('--jvm-options', action='append', metavar='<option>...', advanced=True,
+    register('--jvm-options', type=list_option, metavar='<option>...', advanced=True,
              help='Run with these extra jvm options.')
     cls.register_jvm_tool(register, 'scrooge-linter')
 

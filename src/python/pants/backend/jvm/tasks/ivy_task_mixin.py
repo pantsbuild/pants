@@ -17,6 +17,7 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.option.custom_types import list_option
 from pants.task.task import TaskBase
 from pants.util.memo import memoized_property
 
@@ -87,7 +88,7 @@ class IvyTaskMixin(TaskBase):
   @classmethod
   def register_options(cls, register):
     super(IvyTaskMixin, cls).register_options(register)
-    register('--jvm-options', action='append', metavar='<option>...',
+    register('--jvm-options', type=list_option, metavar='<option>...',
              help='Run Ivy with these extra jvm options.')
     register('--soft-excludes', action='store_true', default=False, advanced=True,
              help='If a target depends on a jar that is excluded by another target '

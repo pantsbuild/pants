@@ -26,7 +26,7 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
-from pants.option.custom_types import dict_option
+from pants.option.custom_types import dict_option, list_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_property
@@ -350,7 +350,7 @@ class ZincCompile(BaseZincCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--scalac-plugins', advanced=True, action='append', fingerprint=True,
+    register('--scalac-plugins', advanced=True, type=list_option, fingerprint=True,
              help='Use these scalac plugins.')
     register('--scalac-plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')

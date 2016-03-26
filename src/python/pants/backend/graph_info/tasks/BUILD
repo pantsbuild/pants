@@ -17,6 +17,7 @@ python_library(
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
     'src/python/pants/goal',
+    'src/python/pants/option',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

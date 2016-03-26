@@ -11,6 +11,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.option.custom_types import list_option
 from pants.util.strutil import safe_shlex_split
 
 
@@ -21,7 +22,7 @@ class PythonRun(PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PythonRun, cls).register_options(register)
-    register('--args', action='append', help='Run with these extra args to main().')
+    register('--args', type=list_option, help='Run with these extra args to main().')
 
   @classmethod
   def supports_passthru_args(cls):

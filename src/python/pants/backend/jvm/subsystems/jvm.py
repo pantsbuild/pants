@@ -26,9 +26,9 @@ class JVM(Subsystem):
   def register_options(cls, register):
     super(JVM, cls).register_options(register)
     # TODO(benjy): Options to specify the JVM version?
-    register('--options', action='append', metavar='<option>...',
+    register('--options', type=list_option, metavar='<option>...',
              help='Run with these extra JVM options.')
-    register('--program-args', action='append', metavar='<arg>...',
+    register('--program-args', type=list_option, metavar='<arg>...',
              help='Run with these extra program args.')
     register('--debug', action='store_true',
              help='Run the JVM with remote debugging.')

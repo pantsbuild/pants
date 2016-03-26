@@ -11,6 +11,7 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.exceptions import TaskError
+from pants.option.custom_types import list_option
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.android.targets.android_binary import AndroidBinary
@@ -49,7 +50,7 @@ class DxCompile(AndroidTask, NailgunTask):
     super(DxCompile, cls).register_options(register)
     register('--build-tools-version',
              help='Create the dex file using this version of the Android build tools.')
-    register('--jvm-options', action='append', metavar='<option>...',
+    register('--jvm-options', type=list_option, metavar='<option>...',
              help='Run dx with these JVM options.')
 
   @classmethod

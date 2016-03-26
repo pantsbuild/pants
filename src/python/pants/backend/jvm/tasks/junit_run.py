@@ -29,6 +29,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.option.custom_types import list_option
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import environment_as
 from pants.util.strutil import pluralize
@@ -68,7 +69,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     super(JUnitRun, cls).register_options(register)
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
              help='Run at most this many tests in a single test process.')
-    register('--test', action='append',
+    register('--test', type=list_option,
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
     register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')

@@ -15,6 +15,7 @@ python_library(
     '3rdparty/python:six',
     'pants-plugins/3rdparty/python:beautifulsoup4',
     'src/python/pants/base:exceptions',
+    'src/python/pants/option',
     'src/python/pants/task',
   ]
 )

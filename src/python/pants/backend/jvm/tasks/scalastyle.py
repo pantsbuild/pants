@@ -12,7 +12,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
-from pants.option.custom_types import file_option
+from pants.option.custom_types import file_option, list_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import touch
 
@@ -76,7 +76,7 @@ class Scalastyle(NailgunTask):
              help='Path to optional scalastyle excludes file. Each line is a regex. (Blank lines '
                   'and lines starting with \'#\' are ignored.) A file is skipped if its path '
                   '(relative to the repo root) matches any of these regexes.')
-    register('--jvm-options', action='append', metavar='<option>...', advanced=True,
+    register('--jvm-options', type=list_option, metavar='<option>...', advanced=True,
              help='Run scalastyle with these extra jvm options.')
     # TODO: Use the task's log level instead of this separate verbosity knob.
     register('--verbose', action='store_true', default=False,

@@ -10,6 +10,7 @@ import unittest
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.option.custom_types import list_option
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
@@ -154,7 +155,7 @@ class BootstrapOptionsTest(unittest.TestCase):
       ])
       # So we don't choke on these on the cmd line.
       opts_single_config.register('', '--pants-config-files')
-      opts_single_config.register('', '--config-override', action='append')
+      opts_single_config.register('', '--config-override', type=list_option)
 
       opts_single_config.register('compile.apt', '--worker-count')
       opts_single_config.register('fruit', '--apple')
@@ -181,7 +182,7 @@ class BootstrapOptionsTest(unittest.TestCase):
         ])
         # So we don't choke on these on the cmd line.
         opts_double_config.register('', '--pants-config-files')
-        opts_double_config.register('', '--config-override', action='append')
+        opts_double_config.register('', '--config-override', type=list_option)
         opts_double_config.register('compile.apt', '--worker-count')
         opts_double_config.register('fruit', '--apple')
 

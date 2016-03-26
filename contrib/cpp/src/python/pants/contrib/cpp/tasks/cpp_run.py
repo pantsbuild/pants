@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.workunit import WorkUnitLabel
+from pants.option.custom_types import list_option
 
 from pants.contrib.cpp.targets.cpp_binary import CppBinary
 from pants.contrib.cpp.tasks.cpp_task import CppTask
@@ -17,8 +18,7 @@ class CppRun(CppTask):
   @classmethod
   def register_options(cls, register):
     super(CppRun, cls).register_options(register)
-    register('--args',
-             action='append',
+    register('--args', type=list_option,
              help='Append these options to the executable command line.')
 
   @classmethod

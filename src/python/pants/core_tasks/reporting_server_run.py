@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 
 from pants.binaries import binary_util
+from pants.option.custom_types import list_option
 from pants.reporting.reporting_server import ReportingServerManager
 from pants.task.task import QuietTaskMixin, Task
 
@@ -25,7 +26,7 @@ class ReportingServerRun(QuietTaskMixin, Task):
              help='Serve on this port. Leave unset to choose a free port '
                   'automatically (recommended if using pants concurrently in '
                   'multiple workspaces on the same host).')
-    register('--allowed-clients', action='append', default=['127.0.0.1'],
+    register('--allowed-clients', type=list_option, default=['127.0.0.1'],
              help='Only requests from these IPs may access this server. Useful for '
                   'temporarily showing build results to a colleague. The special '
                   'value ALL means any client may connect. Use with caution, as '
