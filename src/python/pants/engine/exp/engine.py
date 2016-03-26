@@ -130,7 +130,7 @@ class LocalSerialEngine(Engine):
 
   def __init__(self, scheduler, storage, cache=None):
     super(LocalSerialEngine, self).__init__(scheduler, storage, cache)
-    self._storageIo = StorageIO(storage)
+    self._storage_io = StorageIO(storage)
 
   def reduce(self, execution_request):
     node_builder = self._scheduler.node_builder()
@@ -139,7 +139,7 @@ class LocalSerialEngine(Engine):
         # The sole purpose of a keyed request is to get a stable cache key,
         # so we can sort keyed_request.dependencies by keys as opposed to requiring
         # dep nodes to support compare.
-        keyed_request = self._storageIo.key_for_request(step)
+        keyed_request = self._storage_io.key_for_request(step)
         result = self._maybe_cache_get(keyed_request)
         if result is None:
           result = step(node_builder)
@@ -304,16 +304,20 @@ class StorageIO(Closable):
     self._storage = storage
 
   def key_for_request(self, step_request):
-    """Make keys for the dependency nodes as well as their states."""
+    """Make keys for the dependency nodes as well as their states.
+
+    step_request.node isn't keyed is only for convenience because it is used
+    in a subsequent is_cacheable check.
+    """
     dependencies = {}
     for dep, state in step_request.dependencies.items():
-      dependencies[self._key_for_node(dep)] = self._key_for_state(state)
+      dependencies[self._storage.put(dep)] = self._storage.put(state)
     return StepRequest(step_request.step_id, step_request.node,
                        dependencies, step_request.project_tree)
 
   def key_for_result(self, step_result):
     """Make key for result state."""
-    state_or_key = self._key_for_state(step_result.state)
+    state_or_key = self._storage.put(step_result.state)
     return StepResult(state_or_key)
 
   def resolve_request(self, step_request):
@@ -341,12 +345,6 @@ class StorageIO(Closable):
     else:
       state = step_result.state
     return StepResult(state)
-
-  def _key_for_node(self, node):
-    return self._storage.put(node) if node.is_cacheable else node
-
-  def _key_for_state(self, state):
-    return self._storage.put(state)
 
   def close(self):
     self._storage.close()

@@ -10,10 +10,12 @@ import unittest
 from contextlib import closing, contextmanager
 
 from pants.build_graph.address import Address
-from pants.engine.exp.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
+from pants.engine.exp.engine import (LocalMultiprocessEngine, LocalSerialEngine, SerializationError,
+                                     StorageIO)
 from pants.engine.exp.examples.planners import Classpath, setup_json_scheduler
-from pants.engine.exp.nodes import Node, Return, SelectNode
-from pants.engine.exp.storage import Cache, Storage
+from pants.engine.exp.nodes import Return, SelectNode
+from pants.engine.exp.scheduler import StepRequest, StepResult
+from pants.engine.exp.storage import Cache, Key, Storage
 
 
 class EngineTest(unittest.TestCase):
@@ -75,7 +77,6 @@ class EngineTest(unittest.TestCase):
       self.scheduler.product_graph.invalidate()
       self.assert_engine(engine)
 
-
       # Second run executes same number of steps, and are all cache hits, no more misses.
       self.assertEquals(max_steps * 2, self.scheduler._step_id)
       self.assertEquals(total * 2, cache_stats.total)
@@ -85,3 +86,60 @@ class EngineTest(unittest.TestCase):
       # Ensure we cache no more than what can be cached.
       for request, result in engine._cache.items():
         self.assertTrue(request[0].is_cacheable)
+
+
+class StorageIOTest(unittest.TestCase):
+  class SomeException(Exception): pass
+
+  def setUp(self):
+    self.storage_io = StorageIO(Storage.create(in_memory=True))
+    self.result = StepResult(state='something')
+    self.error = self.SomeException('error')
+    self.request = StepRequest(step_id=123, node='some node',
+                               dependencies={'some dep': 'some state',
+                                             'another dep': 'another state'},
+                               project_tree='some project tree')
+
+  def test_key_for_request(self):
+    with closing(self.storage_io):
+      keyed_request = self.storage_io.key_for_request(self.request)
+      for dep, dep_state in keyed_request.dependencies.items():
+        self.assertEquals(Key, type(dep))
+        self.assertEquals(Key, type(dep_state))
+      self.assertIs(self.request.node, keyed_request.node)
+      self.assertIs(self.request.project_tree, keyed_request.project_tree)
+
+  def test_resolve_request(self):
+    with closing(self.storage_io):
+      keyed_request = self.storage_io.key_for_request(self.request)
+      resolved_request = self.storage_io.resolve_request(keyed_request)
+      self.assertEquals(self.request, resolved_request)
+      self.assertIsNot(self.request, resolved_request)
+
+      # resolve the resolved request will produce a different but equal request.
+      resolved_again_request = self.storage_io.resolve_request(resolved_request)
+      self.assertEquals(resolved_request, resolved_again_request)
+      self.assertIsNot(resolved_request, resolved_again_request)
+
+  def test_key_for_result(self):
+    with closing(self.storage_io):
+      keyed_result = self.storage_io.key_for_result(self.result)
+      self.assertEquals(Key, type(keyed_result.state))
+
+  def test_resolve_result(self):
+    with closing(self.storage_io):
+      keyed_result = self.storage_io.key_for_result(self.result)
+      resolved_result = self.storage_io.resolve_result(keyed_result)
+      self.assertEquals(self.result, resolved_result)
+      self.assertIsNot(self.result, resolved_result)
+
+      # resolve the resolved result will produce a different but equal result.
+      resolved_again_result = self.storage_io.resolve_result(resolved_result)
+      self.assertEquals(resolved_result, resolved_again_result)
+      self.assertIsNot(resolved_result, resolved_again_result)
+
+  def test_resolve_result_not_step_result(self):
+    """Verify the same result is returned if result is not StepResult."""
+    with closing(self.storage_io):
+      resolved_result = self.storage_io.resolve_result(self.error)
+      self.assertIs(self.error, resolved_result)
