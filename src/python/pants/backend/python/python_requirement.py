@@ -40,7 +40,7 @@ class PythonRequirement(object):
 
   def __init__(self, requirement, name=None, repository=None, version_filter=None, use_2to3=False,
                compatibility=None):
-    deprecated_conditional(lambda: version_filter is not None, '0.0.79',
+    deprecated_conditional(lambda: version_filter is not None, '0.0.80',
                            'version_filter using lambda function is no longer supported.')
 
     # TODO(wickman) Allow PythonRequirements to be specified using pip-style vcs or url identifiers,
