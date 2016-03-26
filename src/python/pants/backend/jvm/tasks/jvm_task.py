@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.build_graph import BuildGraph
+from pants.option.custom_types import list_option
 from pants.task.task import Task
 
 
@@ -20,7 +21,7 @@ class JvmTask(Task):
   @classmethod
   def register_options(cls, register):
     super(JvmTask, cls).register_options(register)
-    register('--confs', action='append', default=['default'],
+    register('--confs', type=list_option, default=['default'],
              help='Use only these Ivy configurations of external deps.')
 
   @classmethod

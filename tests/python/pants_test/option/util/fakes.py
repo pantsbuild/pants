@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import defaultdict
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.optionable import Optionable
 from pants.option.parser_hierarchy import enclosing_scope
@@ -57,7 +58,7 @@ def _options_registration_function(defaults):
       action = kwargs.get('action')
       if action == 'store_true':
         default = False
-      if action == 'append':
+      if action == 'append' or kwargs.get('type') == list_option:
         default = []
     for flag_name in args:
       normalized_flag_name = flag_name.lstrip('-').replace('-', '_')

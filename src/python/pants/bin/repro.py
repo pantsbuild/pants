@@ -10,6 +10,7 @@ import os
 import sys
 
 from pants.base.build_environment import get_buildroot
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import open_tar, temporary_file
 from pants.util.dirutil import chmod_plus_x
@@ -30,7 +31,7 @@ class Reproducer(Subsystem):
     register('--capture', metavar='<repro_path>', default=None,
              help='Capture information about this pants run (including the entire workspace) '
                   'into a tar.gz file that can be used to help debug build problems.')
-    register('--ignore', action='append',
+    register('--ignore', type=list_option,
              help='Any paths specified here will not be included in repro tarballs.')
 
   def create_repro(self):

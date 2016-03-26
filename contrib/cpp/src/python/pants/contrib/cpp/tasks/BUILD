@@ -16,6 +16,7 @@ python_library(
     'contrib/cpp/src/python/pants/contrib/cpp/targets:targets',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/option',
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],

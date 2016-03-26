@@ -93,7 +93,7 @@ class JvmCompile(NailgunTaskBase):
     register('--jvm-options', advanced=True, type=list_option, default=[],
              help='Run the compiler with these JVM options.')
 
-    register('--args', advanced=True, action='append',
+    register('--args', advanced=True, type=list_option,
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these args to the compiler.')
 
@@ -109,11 +109,11 @@ class JvmCompile(NailgunTaskBase):
     register('--warnings', default=True, action='store_true', fingerprint=True,
              help='Compile with all configured warnings enabled.')
 
-    register('--warning-args', advanced=True, action='append', fingerprint=True,
+    register('--warning-args', advanced=True, type=list_option, fingerprint=True,
              default=list(cls.get_warning_args_default()),
              help='Extra compiler args to use when warnings are enabled.')
 
-    register('--no-warning-args', advanced=True, action='append', fingerprint=True,
+    register('--no-warning-args', advanced=True, type=list_option, fingerprint=True,
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
@@ -128,7 +128,7 @@ class JvmCompile(NailgunTaskBase):
     register('--debug-symbols', default=False, action='store_true', fingerprint=True,
              help='Compile with debug symbol enabled.')
 
-    register('--debug-symbol-args', advanced=True, action='append', fingerprint=True,
+    register('--debug-symbol-args', advanced=True, type=list_option, fingerprint=True,
              default=['-C-g:lines,source,vars'],
              help='Extra args to enable debug symbol.')
 

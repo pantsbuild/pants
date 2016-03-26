@@ -25,6 +25,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
 from pants.java.executor import Executor
+from pants.option.custom_types import list_option
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
 
@@ -78,7 +79,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     super(BootstrapJvmTools, cls).register_options(register)
     # Must be registered with the shader- prefix, as IvyTaskMixin already registers --jvm-options.
     # TODO: IvyTaskMixin should probably add an ivy- prefix; there's no reason to privilege it.
-    register('--shader-jvm-options', action='append', metavar='<option>...',
+    register('--shader-jvm-options', type=list_option, metavar='<option>...',
              help='Run the tool shader with these extra jvm options.')
 
   @classmethod

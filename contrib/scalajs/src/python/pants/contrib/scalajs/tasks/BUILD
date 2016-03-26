@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/goal:products',
+    'src/python/pants/option',
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ],

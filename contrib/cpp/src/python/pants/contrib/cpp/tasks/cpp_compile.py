@@ -9,6 +9,7 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
+from pants.option.custom_types import list_option
 from pants.util.dirutil import safe_mkdir_for
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
@@ -20,9 +21,9 @@ class CppCompile(CppTask):
   @classmethod
   def register_options(cls, register):
     super(CppCompile, cls).register_options(register)
-    register('--cc-options', advanced=True, action='append', default=[], fingerprint=True,
+    register('--cc-options', advanced=True, type=list_option, fingerprint=True,
              help='Append these options to the compiler command line.')
-    register('--cc-extensions', advanced=True, action='append', fingerprint=True,
+    register('--cc-extensions', advanced=True, type=list_option, fingerprint=True,
              default=['.cc', '.cxx', '.cpp'],
              help=('The list of extensions to consider when determining if a file is a '
                    'C++ source file.'))

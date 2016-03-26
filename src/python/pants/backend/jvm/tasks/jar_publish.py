@@ -327,7 +327,7 @@ class JarPublish(ScmPublishMixin, JarTask):
              help='Publish the specified targets and all their internal dependencies transitively.')
     register('--force', default=False, action='store_true',
              help='Force pushing jars even if there have been no changes since the last push.')
-    register('--override', action='append',
+    register('--override', type=list_option,
              help='Specifies a published jar revision override in the form: '
                   '([org]#[name]|[target spec])=[new revision] '
                   'For example, to specify 2 overrides: '

@@ -12,6 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.option.custom_types import list_option
 from pants.task.console_task import ConsoleTask
 from pants.util.filtering import create_filters, wrap_filters
 
@@ -31,15 +32,15 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(Filter, cls).register_options(register)
-    register('--type', action='append', metavar='[+-]type1,type2,...',
+    register('--type', type=list_option, metavar='[+-]type1,type2,...',
              help='Filter on these target types.')
-    register('--target', action='append', metavar='[+-]spec1,spec2,...',
+    register('--target', type=list_option, metavar='[+-]spec1,spec2,...',
              help='Filter on these target addresses.')
-    register('--ancestor', action='append', metavar='[+-]spec1,spec2,...',
+    register('--ancestor', type=list_option, metavar='[+-]spec1,spec2,...',
              help='Filter on targets that these targets depend on.')
-    register('--regex', action='append', metavar='[+-]regex1,regex2,...',
+    register('--regex', type=list_option, metavar='[+-]regex1,regex2,...',
              help='Filter on target addresses matching these regexes.')
-    register('--tag-regex', action='append', metavar='[+-]regex1,regex2,...',
+    register('--tag-regex', type=list_option, metavar='[+-]regex1,regex2,...',
              help='Filter on targets with tags matching these regexes.')
 
   def __init__(self, *args, **kwargs):

@@ -29,6 +29,7 @@ from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
+from pants.option.custom_types import list_option
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
@@ -106,7 +107,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
                   "emitted to that file (prefix). Note that tests may run in a different cwd, so "
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
-    register('--options', action='append', help='Pass these options to pytest.')
+    register('--options', type=list_option, help='Pass these options to pytest.')
     register('--coverage',
              help='Emit coverage information for specified paths/modules. Value has two forms: '
                   '"module:list,of,modules" or "path:list,of,paths"')

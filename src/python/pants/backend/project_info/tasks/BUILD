@@ -128,6 +128,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/option',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -143,6 +144,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/option',
     'src/python/pants/scm:git',
     'src/python/pants/util:dirutil',
   ],
