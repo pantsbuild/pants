@@ -1,8 +1,12 @@
 RELEASE HISTORY
 ===============
 
-0.0.78 (03/25/2016)
+0.0.79 (03/26/2016)
 -------------------
+
+This is the regularly scheduled release that would have been 0.0.78. Due to an upload issue and
+a desire for immutable versions, the 0.0.78 version number was skipped: all deprecations have been
+extended by one release to account for that.
 
 Bugfixes
 ~~~~~~~~

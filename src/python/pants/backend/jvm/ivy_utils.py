@@ -716,7 +716,7 @@ class IvyUtils(object):
     return TemplateData(org=jar.org, module=jar.name, version=jar.rev)
 
   @staticmethod
-  @deprecated('0.0.80',
+  @deprecated('0.0.81',
               hint_message='Use `construct_and_load_symlink_map` instead.')
   def load_classpath_from_cachepath(path):
     return IvyUtils._load_classpath_from_cachepath(path)
@@ -788,7 +788,7 @@ class IvyUtils(object):
                            .format(ivy_cache_report_path, workdir_report_path, e))
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `do_resolve` instead.')
+  @deprecated('0.0.81', hint_message='Use `do_resolve` instead.')
   def exec_ivy(cls, ivy, confs, ivyxml, args,
                jvm_options,
                executor,
@@ -823,7 +823,7 @@ class IvyUtils(object):
       raise IvyUtils.IvyError(e)
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `construct_and_load_symlink_map` instead.')
+  @deprecated('0.0.81', hint_message='Use `construct_and_load_symlink_map` instead.')
   def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
     return cls._symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath)
 
@@ -890,7 +890,7 @@ class IvyUtils(object):
     return dict(symlink_map)
 
   @staticmethod
-  @deprecated('0.0.80',
+  @deprecated('0.0.81',
               hint_message='Ivy resolves now use the hash name derived from the cache key.')
   def identify(targets):
     targets = list(targets)
