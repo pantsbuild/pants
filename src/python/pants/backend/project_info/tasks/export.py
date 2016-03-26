@@ -362,7 +362,7 @@ class Export(ExportTask, ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(Export, cls).register_options(register)
-    register('--formatted', default=True, action='store_false',
+    register('--formatted', type=bool, implicit_value=False,
              help='Causes output to be a single line of JSON.')
 
   def __init__(self, *args, **kwargs):

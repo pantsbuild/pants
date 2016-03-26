@@ -41,11 +41,11 @@ class GlobalOptionsRegistrar(Optionable):
     logging.addLevelName(logging.WARNING, 'WARN')
     register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
              help='Set the logging level.')
-    register('-q', '--quiet', action='store_true', recursive=True,
+    register('-q', '--quiet', type=bool, recursive=True,
              help='Squelches most console output.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', action='store_true', default=True, recursive=True,
+    register('--colors', type=bool, default=True, recursive=True,
              help='Set whether log messages are displayed in color.')
 
     # Pants code uses this only to verify that we are of the requested version. However
@@ -85,7 +85,7 @@ class GlobalOptionsRegistrar(Optionable):
     # to set extra config file locations in an initial bootstrap config file.
     register('--config-override', advanced=True, type=list, metavar='<path>',
              help='A second config file, to override pants.ini.')
-    register('--pantsrc', advanced=True, action='store_true', default=True,
+    register('--pantsrc', advanced=True, type=bool, default=True,
              help='Use pantsrc files.')
     register('--pantsrc-files', advanced=True, type=list, metavar='<path>',
              default=['/etc/pantsrc', '~/.pants.rc'],
@@ -95,7 +95,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Add these directories to PYTHONPATH to search for plugins.')
     register('--target-spec-file', type=list, dest='target_spec_files',
              help='Read additional specs from this file, one per line')
-    register('--verify-config', action='store_true', default=False,
+    register('--verify-config', type=bool, default=False,
              help='Verify that all config file values correspond to known options.')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
@@ -106,7 +106,7 @@ class GlobalOptionsRegistrar(Optionable):
     # This facilitates bootstrap-time configuration of pantsd usage such that we can
     # determine whether or not to use the Pailgun client to invoke a given pants run
     # without resorting to heavier options parsing.
-    register('--enable-pantsd', advanced=True, action='store_true', default=False,
+    register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon. (Beta)')
 
   @classmethod
@@ -117,9 +117,9 @@ class GlobalOptionsRegistrar(Optionable):
     # global-scope options, for convenience.
     cls.register_bootstrap_options(register)
 
-    register('-x', '--time', action='store_true',
+    register('-x', '--time', type=bool,
              help='Output a timing report at the end of the run.')
-    register('-e', '--explain', action='store_true',
+    register('-e', '--explain', type=bool,
              help='Explain the execution of goals.')
     register('--tag', type=list, metavar='[+-]tag1,tag2,...',
              help="Include only targets with these tags (optional '+' prefix) or without these "
@@ -129,7 +129,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
              help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.
-    register('-k', '--kill-nailguns', advanced=True, action='store_true',
+    register('-k', '--kill-nailguns', advanced=True, type=bool,
              help='Kill nailguns before exiting')
     register('-i', '--interpreter', advanced=True, default=[], type=list,
              metavar='<requirement>',
@@ -152,7 +152,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Patterns for ignoring files when reading BUILD files. '
                   'Use to ignore unneeded directories or BUILD files. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
-    register('--fail-fast', advanced=True, action='store_true', recursive=True,
+    register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
@@ -163,11 +163,11 @@ class GlobalOptionsRegistrar(Optionable):
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking '
              'the command up into multiple invocations.')
-    register('--print-exception-stacktrace', advanced=True, action='store_true',
+    register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
     register('--build-file-rev', advanced=True,
              help='Read BUILD files from this scm rev instead of from the working tree.  This is '
              'useful for implementing pants-aware sparse checkouts.')
-    register('--lock', advanced=True, action='store_true', default=True,
+    register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
