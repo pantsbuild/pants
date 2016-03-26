@@ -113,9 +113,6 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     register('--coverage-output-dir', metavar='<DIR>', default=None,
              help='Directory to emit coverage reports to.'
              'If not specified, a default within dist is used.')
-    register('--shard', deprecated_version='0.0.76', removal_version='0.0.78',
-             deprecated_hint='Use --test-shard instead, with the same value.',
-             help='See --test-shard.')
     register('--test-shard',
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
                   'run tests number 2, 5, 8, 11, ...')
@@ -175,7 +172,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
 
   @contextmanager
   def _maybe_shard(self):
-    shard_spec = self.get_options().test_shard or self.get_options().shard
+    shard_spec = self.get_options().test_shard
     if shard_spec is None:
       yield []
       return
