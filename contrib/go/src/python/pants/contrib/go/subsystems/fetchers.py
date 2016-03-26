@@ -17,7 +17,6 @@ from contextlib import closing, contextmanager
 
 import requests
 from pants.fs.archive import archiver_for_path
-from pants.option.custom_types import dict_option, list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.memo import memoized_method, memoized_property
@@ -183,7 +182,7 @@ class Fetchers(Subsystem):
     # match order by placing fetchers at the head of the list to handle special cases before
     # falling through to more general matchers.
     # Tracked at: https://github.com/pantsbuild/pants/issues/2018
-    register('--mapping', metavar='<mapping>', type=dict_option, default=cls._DEFAULT_FETCHERS,
+    register('--mapping', metavar='<mapping>', type=dict, default=cls._DEFAULT_FETCHERS,
              advanced=True,
              help="A mapping from a remote import path matching regex to a fetcher type to use "
                   "to fetch the remote sources.  The regex must match the beginning of the remote "
@@ -304,7 +303,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    register('--matchers', metavar='<mapping>', type=dict_option,
+    register('--matchers', metavar='<mapping>', type=dict,
              default=cls._DEFAULT_MATCHERS, advanced=True,
              help="A mapping from a remote import path matching regex to an UrlInfo struct "
                   "describing how to fetch and unpack a remote import path.  The regex must match "
@@ -328,7 +327,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
                   'disk when downloading an archive.')
     register('--retries', default=1, advanced=True,
              help='How many times to retry to fetch a remote library.')
-    register('--prefixes', metavar='<paths>', type=list_option, advanced=True,
+    register('--prefixes', metavar='<paths>', type=list, advanced=True,
              fromfile=True, default=[],
              help="Known import-prefixes for go packages")
 

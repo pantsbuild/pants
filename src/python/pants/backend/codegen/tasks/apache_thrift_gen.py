@@ -20,7 +20,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
-from pants.option.custom_types import list_option
 from pants.util.memo import memoized_property
 
 
@@ -38,9 +37,9 @@ class ApacheThriftGen(SimpleCodegenTask):
 
     register('--gen-options', advanced=True, fingerprint=True,
              help='Use these apache thrift java gen options.')
-    register('--deps', advanced=True, type=list_option,
+    register('--deps', advanced=True, type=list,
              help='A list of specs pointing to dependencies of thrift generated java code.')
-    register('--service-deps', advanced=True, type=list_option,
+    register('--service-deps', advanced=True, type=list,
              help='A list of specs pointing to dependencies of thrift generated java service '
                   'code.  If not supplied, then --deps will be used for service deps.')
 

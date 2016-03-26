@@ -43,7 +43,7 @@ class SiteGen(Task):
   @classmethod
   def register_options(cls, register):
     super(SiteGen, cls).register_options(register)
-    register('--config-path', action='append', help='Path to .json file describing site structure')
+    register('--config-path', type=list, help='Path to .json file describing site structure')
 
   def execute(self):
     if not self.get_options().config_path:

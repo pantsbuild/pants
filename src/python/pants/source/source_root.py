@@ -11,7 +11,6 @@ from collections import namedtuple
 from six.moves import range
 
 from pants.base.build_environment import get_buildroot
-from pants.option.custom_types import dict_option, list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -175,23 +174,23 @@ class SourceRootConfig(Subsystem):
              help='Configures the behaviour when sources are defined outside of any configured '
                   'source root. `create` will cause a source root to be implicitly created at '
                   'the definition location of the sources; `fail` will trigger an error.')
-    register('--lang-canonicalizations', metavar='<map>', type=dict_option,
+    register('--lang-canonicalizations', metavar='<map>', type=dict,
              default=cls._DEFAULT_LANG_CANONICALIZATIONS, advanced=True,
              help='Map of language aliases to their canonical names.')
-    register('--source-root-patterns', metavar='<list>', type=list_option,
+    register('--source-root-patterns', metavar='<list>', type=list,
              default=cls._DEFAULT_SOURCE_ROOT_PATTERNS, advanced=True,
              help='A list of source root patterns. Use a "*" wildcard path segment to match the '
                   'language name, which will be canonicalized.')
-    register('--test-root-patterns', metavar='<list>', type=list_option,
+    register('--test-root-patterns', metavar='<list>', type=list,
              default=cls._DEFAULT_TEST_ROOT_PATTERNS, advanced=True,
              help='A list of source root patterns. Use a "*" wildcard path segment to match the '
                   'language name, which will be canonicalized.')
 
-    register('--source-roots', metavar='<map>', type=dict_option,
+    register('--source-roots', metavar='<map>', type=dict,
              default=cls._DEFAULT_SOURCE_ROOTS, advanced=True,
              help='A map of source roots to list of languages.  Useful when you want to enumerate '
                   'fixed source roots explicitly, instead of relying on patterns.')
-    register('--test-roots', metavar='<map>', type=dict_option,
+    register('--test-roots', metavar='<map>', type=dict,
              default=cls._DEFAULT_TEST_ROOTS, advanced=True,
              help='A map of test roots to list of languages.  Useful when you want to enumerate '
                   'fixed test roots explicitly, instead of relying on patterns.')

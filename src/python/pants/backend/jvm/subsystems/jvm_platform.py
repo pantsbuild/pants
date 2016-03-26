@@ -10,7 +10,6 @@ import logging
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
-from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
@@ -54,7 +53,7 @@ class JvmPlatform(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(JvmPlatform, cls).register_options(register)
-    register('--platforms', advanced=True, type=dict_option, default={}, fingerprint=True,
+    register('--platforms', advanced=True, type=dict, default={}, fingerprint=True,
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')

@@ -30,12 +30,12 @@ class Cobertura(Coverage):
   def register_options(cls, register, register_jvm_tool):
     slf4j_jar = JarDependency(org='org.slf4j', name='slf4j-simple', rev='1.7.5')
 
-    register('--coverage-cobertura-include-classes', advanced=True, action='append',
+    register('--coverage-cobertura-include-classes', advanced=True, type=list,
              help='Regex patterns passed to cobertura specifying which classes should be '
                   'instrumented. (see the "includeclasses" element description here: '
                   'https://github.com/cobertura/cobertura/wiki/Ant-Task-Reference)')
 
-    register('--coverage-cobertura-exclude-classes', advanced=True, action='append',
+    register('--coverage-cobertura-exclude-classes', advanced=True, type=list,
              help='Regex patterns passed to cobertura specifying which classes should NOT be '
                   'instrumented. (see the "excludeclasses" element description here: '
                   'https://github.com/cobertura/cobertura/wiki/Ant-Task-Reference')

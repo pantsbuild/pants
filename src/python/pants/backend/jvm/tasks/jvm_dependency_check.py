@@ -14,7 +14,6 @@ from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyze
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
-from pants.option.custom_types import list_option
 
 
 class JvmDependencyCheck(JvmDependencyAnalyzer):
@@ -40,7 +39,7 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
                   'file, as an implementation detail. However it may still be useful to use this '
                   'on occasion. ')
 
-    register('--missing-deps-whitelist', type=list_option, default=[],
+    register('--missing-deps-whitelist', type=list, default=[],
              fingerprint=True,
              help="Don't report these targets even if they have missing deps.")
 

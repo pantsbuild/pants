@@ -12,7 +12,6 @@ from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
-from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -100,7 +99,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                   '"custom" as the --version, custom build targets can be specified in the targets '
                   'for //:scalac and //:scala-library ')
 
-    register('--runtime', advanced=True, type=list_option, default=['//:scala-library'],
+    register('--runtime', advanced=True, type=list, default=['//:scala-library'],
              help='Target specs pointing to the scala runtime libraries.',
              deprecated_version='0.0.75', removal_version='0.0.79',
              deprecated_hint='Option is no longer used, --version is used to specify the major '

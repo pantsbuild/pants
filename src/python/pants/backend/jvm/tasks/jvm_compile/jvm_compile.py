@@ -27,7 +27,6 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.goal.products import MultipleRootedProducts
-from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_walk
 from pants.util.fileutil import create_size_estimators
@@ -90,14 +89,14 @@ class JvmCompile(NailgunTaskBase):
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
-    register('--jvm-options', advanced=True, type=list_option, default=[],
+    register('--jvm-options', advanced=True, type=list, default=[],
              help='Run the compiler with these JVM options.')
 
-    register('--args', advanced=True, action='append',
+    register('--args', advanced=True, type=list,
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these args to the compiler.')
 
-    register('--confs', advanced=True, type=list_option, default=['default'],
+    register('--confs', advanced=True, type=list, default=['default'],
              help='Compile for these Ivy confs.')
 
     # TODO: Stale analysis should be automatically ignored via Task identities:
@@ -109,26 +108,26 @@ class JvmCompile(NailgunTaskBase):
     register('--warnings', default=True, action='store_true', fingerprint=True,
              help='Compile with all configured warnings enabled.')
 
-    register('--warning-args', advanced=True, action='append', fingerprint=True,
+    register('--warning-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_warning_args_default()),
              help='Extra compiler args to use when warnings are enabled.')
 
-    register('--no-warning-args', advanced=True, action='append', fingerprint=True,
+    register('--no-warning-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--fatal-warnings-enabled-args', advanced=True, type=list_option, fingerprint=True,
+    register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_enabled_args_default()),
              help='Extra compiler args to use when fatal warnings are enabled.')
 
-    register('--fatal-warnings-disabled-args', advanced=True, type=list_option, fingerprint=True,
+    register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_disabled_args_default()),
              help='Extra compiler args to use when fatal warnings are disabled.')
 
     register('--debug-symbols', default=False, action='store_true', fingerprint=True,
              help='Compile with debug symbol enabled.')
 
-    register('--debug-symbol-args', advanced=True, action='append', fingerprint=True,
+    register('--debug-symbol-args', advanced=True, type=list, fingerprint=True,
              default=['-C-g:lines,source,vars'],
              help='Extra args to enable debug symbol.')
 

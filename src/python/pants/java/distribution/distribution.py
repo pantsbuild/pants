@@ -17,7 +17,6 @@ from six import string_types
 
 from pants.base.revision import Revision
 from pants.java.util import execute_java, execute_java_async
-from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
@@ -317,7 +316,7 @@ class DistributionLocator(Subsystem):
     super(DistributionLocator, cls).register_options(register)
     human_readable_os_aliases = ', '.join('{}: [{}]'.format(str(key), ', '.join(sorted(val)))
                                           for key, val in OS_ALIASES.items())
-    register('--paths', advanced=True, type=dict_option,
+    register('--paths', advanced=True, type=dict,
              help='Map of os names to lists of paths to jdks. These paths will be searched before '
                   'everything else (before the JDK_HOME, JAVA_HOME, PATH environment variables) '
                   'when locating a jvm to use. The same OS can be specified via several different '

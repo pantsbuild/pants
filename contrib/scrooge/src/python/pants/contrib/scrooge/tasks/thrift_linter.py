@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.option.custom_types import list_option
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
@@ -37,9 +36,9 @@ class ThriftLinter(NailgunTask):
              fingerprint=True,
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
-    register('--linter-args', default=[], advanced=True, type=list_option, fingerprint=True,
+    register('--linter-args', default=[], advanced=True, type=list, fingerprint=True,
              help='Additional options passed to the linter.')
-    register('--jvm-options', action='append', metavar='<option>...', advanced=True,
+    register('--jvm-options', type=list, metavar='<option>...', advanced=True,
              help='Run with these extra jvm options.')
     cls.register_jvm_tool(register, 'scrooge-linter')
 

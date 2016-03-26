@@ -11,7 +11,6 @@ from pex.fetcher import Fetcher, PyPIFetcher
 from pex.http import Context
 from pkg_resources import Requirement
 
-from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -28,7 +27,7 @@ class PythonSetup(Subsystem):
              help='The setuptools version for this python environment.')
     register('--wheel-version', advanced=True, default='0.24.0',
              help='The wheel version for this python environment.')
-    register('--platforms', advanced=True, type=list_option, default=['current'],
+    register('--platforms', advanced=True, type=list, default=['current'],
              help='The wheel version for this python environment.')
     register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the interpreter cache. '
@@ -118,9 +117,9 @@ class PythonRepos(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonRepos, cls).register_options(register)
-    register('--repos', advanced=True, type=list_option, default=[],
+    register('--repos', advanced=True, type=list, default=[],
              help='URLs of code repositories.')
-    register('--indexes', advanced=True, type=list_option,
+    register('--indexes', advanced=True, type=list,
              default=['https://pypi.python.org/simple/'],
              help='URLs of code repository indexes.')
 
