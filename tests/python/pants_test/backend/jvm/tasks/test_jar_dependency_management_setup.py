@@ -66,7 +66,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
                                      JarDependency(org='foobar', name='foobar'),
                                    ])
     context = self.context(target_roots=[jar_library])
-    with self._subsystem(default_target='//foo:nonexistant') as manager:
+    with self._subsystem(default_target='//foo:nonexistant'):
       task = self.create_task(context)
       with self.assertRaises(JarDependencyManagementSetup.InvalidDefaultTarget):
         task.execute()
@@ -170,7 +170,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
                                            JarDependency(org='foobar', name='foobar', rev='3'),
                                          ])
     context = self.context(target_roots=[management_target])
-    with self._subsystem() as manager:
+    with self._subsystem():
       task = self.create_task(context)
       with self.assertRaises(JarDependencyManagementSetup.DuplicateCoordinateError):
         task.execute()
@@ -182,7 +182,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
                                            JarDependency(org='foobar', name='foobar'),
                                          ])
     context = self.context(target_roots=[management_target])
-    with self._subsystem() as manager:
+    with self._subsystem():
       task = self.create_task(context)
       with self.assertRaises(JarDependencyManagementSetup.MissingVersion):
         task.execute()
@@ -200,7 +200,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
                                            '//foo:library',
                                          ])
     context = self.context(target_roots=[jar_library, management_target])
-    with self._subsystem() as manager:
+    with self._subsystem():
       task = self.create_task(context)
       with self.assertRaises(JarDependencyManagementSetup.DuplicateCoordinateError):
         task.execute()
@@ -218,7 +218,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
                                            '//foo:library',
                                          ])
     context = self.context(target_roots=[jar_library, management_target])
-    with self._subsystem() as manager:
+    with self._subsystem():
       task = self.create_task(context)
       with self.assertRaises(JarDependencyManagementSetup.MissingVersion):
         task.execute()

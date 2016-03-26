@@ -13,7 +13,7 @@ from pants.engine.exp.fs import Path
 from pants.engine.exp.graph import BuildFilePaths
 from pants.engine.exp.nodes import SelectNode
 from pants.engine.exp.scheduler import Return, StepRequest, StepResult
-from pants.engine.exp.storage import Cache, InMemoryDb, InvalidKeyError, Lmdb, Storage
+from pants.engine.exp.storage import Cache, InvalidKeyError, Lmdb, Storage
 from pants.engine.exp.struct import Variants
 
 

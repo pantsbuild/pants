@@ -173,15 +173,17 @@ class StackTask(Task):
       raise TaskError("""
 `stack` subprocess failed with the following inputs:
 
-Arguments: {args}
+Stack Arguments: {stack_args}
+Command Arguments: {command_args}
 Contents of {stack_yaml_path}:
 
 ```
 {yaml}
 ```
-""".strip().format(stack_yaml_path=stack_yaml_path,
-                   yaml=yaml,
-                   args=args))
+""".strip().format(stack_args=stack_args,
+                   command_args=cmd_args,
+                   stack_yaml_path=stack_yaml_path,
+                   yaml=yaml))
       raise
 
   def execute(self):

@@ -83,7 +83,7 @@ class GoFetch(GoTask):
     session.mount("https://", retriable_http_adapter)
     try:
       page_data = session.get('http://{import_path}?go-get=1'.format(import_path=import_path))
-    except requests.ConnectionError as e:
+    except requests.ConnectionError:
       return None, None, None
 
     if not page_data:

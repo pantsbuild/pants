@@ -229,7 +229,6 @@ def calculate_genfiles(source):
       namespace = match.group(2)
       namespaces[lang] = namespace
 
-  genfiles = defaultdict(set)
   namespace = namespaces.get('java')
 
   if not namespace:

@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target

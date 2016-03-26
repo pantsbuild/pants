@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-from collections import defaultdict
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -18,7 +17,6 @@ from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask, JarTask
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase

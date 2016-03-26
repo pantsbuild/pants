@@ -18,7 +18,6 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.binaries import binary_util
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.dirutil import safe_mkdir
-from pants.util.memo import memoized_property
 from pants.util.strutil import safe_shlex_split
 
 

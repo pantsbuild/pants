@@ -14,7 +14,6 @@ from pants.backend.codegen.register import build_file_aliases as register_codege
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.build_graph.register import build_file_aliases as register_core
-from pants.util.dirutil import safe_mkdir
 from pants_test.tasks.task_test_base import TaskTestBase
 
 

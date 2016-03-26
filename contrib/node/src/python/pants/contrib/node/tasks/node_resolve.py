@@ -5,9 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
-
-from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 

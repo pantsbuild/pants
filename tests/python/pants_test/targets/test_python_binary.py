@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import pytest
-
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest

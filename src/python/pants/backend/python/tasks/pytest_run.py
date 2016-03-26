@@ -163,7 +163,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       for target in sorted(results):
         self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
 
-      failed_targets = [target for target, rv in results.items() if not rv.success]
+      failed_targets = [target for target, _rv in results.items() if not _rv.success]
       if failed_targets:
         raise TestFailedTaskError(failed_targets=failed_targets)
 
