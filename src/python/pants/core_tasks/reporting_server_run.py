@@ -25,7 +25,7 @@ class ReportingServerRun(QuietTaskMixin, Task):
              help='Serve on this port. Leave unset to choose a free port '
                   'automatically (recommended if using pants concurrently in '
                   'multiple workspaces on the same host).')
-    register('--allowed-clients', action='append', default=['127.0.0.1'],
+    register('--allowed-clients', type=list, default=['127.0.0.1'],
              help='Only requests from these IPs may access this server. Useful for '
                   'temporarily showing build results to a colleague. The special '
                   'value ALL means any client may connect. Use with caution, as '

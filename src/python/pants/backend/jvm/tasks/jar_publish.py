@@ -32,7 +32,6 @@ from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.build_graph import sort_targets
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
-from pants.option.custom_types import dict_option, list_option
 from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin, Semver
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
@@ -327,7 +326,7 @@ class JarPublish(ScmPublishMixin, JarTask):
              help='Publish the specified targets and all their internal dependencies transitively.')
     register('--force', default=False, action='store_true',
              help='Force pushing jars even if there have been no changes since the last push.')
-    register('--override', action='append',
+    register('--override', type=list,
              help='Specifies a published jar revision override in the form: '
                   '([org]#[name]|[target spec])=[new revision] '
                   'For example, to specify 2 overrides: '
@@ -339,12 +338,12 @@ class JarPublish(ScmPublishMixin, JarTask):
                   'Or: --restart-at=src/java/com/twitter/common/base')
     register('--ivy_settings', advanced=True, default=None,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
-    register('--jvm-options', advanced=True, type=list_option,
+    register('--jvm-options', advanced=True, type=list,
              help='Use these jvm options when running Ivy.')
-    register('--repos', advanced=True, type=dict_option,
+    register('--repos', advanced=True, type=dict,
              help='Settings for repositories that can be pushed to. See '
                   'https://pantsbuild.github.io/publish.html for details.')
-    register('--publish-extras', advanced=True, type=dict_option,
+    register('--publish-extras', advanced=True, type=dict,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
     register('--individual-plugins', advanced=True, default=False, action='store_true',

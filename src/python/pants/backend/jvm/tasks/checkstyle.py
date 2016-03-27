@@ -13,7 +13,7 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import dict_option, file_option, list_option
+from pants.option.custom_types import file_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import safe_open
 
@@ -37,11 +37,11 @@ class Checkstyle(NailgunTask):
              help='Skip checkstyle.')
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
              help='Path to the checkstyle configuration file.')
-    register('--properties', advanced=True, type=dict_option, default={}, fingerprint=True,
+    register('--properties', advanced=True, type=dict, default={}, fingerprint=True,
              help='Dictionary of property mappings to use for checkstyle.properties.')
-    register('--confs', advanced=True, type=list_option, default=['default'],
+    register('--confs', advanced=True, type=list, default=['default'],
              help='One or more ivy configurations to resolve for this target.')
-    register('--jvm-options', advanced=True, action='append', metavar='<option>...',
+    register('--jvm-options', advanced=True, type=list, metavar='<option>...',
              help='Run checkstyle with these extra jvm options.')
     register('--include-user-classpath', action='store_true', default=False, fingerprint=True,
              help='Add the user classpath to the checkstyle classpath')

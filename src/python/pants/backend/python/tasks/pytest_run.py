@@ -106,7 +106,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
                   "emitted to that file (prefix). Note that tests may run in a different cwd, so "
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
-    register('--options', action='append', help='Pass these options to pytest.')
+    register('--options', type=list, help='Pass these options to pytest.')
     register('--coverage',
              help='Emit coverage information for specified paths/modules. Value has two forms: '
                   '"module:list,of,modules" or "path:list,of,paths"')

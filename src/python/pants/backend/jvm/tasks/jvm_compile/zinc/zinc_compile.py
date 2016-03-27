@@ -26,7 +26,6 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
-from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_property
@@ -112,7 +111,7 @@ class BaseZincCompile(JvmCompile):
     # ...also, as of sbt 0.13.9, it is significantly slower for cold builds.
     register('--name-hashing', advanced=True, action='store_true', default=False, fingerprint=True,
              help='Use zinc name hashing.')
-    register('--whitelisted-args', advanced=True, type=dict_option,
+    register('--whitelisted-args', advanced=True, type=dict,
              default={
                '-S.*': False,
                '-C.*': False,
@@ -350,9 +349,9 @@ class ZincCompile(BaseZincCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--scalac-plugins', advanced=True, action='append', fingerprint=True,
+    register('--scalac-plugins', advanced=True, type=list, fingerprint=True,
              help='Use these scalac plugins.')
-    register('--scalac-plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
+    register('--scalac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')
 
     # By default we expect no plugin-jars classpath_spec is filled in by the user, so we accept an

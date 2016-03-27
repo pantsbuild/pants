@@ -10,7 +10,6 @@ import traceback
 from abc import abstractmethod
 
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import list_option
 from pants.scm.scm import Scm
 
 
@@ -155,9 +154,9 @@ class ScmPublishMixin(object):
     super(ScmPublishMixin, cls).register_options(register)
     register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
              help='Try pushing the pushdb to the SCM this many times before aborting.')
-    register('--restrict-push-branches', advanced=True, type=list_option,
+    register('--restrict-push-branches', advanced=True, type=list,
              help='Allow pushes only from one of these branches.')
-    register('--restrict-push-urls', advanced=True, type=list_option,
+    register('--restrict-push-urls', advanced=True, type=list,
              help='Allow pushes to only one of these urls.')
 
   @property

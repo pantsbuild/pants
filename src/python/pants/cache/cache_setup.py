@@ -18,7 +18,6 @@ from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifa
 from pants.cache.pinger import BestUrlSelector, Pinger
 from pants.cache.resolver import NoopResolver, Resolver, RESTfulResolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
-from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -62,12 +61,12 @@ class CacheSetup(Subsystem):
                   'artifact caches. none: use URIs from static config options, i.e. '
                   '--read-from, --write-to. rest: look up URIs by querying a RESTful '
                   'URL, which is a remote address from --read-from, --write-to.')
-    register('--read-from', advanced=True, type=list_option, default=default_cache,
+    register('--read-from', advanced=True, type=list, default=default_cache,
              help='The URIs of artifact caches to read directly from. Each entry is a URL of '
                   'a RESTful cache, a path of a filesystem cache, or a pipe-separated list of '
                   'alternate caches to choose from. This list is also used as input to '
                   'the resolver. When resolver is \'none\' list is used as is.')
-    register('--write-to', advanced=True, type=list_option, default=default_cache,
+    register('--write-to', advanced=True, type=list, default=default_cache,
              help='The URIs of artifact caches to write directly to. Each entry is a URL of'
                   'a RESTful cache, a path of a filesystem cache, or a pipe-separated list of '
                   'alternate caches to choose from. This list is also used as input to '

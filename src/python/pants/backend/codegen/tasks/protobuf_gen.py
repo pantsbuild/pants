@@ -22,7 +22,6 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
-from pants.option.custom_types import list_option
 from pants.util.memo import memoized_property
 
 
@@ -47,11 +46,11 @@ class ProtobufGen(SimpleCodegenTask):
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
-    register('--protoc-plugins', advanced=True, fingerprint=True, type=list_option,
+    register('--protoc-plugins', advanced=True, fingerprint=True, type=list,
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.')
 
-    register('--extra_path', advanced=True, type=list_option,
+    register('--extra_path', advanced=True, type=list,
              help='Prepend this path onto PATH in the environment before executing protoc. '
                   'Intended to help protoc find its plugins.',
              default=None)
@@ -59,7 +58,7 @@ class ProtobufGen(SimpleCodegenTask):
              help='Path to use for the protoc binary.  Used as part of the path to lookup the'
                   'tool under --pants-bootstrapdir.',
              default='bin/protobuf')
-    register('--javadeps', advanced=True, type=list_option,
+    register('--javadeps', advanced=True, type=list,
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
              default=['3rdparty:protobuf-java'])

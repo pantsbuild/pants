@@ -18,7 +18,7 @@ class CppRun(CppTask):
   def register_options(cls, register):
     super(CppRun, cls).register_options(register)
     register('--args',
-             action='append',
+             type=list,
              help='Append these options to the executable command line.')
 
   @classmethod

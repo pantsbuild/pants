@@ -49,7 +49,7 @@ class DxCompile(AndroidTask, NailgunTask):
     super(DxCompile, cls).register_options(register)
     register('--build-tools-version',
              help='Create the dex file using this version of the Android build tools.')
-    register('--jvm-options', action='append', metavar='<option>...',
+    register('--jvm-options', type=list, metavar='<option>...',
              help='Run dx with these JVM options.')
 
   @classmethod

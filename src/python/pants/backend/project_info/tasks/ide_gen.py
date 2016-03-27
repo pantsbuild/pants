@@ -87,15 +87,15 @@ class IdeGen(IvyTaskMixin, NailgunTask):
              help='Pull javadoc jars from external dependencies into the project')
 
     # Options intended to be configured primarily in pants.ini
-    register('--python_source_paths', action='append', advanced=True,
+    register('--python_source_paths', type=list, advanced=True,
              help='Always add these paths to the IDE as Python sources.')
-    register('--python_test_paths', action='append', advanced=True,
+    register('--python_test_paths', type=list, advanced=True,
              help='Always add these paths to the IDE as Python test sources.')
-    register('--python_lib_paths', action='append', advanced=True,
+    register('--python_lib_paths', type=list, advanced=True,
              help='Always add these paths to the IDE for Python libraries.')
-    register('--extra-jvm-source-paths', action='append', advanced=True,
+    register('--extra-jvm-source-paths', type=list, advanced=True,
              help='Always add these paths to the IDE for Java sources.')
-    register('--extra-jvm-test-paths', action='append', advanced=True,
+    register('--extra-jvm-test-paths', type=list, advanced=True,
              help='Always add these paths to the IDE for Java test sources.')
 
   @classmethod
