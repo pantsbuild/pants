@@ -584,7 +584,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(1, options.for_global_scope().a)
     self.assertEqual(99, options.for_global_scope().b)
     with self.assertRaises(AttributeError):
-      _ = options.for_global_scope().c
+      options.for_global_scope().c
 
     self.assertEqual(1, options.for_scope('compile').a)
     self.assertEqual(2, options.for_scope('compile').b)
@@ -973,7 +973,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(1, options.for_global_scope().a)
     self.assertEqual(99, options.for_global_scope().b)
     with self.assertRaises(AttributeError):
-      _ = options.for_global_scope().c
+      options.for_global_scope().c
 
     self.assertEqual(1, options.for_scope('compile').a)
     self.assertEqual(2, options.for_scope('compile').b)

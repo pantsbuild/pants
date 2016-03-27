@@ -114,7 +114,7 @@ class RESTfulResolver(Resolver):
       if resp.status_code == requests.codes.ok:
         return resp.content
       raise self.ResolverError('Error status_code={0}'.format(resp.status_code))
-    except requests.RequestException as e:
+    except requests.RequestException:
       raise self.ResolverError('Request error from {0}'.format(resolve_from))
 
   def resolve(self, resolve_from):

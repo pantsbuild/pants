@@ -79,7 +79,7 @@ class PayloadTest(BaseTest):
       PrimitiveField('bar').fingerprint(),
     )
 
-  def test_excludes_field(self):
+  def test_excludes_field_again(self):
     self.assertEqual(
       ExcludesField([Exclude('com', 'foo')]).fingerprint(),
       ExcludesField([Exclude('com', 'foo')]).fingerprint(),

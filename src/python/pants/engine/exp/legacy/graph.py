@@ -10,9 +10,7 @@ from pants.build_graph.address import Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.globs import BaseGlobs, Files
-from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
-from pants.engine.exp.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
 
 
@@ -111,10 +109,6 @@ class ExpGraph(BuildGraph):
       raise TargetDefinitionException(
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
-
-  @property
-  def address_mapper(self):
-    raise NotImplementedError('Not implemented.')
 
   def get_derived_from(self, address):
     raise NotImplementedError('Not implemented.')

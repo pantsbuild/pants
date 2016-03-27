@@ -6,12 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
-from pants.goal.products import MultipleRootedProducts
 from pants.util.dirutil import safe_mkdir, touch
 from pants_test.tasks.task_test_base import TaskTestBase
 

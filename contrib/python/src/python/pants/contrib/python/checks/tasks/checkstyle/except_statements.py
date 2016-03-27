@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
-from pants.subsystem.subsystem import Subsystem
-
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin
 
 

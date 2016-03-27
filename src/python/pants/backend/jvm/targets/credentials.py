@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 from abc import abstractmethod
 
 from pants.base.deprecated import deprecated_conditional
@@ -44,7 +45,7 @@ class LiteralCredentials(Credentials):
     """
     super(LiteralCredentials, self).__init__(**kwargs)
 
-    deprecated_conditional(callable(username) or callable(password), '0.0.81',
+    deprecated_conditional(callable(username) or callable(password), '0.0.82',
                            'Passing callable arguments to `credentials` is deprecated: '
                            'use `netrc_credentials` for target {}'.format(
                              self.address.spec

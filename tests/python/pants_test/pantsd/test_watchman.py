@@ -15,7 +15,6 @@ import pywatchman
 
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants.util.contextutil import environment_as
 from pants_test.base_test import BaseTest
 
 

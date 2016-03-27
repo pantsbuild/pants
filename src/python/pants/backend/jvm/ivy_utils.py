@@ -716,7 +716,7 @@ class IvyUtils(object):
     return TemplateData(org=jar.org, module=jar.name, version=jar.rev)
 
   @staticmethod
-  @deprecated('0.0.80',
+  @deprecated('0.0.81',
               hint_message='Use `construct_and_load_symlink_map` instead.')
   def load_classpath_from_cachepath(path):
     return IvyUtils._load_classpath_from_cachepath(path)
@@ -788,7 +788,7 @@ class IvyUtils(object):
                            .format(ivy_cache_report_path, workdir_report_path, e))
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `do_resolve` instead.')
+  @deprecated('0.0.81', hint_message='Use `do_resolve` instead.')
   def exec_ivy(cls, ivy, confs, ivyxml, args,
                jvm_options,
                executor,
@@ -823,7 +823,7 @@ class IvyUtils(object):
       raise IvyUtils.IvyError(e)
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `construct_and_load_symlink_map` instead.')
+  @deprecated('0.0.81', hint_message='Use `construct_and_load_symlink_map` instead.')
   def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
     return cls._symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath)
 
@@ -890,7 +890,7 @@ class IvyUtils(object):
     return dict(symlink_map)
 
   @staticmethod
-  @deprecated('0.0.80',
+  @deprecated('0.0.81',
               hint_message='Ivy resolves now use the hash name derived from the cache key.')
   def identify(targets):
     targets = list(targets)
@@ -1007,7 +1007,7 @@ class IvyUtils(object):
     # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
     #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
     # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    overrides = [cls._generate_override_template(coord) for coord in artifact_set]
+    overrides = [cls._generate_override_template(_coord) for _coord in artifact_set]
 
     excludes = [cls._generate_exclude_template(exclude) for exclude in excludes]
 
@@ -1037,7 +1037,7 @@ class IvyUtils(object):
       jars_by_key.setdefault((jar.org, jar.name, jar.rev), []).append(jar)
 
 
-    dependencies = [cls._generate_fetch_jar_template(jars) for jars in jars_by_key.values()]
+    dependencies = [cls._generate_fetch_jar_template(_jars) for _jars in jars_by_key.values()]
 
     template_data = TemplateData(org=org,
                                  module=name,

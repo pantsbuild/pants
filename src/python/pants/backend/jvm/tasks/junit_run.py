@@ -31,7 +31,6 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import environment_as
-from pants.util.process_handler import ProcessHandler
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -81,7 +80,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
-             deprecated_hint='Use --output-mode instead.', deprecated_version='0.0.64',
+             deprecated_hint='Use --output-mode instead.',
+             deprecated_version='0.0.64', removal_version='0.0.81',
              help='Redirect test output to files in .pants.d/test/junit.')
     register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
              help='Specify what part of output should be passed to stdout. '
@@ -481,8 +481,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
     if not tests_and_targets:
       return
-
-    bootstrapped_cp = self.tool_classpath('junit')
 
     def compute_complete_classpath():
       return self.classpath(targets)

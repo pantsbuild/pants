@@ -297,7 +297,7 @@ class Parser(object):
     if kwargs.get('type') == target_list_option:
       kwargs['type'] = list_option
       kwargs['member_type'] = target_option
-      deprecated_conditional(lambda: True, '0.0.80',
+      deprecated_conditional(lambda: True, '0.0.81',
                              'target_list_option is deprecated for option {} in scope {}. '
                              'Use type=list_option, member_type=target_option.'.format(
                                args[0], self.scope

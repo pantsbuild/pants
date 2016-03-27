@@ -47,7 +47,7 @@ class FilesetWithSpec(object):
   @classmethod
   def empty(cls, rel_root):
     """Creates an empty FilesetWithSpec object for the given rel_root."""
-    return cls(rel_root, [], lambda: [], cls._no_content)
+    return cls(rel_root, {'globs': []}, lambda: [], cls._no_content)
 
   def __init__(self, rel_root, filespec, files_calculator, file_content_calculator=None):
     """

@@ -5,12 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from abc import abstractmethod, abstractproperty
+from abc import abstractmethod
 from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.meta import AbstractClass
@@ -59,13 +58,6 @@ class BuildGraph(AbstractClass):
 
   def __init__(self):
     self.reset()
-
-  @abstractproperty
-  @deprecated('0.0.78', hint_message='Use context.address_mapper or self.inject_specs_closure.')
-  def address_mapper(self):
-    """
-    :API: public
-    """
 
   def reset(self):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies.

@@ -13,7 +13,6 @@ import six
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary

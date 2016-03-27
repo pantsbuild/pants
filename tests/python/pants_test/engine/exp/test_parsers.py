@@ -12,7 +12,6 @@ from textwrap import dedent
 from pants.engine.exp import parsers
 from pants.engine.exp.objects import Resolvable
 from pants.engine.exp.parsers import ParseError
-from pants.util.contextutil import temporary_file
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.

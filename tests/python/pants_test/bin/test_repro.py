@@ -11,7 +11,7 @@ from functools import partial
 
 from pants.bin.repro import Repro
 from pants.fs.archive import TGZ
-from pants.util.contextutil import open_tar, temporary_dir
+from pants.util.contextutil import temporary_dir
 from pants_test.bin.repro_mixin import ReproMixin
 
 

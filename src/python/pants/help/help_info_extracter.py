@@ -109,7 +109,6 @@ class HelpInfoExtracter(object):
 
     :API: public
     """
-    action = kwargs.get('action')
     metavar = kwargs.get('metavar')
     if not metavar:
       typ = kwargs.get('type', str)

@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import threading
-
 from pants.pantsd.service.pants_service import PantsService
 from pants_test.base_test import BaseTest
 

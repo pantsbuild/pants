@@ -1,6 +1,91 @@
 RELEASE HISTORY
 ===============
 
+0.0.79 (03/26/2016)
+-------------------
+
+This is the regularly scheduled release that would have been 0.0.78. Due to an upload issue and
+a desire for immutable versions, the 0.0.78 version number was skipped: all deprecations have been
+extended by one release to account for that.
+
+Bugfixes
+~~~~~~~~
+
+* Only mark a build incremental if it is successfully cloned
+  `RB #3613 <https://rbcommons.com/s/twitter/r/3613>`_
+
+* Avoid pathological regex performance when linkifying large ivy output.
+  `RB #3603 <https://rbcommons.com/s/twitter/r/3603>`_
+
+* Convert ivy lock to use OwnerPrintingPIDLockFile
+  `RB #3598 <https://rbcommons.com/s/twitter/r/3598>`_
+
+* Fix errors due to iterating over None-types in ivy resolve.
+  `RB #3596 <https://rbcommons.com/s/twitter/r/3596>`_
+
+* Do not return directories from BUILD file's globs implementation
+  `RB #3590 <https://rbcommons.com/s/twitter/r/3590>`_
+
+* Fix unicode parsing of ini files.
+  `RB #3595 <https://rbcommons.com/s/twitter/r/3595>`_
+
+* Fix 'compute_hashes' for 'Page' target type
+  `RB #3591 <https://rbcommons.com/s/twitter/r/3591>`_
+
+* Fix globs for empty SourcesField
+  `RB #3614 <https://rbcommons.com/s/twitter/r/3614>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Validate command line options regardless whether goals use them.
+  `RB #3594 <https://rbcommons.com/s/twitter/r/3594>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Allow a period in a namedver for publishing
+  `RB #3611 <https://rbcommons.com/s/twitter/r/3611>`_
+
+* Bump the junit runner release to 1.0.4 to pick up latest code changes
+  `RB #3599 <https://rbcommons.com/s/twitter/r/3599>`_
+
+* Re-add the ConsoleRunnerOutputTests and consolodate them into ConsoleRunnerTest, also move test clases used for testing into junit/lib directory
+  `RB #2406 <https://rbcommons.com/s/twitter/r/2406>`_
+  `RB #3588 <https://rbcommons.com/s/twitter/r/3588>`_
+
+* Add the Android SDK to the linux CI and turn on Android tests.
+  `RB #3538 <https://rbcommons.com/s/twitter/r/3538>`_
+
+* Update pyflakes to 1.1.0, enable pyflakes checks and fix all warnings
+  `RB #3601 <https://rbcommons.com/s/twitter/r/3601>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Calculate legacy target sources using the engine
+  `Issue #3058 <https://github.com/pantsbuild/pants/issues/3058>`_
+  `RB #3474 <https://rbcommons.com/s/twitter/r/3474>`_
+  `RB #3592 <https://rbcommons.com/s/twitter/r/3592>`_
+
+* Split literal from netrc credentials to allow pickling
+  `Issue #3058 <https://github.com/pantsbuild/pants/issues/3058>`_
+  `RB #3605 <https://rbcommons.com/s/twitter/r/3605>`_
+
+* Make shader classes top-level to allow for pickling
+  `RB #3606 <https://rbcommons.com/s/twitter/r/3606>`_
+
+* [engine] no longer content address subject
+  `Issue #3066 <https://github.com/pantsbuild/pants/issues/3066>`_
+  `RB #3593 <https://rbcommons.com/s/twitter/r/3593>`_
+  `RB #3604 <https://rbcommons.com/s/twitter/r/3604>`_
+
+* Hide cycle in testprojects
+  `RB #3600 <https://rbcommons.com/s/twitter/r/3600>`_
+
+* [engine] Eliminate non-determinism computing cache keys
+  `RB #3593 <https://rbcommons.com/s/twitter/r/3593>`_
+
 0.0.77 (03/18/2016)
 -------------------
 
