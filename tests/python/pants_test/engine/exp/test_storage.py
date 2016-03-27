@@ -13,7 +13,7 @@ from pants.engine.exp.fs import Path
 from pants.engine.exp.graph import BuildFilePaths
 from pants.engine.exp.nodes import SelectNode
 from pants.engine.exp.scheduler import Return, StepRequest, StepResult
-from pants.engine.exp.storage import Cache, InvalidKeyError, Lmdb, Storage
+from pants.engine.exp.storage import Cache, InvalidKeyError, Key, Lmdb, Storage
 from pants.engine.exp.struct import Variants
 
 
@@ -23,6 +23,17 @@ class StorageTest(unittest.TestCase):
 
   TEST_PATH = Path('/foo')
   TEST_PATH2 = Path('/bar')
+
+  class SomeException(Exception): pass
+
+  def setUp(self):
+    self.storage = Storage.create(in_memory=True)
+    self.result = StepResult(state='something')
+    self.error = self.SomeException('error')
+    self.request = StepRequest(step_id=123, node='some node',
+                               dependencies={'some dep': 'some state',
+                                             'another dep': 'another state'},
+                               project_tree='some project tree')
 
   def test_lmdb_key_value_store(self):
     lmdb = Lmdb.create()[0]
@@ -39,7 +50,7 @@ class StorageTest(unittest.TestCase):
       self.assertFalse(kvs.put(self.TEST_KEY, self.TEST_VALUE))
 
   def test_storage(self):
-    with closing(Storage.create(in_memory=True)) as storage:
+    with closing(self.storage) as storage:
       key = storage.put(self.TEST_PATH)
       self.assertEquals(self.TEST_PATH, storage.get(key))
       # The deserialized blob is equal by not the same as the input data.
@@ -57,7 +68,7 @@ class StorageTest(unittest.TestCase):
         storage.get(key)
 
   def test_storage_key_mappings(self):
-    with closing(Storage.create(in_memory=True)) as storage:
+    with closing(self.storage) as storage:
       key1 = storage.put(self.TEST_PATH)
       key2 = storage.put(self.TEST_PATH2)
       storage.add_mapping(key1, key2)
@@ -65,6 +76,48 @@ class StorageTest(unittest.TestCase):
 
       # key2 isn't mapped to any other key.
       self.assertIsNone(storage.get_mapping(key2))
+
+  def test_key_for_request(self):
+    with closing(self.storage) as storage:
+      keyed_request = storage.key_for_request(self.request)
+      for dep, dep_state in keyed_request.dependencies.items():
+        self.assertEquals(Key, type(dep))
+        self.assertEquals(Key, type(dep_state))
+      self.assertIs(self.request.node, keyed_request.node)
+      self.assertIs(self.request.project_tree, keyed_request.project_tree)
+
+      self.assertEquals(keyed_request, storage.key_for_request(keyed_request))
+
+  def test_resolve_request(self):
+    with closing(self.storage) as storage:
+      keyed_request = storage.key_for_request(self.request)
+      resolved_request = storage.resolve_request(keyed_request)
+      self.assertEquals(self.request, resolved_request)
+      self.assertIsNot(self.request, resolved_request)
+
+      self.assertEquals(resolved_request, self.storage.resolve_request(resolved_request))
+
+  def test_key_for_result(self):
+    with closing(self.storage) as storage:
+      keyed_result = storage.key_for_result(self.result)
+      self.assertEquals(Key, type(keyed_result.state))
+
+      self.assertEquals(keyed_result, storage.key_for_result(keyed_result))
+
+  def test_resolve_result(self):
+    with closing(self.storage) as storage:
+      keyed_result = storage.key_for_result(self.result)
+      resolved_result = storage.resolve_result(keyed_result)
+      self.assertEquals(self.result, resolved_result)
+      self.assertIsNot(self.result, resolved_result)
+
+      self.assertEquals(resolved_result, self.storage.resolve_result(resolved_result))
+
+  def test_resolve_result_not_step_result(self):
+    """Verify the same result is returned if result is not StepResult."""
+    with closing(self.storage) as storage:
+      resolved_result = storage.resolve_result(self.error)
+      self.assertIs(self.error, resolved_result)
 
 
 class CacheTest(unittest.TestCase):

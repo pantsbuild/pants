@@ -14,10 +14,9 @@ from abc import abstractmethod
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
-from pants.engine.exp.objects import Closable, SerializationError
+from pants.engine.exp.objects import SerializationError
 from pants.engine.exp.processing import StatefulPool
-from pants.engine.exp.scheduler import StepRequest, StepResult
-from pants.engine.exp.storage import Cache, Key, Storage
+from pants.engine.exp.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -72,8 +71,7 @@ class Engine(AbstractClass):
     :type cache: :class:`pants.engine.exp.storage.Cache`
     """
     self._scheduler = scheduler
-    storage = storage or Storage.create()
-    self._storage_io = StorageIO(storage)
+    self._storage = storage or Storage.create()
     self._cache = cache or Cache.create(storage)
 
   def execute(self, execution_request):
@@ -97,7 +95,7 @@ class Engine(AbstractClass):
 
   def close(self):
     """Shutdown this engine instance, releasing resources it was using."""
-    self._storage_io.close()
+    self._storage.close()
     self._cache.close()
 
   def _should_cache(self, step_request):
@@ -131,7 +129,7 @@ class LocalSerialEngine(Engine):
         # The sole purpose of a keyed request is to get a stable cache key,
         # so we can sort keyed_request.dependencies by keys as opposed to requiring
         # dep nodes to support compare.
-        keyed_request = self._storage_io.key_for_request(step)
+        keyed_request = self._storage.key_for_request(step)
         result = self._maybe_cache_get(keyed_request)
         if result is None:
           result = step(node_builder)
@@ -152,14 +150,14 @@ def _try_pickle(obj):
 def _execute_step(cache_save, debug, process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
 
-  Executes the Step for the given node builder and storageIo, and returns a tuple of step id and
+  Executes the Step for the given node builder and storage, and returns a tuple of step id and
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
   """
-  node_builder, storage_io = process_state
+  node_builder, storage = process_state
 
   step_id = step.step_id
-  resolved_request = storage_io.resolve_request(step)
+  resolved_request = storage.resolve_request(step)
   try:
     result = resolved_request(node_builder)
   except Exception as e:
@@ -176,16 +174,16 @@ def _execute_step(cache_save, debug, process_state, step):
 
   # Save result to cache for this step.
   cache_save(step, result)
-  return (step_id, storage_io.key_for_result(result))
+  return (step_id, storage.key_for_result(result))
 
 
-def _process_initializer(node_builder, storage_io):
+def _process_initializer(node_builder, storage):
   """Another picklable top-level function that provides multi-processes' initial states.
 
   States are returned as a tuple. States are `Closable` so they can be cleaned up once
   processes are done.
   """
-  return (node_builder, StorageIO(Storage.clone(storage_io._storage)))
+  return (node_builder, Storage.clone(storage))
 
 
 class LocalMultiprocessEngine(Engine):
@@ -209,7 +207,7 @@ class LocalMultiprocessEngine(Engine):
 
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
     node_builder = scheduler.node_builder()
-    process_initializer = functools.partial(_process_initializer, node_builder, self._storage_io)
+    process_initializer = functools.partial(_process_initializer, node_builder, self._storage)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
@@ -237,7 +235,7 @@ class LocalMultiprocessEngine(Engine):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
-        step = self._storage_io.key_for_request(step)
+        step = self._storage.key_for_request(step)
         result = self._maybe_cache_get(step)
         if result is not None:
           # Skip in_flight on cache hit.
@@ -253,7 +251,7 @@ class LocalMultiprocessEngine(Engine):
       if not in_flight:
         raise Exception('Awaited an empty pool!')
       step_id, result = self._pool.await_one_result()
-      result = self._storage_io.resolve_result(result)
+      result = self._storage.resolve_result(result)
       if isinstance(result, Exception):
         raise result
       if step_id not in in_flight:
@@ -286,56 +284,3 @@ class LocalMultiprocessEngine(Engine):
   def close(self):
     super(LocalMultiprocessEngine, self).close()
     self._pool.close()
-
-
-class StorageIO(Closable):
-  """Control what to be content addresed and content address them (in both ways)."""
-
-  def __init__(self, storage):
-    self._storage = storage
-
-  def key_for_request(self, step_request):
-    """Make keys for the dependency nodes as well as their states.
-
-    step_request.node isn't keyed is only for convenience because it is used
-    in a subsequent is_cacheable check.
-    """
-    dependencies = {}
-    for dep, state in step_request.dependencies.items():
-      dependencies[self._storage.put(dep)] = self._storage.put(state)
-    return StepRequest(step_request.step_id, step_request.node,
-                       dependencies, step_request.project_tree)
-
-  def key_for_result(self, step_result):
-    """Make key for result state."""
-    state_or_key = self._storage.put(step_result.state)
-    return StepResult(state_or_key)
-
-  def resolve_request(self, step_request):
-    """Optionally resolve keys if they are present int step_request."""
-    dependencies = {}
-    for dep, state in step_request.dependencies.items():
-      if isinstance(dep, Key):
-        dep = self._storage.get(dep)
-      if isinstance(state, Key):
-        state = self._storage.get(state)
-      dependencies[dep] =state
-
-    return StepRequest(step_request.step_id, step_request.node,
-                       dependencies, step_request.project_tree)
-
-  def resolve_result(self, step_result):
-    """Optionally resolve state key if they are present int step_result."""
-
-    # This could be a SerializationError or other error state.
-    if not isinstance(step_result, StepResult):
-      return step_result
-
-    if isinstance(step_result.state, Key):
-      state = self._storage.get(step_result.state)
-    else:
-      state = step_result.state
-    return StepResult(state)
-
-  def close(self):
-    self._storage.close()

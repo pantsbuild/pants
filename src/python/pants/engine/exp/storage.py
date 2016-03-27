@@ -20,6 +20,7 @@ import lmdb
 import six
 
 from pants.engine.exp.objects import Closable, SerializationError
+from pants.engine.exp.scheduler import StepRequest, StepResult
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
@@ -113,6 +114,10 @@ class Storage(Closable):
   Besides contents indexed by their hashed Keys, a secondary index is also provided
   for mappings between Keys. This allows to establish links between contents that
   are represented by those keys. Cache for example is such a use case.
+
+  Convenience methods to content address nodes and states in both ways in
+  `pants.engine.exp.scheduler.StepRequest` and `pants.engine.exp.scheduler.StepResult`
+  are also provided.
   """
 
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
@@ -240,6 +245,50 @@ class Storage(Closable):
       raise ValueError('Mismatch types, key: {}, value: {}'
                        .format(key_type, value_type))
     return value
+
+  def key_for_request(self, step_request):
+    """Make keys for the dependency nodes as well as their states in step_request.
+
+    step_request.node isn't keyed is only for convenience because it is used
+    in a subsequent is_cacheable check.
+    """
+    dependencies = {}
+    for dep, state in step_request.dependencies.items():
+      dependencies[self._to_key(dep)] = self._to_key(state)
+    return StepRequest(step_request.step_id, step_request.node,
+                       dependencies, step_request.project_tree)
+
+  def key_for_result(self, step_result):
+    """Make key for result state."""
+    return StepResult(state=self._to_key(step_result.state))
+
+  def resolve_request(self, step_request):
+    """Optionally resolve keys if they are present in step_request."""
+    dependencies = {}
+    for dep, state in step_request.dependencies.items():
+      dependencies[self._from_key(dep)] = self._from_key(state)
+
+    return StepRequest(step_request.step_id, step_request.node,
+                       dependencies, step_request.project_tree)
+
+  def resolve_result(self, step_result):
+    """Optionally resolve state key if they are present in step_result."""
+
+    # This could be a SerializationError or other error state.
+    if not isinstance(step_result, StepResult):
+      return step_result
+
+    return StepResult(state=self._from_key(step_result.state))
+
+  def _to_key(self, obj):
+    if isinstance(obj, Key):
+      return obj
+    return self.put(obj)
+
+  def _from_key(self, obj):
+    if isinstance(obj, Key):
+      return self.get(obj)
+    return obj
 
 
 class Cache(Closable):
