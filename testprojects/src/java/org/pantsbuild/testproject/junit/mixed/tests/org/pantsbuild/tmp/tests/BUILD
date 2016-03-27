@@ -1,4 +1,8 @@
 java_tests(name='tests',
-  sources=['AllTests.java'],
+  sources=[
+    'AllTestsBase.java',
+    'AllTests.java',
+    'InnerClassTests.java'
+  ],
   dependencies=['3rdparty:junit'],
 )
