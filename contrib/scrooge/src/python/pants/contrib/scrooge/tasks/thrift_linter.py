@@ -8,9 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.option.ranked_value import RankedValue
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
-from pants.option.ranked_value import RankedValue
 
 
 class ThriftLintError(Exception):
