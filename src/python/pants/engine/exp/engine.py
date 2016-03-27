@@ -251,9 +251,9 @@ class LocalMultiprocessEngine(Engine):
       if not in_flight:
         raise Exception('Awaited an empty pool!')
       step_id, result = self._pool.await_one_result()
-      result = self._storage.resolve_result(result)
       if isinstance(result, Exception):
         raise result
+      result = self._storage.resolve_result(result)
       if step_id not in in_flight:
         raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
       in_flight.pop(step_id).success(result)

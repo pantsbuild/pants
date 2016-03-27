@@ -8,13 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from contextlib import closing
 
-from pants.build_graph.address import Address
 from pants.engine.exp.fs import Path
-from pants.engine.exp.graph import BuildFilePaths
-from pants.engine.exp.nodes import SelectNode
-from pants.engine.exp.scheduler import Return, StepRequest, StepResult
+from pants.engine.exp.scheduler import StepRequest, StepResult
 from pants.engine.exp.storage import Cache, InvalidKeyError, Key, Lmdb, Storage
-from pants.engine.exp.struct import Variants
 
 
 class StorageTest(unittest.TestCase):
@@ -29,7 +25,6 @@ class StorageTest(unittest.TestCase):
   def setUp(self):
     self.storage = Storage.create(in_memory=True)
     self.result = StepResult(state='something')
-    self.error = self.SomeException('error')
     self.request = StepRequest(step_id=123, node='some node',
                                dependencies={'some dep': 'some state',
                                              'another dep': 'another state'},
@@ -113,12 +108,6 @@ class StorageTest(unittest.TestCase):
 
       self.assertEquals(resolved_result, self.storage.resolve_result(resolved_result))
 
-  def test_resolve_result_not_step_result(self):
-    """Verify the same result is returned if result is not StepResult."""
-    with closing(self.storage) as storage:
-      resolved_result = storage.resolve_result(self.error)
-      self.assertIs(self.error, resolved_result)
-
 
 class CacheTest(unittest.TestCase):
 
@@ -126,28 +115,23 @@ class CacheTest(unittest.TestCase):
     """Setup cache as well as request and result."""
     self.storage = Storage.create(in_memory=True)
     self.cache = Cache.create(storage=self.storage)
-
-    self.simple = Address.parse('a/b')
-    self.build_file = BuildFilePaths([Path('a/b/BLD.json')])
-
-    subject_key = self.storage.put(self.simple)
-    self.node = SelectNode(subject_key, Path, None, None)
-    self.dep_node = SelectNode(subject_key, Variants, None, None)
-    self.dep_state = self.storage.put(Return(None))
-
-    self.request = StepRequest(1, self.node, {self.dep_node: self.dep_state}, None)
-    self.result = StepResult(self.storage.put(self.simple))
+    request = StepRequest(step_id=123, node='some node',
+                               dependencies={'some dep': 'some state',
+                                             'another dep': 'another state'},
+                               project_tree='some project tree')
+    self.result = StepResult(state='something')
+    self.keyed_request = self.storage.key_for_request(request)
 
   def test_cache(self):
     """Verify get and put."""
     with closing(self.cache):
-      self.assertIsNone(self.cache.get(self.request))
+      self.assertIsNone(self.cache.get(self.keyed_request))
       self._assert_hits_misses(hits=0, misses=1)
 
-      self.cache.put(self.request, self.result)
+      self.cache.put(self.keyed_request, self.result)
 
-      self.assertEquals(self.result, self.cache.get(self.request))
-      self.assertIsNot(self.result, self.cache.get(self.request))
+      self.assertEquals(self.result, self.cache.get(self.keyed_request))
+      self.assertIsNot(self.result, self.cache.get(self.keyed_request))
       self._assert_hits_misses(hits=2, misses=1)
 
   def test_failure_to_update_mapping(self):
@@ -157,7 +141,7 @@ class CacheTest(unittest.TestCase):
       # simulates error might happen for saving key mapping after successfully saving the result.
       self.cache._storage.put(self.result)
 
-      self.assertIsNone(self.cache.get(self.request))
+      self.assertIsNone(self.cache.get(self.keyed_request))
       self._assert_hits_misses(hits=0, misses=1)
 
   def _assert_hits_misses(self, hits, misses):
