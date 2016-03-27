@@ -10,6 +10,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
+from pants.option.ranked_value import RankedValue
 
 
 class ThriftLintError(Exception):
@@ -29,7 +30,7 @@ class ThriftLinter(NailgunTask):
   def register_options(cls, register):
     super(ThriftLinter, cls).register_options(register)
     register('--skip', action='store_true', fingerprint=True, help='Skip thrift linting.')
-    register('--strict', default=None, action='store_true', fingerprint=True,
+    register('--strict', default=False, action='store_true', fingerprint=True,
              help='Fail the goal if thrift linter errors are found. Overrides the '
                   '`strict-default` option.')
     register('--strict-default', default=False, advanced=True, action='store_true',
@@ -62,13 +63,12 @@ class ThriftLinter(NailgunTask):
 
   def _is_strict(self, target):
     # The strict value is read from the following, in order:
-    # 1. options, --[no-]strict
+    # 1. the option --[no-]strict, but only if explicitly set.
     # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
     # 3. options, --[no-]strict-default
-    cmdline_strict = self.get_options().strict
-
-    if cmdline_strict is not None:
-      return self._to_bool(cmdline_strict)
+    options = self.get_options()
+    if options.get_rank('strict') > RankedValue.HARDCODED:
+      return self._to_bool(self.get_options().strict)
 
     if target.thrift_linter_strict is not None:
       return self._to_bool(target.thrift_linter_strict)
