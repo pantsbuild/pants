@@ -14,8 +14,10 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
 from pants.engine.exp.fs import PathGlobs, Paths
 from pants.engine.exp.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return,
-                                    SelectNode, State, StepContext, TaskNode, Throw, Waiting)
+                                    SelectNode, State, StepContext, TaskNode, Throw, Waiting, ProjectionNode)
 from pants.engine.exp.objects import Closable
+from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
+                                        SelectVariant)
 from pants.util.objects import datatype
 
 
@@ -301,6 +303,27 @@ class NodeBuilder(Closable):
     # Tasks.
     for task, anded_clause in self._tasks[product]:
       yield TaskNode(subject, product, variants, task, anded_clause)
+
+  def select_node(self, selector, subject, variants):
+    """Constructs a Node for the given Selector and the given Subject/Variants.
+
+    This method is decoupled from Selector classes in order to allow the `selector` package to not
+    need a dependency on the `nodes` package.
+    """
+    selector_type = type(selector)
+    if selector_type is Select:
+      return SelectNode(subject, selector.product, variants, None)
+    elif selector_type is SelectVariant:
+      return SelectNode(subject, selector.product, variants, selector.variant_key)
+    elif selector_type is SelectDependencies:
+      return DependenciesNode(subject, selector.product, variants, selector.deps_product, selector.field)
+    elif selector_type is SelectProjection:
+      return ProjectionNode(subject, selector.product, variants, selector.projected_subject, selector.fields, selector.input_product)
+    elif selector_type is SelectLiteral:
+      # NB: Intentionally ignores subject parameter to provide a literal subject.
+      return SelectNode(selector.subject, selector.product, variants, None)
+    else:
+      raise ValueError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
 class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_tree'])):

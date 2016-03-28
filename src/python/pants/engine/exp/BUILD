@@ -129,7 +129,6 @@ python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
-    ':nodes',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
