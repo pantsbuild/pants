@@ -5,9 +5,10 @@ python_library(
   name='planners',
   sources=['planners.py'],
   dependencies=[
+    ':sources',
     'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
     'src/python/pants/base:file_system_project_tree',
+    'src/python/pants/build_graph',
     'src/python/pants/engine/exp:fs',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
@@ -16,9 +17,19 @@ python_library(
     'src/python/pants/engine/exp:register',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:selectors',
-    'src/python/pants/engine/exp:sources',
     'src/python/pants/engine/exp:storage',
     'src/python/pants/engine/exp:struct',
+  ]
+)
+
+python_library(
+  name='sources',
+  sources=['sources.py'],
+  dependencies=[
+    'src/python/pants/engine/exp:addressable',
+    'src/python/pants/engine/exp:fs',
+    'src/python/pants/engine/exp:struct',
+    'src/python/pants/source',
   ]
 )
 

@@ -150,17 +150,6 @@ python_library(
 )
 
 python_library(
-  name='sources',
-  sources=['sources.py'],
-  dependencies=[
-    ':addressable',
-    ':fs',
-    ':struct',
-    'src/python/pants/source',
-  ]
-)
-
-python_library(
   name='storage',
   sources=['storage.py'],
   dependencies=[

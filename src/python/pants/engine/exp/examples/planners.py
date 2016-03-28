@@ -22,7 +22,7 @@ from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
-from pants.engine.exp.sources import Sources
+from pants.engine.exp.examples.sources import Sources
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
