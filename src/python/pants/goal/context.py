@@ -293,11 +293,13 @@ class Context(object):
 
     return new_target
 
-  def targets(self, predicate=None, postorder=False):
+  def targets(self, predicate=None, **kwargs):
     """Selects targets in-play in this run from the target roots and their transitive dependencies.
 
     Also includes any new synthetic targets created from the target roots or their transitive
     dependencies during the course of the run.
+
+    See Target.closure_for_targets for remaining parameters.
 
     :API: public
 
@@ -307,24 +309,21 @@ class Context(object):
                           `False` or preorder by default.
     :returns: A list of matching targets.
     """
-    target_set = self._collect_targets(self.target_roots, postorder=postorder)
+    target_set = self._collect_targets(self.target_roots, **kwargs)
 
     synthetics = OrderedSet()
     for synthetic_address in self.build_graph.synthetic_addresses:
       if self.build_graph.get_concrete_derived_from(synthetic_address) in target_set:
         synthetics.add(self.build_graph.get_target(synthetic_address))
-
-    synthetic_set = self._collect_targets(synthetics, postorder=postorder)
-
-    target_set.update(synthetic_set)
+    target_set.update(self._collect_targets(synthetics, **kwargs))
 
     return filter(predicate, target_set)
 
-  def _collect_targets(self, root_targets, postorder=False):
-    addresses = [target.address for target in root_targets]
-    target_set = self.build_graph.transitive_subgraph_of_addresses(addresses,
-                                                                   postorder=postorder)
-    return target_set
+  def _collect_targets(self, root_targets, **kwargs):
+    return Target.closure_for_targets(
+      target_roots=root_targets,
+      **kwargs
+    )
 
   def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that

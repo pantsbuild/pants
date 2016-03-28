@@ -30,6 +30,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
     # Targets that are intended to fail
     negative_test_targets = [
+      'testprojects/maven_layout/provided_patching/leaf:fail',
       'testprojects/src/antlr/pants/backend/python/test:antlr_failure',
       'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files',
       'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:fatal',
@@ -39,15 +40,16 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/junit/mixed/tests/org/pantsbuild/tmp/tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests',
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*',
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
+      'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
       'testprojects/src/python/antlr:test_antlr_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:fatal',
       'testprojects/src/thrift/org/pantsbuild/thrift_linter:',
+      'testprojects/src/java/org/pantsbuild/testproject/provided:c',
       'testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target',
       'testprojects/tests/java/org/pantsbuild/testproject/empty:',
       'testprojects/tests/python/pants/dummies:failing_target',
-      'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',

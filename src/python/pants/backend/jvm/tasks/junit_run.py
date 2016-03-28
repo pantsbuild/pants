@@ -27,6 +27,7 @@ from pants.base.exceptions import TargetDefinitionException, TaskError, TestFail
 from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
+from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
@@ -188,6 +189,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.test_shard:
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
+
+  def classpath(self, targets, classpath_product=None):
+    return super(JUnitRun, self).classpath(targets, classpath_product=classpath_product,
+                                           include_scopes=Scopes.JVM_TEST_SCOPES)
 
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
