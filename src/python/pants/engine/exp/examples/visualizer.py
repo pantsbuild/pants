@@ -67,16 +67,14 @@ def create_digraph(scheduler, storage, request):
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state_key), dependency_entries) in scheduler.product_graph.walk(request.roots):
-    node_state = storage.get(node_state_key)
+  for ((node, node_state), dependency_entries) in scheduler.product_graph.walk(request.roots):
     node_str = format_node(node, node_state)
 
     yield (' "{node}" [style=filled, fillcolor={color}];'
             .format(color=format_color(node, node_state),
                     node=node_str))
 
-    for (dep, dep_state_key) in dependency_entries:
-      dep_state = storage.get(dep_state_key)
+    for (dep, dep_state) in dependency_entries:
       yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
 
   yield '}'

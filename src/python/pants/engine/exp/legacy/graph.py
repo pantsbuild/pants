@@ -47,20 +47,19 @@ class ExpGraph(BuildGraph):
     # Index the ProductGraph.
     # TODO: It's not very common to actually use the dependencies of a Node during a walk... should
     # consider removing those from that API.
-    for ((node, state_key), _) in self._graph.walk(roots=roots):
+    for ((node, state), _) in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyBuildGraphNode values.
-      if state_key.type is Throw:
+      if type(state) is Throw:
         raise AddressLookupError(
-            'Build graph construction failed for {}:\n  {}'.format(node.subject, state_key.exc))
-      elif state_key.type is not Return:
-        State.raise_unrecognized(state_key.type)
+            'Build graph construction failed for {}:\n  {}'.format(node.subject, state.exc))
+      elif type(state) is not Return:
+        State.raise_unrecognized(state)
       if node.product is not LegacyBuildGraphNode:
         continue
       if type(node) is not SelectNode:
         continue
 
       # We have a successfully parsed a LegacyBuildGraphNode.
-      state = self._engine.storage.get(state_key)
       target_adaptor = state.value.target_adaptor
       address = target_adaptor.address
       addresses.add(address)

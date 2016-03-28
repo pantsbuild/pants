@@ -74,11 +74,6 @@ class Engine(AbstractClass):
     self._storage = storage or Storage.create()
     self._cache = cache or Cache.create(storage)
 
-  @property
-  def storage(self):
-    """Return the Storage instance for this Engine."""
-    return self._storage
-
   def execute(self, execution_request):
     """Executes the requested build.
 
@@ -131,10 +126,14 @@ class LocalSerialEngine(Engine):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
-        result = self._maybe_cache_get(step)
+        # The sole purpose of a keyed request is to get a stable cache key,
+        # so we can sort keyed_request.dependencies by keys as opposed to requiring
+        # dep nodes to support compare.
+        keyed_request = self._storage.key_for_request(step)
+        result = self._maybe_cache_get(keyed_request)
         if result is None:
-          result = step(node_builder, self.storage)
-          self._maybe_cache_put(step, result)
+          result = step(node_builder)
+          self._maybe_cache_put(keyed_request, result)
         promise.success(result)
 
 
@@ -158,8 +157,9 @@ def _execute_step(cache_save, debug, process_state, step):
   node_builder, storage = process_state
 
   step_id = step.step_id
+  resolved_request = storage.resolve_request(step)
   try:
-    result = step(node_builder, storage)
+    result = resolved_request(node_builder)
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
@@ -174,8 +174,7 @@ def _execute_step(cache_save, debug, process_state, step):
 
   # Save result to cache for this step.
   cache_save(step, result)
-
-  return (step_id, result)
+  return (step_id, storage.key_for_result(result))
 
 
 def _process_initializer(node_builder, storage):
@@ -208,7 +207,7 @@ class LocalMultiprocessEngine(Engine):
 
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
     node_builder = scheduler.node_builder()
-    process_initializer = functools.partial(_process_initializer, node_builder, storage)
+    process_initializer = functools.partial(_process_initializer, node_builder, self._storage)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
@@ -236,6 +235,7 @@ class LocalMultiprocessEngine(Engine):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
+        step = self._storage.key_for_request(step)
         result = self._maybe_cache_get(step)
         if result is not None:
           # Skip in_flight on cache hit.
@@ -253,6 +253,7 @@ class LocalMultiprocessEngine(Engine):
       step_id, result = self._pool.await_one_result()
       if isinstance(result, Exception):
         raise result
+      result = self._storage.resolve_result(result)
       if step_id not in in_flight:
         raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
       in_flight.pop(step_id).success(result)

@@ -63,14 +63,14 @@ class ProductGraph(object):
     # context specific error messages when they are introduced.
     self._cyclic_dependencies = defaultdict(set)
 
-  def _set_state(self, node, state_key):
-    existing_state_key = self._node_results.get(node, None)
-    if existing_state_key is not None:
+  def _set_state(self, node, state):
+    existing_state = self._node_results.get(node, None)
+    if existing_state is not None:
       raise ValueError('Node {} is already completed:\n  {}\n  {}'
-                       .format(node, existing_state_key, state_key))
-    elif state_key.type not in [Return, Throw, Noop]:
-      raise ValueError('Cannot complete Node {} with state_key {}'.format(node, state_key))
-    self._node_results[node] = state_key
+                       .format(node, existing_state, state))
+    elif type(state) not in [Return, Throw, Noop]:
+      raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
+    self._node_results[node] = state
 
   def is_complete(self, node):
     return node in self._node_results
@@ -78,14 +78,14 @@ class ProductGraph(object):
   def state(self, node):
     return self._node_results.get(node, None)
 
-  def update_state(self, node, state_key, dependencies=None):
+  def update_state(self, node, state):
     """Updates the Node with the given State."""
-    if state_key.type in [Return, Throw, Noop]:
-      self._set_state(node, state_key)
-    elif state_key.type is Waiting:
-      self._add_dependencies(node, dependencies)
+    if type(state) in [Return, Throw, Noop]:
+      self._set_state(node, state)
+    elif type(state) is Waiting:
+      self._add_dependencies(node, state.dependencies)
     else:
-      raise State.raise_unrecognized(state_key)
+      raise State.raise_unrecognized(state)
 
   def _detect_cycle(self, src, dest):
     """Given a src and a dest, each of which _might_ already exist in the graph, detect cycles.
@@ -211,8 +211,8 @@ class ProductGraph(object):
     allow them to request it specifically.
     """
     def _default_walk_predicate(entry):
-      node, state_key = entry
-      return state_key.type is not Noop
+      node, state = entry
+      return type(state) is not Noop
     predicate = predicate or _default_walk_predicate
 
     def _filtered_entries(nodes):
@@ -225,7 +225,7 @@ class ProductGraph(object):
     adjacencies = self.dependents_of if dependents else self.dependencies_of
     def _walk(entries):
       for entry in entries:
-        node, state_key = entry
+        node, state = entry
         if node in walked:
           continue
         walked.add(node)
@@ -314,38 +314,12 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   :param project_tree: A FileSystemProjectTree instance.
   """
 
-  def __call__(self, node_builder, storage):
-    def from_keys():
-      """Translate keys into dependency nodes and their respective states."""
-      dependencies = {}
-      for dep_key, state_key in self.dependencies.items():
-        dependencies[storage.get(dep_key)] = storage.get(state_key)
-      return dependencies
-
-    def to_key(state):
-      """Introduce a potentially new State, and returns its key and optional dependencies."""
-      state_key = storage.put(state)
-      dependencies = state.dependencies if type(state) is Waiting else None
-      return state_key, dependencies
+  def __call__(self, node_builder):
 
     """Called by the Engine in order to execute this Step."""
-    step_context = StepContext(node_builder, storage, self.project_tree)
-
-    dependencies = from_keys()
-    state = self.node.step(dependencies, step_context)
-
-    state_key, dependencies = to_key(state)
-    return StepResult(state_key, dependencies)
-
-  def keyable_fields(self):
-    """Return fields for the purpose of computing the cache key of this step request.
-
-    Some special handling is needed to compute cache key for step request.
-    First step_id should be dropped, because it's only an identifier not part
-    of the input for execution. We also want to sort the dependencies map by
-    keys, i.e, node_keys, to eliminate non-determinism.
-    """
-    return (self.node, sorted(self.dependencies.items()), self.project_tree)
+    step_context = StepContext(node_builder, self.project_tree)
+    state = self.node.step(self.dependencies, step_context)
+    return (StepResult(state,))
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -357,11 +331,10 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
     return hash(self.step_id)
 
 
-class StepResult(datatype('Step', ['state_key', 'dependencies'])):
+class StepResult(datatype('Step', ['state'])):
   """The result of running a Step, passed back to the Scheduler via the Promise class.
 
-  :param state_key: The key of the State that is returned by the Step.
-  :param dependencies: Optional dependency nodes when the type of `State` is `Waiting`.
+  :param state: The State value returned by the Step.
   """
 
 
@@ -388,8 +361,8 @@ class GraphValidator(object):
     consumed_inputs = set()
     # Walk into successful nodes for the same subject under this root.
     def predicate(entry):
-      node, state_key = entry
-      return root.subject == node.subject and state_key.type is Return
+      node, state = entry
+      return root.subject == node.subject and type(state) is Return
     # If a product was successfully selected, record it.
     for ((node, _), _) in product_graph.walk([root], predicate=predicate):
       if type(node) is SelectNode:
@@ -405,15 +378,15 @@ class GraphValidator(object):
     partials = defaultdict(lambda: defaultdict(list))
     # Walk all nodes for the same subject under this root.
     def predicate(entry):
-      node, state_key = entry
+      node, state = entry
       return root.subject == node.subject
-    for ((node, state_key), dependencies) in product_graph.walk([root], predicate=predicate):
+    for ((node, state), dependencies) in product_graph.walk([root], predicate=predicate):
       # Look for unsatisfied TaskNodes with at least one unsatisfied dependency.
       if type(node) is not TaskNode:
         continue
-      if state_key.type is not Noop:
+      if type(state) is not Noop:
         continue
-      missing_products = {dep.product for dep, state_key in dependencies if state_key.type is Noop}
+      missing_products = {dep.product for dep, state in dependencies if type(state) is Noop}
       if not missing_products:
         continue
 
@@ -462,20 +435,18 @@ class GraphValidator(object):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, symbol_table_cls, storage, project_tree, graph_lock=None):
+  def __init__(self, goals, tasks, symbol_table_cls, project_tree, graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
-    :param storage: Content address storage instance, shared with engine.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
                        instance. Defaults to creating a new threading.RLock().
     """
     self._products_by_goal = goals
     self._tasks = tasks
-    self._storage = storage
     self._project_tree = project_tree
     self._node_builder = NodeBuilder.create(self._tasks)
 
@@ -497,14 +468,14 @@ class LocalScheduler(object):
     # See whether all of the dependencies for the node are available.
     deps = dict()
     for dep in self._product_graph.dependencies_of(node):
-      state_key = self._product_graph.state(dep)
-      if state_key is None:
+      state = self._product_graph.state(dep)
+      if state is None:
         return None
-      deps[self._storage.put(dep)] = state_key
+      deps[dep] = state
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in self._product_graph.cyclic_dependencies_of(node):
       noop_state = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
-      deps[self._storage.put(dep)] = self._storage.put(noop_state)
+      deps[dep] = noop_state
 
     # Ready.
     self._step_id += 1
@@ -524,7 +495,7 @@ class LocalScheduler(object):
     :param goals: The list of goal names supplied on the command line.
     :type goals: list of string
     :param subjects: A list of Spec and/or PathGlobs objects.
-    :type subject_keys: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+    :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
       :class:`pants.engine.exp.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given goals and subjects.
     """
@@ -543,8 +514,9 @@ class LocalScheduler(object):
 
     :param products: A list of product types to request for the roots.
     :type products: list of types
-    :param subject_keys: A list of Keys that reference Spec and/or PathGlobs objects in the storage.
-    :type subject_keys: list of :class:`pants.engine.exp.Key`.
+    :param subjects: A list of Spec and/or PathGlobs objects.
+    :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+      :class:`pants.engine.exp.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
 
@@ -574,9 +546,9 @@ class LocalScheduler(object):
 
   def _complete_step(self, node, step_result):
     """Given a StepResult for the given Node, complete the step."""
-    state_key, dependencies = step_result.state_key, step_result.dependencies
+    result = step_result.state
     # Update the Node's state in the graph.
-    self._product_graph.update_state(node, state_key, dependencies=dependencies)
+    self._product_graph.update_state(node, result)
 
   def invalidate(self, predicate=None):
     """Calls `ProductGraph.invalidate()` against an internal ProductGraph instance under

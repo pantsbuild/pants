@@ -61,8 +61,7 @@ class LazyFilesContent(object):
     if result.error:
       raise result.error
     # Expect a value containing the list of Path results.
-    value_key, = result.root_products.values()
-    value = self._engine.storage.get(value_key)
+    value, = result.root_products.values()
     if type(value) is Throw:
       raise ValueError('Failed to compute sources for {}: {}'.format(self._pathglobs, value.exc))
     return {fc.path: fc.content for fc in value.value}

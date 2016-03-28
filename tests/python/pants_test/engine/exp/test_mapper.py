@@ -188,10 +188,10 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
       raise result.error
 
     # Expect a single root.
-    state_key, = result.root_products.values()
-    if state_key.type is Throw:
-      raise self.storage.get(state_key).exc
-    return self.storage.get(state_key).value
+    state, = result.root_products.values()
+    if type(state) is Throw:
+      raise state.exc
+    return state.value
 
   def resolve_multi(self, spec):
     return {uhs.address: uhs.struct for uhs in self.resolve(spec)}

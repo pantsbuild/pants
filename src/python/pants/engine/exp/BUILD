@@ -83,7 +83,6 @@ python_library(
     ':fs',
     ':objects',
     ':struct',
-    ':storage',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',
   ]
@@ -166,6 +165,7 @@ python_library(
   sources=['storage.py'],
   dependencies=[
     ':objects',
+    ':scheduler',
     '3rdparty/python:lmdb',
     'src/python/pants/util:dirutil'
   ]

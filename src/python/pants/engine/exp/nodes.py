@@ -357,6 +357,13 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     except Exception as e:
       return Throw(e)
 
+  def __repr__(self):
+    return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}'\
+      .format(self.subject, self.product, self.variants, self.func.__name__, self.clause)
+
+  def __str__(self):
+    return repr(self)
+
 
 class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants']), Node):
   """A native node type for filesystem operations."""
@@ -416,9 +423,8 @@ class StepContext(object):
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, node_builder, storage, project_tree):
+  def __init__(self, node_builder, project_tree):
     self._node_builder = node_builder
-    self._storage = storage
     self.project_tree = project_tree
 
   def gen_nodes(self, subject, product, variants):
