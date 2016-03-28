@@ -57,10 +57,11 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     register('--output-file', type=str,
              help='Output destination. When unset, outputs to <stdout>.')
     register('--use-cached', action='store_true',
-             help='Use cached data for class products usages between targets, '
-                  'in this case `resolve` and `compile` steps are skipped, '
-                  'useful for calculating analysis for a lot of targets,'
-                  'results can differ from direct execution because 3rdparty libraries resolve is context-aware.')
+             help='Use cached dependency data to compute analysis result. '
+                  'When set, skips `resolve` and `compile` steps. '
+                  'Useful for computing analysis for a lot of targets, but '
+                  'result can differ from direct execution because cached information '
+                  'doesn\'t depend on 3rdparty libraries versions.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -170,6 +171,10 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
 
   def calculating_node_creator(self, classes_by_source, runtime_classpath, product_deps_by_src,
                                target_to_vts):
+    """Strategy directly computes dependency graph node based on
+    `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
+    stores the result to the build cache.
+    """
     def creator(target):
       node = self.create_dep_usage_node(target, get_buildroot(),
                                         classes_by_source, runtime_classpath, product_deps_by_src)
@@ -182,6 +187,8 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     return creator
 
   def cached_node_creator(self, target_to_vts):
+    """Strategy restores dependency graph node from the build cache.
+    """
     def creator(target):
       vt = target_to_vts[target]
       if vt.valid and os.path.exists(self.nodes_json(vt.results_dir)):
