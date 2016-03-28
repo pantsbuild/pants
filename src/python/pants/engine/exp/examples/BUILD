@@ -8,6 +8,7 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:objects',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/util:memo',
   ]
 )
@@ -25,6 +26,7 @@ python_library(
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:nodes',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:selectors',
     'src/python/pants/engine/exp:storage',
