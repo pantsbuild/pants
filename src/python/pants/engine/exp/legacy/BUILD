@@ -30,8 +30,8 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
-    ':parser',
     ':globs',
+    ':parser',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:graph',
@@ -50,24 +50,14 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:specs',
     'src/python/pants/bin',
+    'src/python/pants/engine/exp:fs',
+    'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
-    'src/python/pants/engine/exp:register',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:storage',
     'src/python/pants/option',
     'src/python/pants/util:memo',
   ],
-)
-
-python_library(
-  name='register',
-  sources=['register.py'],
-  dependencies=[
-    ':globs',
-    ':graph',
-    ':parser',
-    'src/python/pants/engine/exp:selectors',
-  ]
 )
 
 python_binary(

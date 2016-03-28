@@ -113,19 +113,6 @@ python_library(
 )
 
 python_library(
-  name='register',
-  sources=['register.py'],
-  dependencies=[
-    ':addressable',
-    ':fs',
-    ':graph',
-    ':mapper',
-    ':selectors',
-    ':struct',
-  ]
-)
-
-python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[

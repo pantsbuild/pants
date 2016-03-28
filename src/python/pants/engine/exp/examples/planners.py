@@ -16,10 +16,10 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.examples.sources import Sources
-from pants.engine.exp.fs import FileContent, FilesContent, Path, PathGlobs, Paths
+from pants.engine.exp.fs import FileContent, FilesContent, Path, PathGlobs, Paths, create_fs_tasks
+from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)

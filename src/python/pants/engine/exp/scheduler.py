@@ -13,8 +13,9 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
 from pants.engine.exp.fs import PathGlobs, Paths
-from pants.engine.exp.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return,
-                                    SelectNode, State, StepContext, TaskNode, Throw, Waiting, ProjectionNode)
+from pants.engine.exp.nodes import (DependenciesNode, FilesystemNode, Node, Noop, ProjectionNode,
+                                    Return, SelectNode, State, StepContext, TaskNode, Throw,
+                                    Waiting)
 from pants.engine.exp.objects import Closable
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
