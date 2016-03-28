@@ -13,12 +13,12 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.goal_runner import OptionsInitializer
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.legacy.graph import ExpGraph
+from pants.engine.exp.fs import create_fs_tasks
+from pants.engine.exp.graph import create_graph_tasks
+from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
 from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
-from pants.engine.exp.legacy.register import create_legacy_graph_tasks
 from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.parsers import SymbolTable
-from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
+from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
 from pants.option.options_bootstrapper import OptionsBootstrapper

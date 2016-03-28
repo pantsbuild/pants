@@ -69,7 +69,7 @@ python_library(
   sources=['mapper.py'],
   dependencies=[
     ':objects',
-    ':parsers',
+    ':parser',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
   ]
@@ -97,8 +97,8 @@ python_library(
 )
 
 python_library(
-  name='parsers',
-  sources=['parsers.py'],
+  name='parser',
+  sources=['parser.py'],
   dependencies=[
     '3rdparty/python:six',
     ':objects',
@@ -113,23 +113,9 @@ python_library(
 )
 
 python_library(
-  name='register',
-  sources=['register.py'],
-  dependencies=[
-    ':addressable',
-    ':fs',
-    ':graph',
-    ':mapper',
-    ':selectors',
-    ':struct',
-  ]
-)
-
-python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
-    ':nodes',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
@@ -146,17 +132,6 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',
-  ]
-)
-
-python_library(
-  name='sources',
-  sources=['sources.py'],
-  dependencies=[
-    ':addressable',
-    ':fs',
-    ':struct',
-    'src/python/pants/source',
   ]
 )
 

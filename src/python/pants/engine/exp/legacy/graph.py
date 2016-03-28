@@ -10,7 +10,9 @@ from pants.build_graph.address import Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.globs import BaseGlobs, Files
+from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
+from pants.engine.exp.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
 
 
@@ -155,3 +157,15 @@ def reify_legacy_graph(target_adaptor, dependency_nodes):
   """Given a TargetAdaptor and LegacyBuildGraphNodes for its deps, return a LegacyBuildGraphNode."""
   return LegacyBuildGraphNode(target_adaptor,
                               [node.target_adaptor.address for node in dependency_nodes])
+
+
+def create_legacy_graph_tasks():
+  """Create tasks to recursively parse the legacy graph."""
+  return [
+    # Recursively requests LegacyGraphNodes for TargetAdaptors, which will result in a
+    # transitive graph walk.
+    (LegacyBuildGraphNode,
+     [Select(TargetAdaptor),
+      SelectDependencies(LegacyBuildGraphNode, TargetAdaptor)],
+     reify_legacy_graph),
+  ]

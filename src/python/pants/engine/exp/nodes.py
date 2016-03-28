@@ -329,12 +329,8 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
   def step(self, dependency_states, step_context):
     # Compute dependencies.
     dep_values = []
-    dependencies = []
-    for select in self.clause:
-      dep = select.construct_node(self.subject, self.variants)
-      if dep is None:
-        return Noop('Dependency {} is not satisfiable.'.format(select))
-      dependencies.append(dep)
+    dependencies = [step_context.select_node(selector, self.subject, self.variants)
+                    for selector in self.clause]
 
     # If all dependency Nodes are Return, execute the Node.
     for dep_select, dep_key in zip(self.clause, dependencies):
@@ -430,3 +426,7 @@ class StepContext(object):
   def gen_nodes(self, subject, product, variants):
     """Yields Node instances which might be able to provide a value for the given inputs."""
     return self._node_builder.gen_nodes(subject, product, variants)
+
+  def select_node(self, selector, subject, variants):
+    """Constructs a Node for the given Selector and the given Subject/Variants."""
+    return self._node_builder.select_node(selector, subject, variants)

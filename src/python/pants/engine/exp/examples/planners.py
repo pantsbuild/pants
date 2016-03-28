@@ -15,14 +15,15 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
-from pants.engine.exp.fs import FileContent, FilesContent, Path, PathGlobs, Paths
+from pants.engine.exp.examples.parsers import JsonParser
+from pants.engine.exp.examples.sources import Sources
+from pants.engine.exp.fs import FileContent, FilesContent, Path, PathGlobs, Paths, create_fs_tasks
+from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
-from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
+from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
-from pants.engine.exp.sources import Sources
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
