@@ -13,4 +13,5 @@ def is_boolean_option(kwargs):
 
 
 def is_list_option(kwargs):
-  return kwargs.get('action') == 'append' or kwargs.get('type') == list_option
+  return (kwargs.get('action') == 'append' or kwargs.get('type') == list or
+          kwargs.get('type') == list_option)

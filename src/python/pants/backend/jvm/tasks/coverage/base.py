@@ -50,7 +50,7 @@ class Coverage(AbstractClass):
     register('--coverage', action='store_true', help='Collect code coverage data.')
     register('--coverage-processor', advanced=True, default='cobertura',
              help='Which coverage subsystem to use.')
-    register('--coverage-jvm-options', advanced=True, action='append',
+    register('--coverage-jvm-options', advanced=True, type=list,
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
     register('--coverage-open', action='store_true',

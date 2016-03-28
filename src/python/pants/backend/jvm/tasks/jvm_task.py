@@ -20,7 +20,7 @@ class JvmTask(Task):
   @classmethod
   def register_options(cls, register):
     super(JvmTask, cls).register_options(register)
-    register('--confs', action='append', default=['default'],
+    register('--confs', type=list, default=['default'],
              help='Use only these Ivy configurations of external deps.')
 
   @classmethod

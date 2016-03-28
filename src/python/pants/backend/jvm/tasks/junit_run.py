@@ -68,7 +68,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     super(JUnitRun, cls).register_options(register)
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
              help='Run at most this many tests in a single test process.')
-    register('--test', action='append',
+    register('--test', type=list,
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
     register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')

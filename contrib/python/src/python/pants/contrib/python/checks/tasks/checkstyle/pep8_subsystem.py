@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.option.custom_types import list_option
-
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import PluginSubsystemBase
 
 
@@ -49,7 +47,7 @@ class PEP8Subsystem(PluginSubsystemBase):
   @classmethod
   def register_options(cls, register):
     super(PEP8Subsystem, cls).register_options(register)
-    register('--ignore', fingerprint=True, type=list_option, default=cls.DEFAULT_IGNORE_CODES,
+    register('--ignore', fingerprint=True, type=list, default=cls.DEFAULT_IGNORE_CODES,
              help='Prevent test failure but still produce output for problems.')
     register('--max-length', fingerprint=True, type=int, default=100,
              help='Max line length to use for PEP8 checks.')
