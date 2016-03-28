@@ -11,7 +11,7 @@ import shutil
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.nodes import Return
-from pants.engine.exp.parsers import SymbolTable
+from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.register import create_fs_tasks
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage

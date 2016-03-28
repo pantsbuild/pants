@@ -9,7 +9,7 @@ python_library(
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
     'src/python/pants/engine/exp:fs',
-    'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:struct',
   ],
 )

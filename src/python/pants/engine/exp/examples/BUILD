@@ -2,9 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name='parsers',
+  sources=['parsers.py'],
+  dependencies=[
+    '3rdparty/python:six',
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/exp:objects',
+    'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
   name='planners',
   sources=['planners.py'],
   dependencies=[
+    ':parsers',
     ':sources',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:file_system_project_tree',
@@ -13,7 +25,6 @@ python_library(
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:nodes',
-    'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:register',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:selectors',

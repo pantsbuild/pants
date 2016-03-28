@@ -9,7 +9,6 @@ import functools
 import importlib
 import inspect
 import threading
-from abc import abstractmethod
 from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 
@@ -17,8 +16,8 @@ import six
 
 from pants.build_graph.address import Address
 from pants.engine.exp.objects import Resolvable, Serializable
+from pants.engine.exp.parser import ParseError, Parser
 from pants.util.memo import memoized, memoized_method
-from pants.util.meta import AbstractClass
 
 
 @memoized
@@ -36,38 +35,6 @@ def _import(typename):
   except ImportError as e:
     raise ParseError('Failed to import type name {} from module {}: {}'
                      .format(typename, modulename, e))
-
-
-class ParseError(Exception):
-  """Indicates an error parsing BUILD configuration."""
-
-
-class SymbolTable(AbstractClass):
-  """A one-classmethod interface exposing a symbol table dict.
-
-  SymbolTables exist as named classes because it allows them to be loaded by name as a python
-  module, rather than being pickled when they cross between processes.
-  """
-
-  @classmethod
-  @abstractmethod
-  def table(cls):
-    """Returns a dict of name to implementation class."""
-
-
-class Parser(AbstractClass):
-  @classmethod
-  @abstractmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls):
-    """
-    :param string filepath: The name of the file being parsed. The parser should not assume
-                            that the path is accessible, and should consume the filecontent.
-    :param bytes filecontent: The raw byte content to parse.
-    :param dict symbol_table_cls: A symbol table to expose to the python file being parsed.
-    :returns: A list of decoded addressable, Serializable objects. The callable will
-              raise :class:`ParseError` if there were any problems encountered parsing the filecontent.
-    :rtype: :class:`collections.Callable`
-    """
 
 
 class JsonParser(Parser):

@@ -69,7 +69,7 @@ python_library(
   sources=['mapper.py'],
   dependencies=[
     ':objects',
-    ':parsers',
+    ':parser',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
   ]
@@ -97,8 +97,8 @@ python_library(
 )
 
 python_library(
-  name='parsers',
-  sources=['parsers.py'],
+  name='parser',
+  sources=['parser.py'],
   dependencies=[
     '3rdparty/python:six',
     ':objects',
