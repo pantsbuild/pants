@@ -115,9 +115,9 @@ class Storage(Closable):
   for mappings between Keys. This allows to establish links between contents that
   are represented by those keys. Cache for example is such a use case.
 
-  Convenience methods to content address nodes and states in both ways in
+  Convenience methods to translate nodes and states in
   `pants.engine.exp.scheduler.StepRequest` and `pants.engine.exp.scheduler.StepResult`
-  are also provided.
+  into keys, and vice versa are also provided.
   """
 
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
@@ -263,7 +263,7 @@ class Storage(Closable):
     return StepResult(state=self._to_key(step_result.state))
 
   def resolve_request(self, step_request):
-    """Optionally resolve keys if they are present in step_request."""
+    """Resolve keys in step_request."""
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       dependencies[self._from_key(dep)] = self._from_key(state)
