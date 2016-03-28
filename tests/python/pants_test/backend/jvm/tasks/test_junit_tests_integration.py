@@ -223,8 +223,13 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           'org.pantsbuild.tmp.tests.AllTests#test1Failure',
           'org.pantsbuild.tmp.tests.AllTests#test3Failure',
           'org.pantsbuild.tmp.tests.AllTests#test4Error',
+          'org.pantsbuild.tmp.tests.InnerClassTests$InnerClassFailureTest#testInnerFailure',
+          'org.pantsbuild.tmp.tests.InnerClassTests$InnerInnerTest$InnerFailureTest#testFailure'
         ]
         output = '\n'.join(line.strip() for line in pants_run.stdout_data.split('\n'))
         self.assertIn('\n'.join(group), output,
                       '{group}\n not found in\n\n{output}.'.format(group='\n'.join(group),
                                                                    output=output))
+        self.assertNotIn('org.pantsbuild.tmp.tests.AllTests#test2Success', output)
+        self.assertNotIn('org.pantsbuild.tmp.tests.AllTestsBase', output)
+        self.assertNotIn('org.pantsbuild.tmp.tests.AllTests$InnerClassSuccessTest', output)

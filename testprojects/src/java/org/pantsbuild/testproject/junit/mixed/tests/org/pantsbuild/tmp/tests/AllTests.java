@@ -1,9 +1,10 @@
 package org.pantsbuild.tmp.tests;
 
 import org.junit.Test;
-import static org.junit.Assert.*;
 
-public class AllTests {
+import static org.junit.Assert.assertTrue;
+
+public class AllTests extends AllTestsBase {
 
   @Test
   public void test1Failure() {
