@@ -207,15 +207,18 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     # done all of the targets must be defined by the user and defaults are set as None.
     # If we catch a case of a scala-platform tool being bootstrapped and we have no user
     # specified target we need to throw an exception for the user.
-
     # It is possible for tests to insert synthetic tool targets which we honor here.
+
+    class ScalaPlatformUnderspecified(Exception):
+      pass
+
     if jvm_tool.scope == 'scala-platform':
       # For objects from buildfiles JarLibrary is used
-      legitimate_target = (t.type_alias != 'JarLibrary' or t.is_synthetic for t in targets)
-      empty_revs = (cp.rev is None for cp in jvm_tool.classpath)
+      legitimate_target = [t.type_alias != 'JarLibrary' or t.is_synthetic for t in targets]
+      empty_revs = [cp.rev is None for cp in jvm_tool.classpath]
 
       if any(empty_revs) and not any(legitimate_target):
-        raise RuntimeError("""
+        raise ScalaPlatformUnderspecified("""
           Unable to bootstrap tool: '{}' because no rev was specified.  This usually
           means that the tool was not defined properly in your build files and no
           default option was provided to use for bootstrap.
