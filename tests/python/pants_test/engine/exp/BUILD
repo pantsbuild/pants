@@ -51,6 +51,7 @@ python_tests(
     'src/python/pants/engine/exp/examples:parsers',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:storage',
     'src/python/pants/engine/exp:struct',
   ]

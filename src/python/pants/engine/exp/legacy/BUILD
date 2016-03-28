@@ -35,6 +35,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:graph',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:selectors',
     'src/python/pants/util:objects',
   ],

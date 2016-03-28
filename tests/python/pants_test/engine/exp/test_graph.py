@@ -12,12 +12,12 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
                                           addressable_list)
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import ResolvedTypeMismatchError
+from pants.engine.exp.examples.parsers import (JsonParser, PythonAssignmentsParser,
+                                               PythonCallbacksParser)
+from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.nodes import Noop, Return, Throw
-from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
-                                      SymbolTable)
-from pants.engine.exp.register import create_graph_tasks
+from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
