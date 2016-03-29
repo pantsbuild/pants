@@ -90,7 +90,12 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                                       confs=self.get_options().confs,
                                       extra_args=self._args)
     if self._report:
+      if all(not result.has_resolved_artifacts for result in results):
+        self.context.log.info("Not generating a report. No resolution performed.")
+
       for result in results:
+        if not result.has_resolved_artifacts:
+          continue
         self._generate_ivy_report(result)
 
   def check_artifact_cache_for(self, invalidation_check):
