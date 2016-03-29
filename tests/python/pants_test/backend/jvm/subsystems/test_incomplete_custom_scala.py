@@ -75,7 +75,6 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
         options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.11']
       )
       self.assert_failure(pants_run)
-      print(pants_run.stdout_data)
       assert "Unable to bootstrap tool: 'scalac'" in pants_run.stdout_data
 
   def test_missing_runtime(self):

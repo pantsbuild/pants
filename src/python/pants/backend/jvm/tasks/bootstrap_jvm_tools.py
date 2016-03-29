@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 import os
 import shutil
+import textwrap
 import threading
 from collections import defaultdict
 from textwrap import dedent
@@ -218,11 +219,11 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       empty_revs = [cp.rev is None for cp in jvm_tool.classpath]
 
       if any(empty_revs) and not any(legitimate_target):
-        raise ScalaPlatformUnderspecified("""
+        raise ScalaPlatformUnderspecified(textwrap.dedent("""
           Unable to bootstrap tool: '{}' because no rev was specified.  This usually
           means that the tool was not defined properly in your build files and no
           default option was provided to use for bootstrap.
-          """.format(jvm_tool.key))
+          """.format(jvm_tool.key)))
 
   def _bootstrap_classpath(self, jvm_tool, targets):
     self._check_scalaplatform_tools(jvm_tool, targets)
