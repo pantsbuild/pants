@@ -7,10 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import contextlib
 import os
-import random
 import re
 import shutil
-import time
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
