@@ -102,9 +102,10 @@ class JvmCompile(NailgunTaskBase):
     register('--confs', advanced=True, type=list, default=['default'],
              help='Compile for these Ivy confs.')
 
-    # TODO: Stale analysis should be automatically ignored via Task identities:
-    # https://github.com/pantsbuild/pants/issues/1351
     register('--clear-invalid-analysis', advanced=True, default=False, action='store_true',
+             deprecated_hint='Invalid analysis will now be automatically ignored via Task '
+                             'implementation_version changes.',
+             deprecated_version='0.0.81', removal_version='0.0.85',
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
@@ -157,6 +158,11 @@ class JvmCompile(NailgunTaskBase):
              fingerprint=True,
              help='Capture classpath to per-target newline-delimited text files. These files will '
                   'be packaged into any jar artifacts that are created from the jvm targets.')
+
+    register('--unused-deps', choices=['ignore', 'warn', 'error'], default='warn',
+             fingerprint=True,
+             help='Controls whether unused deps are checked, and whether they cause warnings or '
+                  'errors.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -319,6 +325,10 @@ class JvmCompile(NailgunTaskBase):
     self._size_estimator = self.size_estimator_by_name(self.get_options().size_estimator)
 
     self._analysis_tools = self.create_analysis_tools()
+
+  @property
+  def _unused_deps_check_enabled(self):
+    return self.get_options().unused_deps != 'ignore'
 
   @property
   def _analysis_parser(self):
@@ -495,11 +505,13 @@ class JvmCompile(NailgunTaskBase):
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process)
 
   def _create_empty_products(self):
-    if self.context.products.is_required_data('classes_by_source'):
+    if self.context.products.is_required_data('classes_by_source') \
+        or self._unused_deps_check_enabled:
       make_products = lambda: defaultdict(MultipleRootedProducts)
       self.context.products.safe_create_data('classes_by_source', make_products)
 
-    if self.context.products.is_required_data('product_deps_by_src'):
+    if self.context.products.is_required_data('product_deps_by_src') \
+        or self._unused_deps_check_enabled:
       self.context.products.safe_create_data('product_deps_by_src', dict)
 
   def compute_classes_by_source(self, compile_contexts):
@@ -600,6 +612,11 @@ class JvmCompile(NailgunTaskBase):
       classpath_targets = target.closure(bfs=True, **self._target_closure_kwargs)
     return ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
                                            extra_compile_time_classpath, self._confs)
+
+  def _check_unused_deps(self, vts):
+    """Uses the `classes_by_source` and `product_deps_by_source` products to check unused deps."""
+    with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
+      pass
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -716,6 +733,10 @@ class JvmCompile(NailgunTaskBase):
 
       # Update the products with the latest classes.
       self._register_vts([compile_context])
+
+      # Once products are registered, check for unused dependencies (if enabled).
+      if not hit_cache and self._unused_deps_check_enabled:
+        self._check_unused_deps(vts)
 
     jobs = []
     invalid_target_set = set(invalid_targets)
