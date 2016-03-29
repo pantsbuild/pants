@@ -45,14 +45,14 @@ class LiteralCredentials(Credentials):
     """
     super(LiteralCredentials, self).__init__(**kwargs)
 
-    deprecated_conditional(callable(username) or callable(password), '0.0.82',
+    deprecated_conditional(lambda: callable(username) or callable(password), '0.0.82',
                            'Passing callable arguments to `credentials` is deprecated: '
                            'use `netrc_credentials` for target {}'.format(
                              self.address.spec
                            ))
 
-    self._username = username if callable(username) else functools.partial(_ignored_repository(username))
-    self._password = password if callable(password) else functools.partial(_ignored_repository(password))
+    self._username = username if callable(username) else functools.partial(_ignored_repository, username)
+    self._password = password if callable(password) else functools.partial(_ignored_repository, password)
 
   def username(self, repository):
     return self._username(repository)
