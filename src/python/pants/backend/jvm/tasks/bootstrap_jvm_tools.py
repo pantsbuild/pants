@@ -156,15 +156,17 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
               tool_classpath_target = JarLibrary(name=dep_address.target_name,
                                                  address=dep_address,
                                                  build_graph=build_graph,
-                                                 jars=jvm_tool.classpath)
+                                                 jars=jvm_tool.classpath,
+                                                 )
             else:
               # The tool classpath is empty by default, so we just inject a dummy target that
               # ivy resolves as the empty list classpath.  JarLibrary won't do since it requires
               # one or more jars, so we just pick a target type ivy has no resolve work to do for.
               tool_classpath_target = Target(name=dep_address.target_name,
                                              address=dep_address,
-                                             build_graph=build_graph)
-            build_graph.inject_target(tool_classpath_target)
+                                             build_graph=build_graph,
+                                             )
+            build_graph.inject_target(tool_classpath_target, synthetic=True)
 
     # We use the trick of not returning alternate roots, but instead just filling the dep_spec
     # holes with a JarLibrary built from a tool's default classpath JarDependency list if there is
@@ -214,11 +216,12 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       pass
 
     if jvm_tool.scope == 'scala-platform':
-      # For objects from buildfiles JarLibrary is used
-      legitimate_target = [t.type_alias != 'JarLibrary' or t.is_synthetic for t in targets]
+      # Bootstrapped tools are inserted as synthetic.  If they exist on disk they are later
+      # updated as non synthetic targets.  If its a synthetic target make sure it has a rev.
+      synthetic_targets = [t.is_synthetic for t in targets]
       empty_revs = [cp.rev is None for cp in jvm_tool.classpath]
 
-      if any(empty_revs) and not any(legitimate_target):
+      if any(empty_revs) and any(synthetic_targets):
         raise ScalaPlatformUnderspecified(textwrap.dedent("""
           Unable to bootstrap tool: '{}' because no rev was specified.  This usually
           means that the tool was not defined properly in your build files and no

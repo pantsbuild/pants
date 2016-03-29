@@ -112,7 +112,6 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.make_target('//:scalastyle',
                        JarLibrary,
                        jars=[JarDependency('org.scalastyle', 'scalastyle_2.10', '0.3.2')],
-                       synthetic=True
       )
       self.set_options_for_scope(ScalaPlatform.options_scope, version='custom')
 
