@@ -45,7 +45,7 @@ class LiteralCredentials(Credentials):
     """
     super(LiteralCredentials, self).__init__(**kwargs)
 
-    deprecated_conditional(callable(username) or callable(password), '0.0.82',
+    deprecated_conditional(lambda: callable(username) or callable(password), '0.0.82',
                            'Passing callable arguments to `credentials` is deprecated: '
                            'use `netrc_credentials` for target {}'.format(
                              self.address.spec
