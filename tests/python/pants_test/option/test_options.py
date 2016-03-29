@@ -196,7 +196,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(True, options.for_scope('test').verbose)
     self.assertEqual(False, options.for_scope('test.junit').verbose)
 
-    # Test action=append option.
+    # Test list-typed option.
     options = self._parse('./pants', config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99], options.for_global_scope().y)
 
@@ -213,7 +213,6 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['']"})
     self.assertEqual([''], options.for_global_scope().config_override)
 
-    # Test list-typed option.
     options = self._parse('./pants --listy=\'[1, 2]\'',
                           config={'DEFAULT': {'listy': '[3, 4]'}})
     self.assertEqual([1, 2], options.for_global_scope().listy)
@@ -246,6 +245,17 @@ class OptionsTest(unittest.TestCase):
       with temporary_file_path() as fp2:
         options = self._parse('./pants --file-listy="{}" --file-listy="{}"'.format(fp1, fp2))
         self.assertEqual([fp1, fp2], options.for_global_scope().file_listy)
+
+  def test_explicit_boolean_values(self):
+    options = self._parse('./pants --verbose=false')
+    self.assertFalse(options.for_global_scope().verbose)
+    options = self._parse('./pants --verbose=False')
+    self.assertFalse(options.for_global_scope().verbose)
+
+    options = self._parse('./pants --verbose=true')
+    self.assertTrue(options.for_global_scope().verbose)
+    options = self._parse('./pants --verbose=True')
+    self.assertTrue(options.for_global_scope().verbose)
 
   def test_boolean_defaults(self):
     options = self._parse('./pants')
