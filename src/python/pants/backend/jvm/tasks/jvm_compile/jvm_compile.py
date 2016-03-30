@@ -15,7 +15,8 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
+from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
+from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
@@ -25,12 +26,12 @@ from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.resources import Resources
-from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_walk
 from pants.util.fileutil import create_size_estimators
+from pants.util.memo import memoized_property
 
 
 class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
@@ -74,8 +75,6 @@ class JvmCompile(NailgunTaskBase):
   """
 
   size_estimators = create_size_estimators()
-  _target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES,
-                                respect_intransitive=True)
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -326,9 +325,17 @@ class JvmCompile(NailgunTaskBase):
 
     self._analysis_tools = self.create_analysis_tools()
 
+    self._dep_context = DependencyContext(self.compiler_plugin_types,
+                                          dict(include_scopes=Scopes.JVM_COMPILE_SCOPES,
+                                               respect_intransitive=True))
+
   @property
   def _unused_deps_check_enabled(self):
     return self.get_options().unused_deps != 'ignore'
+
+  @memoized_property
+  def _dep_analyzer(self):
+    return JvmDependencyAnalyzer(self.context.products.get_data('runtime_classpath'))
 
   @property
   def _analysis_parser(self):
@@ -574,49 +581,15 @@ class JvmCompile(NailgunTaskBase):
         product_deps_by_src[compile_context.target] = \
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
 
-  def _compute_strict_dependencies(self, target):
-    """Compute the 'strict' compile target dependencies for the given target.
-
-    Recursively resolves target aliases, and includes the transitive deps of compiler plugins,
-    since compiletime is actually runtime for them.
-    """
-    def resolve(t):
-      for declared in t.dependencies:
-        if type(declared) == Target:
-          for r in resolve(declared):
-            yield r
-        elif isinstance(declared, self.compiler_plugin_types):
-          for r in declared.closure(bfs=True, **self._target_closure_kwargs):
-            yield r
-        else:
-          yield declared
-
-    yield target
-    for dep in resolve(target):
-      yield dep
-
-  def _compute_classpath_entries(self,
-                                 classpath_products,
-                                 compile_context,
-                                 extra_compile_time_classpath):
-    # Generate a classpath specific to this compile and target.
-    target = compile_context.target
-    if compile_context.strict_deps:
-      classpath_targets = list(self._compute_strict_dependencies(target))
-      pruned = [t.address.spec for t in target.closure(bfs=True, **self._target_closure_kwargs)
-                if t not in classpath_targets]
-      self.context.log.debug(
-          'Using strict classpath for {}, which prunes the following dependencies: {}'.format(
-            target.address.spec, pruned))
-    else:
-      classpath_targets = target.closure(bfs=True, **self._target_closure_kwargs)
-    return ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
-                                           extra_compile_time_classpath, self._confs)
-
   def _check_unused_deps(self, vts):
-    """Uses the `classes_by_source` and `product_deps_by_source` products to check unused deps."""
+    """Uses the `classes_by_source` and `product_deps_by_src` products to check unused deps."""
     with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
-      pass
+      # Determine which of the targets in the directly declared set of this target
+      # (TODO: pass in or memoize on context rather than re-computing) were actually used: ie,
+      # had at least one file consumed by this target.
+      self._dep_analyzer
+
+      # For any targets that were not used, determine whether transitive deps were used.
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -692,9 +665,10 @@ class JvmCompile(NailgunTaskBase):
 
       if not hit_cache:
         # Compute the compile classpath for this target.
-        cp_entries = self._compute_classpath_entries(classpath_products,
-                                                     compile_context,
-                                                     extra_compile_time_classpath)
+        cp_entries = ClasspathUtil.compute_classpath(compile_context.dependencies(self._dep_context),
+                                                     classpath_products,
+                                                     extra_compile_time_classpath,
+                                                     self._confs)
         # TODO: always provide transitive analysis, but not always all classpath entries?
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 

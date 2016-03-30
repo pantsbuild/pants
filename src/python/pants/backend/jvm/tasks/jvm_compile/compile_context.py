@@ -9,6 +9,13 @@ import zipfile
 from contextlib import contextmanager
 
 from pants.util.contextutil import open_zip
+from pants.build_graph.target import Target
+
+
+class DependencyContext(object):
+  def __init__(self, compiler_plugin_types, target_closure_kwargs):
+    self.compiler_plugin_types = compiler_plugin_types
+    self.target_closure_kwargs = target_closure_kwargs
 
 
 class CompileContext(object):
@@ -33,6 +40,38 @@ class CompileContext(object):
   def open_jar(self, mode):
     with open_zip(self.jar_file, mode=mode, compression=zipfile.ZIP_STORED) as jar:
       yield jar
+
+  def dependencies(self, dep_context):
+    """Computes the compile time dependencies of this target, in the given DependencyContext."""
+    if self.strict_deps:
+      return list(self.strict_dependencies(dep_context))
+    else:
+      return self.all_dependencies(dep_context)
+
+  def strict_dependencies(self, dep_context):
+    """Compute the 'strict' compile target dependencies for this target.
+
+    Recursively resolves target aliases, and includes the transitive deps of compiler plugins,
+    since compiletime is actually runtime for them.
+    """
+    def resolve(t):
+      for declared in t.dependencies:
+        if type(declared) == Target:
+          for r in resolve(declared):
+            yield r
+        elif isinstance(declared, dep_context.compiler_plugin_types):
+          for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
+            yield r
+        else:
+          yield declared
+
+    yield self.target
+    for dep in resolve(self.target):
+      yield dep
+
+  def all_dependencies(self, dep_context):
+    """All transitive dependencies of the context's target."""
+    return self.target.closure(bfs=True, **dep_context.target_closure_kwargs)
 
   @property
   def _id(self):
