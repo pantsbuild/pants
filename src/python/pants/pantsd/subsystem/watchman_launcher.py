@@ -73,15 +73,15 @@ class WatchmanLauncher(object):
 
   def maybe_launch(self):
     if not self.watchman.is_alive():
-      self._logger.info('launching watchman')
+      self._logger.debug('launching watchman')
       try:
         self.watchman.launch()
       except (self.watchman.ExecutionError, self.watchman.InvalidCommandOutput) as e:
         self._logger.critical('failed to launch watchman: {exc!r})'.format(exc=e))
         return False
 
-    self._logger.info('watchman is running, pid={pid} socket={socket}'
-                      .format(pid=self.watchman.pid, socket=self.watchman.socket))
+    self._logger.debug('watchman is running, pid={pid} socket={socket}'
+                       .format(pid=self.watchman.pid, socket=self.watchman.socket))
     # TODO(kwlzn): This sleep is currently helpful based on empirical testing with older watchman
     # versions, but should go away quickly once we embed watchman fetching in pants and uprev both
     # the binary and client versions.

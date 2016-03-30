@@ -91,6 +91,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'retry',
+  sources = ['test_retry.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:retry',
+  ]
+)
+
+python_tests(
   name = 'socket',
   sources = ['test_socket.py'],
   coverage = ['pants.util.socket'],
