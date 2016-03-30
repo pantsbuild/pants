@@ -246,7 +246,8 @@ defined in your plugin:
       'public': {  # must match the name of the `Repository` object that you defined in your plugin.
         'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
                                          # in your custom ivysettings.xml.
-        'auth': 'build-support:netrc',   # Pants spec to a 'credentials()' object.
+        'auth': 'build-support:netrc',   # Pants spec to a 'credentials()' or
+                                         # 'netrc_credentials()' object.
         'help': 'Configure your ~/.netrc for maven.example.com access.'
       },
       'testing': {
@@ -270,12 +271,7 @@ matches the `repos` specified above:
 And place the following in a `BUILD` file somewhere in your repository (`build-support/BUILD` is a
 good place, and is used in the example above):
 
-    netrc = netrc()
-
-    credentials(
-      name = 'netrc',
-      username=netrc.getusername,
-      password=netrc.getpassword)
+    netrc_credentials(name = 'netrc')
 
 Next, tell Ivy how to publish to your repository. Add a new `ivysettings.xml` file to your repo
 with the additional information needed to publish artifacts. Here is an example to get you started:
@@ -285,9 +281,9 @@ with the additional information needed to publish artifacts. Here is an example 
 
     <ivysettings>
       <settings defaultResolver="chain-repos"/>
-      <!-- The ${login} and ${password} values come from a credentials() object in a BUILD file,
-           which is fed by '~/.netrc'.  There must be a '~/.netrc' machine entry which matches
-           a resolver in the "repos" object in 'pants.ini', which also matches the 'host' in
+      <!-- The ${login} and ${password} values come from a netrc_credentials() object in a BUILD
+           file, which is fed by '~/.netrc'.  There must be a '~/.netrc' machine entry which
+           matches a resolver in the "repos" object in 'pants.ini', which also matches the 'host' in
            this XML block.
 
            machine <hostname>
