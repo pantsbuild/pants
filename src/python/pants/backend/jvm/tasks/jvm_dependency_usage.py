@@ -16,11 +16,12 @@ from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyze
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.task.task import Task
 from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
 
 
-class JvmDependencyUsage(JvmDependencyAnalyzer):
+class JvmDependencyUsage(Task):
   """Determines the dependency usage ratios of targets.
 
   Analyzes the relationship between the products a target T produces vs. the products
@@ -65,8 +66,8 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(JvmDependencyUsage, cls).prepare(options, round_manager)
     if not options.use_cached:
-      super(JvmDependencyUsage, cls).prepare(options, round_manager)
       round_manager.require_data('classes_by_source')
       round_manager.require_data('runtime_classpath')
       round_manager.require_data('product_deps_by_src')
@@ -175,8 +176,9 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
     stores the result to the build cache.
     """
+    targets_by_file = JvmDependencyAnalyzer(runtime_classpath).targets_by_file(self.context.targets())
     def creator(target):
-      node = self.create_dep_usage_node(target, get_buildroot(),
+      node = self.create_dep_usage_node(target, targets_by_file, get_buildroot(),
                                         classes_by_source, runtime_classpath, product_deps_by_src)
       vt = target_to_vts[target]
       with open(self.nodes_json(vt.results_dir), mode='w') as fp:
@@ -231,7 +233,8 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   def cache_target_dirs(self):
     return True
 
-  def create_dep_usage_node(self, target, buildroot, classes_by_source, runtime_classpath, product_deps_by_src):
+  def create_dep_usage_node(self, target, targets_by_file, buildroot,
+                            classes_by_source, runtime_classpath, product_deps_by_src):
     concrete_target = target.concrete_derived_from
     products_total = self._count_products(runtime_classpath, target)
     node = Node(concrete_target)
@@ -248,7 +251,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     target_product_deps_by_src = product_deps_by_src.get(target, dict())
     for src in target.sources_relative_to_buildroot():
       for product_dep in target_product_deps_by_src.get(os.path.join(buildroot, src), []):
-        for dep_tgt in self.targets_by_file.get(product_dep, []):
+        for dep_tgt in targets_by_file.get(product_dep, []):
           derived_from = dep_tgt.concrete_derived_from
           if not self._select(derived_from):
             continue

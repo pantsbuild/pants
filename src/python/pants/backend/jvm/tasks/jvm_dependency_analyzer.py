@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from abc import abstractmethod
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -17,33 +16,49 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_graph import sort_targets
 from pants.java.distribution.distribution import DistributionLocator
-from pants.task.task import Task
 from pants.util.contextutil import open_zip
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
-class JvmDependencyAnalyzer(Task):
-  """Abstract class for tasks which need to analyze actual source dependencies.
+class JvmDependencyAnalyzer(object):
+  """Helper class for tasks which need to analyze source dependencies.
 
   Primary purpose is to provide a classfile --> target mapping, which subclasses can use in
   determining which targets correspond to the actual source dependencies of any given target.
   """
 
-  @classmethod
-  @abstractmethod
-  def skip(cls, options):
-    """Return true if the task should be entirely skipped, and thus have no product requirements."""
-    pass
+  def __init__(self, runtime_classpath):
+    self._runtime_classpath = runtime_classpath
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(JvmDependencyAnalyzer, cls).prepare(options, round_manager)
-    if not cls.skip(options):
-      round_manager.require_data('runtime_classpath')
-      round_manager.require_data('product_deps_by_src')
+  @memoized_method
+  def files_for_target(self, target):
+    """Yields a sequence of abs path of source, class or jar files provided by the target.
 
-  @memoized_property
-  def targets_by_file(self):
+    The runtime classpath for a target must already have been finalized for a target in order
+    to compute its provided files.
+    """
+    buildroot = get_buildroot()
+
+    # Compute src -> target.
+    if isinstance(target, JvmTarget):
+      for src in target.sources_relative_to_buildroot():
+        yield os.path.join(buildroot, src)
+    # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
+    if isinstance(target, ScalaLibrary):
+      for java_source in target.java_sources:
+        for src in java_source.sources_relative_to_buildroot():
+          yield os.path.join(buildroot, src)
+
+    # Compute classfile -> target and jar -> target.
+    files = ClasspathUtil.classpath_contents((target,), self._runtime_classpath)
+    # And jars; for binary deps, zinc doesn't emit precise deps (yet).
+    cp_entries = ClasspathUtil.classpath((target,), self._runtime_classpath)
+    jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
+    for coll in [files, jars]:
+      for f in coll:
+        yield f
+
+  def targets_by_file(self, targets):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
 
     The value is usually a singleton, because a source or class file belongs to a single target.
@@ -52,33 +67,10 @@ class JvmDependencyAnalyzer(Task):
     "canonical" target will be the first one in the list of targets.
     """
     targets_by_file = defaultdict(OrderedSet)
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
 
-    # Compute src -> target.
-    self.context.log.debug('Mapping sources...')
-    buildroot = get_buildroot()
-    # Look at all targets in-play for this pants run. Does not include synthetic targets,
-    for target in self.context.targets():
-      if isinstance(target, JvmTarget):
-        for src in target.sources_relative_to_buildroot():
-          targets_by_file[os.path.join(buildroot, src)].add(target)
-      # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
-      if isinstance(target, ScalaLibrary):
-        for java_source in target.java_sources:
-          for src in java_source.sources_relative_to_buildroot():
-            targets_by_file[os.path.join(buildroot, src)].add(target)
-
-    # Compute classfile -> target and jar -> target.
-    self.context.log.debug('Mapping classpath...')
-    for target in self.context.targets():
-      # Classpath content.
-      files = ClasspathUtil.classpath_contents((target,), runtime_classpath)
-      # And jars; for binary deps, zinc doesn't emit precise deps (yet).
-      cp_entries = ClasspathUtil.classpath((target,), runtime_classpath)
-      jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
-      for coll in [files, jars]:
-        for f in coll:
-          targets_by_file[f].add(target)
+    for target in targets:
+      for f in self.files_for_target(target):
+        targets_by_file[f].add(target)
 
     return targets_by_file
 
@@ -123,10 +115,10 @@ class JvmDependencyAnalyzer(Task):
     bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
     return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
 
-  def _compute_transitive_deps_by_target(self):
+  def compute_transitive_deps_by_target(self, targets):
     """Map from target to all the targets it depends on, transitively."""
     # Sort from least to most dependent.
-    sorted_targets = reversed(sort_targets(self.context.targets()))
+    sorted_targets = reversed(sort_targets(targets))
     transitive_deps_by_target = defaultdict(set)
     # Iterate in dep order, to accumulate the transitive deps for each target.
     for target in sorted_targets:

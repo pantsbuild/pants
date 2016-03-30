@@ -9,6 +9,7 @@ import os
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_dependency_usage import DependencyUsageGraph, JvmDependencyUsage
 from pants.util.dirutil import safe_mkdir, touch
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
@@ -108,9 +109,10 @@ class TestJvmDependencyUsage(TaskTestBase):
     classes_by_source = task.context.products.get_data('classes_by_source')
     runtime_classpath = task.context.products.get_data('runtime_classpath')
     product_deps_by_src = task.context.products.get_data('product_deps_by_src')
+    targets_by_file = JvmDependencyAnalyzer(runtime_classpath).targets_by_file(targets)
 
     def node_creator(target):
-      return task.create_dep_usage_node(target, '',
+      return task.create_dep_usage_node(target, targets_by_file, '',
                                         classes_by_source, runtime_classpath, product_deps_by_src)
 
     return DependencyUsageGraph(task.create_dep_usage_nodes(targets, node_creator),
