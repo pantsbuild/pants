@@ -16,9 +16,8 @@ from textwrap import dedent
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import file_option, target_option
-from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
-                                 BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidAction, InvalidKwarg, InvalidMemberType,
+from pants.option.errors import (BooleanOptionNameWithNo, DeprecatedOptionError, FrozenRegistration,
+                                 ImplicitValIsNone, InvalidKwarg, InvalidMemberType,
                                  MemberTypeNotAllowed, NoOptionNames, OptionNameDash,
                                  OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
                                  Shadowing)
@@ -62,19 +61,19 @@ class OptionsTest(unittest.TestCase):
     def register_global(*args, **kwargs):
       options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-    register_global('-z', '--verbose', action='store_true', help='Verbose output.', recursive=True)
+    register_global('-z', '--verbose', type=bool, help='Verbose output.', recursive=True)
     register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
     register_global('--y', type=list, member_type=int)
     register_global('--config-override', type=list)
 
     register_global('--pants-foo')
     register_global('--bar-baz')
-    register_global('--store-true-flag', action='store_true', fingerprint=True)
-    register_global('--store-false-flag', action='store_false')
-    register_global('--store-true-def-true-flag', action='store_true', default=True)
-    register_global('--store-true-def-false-flag', action='store_true', default=False)
-    register_global('--store-false-def-false-flag', action='store_false', default=False)
-    register_global('--store-false-def-true-flag', action='store_false', default=True)
+    register_global('--store-true-flag', type=bool, fingerprint=True)
+    register_global('--store-false-flag', type=bool, implicit_value=False)
+    register_global('--store-true-def-true-flag', type=bool, default=True)
+    register_global('--store-true-def-false-flag', type=bool, default=False)
+    register_global('--store-false-def-false-flag', type=bool, implicit_value=False, default=False)
+    register_global('--store-false-def-true-flag', type=bool, implicit_value=False, default=True)
 
     # Choices.
     register_global('--str-choices', choices=['foo', 'bar'])
@@ -101,7 +100,7 @@ class OptionsTest(unittest.TestCase):
     # Deprecated global options
     register_global('--global-crufty', deprecated_version='999.99.9',
                     deprecated_hint='use a less crufty global option')
-    register_global('--global-crufty-boolean', action='store_true', deprecated_version='999.99.9',
+    register_global('--global-crufty-boolean', type=bool, deprecated_version='999.99.9',
                     deprecated_hint='say no to crufty global options')
     register_global('--global-crufty-expired', deprecated_version='0.0.1',
                     deprecated_hint='use a less crufty global option')
@@ -114,7 +113,7 @@ class OptionsTest(unittest.TestCase):
     options.register('stale', '--crufty',
                      deprecated_version='999.99.9',
                      deprecated_hint='use a less crufty stale scoped option')
-    options.register('stale', '--crufty-boolean', action='store_true',
+    options.register('stale', '--crufty-boolean', type=bool,
                      deprecated_version='999.99.9',
                      deprecated_hint='say no to crufty, stale scoped options')
 
@@ -197,7 +196,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(True, options.for_scope('test').verbose)
     self.assertEqual(False, options.for_scope('test.junit').verbose)
 
-    # Test action=append option.
+    # Test list-typed option.
     options = self._parse('./pants', config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99], options.for_global_scope().y)
 
@@ -214,7 +213,6 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['']"})
     self.assertEqual([''], options.for_global_scope().config_override)
 
-    # Test list-typed option.
     options = self._parse('./pants --listy=\'[1, 2]\'',
                           config={'DEFAULT': {'listy': '[3, 4]'}})
     self.assertEqual([1, 2], options.for_global_scope().listy)
@@ -248,10 +246,21 @@ class OptionsTest(unittest.TestCase):
         options = self._parse('./pants --file-listy="{}" --file-listy="{}"'.format(fp1, fp2))
         self.assertEqual([fp1, fp2], options.for_global_scope().file_listy)
 
+  def test_explicit_boolean_values(self):
+    options = self._parse('./pants --verbose=false')
+    self.assertFalse(options.for_global_scope().verbose)
+    options = self._parse('./pants --verbose=False')
+    self.assertFalse(options.for_global_scope().verbose)
+
+    options = self._parse('./pants --verbose=true')
+    self.assertTrue(options.for_global_scope().verbose)
+    options = self._parse('./pants --verbose=True')
+    self.assertTrue(options.for_global_scope().verbose)
+
   def test_boolean_defaults(self):
     options = self._parse('./pants')
     self.assertFalse(options.for_global_scope().store_true_flag)
-    self.assertFalse(options.for_global_scope().store_false_flag)
+    self.assertTrue(options.for_global_scope().store_false_flag)
     self.assertFalse(options.for_global_scope().store_true_def_false_flag)
     self.assertTrue(options.for_global_scope().store_true_def_true_flag)
     self.assertFalse(options.for_global_scope().store_false_def_false_flag)
@@ -481,12 +490,9 @@ class OptionsTest(unittest.TestCase):
     assertError(NoOptionNames)
     assertError(OptionNameDash, 'badname')
     assertError(OptionNameDoubleDash, '-badname')
-    assertError(InvalidAction, '--foo', action='store_const')
     assertError(InvalidKwarg, '--foo', badkwarg=42)
     assertError(ImplicitValIsNone, '--foo', implicit_value=None)
-    assertError(BooleanOptionType, '--foo', action='store_true', type=int)
-    assertError(BooleanOptionImplicitVal, '--foo', action='store_true', implicit_value=False)
-    assertError(BooleanOptionNameWithNo, '--no-foo', action='store_true')
+    assertError(BooleanOptionNameWithNo, '--no-foo', type=bool)
     assertError(MemberTypeNotAllowed, '--foo', member_type=int)
     assertError(MemberTypeNotAllowed, '--foo', type=dict, member_type=int)
     assertError(InvalidMemberType, '--foo', type=list, member_type=set)
@@ -868,7 +874,7 @@ class OptionsTest(unittest.TestCase):
     pairs = options.get_fingerprintable_for_scope('compile.scala')
     self.assertEquals(len(pairs), 3)
     self.assertEquals((str, 'blah blah blah'), pairs[0])
-    self.assertEquals((str, True), pairs[1])
+    self.assertEquals((bool, True), pairs[1])
     self.assertEquals((int, 77), pairs[2])
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):

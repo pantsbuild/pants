@@ -19,13 +19,12 @@ from pants.base.revision import Revision
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.custom_types import (ListValueComponent, dict_option, file_option, list_option,
                                        target_list_option, target_option)
-from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
-                                 BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidAction, InvalidKwarg, InvalidMemberType,
+from pants.option.errors import (BooleanOptionNameWithNo, DeprecatedOptionError, FrozenRegistration,
+                                 ImplicitValIsNone, InvalidKwarg, InvalidMemberType,
                                  MemberTypeNotAllowed, NoOptionNames, OptionNameDash,
                                  OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
                                  Shadowing)
-from pants.option.option_util import is_boolean_option, is_list_option
+from pants.option.option_util import is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
 from pants.version import PANTS_SEMVER
@@ -52,7 +51,7 @@ class Parser(object):
     """Indicates a problem reading a value @fromfile."""
 
   @staticmethod
-  def str_to_bool(s):
+  def _ensure_bool(s):
     if isinstance(s, six.string_types):
       if s.lower() == 'true':
         return True
@@ -66,6 +65,13 @@ class Parser(object):
       return False
     else:
       raise Parser.BooleanConversionError('Got {0}. Expected True or False.'.format(s))
+
+  @classmethod
+  def invert(cls, s):
+    if s is None:
+      return None
+    b = cls._ensure_bool(s)
+    return not b
 
   def __init__(self, env, config, scope_info, parent_parser, option_tracker):
     """Create a Parser instance.
@@ -140,7 +146,6 @@ class Parser(object):
     for args, kwargs in self._unnormalized_option_registrations_iter():
       self._validate(args, kwargs)
       dest = kwargs.get('dest') or self._select_dest(args)
-      is_bool = is_boolean_option(kwargs)
 
       def consume_flag(flag):
         self._check_deprecated(dest, kwargs)
@@ -156,6 +161,9 @@ class Parser(object):
       # specified as a command-line flag, so we don't spam users with deprecated option values
       # specified in config, which isn't something they control.
       implicit_value = kwargs.get('implicit_value')
+      if implicit_value is None and kwargs.get('type') == bool:
+        implicit_value = True  # Allows --foo to mean --foo=true.
+
       flag_vals = []
 
       def add_flag_val(v):
@@ -169,18 +177,19 @@ class Parser(object):
           flag_vals.append(v)
 
       for arg in args:
-        if is_bool:
-          if arg in flag_value_map:
-            flag_vals.append('true' if kwargs['action'] == 'store_true' else 'false')
-            consume_flag(arg)
-          elif self._inverse_arg(arg) in flag_value_map:
-            flag_vals.append('false' if kwargs['action'] == 'store_true' else 'true')
-            consume_flag(self._inverse_arg(arg))
-        else:
-          if arg in flag_value_map:
-            for v in flag_value_map[arg]:
-              add_flag_val(v)
-            consume_flag(arg)
+        # If the user specified --no-foo on the cmd line, treat it as if the user specified
+        # --foo, but with the inverse implicit and explicit values.
+        if kwargs.get('type') == bool:
+          inverse_arg = self._inverse_arg(arg)
+          if inverse_arg in flag_value_map:
+            flag_value_map[arg] = [self.invert(v) for v in flag_value_map[inverse_arg]]
+            implicit_value = self.invert(implicit_value)
+            del flag_value_map[inverse_arg]
+
+        if arg in flag_value_map:
+          for v in flag_value_map[arg]:
+            add_flag_val(v)
+          consume_flag(arg)
 
       # Get the value for this option, falling back to defaults as needed.
       try:
@@ -298,10 +307,11 @@ class Parser(object):
     check_deprecated_types('type')
     check_deprecated_types('member_type')
 
+    action = kwargs.get('action')
     # Temporary munging to effectively turn type=list options into list options,
     # for uniform handling.  From here on, type=list is an error.
     # TODO: Remove after type=list deprecation.
-    if kwargs.get('action') == 'append':
+    if action == 'append':
       if 'type' in kwargs:
         kwargs['member_type'] = kwargs['type']
       kwargs['type'] = list
@@ -321,6 +331,17 @@ class Parser(object):
                              'Use type=list, member_type=target_option.'.format(
                                args[0], self.scope
                              ))
+
+    # Temporary munging to effectively turn action='store_true' into bool-typed options.
+    # From here on, action='store_true' is an error.  Ditto for store_false.
+    if action == 'store_true':
+      kwargs['type'] = bool
+      kwargs['implicit_value'] = True
+      del kwargs['action']
+    elif action == 'store_false':
+      kwargs['type'] = bool
+      kwargs['implicit_value'] = False
+      del kwargs['action']
 
     # Record the args. We'll do the underlying parsing on-demand.
     self._option_registrations.append((args, kwargs))
@@ -351,14 +372,9 @@ class Parser(object):
         warnings.warn('*** {}'.format(msg), DeprecationWarning, stacklevel=9999)
 
   _allowed_registration_kwargs = {
-    'type', 'member_type', 'action', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
+    'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
     'fingerprint', 'deprecated_version', 'deprecated_hint', 'removal_version', 'fromfile'
-  }
-
-  # TODO: Get rid of action entirely.  Replace with type=bool.
-  _allowed_actions = {
-    'store', 'store_true', 'store_false'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -383,17 +399,8 @@ class Parser(object):
         error(OptionNameDoubleDash, arg_name=arg)
 
     # Validate kwargs.
-    if kwargs.get('action', 'store') not in self._allowed_actions:
-      error(InvalidAction, action=kwargs['action'])
-
-    if is_boolean_option(kwargs) and 'type' in kwargs:
-      error(BooleanOptionType)
-
-    if 'implicit_value' in kwargs:
-      if is_boolean_option(kwargs):
-        error(BooleanOptionImplicitVal)
-      elif kwargs['implicit_value'] is None:
-        error(ImplicitValIsNone)
+    if 'implicit_value' in kwargs and kwargs['implicit_value'] is None:
+      error(ImplicitValIsNone)
 
     # Note: we check for list here, not list_option, because we validate the provided kwargs,
     # not the ones we modified.  However we temporarily also allow list_option, until the
@@ -448,14 +455,14 @@ class Parser(object):
     def to_value_type(val_str):
       if val_str is None:
         return None
-      elif is_boolean_option(kwargs):
-        return self.str_to_bool(val_str)
+      elif kwargs.get('type') == bool:
+        return self._ensure_bool(val_str)
       else:
         return self._wrap_type(kwargs.get('type', str))(val_str)
 
     # Helper function to expand a fromfile=True value string, if needed.
     def expand(val_str):
-      if is_fromfile and val_str and val_str.startswith('@'):
+      if kwargs.get('fromfile', False) and val_str and val_str.startswith('@'):
         if val_str.startswith('@@'):   # Support a literal @ for fromfile values via @@.
           return val_str[1:]
         else:
@@ -468,15 +475,6 @@ class Parser(object):
                 dest, self._scope_str(), fromfile, e))
       else:
         return val_str
-
-    # Validate that fromfile=True is only applied to option types that allow it.
-    # TODO: Why? Seems like this should always work. It may be silly to have a boolean
-    # literal in a file, but I don't see why we should go out of our way to prevent it.
-    is_fromfile = kwargs.get('fromfile', False)
-    action = kwargs.get('action')
-    if is_fromfile and action:
-      raise ParseError('Cannot fromfile {} with an action ({}) in scope {}'
-                       .format(dest, action, self._scope))
 
     # Get value from config files, and capture details about its derivation.
     config_details = None
@@ -532,6 +530,7 @@ class Parser(object):
     # Rank all available values.
     # Note that some of these values may already be of the value type, but type conversion
     # is idempotent, so this is OK.
+
     values_to_rank = [to_value_type(x) for x in
                       [flag_val, env_val_str, config_val_str, kwargs.get('default'), None]]
     # Note that ranked_vals will always have at least one element, and all elements will be
@@ -575,6 +574,14 @@ class Parser(object):
       ret = RankedValue(merged_rank, merged_val)
     else:
       ret = ranked_vals[-1]
+      if kwargs.get('type') == bool and ret.value is None:
+        # We don't allow None as a value for bool options. If the value is None here it
+        # means that the value wasn't specified by the user anywhere, so we fall back to
+        # the inverse of the implicit_value (i.e., the inverse of what you'd get if the flag was
+        # specified with no argument).
+        # Note that we convert to str here because kwargs['implicit_value'] may be a string
+        # or a bool - we want it to work in both cases.
+        ret = RankedValue(ret.rank, not self._ensure_bool(kwargs.get('implicit_value', True)))
       check(ret.value)
 
     # All done!

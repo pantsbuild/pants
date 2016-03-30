@@ -106,10 +106,13 @@ class ExplainOptionsTask(ConsoleTask):
   def console_output(self, targets):
     self._force_option_parsing()
     for scope, options in sorted(self.context.options.tracker.option_history_by_scope.items()):
-      if not self._scope_filter(scope): continue
+      if not self._scope_filter(scope):
+        continue
       for option, history in sorted(options.items()):
-        if not self._option_filter(option): continue
-        if not self._rank_filter(history.latest.rank): continue
+        if not self._option_filter(option):
+          continue
+        if not self._rank_filter(history.latest.rank):
+          continue
         if self.get_options().only_overridden and not history.was_overridden:
           continue
         # Skip the option if it has already passed the deprecation period.

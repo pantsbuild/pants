@@ -7,9 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from mock import mock
-
 from pants.help.help_info_extracter import HelpInfoExtracter
+from pants.option.config import Config
+from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.option_tracker import OptionTracker
+from pants.option.parser import Parser
 
 
 class HelpInfoExtracterTest(unittest.TestCase):
@@ -22,11 +24,12 @@ class HelpInfoExtracterTest(unittest.TestCase):
       self.assertListEqual(expected_scoped_cmd_line_args, ohi.scoped_cmd_line_args)
       self.assertListEqual(expected_unscoped_cmd_line_args, ohi.unscoped_cmd_line_args)
 
-    do_test(['-f'], {'action': 'store_true'}, ['-f'], ['-f'])
-    do_test(['--foo'], {'action': 'store_true'}, ['--[no-]foo'], ['--foo', '--no-foo'])
-    do_test(['--foo'], {'action': 'store_false'}, ['--[no-]foo'], ['--foo', '--no-foo'])
-    do_test(['-f', '--foo'], {'action': 'store_true'}, ['-f', '--[no-]foo'],
-                                                       ['-f', '--foo', '--no-foo'])
+    do_test(['-f'], {'type': bool }, ['-f'], ['-f'])
+    do_test(['--foo'], {'type': bool }, ['--[no-]foo'], ['--foo', '--no-foo'])
+    do_test(['--foo'], {'type': bool, 'implicit_value': False },
+            ['--[no-]foo'], ['--foo', '--no-foo'])
+    do_test(['-f', '--foo'], {'type': bool }, ['-f', '--[no-]foo'],
+            ['-f', '--foo', '--no-foo'])
 
     do_test(['--foo'], {}, ['--foo=<str>'], ['--foo'])
     do_test(['--foo'], {'metavar': 'xx'}, ['--foo=xx'], ['--foo'])
@@ -61,30 +64,35 @@ class HelpInfoExtracterTest(unittest.TestCase):
       self.assertListEqual(expected_display_args, ohi.display_args)
       self.assertListEqual(expected_scoped_cmd_line_args, ohi.scoped_cmd_line_args)
       self.assertListEqual(expected_unscoped_cmd_line_args, ohi.unscoped_cmd_line_args)
-    do_test(['-f'], {'action': 'store_true'}, ['--bar-baz-f'], ['--bar-baz-f'], ['-f'])
-    do_test(['--foo'], {'action': 'store_true'}, ['--[no-]bar-baz-foo'],
+    do_test(['-f'], {'type': bool}, ['--bar-baz-f'], ['--bar-baz-f'], ['-f'])
+    do_test(['--foo'], {'type': bool}, ['--[no-]bar-baz-foo'],
             ['--bar-baz-foo', '--no-bar-baz-foo'], ['--foo', '--no-foo'])
-    do_test(['--foo'], {'action': 'store_false'}, ['--[no-]bar-baz-foo'],
+    do_test(['--foo'], {'type': bool, 'implicit_value': False }, ['--[no-]bar-baz-foo'],
             ['--bar-baz-foo', '--no-bar-baz-foo'], ['--foo', '--no-foo'])
 
   def test_default(self):
-    r = lambda value: mock.Mock(value=value)
-
     def do_test(args, kwargs, expected_default):
-      ohi = HelpInfoExtracter('').get_option_help_info(args, kwargs)
+      # Defaults are computed in the parser and added into the kwargs, so we
+      # must jump through this hoop in this test.
+      parser = Parser(env={}, config=Config.load([]),
+                      scope_info=GlobalOptionsRegistrar.get_scope_info(),
+                      parent_parser=None, option_tracker=OptionTracker())
+      parser.register(*args, **kwargs)
+      oshi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser).basic
+      self.assertEquals(1, len(oshi))
+      ohi = oshi[0]
       self.assertEqual(expected_default, ohi.default)
 
-    do_test(['--foo'], {'action': 'store_true'}, 'False')
-    do_test(['--foo'], {'action': 'store_true', 'default': r(True)}, 'True')
-    do_test(['--foo'], {'action': 'store_false'}, 'True')
-    do_test(['--foo'], {'action': 'store_false', 'default': r(False)}, 'False')
+    do_test(['--foo'], {'type': bool }, 'False')
+    do_test(['--foo'], {'type': bool, 'default': True}, 'True')
+    do_test(['--foo'], {'type': bool, 'implicit_value': False }, 'True')
+    do_test(['--foo'], {'type': bool, 'implicit_value': False, 'default': False}, 'False')
     do_test(['--foo'], {}, 'None')
     do_test(['--foo'], {'type': int}, 'None')
-    do_test(['--foo'], {'type': int, 'default': r(42)}, '42')
-    # TODO: Change these if we change the defaults to empty lists/dicts.
-    do_test(['--foo'], {'type': list}, 'None')
+    do_test(['--foo'], {'type': int, 'default': 42}, '42')
+    do_test(['--foo'], {'type': list}, '[]')
+    # TODO: Change this if we switch the implicit default to {}.
     do_test(['--foo'], {'type': dict}, 'None')
-    do_test(['--foo'], {'action': 'append'}, 'None')
 
   def test_deprecated(self):
     kwargs = {'deprecated_version': '999.99.9', 'deprecated_hint': 'do not use this'}
