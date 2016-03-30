@@ -11,10 +11,9 @@ from contextlib import contextmanager
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.specs import DescendantAddresses
 from pants.bin.goal_runner import OptionsInitializer
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.fs import Path, create_fs_tasks
+from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
 from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
@@ -78,7 +77,7 @@ def setup(options=None):
 def maybe_launch_pantsd(options, scheduler):
   if options.for_global_scope().enable_pantsd is True:
     pantsd_launcher = PantsDaemonLauncher.global_instance()
-    pantsd_launcher.set_scheduler(scheduler, (Path, DescendantAddresses), FilesystemNode)
+    pantsd_launcher.set_scheduler(scheduler)
     pantsd_launcher.maybe_launch()
 
 

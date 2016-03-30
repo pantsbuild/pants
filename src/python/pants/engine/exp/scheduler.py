@@ -6,14 +6,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 import sys
 import threading
 from collections import defaultdict
 
+import six
+
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
-from pants.engine.exp.fs import PathGlobs, Paths
+from pants.engine.exp.fs import Path, PathGlobs, Paths
 from pants.engine.exp.nodes import (DependenciesNode, FilesystemNode, Node, Noop, ProjectionNode,
                                     Return, SelectNode, State, StepContext, TaskNode, Throw,
                                     Waiting)
@@ -41,6 +44,9 @@ class ProductGraph(object):
     # dependencies/dependents lists themselves, but track them independently in order to provide
     # context specific error messages when they are introduced.
     self._cyclic_dependencies = defaultdict(set)
+
+  def __len__(self):
+    return len(self._node_results)
 
   def _set_state(self, node, state):
     existing_state = self._node_results.get(node, None)
@@ -146,15 +152,15 @@ class ProductGraph(object):
 
     :param func predicate: A predicate that matches Node objects for all nodes in the graph.
     """
+    def _sever_dependents(node):
+      for associated in self._dependencies[node]:
+        self._dependents[associated].discard(node)
+
     def _delete_node(node):
       del self._node_results[node]
       del self._dependents[node]
       del self._dependencies[node]
       self._cyclic_dependencies.pop(node, None)
-
-    def _sever_dependents(node):
-      for associated in self._dependencies[node]:
-        self._dependents[associated].discard(node)
 
     def all_predicate(_): return True
     predicate = predicate or all_predicate
@@ -173,7 +179,27 @@ class ProductGraph(object):
       logger.debug('invalidating node: %r', node)
       _delete_node(node)
 
-    return len(invalidated_nodes)
+    invalidated_count = len(invalidated_nodes)
+    logger.info('invalidated {} nodes'.format(invalidated_count))
+    return invalidated_count
+
+  def _generate_fsnode_subjects(self, filenames):
+    """Given filenames, generate a set of subject keys for invalidation predicate matching."""
+    file_paths = ((six.text_type(f), six.text_type(os.path.dirname(f))) for f in filenames)
+    for file_path, parent_dir_path in file_paths:
+      yield Path(file_path)
+      yield Path(parent_dir_path)
+      yield DescendantAddresses(parent_dir_path)
+
+  def invalidate_files(self, filenames):
+    """Given a set of changed filenames, invalidate all related FilesystemNodes in the graph."""
+    subjects = set(self._generate_fsnode_subjects(filenames))
+    logger.debug('generated invalidation subjects: %s', subjects)
+
+    def predicate(node):
+      return type(node) is FilesystemNode and node.subject in subjects
+
+    return self.invalidate(predicate)
 
   def walk(self, roots, predicate=None, dependents=False):
     """Yields Nodes depth-first in pre-order, starting from the given roots.
@@ -454,11 +480,11 @@ class LocalScheduler(object):
     # Update the Node's state in the graph.
     self._product_graph.update_state(node, result)
 
-  def invalidate(self, predicate=None):
-    """Calls `ProductGraph.invalidate()` against an internal ProductGraph instance under
-    protection of a scheduler-level lock."""
+  def invalidate_files(self, filenames):
+    """Calls `ProductGraph.invalidate_files()` against an internal ProductGraph instance
+    under protection of a scheduler-level lock."""
     with self._product_graph_lock:
-      return self._product_graph.invalidate(predicate)
+      return self._product_graph.invalidate_files(filenames)
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
