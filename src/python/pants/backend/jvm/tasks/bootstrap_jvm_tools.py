@@ -218,7 +218,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     # Bootstrapped tools are inserted as synthetic.  If they exist on disk they are later
     # updated as non synthetic targets.  If its a synthetic target make sure it has a rev.
     synthetic_targets = [t.is_synthetic for t in targets]
-    empty_revs = [cp.rev is None for cp in jvm_tool.classpath]
+    empty_revs = [cp.rev is None for cp in jvm_tool.classpath or []]
 
     if any(empty_revs) and any(synthetic_targets):
       raise ToolUnderspecified(textwrap.dedent("""
