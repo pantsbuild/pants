@@ -40,6 +40,9 @@ class SchedulerService(PantsService):
     self._subject_classes = subject_classes
     self._fs_node_type = fs_node_type
 
+  def __len__(self):
+    return len(self._scheduler.product_graph.completed_nodes())
+
   def setup(self):
     """Registers filesystem event handlers on an FSEventService instance."""
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)

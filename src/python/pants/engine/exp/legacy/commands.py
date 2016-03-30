@@ -42,8 +42,9 @@ class LegacyTable(SymbolTable):
     return {alias: TargetAdaptor for alias in cls.aliases().target_types}
 
 
-def setup():
-  options, _ = OptionsInitializer(OptionsBootstrapper()).setup()
+def setup(options=None):
+  if not options:
+    options, _ = OptionsInitializer(OptionsBootstrapper()).setup()
   build_root = get_buildroot()
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
@@ -75,15 +76,15 @@ def setup():
 
 
 def maybe_launch_pantsd(options, scheduler):
-  if options.for_global_scope().enable_pantsd:
+  if options.for_global_scope().enable_pantsd is True:
     pantsd_launcher = PantsDaemonLauncher.global_instance()
     pantsd_launcher.set_scheduler(scheduler, (Path, DescendantAddresses), FilesystemNode)
     pantsd_launcher.maybe_launch()
 
 
 @contextmanager
-def _setup_graph():
-  scheduler, storage, options, spec_roots, symbol_table_cls = setup()
+def setup_graph(*args, **kwargs):
+  scheduler, storage, options, spec_roots, symbol_table_cls = setup(*args, **kwargs)
 
   # Populate the graph for the given request, and print the resulting Addresses.
   engine = LocalSerialEngine(scheduler, storage)
@@ -100,13 +101,13 @@ def _setup_graph():
 
 @contextmanager
 def _open_graph():
-  with _setup_graph() as (graph, addresses, _):
+  with setup_graph() as (graph, addresses, _):
     yield graph, addresses
 
 
 @contextmanager
 def _open_scheduler():
-  with _setup_graph() as (_, _, scheduler):
+  with setup_graph() as (_, _, scheduler):
     yield scheduler
 
 

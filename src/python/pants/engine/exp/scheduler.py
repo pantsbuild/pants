@@ -152,10 +152,9 @@ class ProductGraph(object):
       del self._dependencies[node]
       self._cyclic_dependencies.pop(node, None)
 
-    def _sever_root_dependents(roots):
-      for root in roots:
-        for associated in self._dependencies[root]:
-          self._dependents[associated].discard(root)
+    def _sever_dependents(node):
+      for associated in self._dependencies[node]:
+        self._dependents[associated].discard(node)
 
     def all_predicate(_): return True
     predicate = predicate or all_predicate
@@ -165,11 +164,9 @@ class ProductGraph(object):
                                                                 predicate=all_predicate,
                                                                 dependents=True))
 
-    # Sever dependee->dependent relationships in the graph for all given invalidated roots. This
-    # only applies to the outer-most invalidated root nodes due to possible references from non-
-    # invalidated nodes via dependents.
-    for root in invalidated_roots:
-      _sever_root_dependents(invalidated_roots)
+    # Sever dependee->dependent relationships in the graph for all given invalidated nodes.
+    for node in invalidated_nodes:
+      _sever_dependents(node)
 
     # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
     for node in invalidated_nodes:

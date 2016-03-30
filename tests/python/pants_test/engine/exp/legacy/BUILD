@@ -19,3 +19,12 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name = 'scheduler_service',
+  sources = ['test_scheduler_service.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/engine/exp/legacy:commands'
+  ]
+)
