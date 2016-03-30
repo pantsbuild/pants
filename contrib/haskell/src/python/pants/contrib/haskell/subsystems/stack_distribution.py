@@ -63,13 +63,22 @@ class StackDistribution(object):
     :returns: The stack distribution base directory.
     :rtype: string
     """
+    import sys
+    print("STACK DEBUG: in base_dir", file=sys.stderr)
     stack_dist = self._binary_util.select_binary(self._relpath, self.version, 'stack.tar.gz')
+    print("STACK DEBUG: stack_dist: {}".format(stack_dist), file=sys.stderr)
     distribution_workdir = os.path.dirname(stack_dist)
+    print("STACK DEBUG: distribution_workdir: {}".format(distribution_workdir), file=sys.stderr)
     outdir = os.path.join(distribution_workdir, 'unpacked')
+    print("STACK DEBUG: outdir: {}".format(outdir), file=sys.stderr)
     if not os.path.exists(outdir):
       with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
+        print("STACK DEBUG: tmp_dist: {}".format(tmp_dist), file=sys.stderr)
         TGZ.extract(stack_dist, tmp_dist)
+        print("STACK DEBUG: Extracted", file=sys.stderr)
         os.rename(tmp_dist, outdir)
+        print("STACK DEBUG: Renamed", file=sys.stderr)
+    print("STACK DEBUG: Returning", file=sys.stderr)
     return os.path.join(outdir, 'stack')
 
   class StackCommand(namedtuple('StackCommand', ['cmdline', 'env'])):
