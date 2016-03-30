@@ -22,34 +22,6 @@ from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLitera
 from pants.util.objects import datatype
 
 
-class PartiallyConsumedInputsError(Exception):
-  """No task was able to consume a particular literal product for a subject, although some tried.
-
-  In particular, this error allows for safe composition of configuration on targets (ie,
-  ThriftSources AND ThriftConfig), because if a task requires multiple inputs for a subject
-  but cannot find them, a useful error is raised.
-
-  TODO: Improve the error message in the presence of failures due to mismatched variants.
-  """
-
-  @classmethod
-  def _msg(cls, inverted_symbol_table, partially_consumed_inputs):
-    def name(product):
-      return inverted_symbol_table[product]
-    for subject, tasks_and_inputs in partially_consumed_inputs.items():
-      yield '\nSome products were partially specified for `{}`:'.format(subject)
-      for ((input_product, output_product), tasks) in tasks_and_inputs.items():
-        yield '  To consume `{}` and produce `{}`:'.format(name(input_product), name(output_product))
-        for task, additional_inputs in tasks:
-          inputs_str = ' AND '.join('`{}`'.format(name(i)) for i in additional_inputs)
-          yield '    {} also needed ({})'.format(task.__name__, inputs_str)
-
-  @classmethod
-  def create(cls, inverted_symbol_table, partially_consumed_inputs):
-    msg = '\n'.join(cls._msg(inverted_symbol_table, partially_consumed_inputs))
-    return cls(msg)
-
-
 class ProductGraph(object):
 
   def __init__(self, validator=None):
@@ -362,104 +334,10 @@ class StepResult(datatype('Step', ['state'])):
   """
 
 
-class GraphValidator(object):
-  """A concrete object that implements validation of a completed product graph.
-
-  TODO: The name "literal" here is overloaded with SelectLiteral, which is a better fit
-  for the name. The values here are more "user-specified/configured" than "literal".
-
-  TODO: If this abstraction seems useful, we should extract an interface and allow plugin
-  implementers to install their own. But currently the API isn't great: in particular, it
-  would be very, very helpful to be able to run validation _during_ graph execution as
-  subgraphs are completing. This would limit their performance impact, and allow for better
-  locality of errors.
-  """
-
-  def __init__(self, symbol_table_cls):
-    self._literal_types = dict()
-    for name, cls in symbol_table_cls.table().items():
-      self._literal_types[cls] = name
-
-  def _collect_consumed_inputs(self, product_graph, root):
-    """Walks successful nodes under the root for its subject, and returns all products used."""
-    consumed_inputs = set()
-    # Walk into successful nodes for the same subject under this root.
-    def predicate(entry):
-      node, state = entry
-      return root.subject == node.subject and type(state) is Return
-    # If a product was successfully selected, record it.
-    for ((node, _), _) in product_graph.walk([root], predicate=predicate):
-      if type(node) is SelectNode:
-        consumed_inputs.add(node.product)
-    return consumed_inputs
-
-  def _collect_partially_consumed_inputs(self, product_graph, consumed_inputs, root):
-    """Walks below a failed node and collects cases where additional literal products could be used.
-
-    Returns:
-      dict(subject, dict(tuple(input_product, output_product), list(tuple(task, missing_products))))
-    """
-    partials = defaultdict(lambda: defaultdict(list))
-    # Walk all nodes for the same subject under this root.
-    def predicate(entry):
-      node, state = entry
-      return root.subject == node.subject
-    for ((node, state), dependencies) in product_graph.walk([root], predicate=predicate):
-      # Look for unsatisfied TaskNodes with at least one unsatisfied dependency.
-      if type(node) is not TaskNode:
-        continue
-      if type(state) is not Noop:
-        continue
-      missing_products = {dep.product for dep, state in dependencies if type(state) is Noop}
-      if not missing_products:
-        continue
-
-      # If all unattainable products could have been specified as literal...
-      if any(product not in self._literal_types for product in missing_products):
-        continue
-
-      # There was at least one dep successfully (recursively) satisfied via a literal.
-      # TODO: this does multiple walks.
-      used_literal_deps = set()
-      for dep, _ in dependencies:
-        for product in self._collect_consumed_inputs(product_graph, dep):
-          if product in self._literal_types:
-            used_literal_deps.add(product)
-      if not used_literal_deps:
-        continue
-
-      # The partially consumed products were not fully consumed elsewhere.
-      if not (used_literal_deps - consumed_inputs):
-        continue
-
-      # Found a partially consumed input.
-      for used_literal_dep in used_literal_deps:
-        partials[node.subject][(used_literal_dep, node.product)].append((node.func, missing_products))
-    return partials
-
-  def validate(self, product_graph):
-    """Finds 'subject roots' in the product graph and invokes validation on each of them."""
-
-    # Locate roots: those who do not have any dependents for the same subject.
-    roots = set()
-    for node, dependents in product_graph.dependents().items():
-      if any(d.subject == node.subject for d in dependents):
-        # Node had a dependent for its subject: was not a root.
-        continue
-      roots.add(node)
-
-    # Raise if there were any partially consumed inputs.
-    for root in roots:
-      consumed = self._collect_consumed_inputs(product_graph, root)
-      partials = self._collect_partially_consumed_inputs(product_graph, consumed, root)
-      if partials:
-        raise PartiallyConsumedInputsError.create(self._literal_types, partials)
-
-
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, symbol_table_cls, project_tree, graph_lock=None):
+  def __init__(self, goals, tasks, storage, project_tree, graph_lock=None, graph_validator=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
@@ -474,7 +352,7 @@ class LocalScheduler(object):
     self._project_tree = project_tree
     self._node_builder = NodeBuilder.create(self._tasks)
 
-    self._graph_validator = GraphValidator(symbol_table_cls)
+    self._graph_validator = graph_validator
     self._product_graph = ProductGraph()
     self._product_graph_lock = graph_lock or threading.RLock()
     self._step_id = 0
@@ -650,7 +528,5 @@ class LocalScheduler(object):
               len(self._product_graph.dependencies())),
             file=sys.stderr)
 
-  def validate(self):
-    """Validates the generated product graph with the configured GraphValidator."""
-    with self._product_graph_lock:
-      self._graph_validator.validate(self._product_graph)
+      if self._graph_validator is not None:
+        self._graph_validator.validate(self._product_graph)

@@ -112,3 +112,12 @@ python_tests(
     'src/python/pants/util:dirutil',
   ]
 )
+
+python_tests(
+  name='graph_validator',
+  sources=['test_graph_validator.py'],
+  coverage=['pants.engine.exp.nodes', 'pants.engine.exp.scheduler'],
+  dependencies=[
+    ':scheduler',
+  ]
+)

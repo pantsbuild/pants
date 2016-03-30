@@ -102,7 +102,6 @@ def visualize_build_request(build_root, goals, subjects):
   try:
     engine.reduce(execution_request)
     visualize_execution_graph(scheduler, storage, execution_request)
-    scheduler.validate()
   finally:
     engine.close()
 

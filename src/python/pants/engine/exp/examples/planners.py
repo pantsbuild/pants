@@ -15,6 +15,7 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
+from pants.engine.exp.examples.graph_validator import GraphValidator
 from pants.engine.exp.examples.parsers import JsonParser
 from pants.engine.exp.examples.sources import Sources
 from pants.engine.exp.fs import FileContent, FilesContent, Path, PathGlobs, Paths, create_fs_tasks
@@ -511,4 +512,4 @@ def setup_json_scheduler(build_root, debug=True):
     )
 
   project_tree = FileSystemProjectTree(build_root)
-  return LocalScheduler(goals, tasks, symbol_table_cls, project_tree), storage
+  return LocalScheduler(goals, tasks, storage, project_tree, None, GraphValidator(symbol_table_cls)), storage
