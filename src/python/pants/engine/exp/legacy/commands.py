@@ -82,16 +82,13 @@ def maybe_launch_pantsd(options, scheduler):
 
 
 @contextmanager
-def setup_graph(*args, **kwargs):
+def _open_scheduler(*args, **kwargs):
   scheduler, storage, options, spec_roots, symbol_table_cls = setup(*args, **kwargs)
 
-  # Populate the graph for the given request, and print the resulting Addresses.
   engine = LocalSerialEngine(scheduler, storage)
   engine.start()
   try:
-    graph = ExpGraph(scheduler, engine, symbol_table_cls)
-    addresses = tuple(graph.inject_specs_closure(spec_roots))
-    yield graph, addresses, scheduler
+    yield scheduler, engine, symbol_table_cls, spec_roots
     maybe_launch_pantsd(options, scheduler)
   finally:
     print('Cache stats: {}'.format(engine._cache.get_stats()), file=sys.stderr)
@@ -99,27 +96,23 @@ def setup_graph(*args, **kwargs):
 
 
 @contextmanager
-def _open_graph():
-  with setup_graph() as (graph, addresses, _):
-    yield graph, addresses
-
-
-@contextmanager
-def _open_scheduler():
-  with setup_graph() as (_, _, scheduler):
-    yield scheduler
+def open_exp_graph(*args, **kwargs):
+  with _open_scheduler(*args, **kwargs) as (scheduler, engine, symbol_table_cls, spec_roots):
+    graph = ExpGraph(scheduler, engine, symbol_table_cls)
+    addresses = tuple(graph.inject_specs_closure(spec_roots))
+    yield graph, addresses, scheduler
 
 
 def dependencies():
   """Lists the transitive dependencies of targets under the current build root."""
-  with _open_graph() as (graph, addresses):
+  with open_exp_graph() as (_, addresses, _):
     for address in addresses:
       print(address)
 
 
 def filemap():
   """Lists the transitive dependencies of targets under the current build root."""
-  with _open_graph() as (graph, addresses):
+  with open_exp_graph() as (graph, addresses, _):
     for address in addresses:
       target = graph.get_target(address)
       for source in target.sources_relative_to_buildroot():
@@ -128,7 +121,7 @@ def filemap():
 
 def fsnodes():
   """Prints out all of the FilesystemNodes in the Scheduler for debugging purposes."""
-  with _open_scheduler() as scheduler:
+  with open_exp_graph() as (_, _, scheduler):
     for node in scheduler.product_graph.completed_nodes():
       if type(node) is FilesystemNode:
         print(node)

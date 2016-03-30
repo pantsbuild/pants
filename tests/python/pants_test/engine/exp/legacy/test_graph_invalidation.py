@@ -9,7 +9,7 @@ import unittest
 
 import mock
 
-from pants.engine.exp.legacy.commands import setup_graph
+from pants.engine.exp.legacy.commands import open_exp_graph
 
 
 class GraphInvalidationTest(unittest.TestCase):
@@ -20,7 +20,7 @@ class GraphInvalidationTest(unittest.TestCase):
 
   def setup_legacy_product_graph(self, *specs):
     kwargs = self._make_setup_args(*specs)
-    with setup_graph(**kwargs) as (_, _, scheduler):
+    with open_exp_graph(**kwargs) as (_, _, scheduler):
       return scheduler.product_graph
 
   def test_invalidate_fsnode(self):

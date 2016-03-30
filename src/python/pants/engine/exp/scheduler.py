@@ -184,11 +184,12 @@ class ProductGraph(object):
     return invalidated_count
 
   def _generate_fsnode_subjects(self, filenames):
-    """Given filenames, generate a set of subject keys for invalidation predicate matching."""
+    """Given filenames, generate a set of subjects for invalidation predicate matching."""
     file_paths = ((six.text_type(f), six.text_type(os.path.dirname(f))) for f in filenames)
     for file_path, parent_dir_path in file_paths:
       yield Path(file_path)
-      yield Path(parent_dir_path)
+      yield Path(parent_dir_path)  # Invalidate the parent dirs DirectoryListing.
+      # TODO: See https://github.com/pantsbuild/pants/issues/3117.
       yield DescendantAddresses(parent_dir_path)
 
   def invalidate_files(self, filenames):
