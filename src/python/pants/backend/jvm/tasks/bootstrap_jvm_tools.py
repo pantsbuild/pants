@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 import os
 import shutil
+import textwrap
 import threading
 from collections import defaultdict
 from textwrap import dedent
@@ -163,7 +164,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
               tool_classpath_target = Target(name=dep_address.target_name,
                                              address=dep_address,
                                              build_graph=build_graph)
-            build_graph.inject_target(tool_classpath_target)
+            build_graph.inject_target(tool_classpath_target, synthetic=True)
 
     # We use the trick of not returning alternate roots, but instead just filling the dep_spec
     # holes with a JarLibrary built from a tool's default classpath JarDependency list if there is
@@ -202,7 +203,30 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     except (KeyError, AddressLookupError) as e:
       raise self._tool_resolve_error(e, dep_spec, jvm_tool)
 
+  def _check_underspecified_tools(self, jvm_tool, targets):
+    # NOTE: ScalaPlatform allows a user to specify a custom configuration.  When this is
+    # done all of the targets must be defined by the user and defaults are set as None.
+    # If we catch a case of a scala-platform tool being bootstrapped and we have no user
+    # specified target we need to throw an exception for the user.
+    # It is possible for tests to insert synthetic tool targets which we honor here.
+
+    class ToolUnderspecified(Exception):
+      pass
+
+    # Bootstrapped tools are inserted as synthetic.  If they exist on disk they are later
+    # updated as non synthetic targets.  If it's a synthetic target make sure it has a rev.
+    synthetic_targets = [t.is_synthetic for t in targets]
+    empty_revs = [cp.rev is None for cp in jvm_tool.classpath or []]
+
+    if any(empty_revs) and any(synthetic_targets):
+      raise ToolUnderspecified(textwrap.dedent("""
+        Unable to bootstrap tool: '{}' because no rev was specified.  This usually
+        means that the tool was not defined properly in your build files and no
+        default option was provided to use for bootstrap.
+        """.format(jvm_tool.key)))
+
   def _bootstrap_classpath(self, jvm_tool, targets):
+    self._check_underspecified_tools(jvm_tool, targets)
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
     return self.ivy_classpath(targets, silent=True, workunit_name=workunit_name)
 

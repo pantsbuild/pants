@@ -81,7 +81,6 @@ class Scalastyle(NailgunTask):
     # TODO: Use the task's log level instead of this separate verbosity knob.
     register('--verbose', action='store_true', default=False,
              help='Enable verbose scalastyle output.')
-    cls.register_jvm_tool(register, 'scalastyle')
 
   @classmethod
   def get_non_synthetic_scala_targets(cls, targets):

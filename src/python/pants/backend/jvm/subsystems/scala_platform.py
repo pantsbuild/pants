@@ -36,13 +36,14 @@ scala_build_info = {
       repl_name='scala_2_11_repl',
       style_name='scalastyle_2_11',
       style_version='0.8.0'),
-  'custom': major_version_info(
-    full_version='2.10.4',
-    compiler_name='scalac',
-    runtime_name='runtime_default',
-    repl_name='scala-repl',
-    style_name='scalastyle',
-    style_version='0.3.2'),
+  'custom':
+    major_version_info(
+      full_version=None,
+      compiler_name='scalac',
+      runtime_name='runtime_default',
+      repl_name='scala_repl',
+      style_name='scalastyle',
+      style_version=None),
 }
 
 
@@ -90,7 +91,8 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       _register_tool('org.scalastyle', 'scalastyle_{}'.format(version), name, style_version)
 
     super(ScalaPlatform, cls).register_options(register)
-    register('--version', advanced=True, default='2.10', choices=['2.10', '2.11', 'custom'],
+    register('--version', advanced=True, default='2.10',
+             choices=['2.10', '2.11', 'custom'], fingerprint=True,
              help='The scala "platform version", which is suffixed onto all published '
                   'libraries. This should match the declared compiler/library versions. '
                   'Version specified will allow the user provide some sane defaults for common '
@@ -111,13 +113,16 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register('--runtime-spec', advanced=True, default='//:scala-library',
              help='Address to be used for custom scala runtime.')
 
+    register('--repl-spec', advanced=True, default='//:scala-repl',
+             help='Address to be used for custom scala runtime.')
+
     register('--suffix-version', advanced=True, default=None,
              help='Scala suffix to be used when a custom version is specified.  For example 2.10')
 
     # Register Scala compilers.
     register_scala_compiler('2.10')
     register_scala_compiler('2.11')
-    register_scala_compiler('custom')  # This will register default tools.
+    register_scala_compiler('custom')
 
     # Register repl tools.
     jline_dep = JarDependency(
@@ -179,7 +184,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper repl name.
     :return iterator: list with single runtime.
     """
-    return scala_build_info.get(self._get_label()).repl_name
+    if self.get_options().version == 'custom':
+      return self.get_options().repl_spec
+    else:
+      return scala_build_info.get(self._get_label()).repl_name
 
   @property
   def runtime(self):

@@ -14,6 +14,7 @@ from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
 from twitter.common.collections.orderedset import OrderedSet
 
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
@@ -46,6 +47,10 @@ def is_java(target):
 
 
 class IdeGen(IvyTaskMixin, NailgunTask):
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(IdeGen, cls).subsystem_dependencies() + (ScalaPlatform, )
 
   @classmethod
   def register_options(cls, register):
@@ -343,7 +348,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     if self.skip_scala:
       scalac_classpath = []
     else:
-      scalac_classpath = self.tool_classpath('scalac', scope='scala-platform')
+      scalac_classpath = ScalaPlatform.global_instance().compiler_classpath(self.context.products)
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
     self.map_internal_jars(targets)
