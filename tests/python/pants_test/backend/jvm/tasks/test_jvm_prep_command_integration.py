@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -20,12 +20,11 @@ class JvmPrepCommandIntegration(PantsRunIntegrationTest):
     safe_delete('/tmp/running-in-goal-compile.jar')
 
   def assert_prep_compile(self):
-    with temporary_dir() as tempdir:
-      with open_zip('/tmp/running-in-goal-compile.jar') as jar:
-        self.assertEquals(sorted(['BUILD',
-                                  'ExampleJvmPrepCommand.java',
-                                  'META-INF/', 'META-INF/MANIFEST.MF']),
-                          sorted(jar.namelist()))
+    with open_zip('/tmp/running-in-goal-compile.jar') as jar:
+      self.assertEquals(sorted(['BUILD',
+                                'ExampleJvmPrepCommand.java',
+                                'META-INF/', 'META-INF/MANIFEST.MF']),
+                        sorted(jar.namelist()))
 
   def test_jvm_prep_command_in_compile(self):
     pants_run = self.run_pants([

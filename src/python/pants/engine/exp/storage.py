@@ -12,6 +12,7 @@ from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
 from contextlib import closing
+from functools import total_ordering
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
@@ -19,10 +20,12 @@ import lmdb
 import six
 
 from pants.engine.exp.objects import Closable, SerializationError
+from pants.engine.exp.scheduler import StepRequest, StepResult
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
 
+@total_ordering
 class Key(object):
   """Holds the digest for the object, which uniquely identifies it.
 
@@ -86,8 +89,8 @@ class Key(object):
   def __eq__(self, other):
     return type(other) == Key and self._digest == other._digest
 
-  def __ne__(self, other):
-    return not (self == other)
+  def __lt__(self, other):
+    return self._digest < other._digest
 
   def __repr__(self):
     return 'Key({}{})'.format(
@@ -111,14 +114,19 @@ class Storage(Closable):
   Besides contents indexed by their hashed Keys, a secondary index is also provided
   for mappings between Keys. This allows to establish links between contents that
   are represented by those keys. Cache for example is such a use case.
+
+  Convenience methods to translate nodes and states in
+  `pants.engine.exp.scheduler.StepRequest` and `pants.engine.exp.scheduler.StepResult`
+  into keys, and vice versa are also provided.
   """
 
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
-  def create(cls, in_memory=False, debug=True, protocol=None):
+  def create(cls, path=None, in_memory=False, debug=True, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
+    :param path: If in_memory=False, the path to store the database in.
     :param in_memory: Indicate whether to use the in-memory kvs or an embeded database.
     :param debug: A flag to store debug information in the key.
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
@@ -126,7 +134,8 @@ class Storage(Closable):
     if in_memory:
       content, key_mappings = InMemoryDb(), InMemoryDb()
     else:
-      content, key_mappings = Lmdb.create(child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
+      content, key_mappings = Lmdb.create(path=path,
+                                          child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
 
     return Storage(content, key_mappings, debug=debug, protocol=protocol)
 
@@ -237,9 +246,52 @@ class Storage(Closable):
                        .format(key_type, value_type))
     return value
 
+  def key_for_request(self, step_request):
+    """Make keys for the dependency nodes as well as their states in step_request.
+
+    step_request.node isn't keyed is only for convenience because it is used
+    in a subsequent is_cacheable check.
+    """
+    dependencies = {}
+    for dep, state in step_request.dependencies.items():
+      dependencies[self._to_key(dep)] = self._to_key(state)
+    return StepRequest(step_request.step_id, step_request.node,
+                       dependencies, step_request.project_tree)
+
+  def key_for_result(self, step_result):
+    """Make key for result state."""
+    return StepResult(state=self._to_key(step_result.state))
+
+  def resolve_request(self, step_request):
+    """Resolve keys in step_request."""
+    dependencies = {}
+    for dep, state in step_request.dependencies.items():
+      dependencies[self._from_key(dep)] = self._from_key(state)
+
+    return StepRequest(step_request.step_id, step_request.node,
+                       dependencies, step_request.project_tree)
+
+  def resolve_result(self, step_result):
+    """Resolve state key in step_result."""
+    return StepResult(state=self._from_key(step_result.state))
+
+  def _to_key(self, obj):
+    if isinstance(obj, Key):
+      return obj
+    return self.put(obj)
+
+  def _from_key(self, obj):
+    if isinstance(obj, Key):
+      return self.get(obj)
+    return obj
+
 
 class Cache(Closable):
-  """Cache StepResult for a given StepRequest."""
+  """Cache StepResult for a given StepRequest.
+
+  NB: since Subjects in Nodes can be anything, comparison among them are usually N/A,
+  both cache get and put are for a keyed `StepRequest`.
+  """
 
   @classmethod
   def create(cls, storage=None, cache_stats=None):
@@ -260,7 +312,7 @@ class Cache(Closable):
 
   def get(self, step_request):
     """Get the cached StepResult for a given StepRequest."""
-    result_key = self._storage.get_mapping(self._storage.put(step_request))
+    result_key = self._storage.get_mapping(self._storage.put(self._keyable_fields(step_request)))
     if result_key is None:
       self._cache_stats.add_miss()
       return None
@@ -270,7 +322,7 @@ class Cache(Closable):
 
   def put(self, step_request, step_result):
     """Save the StepResult for a given StepResult."""
-    request_key = self._storage.put(step_request)
+    request_key = self._storage.put(self._keyable_fields(step_request))
     result_key = self._storage.put(step_result)
     return self._storage.add_mapping(from_key=request_key, to_key=result_key)
 
@@ -286,7 +338,18 @@ class Cache(Closable):
       request_key = Key(digest=digest, hash_=Key.compute_hash_from_digest(digest),
                         type_=None, string=None)
       request = self._storage.get(request_key)
-      yield request, self.get(request)
+      yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
+
+  def _keyable_fields(self, step_request):
+    """Return fields for the purpose of computing the cache key of this step request.
+
+    Some special handling is needed to compute cache key for step request.
+    First step_id should be dropped, because it's only an identifier not part
+    of the input for execution. We also want to sort the dependencies map by
+    keys, i.e, node_keys, to eliminate non-determinism.
+    """
+    sorted_deps = sorted(step_request.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
+    return (step_request.node, sorted_deps, step_request.project_tree)
 
   def close(self):
     self._storage.close()
@@ -320,6 +383,9 @@ class CacheStats(Counter):
   def total(self):
     """Total count including hits and misses."""
     return self[self.HIT_KEY] + self[self.MISS_KEY]
+
+  def __repr__(self):
+    return 'hits={}, misses={}, total={}'.format(self.hits, self.misses, self.total)
 
 
 class KeyValueStore(Closable, AbstractClass):

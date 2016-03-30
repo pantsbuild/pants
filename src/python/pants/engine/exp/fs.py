@@ -12,6 +12,7 @@ from os.path import join, normpath
 
 from twitter.common.collections.orderedset import OrderedSet
 
+from pants.engine.exp.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -270,3 +271,27 @@ def file_content(project_tree, path):
       return FileContent(path.path, None)
     else:
       raise e
+
+
+def create_fs_tasks():
+  """Creates tasks that consume the native filesystem Node type."""
+  return [
+    (RecursiveSubDirectories,
+     [Select(Path),
+      SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
+     recursive_subdirectories),
+    (Paths,
+     [SelectDependencies(Paths, PathGlobs)],
+     merge_paths),
+    (Paths,
+     [SelectProjection(DirectoryListing, Path, ('directory',), PathWildcard),
+      Select(PathWildcard)],
+     filter_file_listing),
+    (PathGlobs,
+     [SelectProjection(DirectoryListing, Path, ('directory',), PathDirWildcard),
+      Select(PathDirWildcard)],
+     filter_dir_listing),
+    (FilesContent,
+     [SelectDependencies(FileContent, Paths)],
+     files_content),
+  ]

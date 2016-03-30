@@ -125,6 +125,14 @@ class FilesetRelPathWrapperTest(BaseTest):
       """))
     self.context().scan()
 
+  def test_glob_with_folder_with_only_folders(self):
+    self.add_to_build_file('z/BUILD', dedent("""
+      java_library(name="z", sources=globs("*", exclude=["BUILD"]))
+      """))
+    graph = self.context().scan()
+    self.assertEqual([],
+                     list(graph.get_target_from_spec('z').sources_relative_to_source_root()))
+
   def test_glob_exclude_doesnt_modify_exclude_array(self):
     self.add_to_build_file('y/BUILD', dedent("""
       list_of_files = ["fleem.java"]

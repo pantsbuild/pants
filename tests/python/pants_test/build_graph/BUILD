@@ -62,6 +62,27 @@ python_tests(
 )
 
 python_tests(
+  name = 'build_graph_integration',
+  sources = ['test_build_graph_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'scopes',
+  sources = ['test_scopes.py'],
+  dependencies = [
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
+python_tests(
   name = 'source_mapper',
   sources = ['test_source_mapper.py'],
   dependencies = [

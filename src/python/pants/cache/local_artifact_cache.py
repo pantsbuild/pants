@@ -119,7 +119,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     return False
 
   def try_insert(self, cache_key, paths):
-    with self.insert_paths(cache_key, paths) as tmp:
+    with self.insert_paths(cache_key, paths):
       pass
 
   def delete(self, cache_key):

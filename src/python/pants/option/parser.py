@@ -242,7 +242,8 @@ class Parser(object):
   def _unnormalized_option_registrations_iter(self):
     """Returns an iterator over the raw registration arguments of each option in this parser.
 
-    Each yielded item is an (args, kwargs) pair, exactly as passed to register().
+    Each yielded item is an (args, kwargs) pair, exactly as passed to register(), except for
+    substituting list and dict types with list_option/dict_option.
 
     Note that recursive options we inherit from a parent will also be yielded here.
     """
@@ -282,24 +283,42 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    # Temporary munging to effectively turn action='append' options into list options,
-    # for uniform handling.  From here on, action='append' is an error.
-    # TODO: Remove after action='append' deprecation.
+    def check_deprecated_types(kwarg_name):
+      t = kwargs.get(kwarg_name)
+      # First check for deprecated direct use of the internal types.
+      if t == list_option:
+        deprecated_conditional(lambda: True, '0.0.81',
+                               'list_option is deprecated for option {} in scope {}. '
+                               'Use type=list.'.format(args[0], self.scope))
+      elif t == dict_option:
+        deprecated_conditional(lambda: True, '0.0.81',
+                               'dict_option is deprecated for option {} in scope {}. '
+                               'Use type=dict.'.format(args[0], self.scope))
+
+    check_deprecated_types('type')
+    check_deprecated_types('member_type')
+
+    # Temporary munging to effectively turn type=list options into list options,
+    # for uniform handling.  From here on, type=list is an error.
+    # TODO: Remove after type=list deprecation.
     if kwargs.get('action') == 'append':
       if 'type' in kwargs:
         kwargs['member_type'] = kwargs['type']
-      kwargs['type'] = list_option
+      kwargs['type'] = list
       del kwargs['action']
+      deprecated_conditional(lambda: True, '0.0.81',
+                             "action='append' is deprecated for option {} in scope {}. "
+                             "Use type=list.".format(args[0], self.scope))
 
     # Temporary munging to effectively turn type='target_list_option' options into list options,
     # with member type 'target_option', for uniform handling.
     # TODO: Remove after target_list_option deprecation.
     if kwargs.get('type') == target_list_option:
-      kwargs['type'] = list_option
+      kwargs['type'] = list
       kwargs['member_type'] = target_option
-      deprecated_conditional(lambda: True, '0.0.80',
+      deprecated_conditional(lambda: True, '0.0.81',
                              'target_list_option is deprecated for option {} in scope {}. '
-                             'Use type=list_option, member_type=target_option.'.format(
+                             'Use type=list, member_type=target_option.'.format(
                                args[0], self.scope
                              ))
 
@@ -342,8 +361,9 @@ class Parser(object):
     'store', 'store_true', 'store_false'
   }
 
+  # TODO: Remove dict_option from here after deprecation is complete.
   _allowed_member_types = {
-    str, int, float, dict_option, file_option, target_option
+    str, int, float, dict, dict_option, file_option, target_option
   }
 
   def _validate(self, args, kwargs):
@@ -375,11 +395,14 @@ class Parser(object):
       elif kwargs['implicit_value'] is None:
         error(ImplicitValIsNone)
 
-    if 'member_type' in kwargs and kwargs.get('type', str) != list_option:
-      error(MemberTypeNotAllowed, type_=kwargs.get('type', str))
+    # Note: we check for list here, not list_option, because we validate the provided kwargs,
+    # not the ones we modified.  However we temporarily also allow list_option, until the
+    # deprecation is complete.
+    if 'member_type' in kwargs and kwargs.get('type', str) not in [list, list_option]:
+      error(MemberTypeNotAllowed, type_=kwargs.get('type', str).__name__)
 
     if kwargs.get('member_type', str) not in self._allowed_member_types:
-      error(InvalidMemberType, member_type=kwargs.get('member_type', str))
+      error(InvalidMemberType, member_type=kwargs.get('member_type', str).__name__)
 
     for kwarg in kwargs:
       if kwarg not in self._allowed_registration_kwargs:
@@ -407,6 +430,15 @@ class Parser(object):
     arg = next((a for a in args if a.startswith('--')), args[0])
     return arg.lstrip('-').replace('-', '_')
 
+  @staticmethod
+  def _wrap_type(t):
+    if t == list:
+      return list_option
+    elif t == dict:
+      return dict_option
+    else:
+      return t
+
   def _compute_value(self, dest, kwargs, flag_val_strs):
     """Compute the value to use for an option.
 
@@ -419,7 +451,7 @@ class Parser(object):
       elif is_boolean_option(kwargs):
         return self.str_to_bool(val_str)
       else:
-        return kwargs.get('type', str)(val_str)
+        return self._wrap_type(kwargs.get('type', str))(val_str)
 
     # Helper function to expand a fromfile=True value string, if needed.
     def expand(val_str):
@@ -502,7 +534,8 @@ class Parser(object):
     # is idempotent, so this is OK.
     values_to_rank = [to_value_type(x) for x in
                       [flag_val, env_val_str, config_val_str, kwargs.get('default'), None]]
-    # Note that ranked_vals will always have at least one element, and no elements will be None.
+    # Note that ranked_vals will always have at least one element, and all elements will be
+    # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
     # Record info about the derivation of each of the values.
@@ -537,7 +570,7 @@ class Parser(object):
       merged_rank = ranked_vals[-1].rank
       merged_val = ListValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val
-      merged_val = [kwargs.get('member_type', str)(x) for x in merged_val]
+      merged_val = [self._wrap_type(kwargs.get('member_type', str))(x) for x in merged_val]
       map(check, merged_val)
       ret = RankedValue(merged_rank, merged_val)
     else:

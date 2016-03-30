@@ -12,12 +12,12 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
                                           addressable_list)
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import ResolvedTypeMismatchError
+from pants.engine.exp.examples.parsers import (JsonParser, PythonAssignmentsParser,
+                                               PythonCallbacksParser)
+from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.nodes import Noop, Return, Throw
-from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
-                                      SymbolTable)
-from pants.engine.exp.register import create_graph_tasks
+from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
@@ -99,12 +99,11 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     symbol_table_cls = TestTable
 
-    address_mapper_key = self.storage.put(
-        AddressMapper(symbol_table_cls=symbol_table_cls,
-                      build_pattern=build_pattern,
-                      parser_cls=parser_cls))
+    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
+                                   build_pattern=build_pattern,
+                                   parser_cls=parser_cls)
 
-    tasks = create_graph_tasks(address_mapper_key, symbol_table_cls)
+    tasks = create_graph_tasks(address_mapper, symbol_table_cls)
     build_root_src = os.path.join(os.path.dirname(__file__), 'examples')
     scheduler, _, build_root = self.mk_scheduler(tasks=tasks,
                                                  storage=self.storage,
@@ -117,8 +116,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
-    request = scheduler.execution_request([self._product],
-                                          self.storage.puts([address]))
+    request = scheduler.execution_request([self._product], [address])
     LocalSerialEngine(scheduler, self.storage).reduce(request)
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
@@ -130,14 +128,14 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     return list(e for e, _ in scheduler.product_graph.walk([root], predicate=lambda _: True))
 
   def resolve_failure(self, scheduler, address):
-    root, state_key = self._populate(scheduler, address)
-    self.assertEquals(state_key.type, Throw, '{} is not a Throw.'.format(state_key.type))
-    return self.storage.get(state_key).exc
+    root, state = self._populate(scheduler, address)
+    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
+    return state.exc
 
   def resolve(self, scheduler, address):
-    root, state_key = self._populate(scheduler, address)
-    self.assertEquals(state_key.type, Return, '{} is not a Return.'.format(state_key.type))
-    return self.storage.get(state_key).value
+    root, state = self._populate(scheduler, address)
+    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
+    return state.value
 
 
 class InlinedGraphTest(GraphTestBase):
@@ -209,9 +207,8 @@ class InlinedGraphTest(GraphTestBase):
   def do_test_cycle(self, scheduler, address_str):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    self.assertEqual(walk[0][1].type, Throw)
-    states = [self.storage.get(state_key) for node, state_key in walk]
-    self.assertTrue(any('cycle' in state.msg for state in states if type(state) is Noop))
+    self.assertEqual(type(walk[0][1]), Throw)
+    self.assertTrue(any('cycle' in state.msg for _, state in walk if type(state) is Noop))
 
   def test_cycle_self(self):
     self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')

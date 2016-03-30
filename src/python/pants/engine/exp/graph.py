@@ -10,10 +10,13 @@ from os.path import basename as os_path_basename
 
 import six
 
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.mapper import AddressFamily, AddressMap, ResolveError
+from pants.engine.exp.fs import DirectoryListing, FilesContent, Path, Paths, RecursiveSubDirectories
+from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
+from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.exp.struct import Struct
 from pants.util.objects import datatype
 
@@ -212,3 +215,58 @@ def addresses_from_address_family(address_family):
 def addresses_from_address_families(address_families):
   """Given a list of AddressFamiliess, return an Addresses object containing all addressables."""
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
+
+
+def create_graph_tasks(address_mapper, symbol_table_cls):
+  """Creates tasks used to parse Structs from BUILD files.
+
+  :param address_mapper_key: The subject key for an AddressMapper instance.
+  :param symbol_table_cls: A SymbolTable class to provide symbols for Address lookups.
+  """
+  return [
+    # Support for resolving Structs from Addresses
+    (Struct,
+     [Select(UnhydratedStruct),
+      SelectDependencies(Struct, UnhydratedStruct)],
+     hydrate_struct),
+    (UnhydratedStruct,
+     [SelectProjection(AddressFamily, Path, ('spec_path',), Address),
+      Select(Address)],
+     resolve_unhydrated_struct),
+  ] + [
+    # BUILD file parsing.
+    (AddressFamily,
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(Path),
+      SelectProjection(FilesContent, Paths, ('paths',), BuildFilePaths)],
+     parse_address_family),
+    (BuildFilePaths,
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(DirectoryListing)],
+     filter_buildfile_paths),
+  ] + [
+    # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
+    # define that lookup for each literal product.
+    (product,
+     [Select(Struct)],
+     identity)
+    for product in symbol_table_cls.table().values()
+  ] + [
+    # Spec handling.
+    (Addresses,
+     [SelectProjection(AddressFamily, Path, ('directory',), SingleAddress),
+      Select(SingleAddress)],
+     address_from_address_family),
+    (Addresses,
+     [SelectProjection(AddressFamily, Path, ('directory',), SiblingAddresses)],
+     addresses_from_address_family),
+    (Addresses,
+     [SelectDependencies(AddressFamily, RecursiveSubDirectories)],
+     addresses_from_address_families),
+    # TODO: This is a workaround for the fact that we can't currently "project" in a
+    # SelectDependencies clause: we launch the recursion by requesting RecursiveSubDirectories
+    # for a Directory projected from DescendantAddresses.
+    (RecursiveSubDirectories,
+     [SelectProjection(RecursiveSubDirectories, Path, ('directory',), DescendantAddresses)],
+     identity),
+  ]

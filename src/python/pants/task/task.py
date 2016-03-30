@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import sys
 from abc import abstractmethod
 from contextlib import contextmanager
 from hashlib import sha1
@@ -24,7 +23,7 @@ from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.dirutil import safe_rm_oldest_items_in_dir, safe_rmtree
+from pants.util.dirutil import safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 

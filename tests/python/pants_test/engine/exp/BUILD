@@ -48,9 +48,10 @@ python_tests(
   sources=['test_graph.py'],
   dependencies=[
     'src/python/pants/build_graph',
+    'src/python/pants/engine/exp/examples:parsers',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
-    'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:storage',
     'src/python/pants/engine/exp:struct',
   ]
@@ -62,8 +63,8 @@ python_tests(
   dependencies=[
     ':scheduler_test_base',
     'src/python/pants/build_graph',
+    'src/python/pants/engine/exp/examples:parsers',
     'src/python/pants/engine/exp:mapper',
-    'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:storage',
     'src/python/pants/engine/exp:struct',
     'src/python/pants/util:dirutil',
@@ -74,8 +75,8 @@ python_tests(
   name='parsers',
   sources=['test_parsers.py'],
   dependencies=[
+    'src/python/pants/engine/exp/examples:parsers',
     'src/python/pants/engine/exp:objects',
-    'src/python/pants/engine/exp:parsers',
   ]
 )
 
@@ -105,7 +106,7 @@ python_tests(
   dependencies=[
     'src/python/pants/base:file_system_project_tree',
     'src/python/pants/engine/exp:fs',
-    'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:storage',
     'src/python/pants/util:dirutil',

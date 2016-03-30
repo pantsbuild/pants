@@ -30,7 +30,7 @@ class Reproducer(Subsystem):
     register('--capture', metavar='<repro_path>', default=None,
              help='Capture information about this pants run (including the entire workspace) '
                   'into a tar.gz file that can be used to help debug build problems.')
-    register('--ignore', action='append',
+    register('--ignore', type=list,
              help='Any paths specified here will not be included in repro tarballs.')
 
   def create_repro(self):

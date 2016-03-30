@@ -140,14 +140,14 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       iml_file = os.path.join(path, 'project.iml')
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
-      expected_paths = ["file://" + os.path.join(get_buildroot(), path) for path in [
+      expected_paths = ["file://" + os.path.join(get_buildroot(), _path) for _path in [
         'examples/src/java/org/pantsbuild/example/hello',
         'examples/src/java/org/pantsbuild/example/hello/greet',
         'examples/src/java/org/pantsbuild/example/hello/main',
         'examples/src/java/org/pantsbuild/example/hello/simple',
         'examples/src/resources/org/pantsbuild/example/hello',
       ]]
-      expected_java_resource = ["file://" + os.path.join(get_buildroot(), path) for path in [
+      expected_java_resource = ["file://" + os.path.join(get_buildroot(), _path) for _path in [
         'examples/src/resources/org/pantsbuild/example/hello',
       ]]
       remaining = set(expected_paths)

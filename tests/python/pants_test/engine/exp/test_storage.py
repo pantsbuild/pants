@@ -8,13 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from contextlib import closing
 
-from pants.build_graph.address import Address
 from pants.engine.exp.fs import Path
-from pants.engine.exp.graph import BuildFilePaths
-from pants.engine.exp.nodes import SelectNode
-from pants.engine.exp.scheduler import Return, StepRequest, StepResult
-from pants.engine.exp.storage import Cache, InMemoryDb, InvalidKeyError, Lmdb, Storage
-from pants.engine.exp.struct import Variants
+from pants.engine.exp.scheduler import StepRequest, StepResult
+from pants.engine.exp.storage import Cache, InvalidKeyError, Key, Lmdb, Storage
 
 
 class StorageTest(unittest.TestCase):
@@ -23,6 +19,16 @@ class StorageTest(unittest.TestCase):
 
   TEST_PATH = Path('/foo')
   TEST_PATH2 = Path('/bar')
+
+  class SomeException(Exception): pass
+
+  def setUp(self):
+    self.storage = Storage.create(in_memory=True)
+    self.result = StepResult(state='something')
+    self.request = StepRequest(step_id=123, node='some node',
+                               dependencies={'some dep': 'some state',
+                                             'another dep': 'another state'},
+                               project_tree='some project tree')
 
   def test_lmdb_key_value_store(self):
     lmdb = Lmdb.create()[0]
@@ -39,7 +45,7 @@ class StorageTest(unittest.TestCase):
       self.assertFalse(kvs.put(self.TEST_KEY, self.TEST_VALUE))
 
   def test_storage(self):
-    with closing(Storage.create(in_memory=True)) as storage:
+    with closing(self.storage) as storage:
       key = storage.put(self.TEST_PATH)
       self.assertEquals(self.TEST_PATH, storage.get(key))
       # The deserialized blob is equal by not the same as the input data.
@@ -57,7 +63,7 @@ class StorageTest(unittest.TestCase):
         storage.get(key)
 
   def test_storage_key_mappings(self):
-    with closing(Storage.create(in_memory=True)) as storage:
+    with closing(self.storage) as storage:
       key1 = storage.put(self.TEST_PATH)
       key2 = storage.put(self.TEST_PATH2)
       storage.add_mapping(key1, key2)
@@ -66,6 +72,42 @@ class StorageTest(unittest.TestCase):
       # key2 isn't mapped to any other key.
       self.assertIsNone(storage.get_mapping(key2))
 
+  def test_key_for_request(self):
+    with closing(self.storage) as storage:
+      keyed_request = storage.key_for_request(self.request)
+      for dep, dep_state in keyed_request.dependencies.items():
+        self.assertEquals(Key, type(dep))
+        self.assertEquals(Key, type(dep_state))
+      self.assertIs(self.request.node, keyed_request.node)
+      self.assertIs(self.request.project_tree, keyed_request.project_tree)
+
+      self.assertEquals(keyed_request, storage.key_for_request(keyed_request))
+
+  def test_resolve_request(self):
+    with closing(self.storage) as storage:
+      keyed_request = storage.key_for_request(self.request)
+      resolved_request = storage.resolve_request(keyed_request)
+      self.assertEquals(self.request, resolved_request)
+      self.assertIsNot(self.request, resolved_request)
+
+      self.assertEquals(resolved_request, self.storage.resolve_request(resolved_request))
+
+  def test_key_for_result(self):
+    with closing(self.storage) as storage:
+      keyed_result = storage.key_for_result(self.result)
+      self.assertEquals(Key, type(keyed_result.state))
+
+      self.assertEquals(keyed_result, storage.key_for_result(keyed_result))
+
+  def test_resolve_result(self):
+    with closing(self.storage) as storage:
+      keyed_result = storage.key_for_result(self.result)
+      resolved_result = storage.resolve_result(keyed_result)
+      self.assertEquals(self.result, resolved_result)
+      self.assertIsNot(self.result, resolved_result)
+
+      self.assertEquals(resolved_result, self.storage.resolve_result(resolved_result))
+
 
 class CacheTest(unittest.TestCase):
 
@@ -73,28 +115,23 @@ class CacheTest(unittest.TestCase):
     """Setup cache as well as request and result."""
     self.storage = Storage.create(in_memory=True)
     self.cache = Cache.create(storage=self.storage)
-
-    self.simple = Address.parse('a/b')
-    self.build_file = BuildFilePaths([Path('a/b/BLD.json')])
-
-    subject_key = self.storage.put(self.simple)
-    self.node = SelectNode(subject_key, Path, None, None)
-    self.dep_node = SelectNode(subject_key, Variants, None, None)
-    self.dep_state = self.storage.put(Return(None))
-
-    self.request = StepRequest(1, self.node, {self.dep_node: self.dep_state}, None)
-    self.result = StepResult(self.storage.put(self.simple), None)
+    request = StepRequest(step_id=123, node='some node',
+                               dependencies={'some dep': 'some state',
+                                             'another dep': 'another state'},
+                               project_tree='some project tree')
+    self.result = StepResult(state='something')
+    self.keyed_request = self.storage.key_for_request(request)
 
   def test_cache(self):
     """Verify get and put."""
     with closing(self.cache):
-      self.assertIsNone(self.cache.get(self.request))
+      self.assertIsNone(self.cache.get(self.keyed_request))
       self._assert_hits_misses(hits=0, misses=1)
 
-      self.cache.put(self.request, self.result)
+      self.cache.put(self.keyed_request, self.result)
 
-      self.assertEquals(self.result, self.cache.get(self.request))
-      self.assertIsNot(self.result, self.cache.get(self.request))
+      self.assertEquals(self.result, self.cache.get(self.keyed_request))
+      self.assertIsNot(self.result, self.cache.get(self.keyed_request))
       self._assert_hits_misses(hits=2, misses=1)
 
   def test_failure_to_update_mapping(self):
@@ -104,7 +141,7 @@ class CacheTest(unittest.TestCase):
       # simulates error might happen for saving key mapping after successfully saving the result.
       self.cache._storage.put(self.result)
 
-      self.assertIsNone(self.cache.get(self.request))
+      self.assertIsNone(self.cache.get(self.keyed_request))
       self._assert_hits_misses(hits=0, misses=1)
 
   def _assert_hits_misses(self, hits, misses):

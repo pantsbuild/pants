@@ -164,6 +164,10 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
       '''.strip())
 
+      self.add_to_build_file('src/BUILD', '''
+        target(name="alias")
+      '''.strip())
+
   def execute_export(self, *specs):
     context = self.context(target_roots=[self.target(spec) for spec in specs])
     context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
@@ -190,6 +194,15 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.assertEqual(
       {'globs' : ['project_info/com/foo/*.scala']},
       result['targets']['project_info:globular']['globs']
+    )
+
+  def test_source_globs_alias(self):
+    self.set_options(globs=True)
+    result = self.execute_export_json('src:alias')
+
+    self.assertEqual(
+        {'globs': []},
+      result['targets']['src:alias']['globs']
     )
 
   def test_without_dependencies(self):

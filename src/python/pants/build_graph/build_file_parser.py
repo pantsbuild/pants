@@ -10,8 +10,6 @@ import warnings
 
 import six
 
-from pants.base.deprecated import deprecated
-
 
 logger = logging.getLogger(__name__)
 

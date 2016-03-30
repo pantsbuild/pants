@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.payload import Payload
-from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
+from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes, stable_json_sha1
 from pants.build_graph.target import Target
 
 
@@ -30,6 +30,9 @@ class WikiArtifact(object):
     self.wiki = wiki
     self.config = kwargs
 
+  def fingerprint(self):
+    return combine_hashes([self.wiki.fingerprint(), stable_json_sha1(self.config)])
+
 
 class Wiki(object):
   """Identifies a wiki where pages can be published."""
@@ -40,6 +43,10 @@ class Wiki(object):
     """
     self.name = name
     self.url_builder = url_builder
+
+  def fingerprint(self):
+    # TODO: url_builder is not a part of fingerprint.
+    return stable_json_sha1(self.name)
 
 
 class Page(Target):

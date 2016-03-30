@@ -61,7 +61,6 @@ class VersionedTargetSet(object):
     self.previous_cache_key = cache_manager.previous_key(self.cache_key)
     self.valid = self.previous_cache_key == self.cache_key
 
-    self.num_chunking_units = self.cache_key.num_chunking_units
     if cache_manager.invalidation_report:
       cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key,
                                                 self.valid, phase='init')
@@ -203,17 +202,26 @@ class VersionedTarget(VersionedTargetSet):
       return
 
     # Clone from the previous results_dir if incremental, or initialize.
-    if allow_incremental and self.previous_cache_key:
+    previous_dir = self._use_previous_dir(allow_incremental, root_dir, current_dir)
+    if previous_dir is not None:
       self.is_incremental = True
-      previous_dir = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
       self._previous_results_dir = previous_dir
-      if os.path.isdir(previous_dir) and not os.path.isdir(current_dir):
-        shutil.copytree(previous_dir, current_dir)
+      shutil.copytree(previous_dir, current_dir)
     else:
       safe_mkdir(current_dir)
 
     # Finally, create the stable symlink.
     relative_symlink(current_dir, stable_dir)
+
+  def _use_previous_dir(self, allow_incremental, root_dir, current_dir):
+    if not allow_incremental or not self.previous_cache_key:
+      # Not incremental.
+      return None
+    previous_dir = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
+    if not os.path.isdir(previous_dir) or os.path.isdir(current_dir):
+      # Could be useful, but no previous results are present.
+      return None
+    return previous_dir
 
   def __repr__(self):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')

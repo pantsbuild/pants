@@ -27,11 +27,11 @@ from pants.base.exceptions import TargetDefinitionException, TaskError, TestFail
 from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
+from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import environment_as
-from pants.util.process_handler import ProcessHandler
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -69,7 +69,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     super(JUnitRun, cls).register_options(register)
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
              help='Run at most this many tests in a single test process.')
-    register('--test', action='append',
+    register('--test', type=list,
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
     register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')
@@ -81,7 +81,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
-             deprecated_hint='Use --output-mode instead.', deprecated_version='0.0.64',
+             deprecated_hint='Use --output-mode instead.',
+             deprecated_version='0.0.64', removal_version='0.0.81',
              help='Redirect test output to files in .pants.d/test/junit.')
     register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
              help='Specify what part of output should be passed to stdout. '
@@ -104,7 +105,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.2'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.4'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
@@ -188,6 +189,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.test_shard:
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
+
+  def classpath(self, targets, classpath_product=None):
+    return super(JUnitRun, self).classpath(targets, classpath_product=classpath_product,
+                                           include_scopes=Scopes.JVM_TEST_SCOPES)
 
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
@@ -279,47 +284,46 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     :tests_and_targets: {test: target} mapping.
     """
 
-    def get_test_filename(test):
-      return os.path.join(self.workdir, 'TEST-{0}.xml'.format(test))
+    def get_test_filename(test_class_name):
+      return os.path.join(self.workdir, 'TEST-{0}.xml'.format(test_class_name.replace('$', '-')))
 
-    failed_targets = defaultdict(set)
-
+    xml_filenames_to_targets = defaultdict()
     for test, target in tests_and_targets.items():
       if target is None:
         self.context.log.warn('Unknown target for test %{0}'.format(test))
 
-      filename = get_test_filename(test)
-      if os.path.exists(filename):
-        try:
-          xml = XmlParser.from_file(filename)
-          str_failures = xml.get_attribute('testsuite', 'failures')
-          int_failures = int(str_failures)
+      # Look for a TEST-*.xml file that matches the classname or a containing classname
+      test_class_name = test
+      for _part in test.split('$'):
+        filename = get_test_filename(test_class_name)
+        if os.path.exists(filename):
+          xml_filenames_to_targets[filename] = target
+          break
+        else:
+          test_class_name = test_class_name.rsplit('$', 1)[0]
 
-          str_errors = xml.get_attribute('testsuite', 'errors')
-          int_errors = int(str_errors)
+    failed_targets = defaultdict(set)
+    for xml_filename, target in xml_filenames_to_targets.items():
+      try:
+        xml = XmlParser.from_file(xml_filename)
+        failures = int(xml.get_attribute('testsuite', 'failures'))
+        errors = int(xml.get_attribute('testsuite', 'errors'))
 
-          if target and (int_failures or int_errors):
-            for testcase in xml.parsed.getElementsByTagName('testcase'):
-              test_failed = testcase.getElementsByTagName('failure')
-              test_errored = testcase.getElementsByTagName('error')
-              if test_failed or test_errored:
-                failed_targets[target].add('{testclass}#{testname}'.format(
+        if target and (failures or errors):
+          for testcase in xml.parsed.getElementsByTagName('testcase'):
+            test_failed = testcase.getElementsByTagName('failure')
+            test_errored = testcase.getElementsByTagName('error')
+            if test_failed or test_errored:
+              failed_targets[target].add('{testclass}#{testname}'.format(
                   testclass=testcase.getAttribute('classname'),
                   testname=testcase.getAttribute('name'),
-                ))
-        except (XmlParser.XmlError, ValueError) as e:
-          self.context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
-      else:
-        # If the test file doesn't exist, then it must have failed before running the tests, so we should
-        # ensure this target is in failed_targets, but we don't have details about which testclass#testname
-        # failed. Instead we just use the 'test' up to the first '$'.
-        test_split = test.split('$')
-        failed_targets[target].add(test_split[0])
+              ))
+      except (XmlParser.XmlError, ValueError) as e:
+        self.context.log.error('Error parsing test result file {0}: {1}'.format(xml_filename, e))
 
     return dict(failed_targets)
 
   def _run_tests(self, tests_to_targets):
-
     if self._coverage:
       extra_jvm_options = self._coverage.extra_jvm_options
       classpath_prepend = self._coverage.classpath_prepend
@@ -481,8 +485,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
     if not tests_and_targets:
       return
-
-    bootstrapped_cp = self.tool_classpath('junit')
 
     def compute_complete_classpath():
       return self.classpath(targets)

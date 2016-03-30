@@ -8,8 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 
 from pants.base.revision import Revision
-from pants.option.custom_types import dict_option, list_option
-from pants.option.option_util import is_boolean_option
+from pants.option.option_util import is_boolean_option, is_list_option
 from pants.version import PANTS_SEMVER
 
 
@@ -92,9 +91,9 @@ class HelpInfoExtracter(object):
       else:
         return 'None'
 
-    if typ == list_option or action == 'append':
+    if typ == list:
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
-    elif typ == dict_option:
+    elif typ == dict:
       default_str = '{{ {} }}'.format(
         ','.join(["'{}':'{}'".format(k, v) for k, v in default.items()]))
     elif typ == str:
@@ -109,13 +108,13 @@ class HelpInfoExtracter(object):
 
     :API: public
     """
-    action = kwargs.get('action')
     metavar = kwargs.get('metavar')
     if not metavar:
       typ = kwargs.get('type', str)
-      if typ == list_option:
-        metavar = '"[\'str1\',\'str2\',...]"'
-      elif typ == dict_option:
+      if typ == list:
+        typ = kwargs.get('member_type', str)
+
+      if typ == dict:
         metavar = '"{\'key1\':val1,\'key2\':val2,...}"'
       else:
         metavar = '<{}>'.format(typ.__name__)
@@ -178,16 +177,27 @@ class HelpInfoExtracter(object):
 
       if is_boolean_option(kwargs):
         if is_short_arg:
-          display_arg = scoped_arg
+          display_args.append(scoped_arg)
         else:
           unscoped_cmd_line_args.append('--no-{}'.format(arg[2:]))
           scoped_cmd_line_args.append('--no-{}'.format(scoped_arg[2:]))
-          display_arg = '--[no-]{}'.format(scoped_arg[2:])
+          display_args.append('--[no-]{}'.format(scoped_arg[2:]))
       else:
-        display_arg = '{}={}'.format(scoped_arg, self.compute_metavar(kwargs))
-        if kwargs.get('action') == 'append':
-          display_arg = '{arg_str} ({arg_str}) ...'.format(arg_str=display_arg)
-      display_args.append(display_arg)
+        metavar = self.compute_metavar(kwargs)
+        display_arg = '{}={}'.format(scoped_arg, metavar)
+        if is_list_option(kwargs):
+          # Show the multi-arg append form.
+          display_args.append('{arg_str} ({arg_str}) ...'.format(arg_str=display_arg))
+          # Also show the list literal form, both with and without the append operator.
+          if metavar.startswith('"') and metavar.endswith('"'):
+            # We quote the entire list literal, so we shouldn't quote the individual members.
+            metavar = metavar[1:-1]
+          display_args.append('{arg}="[{metavar}, {metavar}, ...]"'.format(arg=scoped_arg,
+                                                                           metavar=metavar))
+          display_args.append('{arg}="+[{metavar}, {metavar}, ...]"'.format(arg=scoped_arg,
+                                                                            metavar=metavar))
+        else:
+          display_args.append(display_arg)
 
     if is_boolean_option(kwargs):
       typ = bool

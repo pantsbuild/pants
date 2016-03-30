@@ -11,7 +11,6 @@ import os
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.custom_types import list_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 
@@ -56,12 +55,12 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-version', advanced=True, default=pants_version(),
              help='Use this pants version.')
 
-    register('--plugins', advanced=True, type=list_option, help='Load these plugins.')
+    register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
              default=os.path.join(get_pants_cachedir(), 'plugins'),
              help='Cache resolved plugin requirements here.')
 
-    register('--backend-packages', advanced=True, type=list_option,
+    register('--backend-packages', advanced=True, type=list,
              help='Load backends from these packages that are already on the path.')
 
     register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
@@ -77,24 +76,24 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-distdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'dist'),
              help='Write end-product artifacts to this dir.')
-    register('--pants-config-files', advanced=True, type=list_option,
+    register('--pants-config-files', advanced=True, type=list,
              default=[get_default_pants_config_file()], help='Paths to Pants config files.')
     # TODO: Deprecate --config-override in favor of --pants-config-files.
     # But only once we're able to both append and override list-valued options, as there are
     # use-cases for both here.
     # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
     # to set extra config file locations in an initial bootstrap config file.
-    register('--config-override', advanced=True, action='append', metavar='<path>',
+    register('--config-override', advanced=True, type=list, metavar='<path>',
              help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, action='store_true', default=True,
              help='Use pantsrc files.')
-    register('--pantsrc-files', advanced=True, action='append', metavar='<path>',
+    register('--pantsrc-files', advanced=True, type=list, metavar='<path>',
              default=['/etc/pantsrc', '~/.pants.rc'],
              help='Override config with values from these files. '
                   'Later files override earlier ones.')
-    register('--pythonpath', advanced=True, action='append',
+    register('--pythonpath', advanced=True, type=list,
              help='Add these directories to PYTHONPATH to search for plugins.')
-    register('--target-spec-file', action='append', dest='target_spec_files',
+    register('--target-spec-file', type=list, dest='target_spec_files',
              help='Read additional specs from this file, one per line')
     register('--verify-config', action='store_true', default=False,
              help='Verify that all config file values correspond to known options.')
@@ -122,7 +121,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Output a timing report at the end of the run.')
     register('-e', '--explain', action='store_true',
              help='Explain the execution of goals.')
-    register('--tag', action='append', metavar='[+-]tag1,tag2,...',
+    register('--tag', type=list, metavar='[+-]tag1,tag2,...',
              help="Include only targets with these tags (optional '+' prefix) or without these "
                   "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                   "(e.g., integration tests.)")
@@ -132,23 +131,23 @@ class GlobalOptionsRegistrar(Optionable):
     # TODO: After moving to the new options system these abstraction leaks can go away.
     register('-k', '--kill-nailguns', advanced=True, action='store_true',
              help='Kill nailguns before exiting')
-    register('-i', '--interpreter', advanced=True, default=[], action='append',
+    register('-i', '--interpreter', advanced=True, default=[], type=list,
              metavar='<requirement>',
              help="Constrain what Python interpreters to use.  Uses Requirement format from "
                   "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
                   "are used.  Multiple constraints may be added.  They will be ORed together.")
-    register('--exclude-target-regexp', advanced=True, action='append', default=[],
+    register('--exclude-target-regexp', advanced=True, type=list, default=[],
              metavar='<regexp>',
              help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
-    register('--spec-excludes', advanced=True, action='append',
+    register('--spec-excludes', advanced=True, type=list,
              default=[register.bootstrap.pants_workdir],
              deprecated_hint='Use --ignore-patterns instead. Use .gitignore syntax for each item, '
                              'to simulate old behavior prefix each item with "/".',
-             deprecated_version='0.0.75', removal_version='0.0.79',
+             deprecated_version='0.0.75', removal_version='0.0.80',
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
-    register('--ignore-patterns', advanced=True, action='append', fromfile=True,
+    register('--ignore-patterns', advanced=True, type=list, fromfile=True,
              default=['.*'],
              help='Patterns for ignoring files when reading BUILD files. '
                   'Use to ignore unneeded directories or BUILD files. '

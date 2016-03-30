@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import pytest
-
 from pants.build_graph.build_graph import CycleException, sort_targets
 from pants_test.base_test import BaseTest
 

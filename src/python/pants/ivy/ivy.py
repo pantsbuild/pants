@@ -8,13 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os.path
 from contextlib import contextmanager
 
-import lockfile
 from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import Executor, SubprocessExecutor
+from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.util.dirutil import safe_mkdir
 
 
@@ -45,6 +45,7 @@ class Ivy(object):
                          self._ivy_cache_dir, type(self._ivy_cache_dir)))
 
     self._extra_jvm_options = extra_jvm_options or []
+    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._ivy_cache_dir, 'pants_ivy_lock'))
 
   @property
   def ivy_settings(self):
@@ -64,8 +65,7 @@ class Ivy(object):
   @contextmanager
   def resolution_lock(self):
     safe_mkdir(self._ivy_cache_dir)
-    ivy_cache_lock_path = os.path.join(self._ivy_cache_dir, 'pants_ivy_lock')
-    with lockfile.LockFile(ivy_cache_lock_path):
+    with self._lock:
       yield
 
   def execute(self, jvm_options=None, args=None, executor=None,

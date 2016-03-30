@@ -20,7 +20,6 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
 from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                     Throw, Waiting)
 from pants.engine.exp.scheduler import PartiallyConsumedInputsError, ProductGraph
-from pants.engine.exp.storage import Key
 
 
 class SchedulerTest(unittest.TestCase):
@@ -46,14 +45,11 @@ class SchedulerTest(unittest.TestCase):
     self.managed_resolve_latest = Address.parse('3rdparty/jvm/managed:latest-hadoop')
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
-  def key(self, subject):
-    return self.storage.put(subject)
-
   def assert_select_for_subjects(self, walk, product, subjects, variants=None, variant_key=None):
     node_type = SelectNode
 
     variants = tuple(variants.items()) if variants else None
-    self.assertEqual({node_type(self.key(subject), product, variants, variant_key) for subject in subjects},
+    self.assertEqual({node_type(subject, product, variants, variant_key) for subject in subjects},
                      {node for (node, _), _ in walk
                       if node.product == product and isinstance(node, node_type) and node.variants == variants})
 
@@ -68,7 +64,7 @@ class SchedulerTest(unittest.TestCase):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
 
   def request_specs(self, goals, *specs):
-    return self.scheduler.build_request(goals=goals, subject_keys=self.storage.puts(specs))
+    return self.scheduler.build_request(goals=goals, subjects=specs)
 
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = self.request(goals, *root_specs)
@@ -80,18 +76,18 @@ class SchedulerTest(unittest.TestCase):
 
   def assert_root(self, walk, node, return_value):
     """Asserts that the first Node in a walk was a DependenciesNode with the single given result."""
-    ((root, root_state_key), dependencies) = walk[0]
+    ((root, root_state), dependencies) = walk[0]
     self.assertEquals(type(root), DependenciesNode)
-    self.assertEquals(Return([return_value]), self.storage.get(root_state_key))
-    self.assertIn((node, self.key(Return(return_value))), dependencies)
+    self.assertEquals(Return([return_value]), root_state)
+    self.assertIn((node, Return(return_value)), dependencies)
 
   def assert_root_failed(self, walk, node, thrown_type):
     """Asserts that the first Node in a walk was a DependenciesNode with a Throw result."""
     ((root, root_state), dependencies) = walk[0]
     self.assertEquals(type(root), DependenciesNode)
-    self.assertEquals(Throw, root_state.type)
-    self.assertIn((node, thrown_type), [(k, type(self.storage.get(v).exc))
-                                        for k, v in dependencies if v.type is Throw])
+    self.assertEquals(Throw, type(root_state))
+    self.assertIn((node, thrown_type), [(k, type(v.exc))
+                                        for k, v in dependencies if type(v) is Throw])
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
@@ -119,7 +115,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Root: expect the synthetic GenGoal product.
     self.assert_root(walk,
-                     SelectNode(self.key(self.thrift), GenGoal, None, None),
+                     SelectNode(self.thrift, GenGoal, None, None),
                      GenGoal("non-empty input to satisfy the Goal constructor"))
 
     variants = {'thrift': 'apache_java'}
@@ -145,7 +141,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Root: expect a DependenciesNode depending on a SelectNode with compilation via javac.
     self.assert_root(walk,
-                     SelectNode(self.key(self.java), Classpath, None, None),
+                     SelectNode(self.java, Classpath, None, None),
                      Classpath(creator='javac'))
 
     # Confirm that exactly the expected subjects got Classpaths.
@@ -159,7 +155,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.key(self.consumes_resources), Classpath, None, None),
+                     SelectNode(self.consumes_resources, Classpath, None, None),
                      Classpath(creator='javac'))
 
     # Confirm a classpath for the resources target and other subjects. We know that they are
@@ -176,7 +172,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.key(self.consumes_managed_thirdparty), Classpath, None, None),
+                     SelectNode(self.consumes_managed_thirdparty, Classpath, None, None),
                      Classpath(creator='javac'))
 
     # Confirm that we produced classpaths for the managed jars.
@@ -188,7 +184,7 @@ class SchedulerTest(unittest.TestCase):
     # Confirm that the produced jars had the appropriate versions.
     self.assertEquals({Jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
                        Jar('com.google.guava', 'guava', '18.0')},
-                      {self.storage.get(ret).value for (node, ret), _ in walk
+                      {ret.value for (node, ret), _ in walk
                        if node.product == Jar and isinstance(node, SelectNode)})
 
   def test_dependency_inference(self):
@@ -198,7 +194,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.key(self.inferred_deps), Classpath, None, None),
+                     SelectNode(self.inferred_deps, Classpath, None, None),
                      Classpath(creator='scalac'))
 
     # Confirm that we requested a classpath for the root and inferred targets.
@@ -211,7 +207,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate that the root failed.
     self.assert_root_failed(walk,
-                            SelectNode(self.key(self.java_multi), Classpath, None, None),
+                            SelectNode(self.java_multi, Classpath, None, None),
                             ConflictingProducersError)
 
   def test_no_variant_thrift(self):
@@ -238,9 +234,9 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    root, root_state_key = walk[0][0]
-    root_value = self.storage.get(root_state_key).value
-    self.assertEqual(DependenciesNode(self.key(spec), Address, None, Addresses, None), root)
+    root, root_state = walk[0][0]
+    root_value = root_state.value
+    self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that a few expected addresses are in the list.
@@ -255,9 +251,9 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    root, root_state_key = walk[0][0]
-    root_value = self.storage.get(root_state_key).value
-    self.assertEqual(DependenciesNode(self.key(spec), Address, None, Addresses, None), root)
+    root, root_state = walk[0][0]
+    root_value = root_state.value
+    self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that an expected address is in the list.
@@ -271,22 +267,18 @@ class ProductGraphTest(unittest.TestCase):
   def setUp(self):
     self.pg = ProductGraph(validator=lambda _: True)  # Allow for string nodes for testing.
 
-  @staticmethod
-  def _mk_key(state):
-    return Key(None, None, type(state), None)
-
   @classmethod
   def _mk_chain(cls, graph, sequence, states=[Waiting, Return]):
     """Create a chain of dependencies (e.g. 'A'->'B'->'C'->'D') in the graph from a sequence."""
     prior_item = sequence[0]
     for state in states:
       for item in sequence:
-        graph.update_state(prior_item, cls._mk_key(state([item])), [item])
+        graph.update_state(prior_item, state([item]))
         prior_item = item
     return sequence
 
   def test_dependency_edges(self):
-    self.pg.update_state('A', self._mk_key(Waiting(['B', 'C'])), ['B', 'C'])
+    self.pg.update_state('A', Waiting(['B', 'C']))
     self.assertEquals({'B', 'C'}, self.pg.dependencies_of('A'))
     self.assertEquals({'A'}, self.pg.dependents_of('B'))
     self.assertEquals({'A'}, self.pg.dependents_of('C'))

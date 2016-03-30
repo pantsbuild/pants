@@ -106,16 +106,13 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
                   "emitted to that file (prefix). Note that tests may run in a different cwd, so "
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
-    register('--options', action='append', help='Pass these options to pytest.')
+    register('--options', type=list, help='Pass these options to pytest.')
     register('--coverage',
              help='Emit coverage information for specified paths/modules. Value has two forms: '
                   '"module:list,of,modules" or "path:list,of,paths"')
     register('--coverage-output-dir', metavar='<DIR>', default=None,
              help='Directory to emit coverage reports to.'
              'If not specified, a default within dist is used.')
-    register('--shard', deprecated_version='0.0.76', removal_version='0.0.78',
-             deprecated_hint='Use --test-shard instead, with the same value.',
-             help='See --test-shard.')
     register('--test-shard',
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
                   'run tests number 2, 5, 8, 11, ...')
@@ -166,7 +163,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       for target in sorted(results):
         self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
 
-      failed_targets = [target for target, rv in results.items() if not rv.success]
+      failed_targets = [target for target, _rv in results.items() if not _rv.success]
       if failed_targets:
         raise TestFailedTaskError(failed_targets=failed_targets)
 
@@ -175,7 +172,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
 
   @contextmanager
   def _maybe_shard(self):
-    shard_spec = self.get_options().test_shard or self.get_options().shard
+    shard_spec = self.get_options().test_shard
     if shard_spec is None:
       yield []
       return

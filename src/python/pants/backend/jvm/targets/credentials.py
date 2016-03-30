@@ -5,32 +5,74 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
+from abc import abstractmethod
+
+from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.target import Target
+from pants.util.memo import memoized_method
+from pants.util.meta import AbstractClass
+from pants.util.netrc import Netrc
 
 
-class Credentials(Target):
+class Credentials(Target, AbstractClass):
   """Credentials for a maven repository.
 
   The ``publish.jar`` section of your ``pants.ini`` file can refer to one
   or more of these.
   """
 
+  @abstractmethod
+  def username(self, repository):
+    """Returns the username in java system property argument form."""
+
+  @abstractmethod
+  def password(self, repository):
+    """Returns the password in java system property argument form."""
+
+
+def _ignored_repository(value, repository):
+  return value
+
+
+class LiteralCredentials(Credentials):
+
   def __init__(self, username=None, password=None, **kwargs):
     """
     :param string name: The name of these credentials.
-    :param username: Either a constant username value or else a callable that can fetch one.
-    :type username: string or callable
-    :param password: Either a constant password value or else a callable that can fetch one.
-    :type password: string or callable
+    :param username: A constant username value.
+    :param password: A constant password value.
     """
-    super(Credentials, self).__init__(**kwargs)
-    self._username = username if callable(username) else lambda _: username
-    self._password = password if callable(password) else lambda _: password
+    super(LiteralCredentials, self).__init__(**kwargs)
+
+    deprecated_conditional(lambda: callable(username) or callable(password), '0.0.82',
+                           'Passing callable arguments to `credentials` is deprecated: '
+                           'use `netrc_credentials` for target {}'.format(
+                             self.address.spec
+                           ))
+
+    self._username = username if callable(username) else functools.partial(_ignored_repository, username)
+    self._password = password if callable(password) else functools.partial(_ignored_repository, password)
 
   def username(self, repository):
-    """Returns the username in java system property argument form."""
     return self._username(repository)
 
   def password(self, repository):
-    """Returns the password in java system property argument form."""
     return self._password(repository)
+
+
+class NetrcCredentials(Credentials):
+  """A Credentials subclass that uses a Netrc file to compute credentials."""
+
+  @memoized_method
+  def _credentials(self, repository):
+    netrc = Netrc()
+    return (netrc.getusername(repository), netrc.getpassword(repository))
+
+  def username(self, repository):
+    """Returns the username in java system property argument form."""
+    return self._credentials(repository)[0]
+
+  def password(self, repository):
+    """Returns the password in java system property argument form."""
+    return self._credentials(repository)[1]

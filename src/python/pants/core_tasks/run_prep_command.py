@@ -9,7 +9,6 @@ import os
 import subprocess
 from collections import namedtuple
 
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.prep_command import PrepCommand
@@ -111,12 +110,3 @@ class RunTestPrepCommand(RunPrepCommandBase):
 class RunCompilePrepCommand(RunPrepCommandBase):
   """Run a shell command before other tasks in the compile goal."""
   goal = 'compile'
-
-
-class RunPrepCommand(RunPrepCommandBase):
-  """Run a shell command before other tasks in the test goal."""
-  goal = 'test'
-
-  @deprecated('0.0.78', hint_message="Register RunTestPrepCommand instead.")
-  def __init__(self, **kwargs):
-    super(RunPrepCommand, self).__init__(self, **kwargs)

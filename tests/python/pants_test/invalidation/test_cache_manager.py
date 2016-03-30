@@ -9,8 +9,7 @@ import shutil
 import tempfile
 
 from pants.invalidation.build_invalidator import CacheKey, CacheKeyGenerator
-from pants.invalidation.cache_manager import (InvalidationCacheManager, InvalidationCheck,
-                                              VersionedTarget)
+from pants.invalidation.cache_manager import InvalidationCacheManager, VersionedTarget
 from pants_test.base_test import BaseTest
 
 
@@ -30,7 +29,7 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
       return CacheKey(combined_id, combined_hash, combined_num_sources)
 
   def key_for_target(self, target, sources=None, transitive=False, fingerprint_strategy=None):
-    return CacheKey(target.id, target.id, target.num_chunking_units)
+    return CacheKey(target.id, target.id)
 
   def key_for(self, tid, sources):
     return CacheKey(tid, tid, len(sources))

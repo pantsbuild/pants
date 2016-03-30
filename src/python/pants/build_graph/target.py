@@ -10,18 +10,20 @@ import os
 from hashlib import sha1
 
 from six import string_types
+from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
 from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
-from pants.option.custom_types import dict_option
+from pants.build_graph.target_scopes import Scope
 from pants.source.payload_fields import DeferredSourcesField, SourcesField
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import Files, FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -150,7 +152,7 @@ class Target(AbstractTarget):
 
     @classmethod
     def register_options(cls, register):
-      register('--ignored', advanced=True, type=dict_option,
+      register('--ignored', advanced=True, type=dict,
                help='Map of target name to a list of keyword arguments that should be ignored if a '
                     'target receives them unexpectedly. Typically used to allow usage of arguments '
                     'in BUILD files that are not yet available in the current version of pants.')
@@ -253,8 +255,67 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
+  @classmethod
+  def _closure_predicate(cls, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
+    if not respect_intransitive and include_scopes is None and exclude_scopes is None:
+      return None
+    def predicate(target, level):
+      if not target.scope.in_scope(include_scopes=include_scopes, exclude_scopes=exclude_scopes):
+        return False
+      if respect_intransitive and not target.transitive and level > 0:
+        return False
+      return True
+    return predicate
+
+  @classmethod
+  def closure_for_targets(cls, target_roots, exclude_scopes=None, include_scopes=None,
+                          bfs=None, postorder=None, respect_intransitive=False):
+    """Computes the closure of the given targets respecting the given input scopes.
+
+    :API: public
+
+    :param list target_roots: The list of Targets to start from. These targets will always be
+      included in the closure, regardless of scope settings.
+    :param Scope exclude_scopes: If present and non-empty, only dependencies which have none of the
+      scope names in this Scope will be traversed.
+    :param Scope include_scopes: If present and non-empty, only dependencies which have at least one
+      of the scope names in this Scope will be traversed.
+    :param bool bfs: Whether to traverse in breadth-first or depth-first order. (Defaults to True).
+    :param bool respect_intransitive: If True, any dependencies which have the 'intransitive' scope
+      will not be included unless they are direct dependencies of one of the root targets. (Defaults
+      to False).
+    """
+    target_roots = list(target_roots) # Sometimes generators are passed into this function.
+    if not target_roots:
+      return OrderedSet()
+
+    build_graph = target_roots[0]._build_graph
+    addresses = [target.address for target in target_roots]
+    leveled_predicate = cls._closure_predicate(include_scopes=include_scopes,
+                                               exclude_scopes=exclude_scopes,
+                                               respect_intransitive=respect_intransitive)
+    closure = OrderedSet()
+
+    if not bfs:
+      build_graph.walk_transitive_dependency_graph(
+        addresses=addresses,
+        work=closure.add,
+        postorder=postorder,
+        leveled_predicate=leveled_predicate,
+      )
+    else:
+      closure.update(build_graph.transitive_subgraph_of_addresses_bfs(
+        addresses=addresses,
+        leveled_predicate=leveled_predicate,
+      ))
+
+    # Make sure all the roots made it into the closure.
+    closure.update(target_roots)
+    return closure
+
   def __init__(self, name, address, build_graph, type_alias=None, payload=None, tags=None,
-               description=None, no_cache=False, **kwargs):
+               description=None, no_cache=False, scope=None, _transitive=None,
+               **kwargs):
     """
     :API: public
 
@@ -278,11 +339,18 @@ class Target(AbstractTarget):
     :type tags: :class:`collections.Iterable` of strings
     :param no_cache: If True, results for this target should not be stored in the artifact cache.
     :param string description: Human-readable description of this target.
+    :param string scope: The scope of this target, used to determine its inclusion on the classpath
+      (and possibly more things in the future). See :class:`pants.build_graph.target_scopes.Scopes`.
+      A value of None, '', or 'default' results in the default scope, which is included everywhere.
     """
     # NB: dependencies are in the pydoc above as a BUILD dictionary hack only; implementation hides
     # the dependencies via TargetAddressable.
 
     self.payload = payload or Payload()
+    self._scope = Scope(scope)
+    self.payload.add_field('scope_string', PrimitiveField(str(scope)))
+    self.payload.add_field('transitive',
+                           PrimitiveField(True if _transitive is None else _transitive))
     self.payload.freeze()
     self.name = name
     self.address = address
@@ -298,6 +366,14 @@ class Target(AbstractTarget):
       self.add_labels('no_cache')
     if kwargs:
       self.UnknownArguments.check(self, kwargs)
+
+  @property
+  def scope(self):
+    return self._scope
+
+  @property
+  def transitive(self):
+    return self.payload.transitive
 
   @property
   def type_alias(self):
@@ -321,10 +397,6 @@ class Target(AbstractTarget):
     :API: public
     """
     return self._tags
-
-  @property
-  def num_chunking_units(self):
-    return max(1, len(self.sources_relative_to_buildroot()))
 
   def assert_list(self, maybe_list, expected_type=string_types, key_arg=None):
     """
@@ -430,7 +502,9 @@ class Target(AbstractTarget):
   @property
   def _sources_field(self):
     sources_field = self.payload.get_field('sources')
-    return sources_field if sources_field else SourcesField(self.address.spec_path, sources=())
+    if sources_field is not None:
+      return sources_field
+    return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
 
   def has_sources(self, extension=''):
     """
@@ -603,17 +677,16 @@ class Target(AbstractTarget):
       raise ValueError('predicate must be callable but was {}'.format(predicate))
     self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
 
-  def closure(self, bfs=False):
+  def closure(self, *vargs, **kwargs):
     """Returns this target's transitive dependencies.
 
     The walk will be depth-first in preorder, or breadth first if bfs=True is specified.
 
+    See Target.closure_for_targets().
+
     :API: public
     """
-    if bfs:
-      return self._build_graph.transitive_subgraph_of_addresses_bfs([self.address])
-    else:
-      return self._build_graph.transitive_subgraph_of_addresses([self.address])
+    return self.closure_for_targets([self], *vargs, **kwargs)
 
   # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def add_labels(self, *label):
@@ -663,11 +736,10 @@ class Target(AbstractTarget):
           .format(spec=address.spec))
       referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
-    elif isinstance(sources, FilesetWithSpec):
-      filespec = sources.filespec
-    else:
-      sources = sources or []
-      assert_list(sources, key_arg=key_arg)
-      filespec = {'globs': [os.path.join(sources_rel_path, src) for src in (sources or [])]}
+    elif sources is None:
+      sources = FilesetWithSpec.empty(sources_rel_path)
+    elif not isinstance(sources, FilesetWithSpec):
+      # Received a literal sources list: convert to a FilesetWithSpec via Files.
+      sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
 
-    return SourcesField(sources=sources, sources_rel_path=sources_rel_path, filespec=filespec)
+    return SourcesField(sources=sources)

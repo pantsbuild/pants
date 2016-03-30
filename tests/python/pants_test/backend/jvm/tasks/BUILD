@@ -185,6 +185,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'intransitive_integration',
+  sources = ['test_intransitive_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=300,
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'ivy_imports',
   sources = ['test_ivy_imports.py'],
   dependencies = [
@@ -552,6 +562,39 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'scope_provided_integration',
+  sources = ['test_scope_provided_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=300,
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'scope_runtime_integration',
+  sources = ['test_scope_runtime_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=300,
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'scope_test_integration',
+  sources = ['test_scope_test_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=300,
   tags = {'integration'},
 )
 

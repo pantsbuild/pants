@@ -59,10 +59,10 @@ class ContextutilTest(unittest.TestCase):
   def test_nested_pushd(self):
     pre_cwd = os.getcwd()
     with temporary_dir() as tempdir1:
-      with pushd(tempdir1) as path1:
+      with pushd(tempdir1):
         self.assertEquals(os.path.realpath(tempdir1), os.getcwd())
         with temporary_dir(root_dir=tempdir1) as tempdir2:
-          with pushd(tempdir2) as path2:
+          with pushd(tempdir2):
             self.assertEquals(os.path.realpath(tempdir2), os.getcwd())
           self.assertEquals(os.path.realpath(tempdir1), os.getcwd())
         self.assertEquals(os.path.realpath(tempdir1), os.getcwd())

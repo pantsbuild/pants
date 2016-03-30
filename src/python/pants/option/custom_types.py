@@ -9,6 +9,7 @@ import six
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
+from pants.util.strutil import ensure_text
 
 
 def dict_option(s):
@@ -47,7 +48,7 @@ def target_option(s):
   return s
 
 
-# TODO: Replace target_list_option with type=list_option, member_type=target_option.
+# TODO: Replace target_list_option with type=list, member_type=target_option.
 # Then we'll get all the goodies from list_option (e.g., appending) free.
 def target_list_option(s):
   """Same type as 'list_option', but indicates list contents are target specs.
@@ -131,6 +132,8 @@ class ListValueComponent(object):
            member_type.
     :rtype: `ListValueComponent`
     """
+    if isinstance(value, six.string_types):
+      value = ensure_text(value)
     if isinstance(value, cls):  # Ensure idempotency.
       action = value.action
       val = value.val

@@ -16,13 +16,13 @@ from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import UnhydratedStruct
+from pants.engine.exp.examples.parsers import JsonParser
+from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
 from pants.engine.exp.nodes import Throw
-from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.register import create_graph_tasks
+from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct
 from pants.util.dirutil import safe_open
@@ -161,11 +161,10 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     # Set up a scheduler that supports address mapping.
     symbol_table_cls = TargetTable
     self.storage = Storage.create(in_memory=True)
-    address_mapper_key = self.storage.put(
-        AddressMapper(symbol_table_cls=symbol_table_cls,
-                      parser_cls=JsonParser,
-                      build_pattern=r'.+\.BUILD.json$'))
-    tasks = create_graph_tasks(address_mapper_key, symbol_table_cls)
+    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
+                                   parser_cls=JsonParser,
+                                   build_pattern=r'.+\.BUILD.json$')
+    tasks = create_graph_tasks(address_mapper, symbol_table_cls)
 
     build_root_src = os.path.join(os.path.dirname(__file__), 'examples/mapper_test')
     self.scheduler, _, self.build_root = self.mk_scheduler(tasks=tasks,
@@ -183,17 +182,16 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     self.storage.close()
 
   def resolve(self, spec):
-    request = self.scheduler.execution_request([UnhydratedStruct],
-                                               self.storage.puts([spec]))
+    request = self.scheduler.execution_request([UnhydratedStruct], [spec])
     result = LocalSerialEngine(self.scheduler, self.storage).execute(request)
     if result.error:
       raise result.error
 
     # Expect a single root.
-    state_key, = result.root_products.values()
-    if state_key.type is Throw:
-      raise self.storage.get(state_key).exc
-    return self.storage.get(state_key).value
+    state, = result.root_products.values()
+    if type(state) is Throw:
+      raise state.exc
+    return state.value
 
   def resolve_multi(self, spec):
     return {uhs.address: uhs.struct for uhs in self.resolve(spec)}

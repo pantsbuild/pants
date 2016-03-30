@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_split
 
@@ -26,15 +25,15 @@ class JVM(Subsystem):
   def register_options(cls, register):
     super(JVM, cls).register_options(register)
     # TODO(benjy): Options to specify the JVM version?
-    register('--options', action='append', metavar='<option>...',
+    register('--options', type=list, metavar='<option>...',
              help='Run with these extra JVM options.')
-    register('--program-args', action='append', metavar='<arg>...',
+    register('--program-args', type=list, metavar='<arg>...',
              help='Run with these extra program args.')
     register('--debug', action='store_true',
              help='Run the JVM with remote debugging.')
     register('--debug-port', advanced=True, type=int, default=5005,
              help='The JVM will listen for a debugger on this port.')
-    register('--debug-args', advanced=True, type=list_option,
+    register('--debug-args', advanced=True, type=list,
              default=[
                '-Xdebug',
                '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address={debug_port}'

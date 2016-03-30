@@ -6,18 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import sys
+from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.goal_runner import OptionsInitializer
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.legacy.graph import ExpGraph
+from pants.engine.exp.fs import create_fs_tasks
+from pants.engine.exp.graph import create_graph_tasks
+from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
 from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
-from pants.engine.exp.legacy.register import create_legacy_graph_tasks
 from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.parsers import SymbolTable
-from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
+from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -50,15 +51,15 @@ def setup():
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  address_mapper_key = storage.put(AddressMapper(symbol_table_cls=symbol_table_cls,
-                                                 parser_cls=LegacyPythonCallbacksParser))
+  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
+                                 parser_cls=LegacyPythonCallbacksParser)
 
   # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The ExpGraph
   # will explicitly request the products it needs.
   tasks = (
     create_legacy_graph_tasks() +
     create_fs_tasks() +
-    create_graph_tasks(address_mapper_key, symbol_table_cls)
+    create_graph_tasks(address_mapper, symbol_table_cls)
   )
 
   return (
@@ -69,8 +70,8 @@ def setup():
   )
 
 
-def dependencies():
-  """Lists the transitive dependencies of targets under the current build root."""
+@contextmanager
+def _open_graph():
   scheduler, storage, spec_roots, symbol_table_cls = setup()
 
   # Populate the graph for the given request, and print the resulting Addresses.
@@ -78,10 +79,27 @@ def dependencies():
   engine.start()
   try:
     graph = ExpGraph(scheduler, engine, symbol_table_cls)
-    for address in graph.inject_specs_closure(spec_roots):
-      print(address)
+    addresses = tuple(graph.inject_specs_closure(spec_roots))
+    yield graph, addresses
   finally:
+    print('Cache stats: {}'.format(engine._cache.get_stats()), file=sys.stderr)
     engine.close()
+
+
+def dependencies():
+  """Lists the transitive dependencies of targets under the current build root."""
+  with _open_graph() as (graph, addresses):
+    for address in addresses:
+      print(address)
+
+
+def filemap():
+  """Lists the transitive dependencies of targets under the current build root."""
+  with _open_graph() as (graph, addresses):
+    for address in addresses:
+      target = graph.get_target(address)
+      for source in target.sources_relative_to_buildroot():
+        print('{} {}'.format(source, target.address.spec))
 
 
 def pantsd():

@@ -93,3 +93,25 @@ This is the second readme file! Isn't it exciting?
     # the 'README.md' page)
     address = Address.parse('src/docs:readme2', relative_to=get_buildroot())
     self.assertEquals(p._build_graph.get_target(address), self.target('src/docs:readme2'))
+
+  def test_wiki_page_fingerprinting(self):
+    def create_page_target(space):
+      self.reset_build_graph()
+      self.create_file('src/docs/BUILD')
+      self.add_to_build_file('src/docs', dedent("""
+        page(name='readme3',
+          source='README.md',
+          provides=[
+            wiki_artifact(
+              wiki=confluence,
+              space='~""" + space + """',
+              title='test_page3',
+            ),
+          ],
+        )
+      """))
+      return self.target('src/docs:readme3')
+
+    fingerprint_before = create_page_target('space1').payload.fingerprint()
+    self.assertEqual(fingerprint_before, create_page_target('space1').payload.fingerprint())
+    self.assertNotEqual(fingerprint_before, create_page_target('space2').payload.fingerprint())

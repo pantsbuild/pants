@@ -26,6 +26,7 @@ class OwnerPrintingPIDLockFile(pidlockfile.PIDLockFile):
         if cmd is not None:
           print('Waiting on pants process {0} ({1}) to complete'.format(pid, cmd), file=sys.stderr)
         else:
+          logger.debug("Breaking lock for {0} {1}".format(pid, cmd))
           self.break_lock()
       except Exception as e:
         logger.warn('Error while determining lock owner: {0}'.format(e))

@@ -19,10 +19,6 @@ class TestRunnerTaskMixin(object):
   expressed can support both languages, and any additional languages that are added to pants.
   """
 
-  @staticmethod
-  def _timeout_for_target(target):
-    return getattr(target, 'timeout', None)
-
   @classmethod
   def register_options(cls, register):
     super(TestRunnerTaskMixin, cls).register_options(register)

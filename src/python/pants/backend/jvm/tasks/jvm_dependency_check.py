@@ -10,17 +10,10 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.build_graph.build_graph import sort_targets
 from pants.java.distribution.distribution import DistributionLocator
-from pants.option.custom_types import list_option
-from pants.task.task import Task
 
 
 class JvmDependencyCheck(JvmDependencyAnalyzer):
@@ -46,7 +39,7 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
                   'file, as an implementation detail. However it may still be useful to use this '
                   'on occasion. ')
 
-    register('--missing-deps-whitelist', type=list_option, default=[],
+    register('--missing-deps-whitelist', type=list, default=[],
              fingerprint=True,
              help="Don't report these targets even if they have missing deps.")
 

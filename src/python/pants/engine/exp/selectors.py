@@ -5,9 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from abc import abstractmethod, abstractproperty
+from abc import abstractproperty
 
-from pants.engine.exp.nodes import DependenciesNode, ProjectionNode, SelectNode, TaskNode
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -16,13 +15,6 @@ class Selector(AbstractClass):
   @abstractproperty
   def optional(self):
     """Return true if this Selector is optional. It may result in a `None` match."""
-
-  @abstractmethod
-  def construct_node(self, subject_key, variants):
-    """Constructs a Node for this Selector and the given Subject/Variants.
-
-    May return None if the Selector can be known statically to not be satisfiable for the inputs.
-    """
 
 
 class Select(datatype('Subject', ['product', 'optional']), Selector):
@@ -34,9 +26,6 @@ class Select(datatype('Subject', ['product', 'optional']), Selector):
   def __new__(cls, product, optional=False):
     return super(Select, cls).__new__(cls, product, optional)
 
-  def construct_node(self, subject_key, variants):
-    return SelectNode(subject_key, self.product, variants, None)
-
 
 class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   """Selects the matching Product and variant name for the Subject provided to the constructor.
@@ -46,9 +35,6 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   ApacheThrift value.
   """
   optional = False
-
-  def construct_node(self, subject_key, variants):
-    return SelectNode(subject_key, self.product, variants, self.variant_key)
 
 
 class SelectDependencies(datatype('Dependencies', ['product', 'deps_product', 'field']), Selector):
@@ -64,9 +50,6 @@ class SelectDependencies(datatype('Dependencies', ['product', 'deps_product', 'f
 
   optional = False
 
-  def construct_node(self, subject_key, variants):
-    return DependenciesNode(subject_key, self.product, variants, self.deps_product, self.field)
-
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
   """Selects a field of the given Subject to produce a Subject, Product dependency from.
@@ -79,14 +62,7 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
   """
   optional = False
 
-  def construct_node(self, subject_key, variants):
-    return ProjectionNode(subject_key, self.product, variants, self.projected_subject, self.fields, self.input_product)
 
-
-class SelectLiteral(datatype('Literal', ['subject_key', 'product']), Selector):
+class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
   optional = False
-
-  def construct_node(self, subject_key, variants):
-    # NB: Intentionally ignores subject_key parameter to provide a literal subject.
-    return SelectNode(self.subject_key, self.product, variants, None)

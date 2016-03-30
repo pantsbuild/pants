@@ -26,8 +26,8 @@ from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
-from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_walk
 from pants.util.fileutil import create_size_estimators
@@ -74,6 +74,8 @@ class JvmCompile(NailgunTaskBase):
   """
 
   size_estimators = create_size_estimators()
+  _target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES,
+                                respect_intransitive=True)
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -90,14 +92,14 @@ class JvmCompile(NailgunTaskBase):
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
-    register('--jvm-options', advanced=True, type=list_option, default=[],
+    register('--jvm-options', advanced=True, type=list, default=[],
              help='Run the compiler with these JVM options.')
 
-    register('--args', advanced=True, action='append',
+    register('--args', advanced=True, type=list,
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these args to the compiler.')
 
-    register('--confs', advanced=True, type=list_option, default=['default'],
+    register('--confs', advanced=True, type=list, default=['default'],
              help='Compile for these Ivy confs.')
 
     # TODO: Stale analysis should be automatically ignored via Task identities:
@@ -109,26 +111,26 @@ class JvmCompile(NailgunTaskBase):
     register('--warnings', default=True, action='store_true', fingerprint=True,
              help='Compile with all configured warnings enabled.')
 
-    register('--warning-args', advanced=True, action='append', fingerprint=True,
+    register('--warning-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_warning_args_default()),
              help='Extra compiler args to use when warnings are enabled.')
 
-    register('--no-warning-args', advanced=True, action='append', fingerprint=True,
+    register('--no-warning-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--fatal-warnings-enabled-args', advanced=True, type=list_option, fingerprint=True,
+    register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_enabled_args_default()),
              help='Extra compiler args to use when fatal warnings are enabled.')
 
-    register('--fatal-warnings-disabled-args', advanced=True, type=list_option, fingerprint=True,
+    register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_disabled_args_default()),
              help='Extra compiler args to use when fatal warnings are disabled.')
 
     register('--debug-symbols', default=False, action='store_true', fingerprint=True,
              help='Compile with debug symbol enabled.')
 
-    register('--debug-symbol-args', advanced=True, action='append', fingerprint=True,
+    register('--debug-symbol-args', advanced=True, type=list, fingerprint=True,
              default=['-C-g:lines,source,vars'],
              help='Extra args to enable debug symbol.')
 
@@ -543,13 +545,11 @@ class JvmCompile(NailgunTaskBase):
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
 
     # Register a mapping between sources and classfiles (if requested).
     if classes_by_source is not None:
       ccbsbc = self.compute_classes_by_source(compile_contexts).items()
       for compile_context, computed_classes_by_source in ccbsbc:
-        target = compile_context.target
         classes_dir = compile_context.classes_dir
 
         for source in compile_context.sources:
@@ -574,7 +574,7 @@ class JvmCompile(NailgunTaskBase):
           for r in resolve(declared):
             yield r
         elif isinstance(declared, self.compiler_plugin_types):
-          for r in declared.closure(bfs=True):
+          for r in declared.closure(bfs=True, **self._target_closure_kwargs):
             yield r
         else:
           yield declared
@@ -591,12 +591,13 @@ class JvmCompile(NailgunTaskBase):
     target = compile_context.target
     if compile_context.strict_deps:
       classpath_targets = list(self._compute_strict_dependencies(target))
-      pruned = [t.address.spec for t in target.closure(bfs=True) if t not in classpath_targets]
+      pruned = [t.address.spec for t in target.closure(bfs=True, **self._target_closure_kwargs)
+                if t not in classpath_targets]
       self.context.log.debug(
           'Using strict classpath for {}, which prunes the following dependencies: {}'.format(
             target.address.spec, pruned))
     else:
-      classpath_targets = target.closure(bfs=True)
+      classpath_targets = target.closure(bfs=True, **self._target_closure_kwargs)
     return ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
                                            extra_compile_time_classpath, self._confs)
 

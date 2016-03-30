@@ -9,13 +9,12 @@ import logging
 import os
 import posixpath
 import subprocess
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.net.http.fetcher import Fetcher
-from pants.option.custom_types import dict_option, list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
@@ -48,14 +47,14 @@ class BinaryUtil(object):
 
     @classmethod
     def register_options(cls, register):
-      register('--baseurls', type=list_option, advanced=True,
+      register('--baseurls', type=list, advanced=True,
                default=['https://dl.bintray.com/pantsbuild/bin/build-support'],
                help='List of urls from which binary tools are downloaded.  Urls are searched in '
                     'order until the requested path is found.')
       register('--fetch-timeout-secs', type=int, default=30, advanced=True,
                help='Timeout in seconds for url reads when fetching binary tools from the '
                     'repos specified by --baseurls')
-      register("--path-by-id", type=dict_option, advanced=True,
+      register("--path-by-id", type=dict, advanced=True,
                help='Maps output of uname for a machine to a binary search path.  e.g. '
                '{ ("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux", "arm32"] }')
 

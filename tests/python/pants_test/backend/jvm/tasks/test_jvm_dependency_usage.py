@@ -6,14 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
-from pants.goal.products import MultipleRootedProducts
+from pants.backend.jvm.tasks.jvm_dependency_usage import DependencyUsageGraph, JvmDependencyUsage
 from pants.util.dirutil import safe_mkdir, touch
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
 class TestJvmDependencyUsage(TaskTestBase):
@@ -62,7 +60,7 @@ class TestJvmDependencyUsage(TaskTestBase):
     product_deps_by_src[t3] = {'d.java': ['a.class', 'b.class'],
                                'e.java': ['a.class', 'b.class']}
 
-    graph = dep_usage.create_dep_usage_graph([t1, t2, t3], '')
+    graph = self.create_graph(dep_usage, [t1, t2, t3])
 
     self.assertEqual(graph._nodes[t1].products_total, 2)
     self.assertEqual(graph._nodes[t2].products_total, 1)
@@ -99,9 +97,37 @@ class TestJvmDependencyUsage(TaskTestBase):
     product_deps_by_src[t1_z] = {}
     product_deps_by_src[t2] = {'a.java': ['x1.class'],
                                'b.java': ['z1.class', 'z2.class']}
-    graph = dep_usage.create_dep_usage_graph([t1, t1_x, t1_y, t1_z, t2], '')
+    graph = self.create_graph(dep_usage, [t1, t1_x, t1_y, t1_z, t2])
 
     self.assertEqual(graph._nodes[t1].products_total, 5)
     self.assertEqual(len(graph._nodes[t2].dep_edges[t1].products_used), 3)
 
     self._cover_output(graph)
+
+  def create_graph(self, task, targets):
+    classes_by_source = task.context.products.get_data('classes_by_source')
+    runtime_classpath = task.context.products.get_data('runtime_classpath')
+    product_deps_by_src = task.context.products.get_data('product_deps_by_src')
+
+    def node_creator(target):
+      return task.create_dep_usage_node(target, '',
+                                        classes_by_source, runtime_classpath, product_deps_by_src)
+
+    return DependencyUsageGraph(task.create_dep_usage_nodes(targets, node_creator),
+                                task.size_estimators[task.get_options().size_estimator])
+
+  @ensure_cached(JvmDependencyUsage, expected_num_artifacts=2)
+  def test_cache_write(self):
+    t1 = self.make_java_target(spec=':t1', sources=['a.java'])
+    self.create_file('a.java')
+    t2 = self.make_java_target(spec=':t2', sources=['b.java'], dependencies=[t1])
+    self.create_file('b.java')
+    self.set_options(size_estimator='filecount')
+    dep_usage, product_deps_by_src = self._setup({
+        t1: ['a.class'],
+        t2: ['b.class'],
+      })
+    product_deps_by_src[t1] = {}
+    product_deps_by_src[t2] = {'b.java': ['a.class']}
+
+    dep_usage.create_dep_usage_graph([t1, t2])

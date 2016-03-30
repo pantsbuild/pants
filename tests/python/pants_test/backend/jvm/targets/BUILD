@@ -2,6 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name='credentials',
+  sources=['test_credentials.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/targets:jvm',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
   name='jar_dependency',
   sources=['test_jar_dependency.py'],
   dependencies=[

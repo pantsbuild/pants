@@ -15,7 +15,6 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
-from pants.option.custom_types import list_option
 from pants.util.contextutil import open_zip
 from pants.util.memo import memoized_property
 
@@ -36,11 +35,11 @@ class DuplicateDetector(JvmBinaryTask):
   @classmethod
   def register_options(cls, register):
     super(DuplicateDetector, cls).register_options(register)
-    register('--exclude-files', default=EXCLUDED_FILES, type=list_option,
+    register('--exclude-files', default=EXCLUDED_FILES, type=list,
              help='Case insensitive filenames (without directory) to exclude from duplicate check.')
-    register('--exclude-dirs', default=EXCLUDED_DIRS, type=list_option,
+    register('--exclude-dirs', default=EXCLUDED_DIRS, type=list,
              help='Directory names to exclude from duplicate check.')
-    register('--exclude-patterns', default=EXCLUDED_PATTERNS, type=list_option,
+    register('--exclude-patterns', default=EXCLUDED_PATTERNS, type=list,
              help='Regular expressions matching paths (directory and filename) to exclude from '
                   'the duplicate check.')
     register('--max-dups', type=int, default=10,

@@ -11,7 +11,6 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.option.custom_types import list_option
 from pants.task.repl_task_mixin import ReplTaskMixin
 
 
@@ -23,7 +22,7 @@ class PythonRepl(ReplTaskMixin, PythonTask):
              help='Run an IPython REPL instead of the standard python one.')
     register('--ipython-entry-point', advanced=True, default='IPython:start_ipython',
              help='The IPython REPL entry point.')
-    register('--ipython-requirements', advanced=True, type=list_option, default=['ipython==1.0.0'],
+    register('--ipython-requirements', advanced=True, type=list, default=['ipython==1.0.0'],
              help='The IPython interpreter version to use.')
 
   @classmethod

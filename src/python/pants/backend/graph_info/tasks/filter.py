@@ -31,15 +31,15 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(Filter, cls).register_options(register)
-    register('--type', action='append', metavar='[+-]type1,type2,...',
+    register('--type', type=list, metavar='[+-]type1,type2,...',
              help='Filter on these target types.')
-    register('--target', action='append', metavar='[+-]spec1,spec2,...',
+    register('--target', type=list, metavar='[+-]spec1,spec2,...',
              help='Filter on these target addresses.')
-    register('--ancestor', action='append', metavar='[+-]spec1,spec2,...',
+    register('--ancestor', type=list, metavar='[+-]spec1,spec2,...',
              help='Filter on targets that these targets depend on.')
-    register('--regex', action='append', metavar='[+-]regex1,regex2,...',
+    register('--regex', type=list, metavar='[+-]regex1,regex2,...',
              help='Filter on target addresses matching these regexes.')
-    register('--tag-regex', action='append', metavar='[+-]regex1,regex2,...',
+    register('--tag-regex', type=list, metavar='[+-]regex1,regex2,...',
              help='Filter on targets with tags matching these regexes.')
 
   def __init__(self, *args, **kwargs):

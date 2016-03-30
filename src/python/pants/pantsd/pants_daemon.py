@@ -16,7 +16,6 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.logging.setup import setup_logging
 from pants.pantsd.process_manager import ProcessManager
-from pants.subsystem.subsystem import Subsystem
 
 
 class _StreamLogger(object):

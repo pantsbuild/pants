@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
-from abc import abstractmethod
 from collections import namedtuple
 
 from pants.binaries.binary_util import BinaryUtil
@@ -15,7 +14,6 @@ from pants.fs.archive import TGZ
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 
 
 class NodeDistribution(object):

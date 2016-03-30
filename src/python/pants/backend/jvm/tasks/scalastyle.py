@@ -76,7 +76,7 @@ class Scalastyle(NailgunTask):
              help='Path to optional scalastyle excludes file. Each line is a regex. (Blank lines '
                   'and lines starting with \'#\' are ignored.) A file is skipped if its path '
                   '(relative to the repo root) matches any of these regexes.')
-    register('--jvm-options', action='append', metavar='<option>...', advanced=True,
+    register('--jvm-options', type=list, metavar='<option>...', advanced=True,
              help='Run scalastyle with these extra jvm options.')
     # TODO: Use the task's log level instead of this separate verbosity knob.
     register('--verbose', action='store_true', default=False,

@@ -15,6 +15,7 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
 from pants.fs.archive import JAR
 from pants.util.dirutil import safe_mkdir
@@ -27,6 +28,7 @@ class BundleCreate(JvmBinaryTask):
 
   # Directory for both internal and external libraries.
   LIBS_DIR = 'libs'
+  _target_closure_kwargs = dict(include_scopes=Scopes.JVM_RUNTIME_SCOPES, respect_intransitive=True)
 
   @classmethod
   def register_options(cls, register):
@@ -97,8 +99,10 @@ class BundleCreate(JvmBinaryTask):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    targets_to_consolidate = self.find_consolidate_classpath_candidates(runtime_classpath,
-                                                                        self.context.targets())
+    targets_to_consolidate = self.find_consolidate_classpath_candidates(
+      runtime_classpath,
+      self.context.targets(**self._target_closure_kwargs),
+    )
     self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
 
     for app in apps:
@@ -142,11 +146,13 @@ class BundleCreate(JvmBinaryTask):
     if not self.get_options().deployjar:
       os.mkdir(lib_dir)
       runtime_classpath = self.context.products.get_data('runtime_classpath')
-      classpath.update(ClasspathUtil.create_canonical_classpath(runtime_classpath,
-                                                                app.target.closure(bfs=True),
-                                                                lib_dir,
-                                                                internal_classpath_only=False,
-                                                                excludes=app.binary.deploy_excludes))
+      classpath.update(ClasspathUtil.create_canonical_classpath(
+        runtime_classpath,
+        app.target.closure(bfs=True, **self._target_closure_kwargs),
+        lib_dir,
+        internal_classpath_only=False,
+        excludes=app.binary.deploy_excludes,
+      ))
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
     with self.monolithic_jar(app.binary, bundle_jar,

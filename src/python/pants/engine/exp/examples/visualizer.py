@@ -26,11 +26,10 @@ def format_type(node):
 
 
 def format_subject(node):
-  subject = node.subject_key.string
   if node.variants:
-    return '({})@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
+    return '({})@{}'.format(node.subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
   else:
-    return '({})'.format(subject)
+    return '({})'.format(node.subject)
 
 
 def format_product(node):
@@ -68,16 +67,14 @@ def create_digraph(scheduler, storage, request):
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state_key), dependency_entries) in scheduler.product_graph.walk(request.roots):
-    node_state = storage.get(node_state_key)
+  for ((node, node_state), dependency_entries) in scheduler.product_graph.walk(request.roots):
     node_str = format_node(node, node_state)
 
     yield (' "{node}" [style=filled, fillcolor={color}];'
             .format(color=format_color(node, node_state),
                     node=node_str))
 
-    for (dep, dep_state_key) in dependency_entries:
-      dep_state = storage.get(dep_state_key)
+    for (dep, dep_state) in dependency_entries:
       yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
 
   yield '}'
@@ -98,7 +95,7 @@ def visualize_execution_graph(scheduler, storage, request):
 
 def visualize_build_request(build_root, goals, subjects):
   scheduler, storage = setup_json_scheduler(build_root)
-  execution_request = scheduler.build_request(goals, storage.puts(subjects))
+  execution_request = scheduler.build_request(goals, subjects)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   engine = LocalSerialEngine(scheduler, storage)
   engine.start()

@@ -80,7 +80,7 @@ class TestBestUrlSelector(BaseTest):
 
         if with_error:
           raise RequestException('error connecting to {}'.format(url))
-    except RequestException as e:
+    except RequestException:
       pass
 
   def test_unsupported_protocol(self):

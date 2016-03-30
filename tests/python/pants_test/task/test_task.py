@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
@@ -27,6 +26,8 @@ class DummyLibrary(Target):
 class DummyTask(Task):
   """A task that appends the content of a DummyLibrary's source into its results_dir."""
 
+  _implementation_version = 0
+
   @property
   def incremental(self):
     return self._incremental
@@ -34,6 +35,11 @@ class DummyTask(Task):
   @property
   def cache_target_dirs(self):
     return True
+
+  @classmethod
+  def implementation_version_str(cls):
+    # NB: Intentionally ignoring `super` and returning a simplified version.
+    return str(cls._implementation_version)
 
   def execute(self):
     with self.invalidated(self.context.targets()) as invalidation:
@@ -124,3 +130,29 @@ class TaskTest(TaskTestBase):
     self.assertContent(vtB, two)
     self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
     self.assertEqual(vtA.results_dir, vtB.results_dir)
+
+  def test_implementation_version(self):
+    """When the implementation version changes, previous artifacts are not available."""
+
+    one = '1\n'
+    two = '2\n'
+    target, task = self._fixture(incremental=True)
+
+    # Run twice, with a different implementation version the second time.
+    DummyTask._implementation_version = 0
+    self._create_clean_file(target, one)
+    vtA = task.execute()
+    self.assertContent(vtA, one)
+    DummyTask._implementation_version = 1
+    self._create_clean_file(target, two)
+    vtB = task.execute()
+
+    # No incrementalism.
+    self.assertFalse(vtA.is_incremental)
+    self.assertFalse(vtB.is_incremental)
+
+    # Confirm two unassociated current directories, and unassociated stable directories.
+    self.assertContent(vtA, one)
+    self.assertContent(vtB, two)
+    self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
+    self.assertNotEqual(vtA.results_dir, vtB.results_dir)

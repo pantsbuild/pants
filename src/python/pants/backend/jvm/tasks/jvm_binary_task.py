@@ -14,6 +14,7 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask
 from pants.base.exceptions import TaskError
+from pants.build_graph.target_scopes import Scopes
 from pants.java.util import execute_runner
 from pants.util.contextutil import temporary_dir
 from pants.util.fileutil import atomic_copy
@@ -56,7 +57,8 @@ class JvmBinaryTask(JarBuilderTask):
     """
     classpath_products = self.context.products.get_data('runtime_classpath')
     classpath_entries = classpath_products.get_artifact_classpath_entries_for_targets(
-        binary.closure(bfs=True))
+        binary.closure(bfs=True, include_scopes=Scopes.JVM_RUNTIME_SCOPES,
+                       respect_intransitive=True))
     external_jars = OrderedSet(jar_entry for conf, jar_entry in classpath_entries
                                if conf == 'default')
     return [(entry.path, entry.coordinate) for entry in external_jars

@@ -57,7 +57,7 @@ def _options_registration_function(defaults):
       action = kwargs.get('action')
       if action == 'store_true':
         default = False
-      if action == 'append':
+      if kwargs.get('type') == list:
         default = []
     for flag_name in args:
       normalized_flag_name = flag_name.lstrip('-').replace('-', '_')
@@ -112,6 +112,10 @@ def create_options(options, passthru_args=None):
 
     def items(self):
       return options.items()
+
+    @property
+    def scope_to_flags(self):
+      return {}
 
     def get_fingerprintable_for_scope(self, scope):
       return []

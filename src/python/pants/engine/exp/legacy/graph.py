@@ -6,8 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.address import Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
+from pants.engine.exp.legacy.globs import BaseGlobs, Files
 from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
 from pants.engine.exp.selectors import Select, SelectDependencies
@@ -47,21 +49,19 @@ class ExpGraph(BuildGraph):
     # Index the ProductGraph.
     # TODO: It's not very common to actually use the dependencies of a Node during a walk... should
     # consider removing those from that API.
-    for ((node, state_key), _) in self._graph.walk(roots=roots):
+    for ((node, state), _) in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyBuildGraphNode values.
-      if state_key.type is Throw:
-        # TODO: get access to `Storage` instance in order to `to-str` more effectively here.
+      if type(state) is Throw:
         raise AddressLookupError(
-            'Build graph construction failed for {}:\n  {}'.format(node.subject_key, state.exc))
-      elif state_key.type is not Return:
-        State.raise_unrecognized(state_key.type)
+            'Build graph construction failed for {}:\n  {}'.format(node.subject, state.exc))
+      elif type(state) is not Return:
+        State.raise_unrecognized(state)
       if node.product is not LegacyBuildGraphNode:
         continue
       if type(node) is not SelectNode:
         continue
 
       # We have a successfully parsed a LegacyBuildGraphNode.
-      state = self._engine.storage.get(state_key)
       target_adaptor = state.value.target_adaptor
       address = target_adaptor.address
       addresses.add(address)
@@ -72,6 +72,18 @@ class ExpGraph(BuildGraph):
       for dependency in dependencies:
         self._target_dependees_by_address[dependency].add(address)
     return addresses
+
+  def _instantiate_sources(self, relpath, sources):
+    """Converts captured `sources` arguments to what is expected by `Target.create_sources_field`.
+
+    For a literal sources list or a BaseGlobs subclass, create a wrapping FilesetWithSpec.
+    For an Addresses object, return as is.
+    """
+    if isinstance(sources, Addresses):
+      return sources
+    if not isinstance(sources, BaseGlobs):
+      sources = Files(*sources)
+    return sources.to_fileset_with_spec(self._engine, self._scheduler, relpath)
 
   def _instantiate_target(self, target_adaptor):
     """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target.
@@ -86,6 +98,11 @@ class ExpGraph(BuildGraph):
       # Pop dependencies, which was already consumed while constructing LegacyBuildGraphNode.
       kwargs = target_adaptor.kwargs()
       kwargs.pop('dependencies')
+      # Replace the sources argument with a FilesetWithSpecs instance, or None.
+      spec_path = kwargs.pop('spec_path')
+      sources = kwargs.get('sources', None)
+      if sources is not None:
+        kwargs['sources'] = self._instantiate_sources(spec_path, sources)
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
@@ -94,10 +111,6 @@ class ExpGraph(BuildGraph):
       raise TargetDefinitionException(
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
-
-  @property
-  def address_mapper(self):
-    raise NotImplementedError('Not implemented.')
 
   def get_derived_from(self, address):
     raise NotImplementedError('Not implemented.')
@@ -124,7 +137,7 @@ class ExpGraph(BuildGraph):
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
-    request = self._scheduler.execution_request([LegacyBuildGraphNode], self._engine.storage.puts(specs))
+    request = self._scheduler.execution_request([LegacyBuildGraphNode], specs)
     result = self._engine.execute(request)
     if result.error:
       raise result.error
@@ -144,3 +157,15 @@ def reify_legacy_graph(target_adaptor, dependency_nodes):
   """Given a TargetAdaptor and LegacyBuildGraphNodes for its deps, return a LegacyBuildGraphNode."""
   return LegacyBuildGraphNode(target_adaptor,
                               [node.target_adaptor.address for node in dependency_nodes])
+
+
+def create_legacy_graph_tasks():
+  """Create tasks to recursively parse the legacy graph."""
+  return [
+    # Recursively requests LegacyGraphNodes for TargetAdaptors, which will result in a
+    # transitive graph walk.
+    (LegacyBuildGraphNode,
+     [Select(TargetAdaptor),
+      SelectDependencies(LegacyBuildGraphNode, TargetAdaptor)],
+     reify_legacy_graph),
+  ]

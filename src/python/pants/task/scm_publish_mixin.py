@@ -10,7 +10,6 @@ import traceback
 from abc import abstractmethod
 
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import list_option
 from pants.scm.scm import Scm
 
 
@@ -30,13 +29,25 @@ class Version(object):
 
 
 class Namedver(Version):
-  _VALID_NAME = re.compile('^[-_A-Za-z0-9]+$')
+  """A less restrictive versioning scheme that does not conflict with Semver
+
+  Its important to not allow certain characters that are used in maven for performing
+  range matching like *><=!  See:
+
+  https://maven.apache.org/enforcer/enforcer-rules/versionRanges.html
+  """
+
+  _VALID_NAME = re.compile('^[-_.A-Za-z0-9]+$')
+  _INVALID_NAME = re.compile('^[-_.]*$')
 
   @classmethod
   def parse(cls, version):
     # must not contain whitespace
     if not cls._VALID_NAME.match(version):
-      raise ValueError("Named versions must be alphanumeric: '{0}'".format(version))
+      raise ValueError("Named versions must match {}: '{}'".format(cls._VALID_NAME.pattern, version))
+    if cls._INVALID_NAME.match(version):
+      raise ValueError("Named version must contain at least one alphanumeric character")
+
     # must not be valid semver
     try:
       Semver.parse(version)
@@ -62,6 +73,7 @@ class Namedver(Version):
 
 
 class Semver(Version):
+  """Semantic versioning. See http://semver.org"""
 
   @staticmethod
   def parse(version):
@@ -142,9 +154,9 @@ class ScmPublishMixin(object):
     super(ScmPublishMixin, cls).register_options(register)
     register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
              help='Try pushing the pushdb to the SCM this many times before aborting.')
-    register('--restrict-push-branches', advanced=True, type=list_option,
+    register('--restrict-push-branches', advanced=True, type=list,
              help='Allow pushes only from one of these branches.')
-    register('--restrict-push-urls', advanced=True, type=list_option,
+    register('--restrict-push-urls', advanced=True, type=list,
              help='Allow pushes to only one of these urls.')
 
   @property

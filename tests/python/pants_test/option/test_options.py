@@ -15,7 +15,7 @@ from textwrap import dedent
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
-from pants.option.custom_types import dict_option, file_option, list_option, target_option
+from pants.option.custom_types import file_option, target_option
 from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
                                  BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
                                  ImplicitValIsNone, InvalidAction, InvalidKwarg, InvalidMemberType,
@@ -64,8 +64,8 @@ class OptionsTest(unittest.TestCase):
 
     register_global('-z', '--verbose', action='store_true', help='Verbose output.', recursive=True)
     register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
-    register_global('--y', action='append', type=int)
-    register_global('--config-override', action='append')
+    register_global('--y', type=list, member_type=int)
+    register_global('--config-override', type=list)
 
     register_global('--pants-foo')
     register_global('--bar-baz')
@@ -78,18 +78,18 @@ class OptionsTest(unittest.TestCase):
 
     # Choices.
     register_global('--str-choices', choices=['foo', 'bar'])
-    register_global('--int-choices', choices=[42, 99], type=int, action='append')
+    register_global('--int-choices', choices=[42, 99], type=list, member_type=int)
 
     # Custom types.
-    register_global('--listy', type=list_option, member_type=int, default='[1, 2, 3]')
-    register_global('--dicty', type=dict_option, default='{"a": "b"}')
-    register_global('--dict-listy', type=list_option, member_type=dict_option,
+    register_global('--listy', type=list, member_type=int, default='[1, 2, 3]')
+    register_global('--dicty', type=dict, default='{"a": "b"}')
+    register_global('--dict-listy', type=list, member_type=dict,
                     default='[{"a": 1, "b": 2}, {"c": 3}]')
     register_global('--targety', type=target_option, default='//:a')
-    register_global('--target-listy', type=list_option, member_type=target_option,
+    register_global('--target-listy', type=list, member_type=target_option,
                     default=['//:a', '//:b'])
     register_global('--filey', type=file_option, default=None)
-    register_global('--file-listy', type=list_option, member_type=file_option)
+    register_global('--file-listy', type=list, member_type=file_option)
 
     # Implicit value.
     register_global('--implicit-valuey', default='default', implicit_value='implicit')
@@ -131,9 +131,9 @@ class OptionsTest(unittest.TestCase):
     # For fromfile test
     options.register('fromfile', '--string', fromfile=True)
     options.register('fromfile', '--intvalue', type=int, fromfile=True)
-    options.register('fromfile', '--dictvalue', type=dict_option, fromfile=True)
-    options.register('fromfile', '--listvalue', type=list_option, fromfile=True)
-    options.register('fromfile', '--appendvalue', action='append', type=int, fromfile=True)
+    options.register('fromfile', '--dictvalue', type=dict, fromfile=True)
+    options.register('fromfile', '--listvalue', type=list, fromfile=True)
+    options.register('fromfile', '--appendvalue', type=list, member_type=int, fromfile=True)
 
   def _create_config(self, config):
     with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
@@ -154,26 +154,22 @@ class OptionsTest(unittest.TestCase):
     self._register(options)
     return options
 
-  def _parse_type_int(self, args_str, env=None, config=None, bootstrap_option_values=None,
-                      action='store'):
-    args = shlex.split(str(args_str))
-    options = Options.create(env=env or {},
-                             config=self._create_config(config or {}),
-                             known_scope_infos=OptionsTest._known_scope_infos,
-                             args=args,
-                             bootstrap_option_values=bootstrap_option_values,
-                             option_tracker=OptionTracker())
-    options.register(GLOBAL_SCOPE, '--config-override', action=action, type=int)
-    return options
-
   def test_env_type_int(self):
-    options = self._parse_type_int('./pants ',
-                                   action='append',
-                                   env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
-    self.assertEqual([123, 456], options.for_global_scope().config_override)
+    options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},
+                             config=self._create_config({}),
+                             known_scope_infos=OptionsTest._known_scope_infos,
+                             args=shlex.split('./pants'),
+                             option_tracker=OptionTracker())
+    options.register(GLOBAL_SCOPE, '--foo-bar', type=list, member_type=int)
+    self.assertEqual([123, 456], options.for_global_scope().foo_bar)
 
-    options = self._parse_type_int('./pants ', env={'PANTS_CONFIG_OVERRIDE': "123"})
-    self.assertEqual(123, options.for_global_scope().config_override)
+    options = Options.create(env={'PANTS_FOO_BAR': '123'},
+                             config=self._create_config({}),
+                             known_scope_infos=OptionsTest._known_scope_infos,
+                             args=shlex.split('./pants'),
+                             option_tracker=OptionTracker())
+    options.register(GLOBAL_SCOPE, '--foo-bar', type=int)
+    self.assertEqual(123, options.for_global_scope().foo_bar)
 
   def test_arg_scoping(self):
     # Some basic smoke tests.
@@ -492,10 +488,10 @@ class OptionsTest(unittest.TestCase):
     assertError(BooleanOptionImplicitVal, '--foo', action='store_true', implicit_value=False)
     assertError(BooleanOptionNameWithNo, '--no-foo', action='store_true')
     assertError(MemberTypeNotAllowed, '--foo', member_type=int)
-    assertError(MemberTypeNotAllowed, '--foo', type=dict_option, member_type=int)
-    assertError(InvalidMemberType, '--foo', type=list_option, member_type=set)
-    assertError(InvalidMemberType, '--foo', type=list_option, member_type=list)
-    assertError(InvalidMemberType, '--foo', type=list_option, member_type=list_option)
+    assertError(MemberTypeNotAllowed, '--foo', type=dict, member_type=int)
+    assertError(InvalidMemberType, '--foo', type=list, member_type=set)
+    assertError(InvalidMemberType, '--foo', type=list, member_type=list)
+    assertError(InvalidMemberType, '--foo', type=list, member_type=list)
 
   def test_frozen_registration(self):
     options = Options.create(args=[], env={}, config=self._create_config({}),
@@ -584,7 +580,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(1, options.for_global_scope().a)
     self.assertEqual(99, options.for_global_scope().b)
     with self.assertRaises(AttributeError):
-      _ = options.for_global_scope().c
+      options.for_global_scope().c
 
     self.assertEqual(1, options.for_scope('compile').a)
     self.assertEqual(2, options.for_scope('compile').b)
@@ -973,7 +969,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(1, options.for_global_scope().a)
     self.assertEqual(99, options.for_global_scope().b)
     with self.assertRaises(AttributeError):
-      _ = options.for_global_scope().c
+      options.for_global_scope().c
 
     self.assertEqual(1, options.for_scope('compile').a)
     self.assertEqual(2, options.for_scope('compile').b)

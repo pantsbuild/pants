@@ -9,10 +9,9 @@ import json
 import unittest
 from textwrap import dedent
 
-from pants.engine.exp import parsers
+from pants.engine.exp import parser
+from pants.engine.exp.examples import parsers
 from pants.engine.exp.objects import Resolvable
-from pants.engine.exp.parsers import ParseError
-from pants.util.contextutil import temporary_file
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.
@@ -30,19 +29,19 @@ class Bob(object):
     return isinstance(other, Bob) and self._key() == other._key()
 
 
-class EmptyTable(parsers.SymbolTable):
+class EmptyTable(parser.SymbolTable):
   @classmethod
   def table(cls):
     return {}
 
 
-class TestTable(parsers.SymbolTable):
+class TestTable(parser.SymbolTable):
   @classmethod
   def table(cls):
     return {'bob': Bob}
 
 
-class TestTable2(parsers.SymbolTable):
+class TestTable2(parser.SymbolTable):
   @classmethod
   def table(cls):
     return {'nancy': Bob}
@@ -229,7 +228,7 @@ class JsonParserTest(unittest.TestCase):
     }
     """).strip()
     filepath = '/dev/null'
-    with self.assertRaises(ParseError) as exc:
+    with self.assertRaises(parser.ParseError) as exc:
       parsers.JsonParser.parse(filepath, document, symbol_table_cls=EmptyTable)
 
     # Strip trailing whitespace from the message since our expected literal below will have

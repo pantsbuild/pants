@@ -18,7 +18,6 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.binaries import binary_util
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.dirutil import safe_mkdir
-from pants.util.memo import memoized_property
 from pants.util.strutil import safe_shlex_split
 
 
@@ -27,7 +26,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(IvyResolve, cls).register_options(register)
-    register('--override', action='append',
+    register('--override', type=list,
              fingerprint=True,
              help='Specifies a jar dependency override in the form: '
              '[org]#[name]=(revision|url) '
@@ -41,10 +40,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              help='Attempt to open the generated ivy resolve report '
                   'in a browser (implies --report)')
     register('--outdir', help='Emit ivy report outputs in to this directory.')
-    register('--args', action='append',
+    register('--args', type=list,
              fingerprint=True,
              help='Pass these extra args to ivy.')
-    register('--confs', action='append', default=['default'],
+    register('--confs', type=list, default=['default'],
              help='Pass a configuration to ivy in addition to the default ones.')
     register('--mutable-pattern',
              fingerprint=True,

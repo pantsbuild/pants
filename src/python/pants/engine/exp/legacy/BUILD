@@ -5,11 +5,24 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
+    ':globs',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
     'src/python/pants/engine/exp:fs',
-    'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:struct',
+  ],
+)
+
+python_library(
+  name='globs',
+  sources=['globs.py'],
+  dependencies=[
+    'src/python/pants/engine/exp:fs',
+    'src/python/pants/engine/exp:nodes',
+    'src/python/pants/source',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ],
 )
 
@@ -17,10 +30,12 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
+    ':globs',
     ':parser',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:graph',
+    'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:selectors',
     'src/python/pants/util:objects',
   ],
@@ -36,8 +51,9 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:specs',
     'src/python/pants/bin',
+    'src/python/pants/engine/exp:fs',
+    'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
-    'src/python/pants/engine/exp:register',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:storage',
     'src/python/pants/option',
@@ -45,19 +61,17 @@ python_library(
   ],
 )
 
-python_library(
-  name='register',
-  sources=['register.py'],
+python_binary(
+  name='dependencies',
+  entry_point='pants.engine.exp.legacy.commands:dependencies',
   dependencies=[
-    ':graph',
-    ':parser',
-    'src/python/pants/engine/exp:selectors',
+    ':commands'
   ]
 )
 
 python_binary(
-  name='dependencies',
-  entry_point='pants.engine.exp.legacy.commands:dependencies',
+  name='filemap',
+  entry_point='pants.engine.exp.legacy.commands:filemap',
   dependencies=[
     ':commands'
   ]

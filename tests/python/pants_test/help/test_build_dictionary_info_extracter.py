@@ -239,7 +239,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         :param bar: Bar details.
         :param int baz: Baz details.
         """
-        return super(Foo, cls).__new__(cls, bar, baz)
+        return super(FooDatatype, cls).__new__(cls, bar, baz)
 
     bfa = BuildFileAliases(targets={},
       objects={
