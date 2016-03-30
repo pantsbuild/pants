@@ -17,7 +17,6 @@ from pants.base.build_environment import get_buildroot
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.task.task import Task
-from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
 
 
@@ -125,23 +124,6 @@ class JvmDependencyUsage(Task):
     else:
       return True
 
-  def _normalize_product_dep(self, buildroot, classes_by_source, dep):
-    """Normalizes the given product dep from the given dep into a set of classfiles.
-
-    Product deps arrive as sources, jars, and classfiles: this method normalizes them to classfiles.
-
-    TODO: This normalization should happen in the super class.
-    """
-    if dep.endswith(".jar"):
-      # TODO: post sbt/zinc jar output patch, binary deps will be reported directly as classfiles
-      return set()
-    elif dep.endswith(".class"):
-      return set([dep])
-    else:
-      # assume a source file and convert to classfiles
-      rel_src = fast_relpath(dep, buildroot)
-      return set(p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths)
-
   def _count_products(self, classpath_products, target):
     contents = ClasspathUtil.classpath_contents((target,), classpath_products)
     # Generators don't implement len.
@@ -176,7 +158,8 @@ class JvmDependencyUsage(Task):
     `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
     stores the result to the build cache.
     """
-    targets_by_file = JvmDependencyAnalyzer(runtime_classpath).targets_by_file(self.context.targets())
+    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
+    targets_by_file = analyzer.targets_by_file(self.context.targets())
     def creator(target):
       node = self.create_dep_usage_node(target, targets_by_file, get_buildroot(),
                                         classes_by_source, runtime_classpath, product_deps_by_src)
@@ -256,7 +239,7 @@ class JvmDependencyUsage(Task):
           if not self._select(derived_from):
             continue
           is_declared = self._is_declared_dep(target, dep_tgt)
-          normalized_deps = self._normalize_product_dep(buildroot, classes_by_source, product_dep)
+          normalized_deps = self._analyzer.normalize_product_dep(buildroot, classes_by_source, product_dep)
           node.add_edge(Edge(is_declared=is_declared, products_used=normalized_deps), derived_from)
 
     return node

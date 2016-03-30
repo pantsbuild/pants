@@ -173,7 +173,8 @@ class JvmDependencyCheck(Task):
 
     All paths in the input and output are absolute.
     """
-    analyzer = JvmDependencyAnalyzer(self.context.products.get_data('runtime_classpath'))
+    analyzer = JvmDependencyAnalyzer(get_buildroot(),
+                                     self.context.products.get_data('runtime_classpath'))
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.

@@ -109,7 +109,8 @@ class TestJvmDependencyUsage(TaskTestBase):
     classes_by_source = task.context.products.get_data('classes_by_source')
     runtime_classpath = task.context.products.get_data('runtime_classpath')
     product_deps_by_src = task.context.products.get_data('product_deps_by_src')
-    targets_by_file = JvmDependencyAnalyzer(runtime_classpath).targets_by_file(targets)
+    analyzer = JvmDependencyAnalyzer(self.build_root, runtime_classpath)
+    targets_by_file = analyzer.targets_by_file(targets)
 
     def node_creator(target):
       return task.create_dep_usage_node(target, targets_by_file, '',

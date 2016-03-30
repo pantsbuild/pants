@@ -13,10 +13,10 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_graph import sort_targets
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
+from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -27,7 +27,8 @@ class JvmDependencyAnalyzer(object):
   determining which targets correspond to the actual source dependencies of any given target.
   """
 
-  def __init__(self, runtime_classpath):
+  def __init__(self, buildroot, runtime_classpath):
+    self._buildroot = buildroot
     self._runtime_classpath = runtime_classpath
 
   @memoized_method
@@ -37,17 +38,16 @@ class JvmDependencyAnalyzer(object):
     The runtime classpath for a target must already have been finalized for a target in order
     to compute its provided files.
     """
-    buildroot = get_buildroot()
 
     # Compute src -> target.
     if isinstance(target, JvmTarget):
       for src in target.sources_relative_to_buildroot():
-        yield os.path.join(buildroot, src)
+        yield os.path.join(self._buildroot, src)
     # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
     if isinstance(target, ScalaLibrary):
       for java_source in target.java_sources:
         for src in java_source.sources_relative_to_buildroot():
-          yield os.path.join(buildroot, src)
+          yield os.path.join(self._buildroot, src)
 
     # Compute classfile -> target and jar -> target.
     files = ClasspathUtil.classpath_contents((target,), self._runtime_classpath)
@@ -136,3 +136,18 @@ class JvmDependencyAnalyzer(object):
 
       transitive_deps_by_target[target] = transitive_deps
     return transitive_deps_by_target
+
+  def normalize_product_dep(self, classes_by_source, dep):
+    """Normalizes the given product dep from the given dep into a set of classfiles.
+
+    Product deps arrive as sources, jars, and classfiles: this method normalizes them to classfiles and jars.
+    """
+    if dep.endswith(".jar"):
+      # NB: We preserve jars "whole" here, because zinc does not support finer granularity.
+      return set([dep])
+    elif dep.endswith(".class"):
+      return set([dep])
+    else:
+      # Assume a source file and convert to classfiles.
+      rel_src = fast_relpath(dep, self._buildroot)
+      return set(p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths)

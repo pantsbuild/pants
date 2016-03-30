@@ -15,10 +15,10 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
+from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -335,7 +335,8 @@ class JvmCompile(NailgunTaskBase):
 
   @memoized_property
   def _dep_analyzer(self):
-    return JvmDependencyAnalyzer(self.context.products.get_data('runtime_classpath'))
+    return JvmDependencyAnalyzer(get_buildroot(),
+                                 self.context.products.get_data('runtime_classpath'))
 
   @property
   def _analysis_parser(self):
@@ -581,15 +582,27 @@ class JvmCompile(NailgunTaskBase):
         product_deps_by_src[compile_context.target] = \
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
 
-  def _check_unused_deps(self, vts):
+  def _check_unused_deps(self, compile_context):
     """Uses the `classes_by_source` and `product_deps_by_src` products to check unused deps."""
     with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
-      # Determine which of the targets in the directly declared set of this target
-      # (TODO: pass in or memoize on context rather than re-computing) were actually used: ie,
-      # had at least one file consumed by this target.
-      self._dep_analyzer
+      analyzer = self._dep_analyzer
+
+      # Flatten the product deps of this target.
+      classes_by_source = self.context.products.get_data('classes_by_source')
+      product_deps_by_src = self.context.products.get_data('product_deps_by_src')
+      product_deps = set()
+      for dep_entries in product_deps_by_src.get(compile_context.target, dict()).values():
+        for dep_entry in dep_entries:
+          product_deps.update(analyzer.normalize_product_dep(classes_by_source, dep_entry))
+      print('>>> product_deps of {} were:\n  {}'.format(compile_context.target.address.spec, '\n  '.join(str(pd) for pd in product_deps)))
+      # Determine which of the targets in the directly declared (ie, 'strict') set of this
+      # target were used.
+      for dep in compile_context.strict_dependencies(self._dep_context):
+        # If any of the target's jars or classfiles were used, consider it used.
+        pass
 
       # For any targets that were not used, determine whether transitive deps were used.
+      # TODO
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -710,7 +723,7 @@ class JvmCompile(NailgunTaskBase):
 
       # Once products are registered, check for unused dependencies (if enabled).
       if not hit_cache and self._unused_deps_check_enabled:
-        self._check_unused_deps(vts)
+        self._check_unused_deps(compile_context)
 
     jobs = []
     invalid_target_set = set(invalid_targets)

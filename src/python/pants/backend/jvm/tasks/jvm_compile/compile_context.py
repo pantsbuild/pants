@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import zipfile
 from contextlib import contextmanager
 
-from pants.util.contextutil import open_zip
 from pants.build_graph.target import Target
+from pants.util.contextutil import open_zip
 
 
 class DependencyContext(object):
