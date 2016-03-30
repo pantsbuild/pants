@@ -156,16 +156,14 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
               tool_classpath_target = JarLibrary(name=dep_address.target_name,
                                                  address=dep_address,
                                                  build_graph=build_graph,
-                                                 jars=jvm_tool.classpath,
-                                                 )
+                                                 jars=jvm_tool.classpath)
             else:
               # The tool classpath is empty by default, so we just inject a dummy target that
               # ivy resolves as the empty list classpath.  JarLibrary won't do since it requires
               # one or more jars, so we just pick a target type ivy has no resolve work to do for.
               tool_classpath_target = Target(name=dep_address.target_name,
                                              address=dep_address,
-                                             build_graph=build_graph,
-                                             )
+                                             build_graph=build_graph)
             build_graph.inject_target(tool_classpath_target, synthetic=True)
 
     # We use the trick of not returning alternate roots, but instead just filling the dep_spec
@@ -216,7 +214,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       pass
 
     # Bootstrapped tools are inserted as synthetic.  If they exist on disk they are later
-    # updated as non synthetic targets.  If its a synthetic target make sure it has a rev.
+    # updated as non synthetic targets.  If it's a synthetic target make sure it has a rev.
     synthetic_targets = [t.is_synthetic for t in targets]
     empty_revs = [cp.rev is None for cp in jvm_tool.classpath or []]
 
