@@ -38,25 +38,26 @@ class JvmDependencyAnalyzer(object):
     The runtime classpath for a target must already have been finalized for a target in order
     to compute its provided files.
     """
-
-    # Compute src -> target.
-    if isinstance(target, JvmTarget):
-      for src in target.sources_relative_to_buildroot():
-        yield os.path.join(self._buildroot, src)
-    # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
-    if isinstance(target, ScalaLibrary):
-      for java_source in target.java_sources:
-        for src in java_source.sources_relative_to_buildroot():
+    def gen():
+      # Compute src -> target.
+      if isinstance(target, JvmTarget):
+        for src in target.sources_relative_to_buildroot():
           yield os.path.join(self._buildroot, src)
+      # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
+      if isinstance(target, ScalaLibrary):
+        for java_source in target.java_sources:
+          for src in java_source.sources_relative_to_buildroot():
+            yield os.path.join(self._buildroot, src)
 
-    # Compute classfile -> target and jar -> target.
-    files = ClasspathUtil.classpath_contents((target,), self._runtime_classpath)
-    # And jars; for binary deps, zinc doesn't emit precise deps (yet).
-    cp_entries = ClasspathUtil.classpath((target,), self._runtime_classpath)
-    jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
-    for coll in [files, jars]:
-      for f in coll:
-        yield f
+      # Compute classfile -> target and jar -> target.
+      files = ClasspathUtil.classpath_contents((target,), self._runtime_classpath)
+      # And jars; for binary deps, zinc doesn't emit precise deps (yet).
+      cp_entries = ClasspathUtil.classpath((target,), self._runtime_classpath)
+      jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
+      for coll in [files, jars]:
+        for f in coll:
+          yield f
+    return set(gen())
 
   def targets_by_file(self, targets):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.

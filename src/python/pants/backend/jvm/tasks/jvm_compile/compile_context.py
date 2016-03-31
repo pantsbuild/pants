@@ -48,11 +48,10 @@ class CompileContext(object):
     else:
       return self.all_dependencies(dep_context)
 
-  def strict_dependencies(self, dep_context):
-    """Compute the 'strict' compile target dependencies for this target.
+  def declared_dependencies(self, dep_context, compiler_plugins=False):
+    """Compute the declared dependencies for this target, recursively resolving target aliases.
 
-    Recursively resolves target aliases, and includes the transitive deps of compiler plugins,
-    since compiletime is actually runtime for them.
+    TODO: Switch to using scopes rather than types to identify plugins.
     """
     def resolve(t):
       for declared in t.dependencies:
@@ -60,14 +59,27 @@ class CompileContext(object):
           for r in resolve(declared):
             yield r
         elif isinstance(declared, dep_context.compiler_plugin_types):
-          for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
-            yield r
+          if compiler_plugins:
+            yield declared
         else:
           yield declared
 
-    yield self.target
     for dep in resolve(self.target):
       yield dep
+
+  def strict_dependencies(self, dep_context):
+    """Compute the 'strict' compile target dependencies for this target.
+
+    Results in a list similar to the list for `declared_dependencies`, with the addition
+    of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
+    """
+    yield self.target
+    for declared in self.declared_dependencies(dep_context, compiler_plugins=True):
+      if isinstance(declared, dep_context.compiler_plugin_types):
+        for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
+          yield r
+      else:
+        yield declared
 
   def all_dependencies(self, dep_context):
     """All transitive dependencies of the context's target."""

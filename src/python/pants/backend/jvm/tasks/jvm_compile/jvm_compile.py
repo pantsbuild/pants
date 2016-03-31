@@ -583,26 +583,63 @@ class JvmCompile(NailgunTaskBase):
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
 
   def _check_unused_deps(self, compile_context):
-    """Uses the `classes_by_source` and `product_deps_by_src` products to check unused deps."""
+    """Uses `classes_by_source` and `product_deps_by_src` to check unused deps.
+
+    TODO: Consider moving to the analyzer.
+    """
     with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
       analyzer = self._dep_analyzer
 
       # Flatten the product deps of this target.
-      classes_by_source = self.context.products.get_data('classes_by_source')
       product_deps_by_src = self.context.products.get_data('product_deps_by_src')
       product_deps = set()
       for dep_entries in product_deps_by_src.get(compile_context.target, dict()).values():
-        for dep_entry in dep_entries:
-          product_deps.update(analyzer.normalize_product_dep(classes_by_source, dep_entry))
-      print('>>> product_deps of {} were:\n  {}'.format(compile_context.target.address.spec, '\n  '.join(str(pd) for pd in product_deps)))
-      # Determine which of the targets in the directly declared (ie, 'strict') set of this
-      # target were used.
-      for dep in compile_context.strict_dependencies(self._dep_context):
-        # If any of the target's jars or classfiles were used, consider it used.
-        pass
+        product_deps.update(dep_entries)
 
-      # For any targets that were not used, determine whether transitive deps were used.
-      # TODO
+      # Determine which of the deps in the declared set of this target were used.
+      used = set()
+      unused = set()
+      for dep in compile_context.declared_dependencies(self._dep_context, compiler_plugins=False):
+        if isinstance(dep, Resources):
+          continue
+        # If any of the target's jars or classfiles were used, consider it used.
+        if any(f in product_deps for f in analyzer.files_for_target(dep)):
+          used.add(dep)
+        else:
+          unused.add(dep)
+
+      # If there were no unused deps, break.
+      if not unused:
+        return
+
+      # For any deps that were used, count their derived-from targets used as well.
+      # TODO: do some of this above?
+      for dep in list(used):
+        for derived_from in dep.derived_from_chain:
+          if derived_from in unused:
+            unused.remove(derived_from)
+            used.add(derived_from)
+
+      # Prune derived targets that would be in the set twice.
+      for dep in list(unused):
+        if set(dep.derived_from_chain) & unused:
+          unused.remove(dep)
+
+      if not unused:
+        return
+
+      # Finally, warn or error for unused.
+      # TODO: For any targets that were not used, determine whether transitive deps were used.
+      unused_msg = (
+          'unused dependencies:\n  {}'.format(
+            compile_context.target.address.spec,
+            '\n  '.join(str(dep.address.spec) for dep in unused),
+          )
+        )
+      if self.get_options().unused_deps == 'error':
+        raise TaskError(unused_msg)
+      else:
+        self.context.log.warn('Target {} had {}'.format(unused_msg))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
