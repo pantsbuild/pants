@@ -67,13 +67,13 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
       config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
       with open(config_path, 'w+') as f:
-        f.write(dedent('''
+        f.write(dedent("""
           [options]
           colors: False
           scope: options
           only_overridden: True
           show_history: True
-        '''))
+        """))
       pants_run = self.run_pants(['--config-override={}'.format(config_path), 'options'])
       self.assert_success(pants_run)
       self.assertIn('options.only_overridden = True', pants_run.stdout_data)
@@ -83,7 +83,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
       config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
       with open(config_path, 'w+') as f:
-        f.write(dedent('''
+        f.write(dedent("""
           [DEFAULT]
           pythonpath: [
               "%(buildroot)s/testprojects/src/python",
@@ -95,20 +95,21 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
           [options]
           colors: False
-        '''))
+        """))
       pants_run = self.run_pants(['--config-override={}'.format(config_path), 'options'])
       self.assert_success(pants_run)
 
 
       self.assertIn('dummy-options.normal_option', pants_run.stdout_data)
-      self.assertIn('dummy-options.dummy_crufty_deprecated_but_still_functioning', pants_run.stdout_data)
+      self.assertIn('dummy-options.dummy_crufty_deprecated_but_still_functioning',
+                    pants_run.stdout_data)
       self.assertNotIn('dummy-options.dummy_crufty_expired', pants_run.stdout_data)
 
   def test_from_config_invalid_section(self):
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
       config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
       with open(config_path, 'w+') as f:
-        f.write(dedent('''
+        f.write(dedent("""
           [DEFAULT]
           some_crazy_thing: 123
 
@@ -119,8 +120,9 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [another_invalid_scope]
           colors: False
           scope: options
-        '''))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path), '--verify-config', 'goals'])
+        """))
+      pants_run = self.run_pants(['--config-override={}'.format(config_path), '--verify-config',
+                                  'goals'])
       self.assert_failure(pants_run)
       self.assertIn('ERROR] Invalid scope [invalid_scope]', pants_run.stderr_data)
       self.assertIn('ERROR] Invalid scope [another_invalid_scope]', pants_run.stderr_data)
@@ -129,17 +131,19 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
       config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
       with open(config_path, 'w+') as f:
-        f.write(dedent('''
+        f.write(dedent("""
           [DEFAULT]
           some_crazy_thing: 123
 
           [test.junit]
           fail_fast: True
           invalid_option: True
-        '''))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),'--verify-config', 'goals'])
+        """))
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),'--verify-config',
+                                  'goals'])
       self.assert_failure(pants_run)
-      self.assertIn("ERROR] Invalid option 'invalid_option' under [test.junit]", pants_run.stderr_data)
+      self.assertIn("ERROR] Invalid option 'invalid_option' under [test.junit]",
+                    pants_run.stderr_data)
 
   def test_from_config_invalid_global_option(self):
     """
@@ -150,7 +154,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
       config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
       with open(config_path, 'w+') as f:
-        f.write(dedent('''
+        f.write(dedent("""
           [DEFAULT]
           some_crazy_thing: 123
 
@@ -160,11 +164,13 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
           [test.junit]
           fail_fast: True
-        '''))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path), '--verify-config', 'goals'])
+        """))
+      pants_run = self.run_pants(['--config-override={}'.format(config_path), '--verify-config',
+                                  'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'invalid_global' under [GLOBAL]", pants_run.stderr_data)
-      self.assertIn("ERROR] Invalid option 'another_invalid_global' under [GLOBAL]", pants_run.stderr_data)
+      self.assertIn("ERROR] Invalid option 'another_invalid_global' under [GLOBAL]",
+                    pants_run.stderr_data)
 
   def test_command_line_option_used_by_goals(self):
     self.assert_success(self.run_pants(['goals', '--bundle-jvm-archive=zip']))
@@ -175,7 +181,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       '--no-colors', '--no-jvm-platform-validate-colors', '--test-junit-colors',
       '--unpack-jars-colors', '--no-resolve-ivy-colors', '--imports-ivy-imports-colors',
       '--compile-colors', '--no-compile-zinc-colors',
-      'options', '--no-colors', '--skip-inherited', '--name=colors',
+      'options', '--skip-inherited', '--name=colors',
     ])
     self.assert_success(pants_run)
     lines = (s.split('(', 1)[0] for s in pants_run.stdout_data.split('\n') if '(' in s)

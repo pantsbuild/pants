@@ -17,7 +17,6 @@ from pants.option.custom_types import ListValueComponent
 from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
-from pants.option.option_util import is_boolean_option
 from pants.option.options import Options
 
 
@@ -81,7 +80,7 @@ class OptionsBootstrapper(object):
           flags.add(arg)
           if len(arg) == 2:
             short_flags.add(arg)
-          elif is_boolean_option(kwargs):
+          elif kwargs.get('type') == bool:
             flags.add('--no-{}'.format(arg[2:]))
 
       GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)

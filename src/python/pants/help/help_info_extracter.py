@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 
 from pants.base.revision import Revision
-from pants.option.option_util import is_boolean_option, is_list_option
+from pants.option.option_util import is_list_option
 from pants.version import PANTS_SEMVER
 
 
@@ -79,17 +79,11 @@ class HelpInfoExtracter(object):
     :API: public
     """
     ranked_default = kwargs.get('default')
-    action = kwargs.get('action')
-    typ = None if action in ['store_true', 'store_false'] else kwargs.get('type', str)
+    typ = kwargs.get('type', str)
 
     default = ranked_default.value if ranked_default else None
     if default is None:
-      if action == 'store_true':
-        return 'False'
-      elif action == 'store_false':
-        return 'True'
-      else:
-        return 'None'
+      return 'None'
 
     if typ == list:
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
@@ -175,7 +169,7 @@ class HelpInfoExtracter(object):
         scoped_arg = arg
       scoped_cmd_line_args.append(scoped_arg)
 
-      if is_boolean_option(kwargs):
+      if kwargs.get('type') == bool:
         if is_short_arg:
           display_args.append(scoped_arg)
         else:
@@ -199,10 +193,7 @@ class HelpInfoExtracter(object):
         else:
           display_args.append(display_arg)
 
-    if is_boolean_option(kwargs):
-      typ = bool
-    else:
-      typ = kwargs.get('type', str)
+    typ = kwargs.get('type', str)
     default = self.compute_default(kwargs)
     help_msg = kwargs.get('help', 'No help available.')
     deprecated_version = kwargs.get('deprecated_version')
