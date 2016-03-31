@@ -90,13 +90,13 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                                       confs=self.get_options().confs,
                                       extra_args=self._args)
     if self._report:
-      if all(not result.has_resolved_artifacts for result in results):
-        self.context.log.info("Not generating a report. No resolution performed.")
+      results_with_resolved_artifacts = filter(lambda r: r.has_resolved_artifacts, results)
 
-      for result in results:
-        if not result.has_resolved_artifacts:
-          continue
-        self._generate_ivy_report(result)
+      if not results_with_resolved_artifacts:
+        self.context.log.info("Not generating a report. No resolution performed.")
+      else:
+        for result in results_with_resolved_artifacts:
+          self._generate_ivy_report(result)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible
