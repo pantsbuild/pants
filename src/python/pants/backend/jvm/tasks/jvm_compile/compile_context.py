@@ -48,15 +48,19 @@ class CompileContext(object):
     else:
       return self.all_dependencies(dep_context)
 
-  def declared_dependencies(self, dep_context, compiler_plugins=False):
+  def declared_dependencies(self, dep_context, compiler_plugins=True, implicit_dependencies=True):
     """Compute the declared dependencies for this target, recursively resolving target aliases.
 
     TODO: Switch to using scopes rather than types to identify plugins.
+    TODO: Consider moving this API to `Target`.
     """
-    def resolve(t):
+    def resolve(t, implicit_dependencies):
+      implicits = set(t.traversable_dependency_specs) if implicit_dependencies else set()
       for declared in t.dependencies:
-        if type(declared) == Target:
-          for r in resolve(declared):
+        if declared in implicits:
+          continue
+        elif type(declared) == Target:
+          for r in resolve(declared, False):
             yield r
         elif isinstance(declared, dep_context.compiler_plugin_types):
           if compiler_plugins:
@@ -64,7 +68,7 @@ class CompileContext(object):
         else:
           yield declared
 
-    for dep in resolve(self.target):
+    for dep in resolve(self.target, implicit_dependencies):
       yield dep
 
   def strict_dependencies(self, dep_context):

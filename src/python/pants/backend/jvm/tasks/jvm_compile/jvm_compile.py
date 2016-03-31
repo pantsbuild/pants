@@ -599,7 +599,11 @@ class JvmCompile(NailgunTaskBase):
       # Determine which of the deps in the declared set of this target were used.
       used = set()
       unused = set()
-      for dep in compile_context.declared_dependencies(self._dep_context, compiler_plugins=False):
+      for dep in compile_context.declared_dependencies(self._dep_context,
+                                                       compiler_plugins=False,
+                                                       implicit_dependencies=False):
+        if dep in used or dep in unused:
+          continue
         if isinstance(dep, Resources):
           continue
         # If any of the target's jars or classfiles were used, consider it used.
@@ -631,15 +635,14 @@ class JvmCompile(NailgunTaskBase):
       # Finally, warn or error for unused.
       # TODO: For any targets that were not used, determine whether transitive deps were used.
       unused_msg = (
-          'unused dependencies:\n  {}'.format(
-            compile_context.target.address.spec,
+          'unused dependencies:\n  {}\n'.format(
             '\n  '.join(str(dep.address.spec) for dep in unused),
           )
         )
       if self.get_options().unused_deps == 'error':
         raise TaskError(unused_msg)
       else:
-        self.context.log.warn('Target {} had {}'.format(unused_msg))
+        self.context.log.warn('Target {} had {}'.format(compile_context.target.address.spec, unused_msg))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
