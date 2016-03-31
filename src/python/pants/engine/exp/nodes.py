@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from abc import abstractmethod, abstractproperty
 
 from pants.build_graph.address import Address
@@ -401,6 +402,10 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
     # If an input product was available, execute.
     input_value = input_state.value
     try:
+      # TODO: https://github.com/pantsbuild/pants/issues/3121
+      assert not os.path.islink(input_value.path), (
+        'cannot perform native filesystem operations on a symlink!')
+
       if self.product is Paths:
         return Return(path_exists(step_context.project_tree, input_value))
       elif self.product is FileContent:

@@ -30,7 +30,6 @@ class SchedulerService(PantsService):
 
     self._event_queue = Queue.Queue(maxsize=64)
     self._scheduler = scheduler
-    self._subjects = self._scheduler.subjects()
     self._fs_event_service = fs_event_service
 
   def setup(self):
@@ -44,17 +43,12 @@ class SchedulerService(PantsService):
     self._event_queue.put(event)
 
   def _handle_batch_event(self, files):
+    self._logger.debug('handling change event for: %s', files)
     if not self._scheduler:
       self._logger.debug('no scheduler. ignoring event.')
       return
 
-    for f in files:
-      self._handle_file_event(f)
-
-  def _handle_file_event(self, filename):
-    self._logger.debug('file {} changed!'.format(filename))
-    # TODO(kwlzn): Map file events to nodes in the ProductGraph and invalidate accordingly.
-    # See: https://github.com/pantsbuild/pants/issues/2970
+    self._scheduler.invalidate_files(files)
 
   def _process_event_queue(self):
     """File event notification queue processor."""

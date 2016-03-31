@@ -19,3 +19,12 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name = 'graph_invalidation',
+  sources = ['test_graph_invalidation.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/engine/exp/legacy:commands'
+  ]
+)

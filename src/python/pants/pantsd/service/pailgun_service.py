@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import select
 
 from pants.pantsd.pailgun_server import PailgunServer
 from pants.pantsd.service.pants_service import PantsService
@@ -50,9 +51,13 @@ class PailgunService(PantsService):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
     self._logger.info('starting pailgun server on port {}'.format(self.pailgun_port))
 
-    # Manually call handle_request() in a loop vs serve_forever() for interruptability.
-    while not self.is_killed:
-      self.pailgun.handle_request()
+    try:
+      # Manually call handle_request() in a loop vs serve_forever() for interruptability.
+      while not self.is_killed:
+        self.pailgun.handle_request()
+    except select.error:
+      # SocketServer can throw `error: (9, 'Bad file descriptor')` on teardown. Ignore it.
+      self._logger.warning('pailgun service shutting down')
 
   def terminate(self):
     """Override of PantsService.terminate() that cleans up when the Pailgun server is terminated."""
