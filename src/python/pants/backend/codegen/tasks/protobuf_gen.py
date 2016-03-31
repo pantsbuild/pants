@@ -189,8 +189,3 @@ class ProtobufGen(SimpleCodegenTask):
     for target in proto_targets:
       for path in self._jars_to_directories(target):
         yield os.path.relpath(path, get_buildroot())
-
-  @property
-  def _copy_target_attributes(self):
-    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
-    return ['provides']

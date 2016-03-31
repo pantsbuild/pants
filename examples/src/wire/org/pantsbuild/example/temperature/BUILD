@@ -10,4 +10,7 @@ java_wire_library(name='temperature',
   # To switch between versions of wire you will also need to edit the
   # //:wire-compiler and //:wire-runtime targets in BUILD.tools
   service_writer='com.squareup.wire.SimpleServiceWriter',
+  # Export the dependencies of this library so that callers don't need to
+  # declare the dep on `wire` that we know they'll need.
+  tags={'exported'},
 )
