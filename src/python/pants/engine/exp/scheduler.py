@@ -46,7 +46,7 @@ class ProductGraph(object):
     self._cyclic_dependencies = defaultdict(set)
 
   def __len__(self):
-    return len(self._node_results)
+    return len(self._dependents)
 
   def _set_state(self, node, state):
     existing_state = self._node_results.get(node, None)
