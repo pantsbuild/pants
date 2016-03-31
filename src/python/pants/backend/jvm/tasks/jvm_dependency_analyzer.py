@@ -12,8 +12,10 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.build_graph import sort_targets
+from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
@@ -152,3 +154,68 @@ class JvmDependencyAnalyzer(object):
       # Assume a source file and convert to classfiles.
       rel_src = fast_relpath(dep, self._buildroot)
       return set(p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths)
+
+  def compute_unused_deps(self, product_deps_by_src, dep_context, compile_context):
+    """Uses `product_deps_by_src` to compute unused deps.
+
+    TODO: Move `compile_context.declared_dependencies` to Target to allow this method
+    to take a Target instead of a CompileContext.
+
+    :returns: dict of unused targets to suggested replacements.
+    """
+
+    # Flatten the product deps of this target.
+    product_deps = set()
+    for dep_entries in product_deps_by_src.get(compile_context.target, dict()).values():
+      product_deps.update(dep_entries)
+
+    # Determine which of the deps in the declared set of this target were used.
+    used = set()
+    unused = set()
+    for dep in compile_context.declared_dependencies(dep_context,
+                                                     compiler_plugins=False,
+                                                     exported=False):
+      if dep in used or dep in unused:
+        continue
+      # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
+      # incorrectly skip "empty" `*_library` targets, which could then be used as a loophole.
+      if isinstance(dep, (Resources, UnpackedJars)):
+        continue
+      # If any of the target's jars or classfiles were used, consider it used.
+      if product_deps.isdisjoint(self.files_for_target(dep)):
+        unused.add(dep)
+      else:
+        used.add(dep)
+
+    # If there were no unused deps, break.
+    if not unused:
+      return dict()
+
+    # For any deps that were used, count their derived-from targets used as well.
+    # TODO: Refactor to do some of this above once tests are in place.
+    for dep in list(used):
+      for derived_from in dep.derived_from_chain:
+        if derived_from in unused:
+          unused.remove(derived_from)
+          used.add(derived_from)
+
+    # Prune derived targets that would be in the set twice.
+    for dep in list(unused):
+      if set(dep.derived_from_chain) & unused:
+        unused.remove(dep)
+
+    if not unused:
+      return dict()
+
+    # For any deps that were not used, determine whether their transitive deps were used, and
+    # recommend those as replacements.
+    replacements = dict()
+    for dep in unused:
+      replacements[dep] = set()
+      for t in dep.closure():
+        if t in used or t in unused:
+          continue
+        if not product_deps.isdisjoint(self.files_for_target(t)):
+          replacements[dep].add(t)
+
+    return replacements

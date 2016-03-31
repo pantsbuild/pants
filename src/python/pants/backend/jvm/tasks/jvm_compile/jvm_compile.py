@@ -14,7 +14,6 @@ from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -514,8 +513,7 @@ class JvmCompile(NailgunTaskBase):
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process)
 
   def _create_empty_products(self):
-    if self.context.products.is_required_data('classes_by_source') \
-        or self._unused_deps_check_enabled:
+    if self.context.products.is_required_data('classes_by_source'):
       make_products = lambda: defaultdict(MultipleRootedProducts)
       self.context.products.safe_create_data('classes_by_source', make_products)
 
@@ -584,69 +582,18 @@ class JvmCompile(NailgunTaskBase):
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
 
   def _check_unused_deps(self, compile_context):
-    """Uses `classes_by_source` and `product_deps_by_src` to check unused deps.
-
-    TODO: Consider moving to the analyzer.
-    """
+    """Uses `product_deps_by_src` to check unused deps and warn or error."""
     with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
-      analyzer = self._dep_analyzer
-
-      # Flatten the product deps of this target.
+      # Compute replacement deps.
       product_deps_by_src = self.context.products.get_data('product_deps_by_src')
-      product_deps = set()
-      for dep_entries in product_deps_by_src.get(compile_context.target, dict()).values():
-        product_deps.update(dep_entries)
+      replacements = self._dep_analyzer.compute_unused_deps(product_deps_by_src,
+                                                            self._dep_context,
+                                                            compile_context)
 
-      # Determine which of the deps in the declared set of this target were used.
-      used = set()
-      unused = set()
-      for dep in compile_context.declared_dependencies(self._dep_context,
-                                                       compiler_plugins=False,
-                                                       exported=False):
-        if dep in used or dep in unused:
-          continue
-        # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
-        # incorrectly skip "empty" `*_library` targets, which could then be used as a loophole.
-        if isinstance(dep, (Resources, UnpackedJars)):
-          continue
-        # If any of the target's jars or classfiles were used, consider it used.
-        if product_deps.isdisjoint(analyzer.files_for_target(dep)):
-          unused.add(dep)
-        else:
-          used.add(dep)
-
-      # If there were no unused deps, break.
-      if not unused:
+      if not replacements:
         return
 
-      # For any deps that were used, count their derived-from targets used as well.
-      # TODO: Refactor to do some of this above once tests are in place.
-      for dep in list(used):
-        for derived_from in dep.derived_from_chain:
-          if derived_from in unused:
-            unused.remove(derived_from)
-            used.add(derived_from)
-
-      # Prune derived targets that would be in the set twice.
-      for dep in list(unused):
-        if set(dep.derived_from_chain) & unused:
-          unused.remove(dep)
-
-      if not unused:
-        return
-
-      # For any deps that were not used, determine whether their transitive deps were used, and
-      # recommend those as replacements.
-      replacements = dict()
-      for dep in unused:
-        replacements[dep] = set()
-        for t in dep.closure():
-          if t in used or t in unused:
-            continue
-          if not product_deps.isdisjoint(analyzer.files_for_target(t)):
-            replacements[dep].add(t)
-
-      # Finally, warn or error for unused.
+      # Warn or error for unused.
       def unused_msg(entry):
         dep, reps = entry
         if reps:
