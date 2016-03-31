@@ -39,13 +39,10 @@ def mk_registration_error(msg):
   return Anon
 
 
-BooleanOptionImplicitVal = mk_registration_error('Boolean option cannot specify an implicit value.')
 BooleanOptionNameWithNo = mk_registration_error('Boolean option names cannot start with --no.')
-BooleanOptionType = mk_registration_error('Boolean option cannot specify a type.')
 FrozenRegistration = mk_registration_error('Cannot register an option on a scope after registering '
                                            'on any of its inner scopes.')
 ImplicitValIsNone = mk_registration_error('Implicit value cannot be None.')
-InvalidAction = mk_registration_error('Invalid action {action}.')
 InvalidKwarg = mk_registration_error('Invalid registration kwarg {kwarg}.')
 InvalidMemberType = mk_registration_error('member_type {member_type} not allowed.')
 MemberTypeNotAllowed = mk_registration_error('member_type not allowed on option with type {type_}. '

@@ -84,7 +84,6 @@ class Engine(AbstractClass):
     """
     try:
       self.reduce(execution_request)
-      self._scheduler.validate()
       return self.Result.finished(self._scheduler.root_entries(execution_request))
     except TaskError as e:
       return self.Result.failure(e)

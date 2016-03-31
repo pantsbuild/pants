@@ -31,11 +31,11 @@ class TestRunnerTaskMixin(object):
              'all tests are run with the total timeout covering the entire run of tests. If a single target '
              'in a test run has no timeout and there is no default, the entire run will have no timeout. This '
              'should change in the future to provide more granularity.')
-    register('--timeout-default', action='store', type=int, advanced=True,
+    register('--timeout-default', type=int, advanced=True,
              help='The default timeout (in seconds) for a test if timeout is not set on the target.')
-    register('--timeout-maximum', action='store', type=int, advanced=True,
+    register('--timeout-maximum', type=int, advanced=True,
              help='The maximum timeout (in seconds) that can be set on a test target.')
-    register('--timeout-terminate-wait', action='store', type=int, advanced=True, default=10,
+    register('--timeout-terminate-wait', type=int, advanced=True, default=10,
              help='If a test does not terminate on a SIGTERM, how long to wait (in seconds) before sending a SIGKILL.')
 
   def execute(self):
