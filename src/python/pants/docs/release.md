@@ -12,7 +12,9 @@ At a high level, releasing pants involves:
 -   Deciding what/when to release. At present this is ad-hoc, typically
     when a change has been made and the author wants to use a version
     incorporating that change. Things are likely to remain this way pre
-    1.0.0.
+    1.0.0.  Post 1.0 we will use the following
+    [[Branching Strategy|pants('src/python/pants/docs:branching_strategy')]]
+    for releases
 -   Preparing the release.
 -   (optional) Perform a release dry run.
 -   Publishing the release to PyPi.

@@ -15,7 +15,13 @@ page(
     ':release',
     ':release_jvm',
     ':styleguide',
+    ':branching_strategy',
   ]
+)
+
+page(
+  name='branching_strategy',
+  source='branching_strategy.md',
 )
 
 page(

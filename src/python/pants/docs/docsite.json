@@ -4,6 +4,7 @@
     "3rdparty_jvm": "dist/markdown/html/examples/src/java/org/pantsbuild/example/3rdparty_jvm.html",
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
+    "branching_strategy": "dist/markdown/html/src/python/pants/docs/branching_strategy.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "changelog": "dist/markdown/html/src/python/pants/CHANGELOG.html",
@@ -118,7 +119,8 @@
             { "page": "deprecation_policy" },
             { "page": "release",
               "children": [
-                { "page": "release_jvm" }
+                { "page": "release_jvm" },
+                { "page": "branching_strategy" }
               ]
             },
             { "page": "docs" },
