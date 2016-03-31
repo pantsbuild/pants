@@ -14,6 +14,7 @@ from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -158,7 +159,7 @@ class JvmCompile(NailgunTaskBase):
              help='Capture classpath to per-target newline-delimited text files. These files will '
                   'be packaged into any jar artifacts that are created from the jvm targets.')
 
-    register('--unused-deps', choices=['ignore', 'warn', 'error'], default='warn',
+    register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='warn',
              fingerprint=True,
              help='Controls whether unused deps are checked, and whether they cause warnings or '
                   'errors.')
@@ -601,10 +602,12 @@ class JvmCompile(NailgunTaskBase):
       unused = set()
       for dep in compile_context.declared_dependencies(self._dep_context,
                                                        compiler_plugins=False,
-                                                       implicit_dependencies=False):
+                                                       exported=False):
         if dep in used or dep in unused:
           continue
-        if isinstance(dep, Resources):
+        # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
+        # incorrectly skip "empty" `*_library` targets, which could then be used as a loophole.
+        if isinstance(dep, (Resources, UnpackedJars)):
           continue
         # If any of the target's jars or classfiles were used, consider it used.
         if any(f in product_deps for f in analyzer.files_for_target(dep)):

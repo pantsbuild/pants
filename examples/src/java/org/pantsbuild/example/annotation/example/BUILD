@@ -5,6 +5,6 @@
 
 java_library(name='example',
   sources=['Example.java'],
-  dependencies=[
-  ],
+  # Is only used as an annotation processor.
+  tags={'exported'},
 )

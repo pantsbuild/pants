@@ -72,7 +72,9 @@ jar_library(name='log4j',
 jar_library(name='protobuf-2.4.1',
             jars = [
               jar(org='com.google.protobuf', name='protobuf-java', rev='2.4.1'),
-            ])
+            ],
+            # Protobuf message builders require undeclared types to be present at compiletime.
+            tags={'exported'},)
 
 target(name='protobuf-java', dependencies = [':protobuf-2.4.1'])
 
@@ -149,7 +151,9 @@ jar_library(name='guava-testlib',
 jar_library(name='junit',
             jars=[
               jar('junit', 'junit', '4.12')
-            ])
+            ],
+            # Frequently used only for its annotations.
+            tags={'exported'},)
 
 jar_library(name='scalatest',
             jars=[

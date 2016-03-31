@@ -212,7 +212,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
         runtime = ScalaPlatform.global_instance().runtime
         buildgraph.inject_synthetic_target(synth_library_address,
                                            JarLibrary,
-                                           jars=runtime)
+                                           jars=runtime,
+                                           # TODO: Potentially not an appropriate solution; runtime
+                                           # jars could automatically be assumed to be exported?
+                                           tags={'exported'})
       else:
         if not buildgraph.get_target(synth_library_address).is_synthetic:
           raise buildgraph.ManualSyntheticTargetError(
