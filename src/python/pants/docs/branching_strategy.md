@@ -2,10 +2,11 @@
 
 ##Naming conventions
 Leading up to release development work should be done on a branch in the following format:
-n.n.xx where.  Once the branch is stable and ready for release it can be pushed as branch n.n.xx.
-For example leading up to the release of 1.0 we would create a branch 1.0.xx  and when we finalize
-the release we would tag the commit with the release version of 1.0.0.  Any future bugfix patches
-would be tagged in the same branch.  For example:
+n.n.xx where n.n is the major/minor version number and xx is the patch level version.  Once the
+branch is stable and ready for release it can be pushed as branch n.n.xx.  For example leading up
+to the release of 1.0 we would create a branch 1.0.xx  and when we finalize the release we would
+tag the commit with the release version of 1.0.0.  Any future bugfix patches would be tagged in
+the same branch.  For example:
 
 If you had a bugfix from 1.1.xx that you needed to backport to 1.0.xx you would cherry-pick your
 changes to the 1.0.xx branch and when ready for release tag the commit with a new patch version.
