@@ -642,7 +642,7 @@ class JvmCompile(NailgunTaskBase):
             '\n  '.join(str(dep.address.spec) for dep in unused),
           )
         )
-      if self.get_options().unused_deps == 'error':
+      if self.get_options().unused_deps == 'fatal':
         raise TaskError(unused_msg)
       else:
         self.context.log.warn('Target {} had {}'.format(compile_context.target.address.spec, unused_msg))
