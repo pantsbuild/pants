@@ -610,17 +610,17 @@ class JvmCompile(NailgunTaskBase):
         if isinstance(dep, (Resources, UnpackedJars)):
           continue
         # If any of the target's jars or classfiles were used, consider it used.
-        if any(f in product_deps for f in analyzer.files_for_target(dep)):
-          used.add(dep)
-        else:
+        if product_deps.isdisjoint(analyzer.files_for_target(dep)):
           unused.add(dep)
+        else:
+          used.add(dep)
 
       # If there were no unused deps, break.
       if not unused:
         return
 
       # For any deps that were used, count their derived-from targets used as well.
-      # TODO: do some of this above?
+      # TODO: Refactor to do some of this above once tests are in place.
       for dep in list(used):
         for derived_from in dep.derived_from_chain:
           if derived_from in unused:
@@ -635,11 +635,29 @@ class JvmCompile(NailgunTaskBase):
       if not unused:
         return
 
+      # For any deps that were not used, determine whether their transitive deps were used, and
+      # recommend those as replacements.
+      replacements = dict()
+      for dep in unused:
+        replacements[dep] = set()
+        for t in dep.closure():
+          if t in used or t in unused:
+            continue
+          if not product_deps.isdisjoint(analyzer.files_for_target(t)):
+            replacements[dep].add(t)
+
       # Finally, warn or error for unused.
-      # TODO: For any targets that were not used, determine whether transitive deps were used.
+      def unused_msg(entry):
+        dep, reps = entry
+        if reps:
+          return '{}{}'.format(
+              dep.address.spec,
+              ' (suggested replacement: {})'.format(' & '.join(str(r.address.spec) for r in reps)))
+        else:
+          return dep.address.spec
       unused_msg = (
           'unused dependencies:\n  {}\n'.format(
-            '\n  '.join(str(dep.address.spec) for dep in unused),
+            '\n  '.join(unused_msg(entry) for entry in replacements.items()),
           )
         )
       if self.get_options().unused_deps == 'fatal':
