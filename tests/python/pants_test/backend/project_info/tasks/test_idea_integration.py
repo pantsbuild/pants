@@ -36,7 +36,10 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
     with temporary_dir(root_dir=project_dir) as project_dir_path:
 
-      extra_flags = ['--idea-project-dir={dir}'.format(dir=project_dir_path)]
+      extra_flags = [
+        '--idea-project-dir={}'.format(project_dir_path),
+        '--ivy-cache-dir={}'.format(os.path.join(project_dir_path, '.ivy_cache')),
+      ]
       extra_flags.extend(extra_args or ())
 
       if project_name is None:
@@ -65,7 +68,9 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       if check_func:
         check_func(workdir)
 
-  def evaluate_subtask(self, targets, workdir, load_extra_confs, extra_args, expected_jars):
+  def evaluate_subtask(self, targets, workdir, load_extra_confs,
+                       extra_args=None, expected_jars=None):
+    expected_jars = expected_jars or []
     def check(path):
       for jar in expected_jars:
         parts = jar.split(':')

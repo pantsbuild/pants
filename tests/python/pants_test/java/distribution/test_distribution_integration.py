@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os.path
 from unittest import skipIf
 
 from pants.java.distribution.distribution import Distribution, DistributionLocator
@@ -43,7 +44,7 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
         'JDK_HOME': two.home,
       })
       self.assert_success(run)
-      self.assertIn('java.home:{}'.format(one.home), run.stdout_data)
+      self.assertIn('java.home:{}'.format(os.path.realpath(one.home)), run.stdout_data)
 
   @skipIf(get_two_distributions() is None, 'Could not find java 7 and java 8 jvms to test with.')
   def test_jvm_jdk_paths_supercedes_environment_variables(self):
