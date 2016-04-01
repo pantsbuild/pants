@@ -2,7 +2,6 @@ page(
   name='readme',
   source='readme.md',
   links=[
-    ':backwards_compatibility',
     ':branching_strategy',
     ':credits',
     ':dev_tasks',
@@ -18,11 +17,6 @@ page(
     ':release_jvm',
     ':styleguide',
   ]
-)
-
-page(
-  name='backwards_compatibility',
-  source='backwards_compatibility.md',
 )
 
 page(

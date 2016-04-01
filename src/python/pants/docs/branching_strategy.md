@@ -45,7 +45,7 @@ should be able to continue using that feature at least through version 1.4.x.
 ### Patch Releases
 In order to allow us to react quickly to bugs patch fixes will be released as needed and may
 include backporting fixes from newer release versions.  These releases would update the minor
-version number and should be [[beckwards compataible|pants('src/python/pants/docs:backwards_compatibility')]].
+version number and should be [[beckwards compataible|pants('src/python/pants/docs:deprecation_policy')]].
 
 Patch releases will be tagged with
 full version and rc number similar to normal releases.  For example: '_1.0.2-rc3'
