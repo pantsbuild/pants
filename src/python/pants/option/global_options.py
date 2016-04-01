@@ -95,7 +95,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Add these directories to PYTHONPATH to search for plugins.')
     register('--target-spec-file', type=list, dest='target_spec_files',
              help='Read additional specs from this file, one per line')
-    register('--verify-config', type=bool, default=False,
+    register('--verify-config', type=bool, default=True,
              help='Verify that all config file values correspond to known options.')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during

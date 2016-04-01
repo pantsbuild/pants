@@ -84,7 +84,8 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
       with open(config_path, 'w+') as f:
         f.write(dedent("""
-          [DEFAULT]
+          [GLOBAL]
+          verify_config: False
           pythonpath: [
               "%(buildroot)s/testprojects/src/python",
             ]

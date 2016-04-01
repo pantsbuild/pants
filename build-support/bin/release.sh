@@ -75,6 +75,7 @@ function execute_packaged_pants_with_internal_backends() {
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
+    --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[ \
         'internal_backend.optional', \
