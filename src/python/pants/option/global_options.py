@@ -140,13 +140,6 @@ class GlobalOptionsRegistrar(Optionable):
              metavar='<regexp>',
              help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
-    register('--spec-excludes', advanced=True, type=list,
-             default=[register.bootstrap.pants_workdir],
-             deprecated_hint='Use --ignore-patterns instead. Use .gitignore syntax for each item, '
-                             'to simulate old behavior prefix each item with "/".',
-             deprecated_version='0.0.75', removal_version='0.0.80',
-             help='Ignore these paths when evaluating the command-line target specs.  Useful with '
-                  '::, to avoid descending into unneeded directories.')
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
              default=['.*'],
              help='Patterns for ignoring files when reading BUILD files. '

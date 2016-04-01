@@ -123,9 +123,6 @@ python_library(
 python_library(
   name = 'python_requirement',
   sources = ['python_requirement.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-  ]
 )
 
 python_library(

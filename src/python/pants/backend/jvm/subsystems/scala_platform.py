@@ -101,15 +101,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                   '"custom" as the --version, custom build targets can be specified in the targets '
                   'for //:scalac and //:scala-library ')
 
-    register('--runtime', advanced=True, type=list, default=['//:scala-library'],
-             help='Target specs pointing to the scala runtime libraries.',
-             deprecated_version='0.0.75', removal_version='0.0.80',
-             deprecated_hint='Option is no longer used, --version is used to specify the major '
-                             'version. The runtime is created based on major version. '
-                             'The runtime target will be defined at the address //:scala-library '
-                             'unless it is overriden by the option --runtime-spec and a --version '
-                             'is set to custom.')
-
     register('--runtime-spec', advanced=True, default='//:scala-library',
              help='Address to be used for custom scala runtime.')
 
