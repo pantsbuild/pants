@@ -26,9 +26,9 @@ class Options(object):
   The value in global scope of option '--foo-bar' (registered in global scope) will be selected
   in the following order:
     - The value of the --foo-bar flag in global scope.
-    - The value of the PANTS_DEFAULT_FOO_BAR environment variable.
+    - The value of the PANTS_GLOBAL_FOO_BAR environment variable.
     - The value of the PANTS_FOO_BAR environment variable.
-    - The value of the foo_bar key in the [DEFAULT] section of pants.ini.
+    - The value of the foo_bar key in the [GLOBAL] section of pants.ini.
     - The hard-coded value provided at registration time.
     - None.
 
@@ -39,11 +39,11 @@ class Options(object):
     - The value of the --foo-bar flag in global scope.
     - The value of the PANTS_COMPILE_JAVA_FOO_BAR environment variable.
     - The value of the PANTS_COMPILE_FOO_BAR environment variable.
-    - The value of the PANTS_DEFAULT_FOO_BAR environment variable.
+    - The value of the PANTS_GLOBAL_FOO_BAR environment variable.
     - The value of the PANTS_FOO_BAR environment variable.
     - The value of the foo_bar key in the [compile.java] section of pants.ini.
     - The value of the foo_bar key in the [compile] section of pants.ini.
-    - The value of the foo_bar key in the [DEFAULT] section of pants.ini.
+    - The value of the foo_bar key in the [GLOBAL] section of pants.ini.
     - The hard-coded value provided at registration time.
     - None.
 
@@ -55,7 +55,7 @@ class Options(object):
     - The value of the PANTS_COMPILE_FOO_BAR environment variable.
     - The value of the foo_bar key in the [compile.java] section of pants.ini.
     - The value of the foo_bar key in the [compile] section of pants.ini.
-    - The value of the foo_bar key in the [DEFAULT] section of pants.ini
+    - The value of the foo_bar key in the [GLOBAL] section of pants.ini
       (because of automatic config file fallback to that section).
     - The hard-coded value provided at registration time.
     - None.

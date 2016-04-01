@@ -494,8 +494,7 @@ class Parser(object):
       # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
       # PANTS_PANTS_WORKDIR or PANTS_GLOBAL_PANTS_WORKDIR. We take the first specified value we
       # find, in this order: PANTS_GLOBAL_FOO, PANTS_FOO, FOO.
-      env_vars = ['PANTS_DEFAULT_{0}'.format(udest),  # Temporary, until deprecation is complete.
-                  'PANTS_GLOBAL_{0}'.format(udest), 'PANTS_{0}'.format(udest)]
+      env_vars = ['PANTS_GLOBAL_{0}'.format(udest), 'PANTS_{0}'.format(udest)]
       if udest.startswith('PANTS_'):
         env_vars.append(udest)
     else:
@@ -507,8 +506,6 @@ class Parser(object):
     if self._env:
       for env_var in env_vars:
         if env_var in self._env:
-          deprecated_conditional(lambda: env_var == 'PANTS_DEFAULT_{0}'.format(udest), '0.0.80',
-                                 'Use PANTS_GLOBAL_{0} instead of PANTS_DEFAULT_{0}'.format(udest))
           env_val_str = expand(self._env.get(env_var))
           env_details = 'from env var {}'.format(env_var)
           break
