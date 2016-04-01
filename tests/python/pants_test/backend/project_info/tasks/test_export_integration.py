@@ -109,6 +109,10 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
       self.assertTrue('org.pantsbuild' in foo_target.get('excludes'))
 
+  # This test fails when the `PANTS_IVY_CACHE_DIR` is set to something that isn't
+  # the default location.  The set cache_dir likely needs to be plumbed down
+  # to the sub-invocation of pants.
+  # https://github.com/pantsbuild/pants/issues/3126
   def test_export_jar_path(self):
     with self.temporary_workdir() as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
@@ -149,6 +153,10 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertIsNotNone(scala_lang_lib['sources'])
       self.assertIsNotNone(scala_lang_lib['javadoc'])
 
+  # This test fails when the `PANTS_IVY_CACHE_DIR` is set to something that isn't
+  # the default location.  The set cache_dir likely needs to be plumbed down
+  # to the sub-invocation of pants.
+  # See https://github.com/pantsbuild/pants/issues/3126
   def test_ivy_classifiers(self):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
