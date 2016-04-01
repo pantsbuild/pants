@@ -5,9 +5,8 @@ Leading up to release development work should be done on a branch in the followi
 n.n.xx where n.n is the major/minor version number and xx is the patch level version.  Once the
 branch is stable and ready for release it can be pushed as branch n.n.x.  For example leading up
 to the release of 1.0 we would create a branch with the literal name of '1.0.x'  and when we
-finalize the release we would tag the commit with the release version of _1.0.0.  Any future
-bugfix patches would be tagged in the same branch.  We use a leading underscore to differentiate
-branch and tag names.
+finalize the release we would tag the commit with the release version of 1.0.0.  Any future
+bugfix patches would be tagged in the same branch.
 
 For example:
 
@@ -27,7 +26,7 @@ parties to test.   Once the release candidate has been created we need to provid
 opportunity to block the release if a problem comes up.  To allow for adequate time to test the
 release we will allow 5 business days for people to raise concerns.  When working on a release
 the releaser would tag commits to the branch with a full version number and rc version.  For
-example: '_1.0.0-rc1'
+example: '1.0.0-rc1'
 
 ## Release Cadence
 ### Major and Minor Releases
@@ -48,6 +47,6 @@ include backporting fixes from newer release versions.  These releases would upd
 version number and should be [[beckwards compataible|pants('src/python/pants/docs:deprecation_policy')]].
 
 Patch releases will be tagged with
-full version and rc number similar to normal releases.  For example: '_1.0.2-rc3'
+full version and rc number similar to normal releases.  For example: '1.0.2-rc3'
 
 
