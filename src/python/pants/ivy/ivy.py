@@ -14,7 +14,7 @@ from twitter.common.collections import maybe_list
 from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import Executor, SubprocessExecutor
-from pants.process.pidlock import OwnerPrintingPIDLockFile
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import safe_mkdir
 
 
@@ -45,7 +45,8 @@ class Ivy(object):
                          self._ivy_cache_dir, type(self._ivy_cache_dir)))
 
     self._extra_jvm_options = extra_jvm_options or []
-    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._ivy_cache_dir, 'pants_ivy_lock'))
+    self._lock = OwnerPrintingInterProcessFileLock(
+      os.path.join(self._ivy_cache_dir, 'pants_ivy.file_lock'))
 
   @property
   def ivy_settings(self):

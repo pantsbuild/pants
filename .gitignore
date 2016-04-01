@@ -2,6 +2,7 @@
 *.iml
 *.ipr
 *.iws
+*.lock_message
 *.pyc
 *.hprof
 *.swp
