@@ -49,10 +49,7 @@ class OptionTracker(object):
 
     @property
     def was_overridden(self):
-      """A value was overridden if it has rank greater than 'HARDCODED'."""
-      if len(self.values) < 2:
-        return False
-      return self.latest.rank > RankedValue.HARDCODED and self.values[-2].rank > RankedValue.NONE
+      return self.latest.rank > RankedValue.HARDCODED
 
     @property
     def latest(self):
