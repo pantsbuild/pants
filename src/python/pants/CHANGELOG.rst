@@ -1,6 +1,98 @@
 RELEASE HISTORY
 ===============
 
+0.0.80 (04/01/2016)
+-------------------
+
+This release brings scopes for jvm dependencies.  Proper documentation has not
+been added yet, but check out the review description for more info:
+https://rbcommons.com/s/twitter/r/3582
+
+The following deprecated items were removed:
+
+Options:
+
+* `--scala-platform-runtime`:
+  Option is no longer used, `--version` is used to specify the major
+  version. The runtime is created based on major version. The runtime
+  target will be defined at the address `//:scala-library` unless it is
+  overriden by the option `--runtime-spec` and a `--version` is set to
+  custom.
+
+* `--spec-excludes`:
+  Use `--ignore-patterns` instead. Use .gitignore syntax for each item, to
+  simulate old behavior prefix each item with "/".
+
+* `PANTS_DEFAULT_*`:
+  Use `PANTS_GLOBAL_*` instead of `PANTS_DEFAULT_*`
+
+BUILD Files:
+
+* `python_requirement(..., version_filter)`:
+  The `version_filter` argument has been removed with no replacement.
+
+API Changes
+~~~~~~~~~~~
+
+* Process 0.0.80 deprecation removals.
+  `RB #3639 <https://rbcommons.com/s/twitter/r/3639>`_
+
+* Delete the Haskell contrib package.
+  `RB #3631 <https://rbcommons.com/s/twitter/r/3631>`_
+
+Bugfixes
+~~~~~~~~
+
+* Add OwnerPrintingInterProcessFileLock and replace OwnerPrintingPIDLockFile.
+  `RB #3633 <https://rbcommons.com/s/twitter/r/3633>`_
+
+* Fix literal credentials
+  `RB #3624 <https://rbcommons.com/s/twitter/r/3624>`_
+
+* Remove defaults for custom scala tools.
+  `RB #3609 <https://rbcommons.com/s/twitter/r/3609>`_
+
+* Fix some bad three-state logic in thrift_linter.
+  `RB #3621 <https://rbcommons.com/s/twitter/r/3621>`_
+
+* stop adding test support classes to junit failure report
+  `RB #3620 <https://rbcommons.com/s/twitter/r/3620>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support options with type=bool.
+  `RB #3623 <https://rbcommons.com/s/twitter/r/3623>`_
+
+* Cache `dep-usage.jvm` results and provide ability to use cached results in analysis summary
+  `RB #3612 <https://rbcommons.com/s/twitter/r/3612>`_
+
+* Implementing scoped dependencies and classpath intransitivity.
+  `RB #3582 <https://rbcommons.com/s/twitter/r/3582>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Speed up node repl integration test by using smaller targets
+  `RB #3584 <https://rbcommons.com/s/twitter/r/3584>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [pantsd] Map filesystem events to ProductGraph invalidation.
+  `RB #3629 <https://rbcommons.com/s/twitter/r/3629>`_
+
+* [engine] Move GraphValidator to examples and make scheduler optionally take a validator.
+  `RB #3608 <https://rbcommons.com/s/twitter/r/3608>`_
+
+* [engine] Package cleanup: round one
+  `RB #3622 <https://rbcommons.com/s/twitter/r/3622>`_
+
+* [engine] Content address node and state only in engine
+  `Issue #3070 <https://github.com/pantsbuild/pants/issues/3070>`_
+  `RB #3597 <https://rbcommons.com/s/twitter/r/3597>`_
+  `RB #3615 <https://rbcommons.com/s/twitter/r/3615>`_
+
 0.0.79 (03/26/2016)
 -------------------
 
@@ -43,6 +135,12 @@ New Features
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Verify config by default.
+  `RB #3636 <https://rbcommons.com/s/twitter/r/3636>`_
+
+* Fix, document, or mark xfail tests that fail in Jenkins.
+  `RB #3632 <https://rbcommons.com/s/twitter/r/3632>`_
 
 * Allow a period in a namedver for publishing
   `RB #3611 <https://rbcommons.com/s/twitter/r/3611>`_
