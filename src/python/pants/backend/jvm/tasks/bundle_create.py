@@ -33,7 +33,7 @@ class BundleCreate(JvmBinaryTask):
   @classmethod
   def register_options(cls, register):
     super(BundleCreate, cls).register_options(register)
-    register('--deployjar', action='store_true', default=False,
+    register('--deployjar', type=bool,
              fingerprint=True,
              help="Expand 3rdparty jars into loose classfiles in the bundle's root dir. "
                   "If unset, the root will contain internal classfiles only, and 3rdparty jars "
@@ -41,13 +41,13 @@ class BundleCreate(JvmBinaryTask):
     register('--archive', choices=list(archive.TYPE_NAMES),
              fingerprint=True,
              help='Create an archive of this type from the bundle.')
-    register('--archive-prefix', action='store_true', default=False,
+    register('--archive-prefix', type=bool,
              fingerprint=True,
              help='If --archive is specified, prefix archive with target basename or a unique '
                   'identifier as determined by --use-basename-prefix.')
     # `target.id` ensures global uniqueness, this flag is provided primarily for
     # backward compatibility.
-    register('--use-basename-prefix', action='store_true', default=False,
+    register('--use-basename-prefix', type=bool,
              help='Use target basename to prefix bundle folder or archive; otherwise a unique '
                   'identifier derived from target will be used.')
 

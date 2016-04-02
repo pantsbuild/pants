@@ -321,7 +321,7 @@ class SetupPy(PythonTask):
              help="The command to run against setup.py.  Don't forget to quote any additional "
                   "parameters.  If no run command is specified, pants will by default generate "
                   "and dump the source distribution.")
-    register('--recursive', action='store_true',
+    register('--recursive', type=bool,
              help='Transitively run setup_py on all provided downstream targets.')
 
   @classmethod

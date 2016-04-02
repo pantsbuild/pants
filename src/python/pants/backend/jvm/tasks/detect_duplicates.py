@@ -44,7 +44,7 @@ class DuplicateDetector(JvmBinaryTask):
                   'the duplicate check.')
     register('--max-dups', type=int, default=10,
              help='Maximum number of duplicate classes to display per artifact.')
-    register('--skip', action='store_true', default=False,
+    register('--skip', type=bool,
              help='Disable the dup checking step.')
 
   @classmethod

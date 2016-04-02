@@ -96,13 +96,13 @@ class ExportTask(IvyTaskMixin, PythonTask):
   @classmethod
   def register_options(cls, register):
     super(ExportTask, cls).register_options(register)
-    register('--libraries', default=True, action='store_true',
+    register('--libraries', default=True, type=bool,
              help='Causes libraries to be output.')
-    register('--libraries-sources', default=False, action='store_true',
+    register('--libraries-sources', type=bool,
              help='Causes libraries with sources to be output.')
-    register('--libraries-javadocs', default=False, action='store_true',
+    register('--libraries-javadocs', type=bool,
              help='Causes libraries with javadocs to be output.')
-    register('--sources', default=False, action='store_true',
+    register('--sources', type=bool,
              help='Causes sources to be output.')
 
   @classmethod

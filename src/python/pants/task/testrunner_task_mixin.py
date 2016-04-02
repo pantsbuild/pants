@@ -22,8 +22,8 @@ class TestRunnerTaskMixin(object):
   @classmethod
   def register_options(cls, register):
     super(TestRunnerTaskMixin, cls).register_options(register)
-    register('--skip', action='store_true', help='Skip running tests.')
-    register('--timeouts', action='store_true', default=True,
+    register('--skip', type=bool, help='Skip running tests.')
+    register('--timeouts', type=bool, default=True,
              help='Enable test target timeouts. If timeouts are enabled then tests with a timeout= parameter '
              'set on their target will time out after the given number of seconds if not completed. '
              'If no timeout is set, then either the default timeout is used or no timeout is configured. '

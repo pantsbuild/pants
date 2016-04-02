@@ -104,11 +104,11 @@ class JvmCompile(NailgunTaskBase):
 
     # TODO: Stale analysis should be automatically ignored via Task identities:
     # https://github.com/pantsbuild/pants/issues/1351
-    register('--clear-invalid-analysis', advanced=True, default=False, action='store_true',
+    register('--clear-invalid-analysis', advanced=True, type=bool,
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
-    register('--warnings', default=True, action='store_true', fingerprint=True,
+    register('--warnings', default=True, type=bool, fingerprint=True,
              help='Compile with all configured warnings enabled.')
 
     register('--warning-args', advanced=True, type=list, fingerprint=True,
@@ -127,14 +127,14 @@ class JvmCompile(NailgunTaskBase):
              default=list(cls.get_fatal_warnings_disabled_args_default()),
              help='Extra compiler args to use when fatal warnings are disabled.')
 
-    register('--debug-symbols', default=False, action='store_true', fingerprint=True,
+    register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
 
     register('--debug-symbol-args', advanced=True, type=list, fingerprint=True,
              default=['-C-g:lines,source,vars'],
              help='Extra args to enable debug symbol.')
 
-    register('--delete-scratch', advanced=True, default=True, action='store_true',
+    register('--delete-scratch', advanced=True, default=True, type=bool,
              help='Leave intermediate scratch files around, for debugging build problems.')
 
     register('--worker-count', advanced=True, type=int, default=cpu_count(),
@@ -149,11 +149,11 @@ class JvmCompile(NailgunTaskBase):
                   'constraints). Choose \'random\' to choose random sizes for each target, which '
                   'may be useful for distributed builds.')
 
-    register('--capture-log', advanced=True, action='store_true', default=False,
+    register('--capture-log', advanced=True, type=bool,
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
 
-    register('--capture-classpath', advanced=True, action='store_true', default=True,
+    register('--capture-classpath', advanced=True, type=bool, default=True,
              fingerprint=True,
              help='Capture classpath to per-target newline-delimited text files. These files will '
                   'be packaged into any jar artifacts that are created from the jvm targets.')

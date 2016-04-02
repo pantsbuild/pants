@@ -18,7 +18,7 @@ class PythonRepl(ReplTaskMixin, PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PythonRepl, cls).register_options(register)
-    register('--ipython', action='store_true',
+    register('--ipython', type=bool,
              help='Run an IPython REPL instead of the standard python one.')
     register('--ipython-entry-point', advanced=True, default='IPython:start_ipython',
              help='The IPython REPL entry point.')

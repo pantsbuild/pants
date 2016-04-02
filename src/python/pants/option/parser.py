@@ -178,7 +178,7 @@ class Parser(object):
 
       for arg in args:
         # If the user specified --no-foo on the cmd line, treat it as if the user specified
-        # --foo, but with the inverse implicit and explicit values.
+        # --foo, but with the inverse value.
         if kwargs.get('type') == bool:
           inverse_arg = self._inverse_arg(arg)
           if inverse_arg in flag_value_map:
@@ -342,6 +342,11 @@ class Parser(object):
       kwargs['type'] = bool
       kwargs['implicit_value'] = False
       del kwargs['action']
+
+    # Boolean options always have an implicit boolean-typed default.  They can never be None.
+    # We make that default explicit here.
+    if kwargs.get('type') == bool and kwargs.get('default') is None:
+      kwargs['default'] = not self._ensure_bool(kwargs.get('implicit_value', True))
 
     # Record the args. We'll do the underlying parsing on-demand.
     self._option_registrations.append((args, kwargs))
@@ -571,14 +576,6 @@ class Parser(object):
       ret = RankedValue(merged_rank, merged_val)
     else:
       ret = ranked_vals[-1]
-      if kwargs.get('type') == bool and ret.value is None:
-        # We don't allow None as a value for bool options. If the value is None here it
-        # means that the value wasn't specified by the user anywhere, so we fall back to
-        # the inverse of the implicit_value (i.e., the inverse of what you'd get if the flag was
-        # specified with no argument).
-        # Note that we convert to str here because kwargs['implicit_value'] may be a string
-        # or a bool - we want it to work in both cases.
-        ret = RankedValue(ret.rank, not self._ensure_bool(kwargs.get('implicit_value', True)))
       check(ret.value)
 
     # All done!

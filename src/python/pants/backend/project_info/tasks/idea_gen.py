@@ -46,27 +46,27 @@ class IdeaGen(IdeGen):
     super(IdeaGen, cls).register_options(register)
     register('--version', choices=sorted(list(_VERSIONS.keys())), default='11',
              help='The IntelliJ IDEA version the project config should be generated for.')
-    register('--merge', action='store_true', default=True,
+    register('--merge', type=bool, default=True,
              help='Merge any manual customizations in existing '
                   'Intellij IDEA configuration. If False, manual customizations '
                   'will be over-written.')
-    register('--open', action='store_true', default=True,
+    register('--open', type=bool, default=True,
              help='Attempts to open the generated project in IDEA.')
-    register('--bash', action='store_true',
+    register('--bash', type=bool,
              help='Adds a bash facet to the generated project configuration.')
     register('--scala-language-level',
              choices=_SCALA_VERSIONS.keys(), default=_SCALA_VERSION_DEFAULT,
              help='Set the scala language level used for IDEA linting.')
     register('--scala-maximum-heap-size-mb', type=int, default=512,
              help='Sets the maximum heap size (in megabytes) for scalac.')
-    register('--fsc', action='store_true', default=False,
+    register('--fsc', type=bool,
              help='If the project contains any scala targets this specifies the '
                   'fsc compiler should be enabled.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
     register('--java-maximum-heap-size-mb', type=int, default=512,
              help='Sets the maximum heap size (in megabytes) for javac.')
-    register('--exclude-maven-target', action='store_true', default=False,
+    register('--exclude-maven-target', type=bool,
              help="Exclude 'target' directories for directories containing "
                   "pom.xml files.  These directories contain generated code and"
                   "copies of files staged for deployment.")
@@ -78,7 +78,7 @@ class IdeaGen(IdeGen):
                '.pants.d/resources',
                ],
              help='Adds folders to be excluded from the project configuration.')
-    register('--annotation-processing-enabled', action='store_true',
+    register('--annotation-processing-enabled', type=bool,
              help='Tell IntelliJ IDEA to run annotation processors.')
     register('--annotation-generated-sources-dir', default='generated', advanced=True,
              help='Directory relative to --project-dir to write annotation processor sources.')

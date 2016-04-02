@@ -29,11 +29,11 @@ class ThriftLinter(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ThriftLinter, cls).register_options(register)
-    register('--skip', action='store_true', fingerprint=True, help='Skip thrift linting.')
-    register('--strict', default=False, action='store_true', fingerprint=True,
+    register('--skip', type=bool, fingerprint=True, help='Skip thrift linting.')
+    register('--strict', type=bool, fingerprint=True,
              help='Fail the goal if thrift linter errors are found. Overrides the '
                   '`strict-default` option.')
-    register('--strict-default', default=False, advanced=True, action='store_true',
+    register('--strict-default', default=False, advanced=True, type=bool,
              fingerprint=True,
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')

@@ -160,7 +160,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     super(JvmPlatformValidate, cls).register_options(register)
     register('--check', default='fatal', choices=['off', 'warn', 'fatal'], fingerprint=True,
              help='Check to make sure no jvm targets target an earlier jdk than their dependencies')
-    register('--children-before-parents', default=False, action='store_true',
+    register('--children-before-parents', type=bool,
              fingerprint=True,
              help='Organize output in the form target -> dependencies, rather than '
                   'target -> dependees.')
@@ -271,24 +271,24 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(JvmPlatformExplain, cls).register_options(register)
-    register('--ranges', action='store_true', default=True,
+    register('--ranges', type=bool, default=True,
              help='For each target, list the minimum and maximum possible jvm target level, based '
                   'on its dependencies and dependees, respectively.')
-    register('--detailed', action='store_true', default=False,
+    register('--detailed', type=bool,
              help='Always list the dependencies and dependees that contributed to the assessment of '
                   'legal jvm target levels (rather than only on failure).')
-    register('--only-broken', action='store_true', default=False,
+    register('--only-broken', type=bool,
              help='Only print jvm target level ranges for targets with currently invalid ranges.')
-    register('--upgradeable', action='store_true', default=False,
+    register('--upgradeable', type=bool,
              help='Print a list of targets which can be upgraded to a higher version than they '
                   'currently are.')
-    register('--downgradeable', action='store_true', default=False,
+    register('--downgradeable', type=bool,
              help='Print a list of targets which can be downgraded to a lower version than they '
                   'currently are.')
     register('--filter',
              help='Limit jvm platform possibility explanation to targets whose specs match this '
                   'regex pattern.')
-    register('--transitive', action='store_true', default=False,
+    register('--transitive', type=bool,
              help='List transitive dependencies in analysis output.')
 
   def __init__(self, *args, **kwargs):

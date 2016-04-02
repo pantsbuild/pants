@@ -24,9 +24,9 @@ class ScalaJSLink(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ScalaJSLink, cls).register_options(register)
-    register('--full-opt', default=False, action='store_true', fingerprint=True,
+    register('--full-opt', type=bool, fingerprint=True,
              help='Perform all optimizations; this is generally only useful for deployments.')
-    register('--check-ir', default=False, action='store_true', fingerprint=True,
+    register('--check-ir', type=bool, fingerprint=True,
              help='Perform (relatively costly) validity checks of IR before linking it.')
     register('--jvm-options', type=list, metavar='<option>...', advanced=True,
              help='Run with these extra jvm options.')

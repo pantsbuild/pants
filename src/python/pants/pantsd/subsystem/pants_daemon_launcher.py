@@ -32,7 +32,7 @@ class PantsDaemonLauncher(Subsystem):
              help='The port to bind the pants nailgun server to. Defaults to a random port.')
     register('--log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
-    register('--fs-event-detection', advanced=True, action='store_true', default=False,
+    register('--fs-event-detection', advanced=True, type=bool,
              help='Whether or not to use filesystem event detection. Experimental.')
     register('--fs-event-workers', advanced=True, type=int, default=4,
              help='The number of workers to use for the filesystem event service executor pool.'
