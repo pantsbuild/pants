@@ -136,6 +136,12 @@ New Features
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Verify config by default.
+  `RB #3636 <https://rbcommons.com/s/twitter/r/3636>`_
+
+* Fix, document, or mark xfail tests that fail in Jenkins.
+  `RB #3632 <https://rbcommons.com/s/twitter/r/3632>`_
+
 * Allow a period in a namedver for publishing
   `RB #3611 <https://rbcommons.com/s/twitter/r/3611>`_
 
