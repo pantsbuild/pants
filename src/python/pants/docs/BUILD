@@ -2,6 +2,7 @@ page(
   name='readme',
   source='readme.md',
   links=[
+    ':branching_strategy',
     ':credits',
     ':dev_tasks',
     ':docs',
@@ -16,6 +17,11 @@ page(
     ':release_jvm',
     ':styleguide',
   ]
+)
+
+page(
+  name='branching_strategy',
+  source='branching_strategy.md',
 )
 
 page(
