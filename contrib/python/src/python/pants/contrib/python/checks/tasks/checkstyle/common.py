@@ -116,6 +116,8 @@ class PythonFile(object):
   @classmethod
   def parse(cls, filename, root=None):
     if root:
+      if os.path.isabs(filename):
+        raise ValueError("filename must be a relative path if root is specified")
       full_filename = os.path.join(root, filename)
     else:
       full_filename = filename

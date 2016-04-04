@@ -169,6 +169,10 @@ class CommonTest(unittest.TestCase):
     error = plugin.error('B380', "I don't like your from import!", 2)
     self.assertEqual(str(ast_error), str(error))
 
+  def test_python_file_absolute_path_and_root_fails(self):
+    with self.assertRaises(ValueError):
+      PythonFile.parse('/absolute/dir', root='/other/abs/dir')
+
   def test_index_error_with_data(self):
     """Test index errors with data in list."""
     test_list = OffByOneList([])

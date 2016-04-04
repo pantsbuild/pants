@@ -35,17 +35,6 @@ class Rage(CheckstylePlugin):
 
 class TestPyStyleTask(PythonTaskTestBase):
 
-  def no_qa_file(self):
-    return self.create_file("no_qa_file.py", dedent_wo_first_line("""
-        # checkstyle: noqa
-        print('This is not fine')
-        print('This is fine')"""))
-
-  def no_qa_line(self):
-    return self.create_file('no_qa_line.py', dedent_wo_first_line("""
-        print('This is not fine')
-        print('This is fine')  # noqa"""))
-
   @classmethod
   def task_type(cls):
     """Required method"""
@@ -65,24 +54,35 @@ class TestPyStyleTask(PythonTaskTestBase):
     self.style_check = self._create_task()
     self.style_check.options.suppress = None
 
+    self.no_qa_line = 'no_qa_line.py'
+    self.create_file(self.no_qa_line, dedent_wo_first_line("""
+        print('This is not fine')
+        print('This is fine')  # noqa"""))
+
+    self.no_qa_file = "no_qa_file.py"
+    self.create_file(self.no_qa_file, dedent_wo_first_line("""
+        # checkstyle: noqa
+        print('This is not fine')
+        print('This is fine')"""))
+
   def tearDown(self):
     super(TestPyStyleTask, self).tearDown()
     PythonCheckStyleTask.clear_plugins()
 
   def test_noqa_line_filter_length(self):
     """Verify the number of lines filtered is what we expect"""
-    nits = list(self.style_check.get_nits(self.no_qa_line()))
+    nits = list(self.style_check.get_nits(self.no_qa_line))
     self.assertEqual(1, len(nits), ('Actually got nits: {}'.format(
       ' '.join('{}:{}'.format(nit._line_number, nit) for nit in nits)
     )))
 
   def test_noqa_line_filter_code(self):
     """Verify that the line we see has the correct code"""
-    nits = list(self.style_check.get_nits(self.no_qa_line()))
+    nits = list(self.style_check.get_nits(self.no_qa_line))
     self.assertEqual('T999', nits[0].code, 'Not handling the code correctly')
 
   def test_noqa_file_filter(self):
     """Verify Whole file filters are applied correctly"""
-    nits = list(self.style_check.get_nits(self.no_qa_file()))
+    nits = list(self.style_check.get_nits(self.no_qa_file))
 
     self.assertEqual(0, len(nits), 'Expected zero nits since entire file should be ignored')
