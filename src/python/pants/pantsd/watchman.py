@@ -116,7 +116,7 @@ class Watchman(ProcessManager):
     # to give the server-side socket setup a few chances to quiesce before potentially orphaning it.
 
     get_output = functools.partial(self.get_subprocess_output, cmd)
-    output = retry_on_exception(get_output, 3, (self.ExecutionError,), .5)
+    output = retry_on_exception(get_output, 3, (self.ExecutionError,), lambda n: n * .5)
 
     # Parse the watchman PID from the cli output.
     pid = self._parse_pid_from_output(output)

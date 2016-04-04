@@ -13,7 +13,8 @@ from pants.util.retry import retry_on_exception
 
 
 class RetryTest(unittest.TestCase):
-  def test_retry_on_exception(self):
+  @mock.patch('time.sleep', autospec=True, spec_set=True)
+  def test_retry_on_exception(self, mock_sleep):
     broken_func = mock.Mock()
     broken_func.side_effect = IOError('broken')
 
@@ -29,7 +30,8 @@ class RetryTest(unittest.TestCase):
     self.assertEquals(retry_on_exception(working_func, 3, (IOError,)), 'works')
     self.assertEquals(working_func.call_count, 1)
 
-  def test_retry_on_exception_eventual_success(self):
+  @mock.patch('time.sleep', autospec=True, spec_set=True)
+  def test_retry_on_exception_eventual_success(self, mock_sleep):
     broken_func = mock.Mock()
     broken_func.side_effect = [IOError('broken'), IOError('broken'), 'works now']
 
@@ -37,7 +39,8 @@ class RetryTest(unittest.TestCase):
 
     self.assertEquals(broken_func.call_count, 3)
 
-  def test_retry_on_exception_not_caught(self):
+  @mock.patch('time.sleep', autospec=True, spec_set=True)
+  def test_retry_on_exception_not_caught(self, mock_sleep):
     broken_func = mock.Mock()
     broken_func.side_effect = IOError('broken')
 
@@ -45,3 +48,18 @@ class RetryTest(unittest.TestCase):
       retry_on_exception(broken_func, 3, (TypeError,))
 
     self.assertEquals(broken_func.call_count, 1)
+
+  @mock.patch('time.sleep', autospec=True, spec_set=True)
+  def test_retry_default_backoff(self, mock_sleep):
+    broken_func = mock.Mock()
+    broken_func.side_effect = IOError('broken')
+
+    with self.assertRaises(IOError):
+      retry_on_exception(broken_func, 4, (IOError,))
+
+    mock_sleep.assert_has_calls((
+      mock.call(0),
+      mock.call(1),
+      mock.call(4),
+      mock.call(9)
+    ))
