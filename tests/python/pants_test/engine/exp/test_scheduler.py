@@ -20,6 +20,7 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
 from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                     Throw, Waiting)
 from pants.engine.exp.scheduler import ProductGraph
+from pants.util.contextutil import temporary_dir
 
 
 class SchedulerTest(unittest.TestCase):
@@ -243,6 +244,23 @@ class SchedulerTest(unittest.TestCase):
     self.assertIn(self.guava, root_value)
     # And that an subdirectory address is not.
     self.assertNotIn(self.managed_guava, root_value)
+
+  def test_scheduler_visualize(self):
+    spec = self.spec_parser.parse_spec('3rdparty/jvm:')
+    build_request = self.request_specs(['list'], spec)
+    self.build_and_walk(build_request)
+
+    graphviz_output = '\n'.join(self.scheduler.visualize_graph(build_request.roots))
+
+    with temporary_dir() as td:
+      output_path = os.path.join(td, 'output.dot')
+      self.scheduler.visualize_graph_to_file(build_request.roots, output_path)
+      with open(output_path, 'rb') as fh:
+        graphviz_disk_output = fh.read().strip()
+
+    self.assertEqual(graphviz_output, graphviz_disk_output)
+    self.assertIn('digraph', graphviz_output)
+    self.assertIn(' -> ', graphviz_output)
 
 
 # TODO: Expand test coverage here.

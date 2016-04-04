@@ -15,80 +15,16 @@ from pants.binaries import binary_util
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
 from pants.engine.exp.fs import PathGlobs
-from pants.engine.exp.nodes import Noop, SelectNode, TaskNode, Throw
-from pants.util.contextutil import temporary_file, temporary_file_path
-
-
-def format_type(node):
-  if type(node) == TaskNode:
-    return node.func.__name__
-  return type(node).__name__
-
-
-def format_subject(node):
-  if node.variants:
-    return '({})@{}'.format(node.subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
-  else:
-    return '({})'.format(node.subject)
-
-
-def format_product(node):
-  if type(node) == SelectNode and node.variant_key:
-    return '{}@{}'.format(node.product.__name__, node.variant_key)
-  return node.product.__name__
-
-
-def format_node(node, state):
-  return '{}:{}:{} == {}'.format(format_product(node),
-                                 format_subject(node),
-                                 format_type(node),
-                                 str(state).replace('"', '\\"'))
-
-
-# NB: there are only 12 colors in `set312`.
-colorscheme = 'set312'
-max_colors = 12
-colors = {}
-
-
-def format_color(node, node_state):
-  if type(node_state) is Throw:
-    return 'tomato'
-  elif type(node_state) is Noop:
-    return 'white'
-  key = node.product
-  return colors.setdefault(key, (len(colors) % max_colors) + 1)
-
-
-def create_digraph(scheduler, storage, request):
-
-  yield 'digraph plans {'
-  yield '  node[colorscheme={}];'.format(colorscheme)
-  yield '  concentrate=true;'
-  yield '  rankdir=LR;'
-
-  for ((node, node_state), dependency_entries) in scheduler.product_graph.walk(request.roots):
-    node_str = format_node(node, node_state)
-
-    yield (' "{node}" [style=filled, fillcolor={color}];'
-            .format(color=format_color(node, node_state),
-                    node=node_str))
-
-    for (dep, dep_state) in dependency_entries:
-      yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
-
-  yield '}'
+from pants.util.contextutil import temporary_file_path
 
 
 def visualize_execution_graph(scheduler, storage, request):
-  with temporary_file(cleanup=False, suffix='.dot') as fp:
-    for line in create_digraph(scheduler, storage, request):
-      fp.write(line)
-      fp.write('\n')
+  with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
+    scheduler.visualize_graph_to_file(request.roots, dot_file)
+    print('dot file saved to: {}'.format(dot_file))
 
-  print('dot file saved to: {}'.format(fp.name))
   with temporary_file_path(cleanup=False, suffix='.svg') as image_file:
-    subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, fp.name), shell=True)
+    subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, dot_file), shell=True)
     print('svg file saved to: {}'.format(image_file))
     binary_util.ui_open(image_file)
 
@@ -118,7 +54,6 @@ def pop_build_root_and_goals(description, args):
     usage('Must supply at least the build root path and one goal.')
 
   build_root = args.pop(0)
-
 
   if not os.path.isdir(build_root):
     usage('First argument must be a valid build root, {} is not a directory.'.format(build_root))
