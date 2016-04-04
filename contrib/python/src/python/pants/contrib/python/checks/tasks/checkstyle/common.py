@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ast
 import codecs
 import itertools
+import os
 import re
 import textwrap
 import tokenize
@@ -68,7 +69,17 @@ class PythonFile(object):
   """Checkstyle wrapper for Python source files."""
   SKIP_TOKENS = frozenset((tokenize.COMMENT, tokenize.NL, tokenize.DEDENT))
 
-  def _remove_coding_header(self, blob):
+  @classmethod
+  def _parse(cls, blob, filename):
+    blob_minus_coding_header = cls._remove_coding_header(blob)
+    try:
+      tree = ast.parse(blob_minus_coding_header, filename)
+    except SyntaxError as e:
+      raise CheckSyntaxError(e, blob, filename)
+    return tree
+
+  @classmethod
+  def _remove_coding_header(cls, blob):
     """
     There is a bug in ast.parse that cause it to throw a syntax error if
     you have a header similar to...
@@ -85,9 +96,9 @@ class PythonFile(object):
       lines[0] = '#remove coding'
     return '\n'.join(lines).encode('ascii', errors='replace')
 
-  def __init__(self, blob, filename='<expr>'):
+  def __init__(self, blob, tree, filename):
     self._blob = self._remove_coding_header(blob)
-    self.tree = ast.parse(self._blob, filename)
+    self.tree = tree
     self.lines = OffByOneList(self._blob.split('\n'))
     self.filename = filename
     self.logical_lines = dict((start, (start, stop, indent))
@@ -103,13 +114,21 @@ class PythonFile(object):
     return 'PythonFile({filename})'.format(filename=self.filename)
 
   @classmethod
-  def parse(cls, filename):
-    with codecs.open(filename, encoding='utf-8') as fp:
+  def parse(cls, filename, root=None):
+    if root:
+      full_filename = os.path.join(root, filename)
+    else:
+      full_filename = filename
+
+    with codecs.open(full_filename, encoding='utf-8') as fp:
       blob = fp.read()
-    return cls(blob, filename)
+
+    tree = cls._parse(blob, filename)
+
+    return cls(blob, tree, filename)
 
   @classmethod
-  def from_statement(cls, statement):
+  def from_statement(cls, statement, filename='<expr>'):
     """A helper to construct a PythonFile from a triple-quoted string, for testing.
     :param statement: Python file contents
     :return: Instance of PythonFile
@@ -117,7 +136,10 @@ class PythonFile(object):
     lines = textwrap.dedent(statement).split('\n')
     if lines and not lines[0]:  # Remove the initial empty line, which is an artifact of dedent.
       lines = lines[1:]
-    return cls('\n'.join(lines))
+
+    blob = '\n'.join(lines)
+    tree = cls._parse(blob, filename)
+    return cls(blob, tree, filename)
 
   @classmethod
   def iter_tokens(cls, blob):
@@ -266,6 +288,34 @@ class Nit(object):
   @property
   def lines(self):
     return self.python_file[self._line_number] if self._line_number else []
+
+
+class SyntaxErrorPythonFile(object):
+  def __init__(self, syntax_error, blob, filename):
+    self._blob = blob
+    self._syntax_error = syntax_error
+    self.filename = filename
+    self.lines = OffByOneList(self._blob.split('\n'))
+
+  def line_range(self, line_number):
+    if line_number <= 0 or line_number > len(self.lines):
+      raise IndexError('NOTE: Python file line numbers are offset by 1.')
+    return slice(line_number, line_number + 1)
+
+  def __getitem__(self, item):
+    return self.lines[self.line_range(item)]
+
+
+class CheckSyntaxError(Exception):
+  def __init__(self, syntax_error, blob, filename):
+    self.blob = blob
+    self.filename = filename
+    self._syntax_error = syntax_error
+
+  def as_nit(self):
+    return Nit('E901', Nit.ERROR, SyntaxErrorPythonFile(self._syntax_error, self.blob, self.filename),
+                'SyntaxError: {error}'.format(error=self._syntax_error.msg),
+                self._syntax_error.lineno)
 
 
 class CheckstylePlugin(AbstractClass):

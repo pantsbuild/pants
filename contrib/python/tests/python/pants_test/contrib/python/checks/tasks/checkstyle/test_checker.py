@@ -54,6 +54,19 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
       task.execute()
     self.assertIn('1 Python Style issues found', str(task_error.exception))
 
+  def test_suppressed_file_passes(self):
+    self.create_file('a/python/fail.py', contents=dedent("""
+                         print 'Print should not be used as a statement'
+                       """))
+    suppression_file = self.create_file('suppress.txt', contents=dedent("""
+    a/python/fail\.py::print-statements"""))
+    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
+    self.set_options(suppress=suppression_file)
+    context = self.context(target_roots=[target], )
+    task = self.create_task(context)
+
+    self.assertEqual(0, task.execute())
+
   def test_failure_fail_false(self):
     self.create_file('a/python/fail.py', contents=dedent("""
                        print 'Print should not be used as a statement'
@@ -72,4 +85,37 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
     self.set_options(fail=False)
     context = self.context(target_roots=[target])
     task = self.create_task(context)
+
     self.assertEqual(1, task.execute())
+
+  def test_failure_print_nit(self):
+    self.create_file('a/python/fail.py', contents=dedent("""
+                         print 'Print should not be used as a statement'
+                       """))
+    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
+    context = self.context(target_roots=[target])
+    task = self.create_task(context)
+
+    nits = list(task.get_nits('a/python/fail.py'))
+
+    self.assertEqual(1, len(nits))
+    self.assertEqual(
+      """T607:ERROR   a/python/fail.py:002 Print used as a statement.\n"""
+      """     |print 'Print should not be used as a statement'""",
+      str(nits[0]))
+
+  def test_syntax_error_nit(self):
+    self.create_file('a/python/error.py', contents=dedent("""
+                         invalid python
+                       """))
+    target = self.make_target('a/python:error', PythonLibrary, sources=['error.py'])
+    self.set_options(fail=False)
+    context = self.context(target_roots=[target])
+    task = self.create_task(context)
+
+    nits = list(task.get_nits('a/python/error.py'))
+
+    self.assertEqual(1, len(nits))
+    self.assertEqual("""E901:ERROR   a/python/error.py:002 SyntaxError: invalid syntax\n"""
+                     """     |invalid python""",
+                     str(nits[0]))

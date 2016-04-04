@@ -11,8 +11,8 @@ import unittest
 
 from pants_test.option.util.fakes import create_options
 
-from pants.contrib.python.checks.tasks.checkstyle.common import (CheckstylePlugin, Nit,
-                                                                 OffByOneList, PythonFile)
+from pants.contrib.python.checks.tasks.checkstyle.common import (CheckstylePlugin, CheckSyntaxError,
+                                                                 Nit, OffByOneList, PythonFile)
 
 
 FILE_TEXT = """
@@ -50,7 +50,7 @@ class CommonTest(unittest.TestCase):
 
   def _python_file_for_testing(self):
     """Pytest Fixture to create a test python file from statement."""
-    return PythonFile(self._statement_for_testing(), 'keeper.py')
+    return PythonFile.from_statement(self._statement_for_testing(), 'keeper.py')
 
   def _plugin_for_testing(self):
     options_object = create_options({'foo': {'skip': False}}).for_scope('foo')
@@ -59,6 +59,14 @@ class CommonTest(unittest.TestCase):
   def test_python_file_name(self):
     """Test that filename attrib is getting set properly."""
     self.assertEqual('keeper.py', self._python_file_for_testing().filename)
+
+  def test_syntax_error_in_parsing(self):
+    with self.assertRaises(CheckSyntaxError) as cm:
+      PythonFile.from_statement("""print('unfinished""",'myfile.py')
+    self.assertEqual(
+      """E901:ERROR   myfile.py:001 SyntaxError: EOL while scanning string literal\n"""
+      """     |print('unfinished""",
+      str(cm.exception.as_nit()))
 
   def test_python_file_logical_lines(self):
     """Test that we get back logical lines we expect."""

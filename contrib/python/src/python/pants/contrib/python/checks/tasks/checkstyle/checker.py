@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import re
 from collections import namedtuple
 
@@ -15,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import file_option
 
-from pants.contrib.python.checks.tasks.checkstyle.common import Nit, PythonFile
+from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError, Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 from pants.contrib.python.checks.tasks.checkstyle.register_plugins import register_plugins
 
@@ -93,23 +92,34 @@ class PythonCheckStyleTask(PythonTask):
     cls._plugins.append(plugin)
     cls._subsystems += (plugin.subsystem, )
 
-  def get_nits(self, python_file):
+  def get_nits(self, filename):
     """Iterate over the instances style checker and yield Nits.
 
-    :param python_file: PythonFile Object
+    :param filename: str pointing to a file within the buildroot.
     """
+    try:
+      python_file = PythonFile.parse(filename, root=get_buildroot())
+    except CheckSyntaxError as e:
+      yield e.as_nit()
+      return
+
     if noqa_file_filter(python_file):
       return
 
     if self.options.suppress:
       # Filter out any suppressed plugins
       check_plugins = [plugin for plugin in self._plugins
-                       if self.excluder.should_include(python_file.filename, plugin.name)]
+                       if self.excluder.should_include(filename, plugin.name)]
     else:
       check_plugins = self._plugins
 
     for plugin in check_plugins:
-      for nit in plugin.checker(python_file):
+
+      for i, nit in enumerate(plugin.checker(python_file)):
+        if i == 0:
+          # NB: Add debug log header for nits from each plugin, but only if there are nits from it.
+          self.context.log.debug('Nits from plugin {} for {}'.format(plugin.name, filename))
+
         if nit._line_number is None:
           yield nit
           continue
@@ -127,22 +137,16 @@ class PythonCheckStyleTask(PythonTask):
     :param filename: (str) Python source filename
     :return: (int) number of failures
     """
-    try:
-      python_file = PythonFile.parse(os.path.join(get_buildroot(), filename))
-    except SyntaxError as e:
-      print('{filename}:SyntaxError: {error}'.format(filename=filename, error=e))
-      return 1
-
     # If the user specifies an invalid severity use comment.
-    severity = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
+    log_threshold = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
 
     failure_count = 0
     fail_threshold = Nit.WARNING if self.options.strict else Nit.ERROR
 
-    for i, nit in enumerate(self.get_nits(python_file)):
+    for i, nit in enumerate(self.get_nits(filename)):
       if i == 0:
         print()  # Add an extra newline to clean up the output only if we have nits.
-      if nit.severity >= severity:
+      if nit.severity >= log_threshold:
         print('{nit}\n'.format(nit=nit))
       if nit.severity >= fail_threshold:
         failure_count += 1
