@@ -115,7 +115,12 @@ class PythonFile(object):
 
   @classmethod
   def parse(cls, filename, root=None):
-    if root:
+    """Parses the file at filename and returns a PythonFile.
+
+    If root is specified, it will open the file with root prepended to the path. The idea is to
+    allow for errors to contain a friendlier file path than the full absolute path.
+    """
+    if root is not None:
       if os.path.isabs(filename):
         raise ValueError("filename must be a relative path if root is specified")
       full_filename = os.path.join(root, filename)
@@ -306,7 +311,8 @@ class CheckSyntaxError(Exception):
   def as_nit(self):
     line_range = slice(self._syntax_error.lineno, self._syntax_error.lineno + 1)
     lines = OffByOneList(self._blob.split('\n'))
-
+    # NB: E901 is the SyntaxError PEP8 code.
+    # See:http://pep8.readthedocs.org/en/latest/intro.html#error-codes
     return Nit('E901', Nit.ERROR, self.filename,
                'SyntaxError: {error}'.format(error=self._syntax_error.msg),
                line_range=line_range, lines=lines)
