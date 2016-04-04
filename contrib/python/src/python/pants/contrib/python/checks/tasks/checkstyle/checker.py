@@ -31,8 +31,8 @@ class LintPlugin(namedtuple('_LintPlugin', ['name', 'subsystem'])):
     return self.subsystem.global_instance().get_plugin(python_file)
 
 
-def noqa_line_filter(python_file, line_number):
-  return _NOQA_LINE_SEARCH(python_file.lines[line_number]) is not None
+def line_contains_noqa(line):
+  return _NOQA_LINE_SEARCH(line) is not None
 
 
 def noqa_file_filter(python_file):
@@ -120,16 +120,12 @@ class PythonCheckStyleTask(PythonTask):
           # NB: Add debug log header for nits from each plugin, but only if there are nits from it.
           self.context.log.debug('Nits from plugin {} for {}'.format(plugin.name, filename))
 
-        if nit._line_number is None:
+        if not nit.has_lines_to_display:
           yield nit
           continue
 
-        nit_slice = python_file.line_range(nit._line_number)
-        for line_number in range(nit_slice.start, nit_slice.stop):
-          if noqa_line_filter(python_file, line_number):
-            break
-          else:
-            yield nit
+        if all(not line_contains_noqa(line) for line in nit.lines):
+          yield nit
 
   def check_file(self, filename):
     """Process python file looking for indications of problems.

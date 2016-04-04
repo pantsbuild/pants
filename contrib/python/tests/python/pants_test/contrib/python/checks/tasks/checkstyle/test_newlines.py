@@ -85,5 +85,5 @@ class NewlinesTest(CheckstylePluginTestBase):
   def test_classdefs(self):
     self.assertNoNits(self.GOOD_CLASS_DEF_1)
     self.assertNoNits(self.GOOD_CLASS_DEF_2)
-    self.assertNit(self.BAD_CLASS_DEF_1, 'T301', expected_line_number=4)
-    self.assertNit(self.BAD_CLASS_DEF_2, 'T301', expected_line_number=7)
+    self.assertNit(self.BAD_CLASS_DEF_1, 'T301', expected_line_number='004')
+    self.assertNit(self.BAD_CLASS_DEF_2, 'T301', expected_line_number='007')

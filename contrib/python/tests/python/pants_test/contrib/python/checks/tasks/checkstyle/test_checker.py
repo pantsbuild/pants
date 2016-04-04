@@ -117,5 +117,25 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
 
     self.assertEqual(1, len(nits))
     self.assertEqual("""E901:ERROR   a/python/error.py:002 SyntaxError: invalid syntax\n"""
-                     """     |invalid python""",
+                     """     |\n"""
+                     """     |invalid python\n"""
+                     """     |""",
                      str(nits[0]))
+
+  def test_multiline_nit_printed_only_once(self):
+    self.create_file('a/python/fail.py', contents=dedent("""
+                         print ('Multi'
+                                'line') + 'expression'
+                       """))
+    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
+    context = self.context(target_roots=[target])
+    task = self.create_task(context)
+
+    nits = list(task.get_nits('a/python/fail.py'))
+
+    self.assertEqual(1, len(nits))
+    self.assertEqual(
+      """T607:ERROR   a/python/fail.py:002-003 Print used as a statement.\n"""
+      """     |print ('Multi'\n"""
+      """     |       'line') + 'expression'""",
+      str(nits[0]))

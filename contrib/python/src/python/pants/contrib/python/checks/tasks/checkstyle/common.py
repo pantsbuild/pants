@@ -253,16 +253,17 @@ class Nit(object):
   def flatten_lines(*line_or_line_list):
     return itertools.chain(*line_or_line_list)
 
-  def __init__(self, code, severity, python_file, message, line_number=None):
+  def __init__(self, code, severity, filename, message, line_range=None, lines=None):
     if severity not in self.SEVERITY:
       raise ValueError('Severity should be one of {}'.format(' '.join(self.SEVERITY.values())))
-    self.python_file = python_file
     if not re.match(r'[A-Z]\d{3}', code):
       raise ValueError('Code must contain a prefix letter followed by a 3 digit number')
+    self.filename = filename
     self.code = code
     self.severity = severity
     self._message = message
-    self._line_number = line_number
+    self._line_range = line_range
+    self._lines = lines
 
   def __str__(self):
     """convert ascii for safe terminal output"""
@@ -271,8 +272,8 @@ class Nit(object):
 
   @property
   def line_number(self):
-    if self._line_number:
-      line_range = self.python_file.line_range(self._line_number)
+    if self._line_range:
+      line_range = self._line_range
       if line_range.stop - line_range.start > 1:
         return '%03d-%03d' % (line_range.start, line_range.stop - 1)
       else:
@@ -283,41 +284,32 @@ class Nit(object):
     return '{code}:{severity:<7} {filename}:{linenum} {message}'.format(
         code=self.code,
         severity=self.SEVERITY[self.severity],
-        filename=self.python_file.filename,
+        filename=self.filename,
         linenum=self.line_number or '*',
         message=self._message)
 
   @property
   def lines(self):
-    return self.python_file[self._line_number] if self._line_number else []
+    return self._lines or []
 
-
-class SyntaxErrorPythonFile(object):
-  def __init__(self, syntax_error, blob, filename):
-    self._blob = blob
-    self._syntax_error = syntax_error
-    self.filename = filename
-    self.lines = OffByOneList(self._blob.split('\n'))
-
-  def line_range(self, line_number):
-    if line_number <= 0 or line_number > len(self.lines):
-      raise IndexError('NOTE: Python file line numbers are offset by 1.')
-    return slice(line_number, line_number + 1)
-
-  def __getitem__(self, item):
-    return self.lines[self.line_range(item)]
+  @property
+  def has_lines_to_display(self):
+    return len(self.lines) > 0
 
 
 class CheckSyntaxError(Exception):
   def __init__(self, syntax_error, blob, filename):
-    self.blob = blob
     self.filename = filename
+    self._blob = blob
     self._syntax_error = syntax_error
 
   def as_nit(self):
-    return Nit('E901', Nit.ERROR, SyntaxErrorPythonFile(self._syntax_error, self.blob, self.filename),
-                'SyntaxError: {error}'.format(error=self._syntax_error.msg),
-                self._syntax_error.lineno)
+    line_range = slice(self._syntax_error.lineno, self._syntax_error.lineno + 1)
+    lines = OffByOneList(self._blob.split('\n'))
+
+    return Nit('E901', Nit.ERROR, self.filename,
+               'SyntaxError: {error}'.format(error=self._syntax_error.msg),
+               line_range=line_range, lines=lines)
 
 
 class CheckstylePlugin(AbstractClass):
@@ -354,7 +346,17 @@ class CheckstylePlugin(AbstractClass):
       line_number = line_number_or_ast
     elif isinstance(line_number_or_ast, ast.AST):
       line_number = getattr(line_number_or_ast, 'lineno', None)
-    return Nit(code, severity, self.python_file, message, line_number)
+
+    if line_number:
+      line_range = self.python_file.line_range(line_number)
+      lines = self.python_file[line_number]
+    else:
+      line_range = None
+      lines = None
+
+    return Nit(code, severity, self.python_file.filename, message,
+               line_range=line_range,
+               lines=lines)
 
   def comment(self, code, message, line_number_or_ast=None):
     return self.nit(code, Nit.COMMENT, message, line_number_or_ast)
