@@ -604,7 +604,7 @@ class JvmCompile(NailgunTaskBase):
           return dep.address.spec
       unused_msg = (
           'unused dependencies:\n  {}\n'.format(
-            '\n  '.join(unused_msg(entry) for entry in replacements.items()),
+            '\n  '.join(unused_msg(entry) for entry in sorted(replacements.items())),
           )
         )
       if self.get_options().unused_deps == 'fatal':

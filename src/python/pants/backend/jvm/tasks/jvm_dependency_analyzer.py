@@ -216,6 +216,6 @@ class JvmDependencyAnalyzer(object):
         if t in used or t in unused:
           continue
         if not product_deps.isdisjoint(self.files_for_target(t)):
-          replacements[dep].add(t)
+          replacements[dep].add(t.concrete_derived_from)
 
     return replacements
