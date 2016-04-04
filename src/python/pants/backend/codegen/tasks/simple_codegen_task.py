@@ -38,7 +38,6 @@ class SimpleCodegenTask(Task):
     """
     super(SimpleCodegenTask, self).__init__(context, workdir)
 
-
   @classmethod
   def product_types(cls):
     # NB(gmalmquist): This is a hack copied from the old CodeGen base class to get the round manager
