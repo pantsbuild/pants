@@ -19,6 +19,6 @@ jar_library(
   jars=[
     # TODO: `incrementalcompiler` only declares a dep on the `tests` classifier for
     # io. We redefine the dep here to get the full package.
-    scala_jar(org='org.scala-sbt', name='io', rev='0.1.0-M3'),
+    scala_jar(org='org.scala-sbt', name='io', rev='1.0.0-M3'),
   ],
 )

@@ -6,21 +6,24 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.net.URLClassLoader
-import sbt.compiler.javac
-import sbt.{
-  ClasspathOptions,
-  CompileOptions,
-  ScalaInstance
-}
-import sbt.compiler.{
+import sbt.internal.inc.{
+  Analysis,
   AnalyzingCompiler,
   CompileOutput,
   CompilerCache,
-  IC
+  javac
 }
-import sbt.Path._
-import sbt.util.{ Logger, LoggerReporter }
-import xsbti.compile.{ JavaCompiler, GlobalsCache }
+import sbt.io.Path._
+import sbt.util.Logger
+import sbt.internal.inc.LoggerReporter
+import xsbti.compile.{
+  ClasspathOptions,
+  CompileOptions,
+  GlobalsCache,
+  IncrementalCompiler,
+  JavaCompiler,
+  ScalaInstance
+}
 
 import org.pantsbuild.zinc.cache.Cache
 import org.pantsbuild.zinc.cache.Cache.Implicits
@@ -67,7 +70,7 @@ object Compiler {
    * Create a new scala compiler.
    */
   def newScalaCompiler(instance: ScalaInstance, interfaceJar: File): AnalyzingCompiler = {
-    IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot)
+    IncrementalCompiler.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot)
   }
 
   /**
@@ -132,7 +135,7 @@ object Compiler {
       dir.mkdirs()
       val tempJar = File.createTempFile("interface-", ".jar.tmp", dir)
       try {
-        IC.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, tempJar, setup.sbtInterface, scalaInstance, log)
+        IncrementalCompiler.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, tempJar, setup.sbtInterface, scalaInstance, log)
         tempJar.renameTo(interfaceJar)
       } finally {
         tempJar.delete()
@@ -165,7 +168,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
       }
 
     val result =
-      IC.incrementalCompile(
+      IncrementalCompiler.incrementalCompile(
         scalac,
         javac,
         sources,

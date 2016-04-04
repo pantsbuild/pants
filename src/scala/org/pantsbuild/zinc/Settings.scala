@@ -9,7 +9,7 @@ import java.util.{ List => JList }
 import sbt.inc.ClassfileManager
 import sbt.inc.IncOptions.{ Default => DefaultIncOptions }
 import sbt.Level
-import sbt.Path._
+import sbt.io.Path._
 import scala.collection.JavaConverters._
 import scala.util.matching.Regex
 import xsbti.compile.CompileOrder
