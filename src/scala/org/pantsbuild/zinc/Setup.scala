@@ -8,7 +8,7 @@ import java.io.File
 import java.util.{ List => JList }
 import scala.collection.JavaConverters._
 
-import sbt.Path._
+import sbt.io.Path._
 import sbt.util.Logger
 
 /**

@@ -16,10 +16,8 @@ import sbt.compiler.{
   AnalyzingCompiler,
   CompileOutput,
   CompilerCache,
-  IC,
-  MixedAnalyzingCompiler
+  IC
 }
-import sbt.inc.ZincPrivateAnalysis
 import sbt.Path._
 import sbt.util.{ Logger, LoggerReporter }
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
@@ -80,10 +78,7 @@ object Compiler {
       if (fork || javaHome.isDefined) {
         javac.JavaCompiler.fork(javaHome)
       } else {
-        Option(javax.tools.ToolProvider.getSystemJavaCompiler).map { jc =>
-          // NB: using backported 0.13.10+ JavaCompiler input
-          new javac.ZincLocalJavaCompiler(jc)
-        }.getOrElse {
+        javac.JavaCompiler.local.getOrElse {
           throw new RuntimeException(
             "Unable to locate javac directly. Please ensure that a JDK is on zinc's classpath."
           )
@@ -166,7 +161,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
       targetAnalysisStore.get().map {
         case (a, s) => (a, Some(s))
       } getOrElse {
-        (ZincPrivateAnalysis.empty(incOptions.nameHashing), None)
+        (Analysis.empty(incOptions.nameHashing), None)
       }
 
     val result =

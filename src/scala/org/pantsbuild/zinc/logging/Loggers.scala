@@ -10,12 +10,15 @@ import java.io.{ BufferedOutputStream, File, FileOutputStream, PrintWriter }
 
 import sbt.util.{
   AbstractLogger,
-  ConsoleLogger,
-  FullLogger,
-  ConsoleOut,
   Level,
-  Logger,
-  MultiLogger
+  Logger
+}
+
+import sbt.internal.util.{
+  ConsoleLogger,
+  ConsoleOut,
+  MultiLogger,
+  FullLogger
 }
 
 object Loggers {

@@ -8,6 +8,7 @@ scala_library(
   ),
   dependencies=[
     '3rdparty/jvm/com/typesafe/sbt:incrementalcompiler',
+    '3rdparty/jvm/com/typesafe/sbt:util-logging',
   ],
   sources=globs('*.scala'),
   strict_deps=True,
