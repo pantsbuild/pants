@@ -26,6 +26,8 @@ class JavaWireLibrary(ExportableJvmLibrary):
   https://github.com/ericzundel/mvn2pants/tree/master/src/python/squarepants/plugins/sake_wire_codegen
 
   But note this requires you to write a custom wire code generator with a command line interface.
+
+  :API: public
   """
 
   def __init__(self,
