@@ -16,6 +16,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.from_target import FromTarget
 from pants.build_graph.resources import Resources
@@ -224,6 +225,13 @@ class WhatChangedTest(WhatChangedTestBasic):
       'root/src/py/a:beta',
       workspace=self.workspace(files=['root/src/py/a/BUILD'])
     )
+
+  def test_broken_build_file(self):
+    with self.assertRaises(AddressLookupError):
+      self.add_to_build_file('root/src/py/a', dedent("""
+        //
+      """))
+      self.assert_console_output(workspace=self.workspace(files=['root/src/py/a/BUILD']))
 
   def test_resource_changed(self):
     self.assert_console_output(
