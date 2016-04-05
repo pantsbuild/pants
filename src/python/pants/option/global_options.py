@@ -164,3 +164,8 @@ class GlobalOptionsRegistrar(Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    register('--delete-lock-on-release', advanced=True, type=bool, default=False,
+             help='Delete the file-lock based global lock on release.  This is to facilitate '
+                  'a transition period from the old "existence" based lock implementation to '
+                  'the new file-lock based implementation, which does not delete the lock file '
+                  'by default.')

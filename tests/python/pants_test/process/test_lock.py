@@ -97,3 +97,10 @@ class TestOwnerPrintingInterProcessFileLock(unittest.TestCase):
     self.assertTrue(self.lock.acquired)
     self.lock.release()
     self.assertFalse(self.lock.acquired)
+
+  def test_delete_on_release(self):
+    lock = OwnerPrintingInterProcessFileLock(self.lock_path, delete_on_release=True)
+    lock.acquire()
+    self.assertTrue(os.path.exists(lock.path))
+    lock.release()
+    self.assertFalse(os.path.exists(lock.path))

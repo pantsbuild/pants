@@ -76,7 +76,10 @@ class Context(object):
     self._products = Products()
     self._buildroot = get_buildroot()
     self._source_roots = SourceRootConfig.global_instance().get_source_roots()
-    self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.run'))
+    self._lock = OwnerPrintingInterProcessFileLock(
+      os.path.join(self._buildroot, '.pants.run'),
+      delete_on_release=options.for_global_scope().delete_lock_on_release,
+    )
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
     self._console_outstream = console_outstream or sys.stdout
