@@ -278,7 +278,10 @@ class Distribution(object):
 
 
 class DistributionLocator(Subsystem):
-  """Subsystem that knows how to look up a java Distribution."""
+  """Subsystem that knows how to look up a java Distribution.
+
+  :API: public
+  """
 
   class Error(Distribution.Error):
     """Error locating a java distribution."""

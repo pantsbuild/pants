@@ -166,7 +166,10 @@ class CommandLineGrabber(Executor):
 
 
 class SubprocessExecutor(Executor):
-  """Executes java programs by launching a jvm in a subprocess."""
+  """Executes java programs by launching a jvm in a subprocess.
+
+  :API: public
+  """
 
   _SCRUBBED_ENV = {
       # We attempt to control the classpath for correctness, caching and invalidation reasons and
