@@ -611,3 +611,11 @@ python_tests(
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
+
+python_tests(
+  name = 'export_classpath',
+  sources = ['test_export_classpath_integration.py'],
+  dependencies = [
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
