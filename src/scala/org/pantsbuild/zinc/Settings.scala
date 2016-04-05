@@ -10,12 +10,15 @@ import java.util.{ List => JList }
 import scala.collection.JavaConverters._
 import scala.util.matching.Regex
 
-import sbt.inc.ClassfileManager
 import sbt.io.Path._
-import sbt.util.Level
+import sbt.util.{Level, Logger}
 import sbt.util.Logger.{m2o, o2m}
 import xsbti.Maybe
-import xsbti.compile.CompileOrder
+import xsbti.compile.{
+  ClassfileManagerType,
+  CompileOrder,
+  TransactionalManagerType
+}
 import xsbti.compile.IncOptionsUtil.defaultIncOptions
 
 
@@ -134,7 +137,7 @@ case class IncOptions(
   recompileOnMacroDef: Option[Boolean] = m2o(defaultIncOptions.recompileOnMacroDef).map(_.booleanValue),
   nameHashing: Boolean           = defaultIncOptions.nameHashing
 ) {
-  def options: xsbti.compile.IncOptions = {
+  def options(log: Logger): xsbti.compile.IncOptions = {
     new xsbti.compile.IncOptions(
       transitiveStep,
       recompileAllFraction,
@@ -142,7 +145,7 @@ case class IncOptions(
       apiDebug,
       apiDiffContextSize,
       o2m(apiDumpDirectory),
-      classfileManager,
+      classfileManager(log),
       o2m(recompileOnMacroDef.map(java.lang.Boolean.valueOf)),
       nameHashing,
       false, // antStyle
@@ -153,11 +156,11 @@ case class IncOptions(
   def defaultApiDumpDirectory =
     defaultIncOptions.apiDumpDirectory
 
-  def classfileManager: () => ClassfileManager =
+  def classfileManager(log: Logger): Maybe[ClassfileManagerType] =
     if (transactional && backup.isDefined)
-      Maybe.just(ClassfileManager.transactional(backup.get))
+      Maybe.just(new TransactionalManagerType(backup.get, log))
     else
-      Maybe.nothing
+      Maybe.nothing[ClassfileManagerType]
 }
 
 /**
@@ -230,7 +233,7 @@ object Settings {
     boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(incOptions = s.incOptions.copy(transactional = true))),
     file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
     boolean(   "-recompileOnMacroDefDisabled", "Disable recompilation of all dependencies of a macro def",
-      (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = false))),
+      (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = Some(false)))),
     boolean(   "-no-name-hashing",             "Disable improved incremental compilation algorithm",
       (s: Settings) => s.copy(incOptions = s.incOptions.copy(nameHashing = false))),
 

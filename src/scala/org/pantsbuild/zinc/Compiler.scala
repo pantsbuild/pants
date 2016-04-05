@@ -70,7 +70,7 @@ object Compiler {
    * Create a new scala compiler.
    */
   def newScalaCompiler(instance: ScalaInstance, interfaceJar: File): AnalyzingCompiler = {
-    IncrementalCompiler.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot)
+    IncrementalCompiler.newScalaCompiler(instance, interfaceJar, sbt.internal.inc.ClasspathOptions.boot)
   }
 
   /**
@@ -88,7 +88,7 @@ object Compiler {
         }
       }
 
-    val options = ClasspathOptions.javac(compiler = false)
+    val options = sbt.internal.inc.ClasspathOptions.javac(compiler = false)
     new javac.JavaCompilerAdapter(compiler, instance, options)
   }
 
@@ -117,7 +117,11 @@ object Compiler {
   /**
    * Create a new classloader with the root loader as parent (to avoid zinc itself being included).
    */
-  def scalaLoader(jars: Seq[File]) = new URLClassLoader(toURLs(jars), sbt.classpath.ClasspathUtilities.rootLoader)
+  def scalaLoader(jars: Seq[File]) =
+    new URLClassLoader(
+      toURLs(jars),
+      sbt.internal.inc.classpath.ClasspathUtilities.rootLoader
+    )
 
   /**
    * Get the actual scala version from the compiler.properties in a classloader.
@@ -157,6 +161,8 @@ object Compiler {
  */
 class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
 
+  private[this] val compiler = new IncrementalCompilerImpl()
+
   /**
    * Run a compile. The resulting analysis is pesisted to `inputs.cacheFile`.
    */
@@ -170,34 +176,34 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
         case (a, s) => (Some(a), Some(s))
       } getOrElse {
         (None, None)
-      }
+       }
 
     val result =
-      new IncrementalCompilerImpl().incrementalCompile(
-        scalac,
-        javac,
-        sources,
-        classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath),
-        output = CompileOutput(classesDirectory),
-        cache = Compiler.residentCache,
-        Some(progress),
-        options = scalacOptions,
-        javacOptions,
-        previousAnalysis,
-        previousSetup,
-        analysisMap = analysisMap.getAnalysis _,
-        definesClass = analysisMap.definesClass _,
-        reporter,
-        compileOrder,
-        skip = false,
-        incOptions.options,
-        extra = Nil
-      )(log)
+       compiler.incrementalCompile(
+         scalac,
+         javac,
+         sources,
+         classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath),
+         output = CompileOutput(classesDirectory),
+         cache = Compiler.residentCache,
+         Some(progress),
+         options = scalacOptions,
+         javacOptions,
+         previousAnalysis,
+         previousSetup,
+         analysisMap = analysisMap.getAnalysis _,
+         definesClass = analysisMap.definesClass _,
+         reporter,
+         compileOrder,
+         skip = false,
+         incOptions.options(log),
+         extra = Nil
+       )(log)
 
     // if the compile resulted in modified analysis, persist it
     if (result.hasModified) {
       targetAnalysisStore.set(result.analysis, result.setup)
-    }
+     }
   }
 
   /**
