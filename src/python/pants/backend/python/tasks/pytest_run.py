@@ -80,9 +80,6 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     # to avoid confusion when debugging pants tests.
     # TODO: make these an option, so any pants install base can pick their pytest version.
     PythonRequirement('pytest>=2.6,<2.7'),
-    # NB, pytest-timeout 1.0.0 introduces a conflicting pytest>=2.8.0 requirement, see:
-    #   https://github.com/pantsbuild/pants/issues/2566
-    PythonRequirement('pytest-timeout<1.0.0'),
     PythonRequirement('pytest-cov>=1.8,<1.9'),
     PythonRequirement('unittest2>=0.6.0,<=1.9.0'),
   ]
