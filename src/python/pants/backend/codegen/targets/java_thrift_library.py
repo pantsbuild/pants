@@ -10,7 +10,10 @@ from pants.base.exceptions import TargetDefinitionException
 
 
 class JavaThriftLibrary(JvmTarget):
-  """A Java library generated from Thrift IDL files."""
+  """A Java library generated from Thrift IDL files.
+
+  :API: public
+  """
 
   # TODO(John Sirois): Tasks should register the values they support in a plugin-registration goal.
   # In general a plugin will contribute a target and a task, but in this case we have a shared
@@ -28,6 +31,8 @@ class JavaThriftLibrary(JvmTarget):
                thrift_linter_strict=None,
                **kwargs):
     """
+    :API: public
+
     :param compiler: The compiler used to compile the thrift files. The default is defined in
       the global options under ``--thrift-default-compiler``.
     :param language: The language used to generate the output files. The default is defined in
