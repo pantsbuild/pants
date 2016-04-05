@@ -59,7 +59,6 @@ class RetryTest(unittest.TestCase):
 
     mock_sleep.assert_has_calls((
       mock.call(0),
-      mock.call(1),
-      mock.call(4),
-      mock.call(9)
+      mock.call(0),
+      mock.call(0)
     ))
