@@ -182,4 +182,5 @@ class OptionsBootstrapper(object):
               has_error = True
 
     if has_error:
-      raise OptionsError("Invalid config entries detected. See log for details.")
+      raise OptionsError("Invalid config entries detected. See log for entries to remove from pants.ini files.\n"
+                         "(Specify --no-verify-config to disable this check.)")
