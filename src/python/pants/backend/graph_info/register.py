@@ -9,6 +9,7 @@ from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.graph_info.tasks.dependees import ReverseDepmap
 from pants.backend.graph_info.tasks.filemap import Filemap
 from pants.backend.graph_info.tasks.filter import Filter
+from pants.backend.graph_info.tasks.graph_queries import GraphQueries
 from pants.backend.graph_info.tasks.list_owners import ListOwners
 from pants.backend.graph_info.tasks.listtargets import ListTargets
 from pants.backend.graph_info.tasks.minimal_cover import MinimalCover
@@ -30,3 +31,4 @@ def register_goals():
   task(name='sort', action=SortTargets).install()
   task(name='cloc', action=CountLinesOfCode).install()
   task(name='list-owners', action=ListOwners).install()
+  task(name='graph-query', action=GraphQueries).install()

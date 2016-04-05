@@ -64,6 +64,31 @@ python_tests(
 )
 
 python_tests(
+  name = 'graph_queries',
+  sources = ['test_graph_queries.py'],
+  dependencies = [
+    'src/python/pants/backend/graph_info/tasks',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+python_tests(
+  name = 'graph_queries_integration',
+  sources = ['test_graph_queries_integration.py'],
+  dependencies = [
+    'src/python/pants/backend/graph_info/tasks',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'listtargets',
   sources = ['test_listtargets.py'],
   dependencies = [
