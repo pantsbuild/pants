@@ -250,7 +250,7 @@ class SchedulerTest(unittest.TestCase):
     build_request = self.request_specs(['list'], spec)
     self.build_and_walk(build_request)
 
-    graphviz_output = '\n'.join(self.scheduler.visualize_graph(build_request.roots))
+    graphviz_output = '\n'.join(self.scheduler.product_graph.visualize(build_request.roots))
 
     with temporary_dir() as td:
       output_path = os.path.join(td, 'output.dot')
