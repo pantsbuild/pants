@@ -10,7 +10,9 @@ import sbt.internal.inc.{
   AnalyzingCompiler,
   CompileOutput,
   CompilerCache,
+  CompilerInterfaceProvider,
   IncrementalCompilerImpl,
+  RawCompiler,
   javac
 }
 import sbt.io.Path._
@@ -69,9 +71,12 @@ object Compiler {
   /**
    * Create a new scala compiler.
    */
-  def newScalaCompiler(instance: ScalaInstance, interfaceJar: File): AnalyzingCompiler = {
-    IncrementalCompiler.newScalaCompiler(instance, interfaceJar, sbt.internal.inc.ClasspathOptions.boot)
-  }
+  def newScalaCompiler(instance: ScalaInstance, interfaceJar: File): AnalyzingCompiler =
+    new AnalyzingCompiler(
+      instance,
+      CompilerInterfaceProvider.constant(interfaceJar),
+      sbt.internal.inc.ClasspathOptions.boot
+    )
 
   /**
    * Create a new java compiler.
@@ -138,13 +143,23 @@ object Compiler {
    * another compilation attempt.
    */
   def compilerInterface(setup: Setup, scalaInstance: ScalaInstance, log: Logger): File = {
+    def compile(targetJar: File): Unit =
+      AnalyzingCompiler.compileSources(
+        Seq(setup.compilerInterfaceSrc),
+        targetJar,
+        Seq(setup.sbtInterface),
+        // TODO: where is this being used?
+        "tododododo",
+        new RawCompiler(scalaInstance, sbt.internal.inc.ClasspathOptions.auto, log),
+        log
+      )
     val dir = setup.cacheDir / interfaceId(scalaInstance.actualVersion)
     val interfaceJar = dir / (CompilerInterfaceId + ".jar")
     if (!interfaceJar.isFile) {
       dir.mkdirs()
       val tempJar = File.createTempFile("interface-", ".jar.tmp", dir)
       try {
-        IncrementalCompiler.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, tempJar, setup.sbtInterface, scalaInstance, log)
+        compile(tempJar)
         tempJar.renameTo(interfaceJar)
       } finally {
         tempJar.delete()

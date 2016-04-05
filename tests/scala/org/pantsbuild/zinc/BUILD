@@ -3,8 +3,10 @@
 
 junit_tests(name='zinc',
   dependencies=[
-    '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
+    '3rdparty/jvm/com/typesafe/sbt:incrementalcompiler',
+    '3rdparty/jvm/com/typesafe/sbt:io',
     '3rdparty:guava',
+    '3rdparty:jsr305',
     '3rdparty:junit',
     '3rdparty:scalatest',
     'src/scala/org/pantsbuild/zinc',

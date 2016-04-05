@@ -10,6 +10,7 @@ scala_library(
     '3rdparty/jvm/com/typesafe/sbt:incrementalcompiler',
     '3rdparty/jvm/com/typesafe/sbt:io',
     '3rdparty:guava',
+    '3rdparty:jsr305',
     'src/scala/org/pantsbuild/zinc/cache',
     'src/scala/org/pantsbuild/zinc/logging',
   ],

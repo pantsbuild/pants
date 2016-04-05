@@ -5,11 +5,11 @@ package org.pantsbuild.zinc
 
 import java.io.File
 
-import sbt.IO
-import sbt.util.{
+import sbt.io.IO
+import sbt.util.Logger
+import sbt.internal.util.{
   ConsoleLogger,
-  ConsoleOut,
-  Logger
+  ConsoleOut
 }
 
 import org.junit.runner.RunWith
