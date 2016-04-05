@@ -7,10 +7,10 @@ package org.pantsbuild.zinc
 import java.io.File
 import java.net.URLClassLoader
 import sbt.internal.inc.{
-  Analysis,
   AnalyzingCompiler,
   CompileOutput,
   CompilerCache,
+  IncrementalCompilerImpl,
   javac
 }
 import sbt.io.Path._
@@ -106,7 +106,12 @@ object Compiler {
     import setup.{scalaCompiler, scalaExtra, scalaLibrary}
     val loader = scalaLoader(scalaLibrary +: scalaCompiler +: scalaExtra)
     val version = scalaVersion(loader)
-    new ScalaInstance(version.getOrElse("unknown"), loader, scalaLibrary, scalaCompiler, scalaExtra, version)
+    new sbt.internal.inc.ScalaInstance(version.getOrElse("unknown"),
+                                       loader,
+                                       scalaLibrary,
+                                       scalaCompiler,
+                                       scalaExtra.toArray,
+                                       version)
   }
 
   /**
@@ -162,13 +167,13 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
     val targetAnalysisStore = AnalysisMap.cachedStore(cacheFile)
     val (previousAnalysis, previousSetup) =
       targetAnalysisStore.get().map {
-        case (a, s) => (a, Some(s))
+        case (a, s) => (Some(a), Some(s))
       } getOrElse {
-        (Analysis.empty(incOptions.nameHashing), None)
+        (None, None)
       }
 
     val result =
-      IncrementalCompiler.incrementalCompile(
+      new IncrementalCompilerImpl().incrementalCompile(
         scalac,
         javac,
         sources,
@@ -185,7 +190,8 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
         reporter,
         compileOrder,
         skip = false,
-        incOptions.options
+        incOptions.options,
+        extra = Nil
       )(log)
 
     // if the compile resulted in modified analysis, persist it

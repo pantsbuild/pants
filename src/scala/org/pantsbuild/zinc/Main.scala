@@ -5,7 +5,7 @@
 package org.pantsbuild.zinc
 
 import java.io.File
-import sbt.Level
+import sbt.util.Level
 import xsbti.CompileFailed
 import org.pantsbuild.zinc.logging.{ Loggers, Reporters }
 

@@ -6,13 +6,17 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList }
-import sbt.inc.ClassfileManager
-import sbt.inc.IncOptions.{ Default => DefaultIncOptions }
-import sbt.Level
-import sbt.io.Path._
+
 import scala.collection.JavaConverters._
 import scala.util.matching.Regex
+
+import sbt.inc.ClassfileManager
+import sbt.io.Path._
+import sbt.util.Level
+import sbt.util.Logger.{m2o, o2m}
+import xsbti.Maybe
 import xsbti.compile.CompileOrder
+import xsbti.compile.IncOptionsUtil.defaultIncOptions
 
 
 /**
@@ -119,52 +123,41 @@ object SbtJars {
  * Wrapper around incremental compiler options.
  */
 case class IncOptions(
-  transitiveStep: Int            = DefaultIncOptions.transitiveStep,
-  recompileAllFraction: Double   = DefaultIncOptions.recompileAllFraction,
-  relationsDebug: Boolean        = DefaultIncOptions.relationsDebug,
-  apiDebug: Boolean              = DefaultIncOptions.apiDebug,
-  apiDiffContextSize: Int        = DefaultIncOptions.apiDiffContextSize,
-  apiDumpDirectory: Option[File] = DefaultIncOptions.apiDumpDirectory,
+  transitiveStep: Int            = defaultIncOptions.transitiveStep,
+  recompileAllFraction: Double   = defaultIncOptions.recompileAllFraction,
+  relationsDebug: Boolean        = defaultIncOptions.relationsDebug,
+  apiDebug: Boolean              = defaultIncOptions.apiDebug,
+  apiDiffContextSize: Int        = defaultIncOptions.apiDiffContextSize,
+  apiDumpDirectory: Option[File] = m2o(defaultIncOptions.apiDumpDirectory),
   transactional: Boolean         = false,
   backup: Option[File]           = None,
-  recompileOnMacroDef: Boolean   = DefaultIncOptions.recompileOnMacroDef,
-  nameHashing: Boolean           = DefaultIncOptions.nameHashing
+  recompileOnMacroDef: Option[Boolean] = m2o(defaultIncOptions.recompileOnMacroDef).map(_.booleanValue),
+  nameHashing: Boolean           = defaultIncOptions.nameHashing
 ) {
-  @deprecated("Use the primary constructor instead.", "0.3.5.2")
-  def this(
-    transitiveStep: Int,
-    recompileAllFraction: Double,
-    relationsDebug: Boolean,
-    apiDebug: Boolean,
-    apiDiffContextSize: Int,
-    apiDumpDirectory: Option[File],
-    transactional: Boolean,
-    backup: Option[File]
-  ) = {
-    this(transitiveStep, recompileAllFraction, relationsDebug, apiDebug, apiDiffContextSize,
-      apiDumpDirectory, transactional, backup, DefaultIncOptions.recompileOnMacroDef,
-      DefaultIncOptions.nameHashing)
-  }
-  def options: sbt.inc.IncOptions = {
-    sbt.inc.IncOptions(
+  def options: xsbti.compile.IncOptions = {
+    new xsbti.compile.IncOptions(
       transitiveStep,
       recompileAllFraction,
       relationsDebug,
       apiDebug,
       apiDiffContextSize,
-      apiDumpDirectory,
+      o2m(apiDumpDirectory),
       classfileManager,
-      recompileOnMacroDef,
-      nameHashing
+      o2m(recompileOnMacroDef.map(java.lang.Boolean.valueOf)),
+      nameHashing,
+      false, // antStyle
+      Map.empty.asJava // extra
     )
   }
 
-  def classfileManager: () => ClassfileManager = {
+  def defaultApiDumpDirectory =
+    defaultIncOptions.apiDumpDirectory
+
+  def classfileManager: () => ClassfileManager =
     if (transactional && backup.isDefined)
-      ClassfileManager.transactional(backup.get)
+      Maybe.just(ClassfileManager.transactional(backup.get))
     else
-      DefaultIncOptions.newClassfileManager
-  }
+      Maybe.nothing
 }
 
 /**

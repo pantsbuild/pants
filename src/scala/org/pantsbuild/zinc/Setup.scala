@@ -235,7 +235,7 @@ object Setup {
    * Debug output for inputs.
    */
   def debug(setup: Setup, log: xsbti.Logger): Unit = {
-    show(setup, s => log.debug(sbt.Logger.f0(s)))
+    show(setup, s => log.debug(Logger.f0(s)))
   }
 
   /**

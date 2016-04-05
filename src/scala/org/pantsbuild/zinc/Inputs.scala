@@ -168,7 +168,7 @@ object Inputs {
    * Debug output for inputs.
    */
   def debug(inputs: Inputs, log: xsbti.Logger): Unit = {
-    show(inputs, s => log.debug(sbt.Logger.f0(s)))
+    show(inputs, s => log.debug(Logger.f0(s)))
   }
 
   /**
