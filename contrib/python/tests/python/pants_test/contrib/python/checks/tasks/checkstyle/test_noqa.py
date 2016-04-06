@@ -24,11 +24,11 @@ class RageSubsystem(PluginSubsystemBase):
 
 class Rage(CheckstylePlugin):
   """Dummy Checkstyle plugin that hates everything"""
-
+  rage_code = 'T999'
   def nits(self):
     """Return Nits for everything you see."""
     for line_no, _ in self.python_file.enumerate():
-      yield self.error('T999', 'I hate everything!', line_no)
+      yield self.error(self.rage_code, 'I hate everything!', line_no)
 
 
 @pytest.fixture()
@@ -89,3 +89,13 @@ class TestPyStyleTask(PythonTaskTestBase):
     """Verify Whole file filters are applied correctly"""
     nits = list(self.style_check.get_nits(self.no_qa_file))
     self.assertEqual(0, len(nits), 'Expected zero nits since entire file should be ignored')
+
+  def test_ignore_option_ignores_error_codes(self):
+    self.style_check.options.ignore = [Rage.rage_code]
+    nits = list(self.style_check.get_nits(self.no_qa_line))
+    self.assertEqual(0, len(nits), 'Expected zero nits since this nit type was ignored')
+
+  def test_ignore_option_ignores_error_codes(self):
+    self.style_check.options.ignore = ['NOT_A_REAL_CODE']
+    nits = list(self.style_check.get_nits(self.no_qa_line))
+    self.assertEqual(1, len(nits), 'Expected a nit since this nit type was not ignored')
