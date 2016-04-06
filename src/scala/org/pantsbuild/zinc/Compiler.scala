@@ -148,8 +148,7 @@ object Compiler {
         Seq(setup.compilerInterfaceSrc),
         targetJar,
         Seq(setup.compilerBridge),
-        // TODO: where is this being used?
-        "tododododo",
+        CompilerInterfaceId,
         new RawCompiler(scalaInstance, sbt.internal.inc.ClasspathOptions.auto, log),
         log
       )
