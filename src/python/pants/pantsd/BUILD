@@ -26,6 +26,7 @@ python_library(
   sources = ['watchman.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:retry',
     ':process_manager',
     ':watchman_client'
   ]

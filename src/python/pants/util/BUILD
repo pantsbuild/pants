@@ -71,6 +71,11 @@ python_library(
 )
 
 python_library(
+  name = 'retry',
+  sources = ['retry.py'],
+)
+
+python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
   dependencies = [
