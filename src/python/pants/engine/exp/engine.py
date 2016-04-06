@@ -152,28 +152,27 @@ def _execute_step(cache_save, debug, process_state, step):
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
+
+  Operations inside the step that might raise exceptions need to be guarded to prevent
+  subprocess from dying.
   """
   node_builder, storage = process_state
-
   step_id = step.step_id
-  try:
+
+  def execute():
     resolved_request = storage.resolve_request(step)
     result = resolved_request(node_builder)
+    _try_pickle(result)
+    cache_save(step, result)
+    return storage.key_for_result(result)
+
+  try:
+    return (step_id, execute())
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
     logger.warn(traceback.format_exc())
     return (step_id, e)
-
-  if debug:
-    try:
-      _try_pickle(result)
-    except SerializationError as e:
-      return (step_id, e)
-
-  # Save result to cache for this step.
-  cache_save(step, result)
-  return (step_id, storage.key_for_result(result))
 
 
 def _process_initializer(node_builder, storage):
