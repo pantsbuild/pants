@@ -8,29 +8,20 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 import six
-from zincutils.zinc_analysis import ZincAnalysis as UnderlyingAnalysis
 
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
+from pants.backend.jvm.zinc.zinc_analysis import ZincAnalysis as UnderlyingAnalysis
 from pants.base.build_environment import get_buildroot
 
 
 class ZincAnalysis(Analysis):
   """Parsed representation of a zinc analysis.
 
-  Implemented by delegating to an underlying zincutils.ZincAnalysis instance.
+  Implemented by delegating to an underlying pants.backend.jvm.zinc.ZincAnalysis instance.
 
   Note also that all files in keys/values are full-path, just as they appear in the analysis file.
   If you want paths relative to the build root or the classes dir or whatever, you must compute
   those yourself.
-
-  zincutils code is at https://github.com/pantsbuild/zincutils.
-  See its README on how to publish it.
-
-  To run a dev pants against zincutils sources, without having to publish, just add its root dir
-  to your PYTHONPATH, e.g.:
-
-   PYTHONPATH=/path/to/zincutils/ \
-    ./pants test tests/python/pants_test/backend/jvm/tasks/jvm_compile/scala:zinc_analysis
   """
 
   FORMAT_VERSION_LINE = UnderlyingAnalysis.FORMAT_VERSION_LINE

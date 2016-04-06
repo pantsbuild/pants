@@ -5,17 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from zincutils.zinc_analysis_parser import ZincAnalysisParser as UnderlyingParser
-
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import (AnalysisParser, ParseError,
                                                                  raise_on_eof)
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
+from pants.backend.jvm.zinc.zinc_analysis_parser import ZincAnalysisParser as UnderlyingParser
 
 
 class ZincAnalysisParser(AnalysisParser):
   """Parses a zinc analysis file.
 
-  Implemented by delegating to an underlying zincutils.ZincAnalysisParser instance.
+  Implemented by delegating to an underlying pants.backend.jvm.zinc.ZincAnalysisParser instance.
   """
 
   # Implement AnalysisParser properties.
