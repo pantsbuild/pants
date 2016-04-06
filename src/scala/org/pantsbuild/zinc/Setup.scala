@@ -19,8 +19,8 @@ case class Setup(
   scalaCompiler: File,
   scalaLibrary: File,
   scalaExtra: Seq[File],
-  compilerBridge: File,
-  compilerInterfaceSrc: File,
+  compilerBridgeSrc: File,
+  compilerInterface: File,
   javaHome: Option[File],
   forkJava: Boolean,
   cacheDir: File)
@@ -55,21 +55,21 @@ object Setup {
   val ScalaCompiler            = JarFile("scala-compiler")
   val ScalaLibrary             = JarFile("scala-library")
   val ScalaReflect             = JarFile("scala-reflect")
-  val CompilerBridge           = JarFile("compiler-bridge")
-  val CompilerInterfaceSources = JarFile("compiler-interface", "sources")
+  val CompilerBridgeSources    = JarFile("compiler-bridge", "sources")
+  val CompilerInterface        = JarFile("compiler-interface")
 
   /**
    * Create compiler setup from command-line settings.
    */
   def apply(settings: Settings): Setup = {
     val scalaJars = selectScalaJars(settings.scala)
-    val (compilerBridge, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
+    val (compilerBridgeSrc, compilerInterface) = selectSbtJars(settings.sbt)
     setup(
       scalaJars.compiler,
       scalaJars.library,
       scalaJars.extra,
-      compilerBridge,
-      compilerInterfaceSrc,
+      compilerBridgeSrc,
+      compilerInterface,
       settings.javaHome,
       settings.forkJava,
       settings.zincCacheDir
@@ -83,8 +83,8 @@ object Setup {
     scalaCompiler: File,
     scalaLibrary: File,
     scalaExtra: Seq[File],
-    compilerBridge: File,
-    compilerInterfaceSrc: File,
+    compilerBridgeSrc: File,
+    compilerInterface: File,
     javaHomeDir: Option[File],
     forkJava: Boolean,
     cacheDir: File
@@ -93,8 +93,8 @@ object Setup {
     val compilerJar          = normalise(scalaCompiler)
     val libraryJar           = normalise(scalaLibrary)
     val extraJars            = scalaExtra map normalise
-    val compilerBridgeJar    = normalise(compilerBridge)
-    val compilerInterfaceJar = normalise(compilerInterfaceSrc)
+    val compilerBridgeJar    = normalise(compilerBridgeSrc)
+    val compilerInterfaceJar = normalise(compilerInterface)
     val javaHome             = javaHomeDir map normalise
     Setup(compilerJar, libraryJar, extraJars, compilerBridgeJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
   }
@@ -132,9 +132,9 @@ object Setup {
    * Select the sbt jars.
    */
   def selectSbtJars(sbt: SbtJars): (File, File) = {
-    val compilerBridge = sbt.compilerBridge getOrElse Defaults.compilerBridge
-    val compilerInterfaceSrc = sbt.compilerInterfaceSrc getOrElse Defaults.compilerInterfaceSrc
-    (compilerBridge, compilerInterfaceSrc)
+    val compilerBridgeSrc = sbt.compilerBridgeSrc getOrElse Defaults.compilerBridgeSrc
+    val compilerInterface = sbt.compilerInterface getOrElse Defaults.compilerInterface
+    (compilerBridgeSrc, compilerInterface)
   }
 
   /**
@@ -143,8 +143,8 @@ object Setup {
   def verify(setup: Setup, log: Logger): Boolean = {
     requireFile(setup.scalaCompiler, log) &&
     requireFile(setup.scalaLibrary, log) &&
-    requireFile(setup.compilerBridge, log) &&
-    requireFile(setup.compilerInterfaceSrc, log)
+    requireFile(setup.compilerBridgeSrc, log) &&
+    requireFile(setup.compilerInterface, log)
   }
 
   /**
@@ -165,8 +165,8 @@ object Setup {
     val userDir  = Util.fileProperty("user.dir")
     val zincHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
 
-    val compilerBridge       = optLibOrDefault(zincHome, CompilerBridge)
-    val compilerInterfaceSrc = optLibOrDefault(zincHome, CompilerInterfaceSources)
+    val compilerBridgeSrc    = optLibOrDefault(zincHome, CompilerBridgeSources)
+    val compilerInterface    = optLibOrDefault(zincHome, CompilerInterface)
 
     val scalaCompiler        = optLibOrDefault(zincHome, ScalaCompiler)
     val scalaLibrary         = optLibOrDefault(zincHome, ScalaLibrary)
@@ -250,8 +250,8 @@ object Setup {
       "scala compiler"             -> scalaCompiler,
       "scala library"              -> scalaLibrary,
       "scala extra"                -> scalaExtra,
-      "compiler bridge"            -> compilerBridge,
-      "compiler interface sources" -> compilerInterfaceSrc,
+      "compiler bridge sources"    -> compilerBridgeSrc,
+      "compiler interface"         -> compilerInterface,
       "java home"                  -> javaHome,
       "fork java"                  -> forkJava,
       "cache directory"            -> cacheDir)

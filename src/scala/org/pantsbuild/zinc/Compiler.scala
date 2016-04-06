@@ -145,9 +145,9 @@ object Compiler {
   def compilerInterface(setup: Setup, scalaInstance: ScalaInstance, log: Logger): File = {
     def compile(targetJar: File): Unit =
       AnalyzingCompiler.compileSources(
-        Seq(setup.compilerInterfaceSrc),
+        Seq(setup.compilerBridgeSrc),
         targetJar,
-        Seq(setup.compilerBridge),
+        Seq(setup.compilerInterface),
         CompilerInterfaceId,
         new RawCompiler(scalaInstance, sbt.internal.inc.ClasspathOptions.auto, log),
         log

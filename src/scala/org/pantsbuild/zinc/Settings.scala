@@ -107,25 +107,9 @@ object ScalaLocation {
  * Locating the sbt jars needed for zinc compile.
  */
 case class SbtJars(
-  compilerBridge: Option[File]         = None,
-  compilerInterfaceSrc: Option[File] = None
+  compilerBridgeSrc: Option[File] = None,
+  compilerInterface: Option[File] = None
 )
-
-object SbtJars {
-  /**
-   * Select the sbt jars from a path.
-   */
-  def fromPath(path: Seq[File]): SbtJars = {
-    val compilerBridge = path find (_.getName matches Setup.CompilerBridge.pattern)
-    val compilerInterfaceSrc = path find (_.getName matches Setup.CompilerInterfaceSources.pattern)
-    SbtJars(compilerBridge, compilerInterfaceSrc)
-  }
-
-  /**
-   * Java API for selecting sbt jars from a path.
-   */
-  def fromPath(path: JList[File]): SbtJars = fromPath(path.asScala)
-}
 
 /**
  * Wrapper around incremental compiler options.
@@ -226,8 +210,8 @@ object Settings {
     prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
-    file(      "-compiler-bridge", "file",     "Specify compiler bridge jar",                (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridge = Some(f)))),
-    file(      "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
+    file(      "-compiler-bridge", "file",     "Specify compiler bridge sources jar",        (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridgeSrc = Some(f)))),
+    file(      "-compiler-interface", "file",  "Specify compiler interface jar",             (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterface = Some(f)))),
     file(      ZincCacheDirName, "file",       "A cache directory for compiler interfaces",  (s: Settings, f: File) => s.copy(_zincCacheDir = Some(f))),
 
     header("Incremental compiler options:"),
@@ -313,8 +297,8 @@ object Settings {
         ),
         javaHome = Util.normaliseOpt(cwd)(javaHome),
         sbt = sbt.copy(
-          compilerBridge = Util.normaliseOpt(cwd)(sbt.compilerBridge),
-          compilerInterfaceSrc = Util.normaliseOpt(cwd)(sbt.compilerInterfaceSrc)
+          compilerBridgeSrc = Util.normaliseOpt(cwd)(sbt.compilerBridgeSrc),
+          compilerInterface = Util.normaliseOpt(cwd)(sbt.compilerInterface)
         ),
         incOptions = incOptions.copy(
           apiDumpDirectory = Util.normaliseOpt(cwd)(incOptions.apiDumpDirectory),
