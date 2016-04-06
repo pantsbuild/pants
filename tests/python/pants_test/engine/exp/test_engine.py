@@ -20,7 +20,7 @@ class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.scheduler, self.storage = setup_json_scheduler(build_root, debug=True)
-    self.cache = Cache.create(Storage.create())
+    self.cache = Cache.create(Storage.create(in_memory=True))
 
     self.java = Address.parse('src/java/codegen/simple')
 
