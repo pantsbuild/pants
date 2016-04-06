@@ -156,8 +156,8 @@ def _execute_step(cache_save, debug, process_state, step):
   node_builder, storage = process_state
 
   step_id = step.step_id
-  resolved_request = storage.resolve_request(step)
   try:
+    resolved_request = storage.resolve_request(step)
     result = resolved_request(node_builder)
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
