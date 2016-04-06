@@ -7,8 +7,8 @@ scala_library(
     publication_metadata=pants_library('The SBT incremental compiler for nailgun')
   ),
   dependencies=[
-    '3rdparty/jvm/com/typesafe/sbt:incrementalcompiler',
-    '3rdparty/jvm/com/typesafe/sbt:util-logging',
+    '3rdparty/jvm/org/scala-sbt:incrementalcompiler',
+    '3rdparty/jvm/org/scala-sbt:util-logging',
   ],
   sources=globs('*.scala'),
   strict_deps=True,

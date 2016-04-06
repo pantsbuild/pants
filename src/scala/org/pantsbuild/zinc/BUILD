@@ -7,9 +7,9 @@ scala_library(
     publication_metadata=pants_library('The SBT incremental compiler for nailgun')
   ),
   dependencies=[
-    '3rdparty/jvm/com/typesafe/sbt:incrementalcompiler',
-    '3rdparty/jvm/com/typesafe/sbt:io',
-    '3rdparty/jvm/com/typesafe/sbt:util-logging',
+    '3rdparty/jvm/org/scala-sbt:incrementalcompiler',
+    '3rdparty/jvm/org/scala-sbt:io',
+    '3rdparty/jvm/org/scala-sbt:util-logging',
     '3rdparty:guava',
     '3rdparty:jsr305',
     'src/scala/org/pantsbuild/zinc/cache',
