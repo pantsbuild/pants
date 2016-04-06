@@ -19,7 +19,7 @@ case class Setup(
   scalaCompiler: File,
   scalaLibrary: File,
   scalaExtra: Seq[File],
-  sbtInterface: File,
+  compilerBridge: File,
   compilerInterfaceSrc: File,
   javaHome: Option[File],
   forkJava: Boolean,
@@ -55,7 +55,7 @@ object Setup {
   val ScalaCompiler            = JarFile("scala-compiler")
   val ScalaLibrary             = JarFile("scala-library")
   val ScalaReflect             = JarFile("scala-reflect")
-  val SbtInterface             = JarFile("sbt-interface")
+  val CompilerBridge           = JarFile("compiler-bridge")
   val CompilerInterfaceSources = JarFile("compiler-interface", "sources")
 
   /**
@@ -63,8 +63,8 @@ object Setup {
    */
   def apply(settings: Settings): Setup = {
     val scalaJars = selectScalaJars(settings.scala)
-    val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
-    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava)
+    val (compilerBridge, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
+    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, compilerBridge, compilerInterfaceSrc, settings.javaHome, settings.forkJava)
   }
 
   /**
@@ -74,7 +74,7 @@ object Setup {
     scalaCompiler: File,
     scalaLibrary: File,
     scalaExtra: Seq[File],
-    sbtInterface: File,
+    compilerBridge: File,
     compilerInterfaceSrc: File,
     javaHomeDir: Option[File],
     forkJava: Boolean): Setup =
@@ -83,11 +83,11 @@ object Setup {
     val compilerJar          = normalise(scalaCompiler)
     val libraryJar           = normalise(scalaLibrary)
     val extraJars            = scalaExtra map normalise
-    val sbtInterfaceJar      = normalise(sbtInterface)
+    val compilerBridgeJar    = normalise(compilerBridge)
     val compilerInterfaceJar = normalise(compilerInterfaceSrc)
     val javaHome             = javaHomeDir map normalise
     val cacheDir             = zincCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
+    Setup(compilerJar, libraryJar, extraJars, compilerBridgeJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
   }
 
   /**
@@ -123,9 +123,9 @@ object Setup {
    * Select the sbt jars.
    */
   def selectSbtJars(sbt: SbtJars): (File, File) = {
-    val sbtInterface = sbt.sbtInterface getOrElse Defaults.sbtInterface
+    val compilerBridge = sbt.compilerBridge getOrElse Defaults.compilerBridge
     val compilerInterfaceSrc = sbt.compilerInterfaceSrc getOrElse Defaults.compilerInterfaceSrc
-    (sbtInterface, compilerInterfaceSrc)
+    (compilerBridge, compilerInterfaceSrc)
   }
 
   /**
@@ -139,7 +139,7 @@ object Setup {
   def verify(setup: Setup, log: Logger): Boolean = {
     requireFile(setup.scalaCompiler, log) &&
     requireFile(setup.scalaLibrary, log) &&
-    requireFile(setup.sbtInterface, log) &&
+    requireFile(setup.compilerBridge, log) &&
     requireFile(setup.compilerInterfaceSrc, log)
   }
 
@@ -162,7 +162,7 @@ object Setup {
     val zincDir  = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
     val zincHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
 
-    val sbtInterface         = optLibOrDefault(zincHome, SbtInterface)
+    val compilerBridge       = optLibOrDefault(zincHome, CompilerBridge)
     val compilerInterfaceSrc = optLibOrDefault(zincHome, CompilerInterfaceSources)
 
     val scalaCompiler        = optLibOrDefault(zincHome, ScalaCompiler)
@@ -247,7 +247,7 @@ object Setup {
       "scala compiler"             -> scalaCompiler,
       "scala library"              -> scalaLibrary,
       "scala extra"                -> scalaExtra,
-      "sbt interface"              -> sbtInterface,
+      "sbt interface"              -> compilerBridge,
       "compiler interface sources" -> compilerInterfaceSrc,
       "java home"                  -> javaHome,
       "fork java"                  -> forkJava,

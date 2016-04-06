@@ -147,7 +147,7 @@ object Compiler {
       AnalyzingCompiler.compileSources(
         Seq(setup.compilerInterfaceSrc),
         targetJar,
-        Seq(setup.sbtInterface),
+        Seq(setup.compilerBridge),
         // TODO: where is this being used?
         "tododododo",
         new RawCompiler(scalaInstance, sbt.internal.inc.ClasspathOptions.auto, log),

@@ -102,7 +102,7 @@ object ScalaLocation {
  * Locating the sbt jars needed for zinc compile.
  */
 case class SbtJars(
-  sbtInterface: Option[File]         = None,
+  compilerBridge: Option[File]         = None,
   compilerInterfaceSrc: Option[File] = None
 )
 
@@ -111,9 +111,9 @@ object SbtJars {
    * Select the sbt jars from a path.
    */
   def fromPath(path: Seq[File]): SbtJars = {
-    val sbtInterface = path find (_.getName matches Setup.SbtInterface.pattern)
+    val compilerBridge = path find (_.getName matches Setup.CompilerBridge.pattern)
     val compilerInterfaceSrc = path find (_.getName matches Setup.CompilerInterfaceSources.pattern)
-    SbtJars(sbtInterface, compilerInterfaceSrc)
+    SbtJars(compilerBridge, compilerInterfaceSrc)
   }
 
   /**
@@ -220,7 +220,7 @@ object Settings {
     prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
-    file(      "-sbt-interface", "file",       "Specify sbt interface jar",                  (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(sbtInterface = Some(f)))),
+    file(      "-compiler-bridge", "file",     "Specify compiler bridge jar",                (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridge = Some(f)))),
     file(      "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
 
     header("Incremental compiler options:"),
@@ -306,7 +306,7 @@ object Settings {
         ),
         javaHome = Util.normaliseOpt(cwd)(javaHome),
         sbt = sbt.copy(
-          sbtInterface = Util.normaliseOpt(cwd)(sbt.sbtInterface),
+          compilerBridge = Util.normaliseOpt(cwd)(sbt.compilerBridge),
           compilerInterfaceSrc = Util.normaliseOpt(cwd)(sbt.compilerInterfaceSrc)
         ),
         incOptions = incOptions.copy(
