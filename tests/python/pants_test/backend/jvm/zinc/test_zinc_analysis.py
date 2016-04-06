@@ -13,10 +13,11 @@ import zipfile
 from contextlib import contextmanager
 
 import six
-from zincutils.contextutil import Timer, environment_as, temporary_dir
-from zincutils.zinc_analysis import ZincAnalysis
-from zincutils.zinc_analysis_element import ZincAnalysisElement
-from zincutils.zinc_analysis_parser import ZincAnalysisParser
+
+from pants.backend.jvm.zinc.zinc_analysis import ZincAnalysis
+from pants.backend.jvm.zinc.zinc_analysis_element import ZincAnalysisElement
+from pants.backend.jvm.zinc.zinc_analysis_parser import ZincAnalysisParser
+from pants.util.contextutil import Timer, environment_as, temporary_dir
 
 
 # Setting this environment variable tells the test to generate new test data (see below).

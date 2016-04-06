@@ -6,5 +6,6 @@ python_tests(
   sources = globs('*.py'),
   dependencies = [
     'src/python/pants/backend/jvm/zinc',
+    'src/python/pants/util:contextutil',
   ]
 )
