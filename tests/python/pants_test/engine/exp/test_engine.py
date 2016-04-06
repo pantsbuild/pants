@@ -61,6 +61,7 @@ class EngineTest(unittest.TestCase):
       with self.assertRaises(SerializationError):
         engine.execute(build_request)
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3149')
   def test_rerun_with_cache(self):
     with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
