@@ -37,6 +37,7 @@ case class Settings(
   scalacOptions: Seq[String] = Seq.empty,
   javaHome: Option[File]     = None,
   forkJava: Boolean          = false,
+  _zincCacheDir: Option[File] = None,
   javaOnly: Boolean          = false,
   javacOptions: Seq[String]  = Seq.empty,
   compileOrder: CompileOrder = CompileOrder.Mixed,
@@ -44,7 +45,11 @@ case class Settings(
   incOptions: IncOptions     = IncOptions(),
   analysis: AnalysisOptions  = AnalysisOptions(),
   properties: Seq[String]    = Seq.empty
-)
+) {
+  def zincCacheDir: File = _zincCacheDir.getOrElse {
+    throw new RuntimeException(s"The ${Settings.ZincCacheDirName} option is required.")
+  }
+}
 
 /** Due to the limit of 22 elements in a case class, options must get broken down into sub-groups.
  * TODO: further break options into sensible subgroups. */
@@ -172,6 +177,7 @@ case class AnalysisOptions(
 )
 
 object Settings {
+  val ZincCacheDirName = "-zinc-cache-dir"
   /**
    * All available command-line options.
    */
@@ -222,6 +228,7 @@ object Settings {
     header("sbt options:"),
     file(      "-compiler-bridge", "file",     "Specify compiler bridge jar",                (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridge = Some(f)))),
     file(      "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
+    file(      ZincCacheDirName, "file",       "A cache directory for compiler interfaces",  (s: Settings, f: File) => s.copy(_zincCacheDir = Some(f))),
 
     header("Incremental compiler options:"),
     int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(transitiveStep = i))),

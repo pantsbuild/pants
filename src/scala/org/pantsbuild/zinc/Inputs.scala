@@ -4,7 +4,7 @@
 
 package org.pantsbuild.zinc
 
-import java.io.File
+import java.io.{File, IOException}
 import java.util.{ List => JList, Map => JMap }
 
 import scala.collection.JavaConverters._
@@ -147,21 +147,13 @@ object Inputs {
   }
 
   /**
-   * Verify inputs and update if necessary.
+   * Verify inputs.
    * Currently checks that the cache file is writable.
    */
-  def verify(inputs: Inputs): Inputs = {
-    inputs.copy(cacheFile = verifyCacheFile(inputs.cacheFile, inputs.classesDirectory))
-  }
-
-  /**
-   * Check that the cache file is writable.
-   * If not writable then the fallback is within the zinc cache directory.
-   *
-   */
-  def verifyCacheFile(cacheFile: File, classesDir: File): File = {
-    if (Util.checkWritable(cacheFile)) cacheFile
-    else Setup.zincCacheDir / "analysis-cache" / Util.pathHash(classesDir)
+  def verify(inputs: Inputs): Unit = {
+    if (!Util.checkWritable(inputs.cacheFile)) {
+      throw new IOException(s"Configured cache file ${inputs.cacheFile} is not writable!")
+    }
   }
 
   /**

@@ -64,7 +64,16 @@ object Setup {
   def apply(settings: Settings): Setup = {
     val scalaJars = selectScalaJars(settings.scala)
     val (compilerBridge, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
-    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, compilerBridge, compilerInterfaceSrc, settings.javaHome, settings.forkJava)
+    setup(
+      scalaJars.compiler,
+      scalaJars.library,
+      scalaJars.extra,
+      compilerBridge,
+      compilerInterfaceSrc,
+      settings.javaHome,
+      settings.forkJava,
+      settings.zincCacheDir
+    )
   }
 
   /**
@@ -77,8 +86,9 @@ object Setup {
     compilerBridge: File,
     compilerInterfaceSrc: File,
     javaHomeDir: Option[File],
-    forkJava: Boolean): Setup =
-  {
+    forkJava: Boolean,
+    cacheDir: File
+  ): Setup = {
     val normalise: File => File = { _.getAbsoluteFile }
     val compilerJar          = normalise(scalaCompiler)
     val libraryJar           = normalise(scalaLibrary)
@@ -86,7 +96,6 @@ object Setup {
     val compilerBridgeJar    = normalise(compilerBridge)
     val compilerInterfaceJar = normalise(compilerInterfaceSrc)
     val javaHome             = javaHomeDir map normalise
-    val cacheDir             = zincCacheDir
     Setup(compilerJar, libraryJar, extraJars, compilerBridgeJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
   }
 
@@ -129,11 +138,6 @@ object Setup {
   }
 
   /**
-   * Zinc cache directory.
-   */
-  def zincCacheDir = Defaults.zincDir / zincVersion.published
-
-  /**
    * Verify that necessary jars exist.
    */
   def verify(setup: Setup, log: Logger): Boolean = {
@@ -159,7 +163,6 @@ object Setup {
   object Defaults {
     val userHome = Util.fileProperty("user.home")
     val userDir  = Util.fileProperty("user.dir")
-    val zincDir  = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
     val zincHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
 
     val compilerBridge       = optLibOrDefault(zincHome, CompilerBridge)
