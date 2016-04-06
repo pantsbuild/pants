@@ -247,7 +247,7 @@ object Setup {
       "scala compiler"             -> scalaCompiler,
       "scala library"              -> scalaLibrary,
       "scala extra"                -> scalaExtra,
-      "sbt interface"              -> compilerBridge,
+      "compiler bridge"            -> compilerBridge,
       "compiler interface sources" -> compilerInterfaceSrc,
       "java home"                  -> javaHome,
       "fork java"                  -> forkJava,

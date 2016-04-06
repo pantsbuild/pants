@@ -75,7 +75,7 @@ object Compiler {
     new AnalyzingCompiler(
       instance,
       CompilerInterfaceProvider.constant(interfaceJar),
-      sbt.internal.inc.ClasspathOptions.boot
+      sbt.internal.inc.ClasspathOptions.auto
     )
 
   /**
