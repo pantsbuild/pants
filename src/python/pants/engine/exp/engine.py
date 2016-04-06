@@ -152,9 +152,6 @@ def _execute_step(cache_save, debug, process_state, step):
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
-
-  Operations inside the step that might raise exceptions need to be guarded to prevent
-  subprocess from dying.
   """
   node_builder, storage = process_state
   step_id = step.step_id
