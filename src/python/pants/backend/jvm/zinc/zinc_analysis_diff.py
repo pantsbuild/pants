@@ -16,6 +16,7 @@ class DictDiff(object):
 
   Useful in tests.
   """
+
   def __init__(self, left_dict, right_dict, keys_only=False):
     left_keys = set(left_dict.keys())
     right_keys = set(right_dict.keys())

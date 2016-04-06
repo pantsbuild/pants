@@ -5,17 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from contextlib import contextmanager
 import os
 import shutil
 import StringIO
 import unittest
 import zipfile
+from contextlib import contextmanager
 
+import six
+from zincutils.contextutil import Timer, environment_as, temporary_dir
 from zincutils.zinc_analysis import ZincAnalysis
 from zincutils.zinc_analysis_element import ZincAnalysisElement
 from zincutils.zinc_analysis_parser import ZincAnalysisParser
-from zincutils.contextutil import Timer, environment_as, temporary_dir
+
 
 # Setting this environment variable tells the test to generate new test data (see below).
 _TEST_DATA_SOURCE_ENV_VAR = 'ZINC_ANALYSIS_TEST_DATA_SOURCE'
@@ -44,7 +46,9 @@ class ZincAnalysisTestBase(unittest.TestCase):
     self.total_time += elapsed
     return ret
 
+
 class ZincAnalysisTestSimple(ZincAnalysisTestBase):
+
   # Test a simple example that is non-trivial, but still small enough to verify manually.
   def test_simple(self):
     with environment_as(ZINCUTILS_SORTED_ANALYSIS='1'):
@@ -125,6 +129,7 @@ class ZincAnalysisTestSimple(ZincAnalysisTestBase):
 
 
 class ZincAnalysisTestComplex(ZincAnalysisTestBase):
+
   # Test on complex analysis files.
   def test_complex(self):
     with environment_as(ZINCUTILS_SORTED_ANALYSIS='1'):
@@ -184,12 +189,12 @@ class ZincAnalysisTestComplex(ZincAnalysisTestBase):
         # Compare the merge result with the re-read one.
         diffs = merged_analysis.diff(merged_analysis2)
         self.assertTrue(merged_analysis.is_equal_to(merged_analysis2), ''.join(
-          [unicode(diff) for diff in diffs]))
+          [six.u(diff) for diff in diffs]))
 
         # Compare the merge result with the expected.
         diffs = expected_merged_analysis.diff(merged_analysis2)
         self.assertTrue(expected_merged_analysis.is_equal_to(merged_analysis2), ''.join(
-          [unicode(diff) for diff in diffs]))
+          [six.u(diff) for diff in diffs]))
 
         # Split the merged analysis back to individual analyses.
         sources_per_analysis = [a.stamps.sources.keys() for a in analyses]
@@ -222,7 +227,7 @@ class ZincAnalysisTestComplex(ZincAnalysisTestBase):
           # This comparison works here only because we've taken care to prepare test data for which
           # it should hold. See _generate_testworthy_splits below for how to do so.
           self.assertTrue(analysis.is_equal_to(split_analysis),
-                          ''.join([unicode(diff) for diff in diffs]))
+                          ''.join([six.u(diff) for diff in diffs]))
 
       print('Total time: %f seconds' % self.total_time)
 
@@ -271,6 +276,7 @@ class ZincAnalysisTestComplex(ZincAnalysisTestBase):
 
 
 class ZincAnalysisTestLarge(ZincAnalysisTestBase):
+
   # Test on a couple of large files, primarily for benchmarking.
   # Note that we don't set ZINCUTILS_SORTED_ANALYSIS='1', as we want to benchmark production
   # performance (without unnecessary sorting).

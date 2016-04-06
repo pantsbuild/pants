@@ -182,8 +182,6 @@ class ZincAnalysis(object):
     return hash((self.compile_setup, self.relations, self.stamps, self.apis,
                  self.source_infos, self.compilations))
 
-  # Implementation of methods required by Analysis.
-
   def split(self, splits, catchall=False):
     # Note: correctly handles "externalizing" internal deps that must be external post-split.
     splits = [set(x) for x in splits]  # Ensure sets, for performance.
@@ -331,8 +329,6 @@ class ZincAnalysis(object):
     self.apis.write(outfile)
     self.source_infos.write(outfile)
     self.compilations.write(outfile)
-
-  # Extra methods on this class only.
 
   # Translate the contents of this analysis. Useful for creating anonymized test data.
   # Note that the resulting file is not a valid analysis, as the base64-encoded serialized objects

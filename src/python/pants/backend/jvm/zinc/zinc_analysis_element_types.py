@@ -96,7 +96,6 @@ class Stamps(ZincAnalysisElement):
   # We make equality ignore the values in classnames: classnames is a map from
   # jar file to one representative class in that jar, and the representative can change.
   # However this doesn't affect any useful aspect of the analysis, so we ignore it.
-
   def diff(self, other):
     return ZincAnalysisElementDiff(self, other, keys_only_headers=('class names', ))
 

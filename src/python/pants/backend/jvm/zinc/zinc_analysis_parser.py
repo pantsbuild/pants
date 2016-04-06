@@ -9,6 +9,7 @@ import os
 import re
 from collections import defaultdict
 
+import six
 from six.moves import range
 
 from pants.backend.jvm.zinc.zinc_analysis import (APIs, Compilations, CompileSetup, Relations,
@@ -56,7 +57,7 @@ class ZincAnalysisParser(object):
     # TODO(benjy): Temporary hack until we inject a dep on the scala runtime jar.
     scalalib_re = re.compile(r'scala-library-\d+\.\d+\.\d+\.jar$')
     filtered_bin_deps = defaultdict(list)
-    for src, deps in bin_deps.iteritems():
+    for src, deps in six.iteritems(bin_deps):
       filtered_bin_deps[src] = filter(lambda x: scalalib_re.search(x) is None, deps)
 
     transformed_ext_deps = {}
