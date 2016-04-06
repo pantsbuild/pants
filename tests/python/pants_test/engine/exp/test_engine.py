@@ -20,7 +20,7 @@ class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.scheduler, self.storage = setup_json_scheduler(build_root, debug=True)
-    self.cache = Cache.create(Storage.create())
+    self.cache = Cache.create(Storage.create(in_memory=True))
 
     self.java = Address.parse('src/java/codegen/simple')
 
@@ -46,17 +46,14 @@ class EngineTest(unittest.TestCase):
     engine = LocalSerialEngine(self.scheduler, self.storage, self.cache)
     self.assert_engine(engine)
 
-  @unittest.skip('test')
   def test_multiprocess_engine_multi(self):
     with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
 
-  @unittest.skip('test')
   def test_multiprocess_engine_single(self):
     with self.multiprocessing_engine(pool_size=1) as engine:
       self.assert_engine(engine)
 
-  @unittest.skip('test')
   def test_multiprocess_unpickleable(self):
     build_request = self.request(['unpickleable'], self.java)
 
@@ -64,7 +61,6 @@ class EngineTest(unittest.TestCase):
       with self.assertRaises(SerializationError):
         engine.execute(build_request)
 
-  @unittest.skip('test')
   def test_rerun_with_cache(self):
     with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
