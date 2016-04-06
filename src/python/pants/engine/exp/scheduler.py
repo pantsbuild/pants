@@ -242,6 +242,58 @@ class ProductGraph(object):
     for entry in _walk(_filtered_entries(roots)):
       yield entry
 
+  def visualize(self, roots):
+    """Visualize a graph walk by generating graphviz `dot` output.
+
+    :param iterable roots: An iterable of the root nodes to begin the graph walk from.
+    """
+    viz_colors = {}
+    viz_color_scheme = 'set312'  # NB: There are only 12 colors in `set312`.
+    viz_max_colors = 12
+
+    def format_color(node, node_state):
+      if type(node_state) is Throw:
+        return 'tomato'
+      elif type(node_state) is Noop:
+        return 'white'
+      return viz_colors.setdefault(node.product, (len(viz_colors) % viz_max_colors) + 1)
+
+    def format_type(node):
+      return node.func.__name__ if type(node) is TaskNode else type(node).__name__
+
+    def format_subject(node):
+      if node.variants:
+        return '({})@{}'.format(node.subject,
+                                ','.join('{}={}'.format(k, v) for k, v in node.variants))
+      else:
+        return '({})'.format(node.subject)
+
+    def format_product(node):
+      if type(node) is SelectNode and node.variant_key:
+        return '{}@{}'.format(node.product.__name__, node.variant_key)
+      return node.product.__name__
+
+    def format_node(node, state):
+      return '{}:{}:{} == {}'.format(format_product(node),
+                                     format_subject(node),
+                                     format_type(node),
+                                     str(state).replace('"', '\\"'))
+
+    yield 'digraph plans {'
+    yield '  node[colorscheme={}];'.format(viz_color_scheme)
+    yield '  concentrate=true;'
+    yield '  rankdir=LR;'
+
+    for ((node, node_state), dependency_entries) in self.walk(roots):
+      node_str = format_node(node, node_state)
+
+      yield ' "{}" [style=filled, fillcolor={}];'.format(node_str, format_color(node, node_state))
+
+      for (dep, dep_state) in dependency_entries:
+        yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
+
+    yield '}'
+
 
 class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   """Holds the roots for an execution, which might have been requested by a user.
@@ -385,6 +437,17 @@ class LocalScheduler(object):
     self._product_graph = ProductGraph()
     self._product_graph_lock = graph_lock or threading.RLock()
     self._step_id = 0
+
+  def visualize_graph_to_file(self, roots, filename):
+    """Visualize a graph walk by writing graphviz `dot` output to a file.
+
+    :param iterable roots: An iterable of the root nodes to begin the graph walk from.
+    :param str filename: The filename to output the graphviz output to.
+    """
+    with self._product_graph_lock, open(filename, 'wb') as fh:
+      for line in self.product_graph.visualize(roots):
+        fh.write(line)
+        fh.write('\n')
 
   def _create_step(self, node):
     """Creates a Step and Promise with the currently available dependencies of the given Node.
