@@ -162,7 +162,8 @@ def _execute_step(cache_save, debug, process_state, step):
   def execute():
     resolved_request = storage.resolve_request(step)
     result = resolved_request(node_builder)
-    _try_pickle(result)
+    if debug:
+      _try_pickle(result)
     cache_save(step, result)
     return storage.key_for_result(result)
 
