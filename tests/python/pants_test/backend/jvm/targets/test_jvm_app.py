@@ -273,14 +273,15 @@ class BundleTest(BaseTest):
                                 _bundle(spec_path)(fileset=['one.xml'])
                               ]).payload.fingerprint()
 
-    fingerprint1 = calc_fingerprint()
+    fingerprint_non_existing_file = calc_fingerprint()
     self.create_file(os.path.join(spec_path, 'one.xml'))
-    fingerprint2 = calc_fingerprint()
-    self.assertNotEqual(fingerprint1, fingerprint2)
+    fingerprint_empty_file = calc_fingerprint()
     self.create_file(os.path.join(spec_path, 'one.xml'), contents='some content')
-    fingerprint3 = calc_fingerprint()
-    self.assertNotEqual(fingerprint1, fingerprint3)
-    self.assertNotEqual(fingerprint2, fingerprint3)
+    fingerprint_file_with_content = calc_fingerprint()
+
+    self.assertNotEqual(fingerprint_empty_file, fingerprint_non_existing_file)
+    self.assertNotEqual(fingerprint_empty_file, fingerprint_file_with_content)
+    self.assertNotEqual(fingerprint_file_with_content, fingerprint_empty_file)
 
   def test_rel_path_with_glob_fails(self):
     # Globs are treated as eager, so rel_path doesn't affect their meaning.
