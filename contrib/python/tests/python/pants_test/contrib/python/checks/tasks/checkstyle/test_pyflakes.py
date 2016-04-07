@@ -22,7 +22,7 @@ class PyflakesCheckerTest(CheckstylePluginTestBase):
     self.assertNoNits('')
 
   def test_pyflakes_unused_import(self):
-    self.assertNit('import os', 'F401', expected_line_number=1)
+    self.assertNit('import os', 'F401', expected_line_number='001')
 
   def test_pyflakes_ignore(self):
     plugin = self.get_plugin('import os', ignore=['F401'])

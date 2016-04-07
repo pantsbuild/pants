@@ -31,7 +31,7 @@ class CheckstylePluginTestBase(unittest.TestCase):
     self.assertEqual(expected_code, nits[0].code)
     self.assertEqual(expected_severity, nits[0].severity)
     if expected_line_number is not None:
-      self.assertEqual(expected_line_number, nits[0]._line_number)
+      self.assertEqual(expected_line_number, nits[0].line_number)
 
   def assertNoNits(self, file_content):
     plugin = self.get_plugin(file_content)
