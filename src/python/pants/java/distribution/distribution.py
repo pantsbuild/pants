@@ -32,6 +32,8 @@ class Distribution(object):
   In particular provides access to the distribution's binaries; ie: java while ensuring basic
   constraints are met.  For example a minimum version can be specified if you know need to compile
   source code or run bytecode that exercise features only available in that version forward.
+
+  :API: public
   """
 
   class Error(Exception):
@@ -278,7 +280,10 @@ class Distribution(object):
 
 
 class DistributionLocator(Subsystem):
-  """Subsystem that knows how to look up a java Distribution."""
+  """Subsystem that knows how to look up a java Distribution.
+
+  :API: public
+  """
 
   class Error(Distribution.Error):
     """Error locating a java distribution."""
