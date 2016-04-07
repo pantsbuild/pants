@@ -69,6 +69,8 @@ class PythonCheckStyleTask(PythonTask):
              help='Takes a XML file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, action='store_true',
              help='Prevent test failure but still produce output for problems.')
+    register('--ignore', fingerprint=True, default=[], type=list,
+             help='Disable messages with the following codes. eg. ["T1234", ... ].')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -114,12 +116,18 @@ class PythonCheckStyleTask(PythonTask):
           yield nit
           continue
 
+        elif self._should_ignore_nit(nit):
+          continue
+
         nit_slice = python_file.line_range(nit._line_number)
         for line_number in range(nit_slice.start, nit_slice.stop):
           if noqa_line_filter(python_file, line_number):
             break
           else:
             yield nit
+
+  def _should_ignore_nit(self, nit):
+    return nit.code in self.options.ignore
 
   def check_file(self, filename):
     """Process python file looking for indications of problems.
