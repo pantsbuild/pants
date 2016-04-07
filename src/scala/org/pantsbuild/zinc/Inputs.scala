@@ -125,25 +125,8 @@ object Inputs {
   def updateIncOptions(incOptions: IncOptions, classesDir: File, normalise: File => File): IncOptions = {
     incOptions.copy(
       apiDumpDirectory = incOptions.apiDumpDirectory map normalise,
-      backup = getBackupDirectory(incOptions, classesDir, normalise)
+      backup = incOptions.backup map normalise
     )
-  }
-
-  /**
-   * Get normalised, default if not specified, backup directory. If transactional.
-   */
-  def getBackupDirectory(incOptions: IncOptions, classesDir: File, normalise: File => File): Option[File] = {
-    if (incOptions.transactional)
-      Some(normalise(incOptions.backup.getOrElse(defaultBackupLocation(classesDir))))
-    else
-      None
-  }
-
-  /**
-   * By default the backup location is relative to the classes directory (for example, target/classes/../backup/classes).
-   */
-  def defaultBackupLocation(classesDir: File) = {
-    classesDir.getParentFile / "backup" / classesDir.getName
   }
 
   /**
@@ -176,7 +159,6 @@ object Inputs {
       "debug api"              -> incOptions.apiDebug,
       "api dump"               -> incOptions.apiDumpDirectory,
       "api diff context size"  -> incOptions.apiDiffContextSize,
-      "transactional"          -> incOptions.transactional,
       "backup directory"       -> incOptions.backup,
       "recompile on macro def" -> incOptions.recompileOnMacroDef,
       "name hashing"           -> incOptions.nameHashing
