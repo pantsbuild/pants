@@ -613,9 +613,10 @@ python_tests(
 )
 
 python_tests(
-  name = 'export_classpath',
+  name = 'export_classpath_integration',
   sources = ['test_export_classpath_integration.py'],
   dependencies = [
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
+  tags = {'integration'},
 )
