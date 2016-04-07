@@ -154,26 +154,23 @@ def _execute_step(cache_save, debug, process_state, step):
   to the cache.
   """
   node_builder, storage = process_state
-
   step_id = step.step_id
-  resolved_request = storage.resolve_request(step)
-  try:
+
+  def execute():
+    resolved_request = storage.resolve_request(step)
     result = resolved_request(node_builder)
+    if debug:
+      _try_pickle(result)
+    cache_save(step, result)
+    return storage.key_for_result(result)
+
+  try:
+    return (step_id, execute())
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
     logger.warn(traceback.format_exc())
     return (step_id, e)
-
-  if debug:
-    try:
-      _try_pickle(result)
-    except SerializationError as e:
-      return (step_id, e)
-
-  # Save result to cache for this step.
-  cache_save(step, result)
-  return (step_id, storage.key_for_result(result))
 
 
 def _process_initializer(node_builder, storage):

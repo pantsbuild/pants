@@ -100,7 +100,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
-    '3rdparty/python:zincutils',
     ':analysis',
     ':analysis_parser',
     ':analysis_tools',
@@ -109,6 +108,7 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/zinc',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:workunit',

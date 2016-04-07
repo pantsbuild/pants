@@ -185,9 +185,16 @@ class ProcessMetadataManager(object):
 class ProcessManager(ProcessMetadataManager):
   """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
-  class ExecutionError(Exception): pass
   class InvalidCommandOutput(Exception): pass
   class NonResponsiveProcess(Exception): pass
+  class ExecutionError(Exception):
+    def __init__(self, message, output=None):
+      super(ProcessManager.ExecutionError, self).__init__(message)
+      self.message = message
+      self.output = output
+
+    def __repr__(self):
+      return '{}(message={!r}, output={!r})'.format(type(self).__name__, self.message, self.output)
 
   KILL_WAIT_SEC = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
@@ -258,9 +265,10 @@ class ProcessManager(ProcessMetadataManager):
     :returns: The output of the command.
     """
     try:
-      return subprocess.check_output(*args)
+      return subprocess.check_output(*args, stderr=subprocess.STDOUT)
     except (OSError, subprocess.CalledProcessError) as e:
-      raise cls.ExecutionError(str(e))
+      subprocess_output = getattr(e, 'output', '').strip()
+      raise cls.ExecutionError(str(e), subprocess_output)
 
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to write pid metadata."""

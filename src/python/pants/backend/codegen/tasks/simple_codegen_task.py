@@ -25,7 +25,18 @@ logger = logging.getLogger(__name__)
 
 
 class SimpleCodegenTask(Task):
-  """A base-class for code generation for a single target language."""
+  """A base-class for code generation for a single target language.
+
+  :API: public
+  """
+
+  def __init__(self, context, workdir):
+    """
+    Add pass-thru Task Constructor for public API visibility.
+
+    :API: public
+    """
+    super(SimpleCodegenTask, self).__init__(context, workdir)
 
   @classmethod
   def product_types(cls):
@@ -51,6 +62,8 @@ class SimpleCodegenTask(Task):
   def get_fingerprint_strategy(cls):
     """Override this method to use a fingerprint strategy other than the default one.
 
+    :API: public
+
     :return: a fingerprint strategy, or None to use the default strategy.
     """
     return None
@@ -65,6 +78,8 @@ class SimpleCodegenTask(Task):
 
     If targets should have sources, the `--allow-empty` flag indicates whether it is a
     warning or an error for sources to be missing.
+
+    :API: public
     """
     return True
 
@@ -76,6 +91,9 @@ class SimpleCodegenTask(Task):
     :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
     might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
     It may not be necessary to use this parameter depending on the details of the subclass.
+
+    :API: public
+
     :return: a list of dependencies.
     """
     return []
@@ -84,6 +102,9 @@ class SimpleCodegenTask(Task):
     """The type of target this codegen task generates.
 
     For example, the target type for JaxbGen would simply be JavaLibrary.
+
+    :API: public
+
     :return: a type (class) that inherits from Target.
     """
     raise NotImplementedError
@@ -92,6 +113,9 @@ class SimpleCodegenTask(Task):
     """The type of target this codegen task generates.
 
     For example, the target type for JaxbGen would simply be JavaLibrary.
+
+    :API: public
+
     :return: a type (class) that inherits from Target.
     """
     raise NotImplementedError
@@ -100,6 +124,9 @@ class SimpleCodegenTask(Task):
     """Predicate which determines whether the target in question is relevant to this codegen task.
 
     E.g., the JaxbGen task considers JaxbLibrary targets to be relevant, and nothing else.
+
+    :API: public
+
     :param Target target: The target to check.
     :return: True if this class can generate code for the given target, False otherwise.
     """
@@ -107,6 +134,8 @@ class SimpleCodegenTask(Task):
 
   def codegen_targets(self):
     """Finds codegen targets in the dependency graph.
+
+    :API: public
 
     :return: an iterable of dependency targets.
     """
@@ -163,6 +192,9 @@ class SimpleCodegenTask(Task):
     return []
 
   def synthetic_target_dir(self, target, target_workdir):
+    """
+    :API: public
+    """
     return target_workdir
 
   def _inject_synthetic_target(self, target, target_workdir):
@@ -213,6 +245,9 @@ class SimpleCodegenTask(Task):
     return synthetic_target
 
   def resolve_deps(self, unresolved_deps):
+    """
+    :API: public
+    """
     deps = OrderedSet()
     for dep in unresolved_deps:
       try:

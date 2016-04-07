@@ -74,7 +74,7 @@ def get_scm():
     if worktree and os.path.isdir(worktree):
       git = Git(worktree=worktree)
       try:
-        logger.info('Detected git repository at {} on branch {}'.format(worktree, git.branch_name))
+        logger.debug('Detected git repository at {} on branch {}'.format(worktree, git.branch_name))
         set_scm(git)
       except git.LocalException as e:
         logger.info('Failed to load git repository at {}: {}'.format(worktree, e))
