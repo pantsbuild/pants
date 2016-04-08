@@ -334,14 +334,21 @@ class Parser(object):
 
     # Temporary munging to effectively turn action='store_true' into bool-typed options.
     # From here on, action='store_true' is an error.  Ditto for store_false.
+    # TODO: Remove after action='store_true'/'store_false' deprecation.
     if action == 'store_true':
       kwargs['type'] = bool
       kwargs['implicit_value'] = True
       del kwargs['action']
+      deprecated_conditional(lambda: True, '0.0.83',
+                             "action='store_true' is deprecated for option {} in scope {}. "
+                             "Use type=bool.".format(args[0], self.scope))
     elif action == 'store_false':
       kwargs['type'] = bool
       kwargs['implicit_value'] = False
       del kwargs['action']
+      deprecated_conditional(lambda: True, '0.0.83',
+                             "action='store_false' is deprecated for option {} in scope {}. "
+                             "Use type=bool, implicit_value=False.".format(args[0], self.scope))
 
     # Boolean options always have an implicit boolean-typed default.  They can never be None.
     # We make that default explicit here.
