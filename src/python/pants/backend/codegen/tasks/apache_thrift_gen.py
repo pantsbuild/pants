@@ -32,7 +32,7 @@ class ApacheThriftGen(SimpleCodegenTask):
     # NB: As of thrift 0.9.2 there is 1 warning that -strict promotes to an error - missing a
     # struct field id.  If an artifact was cached with strict off, we must re-gen with strict on
     # since this case may be present and need to generate a thrift compile error.
-    register('--strict', default=True, fingerprint=True, action='store_true',
+    register('--strict', default=True, fingerprint=True, type=bool,
              help='Run thrift compiler with strict warnings.')
 
     register('--gen-options', advanced=True, fingerprint=True,

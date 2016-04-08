@@ -37,8 +37,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ScroogeGen, cls).register_options(register)
-    register('--verbose', default=False, action='store_true', help='Emit verbose output.')
-    register('--strict', fingerprint=True, default=False, action='store_true',
+    register('--verbose', type=bool, help='Emit verbose output.')
+    register('--strict', fingerprint=True, type=bool,
              help='Enable strict compilation.')
     register('--jvm-options', default=[], advanced=True, type=list,
              help='Use these jvm options when running Scrooge.')

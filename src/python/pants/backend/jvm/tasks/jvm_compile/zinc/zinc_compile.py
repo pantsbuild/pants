@@ -109,7 +109,7 @@ class BaseZincCompile(JvmCompile):
     # TODO: disable by default because it breaks dependency parsing:
     #   https://github.com/pantsbuild/pants/issues/2224
     # ...also, as of sbt 0.13.9, it is significantly slower for cold builds.
-    register('--name-hashing', advanced=True, action='store_true', default=False, fingerprint=True,
+    register('--name-hashing', advanced=True, type=bool, fingerprint=True,
              help='Use zinc name hashing.')
     register('--whitelisted-args', advanced=True, type=dict,
              default={
@@ -122,7 +122,7 @@ class BaseZincCompile(JvmCompile):
                   'Options not listed here are subject to change/removal. The value of the dict '
                   'indicates that an option accepts an argument.')
 
-    register('--incremental', advanced=True, action='store_true', default=True,
+    register('--incremental', advanced=True, type=bool, default=True,
              help='When set, zinc will use sub-target incremental compilation, which dramatically '
                   'improves compile performance while changing large targets. When unset, '
                   'changed targets will be compiled with an empty output directory, as if after '
@@ -131,7 +131,7 @@ class BaseZincCompile(JvmCompile):
     # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
     #  https://github.com/sbt/sbt/pull/2085
     #  https://github.com/sbt/sbt/pull/2160
-    register('--incremental-caching', advanced=True, action='store_true', default=False,
+    register('--incremental-caching', advanced=True, type=bool,
              help='When set, the results of incremental compiles will be written to the cache. '
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')

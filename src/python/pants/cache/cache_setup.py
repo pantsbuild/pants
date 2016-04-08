@@ -49,11 +49,11 @@ class CacheSetup(Subsystem):
   def register_options(cls, register):
     super(CacheSetup, cls).register_options(register)
     default_cache = [os.path.join(get_buildroot(), '.cache')]
-    register('--read', action='store_true', default=True,
+    register('--read', type=bool, default=True,
              help='Read build artifacts from cache, if available.')
-    register('--write', action='store_true', default=True,
+    register('--write', type=bool, default=True,
              help='Write build artifacts to cache, if available.')
-    register('--overwrite', advanced=True, action='store_true',
+    register('--overwrite', advanced=True, type=bool,
              help='If writing build artifacts to cache, overwrite existing artifacts '
                   'instead of skipping them.')
     register('--resolver', advanced=True, choices=['none', 'rest'], default='none',

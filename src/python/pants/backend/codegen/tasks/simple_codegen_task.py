@@ -49,10 +49,10 @@ class SimpleCodegenTask(Task):
   @classmethod
   def register_options(cls, register):
     super(SimpleCodegenTask, cls).register_options(register)
-    register('--allow-empty', action='store_true', default=True, fingerprint=True,
+    register('--allow-empty', type=bool, default=True, fingerprint=True,
              help='Skip targets with no sources defined.',
              advanced=True)
-    register('--allow-dups', action='store_true', default=False, fingerprint=True,
+    register('--allow-dups', type=bool, fingerprint=True,
               help='Allow multiple targets specifying the same sources. If duplicates are '
                    'allowed, the logic of find_sources will associate generated sources with '
                    'the least-dependent targets that generate them.',

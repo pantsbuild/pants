@@ -72,15 +72,15 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--test', type=list,
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
-    register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')
-    register('--default-parallel', advanced=True, action='store_true',
+    register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
+    register('--default-parallel', advanced=True, type=bool,
              help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
     register('--parallel-threads', advanced=True, type=int, default=0,
              help='Number of threads to run tests in parallel. 0 for autoset.')
     register('--test-shard', advanced=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
-    register('--suppress-output', action='store_true', default=True,
+    register('--suppress-output', type=bool, default=True,
              deprecated_hint='Use --output-mode instead.',
              deprecated_version='0.0.64', removal_version='0.0.81',
              help='Redirect test output to files in .pants.d/test/junit.')
@@ -92,14 +92,14 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--cwd', advanced=True,
              help='Set the working directory. If no argument is passed, use the build root. '
                   'If cwd is set on a target, it will supersede this argument.')
-    register('--strict-jvm-version', action='store_true', default=False, advanced=True,
+    register('--strict-jvm-version', type=bool, advanced=True,
              help='If true, will strictly require running junits with the same version of java as '
                   'the platform -target level. Otherwise, the platform -target level will be '
                   'treated as the minimum jvm to run.')
-    register('--failure-summary', action='store_true', default=True,
+    register('--failure-summary', type=bool, default=True,
              help='If true, includes a summary of which test-cases failed at the end of a failed '
                   'junit run.')
-    register('--allow-empty-sources', action='store_true', default=False, advanced=True,
+    register('--allow-empty-sources', type=bool, advanced=True,
              help='Allows a junit_tests() target to be defined with no sources.  Otherwise,'
                   'such a target will raise an error during the test run.')
     cls.register_jvm_tool(register,

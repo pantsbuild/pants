@@ -59,14 +59,14 @@ class PythonCheckStyleTask(PythonTask):
     super(PythonCheckStyleTask, cls).register_options(register)
     register('--severity', fingerprint=True, default='COMMENT', type=str,
              help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
-    register('--strict', fingerprint=True, default=False, action='store_true',
+    register('--strict', fingerprint=True, type=bool,
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
     # Skip short circuits before fingerprinting
-    register('--skip', default=False, action='store_true',
+    register('--skip', type=bool,
              help='If enabled, skip this style checker.')
     register('--suppress', fingerprint=True, type=file_option, default=None,
              help='Takes a XML file where specific rules on specific files will be skipped.')
-    register('--fail', fingerprint=True, default=True, action='store_true',
+    register('--fail', fingerprint=True, default=True, type=bool,
              help='Prevent test failure but still produce output for problems.')
 
   @classmethod

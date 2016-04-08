@@ -29,7 +29,7 @@ class JVM(Subsystem):
              help='Run with these extra JVM options.')
     register('--program-args', type=list, metavar='<arg>...',
              help='Run with these extra program args.')
-    register('--debug', action='store_true',
+    register('--debug', type=bool,
              help='Run the JVM with remote debugging.')
     register('--debug-port', advanced=True, type=int, default=5005,
              help='The JVM will listen for a debugger on this port.')
@@ -40,7 +40,7 @@ class JVM(Subsystem):
              ],
              help='The JVM remote-debugging arguments. {debug_port} will be replaced with '
                   'the value of the --debug-port option.')
-    register('--synthetic-classpath', advanced=True, action='store_true', default=True,
+    register('--synthetic-classpath', advanced=True, type=bool, default=True,
              help="Use synthetic jar to work around classpath length restrictions.")
 
   def get_jvm_options(self):

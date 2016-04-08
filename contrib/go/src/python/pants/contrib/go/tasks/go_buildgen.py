@@ -156,15 +156,15 @@ class GoBuildgen(GoTask):
 
   @classmethod
   def register_options(cls, register):
-    register('--remote', action='store_true', advanced=True, fingerprint=True,
+    register('--remote', type=bool, advanced=True, fingerprint=True,
              help='Allow auto-generation of remote dependencies without pinned versions '
                   '(FLOATING versions).')
 
-    register('--fail-floating', action='store_true', advanced=True, fingerprint=True,
+    register('--fail-floating', type=bool, advanced=True, fingerprint=True,
              help='After generating all dependencies, fail if any newly generated or pre-existing '
                   'dependencies have un-pinned - aka FLOATING - versions.')
 
-    register('--materialize', action='store_true', advanced=True, fingerprint=True,
+    register('--materialize', type=bool, advanced=True, fingerprint=True,
              help='Instead of just auto-generating missing go_binary and go_library targets in '
                   'memory, (re-)generate them on disk using the installed Go BUILD file template.')
 

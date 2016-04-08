@@ -36,11 +36,11 @@ class PythonEval(PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PythonEval, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
+    register('--skip', type=bool,
              help='If enabled, skip eval of python targets.')
-    register('--fail-slow', action='store_true', default=False,
+    register('--fail-slow', type=bool,
              help='Compile all targets and present the full list of errors.')
-    register('--closure', action='store_true', default=False,
+    register('--closure', type=bool,
              help='Eval all targets in the closure individually instead of just the targets '
                   'specified on the command line.')
 

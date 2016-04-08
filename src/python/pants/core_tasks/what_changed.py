@@ -16,7 +16,7 @@ class WhatChanged(ChangedFileTaskMixin, ConsoleTask):
   def register_options(cls, register):
     super(WhatChanged, cls).register_options(register)
     cls.register_change_file_options(register)
-    register('--files', action='store_true', default=False,
+    register('--files', type=bool,
              help='Show changed files instead of the targets that own them.')
 
   def console_output(self, _):

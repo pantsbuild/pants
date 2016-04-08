@@ -47,15 +47,15 @@ class Coverage(AbstractClass):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register('--coverage', action='store_true', help='Collect code coverage data.')
+    register('--coverage', type=bool, help='Collect code coverage data.')
     register('--coverage-processor', advanced=True, default='cobertura',
              help='Which coverage subsystem to use.')
     register('--coverage-jvm-options', advanced=True, type=list,
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
-    register('--coverage-open', action='store_true',
+    register('--coverage-open', type=bool,
              help='Open the generated HTML coverage report in a browser. Implies --coverage.')
-    register('--coverage-force', advanced=True, action='store_true',
+    register('--coverage-force', advanced=True, type=bool,
              help='Attempt to run the reporting phase of coverage even if tests failed '
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
 

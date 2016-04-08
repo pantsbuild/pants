@@ -28,7 +28,7 @@ class GoThriftGen(SimpleCodegenTask):
   def register_options(cls, register):
     super(GoThriftGen, cls).register_options(register)
 
-    register('--strict', default=True, fingerprint=True, action='store_true',
+    register('--strict', default=True, fingerprint=True, type=bool,
              help='Run thrift compiler with strict warnings.')
     register('--gen-options', advanced=True, fingerprint=True,
             help='Use these apache thrift go gen options.')

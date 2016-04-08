@@ -26,8 +26,8 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
   def register_options(cls, register):
     super(BenchmarkRun, cls).register_options(register)
     register('--target', help='Name of the benchmark class. This is a mandatory argument.')
-    register('--memory', default=False, action='store_true', help='Enable memory profiling.')
-    register('--debug', action='store_true',
+    register('--memory', type=bool, help='Enable memory profiling.')
+    register('--debug', type=bool,
              help='Run the benchmark tool with in process debugging.')
 
     cls.register_jvm_tool(register,
