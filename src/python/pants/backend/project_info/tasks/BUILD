@@ -12,6 +12,7 @@ python_library(
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
+    ':plugin_gen',
   ],
 )
 
