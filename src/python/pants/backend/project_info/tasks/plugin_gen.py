@@ -241,7 +241,7 @@ class PluginGen(IdeGen):
     )
 
     configured_workspace = TemplateData(
-      targets=self.context.options.target_specs
+      targets=[os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
     )
 
     existing_project_components = None
