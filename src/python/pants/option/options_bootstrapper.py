@@ -182,4 +182,5 @@ class OptionsBootstrapper(object):
               has_error = True
 
     if has_error:
-      raise OptionsError("Invalid config entries detected. See log for details.")
+      raise OptionsError("Invalid config entries detected. See log for details on which entries to update or remove.\n"
+                         "(Specify --no-verify-config to disable this check.)")
