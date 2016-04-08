@@ -35,10 +35,10 @@ class BundleCreate(JvmBinaryTask):
     super(BundleCreate, cls).register_options(register)
     register('--deployjar', action='store_true', default=False,
              fingerprint=True,
-             help="Expand all 3rdparty and internal jars into loose classfiles in the bundle's "
-                  "root dir. If unset, all jars will go into the bundle's libs directory, "
-                  "the root will only contain a synthetic jar with its manifest's Class-Path "
-                  "set to those jars.")
+             help="Pack all 3rdparty and internal jar classfiles into a single deployjar in "
+                  "the bundle's root dir. If unset, all jars will go into the bundle's libs "
+                  "directory, the root will only contain a synthetic jar with its manifest's "
+                  "Class-Path set to those jars.")
     register('--archive', choices=list(archive.TYPE_NAMES),
              fingerprint=True,
              help='Create an archive of this type from the bundle.')
