@@ -23,6 +23,20 @@ def print_to_stderr(message):
 
 
 class OwnerPrintingInterProcessFileLock(InterProcessLock):
+  def __init__(self, *args, **kwargs):
+    # NOTE: `delete_on_release` should only be used during the transition
+    # period from an "existence" based lock to a file lock on the same
+    # path.  This provides mild protection against the new file lock "leaking"
+    # the existence lock from the perspective of older checkouts.
+    # WARNING: There is a brief period during `release()` where the lock file is
+    # deleted and therefore available for other processes / lock instances to
+    # acquire, but where this instance will still report `self.acquired == True`.
+    # Therefore, threads outside of the one calling `release()` that rely
+    # on the correctness of `self.acquired` may incorrectly think that the lock
+    # is still held.
+    self._delete_on_release = kwargs.pop('delete_on_release', False)
+    super(OwnerPrintingInterProcessFileLock, self).__init__(*args, **kwargs)
+
   @property
   def message_path(self):
     return '{}.lock_message'.format(self.path)
@@ -60,4 +74,6 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
   def release(self):
     if self.acquired:
       safe_delete(self.message_path)
+      if self._delete_on_release:
+        safe_delete(self.path)
     return super(OwnerPrintingInterProcessFileLock, self).release()
