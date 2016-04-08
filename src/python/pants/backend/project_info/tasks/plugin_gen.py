@@ -117,6 +117,7 @@ class PluginGen(IdeGen):
                                         '{}.iml'.format(self.project_name))
     self.workspace_filename = os.path.join(self.gen_project_workdir,
                                         '{}.iws'.format(self.project_name))
+
   @staticmethod
   def _maven_targets_excludes(repo_root):
     excludes = []
@@ -276,8 +277,8 @@ class PluginGen(IdeGen):
       # Generate again, with the extra components.
       ipr = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.project_template),
           project=configured_project.extend(extra_components=extra_project_components)))
-      iml = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.module_template),
-          module=configured_module.extend(extra_components=extra_module_components)))
+      # iml = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.module_template),
+      #     module=configured_module.extend(extra_components=extra_module_components)))
       # iws = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.workspace_template),
       #     workspace=configured_module.extend(extra_components=extra_workspace_components)))
 
@@ -285,7 +286,7 @@ class PluginGen(IdeGen):
                            .format(directory=self.gen_project_workdir))
 
     shutil.move(ipr, self.project_filename)
-    shutil.move(iml, self.module_filename)
+    # shutil.move(iml, self.module_filename)
     shutil.move(iws, self.workspace_filename)
     return None
 
