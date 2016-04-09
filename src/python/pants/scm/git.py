@@ -13,6 +13,7 @@ from contextlib import contextmanager
 
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
+from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_binary
 
 
@@ -341,6 +342,10 @@ class GitRepositoryReader(object):
   class GitDiedException(Exception):
     pass
 
+  class UnterminatedTreeException(Exception):
+    # Programmer error, probably?
+    pass
+
   class UnexpectedGitObjectTypeException(Exception):
     # Programmer error
     pass
@@ -352,6 +357,14 @@ class GitRepositoryReader(object):
       return None
     except self.NotADirException:
       return None
+
+  def _safe_resolve_object(self, relpath):
+    try:
+      return self._resolve_object(relpath)
+    except self.MissingFileException:
+      return None, relpath
+    except self.NotADirException:
+      return None, relpath
 
   def exists(self, relpath):
     path = self._safe_realpath(relpath)
@@ -370,8 +383,8 @@ class GitRepositoryReader(object):
     return False
 
   def islink(self, relpath):
-    path = self._safe_realpath(relpath)
-    raise ValueError('Not implemented for {}!'.format(path))
+    obj, _ = self._safe_resolve_object(relpath)
+    return isinstance(obj, self.Symlink)
 
   class Symlink(object):
 
@@ -430,6 +443,7 @@ class GitRepositoryReader(object):
     assert object_type == 'blob'
     yield StringIO.StringIO(data)
 
+  @memoized_method
   def _realpath(self, relpath):
     """Follow symlinks to find the real path to a file or directory in the repo.
 
@@ -437,17 +451,45 @@ class GitRepositoryReader(object):
               to that file; if a directory, the relative path + '/'; if
               a symlink outside the repo, a path starting with / or ../.
     """
-
-    realpath = self._realpath_cache.get(relpath)
-    if not realpath:
-      realpath = self._realpath_uncached(relpath)
-      self._realpath_cache[relpath] = realpath
-    return realpath
-
-  def _realpath_uncached(self, relpath):
-    path_so_far = ''
-    components = list(relpath.split(os.path.sep))
     symlinks = 0
+    components = list(relpath.split(os.path.sep))
+    while True:
+      obj, path_so_far = self._resolve_object(relpath, components=components)
+      if not isinstance(obj, self.Symlink):
+        return path_so_far
+
+      symlinks += 1
+      if symlinks > MAX_SYMLINKS_IN_REALPATH:
+        raise self.SymlinkLoopException(self.rev, relpath)
+      # A git symlink is stored as a blob containing the name of the target.
+      # Read that blob.
+      object_type, path_data = self._read_object_from_repo(sha=obj.sha)
+      assert object_type == 'blob'
+
+      if path_data[0] == '/':
+        # In the event of an absolute path, just return that path
+        return path_data
+
+      link_to = os.path.normpath(os.path.join(os.path.dirname(path_so_far), path_data))
+      if link_to.startswith('../') or link_to[0] == '/':
+        # If the link points outside the repo, then just return that file
+        return link_to
+
+      # Recurse to continue our search at the top with the new path.
+      # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
+      components = link_to.split(SLASH) + components
+
+  def _resolve_object(self, relpath, components=None):
+    """Resolve a single object from the complete set of its path components.
+
+    This method returns Symlink objects rather than following them.
+
+    :param relpath: The relpath, used only for error messages.
+    :param components: Pre-split components of the same relpath, or None to split on os.path.sep.
+    :returns: A tuple of the underlying object (a Dir, Symlink, or File) and the resolved path.
+    """
+    path_so_far = ''
+    components = components if components is not None else relpath.split(os.path.sep)
 
     # Consume components to build path_so_far
     while components:
@@ -456,7 +498,6 @@ class GitRepositoryReader(object):
         continue
 
       parent_tree = self._read_tree(path_so_far)
-      parent_path = path_so_far
 
       if path_so_far != '':
         path_so_far += '/'
@@ -472,37 +513,19 @@ class GitRepositoryReader(object):
           # We've encountered a file while searching for a directory
           raise self.NotADirException(self.rev, relpath)
         else:
-          return path_so_far
+          return obj, path_so_far
       elif isinstance(obj, self.Dir):
         if not components:
-          return path_so_far + '/'
+          return obj, path_so_far + '/'
         # A dir is OK; we just descend from here
       elif isinstance(obj, self.Symlink):
-        symlinks += 1
-        if symlinks > MAX_SYMLINKS_IN_REALPATH:
-          raise self.SymlinkLoopException(self.rev, relpath)
-        # A git symlink is stored as a blob containing the name of the target.
-        # Read that blob.
-        object_type, path_data = self._read_object_from_repo(sha=obj.sha)
-        assert object_type == 'blob'
-
-        if path_data[0] == '/':
-          # In the event of an absolute path, just return that path
-          return path_data
-
-        link_to = os.path.normpath(os.path.join(parent_path, path_data))
-        if link_to.startswith('../') or link_to[0] == '/':
-          # If the link points outside the repo, then just return that file
-          return link_to
-
-        # Restart our search at the top with the new path.
-        # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
-        components = link_to.split(SLASH) + components
-        path_so_far = ''
+        # Is a symlink.
+        return obj, path_so_far
       else:
         # Programmer error
         raise self.UnexpectedGitObjectTypeException()
-    return './'
+    # TODO: Get the sha for the root.
+    return self.Dir('./', None), './'
 
   def _fixup_dot_relative(self, path):
     """Git doesn't understand dot-relative paths."""
@@ -515,7 +538,7 @@ class GitRepositoryReader(object):
   def _read_tree(self, path):
     """Given a revision and path, parse the tree data out of git cat-file output.
 
-    :returns: a dict from filename -> [list of Symlink, Dir, and Fil objectse]
+    :returns: a dict from filename -> [list of Symlink, Dir, and File objects]
     """
 
     path = self._fixup_dot_relative(path)

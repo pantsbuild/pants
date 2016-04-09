@@ -5,9 +5,10 @@ python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
-    'src/python/pants:version',
-    'src/python/pants/scm:all',
     ':build_root',
+    'src/python/pants/scm',
+    'src/python/pants/scm:git',
+    'src/python/pants:version',
   ]
 )
 

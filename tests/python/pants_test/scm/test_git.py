@@ -178,6 +178,15 @@ class GitTest(unittest.TestCase):
       with reader.listdir('bogus'):
         pass
 
+  def test_islink(self):
+    reader = self.git.repo_reader(self.initial_rev)
+    def islink(*components):
+      return reader.islink(os.path.join(*components))
+    self.assertTrue(islink('dir', 'relative-symlink'))
+    self.assertTrue(islink('not-a-dir'))
+    self.assertFalse(islink('README'))
+    self.assertFalse(islink('dir'))
+
   def test_open(self):
     reader = self.git.repo_reader(self.initial_rev)
 

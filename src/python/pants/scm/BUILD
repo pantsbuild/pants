@@ -2,14 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'all',
-  dependencies = [
-    ':git',
-    ':scm',
-  ]
-)
-
-python_library(
   name = 'scm',
   sources = ['scm.py'],
   dependencies = [
@@ -24,6 +16,7 @@ python_library(
   dependencies = [
     ':scm',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
 )
