@@ -117,9 +117,12 @@ class CacheFactory(object):
 
     # resolver is also close but failing to resolve might have broader impact than
     # single ping failure, therefore use a higher timeout with more retries.
-    self._resolver = (resolver or
-                      RESTfulResolver(timeout=1.0, tries=3) if self._options.resolver == 'rest'
-                      else NoopResolver())
+    if resolver:
+      self._resolver = resolver
+    elif self._options.resolver == 'rest':
+      self._resolver = RESTfulResolver(timeout=1.0, tries=3)
+    else:
+      self._resolver = NoopResolver()
 
   def read_cache_available(self):
     return self._options.read and bool(self._options.read_from) and self.get_read_cache()
