@@ -290,9 +290,12 @@ class ExportTask(IvyTaskMixin, PythonTask):
     if platform_versions:
       graph_info['jvm_distributions_by_platform'] = {}
       for version in platform_versions:
-        dist = DistributionLocator.cached(minimum_version=version)
-        if dist:
-          graph_info['jvm_distributions_by_platform'][str(version)] = dist.home
+        try:
+          dist = DistributionLocator.cached(minimum_version=version)
+          if dist:
+            graph_info['jvm_distributions_by_platform'][str(version)] = dist.home
+        except DistributionLocator.Error:
+          pass
 
     if classpath_products:
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
