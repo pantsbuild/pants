@@ -249,6 +249,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
       if isinstance(current_target, JvmTarget):
         info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
         info['platform'] = current_target.platform.name
+        if hasattr(current_target, 'test_platform'):
+          info['test_platform'] = current_target.test_platform.name
 
       info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,
