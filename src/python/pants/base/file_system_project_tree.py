@@ -26,6 +26,9 @@ class FileSystemProjectTree(ProjectTree):
   def isfile(self, relpath):
     return os.path.isfile(os.path.join(self.build_root, relpath))
 
+  def islink(self, relpath):
+    return os.path.islink(os.path.join(self.build_root, relpath))
+
   def exists(self, relpath):
     return os.path.exists(os.path.join(self.build_root, relpath))
 

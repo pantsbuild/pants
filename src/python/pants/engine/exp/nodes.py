@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 from abc import abstractmethod, abstractproperty
 
 from pants.build_graph.address import Address
@@ -393,10 +392,6 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
 
   def step(self, dependency_states, step_context):
     try:
-      # TODO: https://github.com/pantsbuild/pants/issues/3121
-      assert not os.path.islink(self.subject.path), (
-          'cannot perform native filesystem operations on symlink!: {}'.format(self.subject.path))
-
       if self.product is Paths:
         return Return(path_exists(step_context.project_tree, self.subject))
       elif self.product is FileContent:

@@ -40,6 +40,9 @@ class ScmProjectTree(ProjectTree):
   def isfile(self, relpath):
     return self._reader.isfile(self._scm_relpath(relpath))
 
+  def islink(self, relpath):
+    return self._reader.islink(self._scm_relpath(relpath))
+
   def exists(self, relpath):
     return self._reader.exists(self._scm_relpath(relpath))
 

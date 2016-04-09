@@ -369,6 +369,10 @@ class GitRepositoryReader(object):
       return path.endswith('/')
     return False
 
+  def islink(self, relpath):
+    path = self._safe_realpath(relpath)
+    raise ValueError('Not implemented for {}!'.format(path))
+
   class Symlink(object):
 
     def __init__(self, name, sha):

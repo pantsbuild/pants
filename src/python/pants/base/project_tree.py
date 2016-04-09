@@ -45,6 +45,10 @@ class ProjectTree(AbstractClass):
     """Returns True if path is a file"""
 
   @abstractmethod
+  def islink(self, relpath):
+    """Returns True if path is a link"""
+
+  @abstractmethod
   def exists(self, relpath):
     """Returns True if path exists"""
 
