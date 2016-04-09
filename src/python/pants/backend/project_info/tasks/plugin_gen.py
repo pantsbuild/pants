@@ -196,26 +196,26 @@ class PluginGen(IdeGen):
     if java_language_level is not None:
       java_language_level = 'JDK_{0}_{1}'.format(*java_language_level.components[:2])
 
-    configured_module = TemplateData(
-      root_dir=get_buildroot(),
-      path=self.module_filename,
-      content_roots=content_roots,
-      bash=self.bash,
-      python=project.has_python,
-      scala=scala,
-      internal_jars=[cp_entry.jar for cp_entry in project.internal_jars],
-      internal_source_jars=[cp_entry.source_jar for cp_entry in project.internal_jars
-                            if cp_entry.source_jar],
-      external_jars=[cp_entry.jar for cp_entry in project.external_jars],
-      external_javadoc_jars=[cp_entry.javadoc_jar for cp_entry in project.external_jars
-                             if cp_entry.javadoc_jar],
-      external_source_jars=[cp_entry.source_jar for cp_entry in project.external_jars
-                            if cp_entry.source_jar],
-      annotation_processing=self.annotation_processing_template,
-      extra_components=[],
-      exclude_folders=exclude_folders,
-      java_language_level=java_language_level,
-    )
+    # configured_module = TemplateData(
+    #   root_dir=get_buildroot(),
+    #   path=self.module_filename,
+    #   content_roots=content_roots,
+    #   bash=self.bash,
+    #   python=project.has_python,
+    #   scala=scala,
+    #   internal_jars=[cp_entry.jar for cp_entry in project.internal_jars],
+    #   internal_source_jars=[cp_entry.source_jar for cp_entry in project.internal_jars
+    #                         if cp_entry.source_jar],
+    #   external_jars=[cp_entry.jar for cp_entry in project.external_jars],
+    #   external_javadoc_jars=[cp_entry.javadoc_jar for cp_entry in project.external_jars
+    #                          if cp_entry.javadoc_jar],
+    #   external_source_jars=[cp_entry.source_jar for cp_entry in project.external_jars
+    #                         if cp_entry.source_jar],
+    #   annotation_processing=self.annotation_processing_template,
+    #   extra_components=[],
+    #   exclude_folders=exclude_folders,
+    #   java_language_level=java_language_level,
+    # )
 
     outdir = os.path.abspath(self.intellij_output_dir)
     if not os.path.exists(outdir):
@@ -226,7 +226,7 @@ class PluginGen(IdeGen):
       root_dir=get_buildroot(),
       outdir=outdir,
       git_root=scm.worktree,
-      modules=[configured_module],
+      # modules=[configured_module],
       java=TemplateData(
         encoding=self.java_encoding,
         maximum_heap_size=self.java_maximum_heap_size,
@@ -235,52 +235,33 @@ class PluginGen(IdeGen):
       ),
       resource_extensions=list(project.resource_extensions),
       scala=scala,
-      checkstyle_classpath=';'.join(project.checkstyle_classpath),
+      # checkstyle_classpath=';'.join(project.checkstyle_classpath),
       debug_port=project.debug_port,
       annotation_processing=self.annotation_processing_template,
       extra_components=[],
+      java_language_level=java_language_level,
     )
 
     configured_workspace = TemplateData(
-      targets=[os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
+      targets=[os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs],
+      project_path=os.path.join(get_buildroot(), self.context.options.target_specs.__iter__().next().split(':')[0])
     )
 
-    existing_project_components = None
-    existing_module_components = None
-    existing_workspace_components = None
-    if not self.nomerge:
-      # Grab the existing components, which may include customized ones.
-      existing_project_components = self._parse_xml_component_elements(self.project_filename)
-      existing_module_components = self._parse_xml_component_elements(self.module_filename)
-      existing_workspace_components = self._parse_xml_component_elements(self.workspace_filename)
+    # Grab the existing components, which may include customized ones.
+    existing_project_components = self._parse_xml_component_elements(self.project_filename)
+    # existing_module_components = self._parse_xml_component_elements(self.module_filename)
+    existing_workspace_components = self._parse_xml_component_elements(self.workspace_filename)
 
     # Generate (without merging in any extra components).
     safe_mkdir(os.path.abspath(self.intellij_output_dir))
 
     ipr = self._generate_to_tempfile(
         Generator(pkgutil.get_data(__name__, self.project_template), project=configured_project))
-    iml = self._generate_to_tempfile(
-        Generator(pkgutil.get_data(__name__, self.module_template), module=configured_module))
+    # iml = self._generate_to_tempfile(
+    #     Generator(pkgutil.get_data(__name__, self.module_template), module=configured_module))
     iws = self._generate_to_tempfile(
         Generator(pkgutil.get_data(__name__, self.workspace_template), workspace=configured_workspace))
 
-    if not self.nomerge:
-      # Get the names of the components we generated, and then delete the
-      # generated files.  Clunky, but performance is not an issue, and this
-      # is an easy way to get those component names from the templates.
-      extra_project_components = self._get_components_to_merge(existing_project_components, ipr)
-      extra_module_components = self._get_components_to_merge(existing_module_components, iml)
-      extra_workspace_components = self._get_components_to_merge(existing_workspace_components, iws)
-      os.remove(ipr)
-      os.remove(iml)
-
-      # Generate again, with the extra components.
-      ipr = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.project_template),
-          project=configured_project.extend(extra_components=extra_project_components)))
-      # iml = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.module_template),
-      #     module=configured_module.extend(extra_components=extra_module_components)))
-      # iws = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.workspace_template),
-      #     workspace=configured_module.extend(extra_components=extra_workspace_components)))
 
     self.context.log.info('Generated IntelliJ project in {directory}'
                            .format(directory=self.gen_project_workdir))
@@ -288,7 +269,8 @@ class PluginGen(IdeGen):
     shutil.move(ipr, self.project_filename)
     # shutil.move(iml, self.module_filename)
     shutil.move(iws, self.workspace_filename)
-    return None
+    return self.project_filename
+    # return None
 
   def _generate_to_tempfile(self, generator):
     """Applies the specified generator to a temp file and returns the path to that file.
