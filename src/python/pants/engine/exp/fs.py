@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import errno
 import fnmatch
+from abc import abstractproperty
 from os import sep as os_sep
 from os.path import join, normpath
 
@@ -18,8 +19,28 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Path(datatype('Path', ['path'])):
-  """A filesystem path, relative to the ProjectTree's buildroot."""
+class Path(AbstractClass):
+  """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
+
+  Note that in order to preserve these invariants, end-user functions should never directly
+  instantiate Path instances.
+  """
+
+  @abstractproperty
+  def path(self):
+    """:returns: The string path for this Path."""
+
+
+class File(datatype('File', ['path']), Path):
+  """A file."""
+
+
+class Dir(datatype('Dir', ['path']), Path):
+  """A directory."""
+
+
+class Link(datatype('Link', ['path']), Path):
+  """A symbolic link."""
 
 
 class Paths(datatype('Paths', ['dependencies'])):
@@ -205,9 +226,9 @@ def list_directory(project_tree, directory):
     _, subdirs, subfiles = next(project_tree.walk(directory.path))
     return DirectoryListing(directory,
                             True,
-                            [Path(join(directory.path, subdir)) for subdir in subdirs
+                            [Dir(join(directory.path, subdir)) for subdir in subdirs
                              if not subdir.startswith('.')],
-                            [Path(join(directory.path, subfile)) for subfile in subfiles])
+                            [File(join(directory.path, subfile)) for subfile in subfiles])
   except (IOError, OSError) as e:
     if e.errno == errno.ENOENT:
       return DirectoryListing(directory, False, [], [])
@@ -252,13 +273,14 @@ def filter_dir_listing(directory_listing, path_dir_wildcard):
                          for remainder in path_dir_wildcard.remainders))
 
 
+# TODO: rename to `stat`
 def path_exists(project_tree, path_literal):
   path = path_literal.path
   if path.endswith(os_sep):
-    exists = project_tree.isdir(path)
+    entry = Dir(path) if project_tree.isdir(path) else None
   else:
-    exists = project_tree.isfile(path)
-  return Paths((Path(path),) if exists else ())
+    entry = File(path) if project_tree.isfile(path) else None
+  return Paths((entry,) if entry is not None else ())
 
 
 def files_content(file_contents):
@@ -283,18 +305,18 @@ def create_fs_tasks():
   """Creates tasks that consume the native filesystem Node type."""
   return [
     (RecursiveSubDirectories,
-     [Select(Path),
+     [Select(Dir),
       SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
      recursive_subdirectories),
     (Paths,
      [SelectDependencies(Paths, PathGlobs)],
      merge_paths),
     (Paths,
-     [SelectProjection(DirectoryListing, Path, ('directory',), PathWildcard),
+     [SelectProjection(DirectoryListing, Dir, ('directory',), PathWildcard),
       Select(PathWildcard)],
      filter_file_listing),
     (PathGlobs,
-     [SelectProjection(DirectoryListing, Path, ('directory',), PathDirWildcard),
+     [SelectProjection(DirectoryListing, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
      filter_dir_listing),
     (FilesContent,

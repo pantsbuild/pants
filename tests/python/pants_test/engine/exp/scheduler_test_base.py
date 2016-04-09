@@ -45,7 +45,7 @@ class SchedulerTestBase(object):
     self.addCleanup(safe_rmtree, work_dir)
     build_root = os.path.join(work_dir, 'build_root')
     if build_root_src is not None:
-      shutil.copytree(build_root_src, build_root)
+      shutil.copytree(build_root_src, build_root, symlinks=True)
     else:
       os.mkdir(build_root)
 

@@ -13,7 +13,7 @@ import six
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.fs import DirectoryListing, FilesContent, Path, Paths, RecursiveSubDirectories
+from pants.engine.exp.fs import Dir, DirectoryListing, FilesContent, Paths, RecursiveSubDirectories
 from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -31,7 +31,7 @@ def _key_func(entry):
 
 
 class BuildFilePaths(datatype('BuildFilePaths', ['paths'])):
-  """A list of Paths that are known to match a BUILD file pattern.
+  """A list of Files that are known to match a BUILD file pattern.
 
   TODO: Because BUILD file names are matched using a regex, this cannot currently use PathGlobs.
   If we were willing to allow a bit of slop in terms of files read, this could use
@@ -230,14 +230,14 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
       SelectDependencies(Struct, UnhydratedStruct)],
      hydrate_struct),
     (UnhydratedStruct,
-     [SelectProjection(AddressFamily, Path, ('spec_path',), Address),
+     [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
       Select(Address)],
      resolve_unhydrated_struct),
   ] + [
     # BUILD file parsing.
     (AddressFamily,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(Path),
+      Select(Dir),
       SelectProjection(FilesContent, Paths, ('paths',), BuildFilePaths)],
      parse_address_family),
     (BuildFilePaths,
@@ -254,11 +254,11 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   ] + [
     # Spec handling.
     (Addresses,
-     [SelectProjection(AddressFamily, Path, ('directory',), SingleAddress),
+     [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
       Select(SingleAddress)],
      address_from_address_family),
     (Addresses,
-     [SelectProjection(AddressFamily, Path, ('directory',), SiblingAddresses)],
+     [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
      addresses_from_address_family),
     (Addresses,
      [SelectDependencies(AddressFamily, RecursiveSubDirectories)],
@@ -267,6 +267,6 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # SelectDependencies clause: we launch the recursion by requesting RecursiveSubDirectories
     # for a Directory projected from DescendantAddresses.
     (RecursiveSubDirectories,
-     [SelectProjection(RecursiveSubDirectories, Path, ('directory',), DescendantAddresses)],
+     [SelectProjection(RecursiveSubDirectories, Dir, ('directory',), DescendantAddresses)],
      identity),
   ]

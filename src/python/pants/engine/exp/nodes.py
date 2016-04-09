@@ -9,7 +9,7 @@ from abc import abstractmethod, abstractproperty
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
-from pants.engine.exp.fs import (DirectoryListing, FileContent, Path, PathLiteral, Paths,
+from pants.engine.exp.fs import (Dir, DirectoryListing, File, FileContent, PathLiteral, Paths,
                                  file_content, list_directory, path_exists)
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.meta import AbstractClass
@@ -366,8 +366,8 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
 
   _FS_PRODUCT_TYPES = {
       Paths: PathLiteral,
-      FileContent: Path,
-      DirectoryListing: Path,
+      FileContent: File,
+      DirectoryListing: Dir,
     }
 
   @classmethod
