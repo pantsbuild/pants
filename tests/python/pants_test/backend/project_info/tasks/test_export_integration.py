@@ -229,7 +229,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEquals('java7', json_data['targets'][test_target]['platform'])
       self.assertEquals('java8', json_data['targets'][test_target]['test_platform'])
 
-
   def test_intellij_integration(self):
     with self.temporary_workdir() as workdir:
       exported_file = os.path.join(workdir, "export_file.json")
