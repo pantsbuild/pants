@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 from collections import defaultdict
-from itertools import chain
 
 import six
 from pex.pex_info import PexInfo
@@ -284,7 +283,17 @@ class ExportTask(IvyTaskMixin, PythonTask):
     if jvm_distributions:
       graph_info['jvm_distributions'] = jvm_distributions
 
-    platform_versions = set(chain())
+    platform_versions = set()
+    for _, platform in JvmPlatform.global_instance().platforms_by_name.items():
+      platform_versions.add(platform.source_level)
+      platform_versions.add(platform.target_level)
+    if platform_versions:
+      graph_info['jvm_distributions_by_platform'] = {}
+      for version in platform_versions:
+        dist = DistributionLocator.cached(minimum_version=version)
+        if dist:
+          graph_info['jvm_distributions_by_platform'][str(version)] = dist.home
+
     if classpath_products:
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
 
