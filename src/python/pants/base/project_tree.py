@@ -10,6 +10,7 @@ import os
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,10 @@ class ProjectTree(AbstractClass):
     """Returns a list of paths in path that match glob"""
 
   @abstractmethod
+  def listdir(self, relpath):
+    """Return the names of paths in the given directory."""
+
+  @abstractmethod
   def walk(self, relpath, topdown=True):
     """Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path."""
 
@@ -45,13 +50,25 @@ class ProjectTree(AbstractClass):
     """Returns True if path is a file"""
 
   @abstractmethod
-  def islink(self, relpath):
-    """Returns True if path is a link"""
-
-  @abstractmethod
   def exists(self, relpath):
     """Returns True if path exists"""
 
   @abstractmethod
+  def lstat(self, relpath):
+    """Without following symlinks, returns a PTStat object for the path, or None"""
+
+  @abstractmethod
   def content(self, file_relpath):
     """Returns the content for file at path."""
+
+
+class PTStat(datatype('PTStat', ['ftype'])):
+  """A simple 'Stat' facade that can be implemented uniformly across SCM and posix backends.
+
+  :param ftype: Either 'file', 'dir', or 'link'.
+  """
+
+
+PTSTAT_FILE = PTStat('file')
+PTSTAT_DIR  = PTStat('dir')
+PTSTAT_LINK = PTStat('link')

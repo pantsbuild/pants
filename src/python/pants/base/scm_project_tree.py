@@ -9,7 +9,7 @@ import fnmatch
 import logging
 import os
 
-from pants.base.project_tree import ProjectTree
+from pants.base.project_tree import ProjectTree, PTStat
 
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,24 @@ class ScmProjectTree(ProjectTree):
   def isfile(self, relpath):
     return self._reader.isfile(self._scm_relpath(relpath))
 
-  def islink(self, relpath):
-    return self._reader.islink(self._scm_relpath(relpath))
-
   def exists(self, relpath):
     return self._reader.exists(self._scm_relpath(relpath))
+
+  def lstat(self, relpath):
+    mode = type(self._reader.lstat(self._scm_relpath(relpath)))
+    if mode == NoneType:
+      return None
+    elif mode == self._reader.Symlink:
+      return PTStat.LINK
+    elif mode == self._reader.Dir:
+      return PTStat.DIR
+    elif mode == self._reader.File:
+      return PTStat.FILE
+    else:
+      raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
+
+  def listdir(self, relpath):
+    return self._reader.listdir(self._scm_relpath(relpath))
 
   def walk(self, relpath, topdown=True):
     for path, dirnames, filenames in self._do_walk(self._scm_relpath(relpath), topdown=topdown):

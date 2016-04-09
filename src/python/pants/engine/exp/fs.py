@@ -219,9 +219,6 @@ def list_directory(project_tree, directory):
 
   Raises an exception if the path does not exist, or is not a directory.
   """
-  if project_tree.islink(directory.path):
-    # TODO: https://github.com/pantsbuild/pants/issues/3121
-    raise ValueError('list_directory unsupported for symlinks!: {}'.format(directory.path))
   try:
     _, subdirs, subfiles = next(project_tree.walk(directory.path))
     return DirectoryListing(directory,
@@ -273,7 +270,6 @@ def filter_dir_listing(directory_listing, path_dir_wildcard):
                          for remainder in path_dir_wildcard.remainders))
 
 
-# TODO: rename to `stat`
 def path_exists(project_tree, path_literal):
   path = path_literal.path
   if path.endswith(os_sep):
@@ -289,9 +285,6 @@ def files_content(file_contents):
 
 
 def file_content(project_tree, path):
-  if project_tree.islink(path.path):
-    # TODO: https://github.com/pantsbuild/pants/issues/3121
-    raise ValueError('file_content unsupported for symlinks!: {}'.format(path.path))
   try:
     return FileContent(path.path, project_tree.content(path.path))
   except (IOError, OSError) as e:

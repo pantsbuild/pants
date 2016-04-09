@@ -382,9 +382,9 @@ class GitRepositoryReader(object):
       return path.endswith('/')
     return False
 
-  def islink(self, relpath):
+  def lstat(self, relpath):
     obj, _ = self._safe_resolve_object(relpath)
-    return isinstance(obj, self.Symlink)
+    return obj
 
   class Symlink(object):
 
