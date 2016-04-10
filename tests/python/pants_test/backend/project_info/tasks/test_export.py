@@ -23,9 +23,12 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.java.distribution.distribution import Distribution, DistributionLocator
+from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
 from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
@@ -390,3 +393,10 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources']['is_synthetic'])
     # But not the origin target
     self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
+
+  def test_jvm_distributions_by_platform(self):
+    with temporary_dir() as jdk_home:
+      dist = Distribution(home_path=jdk_home)
+      DistributionLocator._CACHE[(Revision(1, 6), Revision(1, 6, 9999), False)] = dist
+      result = self.execute_export_json()
+      self.assertEqual(jdk_home, result['jvm_distributions_by_platform']['1.6'])

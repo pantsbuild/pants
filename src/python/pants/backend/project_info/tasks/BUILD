@@ -93,6 +93,7 @@ python_library(
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:revision',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',

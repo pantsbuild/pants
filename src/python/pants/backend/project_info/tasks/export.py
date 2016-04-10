@@ -26,6 +26,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -283,17 +284,18 @@ class ExportTask(IvyTaskMixin, PythonTask):
     if jvm_distributions:
       graph_info['jvm_distributions'] = jvm_distributions
 
-    platform_versions = set()
+    platform_levels = set()
     for _, platform in JvmPlatform.global_instance().platforms_by_name.items():
-      platform_versions.add(platform.source_level)
-      platform_versions.add(platform.target_level)
-    if platform_versions:
+      platform_levels.add(platform.source_level)
+      platform_levels.add(platform.target_level)
+    if platform_levels:
       graph_info['jvm_distributions_by_platform'] = {}
-      for version in platform_versions:
+      for level in platform_levels:
         try:
-          dist = DistributionLocator.cached(minimum_version=version)
+          dist = DistributionLocator.cached(minimum_version=level,
+                                            maximum_version=Revision.lenient(str(level) + '.9999'))
           if dist:
-            graph_info['jvm_distributions_by_platform'][str(version)] = dist.home
+            graph_info['jvm_distributions_by_platform'][str(level)] = dist.home
         except DistributionLocator.Error:
           pass
 
