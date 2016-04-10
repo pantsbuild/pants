@@ -16,7 +16,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
     ohi = OptionHelpInfo(registering_class=type(None), display_args=['--foo'],
                          scoped_cmd_line_args=['--foo'], unscoped_cmd_line_args=['--foo'],
                          typ=bool, fromfile=False, default=None, help='help for foo',
-                         deprecated_version=None, deprecated_message=None, deprecated_hint=None,
+                         deprecated_message=None, removal_version=None, removal_hint=None,
                          choices=None)
     ohi = ohi._replace(**kwargs)
     lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
