@@ -13,38 +13,55 @@ from os.path import join, normpath
 
 from twitter.common.collections.orderedset import OrderedSet
 
+from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Path(AbstractClass):
+class Path(datatype('Path', ['path'])):
+  """An existing filesystem path with an unknown type, relative to the ProjectTree's buildroot."""
+
+
+class Stat(AbstractClass):
   """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
 
   Note that in order to preserve these invariants, end-user functions should never directly
-  instantiate Path instances.
+  instantiate Stat instances.
   """
 
   @abstractproperty
   def path(self):
-    """:returns: The string path for this Path."""
+    """:returns: The string path for this Stat."""
 
 
-class File(datatype('File', ['path']), Path):
+class File(datatype('File', ['path']), Stat):
   """A file."""
 
 
-class Dir(datatype('Dir', ['path']), Path):
+class Dir(datatype('Dir', ['path']), Stat):
   """A directory."""
 
 
-class Link(datatype('Link', ['path']), Path):
+class Link(datatype('Link', ['path']), Stat):
   """A symbolic link."""
 
 
 class Paths(datatype('Paths', ['dependencies'])):
   """A set of Path objects."""
+
+
+class Stats(datatype('Stats', ['dependencies'])):
+  """A set of Stat objects."""
+
+
+class Files(datatype('Files', ['dependencies'])):
+  """A set of File objects."""
+
+
+class Dirs(datatype('Dirs', ['dependencies'])):
+  """A set of Dir objects."""
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -202,30 +219,25 @@ class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 
   """A list of Path objects for recursive subdirectories of the given directory."""
 
 
-class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'directories', 'files'])):
-  """Lists of file and directory Paths objects.
+class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'paths'])):
+  """A list of entry names representing a directory listing.
 
-  If exists=False, then both the directories and files lists will be empty.
+  If exists=False, then the entries list will be empty.
   """
 
 
 def list_directory(project_tree, directory):
   """List Paths directly below the given path, relative to the ProjectTree.
 
-  Returns a DirectoryListing containing directory and file paths relative to the ProjectTree.
+  Raises an exception if the path is not a directory.
 
-  Currently ignores `.`-prefixed subdirectories, but should likely use `--ignore-patterns`.
-    TODO: See https://github.com/pantsbuild/pants/issues/2956
-
-  Raises an exception if the path does not exist, or is not a directory.
+  :returns: A DirectoryListing.
   """
   try:
-    _, subdirs, subfiles = next(project_tree.walk(directory.path))
+    path = directory.path
     return DirectoryListing(directory,
                             True,
-                            [Dir(join(directory.path, subdir)) for subdir in subdirs
-                             if not subdir.startswith('.')],
-                            [File(join(directory.path, subfile)) for subfile in subfiles])
+                            [Path(join(path, e)) for e in project_tree.listdir(path)])
   except (IOError, OSError) as e:
     if e.errno == errno.ENOENT:
       return DirectoryListing(directory, False, [], [])
@@ -239,44 +251,60 @@ def recursive_subdirectories(directory, subdirectories_list):
   return RecursiveSubDirectories(directory, directories)
 
 
-def merge_paths(paths_list):
+def merge_stats(stats_list):
   generated = set()
   def generate():
-    for paths in paths_list:
-      for path in paths.dependencies:
-        if path in generated:
-          continue
-        generated.add(path)
-        yield path
-  return Paths(tuple(generate()))
+    for stats in stats_list:
+      for stat in stats.dependencies:
+        if stat.path in generated:
+          # TODO: remove this validation... unclear how it would happen.
+          raise ValueError('Duplicate path in {}'.format(stats_list))
+        generated.add(stat.path)
+        yield stat
+  return Stats(tuple(generate()))
 
 
-def filter_file_listing(directory_listing, path_wildcard):
-  paths = tuple(f for f in directory_listing.files
-                if fnmatch.fnmatch(f.path, path_wildcard.wildcard))
-  return Paths(paths)
+def stats_to_paths(stats):
+  return Paths(tuple(Path(stat.path) for stat in stats.dependencies))
 
 
-def filter_dir_listing(directory_listing, path_dir_wildcard):
+def apply_path_wildcard(stats, path_wildcard):
+  """Filter the given Stats object using the given PathWildcard."""
+  ftype = Dir if path_wildcard.wildcard.endswith(os_sep) else File
+  filtered = tuple(stat for stat in stats.dependencies
+                   if type(stat) == ftype and
+                   fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
+  return Stats(filtered)
+
+
+def apply_path_dir_wildcard(stats, path_dir_wildcard):
   """Given a PathDirWildcard, compute a PathGlobs object that encompasses its children.
 
   The resulting PathGlobs object will be simplified relative to this wildcard, in the sense
   that it will be relative to a subdirectory.
   """
-  paths = [f.path for f in directory_listing.directories
-           if fnmatch.fnmatch(f.path, path_dir_wildcard.wildcard)]
+  paths = [stat.path for stat in stats.dependencies
+           if type(stat) == Dir and
+           fnmatch.fnmatch(stat.path, path_dir_wildcard.wildcard)]
   return PathGlobs(tuple(PathGlob.create_from_spec(p, remainder)
                          for p in paths
                          for remainder in path_dir_wildcard.remainders))
 
 
-def path_exists(project_tree, path_literal):
+def path_stat(project_tree, path_literal):
   path = path_literal.path
-  if path.endswith(os_sep):
-    entry = Dir(path) if project_tree.isdir(path) else None
+  ptstat = project_tree.lstat(path)
+  if ptstat == None:
+    return Stats(tuple())
+
+  if ptstat == PTSTAT_FILE:
+    return Stats((File(path),))
+  elif ptstat == PTSTAT_DIR:
+    return Stats((Dir(path),))
+  elif ptstat == PTSTAT_LINK:
+    return Stats((Link(path),))
   else:
-    entry = File(path) if project_tree.isfile(path) else None
-  return Paths((entry,) if entry is not None else ())
+    raise ValueError('Unrecognized stat type for {}, {}: {}'.format(project_tree, path, ptstat))
 
 
 def files_content(file_contents):
@@ -301,18 +329,28 @@ def create_fs_tasks():
      [Select(Dir),
       SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
      recursive_subdirectories),
-    (Paths,
-     [SelectDependencies(Paths, PathGlobs)],
-     merge_paths),
-    (Paths,
-     [SelectProjection(DirectoryListing, Dir, ('directory',), PathWildcard),
+    (Stats,
+     [SelectProjection(Stats, Dir, ('directory',), PathWildcard),
       Select(PathWildcard)],
-     filter_file_listing),
+     apply_path_wildcard),
     (PathGlobs,
-     [SelectProjection(DirectoryListing, Dir, ('directory',), PathDirWildcard),
+     [SelectProjection(Stats, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
-     filter_dir_listing),
+     apply_path_dir_wildcard),
+    (Paths,
+     [Select(Stats)],
+     stats_to_paths),
+  ] + [
+    # TODO: These tasks are boilerplatey: they do half aggregation / half conversion. The
+    # aggregation bit should become native:
+    #  see https://github.com/pantsbuild/pants/issues/3169
+    (Stats,
+     [SelectDependencies(Stats, PathGlobs)],
+     merge_stats),
+    (Stats,
+     [SelectDependencies(Stats, DirectoryListing, field='paths')],
+     merge_stats),
     (FilesContent,
-     [SelectDependencies(FileContent, Paths)],
+     [SelectDependencies(FileContent, Files)],
      files_content),
   ]

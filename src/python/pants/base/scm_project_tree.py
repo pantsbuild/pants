@@ -9,7 +9,7 @@ import fnmatch
 import logging
 import os
 
-from pants.base.project_tree import ProjectTree, PTStat
+from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
 
 
 logger = logging.getLogger(__name__)
@@ -48,11 +48,11 @@ class ScmProjectTree(ProjectTree):
     if mode == NoneType:
       return None
     elif mode == self._reader.Symlink:
-      return PTStat.LINK
+      return PTSTAT_LINK
     elif mode == self._reader.Dir:
-      return PTStat.DIR
+      return PTSTAT_DIR
     elif mode == self._reader.File:
-      return PTStat.FILE
+      return PTSTAT_FILE
     else:
       raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 

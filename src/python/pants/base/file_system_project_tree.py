@@ -10,7 +10,7 @@ import os
 import stat
 from glob import glob1
 
-from pants.base.project_tree import ProjectTree, PTStat
+from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
 from pants.util.dirutil import fast_relpath, safe_walk
 
 
@@ -33,13 +33,13 @@ class FileSystemProjectTree(ProjectTree):
 
   def lstat(self, relpath):
     try:
-      mode = os.lstat(os.path.join(self.build_root, relpath)).mode
+      mode = os.lstat(os.path.join(self.build_root, relpath)).st_mode
       if stat.S_ISLNK(mode):
-        return PTStat.LINK
+        return PTSTAT_LINK
       elif stat.S_ISDIR(mode):
-        return PTStat.DIR
+        return PTSTAT_DIR
       elif stat.S_ISREG(mode):
-        return PTStat.FILE
+        return PTSTAT_FILE
       else:
         raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
     except (IOError, OSError) as e:

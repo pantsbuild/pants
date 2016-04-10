@@ -15,6 +15,7 @@ from pants.engine.exp.nodes import Return
 from pants.engine.exp.parser import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
+from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 
 
@@ -67,5 +68,7 @@ class SchedulerTestBase(object):
     request = self.execute_request(scheduler, storage, product, *subjects)
     states = scheduler.root_entries(request).values()
     if any(type(state) is not Return for state in states):
-      raise ValueError('At least one request failed: {}'.format(states))
+      with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
+        scheduler.visualize_graph_to_file(request.roots, dot_file)
+        raise ValueError('At least one request failed: {}. Visualized as {}'.format(states, dot_file))
     return list(state.value for state in states)
