@@ -296,11 +296,11 @@ class Parser(object):
       t = kwargs.get(kwarg_name)
       # First check for deprecated direct use of the internal types.
       if t == list_option:
-        deprecated_conditional(lambda: True, '0.0.81',
+        deprecated_conditional(lambda: True, '0.0.83',
                                'list_option is deprecated for option {} in scope {}. '
                                'Use type=list.'.format(args[0], self.scope))
       elif t == dict_option:
-        deprecated_conditional(lambda: True, '0.0.81',
+        deprecated_conditional(lambda: True, '0.0.83',
                                'dict_option is deprecated for option {} in scope {}. '
                                'Use type=dict.'.format(args[0], self.scope))
 
@@ -316,7 +316,7 @@ class Parser(object):
         kwargs['member_type'] = kwargs['type']
       kwargs['type'] = list
       del kwargs['action']
-      deprecated_conditional(lambda: True, '0.0.81',
+      deprecated_conditional(lambda: True, '0.0.83',
                              "action='append' is deprecated for option {} in scope {}. "
                              "Use type=list.".format(args[0], self.scope))
 
@@ -326,7 +326,7 @@ class Parser(object):
     if kwargs.get('type') == target_list_option:
       kwargs['type'] = list
       kwargs['member_type'] = target_option
-      deprecated_conditional(lambda: True, '0.0.81',
+      deprecated_conditional(lambda: True, '0.0.83',
                              'target_list_option is deprecated for option {} in scope {}. '
                              'Use type=list, member_type=target_option.'.format(
                                args[0], self.scope

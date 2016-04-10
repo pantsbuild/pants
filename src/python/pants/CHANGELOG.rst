@@ -1,6 +1,103 @@
 RELEASE HISTORY
 ===============
 
+0.0.81 (04/10/2016)
+-------------------
+
+This release is primarily minor internal and engine improvements.
+
+* The pants workspace lock has been renamed.  If you've been having
+  issues with deadlocks after switching back and forth between old
+  and new versions of pants, this release should fix that and
+  remain backward compatible.
+* Because of the lock rename, ensure that ``.pants.workdir.file_lock``
+  and ``.pants.workdir.file_lock.lock_message`` are ignored by your SCM
+  (e.g. in ``.gitignore``).
+* The junit option --suppress-output has been removed following
+  a deprecation cycle.  Use --output-mode instead.
+* Several internal ivy utility methods have been removed following
+  a deprecation cycle.
+
+API Changes
+~~~~~~~~~~~
+
+* Add Public API markers for ivy and java APIs
+  `RB #3655 <https://rbcommons.com/s/twitter/r/3655>`_
+
+* Set public API markers for codegen
+  `RB #3648 <https://rbcommons.com/s/twitter/r/3648>`_
+
+Bugfixes
+~~~~~~~~
+
+* [CI] Skip hanging engine test.
+  `RB #3653 <https://rbcommons.com/s/twitter/r/3653>`_
+
+* Fix #3132: `./pants changed` doesn't fail on changed invalid `BUILD` files
+  `RB #3646 <https://rbcommons.com/s/twitter/r/3646>`_
+
+New Features
+~~~~~~~~~~~~
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove ivy utils deprecated methods and update test
+  `RB #3675 <https://rbcommons.com/s/twitter/r/3675>`_
+
+* Scrub some old migration code.
+  `RB #3672 <https://rbcommons.com/s/twitter/r/3672>`_
+
+* Rename the global lock from pants.run to pants.workdir.file_lock
+  `RB #3633 <https://rbcommons.com/s/twitter/r/3633>`_
+  `RB #3668 <https://rbcommons.com/s/twitter/r/3668>`_
+
+* Deprecate action='store_true'/'store_false' options.
+  `RB #3667 <https://rbcommons.com/s/twitter/r/3667>`_
+
+* Give a hint on how to disable the Invalid config entries detected message
+  `RB #3642 <https://rbcommons.com/s/twitter/r/3642>`_
+
+* Mark an integration test as such.
+  `RB #3659 <https://rbcommons.com/s/twitter/r/3659>`_
+
+* Replace all action='store_true' options with type=bool.
+  `RB #3661 <https://rbcommons.com/s/twitter/r/3661>`_
+
+* minor: fix bundle deployjar help
+  `RB #3133 <https://rbcommons.com/s/twitter/r/3133>`_
+  `RB #3663 <https://rbcommons.com/s/twitter/r/3663>`_
+
+* pythonstyle: Fix suppression support; improve SyntaxError reporting; Only report each nit once
+  `RB #3647 <https://rbcommons.com/s/twitter/r/3647>`_
+
+* Import zincutils
+  `RB #3657 <https://rbcommons.com/s/twitter/r/3657>`_
+
+* Squelch message from scm
+  `RB #3645 <https://rbcommons.com/s/twitter/r/3645>`_
+
+* Skip generating reports for empty resolves
+  `RB #3625 <https://rbcommons.com/s/twitter/r/3625>`_
+
+* Export manifest jar for external junit run
+  `RB #3626 <https://rbcommons.com/s/twitter/r/3626>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] bug fix: ensure we catch all exceptions in subprocess
+  `Issue #3149 <https://github.com/pantsbuild/pants/issues/3149>`_
+  `Issue #3149 <https://github.com/pantsbuild/pants/issues/3149>`_
+  `RB #3656 <https://rbcommons.com/s/twitter/r/3656>`_
+
+* [engine] Move the visualizer into LocalScheduler.
+  `RB #3649 <https://rbcommons.com/s/twitter/r/3649>`_
+
+* [pantsd] Repair watchman startup flakiness.
+  `RB #3644 <https://rbcommons.com/s/twitter/r/3644>`_
+
 0.0.80 (04/01/2016)
 -------------------
 
