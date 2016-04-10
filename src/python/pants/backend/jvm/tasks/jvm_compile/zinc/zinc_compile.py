@@ -84,16 +84,22 @@ class BaseZincCompile(JvmCompile):
     return (AnnotationProcessor, ScalacPlugin)
 
   @classmethod
+  def get_jvm_options_default(cls, bootstrap_option_values):
+    return ('-Duser.timezone=UTC', '-Dfile.encoding=UTF-8', '-Dzinc.analysis.cache.limit=1000',
+            '-Djava.awt.headless=true', '-Xmx2g')
+
+  @classmethod
   def get_args_default(cls, bootstrap_option_values):
-    return ('-S-encoding', '-SUTF-8', '-S-g:vars')
+    return ('-C-encoding', '-CUTF-8', '-S-encoding', '-SUTF-8', '-S-g:vars')
 
   @classmethod
   def get_warning_args_default(cls):
-    return ('-S-deprecation', '-S-unchecked')
+    return ('-C-deprecation', '-C-Xlint:all', '-C-Xlint:-serial', '-C-Xlint:-path',
+            '-S-deprecation', '-S-unchecked', '-S-Xlint')
 
   @classmethod
   def get_no_warning_args_default(cls):
-    return ('-S-nowarn',)
+    return ('-C-nowarn', '-C-Xlint:none', '-S-nowarn', '-S-Xlint:none', )
 
   @classmethod
   def get_fatal_warnings_enabled_args_default(cls):
@@ -199,7 +205,8 @@ class BaseZincCompile(JvmCompile):
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
     # Validate zinc options.
-    ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
+    ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
+                                   self._args)
     # A directory independent of any other classpath which can contain per-target
     # plugin resource files.
     self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
