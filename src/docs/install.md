@@ -51,7 +51,7 @@ version of pants you just installed:
 Then add an entry like so to pants.ini with that version:
 
       :::ini
-      [DEFAULT]
+      [GLOBAL]
       pants_version: 0.0.42
 
 When you'd like to upgrade pants, just edit the version in pants.ini and pants will self-update on
@@ -63,7 +63,7 @@ If you use pants plugins published to pypi you can configure them by adding a `p
 follows:
 
       :::ini
-      [DEFAULT]
+      [GLOBAL]
       pants_version: 0.0.42
 
       plugins: [
