@@ -141,7 +141,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
-             default=['.*'],
+             default=['.*', '/dist', 'bower_components', 'node_modules', '*.egg-info'],
              help='Patterns for ignoring files when reading BUILD files. '
                   'Use to ignore unneeded directories or BUILD files. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')

@@ -92,7 +92,8 @@ class JvmCompile(NailgunTaskBase):
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
-    register('--jvm-options', advanced=True, type=list, default=[],
+    register('--jvm-options', advanced=True, type=list,
+             default=list(cls.get_jvm_options_default(register.bootstrap)),
              help='Run the compiler with these JVM options.')
 
     register('--args', advanced=True, type=list,
