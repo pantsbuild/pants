@@ -9,13 +9,13 @@ import os
 import pkgutil
 import shutil
 import tempfile
-from xml.dom import minidom
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.project_info.tasks.ide_gen import IdeGen, Project
+from pants.backend.project_info.tasks.ide_gen import IdeGen
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.generator import Generator, TemplateData
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.binaries import binary_util
+from pants.util.dirutil import safe_mkdir
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -40,69 +40,33 @@ _SCALA_VERSIONS = {
 
 class PluginGen(IdeGen):
   """Invoke an IntelliJ Pants plugin to create a project from the given targets."""
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(IdeGen, cls).prepare(options, round_manager)
 
   @classmethod
   def register_options(cls, register):
     super(PluginGen, cls).register_options(register)
     register('--version', choices=sorted(list(_VERSIONS.keys())), default='11',
              help='The IntelliJ IDEA version the project config should be generated for.')
-    register('--merge', action='store_true', default=True,
-             help='Merge any manual customizations in existing '
-                  'Intellij IDEA configuration. If False, manual customizations '
-                  'will be over-written.')
     register('--open', action='store_true', default=True,
              help='Attempts to open the generated project in IDEA.')
-    register('--bash', action='store_true',
-             help='Adds a bash facet to the generated project configuration.')
     register('--scala-language-level',
              choices=_SCALA_VERSIONS.keys(), default=_SCALA_VERSION_DEFAULT,
              help='Set the scala language level used for IDEA linting.')
-    register('--scala-maximum-heap-size-mb', type=int, default=512,
-             help='Sets the maximum heap size (in megabytes) for scalac.')
-    register('--fsc', action='store_true', default=False,
-             help='If the project contains any scala targets this specifies the '
-                  'fsc compiler should be enabled.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
-    register('--java-maximum-heap-size-mb', type=int, default=512,
-             help='Sets the maximum heap size (in megabytes) for javac.')
-    register('--exclude-maven-target', action='store_true', default=False,
-             help="Exclude 'target' directories for directories containing "
-                  "pom.xml files.  These directories contain generated code and"
-                  "copies of files staged for deployment.")
-    register('--exclude_folders', type=list,
-             default=[
-               '.pants.d/compile',
-               '.pants.d/ivy',
-               '.pants.d/python',
-               '.pants.d/resources',
-               ],
-             help='Adds folders to be excluded from the project configuration.')
-    register('--annotation-processing-enabled', action='store_true',
-             help='Tell IntelliJ IDEA to run annotation processors.')
-    register('--annotation-generated-sources-dir', default='generated', advanced=True,
-             help='Directory relative to --project-dir to write annotation processor sources.')
-    register('--annotation-generated-test-sources-dir', default='generated_tests', advanced=True,
-             help='Directory relative to --project-dir to write annotation processor sources.')
-    register('--annotation-processor', type=list, advanced=True,
-             help='Add a Class name of a specific annotation processor to run.')
 
   def __init__(self, *args, **kwargs):
     super(PluginGen, self).__init__(*args, **kwargs)
 
     self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
-    self.nomerge = not self.get_options().merge
     self.open = self.get_options().open
-    self.bash = self.get_options().bash
 
     self.scala_language_level = _SCALA_VERSIONS.get(
       self.get_options().scala_language_level, None)
-    self.scala_maximum_heap_size = self.get_options().scala_maximum_heap_size_mb
-
-    self.fsc = self.get_options().fsc
 
     self.java_encoding = self.get_options().java_encoding
-    self.java_maximum_heap_size = self.get_options().java_maximum_heap_size_mb
 
     idea_version = _VERSIONS[self.get_options().version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR,
@@ -117,32 +81,6 @@ class PluginGen(IdeGen):
                                         '{}.iml'.format(self.project_name))
     self.workspace_filename = os.path.join(self.gen_project_workdir,
                                         '{}.iws'.format(self.project_name))
-
-  @staticmethod
-  def _maven_targets_excludes(repo_root):
-    excludes = []
-    for (dirpath, dirnames, filenames) in safe_walk(repo_root):
-      if "pom.xml" in filenames:
-        excludes.append(os.path.join(os.path.relpath(dirpath, start=repo_root), "target"))
-    return excludes
-
-  @property
-  def annotation_processing_template(self):
-    return TemplateData(
-      enabled=self.get_options().annotation_processing_enabled,
-      rel_source_output_dir=os.path.join('..','..','..',
-                                         self.get_options().annotation_generated_sources_dir),
-      source_output_dir=
-      os.path.join(self.gen_project_workdir,
-                   self.get_options().annotation_generated_sources_dir),
-      rel_test_source_output_dir=os.path.join('..','..','..',
-                                              self.get_options().annotation_generated_test_sources_dir),
-      test_source_output_dir=
-      os.path.join(self.gen_project_workdir,
-                   self.get_options().annotation_generated_test_sources_dir),
-      processors=[{'class_name' : processor}
-                  for processor in self.get_options().annotation_processor],
-    )
 
   def generate_project(self, project):
     def create_content_root(source_set):
@@ -182,12 +120,6 @@ class PluginGen(IdeGen):
         compiler_classpath=project.scala_compiler_classpath
       )
 
-    exclude_folders = []
-    if self.get_options().exclude_maven_target:
-      exclude_folders += PluginGen._maven_targets_excludes(get_buildroot())
-
-    exclude_folders += self.get_options().exclude_folders
-
     java_language_level = None
     for target in project.targets:
       if isinstance(target, JvmTarget):
@@ -195,27 +127,6 @@ class PluginGen(IdeGen):
           java_language_level = target.platform.source_level
     if java_language_level is not None:
       java_language_level = 'JDK_{0}_{1}'.format(*java_language_level.components[:2])
-
-    # configured_module = TemplateData(
-    #   root_dir=get_buildroot(),
-    #   path=self.module_filename,
-    #   content_roots=content_roots,
-    #   bash=self.bash,
-    #   python=project.has_python,
-    #   scala=scala,
-    #   internal_jars=[cp_entry.jar for cp_entry in project.internal_jars],
-    #   internal_source_jars=[cp_entry.source_jar for cp_entry in project.internal_jars
-    #                         if cp_entry.source_jar],
-    #   external_jars=[cp_entry.jar for cp_entry in project.external_jars],
-    #   external_javadoc_jars=[cp_entry.javadoc_jar for cp_entry in project.external_jars
-    #                          if cp_entry.javadoc_jar],
-    #   external_source_jars=[cp_entry.source_jar for cp_entry in project.external_jars
-    #                         if cp_entry.source_jar],
-    #   annotation_processing=self.annotation_processing_template,
-    #   extra_components=[],
-    #   exclude_folders=exclude_folders,
-    #   java_language_level=java_language_level,
-    # )
 
     outdir = os.path.abspath(self.intellij_output_dir)
     if not os.path.exists(outdir):
@@ -226,18 +137,14 @@ class PluginGen(IdeGen):
       root_dir=get_buildroot(),
       outdir=outdir,
       git_root=scm.worktree,
-      # modules=[configured_module],
       java=TemplateData(
         encoding=self.java_encoding,
-        maximum_heap_size=self.java_maximum_heap_size,
         jdk=self.java_jdk,
         language_level='JDK_1_{}'.format(self.java_language_level)
       ),
       resource_extensions=list(project.resource_extensions),
       scala=scala,
-      # checkstyle_classpath=';'.join(project.checkstyle_classpath),
       debug_port=project.debug_port,
-      annotation_processing=self.annotation_processing_template,
       extra_components=[],
       java_language_level=java_language_level,
     )
@@ -247,30 +154,21 @@ class PluginGen(IdeGen):
       project_path=os.path.join(get_buildroot(), self.context.options.target_specs.__iter__().next().split(':')[0])
     )
 
-    # Grab the existing components, which may include customized ones.
-    existing_project_components = self._parse_xml_component_elements(self.project_filename)
-    # existing_module_components = self._parse_xml_component_elements(self.module_filename)
-    existing_workspace_components = self._parse_xml_component_elements(self.workspace_filename)
-
     # Generate (without merging in any extra components).
     safe_mkdir(os.path.abspath(self.intellij_output_dir))
 
     ipr = self._generate_to_tempfile(
         Generator(pkgutil.get_data(__name__, self.project_template), project=configured_project))
-    # iml = self._generate_to_tempfile(
-    #     Generator(pkgutil.get_data(__name__, self.module_template), module=configured_module))
     iws = self._generate_to_tempfile(
         Generator(pkgutil.get_data(__name__, self.workspace_template), workspace=configured_workspace))
 
 
-    self.context.log.info('Generated IntelliJ project in {directory}'
-                           .format(directory=self.gen_project_workdir))
+    self.context.log.info('Generated IntelliJ project in {}'.format(self.gen_project_workdir))
 
     shutil.move(ipr, self.project_filename)
-    # shutil.move(iml, self.module_filename)
     shutil.move(iws, self.workspace_filename)
-    return self.project_filename
-    # return None
+    # return self.project_filename
+    return None
 
   def _generate_to_tempfile(self, generator):
     """Applies the specified generator to a temp file and returns the path to that file.
@@ -280,34 +178,11 @@ class PluginGen(IdeGen):
       generator.write(output)
     return output_path
 
-  def _get_resource_extensions(self, project):
-    resource_extensions = set()
-    resource_extensions.update(project.resource_extensions)
+  def execute(self):
+    """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
+    # Grab the targets in-play before the context is replaced by `self._prepare_project()` below.
+    self._prepare_project()
+    idefile = self.generate_project(self._project)
 
-    # TODO(John Sirois): make test resources 1st class in ant build and punch this through to pants
-    # model
-    for _, _, files in safe_walk(os.path.join(get_buildroot(), 'tests', 'resources')):
-      resource_extensions.update(Project.extract_resource_extensions(files))
-
-    return resource_extensions
-
-  def _parse_xml_component_elements(self, path):
-    """Returns a list of pairs (component_name, xml_fragment) where xml_fragment is the xml text of
-    that <component> in the specified xml file."""
-    if not os.path.exists(path):
-      return []  # No existing components.
-    dom = minidom.parse(path)
-    # .ipr and .iml files both consist of <component> elements directly under a root element.
-    return [(x.getAttribute('name'), x.toxml()) for x in dom.getElementsByTagName('component')]
-
-  def _get_components_to_merge(self, mergable_components, path):
-    """Returns a list of the <component> fragments in mergable_components that are not
-    superceded by a <component> in the specified xml file.
-    mergable_components is a list of (name, xml_fragment) pairs."""
-
-    # As a convenience, we use _parse_xml_component_elements to get the
-    # superceding component names, ignoring the generated xml fragments.
-    # This is fine, since performance is not an issue.
-    generated_component_names = set(
-      [name for (name, _) in self._parse_xml_component_elements(path)])
-    return [x[1] for x in mergable_components if x[0] not in generated_component_names]
+    if idefile:
+      binary_util.ui_open(idefile)
