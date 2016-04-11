@@ -80,11 +80,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
         try:
           dependencies.update(self.context.resolve(depspec))
         except AddressLookupError as e:
-          raise AddressLookupError('{message}\n  referenced from gen.scrooge key: '
-                                   'gen->deps->{category} in pants.ini'.format(
-                                      message=e,
-                                      category=category
-                                    ))
+          raise AddressLookupError('{}\n  referenced from {} scope'.format(e, self.options_scope))
     return deps
 
   def execute_codegen(self, target, target_workdir):
