@@ -13,7 +13,7 @@ import six
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.fs import Dir, Stats, Path, File, FilesContent, PathGlobs, Paths
+from pants.engine.exp.fs import Dir, Dirs, File, FilesContent, Path, PathGlobs, Paths, Stats
 from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -220,7 +220,7 @@ def addresses_from_address_families(address_families):
 
 def descendant_addresses_to_globs(descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
-  return PathGlobs.create(descendant_addresses.directory, rglobs=['*/'])
+  return PathGlobs.create(descendant_addresses.directory, globs=['**/*/', '*/'])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -267,7 +267,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
      addresses_from_address_family),
     (Addresses,
-     [SelectDependencies(AddressFamily, PathGlobs)],
+     [SelectDependencies(AddressFamily, Dirs)],
      addresses_from_address_families),
     (PathGlobs,
      [Select(DescendantAddresses)],

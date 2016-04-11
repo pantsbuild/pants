@@ -6,11 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from abc import abstractmethod, abstractproperty
+from os.path import dirname
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
-from pants.engine.exp.fs import (Dir, DirectoryListing, FileContent, Path, PathLiteral, Stats,
-                                 file_content, list_directory, path_stat)
+from pants.engine.exp.fs import (Dir, DirectoryListing, FileContent, Path, Stats, file_content,
+                                 list_directory, path_stat)
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -368,7 +369,6 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       (DirectoryListing, Dir),
       (FileContent, Path),
       (Stats, Path),
-      (Stats, PathLiteral),
     }
 
   _FS_PRODUCT_TYPES = {product for product, subject in _FS_PAIRS}
@@ -381,6 +381,15 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def is_filesystem_pair(cls, subject_type, product):
     """True if the given subject type and product type should be computed using a FileystemNode."""
     return (product, subject_type) in cls._FS_PAIRS
+
+  @classmethod
+  def generate_subjects(self, filenames):
+    """Given filenames, generate a set of subjects for invalidation predicate matching."""
+    for f in filenames:
+      # Stats or FileContent for the literal path.
+      yield Path(f)
+      # DirectoryListings for parent dirs.
+      yield Dir(dirname(f))
 
   @property
   def is_cacheable(self):

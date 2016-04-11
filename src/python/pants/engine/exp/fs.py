@@ -11,6 +11,7 @@ from abc import abstractproperty
 from os import sep as os_sep
 from os.path import join, normpath
 
+import six
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK
@@ -21,7 +22,11 @@ from pants.util.objects import datatype
 
 
 class Path(datatype('Path', ['path'])):
-  """An existing filesystem path with an unknown type, relative to the ProjectTree's buildroot."""
+  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
+
+  def __new__(cls, path):
+    path = six.text_type(normpath(path))
+    return super(Path, cls).__new__(cls, path)
 
 
 class Stat(AbstractClass):
@@ -39,13 +44,25 @@ class Stat(AbstractClass):
 class File(datatype('File', ['path']), Stat):
   """A file."""
 
+  def __new__(cls, path):
+    return super(File, cls).__new__(cls, six.text_type(path))
+
 
 class Dir(datatype('Dir', ['path']), Stat):
   """A directory."""
 
+  def __new__(cls, path):
+    path = six.text_type(path)
+    if not path.endswith(os_sep):
+      path += os_sep
+    return super(Dir, cls).__new__(cls, path)
+
 
 class Link(datatype('Link', ['path']), Stat):
   """A symbolic link."""
+
+  def __new__(cls, path):
+    return super(Link, cls).__new__(cls, six.text_type(path))
 
 
 class Paths(datatype('Paths', ['dependencies'])):
@@ -54,6 +71,10 @@ class Paths(datatype('Paths', ['dependencies'])):
 
 class Stats(datatype('Stats', ['dependencies'])):
   """A set of Stat objects."""
+
+
+class Dirs(datatype('Dirs', ['dependencies'])):
+  """A set of Dir objects."""
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -235,17 +256,29 @@ def list_directory(project_tree, directory):
       raise e
 
 
-def merge_stats(stats_list):
+def merge_dir_stats(stats_list):
+  return merge_stats(stats_list, ftype=Dir, result_type=Dirs)
+
+
+def merge_stats(stats_list, ftype=None, result_type=Stats):
+  """Merge and filter Stats lists.
+
+  TODO: This is boilerplatey: it's half aggregation / half conversion. The
+  aggregation bit should become native:
+   see https://github.com/pantsbuild/pants/issues/3169
+  """
   generated = set()
   def generate():
     for stats in stats_list:
       for stat in stats.dependencies:
+        if ftype and not type(stat) == ftype:
+          continue
         if stat.path in generated:
           # TODO: remove this validation... unclear how it would happen.
           raise ValueError('Duplicate path in {}'.format(stats_list))
         generated.add(stat.path)
         yield stat
-  return Stats(tuple(generate()))
+  return result_type(tuple(generate()))
 
 
 def stats_to_paths(stats):
@@ -306,6 +339,10 @@ def file_content(project_tree, path):
       raise e
 
 
+def identity(v):
+  return v
+
+
 def create_fs_tasks():
   """Creates tasks that consume the native filesystem Node type."""
   return [
@@ -320,10 +357,9 @@ def create_fs_tasks():
     (Paths,
      [Select(Stats)],
      stats_to_paths),
-  ] + [
-    # TODO: These tasks are boilerplatey: they do half aggregation / half conversion. The
-    # aggregation bit should become native:
-    #  see https://github.com/pantsbuild/pants/issues/3169
+    (Dirs,
+     [SelectDependencies(Stats, PathGlobs)],
+     merge_dir_stats),
     (Stats,
      [SelectDependencies(Stats, PathGlobs)],
      merge_stats),
@@ -333,4 +369,7 @@ def create_fs_tasks():
     (FilesContent,
      [SelectDependencies(FileContent, Paths)],
      files_content),
+    (Stats,
+     [SelectProjection(Stats, Path, ('path',), PathLiteral)],
+     identity),
   ]
