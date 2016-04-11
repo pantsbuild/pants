@@ -72,7 +72,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir(['idea-plugin', '--no-open', target_a, target_b], workdir)
       self.assert_success(pants_run)
 
-      expected_properties = [("targets", [target_a]),
+      expected_properties = [("targets", [target_a, target_b]),
                              ("project_path", ["examples/src/scala/org/pantsbuild/example/hello"])]
       project_dir = self._get_project_dir(pants_run)
       self._do_check(project_dir, expected_properties)
