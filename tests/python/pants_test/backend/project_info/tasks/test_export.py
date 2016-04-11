@@ -214,7 +214,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def test_version(self):
     result = self.execute_export_json('project_info:first')
-    self.assertEqual('1.0.6', result['version'])
+    self.assertEqual('1.0.7', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
@@ -394,7 +394,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     # But not the origin target
     self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
 
-  def test_jvm_distributions_by_platform(self):
+  def test_preferred_jvm_distributions(self):
     with temporary_dir() as strict_jdk_home:
       with temporary_dir() as non_strict_jdk_home:
         strict_cache_key = (Revision(1, 6), Revision(1, 6, 9999), False)
@@ -402,4 +402,4 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         DistributionLocator._CACHE[strict_cache_key] = Distribution(home_path=strict_jdk_home)
         DistributionLocator._CACHE[non_strict_cache_key] = Distribution(home_path=non_strict_jdk_home)
         self.assertEqual({'strict': strict_jdk_home, 'non_strict': non_strict_jdk_home},
-                         self.execute_export_json()['jvm_distributions_by_platform']['java6'])
+                         self.execute_export_json()['preferred_jvm_distributions']['java6'])

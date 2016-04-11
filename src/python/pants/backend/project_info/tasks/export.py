@@ -25,6 +25,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
@@ -55,7 +56,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.6'
+  DEFAULT_EXPORT_VERSION = '1.0.7'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -281,7 +282,14 @@ class ExportTask(IvyTaskMixin, PythonTask):
     }
     jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
     if jvm_distributions:
+      deprecated_conditional(lambda: True, '0.0.89',
+                             'jvm_distributions is deprecated in favor of preferred_jvm_distributions.')
       graph_info['jvm_distributions'] = jvm_distributions
+
+    # `jvm_distributions` are static distribution settings from config,
+    # `preferred_jvm_distributions` are distributions that pants actually uses for the
+    # given platform setting.
+    graph_info['preferred_jvm_distributions'] = {}
 
     def get_preferred_distribution(platform, strict):
       try:
@@ -289,18 +297,15 @@ class ExportTask(IvyTaskMixin, PythonTask):
       except DistributionLocator.Error:
         return None
 
-    graph_info['jvm_distributions_by_platform'] = {}
     for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items():
-      dist = get_preferred_distribution(platform, strict=True)
       preferred_distributions = {}
-      if dist:
-        preferred_distributions['strict'] = dist.home
-      dist = get_preferred_distribution(platform, strict=False)
-      if dist:
-        preferred_distributions['non_strict'] = dist.home
+      for strict, strict_key in [(True, 'strict'), (False, 'non_strict')]:
+        dist = get_preferred_distribution(platform, strict=strict)
+        if dist:
+          preferred_distributions[strict_key] = dist.home
 
       if preferred_distributions:
-        graph_info['jvm_distributions_by_platform'][platform_name] = preferred_distributions
+        graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
 
     if classpath_products:
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
