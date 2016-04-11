@@ -20,8 +20,6 @@ class ThriftLintError(Exception):
 class ThriftLinter(NailgunTask):
   """Print linter warnings for thrift files."""
 
-  _CONFIG_SECTION = 'thrift-linter'
-
   @staticmethod
   def _is_thrift(target):
     return target.is_thrift
@@ -47,10 +45,6 @@ class ThriftLinter(NailgunTask):
   def product_types(cls):
     # Declare the product of this goal. Gen depends on thrift-linter.
     return ['thrift-linter']
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   @property
   def cache_target_dirs(self):
@@ -90,7 +84,6 @@ class ThriftLinter(NailgunTask):
       config_args.extend(['--include-path', p])
 
     args = config_args + list(paths)
-
 
 
     # If runjava returns non-zero, this marks the workunit as a
