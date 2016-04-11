@@ -395,8 +395,11 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
 
   def test_jvm_distributions_by_platform(self):
-    with temporary_dir() as jdk_home:
-      dist = Distribution(home_path=jdk_home)
-      DistributionLocator._CACHE[(Revision(1, 6), Revision(1, 6, 9999), False)] = dist
-      result = self.execute_export_json()
-      self.assertEqual(jdk_home, result['jvm_distributions_by_platform']['1.6'])
+    with temporary_dir() as strict_jdk_home:
+      with temporary_dir() as non_strict_jdk_home:
+        strict_cache_key = (Revision(1, 6), Revision(1, 6, 9999), False)
+        non_strict_cache_key = (Revision(1, 6), None, False)
+        DistributionLocator._CACHE[strict_cache_key] = Distribution(home_path=strict_jdk_home)
+        DistributionLocator._CACHE[non_strict_cache_key] = Distribution(home_path=non_strict_jdk_home)
+        self.assertEqual({'strict': strict_jdk_home, 'non_strict': non_strict_jdk_home},
+                         self.execute_export_json()['jvm_distributions_by_platform']['java6'])

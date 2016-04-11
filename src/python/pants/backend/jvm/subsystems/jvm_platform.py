@@ -68,6 +68,15 @@ class JvmPlatform(Subsystem):
                                platform.get('args', ()),
                                name=name)
 
+  @classmethod
+  def preferred_jvm_distribution(cls, platforms, strict=False):
+    """Returns a jvm Distribution with a version that should work for all the platforms."""
+    if not platforms:
+      return DistributionLocator.cached()
+    min_version = max(platform.target_level for platform in platforms)
+    max_version = Revision(*(min_version.components + [9999])) if strict else None
+    return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
+
   @memoized_property
   def platforms_by_name(self):
     platforms = self.get_options().platforms or {}

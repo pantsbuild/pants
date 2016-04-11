@@ -26,7 +26,6 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.revision import Revision
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -284,20 +283,24 @@ class ExportTask(IvyTaskMixin, PythonTask):
     if jvm_distributions:
       graph_info['jvm_distributions'] = jvm_distributions
 
-    platform_levels = set()
-    for _, platform in JvmPlatform.global_instance().platforms_by_name.items():
-      platform_levels.add(platform.source_level)
-      platform_levels.add(platform.target_level)
-    if platform_levels:
-      graph_info['jvm_distributions_by_platform'] = {}
-      for level in platform_levels:
-        try:
-          dist = DistributionLocator.cached(minimum_version=level,
-                                            maximum_version=Revision.lenient(str(level) + '.9999'))
-          if dist:
-            graph_info['jvm_distributions_by_platform'][str(level)] = dist.home
-        except DistributionLocator.Error:
-          pass
+    def get_preferred_distribution(platform, strict):
+      try:
+        return JvmPlatform.preferred_jvm_distribution([platform], strict=strict)
+      except DistributionLocator.Error:
+        return None
+
+    graph_info['jvm_distributions_by_platform'] = {}
+    for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items():
+      dist = get_preferred_distribution(platform, strict=True)
+      preferred_distributions = {}
+      if dist:
+        preferred_distributions['strict'] = dist.home
+      dist = get_preferred_distribution(platform, strict=False)
+      if dist:
+        preferred_distributions['non_strict'] = dist.home
+
+      if preferred_distributions:
+        graph_info['jvm_distributions_by_platform'][platform_name] = preferred_distributions
 
     if classpath_products:
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
