@@ -70,7 +70,17 @@ class JvmPlatform(Subsystem):
 
   @classmethod
   def preferred_jvm_distribution(cls, platforms, strict=False):
-    """Returns a jvm Distribution with a version that should work for all the platforms."""
+    """Returns a jvm Distribution with a version that should work for all the platforms.
+
+    Any one of those distributions whose version is >= all requested platforms' versions
+    can be returned unless strict flag is set.
+
+    :param iterable platforms: An iterable of platform settings.
+    :param bool strict: If true, only distribution whose version matches the minimum
+      required version can be returned, i.e, the max target_level of all the requested
+      platforms.
+    :returns: Distribution one of the selected distributions.
+    """
     if not platforms:
       return DistributionLocator.cached()
     min_version = max(platform.target_level for platform in platforms)
