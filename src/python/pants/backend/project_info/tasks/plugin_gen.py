@@ -184,5 +184,5 @@ class PluginGen(IdeGen):
     self._prepare_project()
     idefile = self.generate_project(self._project)
 
-    if idefile:
+    if idefile and self.get_options().open:
       binary_util.ui_open(idefile)
