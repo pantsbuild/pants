@@ -73,6 +73,13 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
                           subdir,
                           [join(wildcard, name)])
 
+  def test_create_dir_wildcard_directory(self):
+    subdir = 'foo'
+    wildcard = '*'
+    name = ''
+    self.assert_pg_equals([PathDirWildcard('', wildcard, (name,))], '', [join(wildcard, name)])
+    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, ('',))], subdir, [join(wildcard, name)])
+
   def test_create_recursive_dir_wildcard(self):
     name = 'Blah.java'
     subdir = 'foo'
@@ -107,6 +114,12 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
     self.assert_walk(['*.txt', '**/*.txt'], ['a/3.txt', 'a/b/1.txt', '4.txt'])
     self.assert_walk(['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/4.txt.ln', 'a/b/2'])
     self.assert_walk(['**/*.zzz'], [])
+
+  def test_walk_recursive_directory(self):
+    self.assert_walk(['**/*/'], ['a/b/'])
+    self.assert_walk(['*/'], ['a/'])
+    self.assert_walk(['*/*/'], ['a/b/'])
+    self.assert_walk(['*/*/*/'], [])
 
   def test_files_content_literal(self):
     self.assert_content(['4.txt'], {'4.txt': 'four\n'})

@@ -56,14 +56,6 @@ class Stats(datatype('Stats', ['dependencies'])):
   """A set of Stat objects."""
 
 
-class Files(datatype('Files', ['dependencies'])):
-  """A set of File objects."""
-
-
-class Dirs(datatype('Dirs', ['dependencies'])):
-  """A set of Dir objects."""
-
-
 class FileContent(datatype('FileContent', ['path', 'content'])):
   """The content of a file, or None if it did not exist."""
 
@@ -86,6 +78,8 @@ def _norm_with_dir(path):
   being matched.
   """
   normed = normpath(path)
+  if normed == '.':
+    return ''
   if path.endswith(os_sep):
     return normed + os_sep
   return normed
@@ -215,10 +209,6 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
     return cls(tuple(PathGlob.create_from_spec(relative_to, filespec) for filespec in filespecs))
 
 
-class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 'dependencies'])):
-  """A list of Path objects for recursive subdirectories of the given directory."""
-
-
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'paths'])):
   """A list of entry names representing a directory listing.
 
@@ -240,15 +230,9 @@ def list_directory(project_tree, directory):
                             [Path(join(path, e)) for e in project_tree.listdir(path)])
   except (IOError, OSError) as e:
     if e.errno == errno.ENOENT:
-      return DirectoryListing(directory, False, [], [])
+      return DirectoryListing(directory, False, [])
     else:
       raise e
-
-
-def recursive_subdirectories(directory, subdirectories_list):
-  """Given a directory and a list of RecursiveSubDirectories below it, flatten and return."""
-  directories = [directory] + [d for subdir in subdirectories_list for d in subdir.dependencies]
-  return RecursiveSubDirectories(directory, directories)
 
 
 def merge_stats(stats_list):
@@ -325,10 +309,6 @@ def file_content(project_tree, path):
 def create_fs_tasks():
   """Creates tasks that consume the native filesystem Node type."""
   return [
-    (RecursiveSubDirectories,
-     [Select(Dir),
-      SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
-     recursive_subdirectories),
     (Stats,
      [SelectProjection(Stats, Dir, ('directory',), PathWildcard),
       Select(PathWildcard)],
@@ -351,6 +331,6 @@ def create_fs_tasks():
      [SelectDependencies(Stats, DirectoryListing, field='paths')],
      merge_stats),
     (FilesContent,
-     [SelectDependencies(FileContent, Files)],
+     [SelectDependencies(FileContent, Paths)],
      files_content),
   ]

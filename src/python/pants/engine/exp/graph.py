@@ -13,7 +13,7 @@ import six
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.fs import Dir, DirectoryListing, FilesContent, Paths, RecursiveSubDirectories
+from pants.engine.exp.fs import Dir, Stats, Path, File, FilesContent, PathGlobs, Paths
 from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -30,19 +30,20 @@ def _key_func(entry):
   return key
 
 
-class BuildFilePaths(datatype('BuildFilePaths', ['paths'])):
-  """A list of Files that are known to match a BUILD file pattern.
+class BuildFiles(datatype('BuildFiles', ['paths'])):
+  """A list of paths that are known to match a BUILD file pattern.
 
-  TODO: Because BUILD file names are matched using a regex, this cannot currently use PathGlobs.
+  TODO: Because BUILD file names are matched using a regex, this cannot only use PathGlobs.
   If we were willing to allow a bit of slop in terms of files read, this could use
   PathGlobs to get FilesContent for all files with the right prefix, and then discard.
   """
 
 
-def filter_buildfile_paths(address_mapper, directory_listing):
-  build_files = tuple(f for f in directory_listing.files
-                      if address_mapper.build_pattern.match(os_path_basename(f.path)))
-  return BuildFilePaths(build_files)
+def filter_buildfile_paths(address_mapper, stats):
+  build_files = tuple(Path(stat.path) for stat in stats.dependencies
+                      if type(stat) is File and
+                      address_mapper.build_pattern.match(os_path_basename(stat.path)))
+  return BuildFiles(build_files)
 
 
 def parse_address_family(address_mapper, path, build_files_content):
@@ -213,8 +214,13 @@ def addresses_from_address_family(address_family):
 
 
 def addresses_from_address_families(address_families):
-  """Given a list of AddressFamiliess, return an Addresses object containing all addressables."""
+  """Given a list of AddressFamilies, return an Addresses object containing all addressables."""
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
+
+
+def descendant_addresses_to_globs(descendant_addresses):
+  """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
+  return PathGlobs.create(descendant_addresses.directory, rglobs=['*/'])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -238,11 +244,11 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     (AddressFamily,
      [SelectLiteral(address_mapper, AddressMapper),
       Select(Dir),
-      SelectProjection(FilesContent, Paths, ('paths',), BuildFilePaths)],
+      SelectProjection(FilesContent, Paths, ('paths',), BuildFiles)],
      parse_address_family),
-    (BuildFilePaths,
+    (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(DirectoryListing)],
+      Select(Stats)],
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
@@ -261,12 +267,9 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
      addresses_from_address_family),
     (Addresses,
-     [SelectDependencies(AddressFamily, RecursiveSubDirectories)],
+     [SelectDependencies(AddressFamily, PathGlobs)],
      addresses_from_address_families),
-    # TODO: This is a workaround for the fact that we can't currently "project" in a
-    # SelectDependencies clause: we launch the recursion by requesting RecursiveSubDirectories
-    # for a Directory projected from DescendantAddresses.
-    (RecursiveSubDirectories,
-     [SelectProjection(RecursiveSubDirectories, Dir, ('directory',), DescendantAddresses)],
-     identity),
+    (PathGlobs,
+     [Select(DescendantAddresses)],
+     descendant_addresses_to_globs),
   ]
