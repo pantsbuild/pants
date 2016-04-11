@@ -12,6 +12,14 @@ from pants.task.task import TaskBase
 class JvmToolTaskMixin(JvmToolMixin, TaskBase):
   """A JvmToolMixin specialized for mixing in to Tasks.
 
+  Tasks that mix this in are those that run code in a JVM as an implementation detail of
+  their operation. Examples are compile.java, checkstyle etc.  This is distinct from tasks
+  whose explicit purpose is to run code in a JVM, such as test.junit or jvm.run.  Those
+  tasks extend `pants.backend.jvm.tasks.JvmTask`.
+
+  Note that this mixin is typically used by extending `pants.backend.jvm.tasks.NailgunTask`
+  rather than being mixed in directly.
+
   :API: public
   """
 

@@ -41,8 +41,6 @@ class Checkstyle(NailgunTask):
              help='Dictionary of property mappings to use for checkstyle.properties.')
     register('--confs', advanced=True, type=list, default=['default'],
              help='One or more ivy configurations to resolve for this target.')
-    register('--jvm-options', advanced=True, type=list, metavar='<option>...',
-             help='Run checkstyle with these extra jvm options.')
     register('--include-user-classpath', type=bool, fingerprint=True,
              help='Add the user classpath to the checkstyle classpath')
     cls.register_jvm_tool(register,

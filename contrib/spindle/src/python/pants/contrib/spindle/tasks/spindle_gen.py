@@ -32,13 +32,6 @@ class SpindleGen(NailgunTask):
   def register_options(cls, register):
     super(SpindleGen, cls).register_options(register)
     register(
-      '--jvm-options',
-      default=[],
-      advanced=True,
-      type=list,
-      help='Use these jvm options when running Spindle.',
-    )
-    register(
       '--runtime-dependency',
       default=['3rdparty:spindle-runtime'],
       advanced=True,

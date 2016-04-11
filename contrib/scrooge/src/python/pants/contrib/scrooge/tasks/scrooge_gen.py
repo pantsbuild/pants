@@ -40,8 +40,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     register('--verbose', type=bool, help='Emit verbose output.')
     register('--strict', fingerprint=True, type=bool,
              help='Enable strict compilation.')
-    register('--jvm-options', default=[], advanced=True, type=list,
-             help='Use these jvm options when running Scrooge.')
     register('--service-deps', default={}, advanced=True, type=dict,
              help='A map of language to targets to add as dependencies of '
                   'synthetic thrift libraries that contain services.')
