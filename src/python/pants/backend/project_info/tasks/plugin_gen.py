@@ -167,8 +167,7 @@ class PluginGen(IdeGen):
 
     shutil.move(ipr, self.project_filename)
     shutil.move(iws, self.workspace_filename)
-    # return self.project_filename
-    return None
+    return self.project_filename
 
   def _generate_to_tempfile(self, generator):
     """Applies the specified generator to a temp file and returns the path to that file.
