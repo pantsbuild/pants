@@ -131,3 +131,12 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name = 'idea_plugin_integration',
+  sources = ['test_idea_plugin_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)

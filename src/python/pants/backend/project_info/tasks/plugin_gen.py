@@ -116,9 +116,6 @@ class PluginGen(IdeGen):
     if project.has_scala:
       scala = TemplateData(
         language_level=self.scala_language_level,
-        maximum_heap_size=self.scala_maximum_heap_size,
-        fsc=self.fsc,
-        compiler_classpath=project.scala_compiler_classpath
       )
 
     java_language_level = None
