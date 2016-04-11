@@ -15,25 +15,30 @@ from pants.util.dirutil import fast_relpath, safe_walk
 
 
 class FileSystemProjectTree(ProjectTree):
+  def _join(self, relpath):
+    if relpath.startswith(os.sep):
+      raise ValueError('Absolute path "{}" not legal in {}.'.format(relpath, self))
+    return os.path.join(self.build_root, relpath)
+
   def glob1(self, dir_relpath, glob):
-    return glob1(os.path.join(self.build_root, dir_relpath), glob)
+    return glob1(self._join(dir_relpath), glob)
 
   def content(self, file_relpath):
-    with open(os.path.join(self.build_root, file_relpath), 'rb') as source:
+    with open(self._join(file_relpath), 'rb') as source:
       return source.read()
 
   def isdir(self, relpath):
-    return os.path.isdir(os.path.join(self.build_root, relpath))
+    return os.path.isdir(self._join(relpath))
 
   def isfile(self, relpath):
-    return os.path.isfile(os.path.join(self.build_root, relpath))
+    return os.path.isfile(self._join(relpath))
 
   def exists(self, relpath):
-    return os.path.exists(os.path.join(self.build_root, relpath))
+    return os.path.exists(self._join(relpath))
 
   def lstat(self, relpath):
     try:
-      mode = os.lstat(os.path.join(self.build_root, relpath)).st_mode
+      mode = os.lstat(self._join(relpath)).st_mode
       if stat.S_ISLNK(mode):
         return PTSTAT_LINK
       elif stat.S_ISDIR(mode):
@@ -49,12 +54,12 @@ class FileSystemProjectTree(ProjectTree):
         raise e
 
   def listdir(self, relpath):
-    return os.listdir(os.path.join(self.build_root, relpath))
+    return os.listdir(self._join(relpath))
 
   def walk(self, relpath, topdown=True):
     def onerror(error):
       raise OSError(getattr(error, 'errno', None), 'Failed to walk below {}'.format(relpath), error)
-    for root, dirs, files in safe_walk(os.path.join(self.build_root, relpath),
+    for root, dirs, files in safe_walk(self._join(relpath),
                                        topdown=topdown,
                                        onerror=onerror):
       yield fast_relpath(root, self.build_root), dirs, files

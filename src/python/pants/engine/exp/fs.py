@@ -25,8 +25,7 @@ class Path(datatype('Path', ['path'])):
   """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
 
   def __new__(cls, path):
-    path = six.text_type(normpath(path))
-    return super(Path, cls).__new__(cls, path)
+    return super(Path, cls).__new__(cls, six.text_type(path))
 
 
 class Stat(AbstractClass):
@@ -52,10 +51,7 @@ class Dir(datatype('Dir', ['path']), Stat):
   """A directory."""
 
   def __new__(cls, path):
-    path = six.text_type(path)
-    if not path.endswith(os_sep):
-      path += os_sep
-    return super(Dir, cls).__new__(cls, path)
+    return super(Dir, cls).__new__(cls, six.text_type(path))
 
 
 class Link(datatype('Link', ['path']), Stat):
@@ -93,16 +89,14 @@ class FilesContent(datatype('FilesContent', ['dependencies'])):
 
 
 def _norm_with_dir(path):
-  """Form of `normpath` that preserves trailing slashes.
+  """Form of `normpath` that preserves a trailing slash-dot.
 
-  In this case, a trailing slash is used to explicitly indicate that a directory is
+  In this case, a trailing slash-dot is used to explicitly indicate that a directory is
   being matched.
   """
   normed = normpath(path)
-  if normed == '.':
-    return ''
-  if path.endswith(os_sep):
-    return normed + os_sep
+  if path.endswith(os_sep + '.'):
+    return normed + os_sep + '.'
   return normed
 
 
@@ -287,7 +281,7 @@ def stats_to_paths(stats):
 
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given Stats object using the given PathWildcard."""
-  ftype = Dir if path_wildcard.wildcard.endswith(os_sep) else File
+  ftype = Dir if path_wildcard.wildcard.endswith(os_sep + '.') else File
   filtered = tuple(stat for stat in stats.dependencies
                    if type(stat) == ftype and
                    fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
