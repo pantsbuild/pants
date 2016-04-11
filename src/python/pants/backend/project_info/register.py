@@ -24,7 +24,7 @@ def build_file_aliases():
 def register_goals():
   # IDE support.
   task(name='idea', action=IdeaGen).install()
-  task(name='plugin', action=PluginGen).install()
+  task(name='init-idea-plugin', action=PluginGen).install()
   task(name='eclipse', action=EclipseGen).install()
   task(name='ensime', action=EnsimeGen).install()
   task(name='export', action=Export).install()
