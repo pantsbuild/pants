@@ -39,6 +39,10 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       for value in expected_property[1]:
         self.assertIn(value, actual_property.getAttribute('value'))
 
+  def _get_project_dir(self, pants_run):
+    project_dir = os.path.join(pants_run.workdir, "idea-plugin/idea-plugin/PluginGen_idea_plugin/project")
+    return project_dir
+
   def test_idea_plugin_single_target(self):
     with self.temporary_workdir() as workdir:
       target_a = 'examples/src/scala/org/pantsbuild/example/hello:hello'
@@ -47,7 +51,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
       expected_properties = [("targets", [target_a]),
                              ("project_path", ["examples/src/scala/org/pantsbuild/example/hello"])]
-      project_dir = os.path.join(pants_run.workdir, "idea-plugin/idea-plugin/PluginGen_idea_plugin/project")
+      project_dir = self._get_project_dir(pants_run)
       self._do_check(project_dir, expected_properties)
 
   def test_idea_plugin_single_directory(self):
@@ -58,7 +62,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
       expected_properties = [("targets", [target_a]),
                              ("project_path", ["testprojects/src/python/antlr"])]
-      project_dir = os.path.join(pants_run.workdir, "idea-plugin/idea-plugin/PluginGen_idea_plugin/project")
+      project_dir = self._get_project_dir(pants_run)
       self._do_check(project_dir, expected_properties)
 
   def test_idea_plugin_multiple_targets(self):
@@ -70,5 +74,5 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
       expected_properties = [("targets", [target_a]),
                              ("project_path", ["examples/src/scala/org/pantsbuild/example/hello"])]
-      project_dir = os.path.join(pants_run.workdir, "idea-plugin/idea-plugin/PluginGen_idea_plugin/project")
+      project_dir = self._get_project_dir(pants_run)
       self._do_check(project_dir, expected_properties)
