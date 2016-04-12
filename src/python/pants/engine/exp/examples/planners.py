@@ -18,7 +18,7 @@ from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.examples.graph_validator import GraphValidator
 from pants.engine.exp.examples.parsers import JsonParser
 from pants.engine.exp.examples.sources import Sources
-from pants.engine.exp.fs import Dirs, FileContent, FilesContent, PathGlobs, Stat, create_fs_tasks
+from pants.engine.exp.fs import Dirs, File, FileContent, FilesContent, PathGlobs, create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.parser import SymbolTable
@@ -118,8 +118,8 @@ def select_package_address(jvm_package_name, address_families):
 def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
-  specs = [os_path_join(srcroot, rel_package_dir, '.') for srcroot in source_roots.srcroots]
-  return PathGlobs.create_from_specs('', specs)
+  specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
+  return PathGlobs.create_from_specs(Dirs, '', specs)
 
 
 @printing_func
@@ -429,7 +429,7 @@ def setup_json_scheduler(build_root, debug=True):
       'list': Address,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
-      'ls': Stat,
+      'ls': File,
       'cat': FileContent,
     }
   tasks = [

@@ -61,12 +61,22 @@ class Link(datatype('Link', ['path']), Stat):
     return super(Link, cls).__new__(cls, six.text_type(path))
 
 
+class ReadLink(datatype('ReadLink', ['path'])):
+  """The result of reading a symbolic link."""
+
+  def __new__(cls, path):
+    return super(Link, cls).__new__(cls, six.text_type(path))
+
+
 class Paths(datatype('Paths', ['dependencies'])):
   """A set of Path objects."""
 
 
-class Stats(datatype('Stats', ['dependencies'])):
-  """A set of Stat objects."""
+class Stats(datatype('Stats', ['files', 'dirs', 'links'])):
+  """Sets of File, Dir, and Link objects."""
+
+  def __new__(cls, files=tuple(), dirs=tuple(), links=tuple()):
+    return super(Stats, cls).__new__(cls, files, dirs, links)
 
 
 class Files(datatype('Files', ['dependencies'])):
@@ -75,6 +85,10 @@ class Files(datatype('Files', ['dependencies'])):
 
 class Dirs(datatype('Dirs', ['dependencies'])):
   """A set of Dir objects."""
+
+
+class Links(datatype('Links', ['dependencies'])):
+  """A set of Link objects."""
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -115,10 +129,6 @@ class PathGlob(AbstractClass):
   _SINGLE = '*'
 
   @classmethod
-  def create_from_spec(cls, relative_to, filespec):
-    return cls._parse_spec(relative_to, _norm_with_dir(filespec).split(os_sep))
-
-  @classmethod
   def _wildcard_part(cls, filespec_parts):
     """Returns the index of the first double-wildcard or single-wildcard part in filespec_parts.
 
@@ -136,12 +146,13 @@ class PathGlob(AbstractClass):
     return None, None
 
   @classmethod
-  def _parse_spec(cls, relative_to, parts):
-    """Given the path components of a filespec, return a potentially nested PathGlob object.
+  def create_from_spec(cls, ftype, relative_to, filespec):
+    """Given a filespec, return a potentially nested PathGlob object.
 
     TODO: Because `create_from_spec` is called recursively, this method should work harder to
     avoid splitting/joining. Optimization needed.
     """
+    parts = _norm_with_dir(filespec).split(os_sep)
     print('parsing for {} and {}'.format(relative_to, parts))
     double_index, single_index = cls._wildcard_part(parts)
     if double_index is not None:
@@ -149,39 +160,41 @@ class PathGlob(AbstractClass):
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
       remainders = (join(*parts[double_index+1:]), join(*parts[double_index:]))
-      return PathDirWildcard(join(relative_to, *parts[:double_index]),
+      return PathDirWildcard(ftype,
+                             join(relative_to, *parts[:double_index]),
                              parts[double_index],
                              remainders)
     elif single_index is None:
       # A literal path.
-      return PathLiteral(join(relative_to, *parts))
+      return PathLiteral(ftype, join(relative_to, *parts))
     elif single_index == (len(parts) - 1):
       # There is a wildcard in the file basename of the path.
-      return PathWildcard(join(relative_to, *parts[:-1]), parts[-1])
+      return PathWildcard(ftype, join(relative_to, *parts[:-1]), parts[-1])
     else:
       # There is a wildcard in (at least one of) the dirnames in the path.
       remainders = (join(*parts[single_index + 1:]),)
-      return PathDirWildcard(join(relative_to, *parts[:single_index]),
+      return PathDirWildcard(ftype,
+                             join(relative_to, *parts[:single_index]),
                              parts[single_index],
                              remainders)
 
 
-class PathLiteral(datatype('PathLiteral', ['path']), PathGlob):
+class PathLiteral(datatype('PathLiteral', ['ftype', 'path']), PathGlob):
   """A single literal PathGlob, which may or may not exist."""
 
 
-class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob):
+class PathWildcard(datatype('PathWildcard', ['ftype', 'directory', 'wildcard']), PathGlob):
   """A PathGlob with a wildcard in the basename component."""
 
 
-class PathDirWildcard(datatype('PathDirWildcard', ['directory', 'wildcard', 'remainders']), PathGlob):
+class PathDirWildcard(datatype('PathDirWildcard', ['ftype', 'directory', 'wildcard', 'remainders']), PathGlob):
   """A PathGlob with a single or double-level wildcard in a directory name.
 
   Each remainders value is applied relative to each directory matched by the wildcard.
   """
 
 
-class PathGlobs(datatype('PathGlobs', ['dependencies'])):
+class PathGlobs(datatype('PathGlobs', ['ftype', 'dependencies'])):
   """A set of 'PathGlob' objects.
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
@@ -192,7 +205,7 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   """
 
   @classmethod
-  def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
+  def create(cls, ftype, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
     TODO: This currently sortof-executes parsing via 'to_filespec'. Should maybe push that out to
@@ -200,6 +213,7 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
     :param relative_to: The path that all patterns are relative to (which will itself be relative
                         to the buildroot).
+    :param ftype: A Stat subclass indicating which Stat type will be matched.
     :param files: A list of relative file paths to include.
     :type files: list of string.
     :param string globs: A relative glob pattern of files to include.
@@ -222,11 +236,12 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
       new_specs = res.get('globs', None)
       if new_specs:
         filespecs.update(new_specs)
-    return cls.create_from_specs(relative_to, filespecs)
+    return cls.create_from_specs(ftype, relative_to, filespecs)
 
   @classmethod
-  def create_from_specs(cls, relative_to, filespecs):
-    return cls(tuple(PathGlob.create_from_spec(relative_to, filespec) for filespec in filespecs))
+  def create_from_specs(cls, ftype, relative_to, filespecs):
+    return cls(ftype, tuple(PathGlob.create_from_spec(ftype, relative_to, filespec)
+                            for filespec in filespecs))
 
 
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'paths'])):
@@ -257,47 +272,41 @@ def list_directory(project_tree, directory):
       raise e
 
 
-def merge_file_stats(stats_list):
-  return merge_stats(stats_list, ftype=File, result_type=Files)
+def merge_stats(stats_list):
+  """Merge Stats lists.
 
-
-def merge_dir_stats(stats_list):
-  return merge_stats(stats_list, ftype=Dir, result_type=Dirs)
-
-
-def merge_stats(stats_list, ftype=None, result_type=Stats):
-  """Merge and filter Stats lists.
-
-  TODO: This is boilerplatey: it's half aggregation / half conversion. The
-  aggregation bit should become native:
+  TODO: This is boilerplatey: aggregation should become native:
    see https://github.com/pantsbuild/pants/issues/3169
   """
-  generated = set()
-  def generate():
+  def generate(field):
     for stats in stats_list:
-      for stat in stats.dependencies:
-        if ftype and not type(stat) == ftype:
-          continue
-        if stat.path in generated:
-          # TODO: remove this validation... unclear how it would happen.
-          raise ValueError('Duplicate path in {}'.format(stats_list))
-        generated.add(stat.path)
+      for stat in getattr(stats, field):
         yield stat
-  return result_type(tuple(generate()))
-
-
-def stats_to_paths(stats):
-  return Paths(tuple(Path(stat.path) for stat in stats.dependencies))
+  return Stats(files=tuple(generate('files')),
+               dirs=tuple(generate('dirs')),
+               links=tuple(generate('links')))
 
 
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given Stats object using the given PathWildcard."""
-  ftype = Dir if path_wildcard.wildcard.endswith(os_sep + '.') else File
-  print('>>> path wildcard match type is {} for {}'.format(ftype.__name__, path_wildcard))
-  filtered = tuple(stat for stat in stats.dependencies
-                   if type(stat) == ftype and
-                   fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
-  return Stats(filtered)
+  def filtered(ftype, entries):
+    return tuple(stat for stat in entries
+                 if type(stat) == ftype and
+                 fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
+  coltype = path_wildcard.ftype
+  if coltype is Files:
+    return Stats(files=filtered(File, stats.files))
+  elif coltype is Dirs:
+    return Stats(dirs=filtered(Dir, stats.dirs))
+  elif coltype is Links:
+    return Stats(links=filtered(Link, stats.links))
+  else:
+    raise ValueError('Unrecognized Stat type: {}'.format(coltype))
+
+
+def apply_path_literal(stats, path_literal):
+  """Filter the given Stats object using the given PathLiteral."""
+  raise ValueError('Not implemented.')
 
 
 def apply_path_dir_wildcard(dirs, path_dir_wildcard):
@@ -306,28 +315,55 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   The resulting PathGlobs object will be simplified relative to this wildcard, in the sense
   that it will be relative to a subdirectory.
   """
+  ftype = path_dir_wildcard.ftype
   paths = [d.path for d in dirs.dependencies
            if fnmatch.fnmatch(d.path, path_dir_wildcard.wildcard)]
   print('>>> path dir wildcard {}'.format(path_dir_wildcard))
-  return PathGlobs(tuple(PathGlob.create_from_spec(p, remainder)
-                         for p in paths
-                         for remainder in path_dir_wildcard.remainders))
+  return PathGlobs(ftype, tuple(PathGlob.create_from_spec(ftype, p, remainder)
+                                for p in paths
+                                for remainder in path_dir_wildcard.remainders))
+
+
+def resolve_dir_links(direct_stats, linked_dirs):
+  return Dirs(tuple(d for dirs in (direct_stats.dirs, linked_dirs.dependencies) for d in dirs))
+
+
+def resolve_file_links(direct_stats, linked_files):
+  return Files(tuple(f for files in (direct_stats.files, linked_files.dependencies) for f in files))
+
+
+def merge_dirs(dirs_list):
+  return Dirs(tuple(d for dirs in dirs_list for d in dirs))
+
+
+def merge_files(files_list):
+  return Files(tuple(f for files in files_list for f in files))
+
+
+def read_link(project_tree, link):
+  raise ValueError('Not implemented')
 
 
 def path_stat(project_tree, path_literal):
   path = normpath(path_literal.path)
   ptstat = project_tree.lstat(path)
   if ptstat == None:
-    return Stats(tuple())
+    return Stats()
 
   if ptstat == PTSTAT_FILE:
-    return Stats((File(path),))
+    return Stats(files=(File(path),))
   elif ptstat == PTSTAT_DIR:
-    return Stats((Dir(path),))
+    return Stats(dirs=(Dir(path),))
   elif ptstat == PTSTAT_LINK:
-    return Stats((Link(path),))
+    return Stats(links=(Link(path),))
   else:
     raise ValueError('Unrecognized stat type for {}, {}: {}'.format(project_tree, path, ptstat))
+
+
+def stats_to_paths(stats):
+  return Paths(tuple(Path(s.path)
+                     for col in (stats.files, stats.dirs, stats.links)
+                     for s in col))
 
 
 def files_content(file_contents):
@@ -352,6 +388,7 @@ def identity(v):
 def create_fs_tasks():
   """Creates tasks that consume the native filesystem Node type."""
   return [
+    # Execute globs.
     (Stats,
      [SelectProjection(Stats, Dir, ('directory',), PathWildcard),
       Select(PathWildcard)],
@@ -362,22 +399,43 @@ def create_fs_tasks():
      apply_path_dir_wildcard),
     (Stats,
      [SelectProjection(Stats, Path, ('path',), PathLiteral)],
-     identity),
+     # TODO: need to filter to ftype
+     apply_path_literal),
     (Paths,
      [Select(Stats)],
      stats_to_paths),
-    (Files,
-     [SelectDependencies(Stats, Paths)],
-     merge_file_stats),
+  ] + [
+    # Link resolution.
     (Dirs,
-     [SelectDependencies(Stats, Paths)],
-     merge_dir_stats),
+     [Select(Stats),
+      SelectProjection(Dirs, Links, ('links',), Stats)],
+     resolve_dir_links),
+    (Dirs,
+     [SelectDependencies(Dirs, Links)],
+     merge_dirs),
+    (Dirs,
+     [SelectProjection(Dirs, Path, ('path',), ReadLink)],
+     identity),
+    (Files,
+     [Select(Stats),
+      SelectProjection(Files, Links, ('links',), Stats)],
+     resolve_file_links),
+    (Files,
+     [SelectProjection(Files, Path, ('path',), ReadLink)],
+     identity),
+    (Files,
+     [SelectDependencies(Files, Links)],
+     merge_files),
+  ] + [
+    # TODO: unclassified.
     (Stats,
      [SelectDependencies(Stats, PathGlobs)],
      merge_stats),
     (Stats,
      [SelectDependencies(Stats, DirectoryListing, field='paths')],
      merge_stats),
+  ] + [
+    # Retrieve the contents of Files.
     (FilesContent,
      [SelectDependencies(FileContent, Files)],
      files_content),

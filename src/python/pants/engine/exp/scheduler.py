@@ -13,7 +13,7 @@ from collections import defaultdict
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
-from pants.engine.exp.fs import PathGlobs, Stats
+from pants.engine.exp.fs import PathGlobs
 from pants.engine.exp.nodes import (DependenciesNode, FilesystemNode, Node, Noop, ProjectionNode,
                                     Return, SelectNode, State, StepContext, TaskNode, Throw,
                                     Waiting)
@@ -511,7 +511,7 @@ class LocalScheduler(object):
           elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
             yield DependenciesNode(subject, product, None, Addresses, None)
           elif type(subject) is PathGlobs:
-            yield DependenciesNode(subject, product, None, Stats, None)
+            yield DependenciesNode(subject, product, None, subject.ftype, None)
           else:
             raise ValueError('Unsupported root subject type: {}'.format(subject))
 

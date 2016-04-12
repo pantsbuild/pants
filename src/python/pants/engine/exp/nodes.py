@@ -10,8 +10,8 @@ from os.path import dirname
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
-from pants.engine.exp.fs import (Dir, DirectoryListing, File, FileContent, Path, Stats,
-                                 file_content, list_directory, path_stat)
+from pants.engine.exp.fs import (Dir, DirectoryListing, File, FileContent, Link, Path, ReadLink,
+                                 Stats, file_content, list_directory, path_stat, read_link)
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -369,6 +369,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       (DirectoryListing, Dir),
       (FileContent, File),
       (Stats, Path),
+      (ReadLink, Link),
     }
 
   _FS_PRODUCT_TYPES = {product for product, subject in _FS_PAIRS}
@@ -386,9 +387,10 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def generate_subjects(self, filenames):
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
-      # Stats or FileContent for the literal path.
+      # Stats, ReadLink, or FileContent for the literal path.
       yield Path(f)
       yield File(f)
+      yield Link(f)
       # DirectoryListings for parent dirs.
       yield Dir(dirname(f))
 
@@ -405,6 +407,8 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
         return Return(file_content(step_context.project_tree, self.subject))
       elif self.product is DirectoryListing:
         return Return(list_directory(step_context.project_tree, self.subject))
+      elif self.product is ReadLink:
+        return Return(read_link(step_context.project_tree, self.subject))
       else:
         # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
         raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
