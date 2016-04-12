@@ -18,7 +18,7 @@ from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.examples.graph_validator import GraphValidator
 from pants.engine.exp.examples.parsers import JsonParser
 from pants.engine.exp.examples.sources import Sources
-from pants.engine.exp.fs import FileContent, FilesContent, Path, PathGlobs, Dirs, create_fs_tasks
+from pants.engine.exp.fs import Dirs, FileContent, FilesContent, PathGlobs, Stat, create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.parser import SymbolTable
@@ -429,7 +429,7 @@ def setup_json_scheduler(build_root, debug=True):
       'list': Address,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
-      'ls': Path,
+      'ls': Stat,
       'cat': FileContent,
     }
   tasks = [

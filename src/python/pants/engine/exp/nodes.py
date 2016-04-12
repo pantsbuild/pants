@@ -10,8 +10,8 @@ from os.path import dirname
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
-from pants.engine.exp.fs import (Dir, DirectoryListing, FileContent, Path, Stats, file_content,
-                                 list_directory, path_stat)
+from pants.engine.exp.fs import (Dir, DirectoryListing, File, FileContent, Path, Stats,
+                                 file_content, list_directory, path_stat)
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -367,7 +367,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
 
   _FS_PAIRS = {
       (DirectoryListing, Dir),
-      (FileContent, Path),
+      (FileContent, File),
       (Stats, Path),
     }
 
@@ -388,6 +388,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
     for f in filenames:
       # Stats or FileContent for the literal path.
       yield Path(f)
+      yield File(f)
       # DirectoryListings for parent dirs.
       yield Dir(dirname(f))
 

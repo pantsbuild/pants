@@ -69,6 +69,10 @@ class Stats(datatype('Stats', ['dependencies'])):
   """A set of Stat objects."""
 
 
+class Files(datatype('Files', ['dependencies'])):
+  """A set of File objects."""
+
+
 class Dirs(datatype('Dirs', ['dependencies'])):
   """A set of Dir objects."""
 
@@ -245,12 +249,16 @@ def list_directory(project_tree, directory):
     print('>>> listing {}: got {}'.format(path, entries))
     return DirectoryListing(directory,
                             True,
-                            [Path(e) for e in entries])
+                            tuple(Path(e) for e in entries))
   except (IOError, OSError) as e:
     if e.errno == errno.ENOENT:
-      return DirectoryListing(directory, False, [])
+      return DirectoryListing(directory, False, tuple())
     else:
       raise e
+
+
+def merge_file_stats(stats_list):
+  return merge_stats(stats_list, ftype=File, result_type=Files)
 
 
 def merge_dir_stats(stats_list):
@@ -359,8 +367,11 @@ def create_fs_tasks():
     (Paths,
      [Select(Stats)],
      stats_to_paths),
+    (Files,
+     [SelectDependencies(Stats, Paths)],
+     merge_file_stats),
     (Dirs,
-     [SelectDependencies(Stats, PathGlobs)],
+     [SelectDependencies(Stats, Paths)],
      merge_dir_stats),
     (Stats,
      [SelectDependencies(Stats, PathGlobs)],
@@ -369,6 +380,6 @@ def create_fs_tasks():
      [SelectDependencies(Stats, DirectoryListing, field='paths')],
      merge_stats),
     (FilesContent,
-     [SelectDependencies(FileContent, Paths)],
+     [SelectDependencies(FileContent, Files)],
      files_content),
   ]

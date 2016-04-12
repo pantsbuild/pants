@@ -13,7 +13,7 @@ import six
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.fs import DirectoryListing, Dir, Dirs, File, FilesContent, Path, PathGlobs, Paths, Stats
+from pants.engine.exp.fs import Dir, DirectoryListing, Dirs, Files, FilesContent, PathGlobs, Paths
 from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -30,14 +30,13 @@ def _key_func(entry):
   return key
 
 
-class BuildFiles(datatype('BuildFiles', ['paths'])):
+class BuildFiles(datatype('BuildFiles', ['files'])):
   """A list of Paths that are known to match a BUILD file pattern."""
 
 
-def filter_buildfile_paths(address_mapper, stats_list):
-  build_files = tuple(Path(stat.path) for stats in stats_list for stat in stats.dependencies
-                      if type(stat) is File and
-                      address_mapper.build_pattern.match(os_path_basename(stat.path)))
+def filter_buildfile_paths(address_mapper, files):
+  build_files = tuple(f for f in files.dependencies
+                      if address_mapper.build_pattern.match(os_path_basename(f.path)))
   return BuildFiles(build_files)
 
 
@@ -239,11 +238,11 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     (AddressFamily,
      [SelectLiteral(address_mapper, AddressMapper),
       Select(Dir),
-      SelectProjection(FilesContent, Paths, ('paths',), BuildFiles)],
+      SelectProjection(FilesContent, Files, ('files',), BuildFiles)],
      parse_address_family),
     (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      SelectDependencies(Stats, DirectoryListing, field='paths')],
+      SelectProjection(Files, Paths, ('paths',), DirectoryListing)],
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks

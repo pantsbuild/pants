@@ -9,8 +9,8 @@ import os
 import unittest
 from os.path import join
 
-from pants.engine.exp.fs import (FileContent, Path, PathDirWildcard, PathGlobs, PathLiteral,
-                                 PathWildcard)
+from pants.engine.exp.fs import (FileContent, PathDirWildcard, PathGlobs, PathLiteral, PathWildcard,
+                                 Stat)
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
 
@@ -26,7 +26,7 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
 
   def assert_walk(self, filespecs, files):
     scheduler, storage, _ = self.mk_scheduler(build_root_src=self._build_root_src)
-    result = self.execute(scheduler, storage, Path, self.specs('', *filespecs))[0]
+    result = self.execute(scheduler, storage, Stat, self.specs('', *filespecs))[0]
     self.assertEquals(set(files), set([p.path for p in result]))
 
   def assert_content(self, filespecs, expected_content):
