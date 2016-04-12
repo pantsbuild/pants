@@ -300,15 +300,14 @@ def apply_path_wildcard(stats, path_wildcard):
   return Stats(filtered)
 
 
-def apply_path_dir_wildcard(stats, path_dir_wildcard):
+def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   """Given a PathDirWildcard, compute a PathGlobs object that encompasses its children.
 
   The resulting PathGlobs object will be simplified relative to this wildcard, in the sense
   that it will be relative to a subdirectory.
   """
-  paths = [stat.path for stat in stats.dependencies
-           if type(stat) == Dir and
-           fnmatch.fnmatch(stat.path, path_dir_wildcard.wildcard)]
+  paths = [d.path for d in dirs.dependencies
+           if fnmatch.fnmatch(d.path, path_dir_wildcard.wildcard)]
   print('>>> path dir wildcard {}'.format(path_dir_wildcard))
   return PathGlobs(tuple(PathGlob.create_from_spec(p, remainder)
                          for p in paths
@@ -358,7 +357,7 @@ def create_fs_tasks():
       Select(PathWildcard)],
      apply_path_wildcard),
     (PathGlobs,
-     [SelectProjection(Stats, Dir, ('directory',), PathDirWildcard),
+     [SelectProjection(Dirs, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
     (Stats,
