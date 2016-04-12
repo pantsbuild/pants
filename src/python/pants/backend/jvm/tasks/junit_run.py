@@ -80,10 +80,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--test-shard', advanced=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
-    register('--suppress-output', type=bool, default=True,
-             deprecated_hint='Use --output-mode instead.',
-             deprecated_version='0.0.64', removal_version='0.0.81',
-             help='Redirect test output to files in .pants.d/test/junit.')
     register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
              help='Specify what part of output should be passed to stdout. '
                   'In case of FAILURE_ONLY and parallel tests execution '

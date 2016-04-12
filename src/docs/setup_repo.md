@@ -11,15 +11,16 @@ and not worry about these things.)
 Configuring with `pants.ini`
 ----------------------------
 
-Pants Build is very configurable. Your source tree's top-level directory
-contains a `pants.ini` file that can set various options,
-specify binaries to
-use in your toolchain, set arguments to pass to tools, etc.
+Pants is very configurable and has literally hundreds of options.  Most of these are 
+automatically set to useful defaults. However it is inevitable that sooner or later you'll 
+need to tweak some of them.  For example, you may want to use `pants.ini`
+[[to pin your Pants version|pants('src/docs:install')]]
 
-This file is a [Python config
-files](http://docs.python.org/install/index.html#inst-config-syntax),
-parsed by
-[ConfigParser](http://docs.python.org/library/configparser.html). Thus,
+To do so, create a `pants.ini` file in your source tree's top-level directory.  If you installed
+pants [[as recommended|pants('src/docs:install')]] this file should already exist.
+
+The `pants.ini` file is a [Python config files](http://docs.python.org/install/index.html#inst-config-syntax),
+parsed by [ConfigParser](http://docs.python.org/library/configparser.html). Thus,
 it looks something like:
 
     :::ini
@@ -47,9 +48,7 @@ several contexts, as in these excerpts that define/use `thrift_workdir`:
     ]
 
 It's also handy for defining values that are used in several contexts,
-since these values will be available in all those contexts. The code
-that combines DEFAULT values with others is in Pants'
-[option/config.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/config.py).
+since these values will be available in all those contexts. 
 
 Configure Pants' own Runtime Dependencies
 -----------------------------------------
@@ -373,7 +372,7 @@ If you you work with a large engineering organization, you might want to
 gather this information in one place, so it can inform decisions about how
 to improve everybody's build times.
 
-In everyone's `pants.ini` files, in the `[DEFAULT]` section, add a
+In everyone's `pants.ini` files, in the `[run-tracker]` section, add a
 `stats_upload_url` line:
 
     stats_upload_url: "http://myorg.org/pantsstats"
