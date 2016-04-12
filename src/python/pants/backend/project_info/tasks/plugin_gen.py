@@ -15,6 +15,7 @@ from pants.backend.project_info.tasks.ide_gen import IdeGen
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.generator import Generator, TemplateData
 from pants.binaries import binary_util
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
@@ -61,7 +62,6 @@ class PluginGen(IdeGen):
   def __init__(self, *args, **kwargs):
     super(PluginGen, self).__init__(*args, **kwargs)
 
-    self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
     self.open = self.get_options().open
 
     self.scala_language_level = _SCALA_VERSIONS.get(
@@ -72,16 +72,20 @@ class PluginGen(IdeGen):
     idea_version = _VERSIONS[self.get_options().version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR,
                                          'project-{}.mustache'.format(idea_version))
-    self.module_template = os.path.join(_TEMPLATE_BASEDIR,
-                                        'module-{}.mustache'.format(idea_version))
     self.workspace_template = os.path.join(_TEMPLATE_BASEDIR,
                                         'workspace-{}.mustache'.format(idea_version))
-    self.project_filename = os.path.join(self.cwd,
-                                         '{}.ipr'.format(self.project_name))
-    self.module_filename = os.path.join(self.gen_project_workdir,
-                                        '{}.iml'.format(self.project_name))
-    self.workspace_filename = os.path.join(self.gen_project_workdir,
-                                        '{}.iws'.format(self.project_name))
+
+    output_dir = os.path.join(get_buildroot(), ".idea", "idea-plugin")
+    safe_mkdir(output_dir)
+
+    with temporary_dir(root_dir=output_dir, cleanup=False) as output_project_dir:
+      self.gen_project_workdir = output_project_dir
+      
+      self.project_filename = os.path.join(self.gen_project_workdir,
+                                           '{}.ipr'.format(self.project_name))
+      self.workspace_filename = os.path.join(self.gen_project_workdir,
+                                          '{}.iws'.format(self.project_name))
+      self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
 
   def generate_project(self, project):
     def create_content_root(source_set):
