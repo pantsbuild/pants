@@ -80,7 +80,7 @@ class PluginGen(IdeGen):
 
     with temporary_dir(root_dir=output_dir, cleanup=False) as output_project_dir:
       self.gen_project_workdir = output_project_dir
-      
+
       self.project_filename = os.path.join(self.gen_project_workdir,
                                            '{}.ipr'.format(self.project_name))
       self.workspace_filename = os.path.join(self.gen_project_workdir,
