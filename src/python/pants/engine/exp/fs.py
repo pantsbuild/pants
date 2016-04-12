@@ -25,7 +25,7 @@ class Path(datatype('Path', ['path'])):
   """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
 
   def __new__(cls, path):
-    return super(Path, cls).__new__(cls, six.text_type(path))
+    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
 
 
 class Stat(AbstractClass):
@@ -138,6 +138,7 @@ class PathGlob(AbstractClass):
     TODO: Because `create_from_spec` is called recursively, this method should work harder to
     avoid splitting/joining. Optimization needed.
     """
+    print('parsing for {} and {}'.format(relative_to, parts))
     double_index, single_index = cls._wildcard_part(parts)
     if double_index is not None:
       # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
@@ -239,10 +240,12 @@ def list_directory(project_tree, directory):
   :returns: A DirectoryListing.
   """
   try:
-    path = directory.path
+    path = normpath(directory.path)
+    entries = [join(path, e) for e in project_tree.listdir(path)]
+    print('>>> listing {}: got {}'.format(path, entries))
     return DirectoryListing(directory,
                             True,
-                            [Path(join(path, e)) for e in project_tree.listdir(path)])
+                            [Path(e) for e in entries])
   except (IOError, OSError) as e:
     if e.errno == errno.ENOENT:
       return DirectoryListing(directory, False, [])
@@ -282,6 +285,7 @@ def stats_to_paths(stats):
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given Stats object using the given PathWildcard."""
   ftype = Dir if path_wildcard.wildcard.endswith(os_sep + '.') else File
+  print('>>> path wildcard match type is {} for {}'.format(ftype.__name__, path_wildcard))
   filtered = tuple(stat for stat in stats.dependencies
                    if type(stat) == ftype and
                    fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
@@ -297,13 +301,14 @@ def apply_path_dir_wildcard(stats, path_dir_wildcard):
   paths = [stat.path for stat in stats.dependencies
            if type(stat) == Dir and
            fnmatch.fnmatch(stat.path, path_dir_wildcard.wildcard)]
+  print('>>> path dir wildcard {}'.format(path_dir_wildcard))
   return PathGlobs(tuple(PathGlob.create_from_spec(p, remainder)
                          for p in paths
                          for remainder in path_dir_wildcard.remainders))
 
 
 def path_stat(project_tree, path_literal):
-  path = path_literal.path
+  path = normpath(path_literal.path)
   ptstat = project_tree.lstat(path)
   if ptstat == None:
     return Stats(tuple())
@@ -348,6 +353,9 @@ def create_fs_tasks():
      [SelectProjection(Stats, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
+    (Stats,
+     [SelectProjection(Stats, Path, ('path',), PathLiteral)],
+     identity),
     (Paths,
      [Select(Stats)],
      stats_to_paths),
@@ -363,7 +371,4 @@ def create_fs_tasks():
     (FilesContent,
      [SelectDependencies(FileContent, Paths)],
      files_content),
-    (Stats,
-     [SelectProjection(Stats, Path, ('path',), PathLiteral)],
-     identity),
   ]

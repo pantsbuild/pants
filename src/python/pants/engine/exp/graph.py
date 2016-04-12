@@ -13,7 +13,7 @@ import six
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.fs import Dir, Dirs, File, FilesContent, Path, PathGlobs, Paths, Stats
+from pants.engine.exp.fs import DirectoryListing, Dir, Dirs, File, FilesContent, Path, PathGlobs, Paths, Stats
 from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -31,16 +31,11 @@ def _key_func(entry):
 
 
 class BuildFiles(datatype('BuildFiles', ['paths'])):
-  """A list of paths that are known to match a BUILD file pattern.
-
-  TODO: Because BUILD file names are matched using a regex, this cannot only use PathGlobs.
-  If we were willing to allow a bit of slop in terms of files read, this could use
-  PathGlobs to get FilesContent for all files with the right prefix, and then discard.
-  """
+  """A list of Paths that are known to match a BUILD file pattern."""
 
 
-def filter_buildfile_paths(address_mapper, stats):
-  build_files = tuple(Path(stat.path) for stat in stats.dependencies
+def filter_buildfile_paths(address_mapper, stats_list):
+  build_files = tuple(Path(stat.path) for stats in stats_list for stat in stats.dependencies
                       if type(stat) is File and
                       address_mapper.build_pattern.match(os_path_basename(stat.path)))
   return BuildFiles(build_files)
@@ -248,7 +243,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      parse_address_family),
     (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(Stats)],
+      SelectDependencies(Stats, DirectoryListing, field='paths')],
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks

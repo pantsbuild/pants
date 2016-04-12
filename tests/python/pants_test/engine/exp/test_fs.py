@@ -116,9 +116,9 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
     self.assert_walk(['**/*.zzz'], [])
 
   def test_walk_recursive_directory(self):
-    self.assert_walk(['*/.'], ['a/.'])
-    self.assert_walk(['*/*/.'], ['a/b/.'])
-    self.assert_walk(['**/*/.'], ['a/b/.'])
+    self.assert_walk(['*/.'], ['a'])
+    self.assert_walk(['*/*/.'], ['a/b'])
+    self.assert_walk(['**/*/.'], ['a/b'])
     self.assert_walk(['*/*/*/.'], [])
 
   def test_files_content_literal(self):
