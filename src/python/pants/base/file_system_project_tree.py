@@ -53,17 +53,8 @@ class FileSystemProjectTree(ProjectTree):
       else:
         raise e
 
-  def readlink(self, relpath):
-    link_path = os.readlink(self._join(relpath))
-    if os.path.isabs(link_path):
-      raise IOError('Absolute symlinks not supported in {}: {} -> {}'.format(
-        self, relpath, link_path))
-    # In order to enforce that this link does not escape the build_root, we join and
-    # then remove it.
-    abs_normpath = os.path.normpath(os.path.join(self.build_root,
-                                                 os.path.dirname(relpath),
-                                                 link_path))
-    return fast_relpath(abs_normpath, self.build_root)
+  def relative_readlink(self, relpath):
+    return os.readlink(self._join(relpath))
 
   def listdir(self, relpath):
     return os.listdir(self._join(relpath))

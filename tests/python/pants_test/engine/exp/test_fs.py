@@ -9,7 +9,7 @@ import os
 import unittest
 from os.path import join
 
-from pants.engine.exp.fs import (FileContent, Files, Dirs, Path, PathDirWildcard, PathGlobs,
+from pants.engine.exp.fs import (Dirs, FileContent, Files, Path, PathDirWildcard, PathGlobs,
                                  PathWildcard)
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
@@ -61,9 +61,9 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
   def test_create_wildcard(self):
     name = '*.java'
     subdir = 'foo'
-    self.assert_files_equals([PathWildcard(Files, '', name)], '', [name])
-    self.assert_files_equals([PathWildcard(Files, subdir, name)], subdir, [name])
-    self.assert_files_equals([PathWildcard(Files, subdir, name)], '', [join(subdir, name)])
+    self.assert_files_equals([PathWildcard('', name)], '', [name])
+    self.assert_files_equals([PathWildcard(subdir, name)], subdir, [name])
+    self.assert_files_equals([PathWildcard(subdir, name)], '', [join(subdir, name)])
 
   def test_create_dir_wildcard(self):
     name = 'Blah.java'

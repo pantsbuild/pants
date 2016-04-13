@@ -57,6 +57,9 @@ class ScmProjectTree(ProjectTree):
     else:
       raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 
+  def relative_readlink(self, relpath):
+    return self._reader.readlink(self._scm_relpath(relpath))
+
   def listdir(self, relpath):
     return self._reader.listdir(self._scm_relpath(relpath))
 

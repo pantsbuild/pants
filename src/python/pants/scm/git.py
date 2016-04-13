@@ -386,6 +386,10 @@ class GitRepositoryReader(object):
     obj, _ = self._safe_resolve_object(relpath)
     return obj
 
+  def readlink(self, relpath):
+    obj, _ = self._safe_resolve_object(relpath)
+    return self._read_symlink(obj)
+
   class Symlink(object):
 
     def __init__(self, name, sha):
@@ -458,19 +462,13 @@ class GitRepositoryReader(object):
       if not isinstance(obj, self.Symlink):
         return path_so_far
 
+      # Is a symlink.
       symlinks += 1
       if symlinks > MAX_SYMLINKS_IN_REALPATH:
         raise self.SymlinkLoopException(self.rev, relpath)
-      # A git symlink is stored as a blob containing the name of the target.
-      # Read that blob.
-      object_type, path_data = self._read_object_from_repo(sha=obj.sha)
-      assert object_type == 'blob'
 
-      if path_data[0] == '/':
-        # In the event of an absolute path, just return that path
-        return path_data
+      link_to = self._read_symlink(obj, relpath)
 
-      link_to = os.path.normpath(os.path.join(os.path.dirname(path_so_far), path_data))
       if link_to.startswith('../') or link_to[0] == '/':
         # If the link points outside the repo, then just return that file
         return link_to
@@ -478,6 +476,18 @@ class GitRepositoryReader(object):
       # Recurse to continue our search at the top with the new path.
       # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
       components = link_to.split(SLASH) + components
+
+  def _read_symlink(self, obj):
+    # A git symlink is stored as a blob containing the name of the target.
+    # Read that blob.
+    object_type, path_data = self._read_object_from_repo(sha=obj.sha)
+    assert object_type == 'blob'
+
+    if path_data[0] == '/':
+      # In the event of an absolute path, just return that path
+      return path_data
+
+    return os.path.normpath(os.path.join(os.path.dirname(obj.name), path_data))
 
   def _resolve_object(self, relpath, components=None):
     """Resolve a single object from the complete set of its path components.

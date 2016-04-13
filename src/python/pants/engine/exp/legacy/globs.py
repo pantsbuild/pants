@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 
-from pants.engine.exp.fs import FileContent, Files as FSFiles, PathGlobs
+from pants.engine.exp.fs import Files as FSFiles
+from pants.engine.exp.fs import FileContent, PathGlobs
 from pants.engine.exp.nodes import Throw
 from pants.source import wrapped_globs
 from pants.util.memo import memoized_property

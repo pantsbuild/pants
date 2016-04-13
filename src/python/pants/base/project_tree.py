@@ -9,6 +9,7 @@ import logging
 import os
 from abc import abstractmethod
 
+from pants.util.dirutil import fast_relpath
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -58,8 +59,20 @@ class ProjectTree(AbstractClass):
     """Without following symlinks, returns a PTStat object for the path, or None"""
 
   @abstractmethod
+  def relative_readlink(self, relpath):
+    """Execute `readlink` for the given path, which may result in a relative path."""
+
   def readlink(self, relpath):
-    """Execute `readlink` for the given path, which must be a symlink."""
+    link_path = self.relative_readlink(relpath)
+    if os.path.isabs(link_path):
+      raise IOError('Absolute symlinks not supported in {}: {} -> {}'.format(
+        self, relpath, link_path))
+    # In order to enforce that this link does not escape the build_root, we join and
+    # then remove it.
+    abs_normpath = os.path.normpath(os.path.join(self.build_root,
+                                                 os.path.dirname(relpath),
+                                                 link_path))
+    return fast_relpath(abs_normpath, self.build_root)
 
   @abstractmethod
   def content(self, file_relpath):
