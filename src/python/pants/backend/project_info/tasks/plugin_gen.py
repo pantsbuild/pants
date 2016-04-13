@@ -41,7 +41,7 @@ _SCALA_VERSIONS = {
 
 
 class PluginGen(IdeGen, ConsoleTask):
-  """Invoke an IntelliJ Pants plugin to create a project from the given targets."""
+  """Invoke IntelliJ Pants plugin to create a project."""
 
   @classmethod
   def prepare(cls, options, round_manager):
