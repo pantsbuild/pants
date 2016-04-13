@@ -375,6 +375,11 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def is_filesystem_product(cls, product):
     return product in cls._FS_PRODUCT_TYPES
 
+  @classmethod
+  def is_filesystem_pair(cls, subject_type, product):
+    """True if the given subject type and product type should be computed using a FileystemNode."""
+    return subject_type is cls._FS_PRODUCT_TYPES.get(product, None)
+
   @property
   def is_cacheable(self):
     """Native node should not be cached."""
@@ -387,33 +392,20 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
     return SelectNode(self.subject, self._input_type(), self.variants, None)
 
   def step(self, dependency_states, step_context):
-    # Request the relevant input product for the output product.
-    input_node = self._input_node()
-    input_state = dependency_states.get(input_node, None)
-    if input_state is None or type(input_state) == Waiting:
-      return Waiting([input_node])
-    elif type(input_state) == Throw:
-      return input_state
-    elif type(input_state) == Noop:
-      return Noop('Could not compute {} in order to make filesystem request.'.format(input_node))
-    elif type(input_state) != Return:
-      State.raise_unrecognized(input_state)
-
-    # If an input product was available, execute.
-    input_value = input_state.value
     try:
       # TODO: https://github.com/pantsbuild/pants/issues/3121
-      assert not os.path.islink(input_value.path), (
-        'cannot perform native filesystem operations on a symlink!')
+      assert not os.path.islink(self.subject.path), (
+          'cannot perform native filesystem operations on symlink!: {}'.format(self.subject.path))
 
       if self.product is Paths:
-        return Return(path_exists(step_context.project_tree, input_value))
+        return Return(path_exists(step_context.project_tree, self.subject))
       elif self.product is FileContent:
-        return Return(file_content(step_context.project_tree, input_value))
+        return Return(file_content(step_context.project_tree, self.subject))
       elif self.product is DirectoryListing:
-        return Return(list_directory(step_context.project_tree, input_value))
+        return Return(list_directory(step_context.project_tree, self.subject))
       else:
-        return Throw('Mismatched input value {} for {}'.format(input_value, self))
+        # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
+        raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
     except Exception as e:
       return Throw(e)
 

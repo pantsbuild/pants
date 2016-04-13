@@ -189,8 +189,6 @@ class ProductGraph(object):
     for file_path, parent_dir_path in file_paths:
       yield Path(file_path)
       yield Path(parent_dir_path)  # Invalidate the parent dirs DirectoryListing.
-      # TODO: See https://github.com/pantsbuild/pants/issues/3117.
-      yield DescendantAddresses(parent_dir_path)
 
   def invalidate_files(self, filenames):
     """Given a set of changed filenames, invalidate all related FilesystemNodes in the graph."""
@@ -350,13 +348,13 @@ class NodeBuilder(Closable):
     self._tasks = tasks
 
   def gen_nodes(self, subject, product, variants):
-    # Native filesystem operations.
-    if FilesystemNode.is_filesystem_product(product):
+    if FilesystemNode.is_filesystem_pair(type(subject), product):
+      # Native filesystem operations.
       yield FilesystemNode(subject, product, variants)
-
-    # Tasks.
-    for task, anded_clause in self._tasks[product]:
-      yield TaskNode(subject, product, variants, task, anded_clause)
+    else:
+      # Tasks.
+      for task, anded_clause in self._tasks[product]:
+        yield TaskNode(subject, product, variants, task, anded_clause)
 
   def select_node(self, selector, subject, variants):
     """Constructs a Node for the given Selector and the given Subject/Variants.
