@@ -166,7 +166,7 @@ class PathGlob(AbstractClass):
                              remainders)
     elif single_index is None:
       # A literal path.
-      return PathLiteral(ftype, join(relative_to, *parts))
+      return Path(join(relative_to, *parts))
     elif single_index == (len(parts) - 1):
       # There is a wildcard in the file basename of the path.
       return PathWildcard(ftype, join(relative_to, *parts[:-1]), parts[-1])
@@ -177,10 +177,6 @@ class PathGlob(AbstractClass):
                              join(relative_to, *parts[:single_index]),
                              parts[single_index],
                              remainders)
-
-
-class PathLiteral(datatype('PathLiteral', ['ftype', 'path']), PathGlob):
-  """A single literal PathGlob, which may or may not exist."""
 
 
 class PathWildcard(datatype('PathWildcard', ['ftype', 'directory', 'wildcard']), PathGlob):
@@ -289,24 +285,10 @@ def merge_stats(stats_list):
 
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given Stats object using the given PathWildcard."""
-  def filtered(ftype, entries):
+  def filtered(entries):
     return tuple(stat for stat in entries
-                 if type(stat) == ftype and
-                 fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
-  coltype = path_wildcard.ftype
-  if coltype is Files:
-    return Stats(files=filtered(File, stats.files))
-  elif coltype is Dirs:
-    return Stats(dirs=filtered(Dir, stats.dirs))
-  elif coltype is Links:
-    return Stats(links=filtered(Link, stats.links))
-  else:
-    raise ValueError('Unrecognized Stat type: {}'.format(coltype))
-
-
-def apply_path_literal(stats, path_literal):
-  """Filter the given Stats object using the given PathLiteral."""
-  raise ValueError('Not implemented.')
+                 if fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
+  return Stats(files=filtered(stats.files), dirs=filtered(stats.dirs), links=filtered(stats.links))
 
 
 def apply_path_dir_wildcard(dirs, path_dir_wildcard):
@@ -360,10 +342,8 @@ def path_stat(project_tree, path_literal):
     raise ValueError('Unrecognized stat type for {}, {}: {}'.format(project_tree, path, ptstat))
 
 
-def stats_to_paths(stats):
-  return Paths(tuple(Path(s.path)
-                     for col in (stats.files, stats.dirs, stats.links)
-                     for s in col))
+def stat_to_path(stat):
+  return Path(stat.path)
 
 
 def files_content(file_contents):
@@ -397,13 +377,9 @@ def create_fs_tasks():
      [SelectProjection(Dirs, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
-    (Stats,
-     [SelectProjection(Stats, Path, ('path',), PathLiteral),
-      Select(PathLiteral)],
-     apply_path_literal),
-    (Paths,
-     [Select(Stats)],
-     stats_to_paths),
+    (Path,
+     [Select(Stat)],
+     stat_to_path),
   ] + [
     # Link resolution.
     (Dirs,

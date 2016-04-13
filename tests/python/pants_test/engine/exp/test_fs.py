@@ -9,7 +9,7 @@ import os
 import unittest
 from os.path import join
 
-from pants.engine.exp.fs import (FileContent, Files, Dirs, Path, PathDirWildcard, PathGlobs, PathLiteral,
+from pants.engine.exp.fs import (FileContent, Files, Dirs, Path, PathDirWildcard, PathGlobs,
                                  PathWildcard)
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
@@ -47,16 +47,16 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
   def test_create_literal(self):
     subdir = 'foo'
     name = 'Blah.java'
-    self.assert_files_equals([PathLiteral(Files, name)], '', [name])
-    self.assert_files_equals([PathLiteral(Files, join(subdir, name))], subdir, [name])
-    self.assert_files_equals([PathLiteral(Files, join(subdir, name))], '', [join(subdir, name)])
+    self.assert_files_equals([Path(name)], '', [name])
+    self.assert_files_equals([Path(join(subdir, name))], subdir, [name])
+    self.assert_files_equals([Path(join(subdir, name))], '', [join(subdir, name)])
 
   def test_create_literal_directory(self):
     subdir = 'foo'
     name = 'bar/.'
-    self.assert_dirs_equals([PathLiteral(Dirs, name)], '', [name])
-    self.assert_dirs_equals([PathLiteral(Dirs, join(subdir, name))], subdir, [name])
-    self.assert_dirs_equals([PathLiteral(Dirs, join(subdir, name))], '', [join(subdir, name)])
+    self.assert_dirs_equals([Path(name)], '', [name])
+    self.assert_dirs_equals([Path(join(subdir, name))], subdir, [name])
+    self.assert_dirs_equals([Path(join(subdir, name))], '', [join(subdir, name)])
 
   def test_create_wildcard(self):
     name = '*.java'
