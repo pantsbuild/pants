@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from xml.dom import minidom
 
+from pants.backend.project_info.tasks.plugin_gen import PROJECT_OUTPUT_MESSAGE
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -40,8 +41,10 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
         self.assertIn(value, actual_property.getAttribute('value'))
 
   def _get_project_dir(self, pants_run):
-    project_dir = os.path.join(pants_run.workdir, "idea-plugin/idea-plugin/PluginGen_idea_plugin/project")
-    return project_dir
+    for line in pants_run.stdout_data.splitlines():
+      if PROJECT_OUTPUT_MESSAGE in line:
+        return line.strip(PROJECT_OUTPUT_MESSAGE).split()[0]
+    return None
 
   def test_idea_plugin_single_target(self):
     with self.temporary_workdir() as workdir:
@@ -52,6 +55,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       expected_properties = [("targets", [target_a]),
                              ("project_path", ["examples/src/scala/org/pantsbuild/example/hello"])]
       project_dir = self._get_project_dir(pants_run)
+      self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
       self._do_check(project_dir, expected_properties)
 
   def test_idea_plugin_single_directory(self):

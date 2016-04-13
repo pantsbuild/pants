@@ -19,6 +19,8 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
+PROJECT_OUTPUT_MESSAGE = 'Generated IntelliJ project in'
+
 _TEMPLATE_BASEDIR = 'templates/idea'
 
 
@@ -165,7 +167,7 @@ class PluginGen(IdeGen):
         Generator(pkgutil.get_data(__name__, self.workspace_template), workspace=configured_workspace))
 
 
-    self.context.log.info('Generated IntelliJ project in {}'.format(self.gen_project_workdir))
+    self.context.log.info('{} {} '.format(PROJECT_OUTPUT_MESSAGE, self.gen_project_workdir))
 
     shutil.move(ipr, self.project_filename)
     shutil.move(iws, self.workspace_filename)
