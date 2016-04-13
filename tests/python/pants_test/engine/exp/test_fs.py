@@ -8,27 +8,34 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 from os.path import join
+from abc import abstractmethod
 
+from pants.util.meta import AbstractClass
 from pants.engine.exp.fs import (Dirs, FileContent, Files, Path, PathDirWildcard, PathGlobs,
                                  PathWildcard)
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
 
-class FSTest(unittest.TestCase, SchedulerTestBase):
+class FSTestBase(SchedulerTestBase, AbstractClass):
 
   _build_root_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test')
+
+  @abstractmethod
+  def mk_project_tree(self, build_root_src):
+    """Construct a ProjectTree for the given src path."""
+    pass
 
   def specs(self, ftype, relative_to, *filespecs):
     return PathGlobs.create_from_specs(ftype, relative_to, filespecs)
 
   def assert_walk(self, ftype, filespecs, files):
-    project_tree = self.mk_fs_tree(self._build_root_src)
+    project_tree = self.mk_project_tree(self._build_root_src)
     scheduler, storage = self.mk_scheduler(project_tree=project_tree)
     result = self.execute(scheduler, storage, Path, self.specs(ftype, '', *filespecs))[0]
     self.assertEquals(set(files), set([p.path for p in result]))
 
   def assert_content(self, filespecs, expected_content):
-    project_tree = self.mk_fs_tree(self._build_root_src)
+    project_tree = self.mk_project_tree(self._build_root_src)
     scheduler, storage = self.mk_scheduler(project_tree=project_tree)
     result = self.execute(scheduler, storage, FileContent, self.specs(Files, '', *filespecs))[0]
     def validate(e):
@@ -143,3 +150,8 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
       self.assert_content(['a/b/'], {'a/b/': 'nope\n'})
     with self.assertRaises(Exception):
       self.assert_content(['a/b'], {'a/b': 'nope\n'})
+
+
+class PosixFSTest(unittest.TestCase, FSTestBase):
+  def mk_project_tree(self, build_root_src):
+    return self.mk_fs_tree(build_root_src)
