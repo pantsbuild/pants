@@ -21,13 +21,6 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Path(datatype('Path', ['path'])):
-  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
-
-  def __new__(cls, path):
-    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
-
-
 class Stat(AbstractClass):
   """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
 
@@ -66,10 +59,6 @@ class ReadLink(datatype('ReadLink', ['path'])):
 
   def __new__(cls, path):
     return super(ReadLink, cls).__new__(cls, six.text_type(path))
-
-
-class Paths(datatype('Paths', ['dependencies'])):
-  """A set of Path objects."""
 
 
 class Stats(datatype('Stats', ['files', 'dirs', 'links'])):
@@ -153,7 +142,6 @@ class PathGlob(AbstractClass):
     avoid splitting/joining. Optimization needed.
     """
     parts = _norm_with_dir(filespec).split(os_sep)
-    print('parsing for {} and {}'.format(relative_to, parts))
     double_index, single_index = cls._wildcard_part(parts)
     if double_index is not None:
       # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
@@ -169,7 +157,7 @@ class PathGlob(AbstractClass):
       return Path(join(relative_to, *parts))
     elif single_index == (len(parts) - 1):
       # There is a wildcard in the file basename of the path.
-      return PathWildcard(ftype, join(relative_to, *parts[:-1]), parts[-1])
+      return PathWildcard(join(relative_to, *parts[:-1]), parts[-1])
     else:
       # There is a wildcard in (at least one of) the dirnames in the path.
       remainders = (join(*parts[single_index + 1:]),)
@@ -179,7 +167,14 @@ class PathGlob(AbstractClass):
                              remainders)
 
 
-class PathWildcard(datatype('PathWildcard', ['ftype', 'directory', 'wildcard']), PathGlob):
+class Path(datatype('Path', ['path']), PathGlob):
+  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
+
+  def __new__(cls, path):
+    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
+
+
+class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob):
   """A PathGlob with a wildcard in the basename component."""
 
 
@@ -257,7 +252,6 @@ def list_directory(project_tree, directory):
   try:
     path = normpath(directory.path)
     entries = [join(path, e) for e in project_tree.listdir(path)]
-    print('>>> listing {}: got {}'.format(path, entries))
     return DirectoryListing(directory,
                             True,
                             tuple(Path(e) for e in entries))
@@ -269,11 +263,7 @@ def list_directory(project_tree, directory):
 
 
 def merge_stats(stats_list):
-  """Merge Stats lists.
-
-  TODO: This is boilerplatey: aggregation should become native:
-   see https://github.com/pantsbuild/pants/issues/3169
-  """
+  """Merge Stats lists."""
   def generate(field):
     for stats in stats_list:
       for stat in getattr(stats, field):
@@ -300,7 +290,6 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   ftype = path_dir_wildcard.ftype
   paths = [d.path for d in dirs.dependencies
            if fnmatch.fnmatch(d.path, path_dir_wildcard.wildcard)]
-  print('>>> path dir wildcard {}'.format(path_dir_wildcard))
   return PathGlobs(ftype, tuple(PathGlob.create_from_spec(ftype, p, remainder)
                                 for p in paths
                                 for remainder in path_dir_wildcard.remainders))
@@ -387,9 +376,6 @@ def create_fs_tasks():
       SelectProjection(Dirs, Links, ('links',), Stats)],
      resolve_dir_links),
     (Dirs,
-     [SelectDependencies(Dirs, Links)],
-     merge_dirs),
-    (Dirs,
      [SelectProjection(Dirs, Path, ('path',), ReadLink)],
      identity),
     (Files,
@@ -399,17 +385,21 @@ def create_fs_tasks():
     (Files,
      [SelectProjection(Files, Path, ('path',), ReadLink)],
      identity),
-    (Files,
-     [SelectDependencies(Files, Links)],
-     merge_files),
   ] + [
-    # TODO: unclassified.
+    # TODO: These are boilerplatey: aggregation should become native:
+    #   see https://github.com/pantsbuild/pants/issues/3169
     (Stats,
      [SelectDependencies(Stats, PathGlobs)],
      merge_stats),
     (Stats,
      [SelectDependencies(Stats, DirectoryListing, field='paths')],
      merge_stats),
+    (Files,
+     [SelectDependencies(Files, Links)],
+     merge_files),
+    (Dirs,
+     [SelectDependencies(Dirs, Links)],
+     merge_dirs),
   ] + [
     # Retrieve the contents of Files.
     (FilesContent,
