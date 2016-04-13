@@ -9,7 +9,6 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name='fs',
   sources=['test_fs.py'],
@@ -20,6 +19,13 @@ python_tests(
   ]
 )
 
+python_tests(
+  name='path_globs',
+  sources=['test_path_globs.py'],
+  dependencies=[
+    'src/python/pants/engine/exp:fs',
+  ]
+)
 
 python_tests(
   name='struct',

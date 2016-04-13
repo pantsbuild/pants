@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from os.path import join
 from abc import abstractmethod
 
+from pants.base.scm_project_tree import ScmProjectTree
+from pants.engine.exp.fs import Dirs, FileContent, Files, Path, PathGlobs
+from pants.scm.git import Git
 from pants.util.meta import AbstractClass
-from pants.engine.exp.fs import (Dirs, FileContent, Files, Path, PathDirWildcard, PathGlobs,
-                                 PathWildcard)
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
 
@@ -43,70 +43,6 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
       return True
     actual_content = {f.path: f.content for f in result if validate(f)}
     self.assertEquals(expected_content, actual_content)
-
-  def assert_pg_equals(self, ftype, pathglobs, relative_to, filespecs):
-    self.assertEquals(PathGlobs(ftype, tuple(pathglobs)), self.specs(ftype, relative_to, *filespecs))
-
-  def assert_files_equals(self, pathglobs, relative_to, filespecs):
-    self.assert_pg_equals(Files, pathglobs, relative_to, filespecs)
-
-  def assert_dirs_equals(self, pathglobs, relative_to, filespecs):
-    self.assert_pg_equals(Dirs, pathglobs, relative_to, filespecs)
-
-  def test_create_literal(self):
-    subdir = 'foo'
-    name = 'Blah.java'
-    self.assert_files_equals([Path(name)], '', [name])
-    self.assert_files_equals([Path(join(subdir, name))], subdir, [name])
-    self.assert_files_equals([Path(join(subdir, name))], '', [join(subdir, name)])
-
-  def test_create_literal_directory(self):
-    subdir = 'foo'
-    name = 'bar/.'
-    self.assert_dirs_equals([Path(name)], '', [name])
-    self.assert_dirs_equals([Path(join(subdir, name))], subdir, [name])
-    self.assert_dirs_equals([Path(join(subdir, name))], '', [join(subdir, name)])
-
-  def test_create_wildcard(self):
-    name = '*.java'
-    subdir = 'foo'
-    self.assert_files_equals([PathWildcard('', name)], '', [name])
-    self.assert_files_equals([PathWildcard(subdir, name)], subdir, [name])
-    self.assert_files_equals([PathWildcard(subdir, name)], '', [join(subdir, name)])
-
-  def test_create_dir_wildcard(self):
-    name = 'Blah.java'
-    subdir = 'foo'
-    wildcard = '*'
-    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, (name,))],
-                             '',
-                             [join(subdir, wildcard, name)])
-    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, (name,))],
-                             subdir,
-                             [join(wildcard, name)])
-
-  def test_create_dir_wildcard_directory(self):
-    subdir = 'foo'
-    wildcard = '*'
-    name = '.'
-    self.assert_dirs_equals([PathDirWildcard(Dirs, '', wildcard, (name,))],
-                            '',
-                            [join(wildcard, name)])
-    self.assert_dirs_equals([PathDirWildcard(Dirs, subdir, wildcard, (name,))],
-                            subdir,
-                            [join(wildcard, name)])
-
-  def test_create_recursive_dir_wildcard(self):
-    name = 'Blah.java'
-    subdir = 'foo'
-    wildcard = '**'
-    expected_remainders = (name, join(wildcard, name))
-    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, expected_remainders)],
-                             '',
-                             [join(subdir, wildcard, name)])
-    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, expected_remainders)],
-                             subdir,
-                             [join(wildcard, name)])
 
   def test_walk_literal(self):
     self.assert_walk(Files, ['4.txt'], ['4.txt'])
@@ -155,3 +91,8 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 class PosixFSTest(unittest.TestCase, FSTestBase):
   def mk_project_tree(self, build_root_src):
     return self.mk_fs_tree(build_root_src)
+
+
+class GitFSTest(unittest.TestCase, FSTestBase):
+  def mk_project_tree(self, build_root_src):
+    return ScmProjectTree(build_root_src, Git(worktree=build_root_src), 'HEAD')
