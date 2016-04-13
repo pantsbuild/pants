@@ -9,7 +9,7 @@ import os
 import unittest
 from os.path import join
 
-from pants.engine.exp.fs import (FileContent, Path, PathDirWildcard, PathGlobs, PathLiteral,
+from pants.engine.exp.fs import (FileContent, Files, Dirs, Path, PathDirWildcard, PathGlobs, PathLiteral,
                                  PathWildcard)
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
@@ -18,108 +18,116 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
 
   _build_root_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test')
 
-  def pg(self, *pathglobs):
-    return PathGlobs(pathglobs)
+  def specs(self, ftype, relative_to, *filespecs):
+    return PathGlobs.create_from_specs(ftype, relative_to, filespecs)
 
-  def specs(self, relative_to, *filespecs):
-    return PathGlobs.create_from_specs(relative_to, filespecs)
-
-  def assert_walk(self, filespecs, files):
+  def assert_walk(self, ftype, filespecs, files):
     scheduler, storage, _ = self.mk_scheduler(build_root_src=self._build_root_src)
-    result = self.execute(scheduler, storage, Path, self.specs('', *filespecs))[0]
+    result = self.execute(scheduler, storage, Path, self.specs(ftype, '', *filespecs))[0]
     self.assertEquals(set(files), set([p.path for p in result]))
 
   def assert_content(self, filespecs, expected_content):
     scheduler, storage, _ = self.mk_scheduler(build_root_src=self._build_root_src)
-    result = self.execute(scheduler, storage, FileContent, self.specs('', *filespecs))[0]
+    result = self.execute(scheduler, storage, FileContent, self.specs(Files, '', *filespecs))[0]
     def validate(e):
       self.assertEquals(type(e), FileContent)
       return True
     actual_content = {f.path: f.content for f in result if validate(f)}
     self.assertEquals(expected_content, actual_content)
 
-  def assert_pg_equals(self, pathglobs, relative_to, filespecs):
-    self.assertEquals(self.pg(*pathglobs), self.specs(relative_to, *filespecs))
+  def assert_pg_equals(self, ftype, pathglobs, relative_to, filespecs):
+    self.assertEquals(PathGlobs(ftype, tuple(pathglobs)), self.specs(ftype, relative_to, *filespecs))
+
+  def assert_files_equals(self, pathglobs, relative_to, filespecs):
+    self.assert_pg_equals(Files, pathglobs, relative_to, filespecs)
+
+  def assert_dirs_equals(self, pathglobs, relative_to, filespecs):
+    self.assert_pg_equals(Dirs, pathglobs, relative_to, filespecs)
 
   def test_create_literal(self):
     subdir = 'foo'
     name = 'Blah.java'
-    self.assert_pg_equals([PathLiteral(name)], '', [name])
-    self.assert_pg_equals([PathLiteral(join(subdir, name))], subdir, [name])
-    self.assert_pg_equals([PathLiteral(join(subdir, name))], '', [join(subdir, name)])
+    self.assert_files_equals([PathLiteral(Files, name)], '', [name])
+    self.assert_files_equals([PathLiteral(Files, join(subdir, name))], subdir, [name])
+    self.assert_files_equals([PathLiteral(Files, join(subdir, name))], '', [join(subdir, name)])
 
   def test_create_literal_directory(self):
     subdir = 'foo'
     name = 'bar/.'
-    self.assert_pg_equals([PathLiteral(name)], '', [name])
-    self.assert_pg_equals([PathLiteral(join(subdir, name))], subdir, [name])
-    self.assert_pg_equals([PathLiteral(join(subdir, name))], '', [join(subdir, name)])
+    self.assert_dirs_equals([PathLiteral(Dirs, name)], '', [name])
+    self.assert_dirs_equals([PathLiteral(Dirs, join(subdir, name))], subdir, [name])
+    self.assert_dirs_equals([PathLiteral(Dirs, join(subdir, name))], '', [join(subdir, name)])
 
   def test_create_wildcard(self):
     name = '*.java'
     subdir = 'foo'
-    self.assert_pg_equals([PathWildcard('', name)], '', [name])
-    self.assert_pg_equals([PathWildcard(subdir, name)], subdir, [name])
-    self.assert_pg_equals([PathWildcard(subdir, name)], '', [join(subdir, name)])
+    self.assert_files_equals([PathWildcard(Files, '', name)], '', [name])
+    self.assert_files_equals([PathWildcard(Files, subdir, name)], subdir, [name])
+    self.assert_files_equals([PathWildcard(Files, subdir, name)], '', [join(subdir, name)])
 
   def test_create_dir_wildcard(self):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '*'
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, (name,))],
-                          '',
-                          [join(subdir, wildcard, name)])
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, (name,))],
-                          subdir,
-                          [join(wildcard, name)])
+    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, (name,))],
+                             '',
+                             [join(subdir, wildcard, name)])
+    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, (name,))],
+                             subdir,
+                             [join(wildcard, name)])
 
   def test_create_dir_wildcard_directory(self):
     subdir = 'foo'
     wildcard = '*'
     name = '.'
-    self.assert_pg_equals([PathDirWildcard('', wildcard, (name,))], '', [join(wildcard, name)])
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, (name,))], subdir, [join(wildcard, name)])
+    self.assert_dirs_equals([PathDirWildcard(Dirs, '', wildcard, (name,))],
+                            '',
+                            [join(wildcard, name)])
+    self.assert_dirs_equals([PathDirWildcard(Dirs, subdir, wildcard, (name,))],
+                            subdir,
+                            [join(wildcard, name)])
 
   def test_create_recursive_dir_wildcard(self):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '**'
     expected_remainders = (name, join(wildcard, name))
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, expected_remainders)],
-                          '',
-                          [join(subdir, wildcard, name)])
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, expected_remainders)],
-                          subdir,
-                          [join(wildcard, name)])
+    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, expected_remainders)],
+                             '',
+                             [join(subdir, wildcard, name)])
+    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, expected_remainders)],
+                             subdir,
+                             [join(wildcard, name)])
 
   def test_walk_literal(self):
-    self.assert_walk(['4.txt'], ['4.txt'])
-    self.assert_walk(['a/b/1.txt', 'a/b/2'], ['a/b/1.txt', 'a/b/2'])
-    self.assert_walk(['a/3.txt'], ['a/3.txt'])
-    self.assert_walk(['z.txt'], [])
+    self.assert_walk(Files, ['4.txt'], ['4.txt'])
+    self.assert_walk(Files, ['a/b/1.txt', 'a/b/2'], ['a/b/1.txt', 'a/b/2'])
+    self.assert_walk(Files, ['a/3.txt'], ['a/3.txt'])
+    self.assert_walk(Files, ['z.txt'], [])
 
   def test_walk_literal_directory(self):
-    self.assert_walk(['a/'], ['a'])
-    self.assert_walk(['a/b/'], ['a/b'])
-    self.assert_walk(['z/'], [])
+    self.assert_walk(Dirs, ['a/'], ['a'])
+    self.assert_walk(Dirs, ['a/b/'], ['a/b'])
+    self.assert_walk(Dirs, ['z/'], [])
+    self.assert_walk(Dirs, ['4.txt', 'a/3.txt'], [])
 
   def test_walk_siblings(self):
-    self.assert_walk(['*.txt'], ['4.txt'])
-    self.assert_walk(['a/b/*.txt'], ['a/b/1.txt'])
-    self.assert_walk(['a/b/*'], ['a/b/1.txt', 'a/b/2'])
-    self.assert_walk(['*/0.txt'], [])
+    self.assert_walk(Files, ['*.txt'], ['4.txt'])
+    self.assert_walk(Files, ['a/b/*.txt'], ['a/b/1.txt'])
+    self.assert_walk(Files, ['a/b/*'], ['a/b/1.txt', 'a/b/2'])
+    self.assert_walk(Files, ['*/0.txt'], [])
 
   def test_walk_recursive(self):
-    self.assert_walk(['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
-    self.assert_walk(['*.txt', '**/*.txt'], ['a/3.txt', 'a/b/1.txt', '4.txt'])
-    self.assert_walk(['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/4.txt.ln', 'a/b/2'])
-    self.assert_walk(['**/*.zzz'], [])
+    self.assert_walk(Files, ['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
+    self.assert_walk(Files, ['*.txt', '**/*.txt'], ['a/3.txt', 'a/b/1.txt', '4.txt'])
+    self.assert_walk(Files, ['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/4.txt.ln', 'a/b/2'])
+    self.assert_walk(Files, ['**/*.zzz'], [])
 
   def test_walk_recursive_directory(self):
-    self.assert_walk(['*/.'], ['a'])
-    self.assert_walk(['*/*/.'], ['a/b'])
-    self.assert_walk(['**/*/.'], ['a/b'])
-    self.assert_walk(['*/*/*/.'], [])
+    self.assert_walk(Dirs, ['*/.'], ['a'])
+    self.assert_walk(Dirs, ['*/*/.'], ['a/b'])
+    self.assert_walk(Dirs, ['**/*/.'], ['a/b'])
+    self.assert_walk(Dirs, ['*/*/*/.'], [])
 
   def test_files_content_literal(self):
     self.assert_content(['4.txt'], {'4.txt': 'four\n'})

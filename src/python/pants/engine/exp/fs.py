@@ -398,8 +398,8 @@ def create_fs_tasks():
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
     (Stats,
-     [SelectProjection(Stats, Path, ('path',), PathLiteral)],
-     # TODO: need to filter to ftype
+     [SelectProjection(Stats, Path, ('path',), PathLiteral),
+      Select(PathLiteral)],
      apply_path_literal),
     (Paths,
      [Select(Stats)],
