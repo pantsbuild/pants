@@ -9,6 +9,7 @@ import json
 import os
 import pkgutil
 import shutil
+import subprocess
 import tempfile
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -21,10 +22,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
-PROJECT_OUTPUT_MESSAGE = 'Generated IntelliJ project in'
-
 _TEMPLATE_BASEDIR = 'templates/idea'
-
 
 _VERSIONS = {
   '9': '12',  # 9 and 12 are ipr/iml compatible
@@ -32,7 +30,6 @@ _VERSIONS = {
   '11': '12',  # 11 and 12 are ipr/iml compatible
   '12': '12'
 }
-
 
 _SCALA_VERSION_DEFAULT = '2.9'
 _SCALA_VERSIONS = {
@@ -62,6 +59,8 @@ class PluginGen(IdeGen, ConsoleTask):
              help='Set the scala language level used for IDEA linting.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
+    register('--open-with', advanced=True, default=None, recursive=True,
+             help='Program used to open the generated IntelliJ project.')
 
   def __init__(self, *args, **kwargs):
     super(PluginGen, self).__init__(*args, **kwargs)
@@ -187,7 +186,12 @@ class PluginGen(IdeGen, ConsoleTask):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
     # Grab the targets in-play before the context is replaced by `self._prepare_project()` below.
     self._prepare_project()
-    idefile = self.generate_project(self._project)
+    ide_file = self.generate_project(self._project)
 
-    if idefile and self.get_options().open:
-      binary_util.ui_open(idefile)
+    if ide_file and self.get_options().open:
+      open_with = self.get_options().open_with
+      if open_with:
+        null = open(os.devnull, 'w')
+        subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
+      else:
+        binary_util.ui_open(ide_file)
