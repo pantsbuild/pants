@@ -15,6 +15,7 @@ from pants.backend.project_info.tasks.ide_gen import IdeGen
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.generator import Generator, TemplateData
 from pants.binaries import binary_util
+from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
@@ -41,7 +42,7 @@ _SCALA_VERSIONS = {
 }
 
 
-class PluginGen(IdeGen):
+class PluginGen(IdeGen, ConsoleTask):
   """Invoke an IntelliJ Pants plugin to create a project from the given targets."""
 
   @classmethod
@@ -166,8 +167,7 @@ class PluginGen(IdeGen):
     iws = self._generate_to_tempfile(
         Generator(pkgutil.get_data(__name__, self.workspace_template), workspace=configured_workspace))
 
-
-    self.context.log.info('{} {} '.format(PROJECT_OUTPUT_MESSAGE, self.gen_project_workdir))
+    self._outstream.write(self.gen_project_workdir)
 
     shutil.move(ipr, self.project_filename)
     shutil.move(iws, self.workspace_filename)

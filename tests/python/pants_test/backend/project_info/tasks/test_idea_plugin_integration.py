@@ -9,6 +9,7 @@ import os
 from xml.dom import minidom
 
 from pants.backend.project_info.tasks.plugin_gen import PROJECT_OUTPUT_MESSAGE
+from pants.util.contextutil import temporary_file
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -40,43 +41,40 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       for value in expected_property[1]:
         self.assertIn(value, actual_property.getAttribute('value'))
 
-  def _get_project_dir(self, pants_run):
-    for line in pants_run.stdout_data.splitlines():
-      if PROJECT_OUTPUT_MESSAGE in line:
-        return line.strip(PROJECT_OUTPUT_MESSAGE).split()[0]
-    return None
+  def _get_project_dir(self, output_file):
+    with open(output_file, 'r') as result:
+      return result.readlines()[0]
+
+  def _run_and_check(self, expected_properties, targets):
+    with self.temporary_workdir() as workdir:
+      with temporary_file(root_dir=workdir, cleanup=True) as output_file:
+        pants_run = self.run_pants_with_workdir(
+          ['idea-plugin', '--output-file={}'.format(output_file.name), '--no-open'] + targets, workdir)
+        self.assert_success(pants_run)
+
+        project_dir = self._get_project_dir(output_file.name)
+        self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
+        self._do_check(project_dir, expected_properties)
 
   def test_idea_plugin_single_target(self):
-    with self.temporary_workdir() as workdir:
-      target_a = 'examples/src/scala/org/pantsbuild/example/hello:hello'
-      pants_run = self.run_pants_with_workdir(['idea-plugin', '--no-open', target_a], workdir)
-      self.assert_success(pants_run)
 
-      expected_properties = [("targets", [target_a]),
-                             ("project_path", ["examples/src/scala/org/pantsbuild/example/hello"])]
-      project_dir = self._get_project_dir(pants_run)
-      self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
-      self._do_check(project_dir, expected_properties)
+    target = 'examples/src/scala/org/pantsbuild/example/hello:hello'
+    expected_properties = [("targets", [target]),
+                           ("project_path", ["examples/src/scala/org/pantsbuild/example/hello"])]
+
+    self._run_and_check(expected_properties, [target])
 
   def test_idea_plugin_single_directory(self):
-    with self.temporary_workdir() as workdir:
-      target_a = 'testprojects/src/python/antlr::'
-      pants_run = self.run_pants_with_workdir(['idea-plugin', '--no-open', target_a], workdir)
-      self.assert_success(pants_run)
+    target = 'testprojects/src/python/antlr::'
+    expected_properties = [("targets", [target]),
+                           ("project_path", ["testprojects/src/python/antlr"])]
 
-      expected_properties = [("targets", [target_a]),
-                             ("project_path", ["testprojects/src/python/antlr"])]
-      project_dir = self._get_project_dir(pants_run)
-      self._do_check(project_dir, expected_properties)
+    self._run_and_check(expected_properties, [target])
 
   def test_idea_plugin_multiple_targets(self):
-    with self.temporary_workdir() as workdir:
-      target_a = 'examples/src/scala/org/pantsbuild/example/hello:'
-      target_b = 'testprojects/src/python/antlr::'
-      pants_run = self.run_pants_with_workdir(['idea-plugin', '--no-open', target_a, target_b], workdir)
-      self.assert_success(pants_run)
+    target_a = 'examples/src/scala/org/pantsbuild/example/hello:'
+    target_b = 'testprojects/src/python/antlr::'
+    expected_properties = [("targets", [target_a, target_b]),
+                           ("project_path", ["examples/src/scala/org/pantsbuild/example/hello"])]
 
-      expected_properties = [("targets", [target_a, target_b]),
-                             ("project_path", ["examples/src/scala/org/pantsbuild/example/hello"])]
-      project_dir = self._get_project_dir(pants_run)
-      self._do_check(project_dir, expected_properties)
+    self._run_and_check(expected_properties, [target_a, target_b])
