@@ -28,8 +28,6 @@ class ScalaJSLink(NailgunTask):
              help='Perform all optimizations; this is generally only useful for deployments.')
     register('--check-ir', type=bool, fingerprint=True,
              help='Perform (relatively costly) validity checks of IR before linking it.')
-    register('--jvm-options', type=list, metavar='<option>...', advanced=True,
-             help='Run with these extra jvm options.')
     # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
     cls.register_jvm_tool(register, 'scala-js-cli', main=cls._SCALA_JS_CLI_MAIN)
 

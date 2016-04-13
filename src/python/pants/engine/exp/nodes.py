@@ -375,10 +375,6 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   _FS_PRODUCT_TYPES = {product for product, subject in _FS_PAIRS}
 
   @classmethod
-  def is_filesystem_product(cls, product):
-    return product in cls._FS_PRODUCT_TYPES
-
-  @classmethod
   def is_filesystem_pair(cls, subject_type, product):
     """True if the given subject type and product type should be computed using a FileystemNode."""
     return (product, subject_type) in cls._FS_PAIRS

@@ -13,6 +13,7 @@ from collections import defaultdict
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -24,7 +25,6 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
-from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.build_graph.target_scopes import Scopes
@@ -191,16 +191,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                                            include_scopes=Scopes.JVM_TEST_SCOPES)
 
   def preferred_jvm_distribution_for_targets(self, targets):
-    return self.preferred_jvm_distribution([target.platform for target in targets
-                                            if isinstance(target, JvmTarget)])
-
-  def preferred_jvm_distribution(self, platforms):
-    """Returns a jvm Distribution with a version that should work for all the platforms."""
-    if not platforms:
-      return DistributionLocator.cached()
-    min_version = max(platform.target_level for platform in platforms)
-    max_version = Revision(*(min_version.components + [9999])) if self._strict_jvm_version else None
-    return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
+    return JvmPlatform.preferred_jvm_distribution([target.platform for target in targets
+                                                  if isinstance(target, JvmTarget)],
+                                                  self._strict_jvm_version)
 
   def _spawn(self, distribution, executor=None, *args, **kwargs):
     """Returns a processhandler to a process executing java.
@@ -351,7 +344,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         complete_classpath.update(self.classpath(relevant_targets,
                                                  classpath_product=classpath_product))
         complete_classpath.update(classpath_append)
-        distribution = self.preferred_jvm_distribution([platform])
+        distribution = JvmPlatform.preferred_jvm_distribution([platform], self._strict_jvm_version)
         with binary_util.safe_args(batch, self.get_options()) as batch_tests:
           self.context.log.debug('CWD = {}'.format(workdir))
           self.context.log.debug('platform = {}'.format(platform))
