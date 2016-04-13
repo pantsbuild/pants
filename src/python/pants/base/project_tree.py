@@ -58,6 +58,10 @@ class ProjectTree(AbstractClass):
     """Without following symlinks, returns a PTStat object for the path, or None"""
 
   @abstractmethod
+  def readlink(self, relpath):
+    """Execute `readlink` for the given path, which must be a symlink."""
+
+  @abstractmethod
   def content(self, file_relpath):
     """Returns the content for file at path."""
 

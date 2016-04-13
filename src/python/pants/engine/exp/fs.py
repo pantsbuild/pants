@@ -65,7 +65,7 @@ class ReadLink(datatype('ReadLink', ['path'])):
   """The result of reading a symbolic link."""
 
   def __new__(cls, path):
-    return super(Link, cls).__new__(cls, six.text_type(path))
+    return super(ReadLink, cls).__new__(cls, six.text_type(path))
 
 
 class Paths(datatype('Paths', ['dependencies'])):
@@ -315,15 +315,15 @@ def resolve_file_links(direct_stats, linked_files):
 
 
 def merge_dirs(dirs_list):
-  return Dirs(tuple(d for dirs in dirs_list for d in dirs))
+  return Dirs(tuple(d for dirs in dirs_list for d in dirs.dependencies))
 
 
 def merge_files(files_list):
-  return Files(tuple(f for files in files_list for f in files))
+  return Files(tuple(f for files in files_list for f in files.dependencies))
 
 
 def read_link(project_tree, link):
-  raise ValueError('Not implemented')
+  return ReadLink(project_tree.readlink(link.path))
 
 
 def path_stat(project_tree, path_literal):

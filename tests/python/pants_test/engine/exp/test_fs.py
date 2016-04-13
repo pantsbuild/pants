@@ -106,31 +106,35 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
     self.assert_walk(Files, ['z.txt'], [])
 
   def test_walk_literal_directory(self):
-    self.assert_walk(Dirs, ['a/'], ['a'])
-    self.assert_walk(Dirs, ['a/b/'], ['a/b'])
-    self.assert_walk(Dirs, ['z/'], [])
+    self.assert_walk(Dirs, ['c'], ['a/b'])
+    self.assert_walk(Dirs, ['a'], ['a'])
+    self.assert_walk(Dirs, ['a/b'], ['a/b'])
+    self.assert_walk(Dirs, ['z'], [])
     self.assert_walk(Dirs, ['4.txt', 'a/3.txt'], [])
 
   def test_walk_siblings(self):
     self.assert_walk(Files, ['*.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/*.txt'], ['a/b/1.txt'])
+    self.assert_walk(Files, ['c/*.txt'], ['c/1.txt'])
     self.assert_walk(Files, ['a/b/*'], ['a/b/1.txt', 'a/b/2'])
     self.assert_walk(Files, ['*/0.txt'], [])
 
   def test_walk_recursive(self):
+    self.assert_walk(Files, ['**/*.txt.ln'], ['4.txt'])
     self.assert_walk(Files, ['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
     self.assert_walk(Files, ['*.txt', '**/*.txt'], ['a/3.txt', 'a/b/1.txt', '4.txt'])
-    self.assert_walk(Files, ['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/4.txt.ln', 'a/b/2'])
+    self.assert_walk(Files, ['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/b/2'])
     self.assert_walk(Files, ['**/*.zzz'], [])
 
   def test_walk_recursive_directory(self):
-    self.assert_walk(Dirs, ['*/.'], ['a'])
-    self.assert_walk(Dirs, ['*/*/.'], ['a/b'])
-    self.assert_walk(Dirs, ['**/*/.'], ['a/b'])
-    self.assert_walk(Dirs, ['*/*/*/.'], [])
+    self.assert_walk(Dirs, ['*'], ['a', 'a/b'])
+    self.assert_walk(Dirs, ['*/*'], ['a/b'])
+    self.assert_walk(Dirs, ['**/*'], ['a/b'])
+    self.assert_walk(Dirs, ['*/*/*'], [])
 
   def test_files_content_literal(self):
     self.assert_content(['4.txt'], {'4.txt': 'four\n'})
+    self.assert_content(['a/4.txt.ln'], {'4.txt': 'four\n'})
 
   def test_files_content_directory(self):
     with self.assertRaises(Exception):

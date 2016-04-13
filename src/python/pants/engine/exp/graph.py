@@ -13,7 +13,7 @@ import six
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.fs import Dir, DirectoryListing, Dirs, Files, FilesContent, PathGlobs, Paths
+from pants.engine.exp.fs import Dir, Dirs, Files, FilesContent, PathGlobs
 from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -214,7 +214,7 @@ def addresses_from_address_families(address_families):
 
 def descendant_addresses_to_globs(descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
-  return PathGlobs.create(Dirs, descendant_addresses.directory, globs=['*', '**/*'])
+  return PathGlobs.create(Dirs, descendant_addresses.directory, globs=['.', '*', '**/*'])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -242,7 +242,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      parse_address_family),
     (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      SelectProjection(Files, Paths, ('paths',), DirectoryListing)],
+      Select(Files)],
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
