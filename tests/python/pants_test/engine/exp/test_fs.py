@@ -22,12 +22,14 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
     return PathGlobs.create_from_specs(ftype, relative_to, filespecs)
 
   def assert_walk(self, ftype, filespecs, files):
-    scheduler, storage, _ = self.mk_scheduler(build_root_src=self._build_root_src)
+    project_tree = self.mk_fs_tree(self._build_root_src)
+    scheduler, storage = self.mk_scheduler(project_tree=project_tree)
     result = self.execute(scheduler, storage, Path, self.specs(ftype, '', *filespecs))[0]
     self.assertEquals(set(files), set([p.path for p in result]))
 
   def assert_content(self, filespecs, expected_content):
-    scheduler, storage, _ = self.mk_scheduler(build_root_src=self._build_root_src)
+    project_tree = self.mk_fs_tree(self._build_root_src)
+    scheduler, storage = self.mk_scheduler(project_tree=project_tree)
     result = self.execute(scheduler, storage, FileContent, self.specs(Files, '', *filespecs))[0]
     def validate(e):
       self.assertEquals(type(e), FileContent)

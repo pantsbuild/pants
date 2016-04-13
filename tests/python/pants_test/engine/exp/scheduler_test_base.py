@@ -31,17 +31,12 @@ class SchedulerTestBase(object):
   TODO: In the medium term, this should be part of pants_test.base_test.BaseTest.
   """
 
-  def mk_scheduler(self,
-                   tasks=None,
-                   goals=None,
-                   storage=None,
-                   build_root_src=None,
-                   symbol_table_cls=EmptyTable):
-    """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
-    goals = goals or dict()
-    tasks = tasks or []
-    storage = storage or Storage.create(in_memory=True)
+  def mk_fs_tree(self, build_root_src=None):
+    """Create a temporary FilesystemProjectTree.
 
+    :param build_root_src: Optional directory to pre-populate from; otherwise, empty.
+    :returns: A FilesystemProjectTree.
+    """
     work_dir = safe_mkdtemp()
     self.addCleanup(safe_rmtree, work_dir)
     build_root = os.path.join(work_dir, 'build_root')
@@ -49,11 +44,23 @@ class SchedulerTestBase(object):
       shutil.copytree(build_root_src, build_root, symlinks=True)
     else:
       os.mkdir(build_root)
+    return FileSystemProjectTree(build_root)
+
+  def mk_scheduler(self,
+                   tasks=None,
+                   goals=None,
+                   storage=None,
+                   project_tree=None,
+                   symbol_table_cls=EmptyTable):
+    """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
+    goals = goals or dict()
+    tasks = tasks or []
+    storage = storage or Storage.create(in_memory=True)
+    project_tree = project_tree or self.mk_fs_tree()
 
     tasks = list(tasks) + create_fs_tasks()
-    project_tree = FileSystemProjectTree(build_root)
     scheduler = LocalScheduler(goals, tasks, storage, project_tree)
-    return scheduler, storage, build_root
+    return scheduler, storage
 
   def execute_request(self, scheduler, storage, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
