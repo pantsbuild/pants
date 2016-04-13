@@ -21,8 +21,6 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-# TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
-# in pants java since non-jvm backends depend on it to run things.
 from pants.build_graph.resources import Resources
 from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
@@ -405,6 +403,52 @@ class TestSetupPy(PythonTaskTestBase):
           self.assertEqual('196883', fp.read())
 
         with open(path('src/monster/j-function.res')) as fp:
+          self.assertEqual('196884', fp.read())
+
+  def test_symlinks_issues_2815(self):
+    res = self.create_file(relpath='src/python/monster/j-function.res', contents='196884')
+
+    os.symlink(res, os.path.join(self.build_root, 'src/python/monster/group.res'))
+    self.create_file(relpath='src/python/monster/__init__.py', contents='')
+    self.create_file(relpath='src/python/monster/research_programme.py',
+                     contents='# Look for more off-by-one "errors"!')
+
+    # NB: We have to resort to BUILD files on disk here due to the target ownership algorithm in
+    # SetupPy needing to walk ancestors in this case which currently requires BUILD files on disk.
+    self.add_to_build_file('src/python/monster', dedent("""
+      python_library(
+        name='conway',
+        sources=['__init__.py', 'research_programme.py'],
+        resources=['group.res'],
+        provides=setup_py(
+          name='monstrous.moonshine',
+          version='0.0.0',
+        )
+      )
+      """))
+    conway = self.target('src/python/monster:conway')
+
+    with self.run_execute(conway) as created:
+      self.assertEqual([conway], created.keys())
+
+      # Now that we've created the sdist tarball, delete the symlink destination to ensure the
+      # unpacked sdist can't get away with unpacking a symlink that happens to have local
+      # resolution.
+      os.unlink(res)
+
+      with self.extracted_sdist(sdist=created[conway],
+                                expected_prefix='monstrous.moonshine-0.0.0',
+                                collect_suffixes=('.py', '.res')) as (py_files, path):
+        res_link_path = path('src/monster/group.res')
+        self.assertFalse(os.path.islink(res_link_path))
+
+        self.assertEqual({path('setup.py'),
+                          path('src/monster/__init__.py'),
+                          path('src/monster/research_programme.py'),
+                          res_link_path},
+                         py_files)
+
+        with open(res_link_path) as fp:
           self.assertEqual('196884', fp.read())
 
   def test_exported_antlr(self):

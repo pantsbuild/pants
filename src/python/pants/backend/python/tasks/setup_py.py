@@ -462,9 +462,9 @@ class SetupPy(PythonTask):
   def write_contents(self, root_target, reduced_dependencies, chroot):
     """Write contents of the target."""
     def write_target_source(target, src):
-      chroot.link(os.path.join(get_buildroot(), target.target_base, src),
+      chroot.copy(os.path.join(get_buildroot(), target.target_base, src),
                   os.path.join(self.SOURCE_ROOT, src))
-      # check parent __init__.pys to see if they also need to be linked.  this is to allow
+      # check parent __init__.pys to see if they also need to be copied.  this is to allow
       # us to determine if they belong to regular packages or namespace packages.
       while True:
         src = os.path.dirname(src)
@@ -472,11 +472,11 @@ class SetupPy(PythonTask):
           # Do not allow the repository root to leak (i.e. '.' should not be a package in setup.py)
           break
         if os.path.exists(os.path.join(target.target_base, src, '__init__.py')):
-          chroot.link(os.path.join(target.target_base, src, '__init__.py'),
+          chroot.copy(os.path.join(target.target_base, src, '__init__.py'),
                       os.path.join(self.SOURCE_ROOT, src, '__init__.py'))
 
     def write_codegen_source(relpath, abspath):
-      chroot.link(abspath, os.path.join(self.SOURCE_ROOT, relpath))
+      chroot.copy(abspath, os.path.join(self.SOURCE_ROOT, relpath))
 
     def write_target(target):
       if isinstance(target, tuple(self.generated_targets.keys())):
