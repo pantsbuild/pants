@@ -331,7 +331,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def assert_attributes(self, elem, **kwargs):
     self.assertEqual(dict(**kwargs), dict(elem.attrib))
 
-  def test_symlink_cachepath(self):
+  def test_construct_and_load_symlink_map(self):
     self.maxDiff = None
     with temporary_dir() as mock_cache_dir:
       with temporary_dir() as symlink_dir:
@@ -344,9 +344,12 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
           with open(input_path, 'w') as inpath:
             inpath.write(foo_path)
-          result_map = IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir,
-                                                  output_path)
+          result_classpath, result_map = IvyUtils.construct_and_load_symlink_map(symlink_dir,
+                                                                                 mock_cache_dir,
+                                                                                 input_path,
+                                                                                 output_path)
           symlink_foo_path = os.path.join(symlink_dir, 'foo.jar')
+          self.assertEquals([symlink_foo_path], result_classpath)
           self.assertEquals(
             {
               os.path.realpath(foo_path): symlink_foo_path
@@ -363,8 +366,10 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             bar.write("test jar contents2")
           with open(input_path, 'w') as inpath:
             inpath.write(os.pathsep.join([foo_path, bar_path]))
-          result_map = IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir,
-                                                  output_path)
+          result_classpath, result_map = IvyUtils.construct_and_load_symlink_map(symlink_dir,
+                                                                                 mock_cache_dir,
+                                                                                 input_path,
+                                                                                 output_path)
           symlink_bar_path = os.path.join(symlink_dir, 'bar.jar')
           self.assertEquals(
             {
@@ -372,6 +377,8 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
               os.path.realpath(bar_path): symlink_bar_path,
             },
             result_map)
+          self.assertEquals([symlink_foo_path, symlink_bar_path], result_classpath)
+
           with open(output_path, 'r') as outpath:
             self.assertEquals(symlink_foo_path + os.pathsep + symlink_bar_path, outpath.readline())
           self.assertTrue(os.path.islink(symlink_foo_path))
@@ -382,7 +389,10 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           # Reverse the ordering and make sure order is preserved in the output path
           with open(input_path, 'w') as inpath:
             inpath.write(os.pathsep.join([bar_path, foo_path]))
-          IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir, output_path)
+          IvyUtils.construct_and_load_symlink_map(symlink_dir,
+                                                  mock_cache_dir,
+                                                  input_path,
+                                                  output_path)
           with open(output_path, 'r') as outpath:
             self.assertEquals(symlink_bar_path + os.pathsep + symlink_foo_path, outpath.readline())
 

@@ -37,8 +37,8 @@ class Config(AbstractClass):
     section, and be available for use in substitutions.  The caller may override some of these
     seed values.
 
-    :param list configpaths: Load from these paths. Later instances take precedence over earlier ones.
-                             If empty, returns an empty config.
+    :param list configpaths: Load from these paths. Later instances take precedence over earlier
+                             ones. If empty, returns an empty config.
     :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
                         pants_supportdir and pants_distdir.
     """

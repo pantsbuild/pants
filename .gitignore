@@ -18,6 +18,7 @@
 .idea
 .pants.d
 .pants.run
+.pants.workdir.file_lock
 .pants.stats
 .pids
 .project
