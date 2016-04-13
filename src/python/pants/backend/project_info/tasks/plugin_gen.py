@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 import pkgutil
 import shutil
@@ -154,8 +155,9 @@ class PluginGen(IdeGen, ConsoleTask):
       java_language_level=java_language_level,
     )
 
+    abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
     configured_workspace = TemplateData(
-      targets=[os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs],
+      targets=json.dumps(abs_target_specs),
       project_path=os.path.join(get_buildroot(), self.context.options.target_specs.__iter__().next().split(':')[0])
     )
 
