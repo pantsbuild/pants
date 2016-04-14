@@ -75,12 +75,12 @@ class CppIntegrationTest(PantsRunIntegrationTest):
         '-ldebug',
       ]
 
-      pants_run = self.run_pants(args)
+      pants_run = self.run_pants(args, cache_read=True)
       self.assert_success(pants_run)
       self.assertIn('No cached artifacts', pants_run.stdout_data)
       self.assertIn('Caching artifacts', pants_run.stdout_data)
 
-      pants_run = self.run_pants(args)
+      pants_run = self.run_pants(args, cache_read=True)
       self.assert_success(pants_run)
       self.assertIn('Using cached artifacts', pants_run.stdout_data)
       self.assertNotIn('No cached artifacts', pants_run.stdout_data)

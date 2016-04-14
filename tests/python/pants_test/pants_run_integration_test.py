@@ -109,14 +109,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
       yield clone_dir
 
-  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
+  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None, cache_read=True,
                              **kwargs):
-
     args = ['--no-pantsrc',
             '--pants-workdir=' + workdir,
             '--kill-nailguns',
             '--print-exception-stacktrace']
-
+    if not cache_read:
+      args.append('--no-cache-read')
     if config:
       config_data = config.copy()
       ini = ConfigParser.ConfigParser(defaults=config_data.pop('DEFAULT', None))
@@ -142,7 +142,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"),
                        stderr_data.decode("utf-8"), workdir)
 
-  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
+  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, cache_read=None, **kwargs):
     """Runs pants in a subprocess.
 
     :param list command: A list of command line arguments coming after `./pants`.
@@ -152,10 +152,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
     with self.temporary_workdir() as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, cache_read, **kwargs)
 
   @contextmanager
-  def pants_results(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
+  def pants_results(self, command, config=None, stdin_data=None, extra_env=None, cache_read=None, **kwargs):
     """Similar to run_pants in that it runs pants in a subprocess, but yields in order to give
     callers a chance to do any necessary validations on the workdir.
 
@@ -166,7 +166,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
     with self.temporary_workdir() as workdir:
-      yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+      yield self.run_pants_with_workdir(command, cache_read, workdir, config, stdin_data, extra_env, cache_read, **kwargs)
 
   def bundle_and_run(self, target, bundle_name, bundle_jar_name=None, bundle_options=None,
                      args=None,
