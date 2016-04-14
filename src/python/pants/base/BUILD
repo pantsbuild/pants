@@ -16,6 +16,7 @@ python_library(
   name = 'project_tree',
   sources = ['project_tree.py'],
   dependencies = [
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
