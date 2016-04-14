@@ -15,6 +15,7 @@ import tempfile
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.project_info.tasks.ide_gen import IdeGen
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.binaries import binary_util
 from pants.task.console_task import ConsoleTask
@@ -41,7 +42,28 @@ _SCALA_VERSIONS = {
 
 
 class PluginGen(IdeGen, ConsoleTask):
-  """Invoke IntelliJ Pants plugin to create a project."""
+  """Invoke IntelliJ Pants plugin (installation required) to create a project.
+
+  The ideal workflow is to programmatically open idea -> select import -> import as pants project -> select project
+  path, but IDEA does not have CLI support for "select import" and "import as pants project" once it is opened.
+
+  Therefore, this task takes another approach to embed the target specs into a `iws` workspace file along
+  with an skeleton `ipr` project file.
+
+  Sample `iws`:
+  ********************************************************
+    <?xml version="1.0"?>
+    <project version="4">
+      <component name="PropertiesComponent">
+        <property name="targets" value="[&quot;/Users/me/workspace/pants/testprojects/tests/scala/org/pantsbuild/testproject/cp-directories/::&quot;]" />
+        <property name="project_path" value="/Users/me/workspace/pants/testprojects/tests/scala/org/pantsbuild/testproject/cp-directories/" />
+      </component>
+    </project>
+  ********************************************************
+
+  Once pants plugin sees `targets` and `project_path`, it will simulate the import process on and populate the
+  existing skeleton project into a Pants project as if user is importing these targets.
+  """
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -50,9 +72,7 @@ class PluginGen(IdeGen, ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(PluginGen, cls).register_options(register)
-    register('--version', choices=sorted(list(_VERSIONS.keys())), default='11',
-             help='The IntelliJ IDEA version the project config should be generated for.')
-    register('--open', action='store_true', default=True,
+    register('--open', type=bool, default=True,
              help='Attempts to open the generated project in IDEA.')
     register('--scala-language-level',
              choices=_SCALA_VERSIONS.keys(), default=_SCALA_VERSION_DEFAULT,
@@ -69,14 +89,11 @@ class PluginGen(IdeGen, ConsoleTask):
 
     self.scala_language_level = _SCALA_VERSIONS.get(
       self.get_options().scala_language_level, None)
-
     self.java_encoding = self.get_options().java_encoding
-
-    idea_version = _VERSIONS[self.get_options().version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR,
-                                         'project-{}.mustache'.format(idea_version))
+                                         'project-12.mustache')
     self.workspace_template = os.path.join(_TEMPLATE_BASEDIR,
-                                        'workspace-{}.mustache'.format(idea_version))
+                                           'workspace-12.mustache')
 
     output_dir = os.path.join(get_buildroot(), ".idea", "idea-plugin")
     safe_mkdir(output_dir)
@@ -87,13 +104,13 @@ class PluginGen(IdeGen, ConsoleTask):
       self.project_filename = os.path.join(self.gen_project_workdir,
                                            '{}.ipr'.format(self.project_name))
       self.workspace_filename = os.path.join(self.gen_project_workdir,
-                                          '{}.iws'.format(self.project_name))
+                                             '{}.iws'.format(self.project_name))
       self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
 
   def generate_project(self, project):
     def create_content_root(source_set):
       root_relative_path = os.path.join(source_set.source_base, source_set.path) \
-                           if source_set.path else source_set.source_base
+        if source_set.path else source_set.source_base
       if source_set.resources_only:
         if source_set.is_test:
           content_type = 'java-test-resource'
@@ -154,6 +171,9 @@ class PluginGen(IdeGen, ConsoleTask):
       java_language_level=java_language_level,
     )
 
+    if not self.context.options.target_specs:
+      raise TaskError("No targets specified.")
+
     abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),
@@ -164,9 +184,9 @@ class PluginGen(IdeGen, ConsoleTask):
     safe_mkdir(os.path.abspath(self.intellij_output_dir))
 
     ipr = self._generate_to_tempfile(
-        Generator(pkgutil.get_data(__name__, self.project_template), project=configured_project))
+      Generator(pkgutil.get_data(__name__, self.project_template), project=configured_project))
     iws = self._generate_to_tempfile(
-        Generator(pkgutil.get_data(__name__, self.workspace_template), workspace=configured_workspace))
+      Generator(pkgutil.get_data(__name__, self.workspace_template), workspace=configured_workspace))
 
     self._outstream.write(self.gen_project_workdir)
 
