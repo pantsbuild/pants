@@ -142,9 +142,9 @@ python_library(
   ],
   dependencies = [
     ':ide_gen',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
-    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/scm:git',
     'src/python/pants/util:dirutil',
   ],
@@ -158,9 +158,9 @@ python_library(
   ],
   dependencies = [
     ':ide_gen',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
-    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/scm:git',
     'src/python/pants/util:dirutil',
   ],
