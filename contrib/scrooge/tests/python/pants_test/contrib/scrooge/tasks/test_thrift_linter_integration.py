@@ -32,21 +32,21 @@ class ThriftLinterTest(PantsRunIntegrationTest):
   def test_bad_default(self):
     # thrift-linter fails on linter errors.
     cmd = ['thrift-linter', self.thrift_test_target('bad-thrift-default')]
-    pants_run = self.run_pants(cmd)
+    pants_run = self.run_pants(cmd, cache_read=False)
     self.assert_success(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
 
   def test_bad_strict(self):
     # thrift-linter fails on linter errors (BUILD target defines thrift_linter_strict=True)
     cmd = ['thrift-linter', self.thrift_test_target('bad-thrift-strict')]
-    pants_run = self.run_pants(cmd)
+    pants_run = self.run_pants(cmd, cache_read=False)
     self.assert_failure(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
 
   def test_bad_non_strict(self):
     # thrift-linter fails on linter errors (BUILD target defines thrift_linter_strict=False)
     cmd = ['thrift-linter', self.thrift_test_target('bad-thrift-non-strict')]
-    pants_run = self.run_pants(cmd)
+    pants_run = self.run_pants(cmd, cache_read=False)
     self.assert_success(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
 
@@ -60,7 +60,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
   def test_bad_strict_override(self):
     # thrift-linter passes with non-strict command line flag overriding the BUILD section.
     cmd = ['thrift-linter', '--no-strict', self.thrift_test_target('bad-thrift-strict')]
-    pants_run = self.run_pants(cmd)
+    pants_run = self.run_pants(cmd, cache_read=False)
     self.assert_success(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
 
@@ -84,6 +84,6 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     # a command line non-strict flag is passed.
     cmd = ['thrift-linter', '--no-strict', self.thrift_test_target('bad-thrift-default')]
     pants_ini_config = {'thrift-linter': {'strict': True}}
-    pants_run = self.run_pants(cmd, config=pants_ini_config)
+    pants_run = self.run_pants(cmd, config=pants_ini_config, cache_read=False)
     self.assert_success(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
