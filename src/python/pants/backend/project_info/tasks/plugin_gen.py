@@ -72,11 +72,10 @@ class PluginGen(IdeGen, ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(PluginGen, cls).register_options(register)
+    # TODO: https://github.com/pantsbuild/pants/issues/3198
+    # scala/java-language level should use what Pants already knows.
     register('--open', type=bool, default=True,
              help='Attempts to open the generated project in IDEA.')
-    register('--scala-language-level',
-             choices=_SCALA_VERSIONS.keys(), default=_SCALA_VERSION_DEFAULT,
-             help='Set the scala language level used for IDEA linting.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
     register('--open-with', advanced=True, default=None, recursive=True,
@@ -87,8 +86,6 @@ class PluginGen(IdeGen, ConsoleTask):
 
     self.open = self.get_options().open
 
-    self.scala_language_level = _SCALA_VERSIONS.get(
-      self.get_options().scala_language_level, None)
     self.java_encoding = self.get_options().java_encoding
     self.project_template = os.path.join(_TEMPLATE_BASEDIR,
                                          'project-12.mustache')
@@ -136,12 +133,6 @@ class PluginGen(IdeGen, ConsoleTask):
     if project.has_python:
       content_roots.extend(create_content_root(source_set) for source_set in project.py_sources)
 
-    scala = None
-    if project.has_scala:
-      scala = TemplateData(
-        language_level=self.scala_language_level,
-      )
-
     java_language_level = None
     for target in project.targets:
       if isinstance(target, JvmTarget):
@@ -165,7 +156,6 @@ class PluginGen(IdeGen, ConsoleTask):
         language_level='JDK_1_{}'.format(self.java_language_level)
       ),
       resource_extensions=list(project.resource_extensions),
-      scala=scala,
       debug_port=project.debug_port,
       extra_components=[],
       java_language_level=java_language_level,
