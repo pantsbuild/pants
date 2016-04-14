@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 import subprocess
+import types
 import unittest
 from contextlib import contextmanager
 from itertools import izip_longest
@@ -178,14 +179,15 @@ class GitTest(unittest.TestCase):
       with reader.listdir('bogus'):
         pass
 
-  def test_islink(self):
+  def test_lstat(self):
     reader = self.git.repo_reader(self.initial_rev)
-    def islink(*components):
-      return reader.islink(os.path.join(*components))
-    self.assertTrue(islink('dir', 'relative-symlink'))
-    self.assertTrue(islink('not-a-dir'))
-    self.assertFalse(islink('README'))
-    self.assertFalse(islink('dir'))
+    def lstat(*components):
+      return type(reader.lstat(os.path.join(*components)))
+    self.assertEquals(reader.Symlink, lstat('dir', 'relative-symlink'))
+    self.assertEquals(reader.Symlink, lstat('not-a-dir'))
+    self.assertEquals(reader.File, lstat('README'))
+    self.assertEquals(reader.Dir, lstat('dir'))
+    self.assertEquals(types.NoneType, lstat('nope-not-here'))
 
   def test_open(self):
     reader = self.git.repo_reader(self.initial_rev)

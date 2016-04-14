@@ -342,10 +342,6 @@ class GitRepositoryReader(object):
   class GitDiedException(Exception):
     pass
 
-  class UnterminatedTreeException(Exception):
-    # Programmer error, probably?
-    pass
-
   class UnexpectedGitObjectTypeException(Exception):
     # Programmer error
     pass
@@ -467,7 +463,7 @@ class GitRepositoryReader(object):
       if symlinks > MAX_SYMLINKS_IN_REALPATH:
         raise self.SymlinkLoopException(self.rev, relpath)
 
-      link_to = self._read_symlink(obj, relpath)
+      link_to = self._read_symlink(obj)
 
       if link_to.startswith('../') or link_to[0] == '/':
         # If the link points outside the repo, then just return that file
