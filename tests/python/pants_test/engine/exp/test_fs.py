@@ -89,10 +89,14 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 
 
 class PosixFSTest(unittest.TestCase, FSTestBase):
+
   def mk_project_tree(self, build_root_src):
     return self.mk_fs_tree(build_root_src)
 
 
+# TODO: See https://github.com/pantsbuild/pants/issues/3189
+@unittest.expectedFailure
 class GitFSTest(unittest.TestCase, FSTestBase):
+
   def mk_project_tree(self, build_root_src):
     return ScmProjectTree(build_root_src, Git(worktree=build_root_src), 'HEAD')
