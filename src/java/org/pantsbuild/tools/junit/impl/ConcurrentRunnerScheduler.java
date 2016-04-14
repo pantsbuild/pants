@@ -3,6 +3,8 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.CompletionService;
@@ -11,12 +13,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
-
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import org.junit.runners.model.RunnerScheduler;
-
 import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
 
@@ -25,6 +22,7 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
   private final Queue<Future<Void>> concurrentTasks;
   private final Queue<Runnable> serialTasks;
   private final boolean defaultParallel;
+  private final boolean parallelMethods;
 
   /**
    * A concurrent scheduler to run junit tests in parallel if possible, followed by tests that can
@@ -37,10 +35,13 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
    * Call {@link org.junit.runners.ParentRunner#setScheduler} to use this scheduler.
    *
    * @param defaultParallel  whether to unannotated classes in parallel
+   * @param parallelMethods run individual test methods in parallel
    * @param numThreads       number of parallel threads to use, must be positive.
    */
-  public ConcurrentRunnerScheduler(boolean defaultParallel, int numThreads) {
+  public ConcurrentRunnerScheduler(boolean defaultParallel, boolean parallelMethods,
+      int numThreads) {
     this.defaultParallel = defaultParallel;
+    this.parallelMethods = parallelMethods;
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setDaemon(true)
         .setNameFormat("concurrent-junit-runner-%d")
@@ -53,7 +54,11 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
 
   @Override
   public void schedule(Runnable childStatement) {
-    serialTasks.offer(childStatement);
+    if (shouldMethodsRunParallel()) {
+      concurrentTasks.offer(completionService.submit(childStatement, null));
+    } else {
+      serialTasks.offer(childStatement);
+    }
   }
 
   /**
@@ -61,14 +66,19 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
    * in serial or parallel.
    */
   public void schedule(Runnable childStatement, Class<?> clazz) {
-    if (shouldRunParallel(clazz)) {
+    if (shouldClassRunParallel(clazz)) {
       concurrentTasks.offer(completionService.submit(childStatement, null));
     } else {
       serialTasks.offer(childStatement);
     }
   }
 
-  private boolean shouldRunParallel(Class<?> clazz) {
+  private boolean shouldMethodsRunParallel() {
+    // TODO(zundel): Add support for an annotation like TestParallelMethods
+    return this.parallelMethods;
+  }
+
+  private boolean shouldClassRunParallel(Class<?> clazz) {
     return !clazz.isAnnotationPresent(TestSerial.class)
         && (clazz.isAnnotationPresent(TestParallel.class) || this.defaultParallel);
   }

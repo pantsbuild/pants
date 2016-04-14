@@ -147,6 +147,14 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   }
 
   @Test
+  public void testParallelMethodsDefaultParallel() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray(
+        "ParallelMethodsDefaultParallelTest1 ParallelMethodsDefaultParallelTest2"
+        + " -parallel-methods -parallel-threads 4 -default-parallel"));
+    assertEquals("pmdptest11 pmdptest12 pmdptest21 pmdptest22", TestRegistry.getCalledTests());
+  }
+
+  @Test
   public void testXmlReportAll() throws Exception {
     String testClassName = XmlReportTest.class.getCanonicalName();
 
