@@ -40,6 +40,9 @@ _SCALA_VERSIONS = {
   '2.10-virt': 'Scala 2.10 virtualized'
 }
 
+# Follow `export.py` for versioning strategy.
+IDEA_PLUGIN_VERSION = '0.0.1'
+
 
 class PluginGen(IdeGen, ConsoleTask):
   """Invoke IntelliJ Pants plugin (installation required) to create a project.
@@ -92,18 +95,19 @@ class PluginGen(IdeGen, ConsoleTask):
     self.workspace_template = os.path.join(_TEMPLATE_BASEDIR,
                                            'workspace-12.mustache')
 
-    output_dir = os.path.join(get_buildroot(), ".idea", "idea-plugin")
+    output_dir = os.path.join(get_buildroot(), ".idea", self.__class__.__name__)
     safe_mkdir(output_dir)
 
     with temporary_dir(root_dir=output_dir, cleanup=False) as output_project_dir:
       self.gen_project_workdir = output_project_dir
-
       self.project_filename = os.path.join(self.gen_project_workdir,
                                            '{}.ipr'.format(self.project_name))
       self.workspace_filename = os.path.join(self.gen_project_workdir,
                                              '{}.iws'.format(self.project_name))
       self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
 
+  # TODO: https://github.com/pantsbuild/pants/issues/3198
+  # trim it down or refactor together with IdeaGen
   def generate_project(self, project):
     def create_content_root(source_set):
       root_relative_path = os.path.join(source_set.source_base, source_set.path) \
@@ -167,7 +171,8 @@ class PluginGen(IdeGen, ConsoleTask):
     abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),
-      project_path=os.path.join(get_buildroot(), self.context.options.target_specs.__iter__().next().split(':')[0])
+      project_path=os.path.join(get_buildroot(), abs_target_specs[0].split(':')[0]),
+      idea_plugin_version=IDEA_PLUGIN_VERSION
     )
 
     # Generate (without merging in any extra components).

@@ -9,6 +9,7 @@ import json
 import os
 from xml.dom import minidom
 
+from pants.backend.project_info.tasks.plugin_gen import IDEA_PLUGIN_VERSION
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_file
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -24,7 +25,6 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     iws_file = os.path.join(project_dir_path, 'project.iws')
     self.assertTrue(os.path.exists(iws_file))
     dom = minidom.parse(iws_file)
-
     self.assertEqual(1, len(dom.getElementsByTagName("project")))
     project = dom.getElementsByTagName("project")[0]
 
@@ -32,7 +32,8 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     component = project.getElementsByTagName('component')[0]
 
     actual_properties = component.getElementsByTagName('property')
-    self.assertEqual(2, len(actual_properties))
+    # 3 properties: targets, project_path, pants_idea_plugin_version
+    self.assertEqual(3, len(actual_properties))
 
     self.assertEqual('targets', actual_properties[0].getAttribute('name'))
     actual_targets = json.loads(actual_properties[0].getAttribute('value'))
@@ -42,6 +43,9 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     self.assertEqual('project_path', actual_properties[1].getAttribute('name'))
     actual_project_path = actual_properties[1].getAttribute('value')
     self.assertEqual(os.path.join(get_buildroot(), expected_project_path), actual_project_path)
+
+    self.assertEqual('pants_idea_plugin_version', actual_properties[2].getAttribute('name'))
+    self.assertEqual(IDEA_PLUGIN_VERSION, actual_properties[2].getAttribute('value'))
 
   def _get_project_dir(self, output_file):
     with open(output_file, 'r') as result:
@@ -61,16 +65,12 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
   def test_idea_plugin_single_target(self):
 
     target = 'examples/src/scala/org/pantsbuild/example/hello:hello'
-    # project_path is always the directory of the first target,
-    # which is where intellij is going to zoom in at project view.
     project_path = "examples/src/scala/org/pantsbuild/example/hello"
 
     self._run_and_check(project_path, [target])
 
   def test_idea_plugin_single_directory(self):
     target = 'testprojects/src/python/antlr::'
-    # project_path is always the directory of the first target,
-    # which is where intellij is going to zoom in at project view.
     project_path = "testprojects/src/python/antlr"
 
     self._run_and_check(project_path, [target])
