@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
@@ -17,8 +18,11 @@ class JavaTests(JvmTarget):
   :API: public
   """
 
+  _VALID_CONCURRENCY_OPTS = ['serial', 'parallel', 'parallel_methods']
+
   def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None,
-               extra_jvm_options=None, extra_env_vars=None, **kwargs):
+               extra_jvm_options=None, extra_env_vars=None, concurrency=None,
+               threads=None, **kwargs):
     """
     :param str cwd: working directory (relative to the build root) for the tests under this
       target. If unspecified (None), the working directory will be controlled by junit_run's --cwd.
@@ -31,8 +35,12 @@ class JavaTests(JvmTarget):
       tests. Example: ['-Dexample.property=1'] If unspecified, no extra jvm options will be added.
     :param dict extra_env_vars: A map of environment variables to set when running the tests, e.g.
       { 'FOOBAR': 12 }. Using `None` as the value will cause the variable to be unset.
+    :param string concurrency: One of 'serial', 'parallel', or 'parallel_methods'.  Overrides
+      the setting of --test-junit-default-parallel or --test-junit-parallel-methods options.
+    :param int threads: Use the specified number of threads when running the test. Overrides
+      the setting of --test-junit-parallel-threads.
     """
-    self.cwd = cwd
+
     payload = payload or Payload()
 
     if extra_env_vars is None:
@@ -43,11 +51,28 @@ class JavaTests(JvmTarget):
 
     payload.add_fields({
       'test_platform': PrimitiveField(test_platform),
+      # TODO(zundel): Do extra_jvm_options and extra_env_vars really need to be fingerprinted?
       'extra_jvm_options': PrimitiveField(tuple(extra_jvm_options or ())),
       'extra_env_vars': PrimitiveField(tuple(extra_env_vars.items())),
     })
-    self._timeout = timeout
     super(JavaTests, self).__init__(payload=payload, **kwargs)
+
+    # These parameters don't need to go into the fingerprint:
+    self._concurrency = concurrency
+    self._cwd = cwd
+    self._threads = None
+    self._timeout = timeout
+
+    try:
+      if threads is not None:
+        self._threads = int(threads)
+    except ValueError:
+      raise TargetDefinitionException(self,
+                                      "The value for 'threads' must be an integer, got " + threads)
+    if concurrency and concurrency not in self._VALID_CONCURRENCY_OPTS:
+      raise TargetDefinitionException(self,
+                                      "The value for 'concurrency' must be one of "
+                                      + repr(self._VALID_CONCURRENCY_OPTS) + " got: " + concurrency)
 
     # TODO(John Sirois): These could be scala, clojure, etc.  'jvm' and 'tests' are the only truly
     # applicable labels - fixup the 'java' misnomer.
@@ -58,6 +83,18 @@ class JavaTests(JvmTarget):
     if self.payload.test_platform:
       return JvmPlatform.global_instance().get_platform_by_name(self.payload.test_platform)
     return self.platform
+
+  @property
+  def concurrency(self):
+    return self._concurrency
+
+  @property
+  def cwd(self):
+    return self._cwd
+
+  @property
+  def threads(self):
+    return self._threads
 
   @property
   def timeout(self):

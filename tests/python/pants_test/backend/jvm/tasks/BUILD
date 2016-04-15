@@ -359,6 +359,18 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 240,
+)
+
+python_tests(
+  name = 'junit_tests_concurrency_integration',
+  sources = ['test_junit_tests_concurrency_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+  timeout = 240,
 )
 
 python_library(
