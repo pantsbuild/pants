@@ -145,7 +145,11 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc', '1.0.12')
+                            # NB: This is explicitly a `_2.10` JarDependency rather than a
+                            # ScalaJarDependency. The latter would pick up the platform in a users'
+                            # repo, whereas this binary is shaded and independent of the target
+                            # platform version.
+                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.3')
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=[
