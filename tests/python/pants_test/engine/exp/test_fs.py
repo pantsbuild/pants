@@ -47,11 +47,13 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def test_walk_literal(self):
     self.assert_walk(Files, ['4.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/1.txt', 'a/b/2'], ['a/b/1.txt', 'a/b/2'])
+    self.assert_walk(Files, ['c.ln/2'], ['c.ln/2'])
+    self.assert_walk(Files, ['d.ln/b/1.txt'], ['d.ln/b/1.txt'])
     self.assert_walk(Files, ['a/3.txt'], ['a/3.txt'])
     self.assert_walk(Files, ['z.txt'], [])
 
   def test_walk_literal_directory(self):
-    self.assert_walk(Dirs, ['c'], ['a/b'])
+    self.assert_walk(Dirs, ['c.ln'], ['a/b'])
     self.assert_walk(Dirs, ['a'], ['a'])
     self.assert_walk(Dirs, ['a/b'], ['a/b'])
     self.assert_walk(Dirs, ['z'], [])
@@ -60,7 +62,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def test_walk_siblings(self):
     self.assert_walk(Files, ['*.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/*.txt'], ['a/b/1.txt'])
-    self.assert_walk(Files, ['c/*.txt'], ['c/1.txt'])
+    self.assert_walk(Files, ['c.ln/*.txt'], ['c.ln/1.txt'])
     self.assert_walk(Files, ['a/b/*'], ['a/b/1.txt', 'a/b/2'])
     self.assert_walk(Files, ['*/0.txt'], [])
 
