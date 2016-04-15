@@ -10,7 +10,7 @@ import unittest
 from abc import abstractmethod
 
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.exp.fs import Dirs, FileContent, Files, Path, PathGlobs
+from pants.engine.exp.fs import Dirs, FileContent, Files, PathGlobs, Stat
 from pants.scm.git import Git
 from pants.util.meta import AbstractClass
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
@@ -31,7 +31,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def assert_walk(self, ftype, filespecs, files):
     project_tree = self.mk_project_tree(self._build_root_src)
     scheduler, storage = self.mk_scheduler(project_tree=project_tree)
-    result = self.execute(scheduler, storage, Path, self.specs(ftype, '', *filespecs))[0]
+    result = self.execute(scheduler, storage, Stat, self.specs(ftype, '', *filespecs))[0]
     self.assertEquals(set(files), set([p.path for p in result]))
 
   def assert_content(self, filespecs, expected_content):
@@ -47,8 +47,8 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def test_walk_literal(self):
     self.assert_walk(Files, ['4.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/1.txt', 'a/b/2'], ['a/b/1.txt', 'a/b/2'])
-    self.assert_walk(Files, ['c.ln/2'], ['c.ln/2'])
-    self.assert_walk(Files, ['d.ln/b/1.txt'], ['d.ln/b/1.txt'])
+    self.assert_walk(Files, ['c.ln/2'], ['a/b/2'])
+    self.assert_walk(Files, ['d.ln/b/1.txt'], ['a/b/1.txt'])
     self.assert_walk(Files, ['a/3.txt'], ['a/3.txt'])
     self.assert_walk(Files, ['z.txt'], [])
 

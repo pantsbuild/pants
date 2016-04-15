@@ -110,8 +110,8 @@ def _norm_with_dir(path):
 class PathGlob(AbstractClass):
   """A filename pattern.
 
-  All PathGlob subclasses match zero or more paths, which differentiates them from Path
-  objects, which are expected to represent literal existing files.
+  All PathGlob subclasses represent in-progress recursion that may match zero or more Stats. The
+  leaves of a "tree" of PathGlobs will be Path objects which may or may not exist.
   """
 
   _DOUBLE = '**'
@@ -135,12 +135,21 @@ class PathGlob(AbstractClass):
     return None, None
 
   @classmethod
-  def create_from_spec(cls, ftype, relative_to, filespec):
-    """Given a filespec, return a potentially nested PathGlob object.
+  def create_from_spec(cls, ftype, canonical_at, filespec):
+    """Given a filespec return a potentially nested PathGlob object.
+
+    :param ftype: The Stat subclass intended to be matched by this PathGlobs. TODO: this
+      value is only used by the Scheduler currently, which is weird. Move to a wrapper?
+    :param canonical_at: A path relative to the ProjectTree that is known to be
+      canonical. This requirement exists in order to avoid "accidentally"
+      traversing symlinks during expansion of a PathGlobs, which would break filesystem
+      invalidation. TODO: Consider asserting that this is a `realpath`.
+    :param filespec: A filespec, relative to canonical_at.
 
     TODO: Because `create_from_spec` is called recursively, this method should work harder to
     avoid splitting/joining. Optimization needed.
     """
+
     parts = _norm_with_dir(filespec).split(os_sep)
     double_index, single_index = cls._wildcard_part(parts)
     if double_index is not None:
@@ -149,20 +158,22 @@ class PathGlob(AbstractClass):
       # other without.
       remainders = (join(*parts[double_index+1:]), join(*parts[double_index:]))
       return PathDirWildcard(ftype,
-                             join(relative_to, *parts[:double_index]),
+                             join(canonical_at, *parts[:double_index]),
                              parts[double_index],
                              remainders)
     elif single_index is None:
-      # A literal path.
-      return Path(join(relative_to, *parts))
+      # A literal path. Look up the first non-canonical component.
+      if len(parts) == 1:
+        return Path(join(canonical_at, parts[0]))
+      return PathLiteral(ftype, join(canonical_at, parts[0]), join(*parts[1:]))
     elif single_index == (len(parts) - 1):
       # There is a wildcard in the file basename of the path.
-      return PathWildcard(join(relative_to, *parts[:-1]), parts[-1])
+      return PathWildcard(join(canonical_at, *parts[:-1]), parts[-1])
     else:
       # There is a wildcard in (at least one of) the dirnames in the path.
       remainders = (join(*parts[single_index + 1:]),)
       return PathDirWildcard(ftype,
-                             join(relative_to, *parts[:single_index]),
+                             join(canonical_at, *parts[:single_index]),
                              parts[single_index],
                              remainders)
 
@@ -176,6 +187,14 @@ class Path(datatype('Path', ['path']), PathGlob):
 
 class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob):
   """A PathGlob with a wildcard in the basename component."""
+
+
+class PathLiteral(datatype('PathLiteral', ['ftype', 'directory', 'remainder']), PathGlob):
+  """A PathGlob representing a partially-expanded literal Path.
+
+  While it still requires recursion, a PathLiteral is simpler to execute than either `wildcard`
+  type: it only needs to stat each directory on the way down, rather than listing them.
+  """
 
 
 class PathDirWildcard(datatype('PathDirWildcard', ['ftype', 'directory', 'wildcard', 'remainders']), PathGlob):
@@ -213,6 +232,7 @@ class PathGlobs(datatype('PathGlobs', ['ftype', 'dependencies'])):
     :param zglobs: A relative zsh-style glob pattern of files to include.
     :rtype: :class:`PathGlobs`
     """
+    relative_to = normpath(relative_to)
     filespecs = OrderedSet()
     for specs, pattern_cls in ((files, Globs),
                                (globs, Globs),
@@ -284,11 +304,20 @@ def apply_path_wildcard(stats, path_wildcard):
   return Stats(files=filtered(stats.files), dirs=filtered(stats.dirs), links=filtered(stats.links))
 
 
+def apply_path_literal(dirs, path_literal):
+  """Given a PathLiteral, generate a PathGlobs object with a longer canonical_at prefix."""
+  ftype = path_literal.ftype
+  if len(dirs.dependencies) > 1:
+    raise AssertionError('{} matched more than one directory!: {}'.format(path_literal, dirs))
+  return PathGlobs(ftype, tuple(PathGlob.create_from_spec(ftype, d.path, path_literal.remainder)
+                                for d in dirs.dependencies))
+
+
 def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   """Given a PathDirWildcard, compute a PathGlobs object that encompasses its children.
 
-  The resulting PathGlobs object will be simplified relative to this wildcard, in the sense
-  that it will be relative to a subdirectory.
+  The resulting PathGlobs will have longer canonical prefixes than this wildcard, in the
+  sense that they will be relative to known-canonical subdirectories.
   """
   ftype = path_dir_wildcard.ftype
   paths = [d.path for d in dirs.dependencies
@@ -360,18 +389,19 @@ def identity(v):
 def create_fs_tasks():
   """Creates tasks that consume the native filesystem Node type."""
   return [
-    # Execute globs.
+    # Glob execution.
     (Stats,
      [SelectProjection(Stats, Dir, ('directory',), PathWildcard),
       Select(PathWildcard)],
      apply_path_wildcard),
     (PathGlobs,
+     [SelectProjection(Dirs, Path, ('directory',), PathLiteral),
+      Select(PathLiteral)],
+     apply_path_literal),
+    (PathGlobs,
      [SelectProjection(Dirs, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
-    (Path,
-     [Select(Stat)],
-     stat_to_path),
   ] + [
     # Link resolution.
     (Dirs,
@@ -403,8 +433,6 @@ def create_fs_tasks():
     (Dirs,
      [SelectDependencies(Dirs, Links)],
      merge_dirs),
-  ] + [
-    # Retrieve the contents of Files.
     (FilesContent,
      [SelectDependencies(FileContent, Files)],
      files_content),
