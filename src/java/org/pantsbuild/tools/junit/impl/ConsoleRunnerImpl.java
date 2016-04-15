@@ -335,6 +335,7 @@ public class ConsoleRunnerImpl {
   private final File outdir;
   private final boolean perTestTimer;
   private final boolean defaultParallel;
+  private final boolean parallelMethods;
   private final int parallelThreads;
   private final int testShard;
   private final int numTestShards;
@@ -349,13 +350,13 @@ public class ConsoleRunnerImpl {
       boolean perTestTimer,
       File outdir,
       boolean defaultParallel,
+      boolean parallelMethods,
       int parallelThreads,
       int testShard,
       int numTestShards,
       int numRetries,
       PrintStream out,
       PrintStream err) {
-
     this.failFast = failFast;
     this.outputMode = outputMode;
     this.xmlReport = xmlReport;
@@ -363,6 +364,7 @@ public class ConsoleRunnerImpl {
     this.outdir = outdir;
     this.defaultParallel = defaultParallel;
     this.parallelThreads = parallelThreads;
+    this.parallelMethods = parallelMethods;
     this.testShard = testShard;
     this.numTestShards = numTestShards;
     this.numRetries = numRetries;
@@ -422,7 +424,7 @@ public class ConsoleRunnerImpl {
     try {
       if (this.parallelThreads > 1) {
         ConcurrentCompositeRequest request = new ConcurrentCompositeRequest(
-            requests, this.defaultParallel, this.parallelThreads);
+            requests, this.defaultParallel, this.parallelMethods, this.parallelThreads);
         failures = core.run(request).getFailureCount();
       } else {
         for (Request request : requests) {
@@ -513,7 +515,15 @@ public class ConsoleRunnerImpl {
     if (!classes.isEmpty()) {
       if (this.perTestTimer || this.parallelThreads > 1) {
         for (Class<?> clazz : classes) {
-          requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
+          if (this.shouldRunParallelMethods(clazz)) {
+            // Don't add these as class requests, make individual TestMethod requests
+            for (Method method :
+                Iterables.filter(Arrays.asList(clazz.getMethods()),IS_ANNOTATED_TEST_METHOD)) {
+              testMethods.add(new TestMethod(clazz, method.getName()));
+            }
+          } else {
+            requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
+          }
         }
       } else {
         // The code below does what the original call
@@ -536,6 +546,11 @@ public class ConsoleRunnerImpl {
           .filterWith(Description.createTestDescription(testMethod.clazz, testMethod.name)));
     }
     return requests;
+  }
+
+  private boolean shouldRunParallelMethods(Class<?> clazz) {
+    // TODO(zundel): Add support for an annotation like TestParallelMethods
+    return this.defaultParallel && this.parallelMethods;
   }
 
   // Loads classes without initializing them.  We just need the type, annotations and method
@@ -608,7 +623,8 @@ public class ConsoleRunnerImpl {
 
   private void notFoundError(String spec, PrintStream out, Throwable t) {
     out.printf("FATAL: Error during test discovery for %s: %s\n", spec, t);
-    throw new RuntimeException("Classloading error during test discovery for " + spec, t);
+    throw new RuntimeException(
+        "Classloading error during test discovery for spec '%s'".format(spec), t);
   }
 
   /**
@@ -644,6 +660,10 @@ public class ConsoleRunnerImpl {
       @Option(name = "-default-parallel",
           usage = "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
       private boolean defaultParallel;
+
+      @Option(name = "-parallel-methods",
+          usage = "Run methods within a class in parallel.")
+      private boolean parallelMethods;
 
       private int parallelThreads = 0;
 
@@ -728,6 +748,7 @@ public class ConsoleRunnerImpl {
             options.perTestTimer,
             options.outdir,
             options.defaultParallel,
+            options.parallelMethods,
             options.parallelThreads,
             options.testShard,
             options.numTestShards,
