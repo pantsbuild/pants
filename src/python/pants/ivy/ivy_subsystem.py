@@ -42,6 +42,8 @@ class IvySubsystem(Subsystem):
              help='Directory to store artifacts retrieved by Ivy.')
     register('--ivy-settings', advanced=True,
              help='Location of XML configuration file for Ivy settings.')
+    register('--bootstrap-ivy-settings', advanced=True,
+             help='Bootstrap Ivy XML configuration file.')
 
   @classmethod
   def subsystem_dependencies(cls):
