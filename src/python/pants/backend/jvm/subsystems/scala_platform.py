@@ -169,9 +169,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   @property
   def repl(self):
-    """Return the proper repl name.
-    :return iterator: list with single runtime.
-    """
+    """Return the proper repl name."""
     return scala_build_info.get(self._get_label()).repl_name
 
   @property
