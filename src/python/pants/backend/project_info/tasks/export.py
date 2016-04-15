@@ -105,6 +105,10 @@ class ExportTask(IvyTaskMixin, PythonTask):
              help='Causes libraries with javadocs to be output.')
     register('--sources', type=bool,
              help='Causes sources to be output.')
+    # Required by IvyTaskMixin.
+    # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
+    register('--jvm-options', type=list, metavar='<option>...',
+             help='Run Ivy with these extra jvm options.')
 
   @classmethod
   def prepare(cls, options, round_manager):

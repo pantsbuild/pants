@@ -77,8 +77,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   @classmethod
   def register_options(cls, register):
     super(BootstrapJvmTools, cls).register_options(register)
-    # Must be registered with the shader- prefix, as IvyTaskMixin already registers --jvm-options.
-    # TODO: IvyTaskMixin should probably add an ivy- prefix; there's no reason to privilege it.
+    # Must be registered with the shader- prefix, as JarTask already registers --jvm-options
+    # (indirectly, via NailgunTask).
     register('--shader-jvm-options', type=list, metavar='<option>...',
              help='Run the tool shader with these extra jvm options.')
 
