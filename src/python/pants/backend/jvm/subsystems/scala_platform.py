@@ -41,7 +41,7 @@ scala_build_info = {
       full_version=None,
       compiler_name='scalac',
       runtime_name='runtime_default',
-      repl_name='scala_repl',
+      repl_name='scala-repl',
       style_name='scalastyle',
       style_version=None),
 }
@@ -102,9 +102,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                   'for //:scalac and //:scala-library ')
 
     register('--runtime-spec', advanced=True, default='//:scala-library',
-             help='Address to be used for custom scala runtime.')
-
-    register('--repl-spec', advanced=True, default='//:scala-repl',
              help='Address to be used for custom scala runtime.')
 
     register('--suffix-version', advanced=True, default=None,
@@ -175,10 +172,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper repl name.
     :return iterator: list with single runtime.
     """
-    if self.get_options().version == 'custom':
-      return self.get_options().repl_spec
-    else:
-      return scala_build_info.get(self._get_label()).repl_name
+    return scala_build_info.get(self._get_label()).repl_name
 
   @property
   def runtime(self):

@@ -9,6 +9,7 @@ import contextlib
 import os
 import re
 import shutil
+from textwrap import dedent
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -31,6 +32,14 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
       options = []
     full_options = options + ['clean-all', 'compile', self.target_path]
     return self.run_pants(full_options)
+
+  def run_repl(self, target, program, options=None):
+    """Run a repl for the given target with the given input, and return stdout_data"""
+    command = ['repl']
+    if options:
+      command.extend(options)
+    command.extend([target, '--quiet'])
+    return self.run_pants(command=command, stdin_data=program)
 
   def setUp(self):
     self.target_path = 'testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin/'
@@ -55,6 +64,38 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       assert not re.search('bootstrap-scalastyle_2_10', pants_run.stdout_data)
       assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
+
+  def test_repl_working_custom_210(self):
+    custom_buildfile = os.path.join(self.target_path, 'custom_210_scalatools.build')
+    with self.tmp_buildfile(custom_buildfile):
+      pants_run = self.run_repl(
+        'examples/src/scala/org/pantsbuild/example/hello/welcome',
+        dedent("""
+            import org.pantsbuild.example.hello.welcome.WelcomeEverybody
+            println(WelcomeEverybody("World" :: Nil).head)
+          """),
+        options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.10']
+      )
+
+      # Make sure this didn't happen:
+      # FAILURE: No bootstrap callback registered for //:scala-repl in scala-platform
+      self.assert_success(pants_run)
+
+  def test_repl_working_custom_211(self):
+    custom_buildfile = os.path.join(self.target_path, 'custom_211_scalatools.build')
+    with self.tmp_buildfile(custom_buildfile):
+      pants_run = self.run_repl(
+        'examples/src/scala/org/pantsbuild/example/hello/welcome',
+        dedent("""
+            import org.pantsbuild.example.hello.welcome.WelcomeEverybody
+            println(WelcomeEverybody("World" :: Nil).head)
+          """),
+        options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.10']
+      )
+
+      # Make sure this didn't happen:
+      # FAILURE: No bootstrap callback registered for //:scala-repl in scala-platform
+      self.assert_success(pants_run)
 
   def test_working_custom_211(self):
     custom_buildfile = os.path.join(self.target_path, 'custom_211_scalatools.build')
