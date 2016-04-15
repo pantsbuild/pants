@@ -14,19 +14,29 @@ from pants.util.dirutil import fast_relpath, safe_walk
 
 class FileSystemProjectTree(ProjectTree):
   def glob1(self, dir_relpath, glob):
+    if self.isignored(dir_relpath):
+      return []
     return glob1(os.path.join(self.build_root, dir_relpath), glob)
 
   def content(self, file_relpath):
+    if self.isignored(file_relpath):
+      return ""
     with open(os.path.join(self.build_root, file_relpath), 'rb') as source:
       return source.read()
 
   def isdir(self, relpath):
+    if self.isignored(relpath):
+      return False
     return os.path.isdir(os.path.join(self.build_root, relpath))
 
   def isfile(self, relpath):
+    if self.isignored(relpath):
+      return False
     return os.path.isfile(os.path.join(self.build_root, relpath))
 
   def exists(self, relpath):
+    if self.isignored(relpath):
+      return False
     return os.path.exists(os.path.join(self.build_root, relpath))
 
   def walk(self, relpath, topdown=True):
@@ -35,6 +45,14 @@ class FileSystemProjectTree(ProjectTree):
     for root, dirs, files in safe_walk(os.path.join(self.build_root, relpath),
                                        topdown=topdown,
                                        onerror=onerror):
+      matched_dirs = self.ignore.match_files(dirs)
+      matched_files = self.ignore.match_files(files)
+      for matched_dir in matched_dirs:
+        dirs.remove(matched_dir)
+
+      for matched_file in matched_files:
+        files.remove(matched_file)
+
       yield fast_relpath(root, self.build_root), dirs, files
 
   def __eq__(self, other):

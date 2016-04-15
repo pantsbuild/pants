@@ -9,6 +9,9 @@ import logging
 import os
 from abc import abstractmethod
 
+from pathspec.gitignore import GitIgnorePattern
+from pathspec.pathspec import PathSpec
+
 from pants.util.meta import AbstractClass
 
 
@@ -23,10 +26,11 @@ class ProjectTree(AbstractClass):
   class InvalidBuildRootError(Exception):
     """Raised when the build_root specified to a ProjectTree is not valid."""
 
-  def __init__(self, build_root):
+  def __init__(self, build_root, pants_ignore = None):
     if not os.path.isabs(build_root):
       raise self.InvalidBuildRootError('ProjectTree build_root {} must be an absolute path.'.format(build_root))
     self.build_root = os.path.realpath(build_root)
+    self.ignore = PathSpec.from_lines(GitIgnorePattern, pants_ignore if pants_ignore else [])
 
   @abstractmethod
   def glob1(self, dir_relpath, glob):
@@ -51,3 +55,8 @@ class ProjectTree(AbstractClass):
   @abstractmethod
   def content(self, file_relpath):
     """Returns the content for file at path."""
+
+  def isignored(self, relpath):
+    """Returns True id path matches pants ignore pattern"""
+    match_result = list(self.ignore.match_files([relpath]))
+    return match_result != []

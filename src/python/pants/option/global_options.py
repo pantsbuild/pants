@@ -145,6 +145,10 @@ class GlobalOptionsRegistrar(Optionable):
              help='Glob patterns for ignoring files when reading BUILD files. '
                   'Use to ignore unneeded directories or BUILD files. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
+    register('--pants-ignore', advanced=True, type=list, fromfile=True,
+             default=['.*', '/dist', 'bower_components', 'node_modules', '*.egg-info', 'test*'],
+             help='Ignore files that match the specified patterns '
+                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
