@@ -1,6 +1,66 @@
 RELEASE HISTORY
 ===============
 
+0.0.82 (04/15/2016)
+-------------------
+
+This release has several changes to tooling, bugfixes relating to symlinks, and some minor api changes.
+
+* Downgraded the version of pex to fix a bug.
+* Upgraded the version of zinc to fix a bug.
+* Added "preferred_jvm_distributions" to the pants export data, deprecating "jvm_distributions". This
+  way the IntelliJ plugin (and other tooling) can easily configure the project sdk that pants is
+  actually using.
+* Changed some option defaults for jvm_compile, zinc_compile, and the --ignore-patterns global option.
+
+API Changes
+~~~~~~~~~~~
+
+* Export preferred_jvm_distributions that pants actually uses (and to deprecate jvm_distributions)
+  `RB #3680 <https://rbcommons.com/s/twitter/r/3680>`_
+
+* Change some option defaults.
+  `RB #3678 <https://rbcommons.com/s/twitter/r/3678>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use the latest zinc release in order to pick up the canonical path fix.
+  `RB #3692 <https://rbcommons.com/s/twitter/r/3692>`_
+  `RB #3693 <https://rbcommons.com/s/twitter/r/3693>`_
+
+* [zinc] Record the canonical path that was fingerprinted, rather than the input path
+  `RB #3692 <https://rbcommons.com/s/twitter/r/3692>`_
+
+* Resolve symlinks when generating sdists.
+  `RB #3689 <https://rbcommons.com/s/twitter/r/3689>`_
+
+* Downgrade pex to 2.1.2
+  `Issue #226 <https://github.com/pantsbuild/pex/issues/226>`_
+  `RB #3687 <https://rbcommons.com/s/twitter/r/3687>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Have all JvmToolMixins share the same --jvm-options option registration.
+  `RB #3684 <https://rbcommons.com/s/twitter/r/3684>`_
+
+* Upgrade default go from 1.6 to 1.6.1.
+  `RB #3686 <https://rbcommons.com/s/twitter/r/3686>`_
+
+* Remove unused config_section from codegen tasks.
+  `RB #3683 <https://rbcommons.com/s/twitter/r/3683>`_
+
+* Add duration pytest option to pants.travis-ci.ini
+  `RB #3662 <https://rbcommons.com/s/twitter/r/3662>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Limit matches for FilesystemNode to only cases where lhs/rhs match
+  `Issue #3117 <https://github.com/pantsbuild/pants/issues/3117>`_
+  `RB #3688 <https://rbcommons.com/s/twitter/r/3688>`_
+
 0.0.81 (04/10/2016)
 -------------------
 
