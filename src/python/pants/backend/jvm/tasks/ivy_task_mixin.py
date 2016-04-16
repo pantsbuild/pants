@@ -66,6 +66,10 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 class IvyTaskMixin(TaskBase):
   """A mixin for Tasks that execute resolves via Ivy.
 
+  Must be mixed in to a task that registers a --jvm-options option (typically by
+  extending NailgunClass).
+  TODO: Get rid of this requirement by registering an --ivy-jvm-options below.
+
   NB: Ivy reports are not relocatable in a cache, and a report must be present in order to
   parse the graph structure of dependencies. Therefore, this mixin explicitly disables the
   cache for its invalidation checks via the `use_cache=False` parameter. Tasks that extend
@@ -87,8 +91,9 @@ class IvyTaskMixin(TaskBase):
   @classmethod
   def register_options(cls, register):
     super(IvyTaskMixin, cls).register_options(register)
-    register('--jvm-options', type=list, metavar='<option>...',
-             help='Run Ivy with these extra jvm options.')
+    # TODO: Register an --ivy-jvm-options here and use that, instead of the --jvm-options
+    # registered by the task we mix into. That task may have intended those options for some
+    # other JVM run than the Ivy one.
     register('--soft-excludes', type=bool, advanced=True,
              help='If a target depends on a jar that is excluded by another target '
                   'resolve this jar anyway')
