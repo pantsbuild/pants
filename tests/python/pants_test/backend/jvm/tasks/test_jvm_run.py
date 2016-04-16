@@ -9,6 +9,7 @@ import os
 import re
 from contextlib import contextmanager
 
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.util.contextutil import pushd, temporary_dir
@@ -56,5 +57,5 @@ class JvmRunTest(JvmTaskTestBase):
   def _match_cmdline_regex(self, cmdline, main):
     # Original classpath is embedded in the manifest file of a synthetic jar, just verify
     # classpath is a singleton jar here.
-    m = re.search(r'java -cp [^:]*\.jar {}'.format(main), cmdline)
+    m = re.search(r'java {} -cp [^:]*\.jar {}'.format(' '.join(JVM.options_default), main), cmdline)
     return m is not None

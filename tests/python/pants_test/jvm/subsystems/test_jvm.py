@@ -16,7 +16,7 @@ create_JVM = functools.partial(create_subsystem, JVM)
 
 def test_options_default():
   jvm = create_JVM()
-  assert [] == jvm.get_jvm_options()
+  assert jvm.options_default == jvm.get_jvm_options()
 
 
 def test_options_simple():
@@ -62,7 +62,7 @@ def test_implicit_via_debug_port():
 
 def test_explicit_debug_args():
   jvm = create_JVM(debug_args=['fred'])
-  assert ['fred'] == jvm.get_jvm_options()
+  assert jvm.options_default + ['fred'] == jvm.get_jvm_options()
 
 
 def test_explicit_debug_args_with_options():
