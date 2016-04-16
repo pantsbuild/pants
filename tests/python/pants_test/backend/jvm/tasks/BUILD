@@ -466,6 +466,7 @@ python_tests(
   name = 'jvm_run',
   sources = ['test_jvm_run.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/subsystems:jvm',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/util:contextutil',

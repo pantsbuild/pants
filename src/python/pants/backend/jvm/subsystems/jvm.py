@@ -21,11 +21,14 @@ class JVM(Subsystem):
   """
   options_scope = 'jvm'
 
+  options_default = ['-Xmx1g', '-XX:MaxPermSize=256m', '-Dfile.encoding=UTF8']
+
   @classmethod
   def register_options(cls, register):
     super(JVM, cls).register_options(register)
     # TODO(benjy): Options to specify the JVM version?
     register('--options', type=list, metavar='<option>...',
+             default=cls.options_default,
              help='Run with these extra JVM options.')
     register('--program-args', type=list, metavar='<arg>...',
              help='Run with these extra program args.')

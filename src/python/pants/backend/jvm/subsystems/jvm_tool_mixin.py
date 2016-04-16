@@ -58,7 +58,7 @@ class JvmToolMixin(object):
                                     See src/python/pants/options/options_bootstrapper.py for
                                     details.
     """
-    return []
+    return ['-Xmx1g', '-XX:MaxPermSize=256m', '-Dfile.encoding=UTF8']
 
   @classmethod
   def register_options(cls, register):
