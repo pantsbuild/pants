@@ -57,5 +57,9 @@ class JvmRunTest(JvmTaskTestBase):
   def _match_cmdline_regex(self, cmdline, main):
     # Original classpath is embedded in the manifest file of a synthetic jar, just verify
     # classpath is a singleton jar here.
-    m = re.search(r'java {} -cp [^:]*\.jar {}'.format(' '.join(JVM.options_default), main), cmdline)
+    if JVM.options_default:
+      opts_str = ' '.join(JVM.options_default) + ' '
+    else:
+      opts_str = ''
+    m = re.search(r'java {}-cp [^:]*\.jar {}'.format(opts_str, main), cmdline)
     return m is not None
