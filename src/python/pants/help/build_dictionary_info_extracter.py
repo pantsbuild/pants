@@ -7,9 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import inspect
 import re
-from collections import OrderedDict, namedtuple
-
 import textwrap
+from collections import OrderedDict, namedtuple
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
