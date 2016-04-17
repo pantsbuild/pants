@@ -144,8 +144,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
     pants_command = [pants_script] + args + command
 
-    env = os.environ.copy()
-    env.update(extra_env or {})
+    if extra_env is None:
+      env = {}
+    else:
+      env = extra_env.copy()
+    if not self.hermetic():
+      env.update(os.environ)
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)

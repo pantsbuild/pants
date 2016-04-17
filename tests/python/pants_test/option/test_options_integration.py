@@ -14,6 +14,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class TestOptionsIntegration(PantsRunIntegrationTest):
 
+  @classmethod
+  def hermetic(cls):
+    return True
+
   def test_options_works_at_all(self):
     self.assert_success(self.run_pants(['options']))
 
