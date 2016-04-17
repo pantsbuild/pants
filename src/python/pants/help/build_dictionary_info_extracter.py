@@ -30,7 +30,7 @@ class BuildSymbolInfo(namedtuple('_BuildSymbolInfo',
   details_lines: A list of lines of text providing further details (possibly empty).
   args: A list of FunctionArg instances.
   """
-  
+
   def details(self):
     return '\n'.join(self.details_lines)
 
