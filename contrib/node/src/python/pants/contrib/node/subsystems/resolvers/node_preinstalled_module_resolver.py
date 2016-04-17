@@ -8,16 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import shutil
-from contextlib import closing
 
-import six.moves.urllib.error as urllib_error
 import six.moves.urllib.parse as urllib_parse
-import six.moves.urllib.request as urllib_request
 from pants.base.exceptions import TaskError
 from pants.fs.archive import archiver_for_path
+from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_open
 
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
@@ -54,14 +51,14 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
                           path=download_path))
 
       try:
-        with closing(urllib_request.urlopen(target.dependencies_archive_url)) as opened_archive_url:
-          with safe_open(download_path, 'wb') as downloaded_archive:
-            downloaded_archive.write(opened_archive_url.read())
-      except (IOError, urllib_error.HTTPError, urllib_error.URLError, ValueError) as error:
-        raise TaskError('Failed to fetch preinstalled node_modules for {target} from '
-                        '{dependencies_archive_url}: {error}'
+        Fetcher().download(target.dependencies_archive_url,
+                           listener=Fetcher.ProgressListener(),
+                           path_or_fd=download_path)
+      except Fetcher.Error as error:
+        raise TaskError('Failed to fetch preinstalled node_modules for {target} from {url}: {error}'
                         .format(target=target.address.reference(),
-                                url=target.dependencies_archive_url, error=error))
+                                url=target.dependencies_archive_url,
+                                error=error))
 
       logger.info('Fetched archive {archive_file_name} from {dependencies_archive_url} to {path}'
                   .format(archive_file_name=archive_file_name,
