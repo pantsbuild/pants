@@ -31,7 +31,6 @@ PantsResult = namedtuple(
 def ensure_cached(expected_num_artifacts=None):
   """Decorator for asserting cache writes in an integration test.
 
-  :param task_cls: Class of the task to check the artifact cache for. (e.g. JarCreate)
   :param expected_num_artifacts: Expected number of artifacts to be in the task's
                                  cache after running the test. If unspecified, will
                                  assert that the number of artifacts in the cache is
@@ -62,6 +61,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   PANTS_SUCCESS_CODE = 0
   PANTS_SCRIPT_NAME = 'pants'
+
+  @classmethod
+  def hermetic(cls):
+    """Subclasses may override to acknowledge that they are hermetic.
+
+    That is, that they should run without reading the real pants.ini.
+    """
+    return False
 
   @classmethod
   def has_python_version(cls, version):
@@ -112,10 +119,15 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              **kwargs):
 
-    args = ['--no-pantsrc',
-            '--pants-workdir=' + workdir,
-            '--kill-nailguns',
-            '--print-exception-stacktrace']
+    args = [
+      '--no-pantsrc',
+      '--pants-workdir={}'.format(workdir),
+      '--kill-nailguns',
+      '--print-exception-stacktrace',
+    ]
+
+    if self.hermetic():
+      args.extend(['--pants-config-files=[]', '--no-cache-read', '--no-cache-write'])
 
     if config:
       config_data = config.copy()
