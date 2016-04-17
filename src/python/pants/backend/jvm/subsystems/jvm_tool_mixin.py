@@ -58,7 +58,7 @@ class JvmToolMixin(object):
                                     See src/python/pants/options/options_bootstrapper.py for
                                     details.
     """
-    return []
+    return ['-Xmx256m']
 
   @classmethod
   def register_options(cls, register):
