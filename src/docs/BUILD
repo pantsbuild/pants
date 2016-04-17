@@ -21,6 +21,11 @@ page(
 )
 
 page(
+    name='community',
+    source='community.md',
+)
+
+page(
   name='first_concepts',
   source='first_concepts.md',
   links=[
@@ -50,13 +55,13 @@ page(
     ':first_tutorial',
     ':install',
     ':invoking',
+    ':options',
     ':powered_by',
-    ':publish',
     ':setup_repo',
     ':target_addresses',
     ':tshoot',
-    ':with_emacs',
-    ':with_intellij',
+    ':ide_support',
+    ':why_use_pants',
     'examples/src/java/org/pantsbuild/example:page',
     'examples/src/java/org/pantsbuild/example:readme',
     'examples/src/python/example:readme',
@@ -82,16 +87,18 @@ page(
 )
 
 page(
+    name='options',
+    source='options.md',
+)
+
+page(
   name='powered_by',
   source='powered_by.md',
 )
 
 page(
-  name='publish',
-  source='publish.md',
-  links=[
-    ':3rdparty',
-  ]
+    name='reporting_server',
+    source='reporting_server.md',
 )
 
 page(
@@ -100,7 +107,7 @@ page(
   links=[
     ':build_files',
     ':first_concepts',
-    ':publish',
+    ':options',
     'src/python/pants/docs:dev_tasks',
     'src/python/pants/docs:dev_tasks_publish_extras',
     'src/python/pants/docs:howto_contribute',
@@ -117,19 +124,18 @@ page(
   name='tshoot',
   source='tshoot.md',
   links=[
+    ':community',
+    ':reporting_server',
     'src/python/pants/docs:howto_ask',
   ]
 )
 
 page(
-  name='with_emacs',
-  source='with_emacs.md'
+  name='why_use_pants',
+  source='why_use_pants.md'
 )
 
 page(
-  name='with_intellij',
-  source='with_intellij.md',
-  links=[
-    'src/python/pants/docs:intellij',
-  ],
+  name='ide_support',
+  source='ide_support.md',
 )

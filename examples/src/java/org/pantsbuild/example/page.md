@@ -1,11 +1,8 @@
-README Files and Markdown
-=========================
+Markdown
+========
 
-You can write program documentation in the popular Markdown or ReST format;
-Pants eases publishing your docs to places where your users can read it.
-E.g., that `README.md` file in your source code is handy for editing;
-but you might want to generate a web page from that so folks can decide
-whether they want to look at your source code.
+You can write codebase documentation in the popular Markdown or ReST format;
+Pants eases generating readable versions and publishing them so your users can read it.
 
 Markdown to HTML
 ----------------

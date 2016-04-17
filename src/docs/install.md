@@ -30,13 +30,13 @@ this, first find out the version of pants you just installed:
 
       :::bash
       ./pants -V
-      0.0.42
+      1.0.0
 
 Then add an entry like so to pants.ini with that version:
 
       :::ini
       [GLOBAL]
-      pants_version: 0.0.42
+      pants_version: 1.0.0
 
 When you'd like to upgrade pants, just edit the version in pants.ini and pants will self-update on
 the next run.  This script stores the various pants versions you use centrally in
@@ -48,7 +48,7 @@ follows:
 
       :::ini
       [GLOBAL]
-      pants_version: 0.0.42
+      pants_version: 1.0.0
 
       plugins: [
           'pantsbuild.pants.contrib.go==%(pants_version)s',
@@ -78,13 +78,13 @@ of a file named `pants` in the buildroot, and that file might as well be the run
 
 PEX-based Installation
 ----------------------
-
-To support hermetic builds and not depend on a local pants installation (e.g.: CI machines may
-prohibit software installation), some sites fetch a pre-built `pants.pex` using the `pants_version`
-defined in `pants.ini`. To upgrade pants, they generate a `pants.pex` and upload it to a file
-server at a location computable from the version number. They then write their own `./pants`
-script that checks the `pants.ini` `pants_version` and downloads the appropriate pex from the file
-server to the correct spot.
+The virtualenv-based method is the recommended way of installing Pants. 
+However in cases where you can't depend on a local pants installation (e.g., your machines
+prohibit software installation), some sites fetch a pre-built executable `pants.pex` using 
+the `pants_version` defined in `pants.ini`.  To upgrade pants, they generate a `pants.pex` 
+and upload it to a file server at a location computable  from the version number. 
+They then write their own `./pants` script that checks the `pants_version` in 
+`pants.ini` and download the appropriate pex from the file server to the correct spot.
 
 Troubleshooting
 ---------------
