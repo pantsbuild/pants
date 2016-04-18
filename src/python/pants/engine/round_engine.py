@@ -17,29 +17,18 @@ from pants.engine.round_manager import RoundManager
 
 
 class GoalExecutor(object):
-  """
-  :API: public
-  """
 
   def __init__(self, context, goal, tasktypes_by_name):
-    """
-    :API: public
-    """
     self._context = context
     self._goal = goal
     self._tasktypes_by_name = tasktypes_by_name
 
   @property
   def goal(self):
-    """
-    :API: public
-    """
     return self._goal
 
   def attempt(self, explain):
     """Attempts to execute the goal's tasks in installed order.
-
-    :API: public
 
     :param bool explain: If ``True`` then the goal plan will be explained instead of being
                          executed.

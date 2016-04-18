@@ -63,9 +63,6 @@ class Context(object):
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, invalidation_report=None):
-    """
-    :API: public
-    """
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -147,17 +144,11 @@ class Context(object):
 
   @property
   def workspace(self):
-    """Returns the current workspace, if any.
-
-    :API: public
-    """
+    """Returns the current workspace, if any."""
     return self._workspace
 
   @property
   def invalidation_report(self):
-    """
-    :API: public
-    """
     return self._invalidation_report
 
   def __str__(self):
@@ -185,10 +176,7 @@ class Context(object):
       work_chain, workunit_parent=workunit_parent, done_hook=done_hook)
 
   def background_worker_pool(self):
-    """Returns the pool to which tasks can submit background work.
-
-    :API: public
-    """
+    """Returns the pool to which tasks can submit background work."""
     return self.run_tracker.background_worker_pool()
 
   def subproc_map(self, f, items):

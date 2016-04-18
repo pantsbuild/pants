@@ -19,8 +19,6 @@ class TaskRegistrar(object):
 
   def __init__(self, name, action, dependencies=None, serialize=True):
     """
-    :API: public
-
     :param name: the name of the task.
     :param action: the Task action object to invoke this task.
     :param dependencies: DEPRECATED
