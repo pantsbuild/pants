@@ -36,6 +36,12 @@ also be run from pants sources. Explaining each environment variable:
   can also be taken from the pants repo pants.ini.  You'll need one package name per plugin your
   other repo uses.
 
+If your other repo uses plugins but you don't use this environment variable technique, or you do use
+it but miss one or more plugins, pants will still run, but the result can be confusing since the
+plugins not covered by the environment variable settings will run from a cached binary distribution
+and not from your local edits to pants.  Its worth adding temporary print statements to make sure
+you're hitting your code edits if you aren't using a debugger.
+
 Building Pants PEX for Production
 -----------------------------------
 
