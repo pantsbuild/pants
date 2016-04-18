@@ -31,7 +31,7 @@ also be run from pants sources. Explaining each environment variable:
 
 + `PANTS_PLUGINS`: This should always be as-shown, ie: an empty list.
 + `PANTS_PYTHONPATH`: This is a comma-separated list of PYTHONPATH elements.  The values can be
-  taken from the pants repo pants.ini.  You'll need one path per plugin you other repo uses.
+  taken from the pants repo pants.ini.  You'll need one path per plugin your other repo uses.
 + `PANTS_BACKEND_PACKAGES`: This is a comma-separated list of plugin package names.  These values
   can also be taken from the pants repo pants.ini.  You'll need one package name per plugin your
   other repo uses.
