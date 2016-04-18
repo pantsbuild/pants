@@ -85,6 +85,9 @@ class PantsIgnoreTest(ProjectTreeTestBase):
                        'grocery/fruit'
                        }, set(files_list))
 
+    files_list = self._project_tree.glob1("fruit", "*")
+    self.assertEquals({'banana', 'orange', 'fruit'}, set(files_list))
+
   def test_ignore_pattern_leading_slash(self):
     self._project_tree = FileSystemProjectTree(self.root_dir, ["/apple"])
     files_list = []
@@ -110,6 +113,9 @@ class PantsIgnoreTest(ProjectTreeTestBase):
                        'fruit/fruit/apple', 'fruit/fruit/banana', 'fruit/fruit/orange',
                        'grocery/fruit'
                        }, set(files_list))
+
+    files_list = self._project_tree.glob1("", "*e")
+    self.assertEquals(set(), set(files_list))
 
   def test_ignore_pattern_two_asterisks(self):
     self._project_tree = FileSystemProjectTree(self.root_dir, ["/**/apple"])

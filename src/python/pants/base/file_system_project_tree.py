@@ -14,9 +14,16 @@ from pants.util.dirutil import fast_relpath, safe_walk
 
 class FileSystemProjectTree(ProjectTree):
   def glob1(self, dir_relpath, glob):
+    ret_list = []
+
     if self.isignored(dir_relpath):
-      return []
-    return glob1(os.path.join(self.build_root, dir_relpath), glob)
+      return ret_list
+
+    for matched_file in glob1(os.path.join(self.build_root, dir_relpath), glob):
+      if not self.isignored(os.path.join(dir_relpath, matched_file)):
+        ret_list.append(matched_file)
+
+    return ret_list
 
   def content(self, file_relpath):
     if self.isignored(file_relpath):
