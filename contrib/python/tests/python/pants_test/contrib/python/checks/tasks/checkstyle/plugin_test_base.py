@@ -6,8 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import os
 import unittest
 
+from pants.util.dirutil import safe_mkdtemp
 from pants_test.option.util.fakes import create_options
 
 from pants.contrib.python.checks.tasks.checkstyle.common import Nit, PythonFile
@@ -16,8 +18,23 @@ from pants.contrib.python.checks.tasks.checkstyle.common import Nit, PythonFile
 class CheckstylePluginTestBase(unittest.TestCase):
   plugin_type = None   # Subclasses must override.
 
+  @property
+  def file_required(self):
+    """Override and return `True` if the plugin needs to operate on a file on disk."""
+    return False
+
+  def create_python_file(self, file_content):
+    if self.file_required:
+      tmpdir = safe_mkdtemp()
+      with open(os.path.join(tmpdir, 'file.py'), 'wb') as fp:
+        fp.write(file_content)
+        fp.close()
+        return PythonFile.parse(fp.name)
+    else:
+      return PythonFile.from_statement(file_content)
+
   def get_plugin(self, file_content, **options):
-    python_file = PythonFile.from_statement(file_content)
+    python_file = self.create_python_file(file_content)
     full_options = copy.copy(options)
     full_options['skip'] = False
     options_object = create_options({'foo': full_options}).for_scope('foo')
