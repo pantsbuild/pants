@@ -15,10 +15,6 @@ class JarTool(JvmToolMixin, Subsystem):
   options_scope = 'jar-tool'
 
   @classmethod
-  def get_jvm_options_default(cls, bootstrap_option_values):
-    return ['-Xmx64M']
-
-  @classmethod
   def register_options(cls, register):
     super(JarTool, cls).register_options(register)
     cls.register_jvm_tool(register,
