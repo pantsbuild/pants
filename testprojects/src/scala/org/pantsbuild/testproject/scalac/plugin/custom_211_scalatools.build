@@ -11,9 +11,9 @@ jar_library(name = 'scala-library',
             ])
 
 jar_library(name = 'scala-repl',
-            dependencies = [
-              ':scala-compiler',
-              ':scala-library',
+            jars = [
+              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.11.7'),
+              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.11.7'),
             ])
 
 jar_library(name = 'scalastyle',
