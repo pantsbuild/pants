@@ -13,11 +13,10 @@ import unittest
 from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
 
-from pants.base.build_file import BuildFile
 from pants.util.dirutil import safe_mkdir, touch
 
 
-class BuildFileTestBase(unittest.TestCase):
+class ProjectTreeTestBase(unittest.TestCase):
   """
     :API: public
   """
@@ -40,31 +39,11 @@ class BuildFileTestBase(unittest.TestCase):
     """
     touch(self.fullpath(path))
 
-  def _create_ignore_spec(self, build_ignore_patterns):
+  def _create_ignore_spec(self, ignore_patterns):
     """
     :API: public
     """
-    return PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
-
-  def scan_buildfiles(self, base_relpath, build_ignore_patterns=None):
-    """
-    :API: public
-    """
-    return BuildFile.scan_build_files(self._project_tree, base_relpath,
-                                      build_ignore_patterns=self._create_ignore_spec(build_ignore_patterns))
-
-  def create_buildfile(self, relpath):
-    """
-    :API: public
-    """
-    return BuildFile(self._project_tree, relpath)
-
-  def get_build_files_family(self, relpath, build_ignore_patterns=None):
-    """
-    :API: public
-    """
-    return BuildFile.get_build_files_family(self._project_tree, relpath,
-                                            build_ignore_patterns=self._create_ignore_spec(build_ignore_patterns))
+    return PathSpec.from_lines(GitIgnorePattern, ignore_patterns or [])
 
   def setUp(self):
     """
@@ -78,30 +57,39 @@ class BuildFileTestBase(unittest.TestCase):
 
     self.root_dir = os.path.join(self.base_dir, 'root')
 
-    self.touch('grandparent/parent/BUILD')
-    self.touch('grandparent/parent/BUILD.twitter')
-    # Tricky!  This is a directory
-    self.makedirs('grandparent/parent/BUILD.dir')
-    self.makedirs('grandparent/BUILD')
-    self.touch('BUILD')
-    self.touch('BUILD.twitter')
-    self.touch('grandparent/parent/child1/BUILD')
-    self.touch('grandparent/parent/child1/BUILD.twitter')
-    self.touch('grandparent/parent/child2/child3/BUILD')
-    self.makedirs('grandparent/parent/child2/BUILD')
-    self.makedirs('grandparent/parent/child4')
-    self.touch('grandparent/parent/child5/BUILD')
-    self.makedirs('path-that-does-exist')
-    self.touch('path-that-does-exist/BUILD.invalid.suffix')
+    # make 'root/'
+    self.makedirs('')
 
-    # This exercises https://github.com/pantsbuild/pants/issues/1742
-    # Prior to that fix, BUILD directories were handled, but not if there was a valid BUILD file
-    # sibling.
-    self.makedirs('issue_1742/BUILD')
-    self.touch('issue_1742/BUILD.sibling')
+    # make 'root/...'
+    self.touch('apple')
+    self.touch('orange')
+    self.touch('banana')
+
+    # make 'root/fruit/'
+    self.makedirs('fruit')
+
+    # make 'root/fruit/...'
+    self.touch('fruit/apple')
+    self.touch('fruit/orange')
+    self.touch('fruit/banana')
+
+    # make 'root/fruit/fruit/'
+    self.makedirs('fruit/fruit')
+
+    # make 'root/fruit/fruit/...'
+    self.touch('fruit/fruit/apple')
+    self.touch('fruit/fruit/orange')
+    self.touch('fruit/fruit/banana')
+
+    self.makedirs('grocery')
+    self.touch('grocery/fruit')
+
+    self.cwd = os.getcwd()
+    os.chdir(self.root_dir)
 
   def tearDown(self):
     """
     :API: public
     """
     shutil.rmtree(self.base_dir)
+    os.chdir(self.cwd)

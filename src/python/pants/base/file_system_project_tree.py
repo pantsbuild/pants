@@ -45,15 +45,16 @@ class FileSystemProjectTree(ProjectTree):
     for root, dirs, files in safe_walk(os.path.join(self.build_root, relpath),
                                        topdown=topdown,
                                        onerror=onerror):
-      matched_dirs = self.ignore.match_files(dirs)
-      matched_files = self.ignore.match_files(files)
+      rel_root = fast_relpath(root, self.build_root)
+      matched_dirs = self.ignore.match_files([os.path.join(rel_root, "{0}/".format(d)) for d in dirs])
+      matched_files = self.ignore.match_files([os.path.join(rel_root, f) for f in files])
       for matched_dir in matched_dirs:
-        dirs.remove(matched_dir)
+        dirs.remove(matched_dir.replace(rel_root, '').strip('/'))
 
       for matched_file in matched_files:
-        files.remove(matched_file)
+        files.remove(matched_file.replace(rel_root, '').strip('/'))
 
-      yield fast_relpath(root, self.build_root), dirs, files
+      yield rel_root, dirs, files
 
   def __eq__(self, other):
     return other and (type(other) == type(self)) and (self.build_root == other.build_root)

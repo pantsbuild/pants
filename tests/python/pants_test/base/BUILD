@@ -45,6 +45,26 @@ python_tests(
   ]
 )
 
+python_library(
+  name = 'project_tree_test_base',
+  sources = ['project_tree_test_base.py'],
+  dependencies = [
+    '3rdparty/python:pathspec',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name = 'pants_ignore',
+  sources = ['test_pants_ignore.py'],
+  dependencies = [
+    ':project_tree_test_base',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
 python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],

@@ -182,7 +182,6 @@ class GoalRunnerFactory(object):
 
     pants_ignore = self._global_options.pants_ignore or []
     self._project_tree = self._get_project_tree(self._global_options.build_file_rev, pants_ignore)
-    import pdb;pdb.set_trace()
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
     build_ignore_patterns = self._global_options.ignore_patterns or []
     self._address_mapper = BuildFileAddressMapper(
