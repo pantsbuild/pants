@@ -17,7 +17,26 @@ As pants is implemented in python it can be run directly from sources.
     $ ./pants goals
     <remainder of output omitted for brevity>
 
-Building a Pants PEX for Production
+If you want to run pants from sources, but in another repo to test changes before a release, you
+can run it like so:
+
+    :::bash
+    (other repo) $ PANTS_PLUGINS="[]" \
+      PANTS_PYTHONPATH="['/path/to/pants/repo/contrib/python/src/python']" \
+      PANTS_BACKEND_PACKAGES="['pants.contrib.python.checks']" \
+      /path/to/pants/repo/pants compile ::
+
+Here the environment variables are used to make sure any pants plugins your other repo uses will
+also be run from pants sources. Explaining each environment variable:
+
++ `PANTS_PLUGINS`: This should always be as-shown, ie: an empty list.
++ `PANTS_PYTHONPATH`: This is a comma-separated list of PYTHONPATH elements.  The values can be
+  taken from the pants repo pants.ini.  You'll need one path per plugin you other repo uses.
++ `PANTS_BACKEND_PACKAGES`: This is a comma-separated list of plugin package names.  These values
+  can also be taken from the pants repo pants.ini.  You'll need one package name per plugin your
+  other repo uses.
+
+Building Pants PEX for Production
 -----------------------------------
 
 You will usually want to use an official published version of pants. But what if you want to
