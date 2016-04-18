@@ -17,7 +17,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
   @contextlib.contextmanager
   def tmp_buildfile(self, path):
-    """Temporarily create a BUILD file in the root for custom scala testing"""
+    """Temporarily create a BUILD file in the root for custom scala testing."""
     if os.path.exists(self.tmp_build_file_path):
       raise RuntimeError('BUILD file exists failing to avoid overwritting file.'
                          'Ensure that file does not exist from a previous run')
@@ -34,7 +34,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     return self.run_pants(full_options)
 
   def run_repl(self, target, program, options=None):
-    """Run a repl for the given target with the given input, and return stdout_data"""
+    """Run a repl for the given target with the given input, and return stdout_data."""
     command = ['repl']
     if options:
       command.extend(options)
