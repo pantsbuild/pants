@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from os.path import join
 
-from pants.engine.exp.fs import Dirs, Files, Path, PathDirWildcard, PathGlobs, PathWildcard
+from pants.engine.exp.fs import (Dirs, Files, Path, PathDirWildcard, PathGlobs, PathLiteral,
+                                 PathWildcard)
 
 
 class PathGlobsTest(unittest.TestCase):
@@ -27,14 +28,7 @@ class PathGlobsTest(unittest.TestCase):
     name = 'Blah.java'
     self.assert_files_equals([Path(name)], '', [name])
     self.assert_files_equals([Path(join(subdir, name))], subdir, [name])
-    self.assert_files_equals([Path(join(subdir, name))], '', [join(subdir, name)])
-
-  def test_literal_directory(self):
-    subdir = 'foo'
-    name = 'bar/.'
-    self.assert_dirs_equals([Path(name)], '', [name])
-    self.assert_dirs_equals([Path(join(subdir, name))], subdir, [name])
-    self.assert_dirs_equals([Path(join(subdir, name))], '', [join(subdir, name)])
+    self.assert_files_equals([PathLiteral(Files, subdir, name)], '', [join(subdir, name)])
 
   def test_wildcard(self):
     name = '*.java'

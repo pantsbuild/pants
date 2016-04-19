@@ -10,7 +10,9 @@ import unittest
 from abc import abstractmethod
 
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.exp.fs import Dirs, FileContent, Files, PathGlobs, Stat
+from pants.engine.exp.fs import (Dir, DirectoryListing, Dirs, FileContent, Files, Link, Path,
+                                 PathGlobs, ReadLink, Stat, Stats)
+from pants.engine.exp.nodes import FilesystemNode
 from pants.scm.git import Git
 from pants.util.meta import AbstractClass
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
@@ -43,6 +45,17 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
       return True
     actual_content = {f.path: f.content for f in result if validate(f)}
     self.assertEquals(expected_content, actual_content)
+
+  def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
+    project_tree = self.mk_project_tree(self._build_root_src)
+    scheduler, storage = self.mk_scheduler(project_tree=project_tree)
+    request = self.execute_request(scheduler, storage, Stat, self.specs(ftype, '', *filespecs))
+
+    # Validate that FilesystemNodes for exactly the given subjects are reachable under this
+    # request.
+    fs_nodes = [n for ((n, _), _) in scheduler.product_graph.walk(roots=request.roots)
+                if type(n) is FilesystemNode]
+    self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
 
   def test_walk_literal(self):
     self.assert_walk(Files, ['4.txt'], ['4.txt'])
@@ -88,6 +101,57 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
       self.assert_content(['a/b/'], {'a/b/': 'nope\n'})
     with self.assertRaises(Exception):
       self.assert_content(['a/b'], {'a/b': 'nope\n'})
+
+  def test_nodes_file(self):
+    self.assert_fsnodes(Files, ['4.txt'], [
+        (Path('4.txt'), Stats),
+      ])
+
+  def test_nodes_symlink_file(self):
+    self.assert_fsnodes(Files, ['c.ln/2'], [
+        (Link('c.ln'), ReadLink),
+        (Path('c.ln'), Stats),
+        (Path('a/b'), Stats),
+        (Path('a/b/2'), Stats),
+      ])
+    self.assert_fsnodes(Files, ['d.ln/b/1.txt'], [
+        (Path('d.ln'), Stats),
+        (Link('d.ln'), ReadLink),
+        (Path('a'), Stats),
+        (Path('a/b'), Stats),
+        (Path('a/b/1.txt'), Stats),
+      ])
+
+  def test_nodes_symlink_globbed_dir(self):
+    self.assert_fsnodes(Files, ['*/2'], [
+        # Glob the root.
+        (Dir(''), DirectoryListing),
+        # Stat each entry.
+        (Path('a'), Stats),
+        (Path('c.ln'), Stats),
+        (Path('d.ln'), Stats),
+        (Path('4.txt'), Stats),
+        # Read links to determine whether they're actually directories.
+        (Link('c.ln'), ReadLink),
+        (Link('d.ln'), ReadLink),
+        # Stat the detination of one link (the other was already stat'd during the initial list).
+        (Path('a/b'), Stats),
+        # Look up the literal in each path.
+        (Path('a/b/2'), Stats),
+        (Path('a/2'), Stats),
+      ])
+
+  def test_nodes_symlink_globbed_file(self):
+    self.assert_fsnodes(Files, ['d.ln/b/*.txt'], [
+        # NB: Needs to stat every path on the way down to track whether
+        # it is traversing a symlink.
+        (Path('d.ln'), Stats),
+        (Link('d.ln'), ReadLink),
+        (Path('a/b'), Stats),
+        (Dir('a/b'), DirectoryListing),
+        (Path('a/b/2'), Stats),
+        (Path('a/b/1.txt'), Stats),
+      ])
 
 
 class PosixFSTest(unittest.TestCase, FSTestBase):
