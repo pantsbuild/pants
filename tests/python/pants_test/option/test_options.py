@@ -605,7 +605,7 @@ class OptionsTest(unittest.TestCase):
         """
       ))
       tmp.flush()
-      # Not that we prevent loading a real pants.ini during get_bootstrap_options().
+      # Note that we prevent loading a real pants.ini during get_bootstrap_options().
       cmdline = './pants --target-spec-file={filename} --pants-config-files="[]" ' \
                 'compile morx:tgt fleem:tgt'.format(
         filename=tmp.name)

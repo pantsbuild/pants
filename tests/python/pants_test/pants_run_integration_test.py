@@ -127,7 +127,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
     ]
 
     if self.hermetic():
-      args.extend(['--pants-config-files=[]', '--no-cache-read', '--no-cache-write'])
+      args.extend(['--pants-config-files=[]',
+                   # Turn off cache globally.  A hermetic integration test shouldn't rely on cache,
+                   # or we have no idea if it's actually testing anything.
+                   '--no-cache-read', '--no-cache-write',
+                   # Turn cache on just for tool bootstrapping, for performance.
+                   '--cache-bootstrap-read', '--cache-bootstrap-write'
+                   ])
 
     if config:
       config_data = config.copy()
