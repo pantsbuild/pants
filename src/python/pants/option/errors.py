@@ -12,8 +12,8 @@ class OptionsError(Exception):
   """An options system-related error."""
 
 
-class OptionScopeError(OptionsError):
-  """An error at config scope parsing time."""
+class ConfigOptionError(OptionsError):
+  """An error at config option parsing time."""
 
 
 class RegistrationError(OptionsError):
