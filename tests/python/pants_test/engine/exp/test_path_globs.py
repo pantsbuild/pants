@@ -35,15 +35,11 @@ class PathGlobsTest(unittest.TestCase):
     subdir = 'foo'
     self.assert_files_equals([PathWildcard('', name)], '', [name])
     self.assert_files_equals([PathWildcard(subdir, name)], subdir, [name])
-    self.assert_files_equals([PathWildcard(subdir, name)], '', [join(subdir, name)])
 
   def test_dir_wildcard(self):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '*'
-    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, (name,))],
-                             '',
-                             [join(subdir, wildcard, name)])
     self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, (name,))],
                              subdir,
                              [join(wildcard, name)])
@@ -64,9 +60,6 @@ class PathGlobsTest(unittest.TestCase):
     subdir = 'foo'
     wildcard = '**'
     expected_remainders = (name, join(wildcard, name))
-    self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, expected_remainders)],
-                             '',
-                             [join(subdir, wildcard, name)])
     self.assert_files_equals([PathDirWildcard(Files, subdir, wildcard, expected_remainders)],
                              subdir,
                              [join(wildcard, name)])

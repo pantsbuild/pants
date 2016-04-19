@@ -75,7 +75,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def test_walk_siblings(self):
     self.assert_walk(Files, ['*.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/*.txt'], ['a/b/1.txt'])
-    self.assert_walk(Files, ['c.ln/*.txt'], ['c.ln/1.txt'])
+    self.assert_walk(Files, ['c.ln/*.txt'], ['a/b/1.txt'])
     self.assert_walk(Files, ['a/b/*'], ['a/b/1.txt', 'a/b/2'])
     self.assert_walk(Files, ['*/0.txt'], [])
 
@@ -147,6 +147,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         # it is traversing a symlink.
         (Path('d.ln'), Stats),
         (Link('d.ln'), ReadLink),
+        (Path('a'), Stats),
         (Path('a/b'), Stats),
         (Dir('a/b'), DirectoryListing),
         (Path('a/b/2'), Stats),

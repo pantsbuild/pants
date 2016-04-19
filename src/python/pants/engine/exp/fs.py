@@ -118,25 +118,8 @@ class PathGlob(AbstractClass):
   _SINGLE = '*'
 
   @classmethod
-  def _wildcard_part(cls, filespec_parts):
-    """Returns the index of the first double-wildcard or single-wildcard part in filespec_parts.
-
-    Only the first value of either kind will be returned, so at least one entry in the tuple will
-    always be None.
-    """
-    for i, part in enumerate(filespec_parts):
-      if cls._DOUBLE in part:
-        if part != cls._DOUBLE:
-          raise ValueError(
-              'Illegal component "{}" in filespec: {}'.format(part, join(*filespec_parts)))
-        return i, None
-      elif cls._SINGLE in part:
-        return None, i
-    return None, None
-
-  @classmethod
   def create_from_spec(cls, ftype, canonical_at, filespec):
-    """Given a filespec return a potentially nested PathGlob object.
+    """Given a filespec, return a PathGlob object.
 
     :param ftype: The Stat subclass intended to be matched by this PathGlobs. TODO: this
       value is only used by the Scheduler currently, which is weird. Move to a wrapper?
@@ -151,30 +134,29 @@ class PathGlob(AbstractClass):
     """
 
     parts = _norm_with_dir(filespec).split(os_sep)
-    double_index, single_index = cls._wildcard_part(parts)
-    if double_index is not None:
+    if cls._DOUBLE in parts[0]:
+      if parts[0] != cls._DOUBLE:
+        raise ValueError(
+            'Illegal component "{}" in filespec: {}'.format(parts[0], join(canonical_at, filespec)))
       # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
-      remainders = (join(*parts[double_index+1:]), join(*parts[double_index:]))
-      return PathDirWildcard(ftype,
-                             join(canonical_at, *parts[:double_index]),
-                             parts[double_index],
-                             remainders)
-    elif single_index is None:
-      # A literal path. Look up the first non-canonical component.
+      remainders = (join(*parts[1:]), join(*parts[0:]))
+      return PathDirWildcard(ftype, canonical_at, parts[0], remainders)
+    elif cls._SINGLE not in parts[0]:
+      # A literal path component. Look up the first non-canonical component.
       if len(parts) == 1:
         return Path(join(canonical_at, parts[0]))
       return PathLiteral(ftype, join(canonical_at, parts[0]), join(*parts[1:]))
-    elif single_index == (len(parts) - 1):
-      # There is a wildcard in the file basename of the path.
-      return PathWildcard(join(canonical_at, *parts[:-1]), parts[-1])
+    elif len(parts) == 1:
+      # This is the path basename, and it contains a wildcard.
+      return PathWildcard(canonical_at, parts[0])
     else:
-      # There is a wildcard in (at least one of) the dirnames in the path.
-      remainders = (join(*parts[single_index + 1:]),)
+      # This is a path dirname, and it contains a wildcard.
+      remainders = (join(*parts[1:]),)
       return PathDirWildcard(ftype,
-                             join(canonical_at, *parts[:single_index]),
-                             parts[single_index],
+                             canonical_at,
+                             parts[0],
                              remainders)
 
 
