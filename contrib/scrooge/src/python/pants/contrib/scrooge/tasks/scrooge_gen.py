@@ -22,6 +22,7 @@ from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
 from twitter.common.collections import OrderedSet
 
+from pants.contrib.scrooge.targets.lua_library import LuaLibrary
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
@@ -54,7 +55,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def product_types(cls):
-    return ['java', 'scala']
+    return ['java', 'scala', 'lua']
 
   @classmethod
   def implementation_version(cls):
@@ -179,7 +180,13 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    return self._thrift_defaults.compiler(target) == 'scrooge'
+    if self._thrift_defaults.compiler(target) != 'scrooge':
+      return False
+
+    language = self._thrift_defaults.language(target)
+    if language not in _TARGET_TYPE_FOR_LANG.keys():
+      raise TaskError('Scrooge can not generate {0}'.format(language))
+    return True
 
   def _validate_compiler_configs(self, targets):
     assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")
