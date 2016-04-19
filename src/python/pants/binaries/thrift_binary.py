@@ -11,9 +11,15 @@ from pants.util.memo import memoized_property
 
 
 class ThriftBinary(object):
-  """Encapsulates access to pre-built thrift static binaries."""
+  """Encapsulates access to pre-built thrift static binaries.
+
+  :API: public
+  """
 
   class Factory(Subsystem):
+    """
+    :API: public
+    """
     options_scope = 'thrift-binary'
 
     @classmethod
@@ -30,6 +36,9 @@ class ThriftBinary(object):
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
 
     def create(self):
+      """
+      :API: public
+      """
       # NB: create is an instance method to allow the user to choose global or scoped.
       # Its not unreasonable to imagine python and jvm stacks using different versions.
       binary_util = BinaryUtil.Factory.create()

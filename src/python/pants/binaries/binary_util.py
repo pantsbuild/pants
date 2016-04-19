@@ -40,9 +40,15 @@ logger = logging.getLogger(__name__)
 
 
 class BinaryUtil(object):
-  """Wraps utility methods for finding binary executables."""
+  """Wraps utility methods for finding binary executables.
+
+  :API: public
+  """
 
   class Factory(Subsystem):
+    """
+    :API: public
+    """
     options_scope = 'binaries'
 
     @classmethod
@@ -60,6 +66,9 @@ class BinaryUtil(object):
 
     @classmethod
     def create(cls):
+      """
+      :API: public
+      """
       # NB: create is a class method to ~force binary fetch location to be global.
       options = cls.global_instance().get_options()
       return BinaryUtil(options.baseurls, options.fetch_timeout_secs, options.pants_bootstrapdir,
