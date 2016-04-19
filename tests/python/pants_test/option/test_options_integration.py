@@ -173,7 +173,23 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assertIn("ERROR] Invalid option 'another_invalid_global' under [GLOBAL]",
                     pants_run.stderr_data)
 
-  def test_command_line_option_used_by_goals(self):
+  def test_invalid_command_line_option_with_invalid_config(self):
+    """
+    Make sure invalid command line error will be thrown and exits.
+    """
+    with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
+      config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
+      with open(config_path, 'w+') as f:
+        f.write(dedent("""
+          [test.junit]
+          bad_option: True
+        """))
+      pants_run = self.run_pants(['--config-override={}'.format(config_path), '--test-junit-bad-flag',
+                                  'goals'])
+      self.assert_failure(pants_run)
+      self.assertIn("Exception message: Unrecognized command line flags", pants_run.stderr_data)
+
+  def test_command_line_option_unused_by_goals(self):
     self.assert_success(self.run_pants(['goals', '--bundle-jvm-archive=zip']))
     self.assert_failure(self.run_pants(['goals', '--jvm-invalid=zip']))
 

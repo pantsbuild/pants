@@ -170,9 +170,8 @@ class OptionsBootstrapper(object):
           scope = section
         try:
           valid_options_under_scope = set(options.for_scope(scope))
-        except OptionsError:
-          logger.error("Invalid scope [{}] in {}".format(section, config.configpath))
-          has_error = True
+        except OptionsError as e:
+          raise e
         else:
           # All the options specified under [`section`] in `config` excluding bootstrap defaults.
           all_options_under_scope = set(config.configparser.options(section)) - set(config.configparser.defaults())
