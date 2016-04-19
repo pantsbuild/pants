@@ -51,6 +51,9 @@ class FileSystemProjectTree(ProjectTree):
     return os.path.exists(self._join(relpath))
 
   def lstat(self, relpath):
+    if self.isignored(relpath):
+      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
+
     try:
       mode = os.lstat(self._join(relpath)).st_mode
       if stat.S_ISLNK(mode):
@@ -68,10 +71,17 @@ class FileSystemProjectTree(ProjectTree):
         raise e
 
   def relative_readlink(self, relpath):
+    if self.isignored(relpath):
+      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
     return os.readlink(self._join(relpath))
 
   def listdir(self, relpath):
-    return os.listdir(self._join(relpath))
+    if self.isignored(relpath):
+      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
+
+    names = os.listdir(self._join(relpath))
+    file_list = self.filter_ignored([os.path.join(relpath, name) for name in names])
+    return [fast_relpath(f, relpath) for f in file_list]
 
   def walk(self, relpath, topdown=True):
     def onerror(error):

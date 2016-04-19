@@ -59,6 +59,9 @@ class ScmProjectTree(ProjectTree):
     return self._reader.exists(self._scm_relpath(relpath))
 
   def lstat(self, relpath):
+    if self.isignored(relpath):
+      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
+
     mode = type(self._reader.lstat(self._scm_relpath(relpath)))
     if mode == NoneType:
       return None
@@ -72,10 +75,12 @@ class ScmProjectTree(ProjectTree):
       raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 
   def relative_readlink(self, relpath):
+    if self.isignored(relpath):
+      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
     return self._reader.readlink(self._scm_relpath(relpath))
 
   def listdir(self, relpath):
-    return self._reader.listdir(self._scm_relpath(relpath))
+    return self.glob1(relpath, "*")
 
   def walk(self, relpath, topdown=True):
     for path, dirnames, filenames in self._do_walk(self._scm_relpath(relpath), topdown=topdown):
@@ -98,12 +103,11 @@ class ScmProjectTree(ProjectTree):
     if self._reader.isdir(scm_relpath):
       filenames = []
       dirnames = []
-#      dirpaths = []
+
       for filename in self._reader.listdir(scm_relpath):
         path = os.path.join(scm_relpath, filename)
         if self._reader.isdir(path):
           dirnames.append(filename)
-#          dirpaths.append(path)
         else:
           filenames.append(filename)
 

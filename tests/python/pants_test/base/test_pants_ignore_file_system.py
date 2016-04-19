@@ -88,6 +88,12 @@ class FileSystemPantsIgnoreTest(ProjectTreeTestBase):
     files_list = self._project_tree.glob1("fruit", "*")
     self.assertEquals({'banana', 'orange', 'fruit'}, set(files_list))
 
+    files_list = self._project_tree.listdir("fruit")
+    self.assertEquals({'banana', 'orange', 'fruit'}, set(files_list))
+
+    with self.assertRaises(self._project_tree.AccessIgnoredPathError):
+      self._project_tree.content("fruit/apple")
+
   def test_ignore_pattern_leading_slash(self):
     self._project_tree = FileSystemProjectTree(self.root_dir, ["/apple"])
     files_list = []
@@ -116,6 +122,9 @@ class FileSystemPantsIgnoreTest(ProjectTreeTestBase):
 
     files_list = self._project_tree.glob1("", "*e")
     self.assertEquals(set(), set(files_list))
+
+    files_list = self._project_tree.listdir("")
+    self.assertEquals({'banana', 'fruit', 'grocery'}, set(files_list))
 
   def test_ignore_pattern_two_asterisks(self):
     self._project_tree = FileSystemProjectTree(self.root_dir, ["/**/apple"])

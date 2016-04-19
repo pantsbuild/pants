@@ -247,9 +247,6 @@ class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'pat
 def list_directory(project_tree, directory):
   """List Paths directly below the given path, relative to the ProjectTree.
 
-  Currently ignores `.`-prefixed subdirectories, but should likely use `--ignore-patterns`.
-    TODO: See https://github.com/pantsbuild/pants/issues/2956
-
   Raises an exception if the path is not a directory.
 
   :returns: A DirectoryListing.
