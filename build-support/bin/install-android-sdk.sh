@@ -4,6 +4,8 @@
 
 # Install the Android SDK for the Pants Android contrib module.
 
+set -e
+
 # SDK_INSTALL_LOCATION and ANDROID_HOME set in travis.yaml.
 ANDROID_SDK_URL="http://dl.google.com/android/android-sdk_r24.4.1-linux.tgz"
 SDK_FILE=$(basename "$ANDROID_SDK_URL")
