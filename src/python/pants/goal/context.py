@@ -176,7 +176,10 @@ class Context(object):
       work_chain, workunit_parent=workunit_parent, done_hook=done_hook)
 
   def background_worker_pool(self):
-    """Returns the pool to which tasks can submit background work."""
+    """Returns the pool to which tasks can submit background work.
+
+    :API: public
+    """
     return self.run_tracker.background_worker_pool()
 
   def subproc_map(self, f, items):
