@@ -339,6 +339,15 @@ class GitRepositoryReader(object):
     def __str__(self):
       return "SymlinkLoop({}, {})".format(self.relpath, self.rev)
 
+  class ExternalSymlinkException(Exception):
+
+    def __init__(self, rev, relpath):
+      self.relpath = relpath
+      self.rev = rev
+
+    def __str__(self):
+      return "ExternalSymlink({}, {})".format(self.relpath, self.rev)
+
   class GitDiedException(Exception):
     pass
 
@@ -354,9 +363,9 @@ class GitRepositoryReader(object):
     except self.NotADirException:
       return None
 
-  def _safe_resolve_object(self, relpath):
+  def _safe_read_object(self, relpath, max_symlinks):
     try:
-      return self._resolve_object(relpath)
+      return self._read_object(relpath, max_symlinks)
     except self.MissingFileException:
       return None, relpath
     except self.NotADirException:
@@ -379,12 +388,17 @@ class GitRepositoryReader(object):
     return False
 
   def lstat(self, relpath):
-    obj, _ = self._safe_resolve_object(relpath)
+    obj, _ = self._safe_read_object(relpath, max_symlinks=0)
     return obj
 
   def readlink(self, relpath):
-    obj, _ = self._safe_resolve_object(relpath)
-    return self._read_symlink(obj)
+    # TODO: Relatively inefficient, but easier than changing read_object, unfortunately.
+    if type(self.lstat(relpath)) != self.Symlink:
+      return None
+    obj, path_so_far = self._safe_read_object(relpath, max_symlinks=1)
+    if obj == None:
+      return None
+    return path_so_far
 
   class Symlink(object):
 
@@ -451,51 +465,15 @@ class GitRepositoryReader(object):
               to that file; if a directory, the relative path + '/'; if
               a symlink outside the repo, a path starting with / or ../.
     """
-    symlinks = 0
-    components = list(relpath.split(os.path.sep))
-    while True:
-      obj, path_so_far = self._resolve_object(relpath, components=components)
-      if not isinstance(obj, self.Symlink):
-        return path_so_far
+    obj, path_so_far = self._read_object(relpath, MAX_SYMLINKS_IN_REALPATH)
+    if isinstance(obj, self.Symlink):
+      raise self.SymlinkLoopException(self.rev, relpath)
+    return path_so_far
 
-      # Is a symlink.
-      symlinks += 1
-      if symlinks > MAX_SYMLINKS_IN_REALPATH:
-        raise self.SymlinkLoopException(self.rev, relpath)
-
-      link_to = self._read_symlink(obj)
-
-      if link_to.startswith('../') or link_to[0] == '/':
-        # If the link points outside the repo, then just return that file
-        return link_to
-
-      # Recurse to continue our search at the top with the new path.
-      # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
-      components = link_to.split(SLASH) + components
-
-  def _read_symlink(self, obj):
-    # A git symlink is stored as a blob containing the name of the target.
-    # Read that blob.
-    object_type, path_data = self._read_object_from_repo(sha=obj.sha)
-    assert object_type == 'blob'
-
-    if path_data[0] == '/':
-      # In the event of an absolute path, just return that path
-      return path_data
-
-    return os.path.normpath(os.path.join(os.path.dirname(obj.name), path_data))
-
-  def _resolve_object(self, relpath, components=None):
-    """Resolve a single object from the complete set of its path components.
-
-    This method returns Symlink objects rather than following them.
-
-    :param relpath: The relpath, used only for error messages.
-    :param components: Pre-split components of the same relpath, or None to split on os.path.sep.
-    :returns: A tuple of the underlying object (a Dir, Symlink, or File) and the resolved path.
-    """
+  def _read_object(self, relpath, max_symlinks):
     path_so_far = ''
-    components = components if components is not None else relpath.split(os.path.sep)
+    components = list(relpath.split(os.path.sep))
+    symlinks = 0
 
     # Consume components to build path_so_far
     while components:
@@ -504,6 +482,7 @@ class GitRepositoryReader(object):
         continue
 
       parent_tree = self._read_tree(path_so_far)
+      parent_path = path_so_far
 
       if path_so_far != '':
         path_so_far += '/'
@@ -525,12 +504,30 @@ class GitRepositoryReader(object):
           return obj, path_so_far + '/'
         # A dir is OK; we just descend from here
       elif isinstance(obj, self.Symlink):
-        # Is a symlink.
-        return obj, path_so_far
+        symlinks += 1
+        if symlinks > max_symlinks:
+          return obj, path_so_far
+        # A git symlink is stored as a blob containing the name of the target.
+        # Read that blob.
+        object_type, path_data = self._read_object_from_repo(sha=obj.sha)
+        assert object_type == 'blob'
+
+        if path_data[0] == '/':
+          # Is absolute, thus likely points outside the repo.
+          raise self.ExternalSymlinkException(self.rev, relpath)
+
+        link_to = os.path.normpath(os.path.join(parent_path, path_data))
+        if link_to.startswith('../') or link_to[0] == '/':
+          # Points outside the repo.
+          raise self.ExternalSymlinkException(self.rev, relpath)
+
+        # Restart our search at the top with the new path.
+        # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
+        components = link_to.split(SLASH) + components
+        path_so_far = ''
       else:
         # Programmer error
         raise self.UnexpectedGitObjectTypeException()
-    # TODO: Get the sha for the root.
     return self.Dir('./', None), './'
 
   def _fixup_dot_relative(self, path):

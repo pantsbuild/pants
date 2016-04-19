@@ -189,6 +189,16 @@ class GitTest(unittest.TestCase):
     self.assertEquals(reader.Dir, lstat('dir'))
     self.assertEquals(types.NoneType, lstat('nope-not-here'))
 
+  def test_readlink(self):
+    reader = self.git.repo_reader(self.initial_rev)
+    def readlink(*components):
+      return reader.readlink(os.path.join(*components))
+    self.assertEquals('dir/f', readlink('dir', 'relative-symlink'))
+    self.assertEquals(None, readlink('not-a-dir'))
+    self.assertEquals(None, readlink('README'))
+    self.assertEquals(None, readlink('dir'))
+    self.assertEquals(None, readlink('nope-not-here'))
+
   def test_open(self):
     reader = self.git.repo_reader(self.initial_rev)
 
