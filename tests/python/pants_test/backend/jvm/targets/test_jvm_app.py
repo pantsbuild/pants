@@ -262,6 +262,27 @@ class BundleTest(BaseTest):
     self.create_file(os.path.join(spec_path, 'three.xml'))
     self.assertNotEqual(fingerprint_before, calc_fingerprint())
 
+  def test_jvmapp_fingerprinting_with_non_existing_files(self):
+    spec_path = 'y'
+    def calc_fingerprint():
+      self.reset_build_graph()
+      return self.make_target('y:app',
+                              JvmApp,
+                              dependencies=[],
+                              bundles=[
+                                _bundle(spec_path)(fileset=['one.xml'])
+                              ]).payload.fingerprint()
+
+    fingerprint_non_existing_file = calc_fingerprint()
+    self.create_file(os.path.join(spec_path, 'one.xml'))
+    fingerprint_empty_file = calc_fingerprint()
+    self.create_file(os.path.join(spec_path, 'one.xml'), contents='some content')
+    fingerprint_file_with_content = calc_fingerprint()
+
+    self.assertNotEqual(fingerprint_empty_file, fingerprint_non_existing_file)
+    self.assertNotEqual(fingerprint_empty_file, fingerprint_file_with_content)
+    self.assertNotEqual(fingerprint_file_with_content, fingerprint_empty_file)
+
   def test_rel_path_with_glob_fails(self):
     # Globs are treated as eager, so rel_path doesn't affect their meaning.
     # The effect of this is likely to be confusing, so disallow it.

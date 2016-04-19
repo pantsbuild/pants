@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 from abc import abstractmethod
 
-from pants.base.deprecated import deprecated_conditional
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
@@ -45,14 +45,12 @@ class LiteralCredentials(Credentials):
     """
     super(LiteralCredentials, self).__init__(**kwargs)
 
-    deprecated_conditional(lambda: callable(username) or callable(password), '0.0.82',
-                           'Passing callable arguments to `credentials` is deprecated: '
-                           'use `netrc_credentials` for target {}'.format(
-                             self.address.spec
-                           ))
+    if callable(username) or callable(password):
+      raise TargetDefinitionException(self, 'The username and password arguments to credentials() '
+                                            'cannot be callable. Use netrc_credentials() instead.')
 
-    self._username = username if callable(username) else functools.partial(_ignored_repository, username)
-    self._password = password if callable(password) else functools.partial(_ignored_repository, password)
+    self._username = functools.partial(_ignored_repository, username)
+    self._password = functools.partial(_ignored_repository, password)
 
   def username(self, repository):
     return self._username(repository)

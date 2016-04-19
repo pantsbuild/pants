@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import inspect
 import re
+import textwrap
 from collections import OrderedDict, namedtuple
 
 from pants.base.exceptions import TaskError
@@ -19,16 +20,22 @@ class FunctionArg(namedtuple('_FunctionArg', ['name', 'description', 'has_defaul
   pass
 
 
-class BuildSymbolInfo(namedtuple('_BuildSymbolInfo', ['symbol', 'description', 'args'])):
-  """A container for help information about a symbol that can be used in a BUILD file."""
-  pass
+class BuildSymbolInfo(namedtuple('_BuildSymbolInfo',
+                                 ['symbol', 'description', 'details_lines', 'args'])):
+  """A container for help information about a symbol that can be used in a BUILD file.
+
+  symbol: The name of the symbol.
+  description: A single line of text providing a summary description.
+  details_lines: A list of lines of text providing further details (possibly empty).
+  args: A list of FunctionArg instances.
+  """
+
+  def details(self):
+    return '\n'.join(self.details_lines)
 
 
 class BuildDictionaryInfoExtracter(object):
-  """Extracts help information about the symbols that may be used in BUILD files.
-
-  :API: public
-  """
+  """Extracts help information about the symbols that may be used in BUILD files."""
 
   ADD_DESCR = '<Add description>'
 
@@ -42,15 +49,24 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def get_description_from_docstring(cls, obj):
-    """
-    :API: public
+    """Returns a pair (description, details) from the obj's docstring.
+
+    description is a single line.
+    details is a list of subsequent lines, possibly empty.
     """
     doc = obj.__doc__ or ''
     p = doc.find('\n')
     if p == -1:
-      return doc
+      return doc, []
     else:
-      return doc[:p]
+      description = doc[:p]
+      details = textwrap.dedent(doc[p+1:]).splitlines()
+      # Remove leading and trailing empty lines.
+      while details and not details[0].strip():
+        details = details[1:]
+      while details and not details[-1].strip():
+        details.pop()
+      return description, details
 
   @classmethod
   @memoized_method
@@ -71,10 +87,7 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def get_arg_descriptions_from_docstring(cls, obj):
-    """Returns an ordered map of arg name -> arg description found in :param: stanzas.
-
-    :API: public
-    """
+    """Returns an ordered map of arg name -> arg description found in :param: stanzas."""
 
     ret = OrderedDict()
     name = ''
@@ -87,7 +100,7 @@ class BuildDictionaryInfoExtracter(object):
         # If first line of a parameter description, set name and description.
         name, description = m.group(3, 4)
         ret[name] = description
-      elif (m and m.group(1) != 'param'):
+      elif m and m.group(1) != 'param':
         # If first line of a description of an item other than a parameter, clear name.
         name = ''
       elif name and line:
@@ -99,9 +112,6 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def get_args_for_target_type(cls, target_type):
-    """
-    :API: public
-    """
     return list(cls._get_args_for_target_type(target_type))
 
   @classmethod
@@ -114,7 +124,7 @@ class BuildDictionaryInfoExtracter(object):
 
     # Non-BUILD-file-facing Target.__init__ args that some Target subclasses capture in their
     # own __init__ for various reasons.
-    ignore_args = set(['address', 'payload'])
+    ignore_args = {'address', 'payload'}
 
     # Now look at the MRO, in reverse (so we see the more 'common' args first.
     methods_seen = set()  # Ensure we only look at each __init__ method once.
@@ -132,8 +142,6 @@ class BuildDictionaryInfoExtracter(object):
     """Returns pairs (arg, default) for each argument of func, in declaration order.
 
     Ignores *args, **kwargs. Ignores self for methods.
-
-    :API: public
     """
     return list(cls._get_function_args(func))
 
@@ -165,25 +173,16 @@ class BuildDictionaryInfoExtracter(object):
         yield FunctionArg(arg_name, descr_sans_default, True, default_value)
 
   def __init__(self, buildfile_aliases):
-    """
-    :API: public
-    """
     self._buildfile_aliases = buildfile_aliases
 
   def get_target_args(self, alias):
-    """Returns a list of FunctionArgs for the specified target_type.
-
-    :API: public
-    """
+    """Returns a list of FunctionArgs for the specified target_type."""
     target_types = list(self._buildfile_aliases.target_types_by_alias.get(alias))
     if not target_types:
       raise TaskError('No such target type: {}'.format(alias))
     return self.get_args_for_target_type(target_types[0])
 
   def get_object_args(self, alias):
-    """
-    :API: public
-    """
     obj_type = self._buildfile_aliases.objects.get(alias)
     if not obj_type:
       raise TaskError('No such object type: {}'.format(alias))
@@ -199,57 +198,45 @@ class BuildDictionaryInfoExtracter(object):
       return []
 
   def get_object_factory_args(self, alias):
-    """
-    :API: public
-    """
     obj_factory = self._buildfile_aliases.context_aware_object_factories.get(alias)
     if not obj_factory:
       raise TaskError('No such context aware object factory: {}'.format(alias))
     return self.get_function_args(obj_factory.__call__)
 
   def get_target_type_info(self):
-    """Returns a sorted list of BuildSymbolInfo for all known target types.
-
-    :API: public
-    """
+    """Returns a sorted list of BuildSymbolInfo for all known target types."""
     return sorted(self._get_target_type_info())
 
   def _get_target_type_info(self):
     for alias, target_type in self._buildfile_aliases.target_types.items():
-      yield BuildSymbolInfo(alias,
-                            self.get_description_from_docstring(target_type) or self.ADD_DESCR,
-                            self.get_target_args(alias))
+      description, details = self.get_description_from_docstring(target_type)
+      description = description or self.ADD_DESCR
+      yield BuildSymbolInfo(alias, description, details, self.get_target_args(alias))
     for alias, target_macro_factory in self._buildfile_aliases.target_macro_factories.items():
       # Take the description from the first target type we encounter that has one.
       target_args = self.get_target_args(alias)
       for target_type in target_macro_factory.target_types:
-        description = self.get_description_from_docstring(target_type)
+        description, details = self.get_description_from_docstring(target_type)
         if description:
-          yield BuildSymbolInfo(alias, description, target_args)
+          yield BuildSymbolInfo(alias, description, details, target_args)
           break
       else:
-        yield BuildSymbolInfo(alias, self.ADD_DESCR, target_args)
+        yield BuildSymbolInfo(alias, self.ADD_DESCR, [], target_args)
 
   def get_object_info(self):
-    """
-    :API: public
-    """
     return sorted(self._get_object_info())
 
   def _get_object_info(self):
     for alias, obj in self._buildfile_aliases.objects.items():
-      yield BuildSymbolInfo(alias,
-                            self.get_description_from_docstring(obj) or self.ADD_DESCR,
-                            self.get_object_args(alias))
+      description, details = self.get_description_from_docstring(obj)
+      description = description or self.ADD_DESCR
+      yield BuildSymbolInfo(alias, description, details, self.get_object_args(alias))
 
   def get_object_factory_info(self):
-    """
-    :API: public
-    """
     return sorted(self._get_object_factory_info())
 
   def _get_object_factory_info(self):
     for alias, factory_type in self._buildfile_aliases.context_aware_object_factories.items():
-      yield BuildSymbolInfo(alias,
-                            self.get_description_from_docstring(factory_type) or self.ADD_DESCR,
-                            self.get_object_factory_args(alias))
+      description, details = self.get_description_from_docstring(factory_type)
+      description = description or self.ADD_DESCR
+      yield BuildSymbolInfo(alias, description, details, self.get_object_factory_args(alias))

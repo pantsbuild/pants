@@ -15,7 +15,7 @@ jar_library(name = 'scala-repl',
               jar(org = 'org.scala-lang', name = 'jline', rev = '2.10.4', intransitive = True),
             ],
             dependencies = [
-              ':scala-compiler',
+              ':scalac',
               ':scala-library',
             ])
 
