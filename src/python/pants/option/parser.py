@@ -21,9 +21,9 @@ from pants.option.custom_types import (ListValueComponent, dict_option, file_opt
                                        target_list_option, target_option)
 from pants.option.errors import (BooleanOptionNameWithNo, DeprecatedOptionError, FrozenRegistration,
                                  ImplicitValIsNone, InvalidKwarg, InvalidMemberType,
-                                 MemberTypeNotAllowed, NoOptionNames, OptionNameDash,
-                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
-                                 Shadowing)
+                                 MemberTypeNotAllowed, NoOptionNames, OptionAlreadyRegistered,
+                                 OptionNameDash, OptionNameDoubleDash, ParseError,
+                                 RecursiveSubsystemOption, Shadowing)
 from pants.option.option_util import is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
@@ -362,6 +362,9 @@ class Parser(object):
         existing_scope = self._parent_parser._existing_scope(arg)
         if existing_scope is not None:
           raise Shadowing(self.scope, arg, outer_scope=self._scope_str(existing_scope))
+    for arg in args:
+      if arg in self._known_args:
+        raise OptionAlreadyRegistered(self.scope, arg)
     self._known_args.update(args)
 
   def _check_deprecated(self, dest, kwargs):

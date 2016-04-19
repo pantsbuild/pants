@@ -97,14 +97,14 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
     :rtype: :class:`AddressFamily`
     :raises: :class:`MappingError` if the given address maps do not form a family.
     """
+    if spec_path == b'.':
+      spec_path = ''
     for address_map in address_maps:
       if not address_map.path.startswith(spec_path):
         raise DifferingFamiliesError('Expected AddressMaps to share the same parent directory {}, '
                                      'but received: {}'
                                      .format(spec_path, address_map.path))
 
-    if spec_path == b'.':
-      spec_path = ''
 
     objects_by_name = {}
     for address_map in address_maps:

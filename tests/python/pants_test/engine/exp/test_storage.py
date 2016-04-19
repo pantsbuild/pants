@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from contextlib import closing
 
-from pants.engine.exp.fs import Path
+from pants.engine.exp.fs import Dir, File
 from pants.engine.exp.scheduler import StepRequest, StepResult
 from pants.engine.exp.storage import Cache, InvalidKeyError, Key, Lmdb, Storage
 
@@ -17,8 +17,8 @@ class StorageTest(unittest.TestCase):
   TEST_KEY = b'hello'
   TEST_VALUE = b'world'
 
-  TEST_PATH = Path('/foo')
-  TEST_PATH2 = Path('/bar')
+  TEST_PATH = File('/foo')
+  TEST_PATH2 = Dir('/bar')
 
   class SomeException(Exception): pass
 

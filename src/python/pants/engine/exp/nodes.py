@@ -5,13 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 from abc import abstractmethod, abstractproperty
+from os.path import dirname
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
-from pants.engine.exp.fs import (DirectoryListing, FileContent, Path, PathLiteral, Paths,
-                                 file_content, list_directory, path_exists)
+from pants.engine.exp.fs import (Dir, DirectoryListing, File, FileContent, Link, Path, ReadLink,
+                                 Stats, file_content, list_directory, path_stat, read_link)
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -119,9 +119,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     return True
 
   def _variants_node(self):
-    # TODO: This super-broad check is crazy expensive. Should reduce to just doing Variants
-    # lookups for literal/addressable products.
-    if self.product != Variants:
+    if type(self.subject) is Address and self.product is not Variants:
       return SelectNode(self.subject, Variants, self.variants, None)
     return None
 
@@ -365,44 +363,46 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
 class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants']), Node):
   """A native node type for filesystem operations."""
 
-  _FS_PRODUCT_TYPES = {
-      Paths: PathLiteral,
-      FileContent: Path,
-      DirectoryListing: Path,
+  _FS_PAIRS = {
+      (DirectoryListing, Dir),
+      (FileContent, File),
+      (Stats, Path),
+      (ReadLink, Link),
     }
 
-  @classmethod
-  def is_filesystem_product(cls, product):
-    return product in cls._FS_PRODUCT_TYPES
+  _FS_PRODUCT_TYPES = {product for product, subject in _FS_PAIRS}
 
   @classmethod
   def is_filesystem_pair(cls, subject_type, product):
     """True if the given subject type and product type should be computed using a FileystemNode."""
-    return subject_type is cls._FS_PRODUCT_TYPES.get(product, None)
+    return (product, subject_type) in cls._FS_PAIRS
+
+  @classmethod
+  def generate_subjects(self, filenames):
+    """Given filenames, generate a set of subjects for invalidation predicate matching."""
+    for f in filenames:
+      # Stats, ReadLink, or FileContent for the literal path.
+      yield Path(f)
+      yield File(f)
+      yield Link(f)
+      # DirectoryListings for parent dirs.
+      yield Dir(dirname(f))
 
   @property
   def is_cacheable(self):
     """Native node should not be cached."""
     return False
 
-  def _input_type(self):
-    return self._FS_PRODUCT_TYPES[self.product]
-
-  def _input_node(self):
-    return SelectNode(self.subject, self._input_type(), self.variants, None)
-
   def step(self, dependency_states, step_context):
     try:
-      # TODO: https://github.com/pantsbuild/pants/issues/3121
-      assert not os.path.islink(self.subject.path), (
-          'cannot perform native filesystem operations on symlink!: {}'.format(self.subject.path))
-
-      if self.product is Paths:
-        return Return(path_exists(step_context.project_tree, self.subject))
+      if self.product is Stats:
+        return Return(path_stat(step_context.project_tree, self.subject))
       elif self.product is FileContent:
         return Return(file_content(step_context.project_tree, self.subject))
       elif self.product is DirectoryListing:
         return Return(list_directory(step_context.project_tree, self.subject))
+      elif self.product is ReadLink:
+        return Return(read_link(step_context.project_tree, self.subject))
       else:
         # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
         raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))

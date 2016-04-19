@@ -104,11 +104,11 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
                                    parser_cls=parser_cls)
 
     tasks = create_graph_tasks(address_mapper, symbol_table_cls)
-    build_root_src = os.path.join(os.path.dirname(__file__), 'examples')
-    scheduler, _, build_root = self.mk_scheduler(tasks=tasks,
-                                                 storage=self.storage,
-                                                 build_root_src=build_root_src,
-                                                 symbol_table_cls=symbol_table_cls)
+    project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
+    scheduler, _ = self.mk_scheduler(tasks=tasks,
+                                     storage=self.storage,
+                                     project_tree=project_tree,
+                                     symbol_table_cls=symbol_table_cls)
     return scheduler
 
   def create_json(self):

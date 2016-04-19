@@ -290,7 +290,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     fingerprint_strategy=fingerprint_strategy,
                                     invalidation_report=self.context.invalidation_report,
                                     task_name=type(self).__name__,
-                                    task_version=self.implementation_version_str())
+                                    task_version=self.implementation_version_str(),
+                                    artifact_write_callback=self.maybe_write_artifact)
 
   @property
   def cache_target_dirs(self):
@@ -336,8 +337,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                   invalidate_dependents=False,
                   silent=False,
                   fingerprint_strategy=None,
-                  topological_order=False,
-                  use_cache=True):
+                  topological_order=False):
     """Checks targets for invalidation, first checking the artifact cache.
 
     Subclasses call this to figure out what to work on.
@@ -348,9 +348,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :param invalidate_dependents: If True then any targets depending on changed targets are invalidated.
     :param fingerprint_strategy:   A FingerprintStrategy instance, which can do per task, finer grained
                                   fingerprinting of a given Target.
-    :param use_cache:             A boolean to indicate whether to read/write the cache within this
-                                  invalidate call. In order for the cache to be used, both the task
-                                  settings and this parameter must agree that they should be used.
 
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
@@ -365,7 +362,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 
-    if invalidation_check.invalid_vts and use_cache and self.artifact_cache_reads_enabled():
+    if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
         cached_vts, uncached_vts, uncached_causes = \
           self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
@@ -412,23 +409,17 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       for vts in invalidation_check.all_vts:
         invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
                                     phase='post-check')
+
     for vt in invalidation_check.invalid_vts:
-      vt.update()  # In case the caller doesn't update.
+      vt.update()
 
     # Background work to clean up previous builds.
     if self.context.options.for_global_scope().workdir_max_build_entries is not None:
       self._launch_background_workdir_cleanup(invalidation_check.all_vts)
 
-    write_to_cache = (self.cache_target_dirs
-                      and use_cache
-                      and self.artifact_cache_writes_enabled()
-                      and invalidation_check.invalid_vts)
-    if write_to_cache:
-      pairs = []
-      for vt in invalidation_check.invalid_vts:
-        if self._should_cache(vt):
-          pairs.append((vt, [vt.current_results_dir]))
-      self.update_artifact_cache(pairs)
+  def maybe_write_artifact(self, vt):
+    if self._should_cache_target_dir(vt):
+      self.update_artifact_cache([(vt, [vt.current_results_dir])])
 
   def _launch_background_workdir_cleanup(self, vts):
     workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds, [(vts,)], 'workdir_build_cleanup')
@@ -444,14 +435,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       root_dir = os.path.dirname(vt.results_dir)
       safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes=live_dirs)
 
-  def _should_cache(self, vt):
+  def _should_cache_target_dir(self, vt):
     """Return true if the given vt should be written to a cache (if configured)."""
-    if vt.target.has_label('no_cache'):
-      return False
-    elif not vt.is_incremental or self.cache_incremental:
-      return True
-    else:
-      return False
+    return (
+      self.cache_target_dirs and
+      not vt.target.has_label('no_cache') and
+      (not vt.is_incremental or self.cache_incremental) and
+      self.artifact_cache_writes_enabled()
+    )
 
   def _maybe_create_results_dirs(self, vts):
     """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
@@ -544,7 +535,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       targets = set()
       for vts, _ in vts_artifactfiles_pairs:
         targets.update(vts.targets)
-      self._report_targets('Caching artifacts for ', list(targets), '.')
+
+      self._report_targets(
+        'Caching artifacts for ',
+        list(targets),
+        '.',
+        logger=self.context.log.debug,
+      )
 
       always_overwrite = self._cache_factory.overwrite()
 
@@ -558,11 +555,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     else:
       return None
 
-  def _report_targets(self, prefix, targets, suffix):
-    self.context.log.info(
+  def _report_targets(self, prefix, targets, suffix, logger=None):
+    logger = logger or self.context.log.info
+    logger(
       prefix,
       items_to_report_element([t.address.reference() for t in targets], 'target'),
-      suffix)
+      suffix,
+    )
 
   def require_single_root_target(self):
     """If a single target was specified on the cmd line, returns that target.

@@ -9,7 +9,7 @@ import os
 from abc import abstractproperty
 
 from pants.engine.exp.addressable import Exactly, addressable
-from pants.engine.exp.fs import PathGlobs
+from pants.engine.exp.fs import Files, PathGlobs
 from pants.engine.exp.objects import Locatable
 from pants.engine.exp.struct import Struct
 
@@ -59,7 +59,8 @@ class Sources(Struct, Locatable):
 
     This field may be projected to request the content of the files for this Sources object.
     """
-    return PathGlobs.create(self.spec_path,
+    return PathGlobs.create(Files,
+                            self.spec_path,
                             files=self.files,
                             globs=self.globs,
                             rglobs=self.rglobs,

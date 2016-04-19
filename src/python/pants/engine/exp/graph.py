@@ -13,7 +13,7 @@ import six
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.fs import DirectoryListing, FilesContent, Path, Paths, RecursiveSubDirectories
+from pants.engine.exp.fs import Dir, Dirs, Files, FilesContent, PathGlobs
 from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -30,19 +30,14 @@ def _key_func(entry):
   return key
 
 
-class BuildFilePaths(datatype('BuildFilePaths', ['paths'])):
-  """A list of Paths that are known to match a BUILD file pattern.
-
-  TODO: Because BUILD file names are matched using a regex, this cannot currently use PathGlobs.
-  If we were willing to allow a bit of slop in terms of files read, this could use
-  PathGlobs to get FilesContent for all files with the right prefix, and then discard.
-  """
+class BuildFiles(datatype('BuildFiles', ['files'])):
+  """A list of Paths that are known to match a BUILD file pattern."""
 
 
-def filter_buildfile_paths(address_mapper, directory_listing):
-  build_files = tuple(f for f in directory_listing.files
+def filter_buildfile_paths(address_mapper, files):
+  build_files = tuple(f for f in files.dependencies
                       if address_mapper.build_pattern.match(os_path_basename(f.path)))
-  return BuildFilePaths(build_files)
+  return BuildFiles(build_files)
 
 
 def parse_address_family(address_mapper, path, build_files_content):
@@ -213,8 +208,13 @@ def addresses_from_address_family(address_family):
 
 
 def addresses_from_address_families(address_families):
-  """Given a list of AddressFamiliess, return an Addresses object containing all addressables."""
+  """Given a list of AddressFamilies, return an Addresses object containing all addressables."""
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
+
+
+def descendant_addresses_to_globs(descendant_addresses):
+  """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
+  return PathGlobs.create(Dirs, descendant_addresses.directory, globs=['.', '*', '**/*'])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -230,19 +230,19 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
       SelectDependencies(Struct, UnhydratedStruct)],
      hydrate_struct),
     (UnhydratedStruct,
-     [SelectProjection(AddressFamily, Path, ('spec_path',), Address),
+     [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
       Select(Address)],
      resolve_unhydrated_struct),
   ] + [
     # BUILD file parsing.
     (AddressFamily,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(Path),
-      SelectProjection(FilesContent, Paths, ('paths',), BuildFilePaths)],
+      Select(Dir),
+      SelectProjection(FilesContent, Files, ('files',), BuildFiles)],
      parse_address_family),
-    (BuildFilePaths,
+    (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(DirectoryListing)],
+      Select(Files)],
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
@@ -254,19 +254,16 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   ] + [
     # Spec handling.
     (Addresses,
-     [SelectProjection(AddressFamily, Path, ('directory',), SingleAddress),
+     [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
       Select(SingleAddress)],
      address_from_address_family),
     (Addresses,
-     [SelectProjection(AddressFamily, Path, ('directory',), SiblingAddresses)],
+     [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
      addresses_from_address_family),
     (Addresses,
-     [SelectDependencies(AddressFamily, RecursiveSubDirectories)],
+     [SelectDependencies(AddressFamily, Dirs)],
      addresses_from_address_families),
-    # TODO: This is a workaround for the fact that we can't currently "project" in a
-    # SelectDependencies clause: we launch the recursion by requesting RecursiveSubDirectories
-    # for a Directory projected from DescendantAddresses.
-    (RecursiveSubDirectories,
-     [SelectProjection(RecursiveSubDirectories, Path, ('directory',), DescendantAddresses)],
-     identity),
+    (PathGlobs,
+     [Select(DescendantAddresses)],
+     descendant_addresses_to_globs),
   ]
