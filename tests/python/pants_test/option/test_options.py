@@ -18,9 +18,9 @@ from pants.option.config import Config
 from pants.option.custom_types import file_option, target_option
 from pants.option.errors import (BooleanOptionNameWithNo, DeprecatedOptionError, FrozenRegistration,
                                  ImplicitValIsNone, InvalidKwarg, InvalidMemberType,
-                                 MemberTypeNotAllowed, NoOptionNames, OptionNameDash,
-                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
-                                 Shadowing)
+                                 MemberTypeNotAllowed, NoOptionNames, OptionAlreadyRegistered,
+                                 OptionNameDash, OptionNameDoubleDash, ParseError,
+                                 RecursiveSubsystemOption, Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
@@ -996,3 +996,12 @@ class OptionsTest(unittest.TestCase):
 
     self.assertEqual(99, options.for_global_scope().b)
     self.assertTrue(options.for_global_scope().store_true_flag)
+
+  def test_double_registration(self):
+    options = Options.create(env={},
+                             config=self._create_config({}),
+                             known_scope_infos=OptionsTest._known_scope_infos,
+                             args=shlex.split('./pants'),
+                             option_tracker=OptionTracker())
+    options.register(GLOBAL_SCOPE, '--foo-bar')
+    self.assertRaises(OptionAlreadyRegistered, lambda: options.register(GLOBAL_SCOPE, '--foo-bar'))

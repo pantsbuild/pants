@@ -5,19 +5,26 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
 import os
+import stat
 from glob import glob1
 
-from pants.base.project_tree import ProjectTree
+from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
 from pants.util.dirutil import fast_relpath, safe_walk
 
 
 class FileSystemProjectTree(ProjectTree):
+  def _join(self, relpath):
+    if relpath.startswith(os.sep):
+      raise ValueError('Absolute path "{}" not legal in {}.'.format(relpath, self))
+    return os.path.join(self.build_root, relpath)
+
   def glob1(self, dir_relpath, glob):
     if self.isignored(dir_relpath):
       return []
 
-    matched_files = glob1(os.path.join(self.build_root, dir_relpath), glob)
+    matched_files = glob1(self._join(dir_relpath), glob)
     matched_files = self.filter_ignored([os.path.join(dir_relpath, p) for p in matched_files])
     return [fast_relpath(p, dir_relpath) for p in matched_files]
 
@@ -25,28 +32,51 @@ class FileSystemProjectTree(ProjectTree):
     if self.isignored(file_relpath):
       raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(file_relpath))
 
-    with open(os.path.join(self.build_root, file_relpath), 'rb') as source:
+    with open(self._join(file_relpath), 'rb') as source:
       return source.read()
 
   def isdir(self, relpath):
     if self.isignored(relpath):
       return False
-    return os.path.isdir(os.path.join(self.build_root, relpath))
+    return os.path.isdir(self._join(relpath))
 
   def isfile(self, relpath):
     if self.isignored(relpath):
       return False
-    return os.path.isfile(os.path.join(self.build_root, relpath))
+    return os.path.isfile(self._join(relpath))
 
   def exists(self, relpath):
     if self.isignored(relpath):
       return False
-    return os.path.exists(os.path.join(self.build_root, relpath))
+    return os.path.exists(self._join(relpath))
+
+  def lstat(self, relpath):
+    try:
+      mode = os.lstat(self._join(relpath)).st_mode
+      if stat.S_ISLNK(mode):
+        return PTSTAT_LINK
+      elif stat.S_ISDIR(mode):
+        return PTSTAT_DIR
+      elif stat.S_ISREG(mode):
+        return PTSTAT_FILE
+      else:
+        raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
+    except (IOError, OSError) as e:
+      if e.errno == errno.ENOENT:
+        return None
+      else:
+        raise e
+
+  def relative_readlink(self, relpath):
+    return os.readlink(self._join(relpath))
+
+  def listdir(self, relpath):
+    return os.listdir(self._join(relpath))
 
   def walk(self, relpath, topdown=True):
     def onerror(error):
       raise OSError(getattr(error, 'errno', None), 'Failed to walk below {}'.format(relpath), error)
-    for root, dirs, files in safe_walk(os.path.join(self.build_root, relpath),
+    for root, dirs, files in safe_walk(self._join(relpath),
                                        topdown=topdown,
                                        onerror=onerror):
       rel_root = fast_relpath(root, self.build_root)

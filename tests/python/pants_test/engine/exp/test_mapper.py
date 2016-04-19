@@ -166,11 +166,12 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                                    build_pattern=r'.+\.BUILD.json$')
     tasks = create_graph_tasks(address_mapper, symbol_table_cls)
 
-    build_root_src = os.path.join(os.path.dirname(__file__), 'examples/mapper_test')
-    self.scheduler, _, self.build_root = self.mk_scheduler(tasks=tasks,
-                                                           build_root_src=build_root_src,
-                                                           storage=self.storage,
-                                                           symbol_table_cls=symbol_table_cls)
+    project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
+    self.build_root = project_tree.build_root
+    self.scheduler, _ = self.mk_scheduler(tasks=tasks,
+                                          project_tree=project_tree,
+                                          storage=self.storage,
+                                          symbol_table_cls=symbol_table_cls)
 
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',

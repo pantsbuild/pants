@@ -167,8 +167,11 @@ class BundleField(tuple, PayloadField):
       buildroot_relative_path = os.path.relpath(abs_path, get_buildroot())
       hasher.update(buildroot_relative_path)
       hasher.update(bundle.filemap[abs_path])
-      with open(abs_path, 'rb') as f:
-        hasher.update(f.read())
+      if os.path.isfile(abs_path):
+        # Update with any additional string to differentiate empty file with non-existing file.
+        hasher.update('e')
+        with open(abs_path, 'rb') as f:
+          hasher.update(f.read())
     return hasher.hexdigest()
 
   def _compute_fingerprint(self):
