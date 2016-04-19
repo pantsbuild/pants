@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.errors import OptionScopeError, OptionsError
+from pants.option.errors import OptionScopeError
 from pants.option.parser import Parser
 
 
