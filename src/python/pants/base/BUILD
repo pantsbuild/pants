@@ -5,9 +5,10 @@ python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
-    'src/python/pants:version',
-    'src/python/pants/scm:all',
     ':build_root',
+    'src/python/pants/scm',
+    'src/python/pants/scm:git',
+    'src/python/pants:version',
   ]
 )
 
@@ -15,7 +16,9 @@ python_library(
   name = 'project_tree',
   sources = ['project_tree.py'],
   dependencies = [
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ]
 )
 
