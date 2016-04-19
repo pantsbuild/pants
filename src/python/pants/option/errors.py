@@ -11,6 +11,8 @@ from pants.option.arg_splitter import GLOBAL_SCOPE
 class OptionsError(Exception):
   """An options system-related error."""
 
+class OptionScopeError(OptionsError):
+  """An error at config scope parsing time."""
 
 class RegistrationError(OptionsError):
   """An error at option registration time."""

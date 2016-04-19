@@ -184,10 +184,15 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [test.junit]
           bad_option: True
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path), '--test-junit-bad-flag',
+        
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+                                  '--test-junit-invalid=ALL',
+                                  '--no-verify-config',
                                   'goals'])
+
       self.assert_failure(pants_run)
-      self.assertIn("Exception message: Unrecognized command line flags", pants_run.stderr_data)
+      self.assertIn("Exception message: Unrecognized command line flags on scope 'test.junit': --invalid",
+                    pants_run.stderr_data)
 
   def test_command_line_option_unused_by_goals(self):
     self.assert_success(self.run_pants(['goals', '--bundle-jvm-archive=zip']))

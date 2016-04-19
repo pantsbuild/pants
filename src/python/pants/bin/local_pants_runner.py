@@ -61,6 +61,11 @@ class LocalPantsRunner(object):
     if options.for_global_scope().verify_config:
       options_bootstrapper.verify_configs_against_options(options)
 
+    # Option values are usually computed lazily on demand,
+    # but command line options are eagerly computed for validation.
+    for scope in options.scope_to_flags.keys():
+      options.for_scope(scope)
+
     # Launch RunTracker as early as possible (just after Subsystem options are initialized).
     run_tracker, reporting = ReportingInitializer().setup()
 
