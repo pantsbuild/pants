@@ -192,10 +192,10 @@ class GoalRunnerFactory(object):
     )
     self._build_graph = MutableBuildGraph(self._address_mapper)
 
-  def _get_project_tree(self, build_file_rev, pants_ignore = None):
+  def _get_project_tree(self, build_file_rev, pants_ignore=None):
     """Creates the project tree for build files for use in a given pants run."""
     if build_file_rev:
-      return ScmProjectTree(self._root_dir, get_scm(), build_file_rev)
+      return ScmProjectTree(self._root_dir, get_scm(), build_file_rev, pants_ignore)
     else:
       return FileSystemProjectTree(self._root_dir, pants_ignore)
 

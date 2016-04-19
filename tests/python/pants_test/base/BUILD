@@ -55,8 +55,19 @@ python_library(
 )
 
 python_tests(
-  name = 'pants_ignore',
-  sources = ['test_pants_ignore.py'],
+  name = 'pants_ignore_file_system',
+  sources = ['test_pants_ignore_file_system.py'],
+  dependencies = [
+    ':project_tree_test_base',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name = 'pants_ignore_scm',
+  sources = ['test_pants_ignore_scm.py'],
   dependencies = [
     ':project_tree_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',

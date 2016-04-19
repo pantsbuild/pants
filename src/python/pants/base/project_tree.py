@@ -26,6 +26,9 @@ class ProjectTree(AbstractClass):
   class InvalidBuildRootError(Exception):
     """Raised when the build_root specified to a ProjectTree is not valid."""
 
+  class AccessIgnoredPathError(Exception):
+    """Raised when accessing a path which is ignored by pants"""
+
   def __init__(self, build_root, pants_ignore = None):
     if not os.path.isabs(build_root):
       raise self.InvalidBuildRootError('ProjectTree build_root {} must be an absolute path.'.format(build_root))
@@ -60,3 +63,8 @@ class ProjectTree(AbstractClass):
     """Returns True id path matches pants ignore pattern"""
     match_result = list(self.ignore.match_files([relpath]))
     return match_result != []
+
+  def filter_ignored(self, path_list):
+    """Takes a list of paths and return a list of unignored files"""
+    ignored_paths = set(self.ignore.match_files(path_list))
+    return list(set(path_list) - ignored_paths)
