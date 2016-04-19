@@ -47,7 +47,7 @@ if [[ ! -f "$SDK_ARCHIVE_LOCATION.processed" || "$FILTER" != "$(cat $SDK_ARCHIVE
   fi
 
   # Commit the transaction.
-  echo "$SDK_MODULES" > "$SDK_ARCHIVE_LOCATION.processed"
+  echo "$FILTER" > "$SDK_ARCHIVE_LOCATION.processed"
 else
   echo "$SDK_ARCHIVE_LOCATION is already installed with modules:"
   for module in "${SDK_MODULES[@]}"; do
