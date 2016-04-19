@@ -14,7 +14,7 @@ from pants.base.build_environment import get_default_pants_config_file
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
-from pants.option.errors import ConfigOptionError, OptionsError
+from pants.option.errors import ConfigOptionError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
