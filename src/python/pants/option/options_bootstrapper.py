@@ -161,7 +161,7 @@ class OptionsBootstrapper(object):
     :return: None.
     """
     error_log = []
-    for config in self._post_bootstrap_config.configs:
+    for config in self._post_bootstrap_config.configs():
       for section in config.sections():
         if section == GLOBAL_SCOPE_CONFIG_SECTION:
           scope = GLOBAL_SCOPE
