@@ -162,7 +162,7 @@ class OptionsBootstrapper(object):
     :return: None.
     """
     has_error = False
-    for config in self._post_bootstrap_config.configs:
+    for config in self._post_bootstrap_config.configs():
       for section in config.sections():
         if section == GLOBAL_SCOPE_CONFIG_SECTION:
           scope = GLOBAL_SCOPE
@@ -175,12 +175,15 @@ class OptionsBootstrapper(object):
           has_error = True
         else:
           # All the options specified under [`section`] in `config` excluding bootstrap defaults.
-          all_options_under_scope = set(config.configparser.options(section)) - set(config.configparser.defaults())
+          all_options_under_scope = (set(config.configparser.options(section)) -
+                                     set(config.configparser.defaults()))
           for option in all_options_under_scope:
             if option not in valid_options_under_scope:
-              logger.error("Invalid option '{}' under [{}] in {}".format(option, section, config.configpath))
+              logger.error("Invalid option '{}' under [{}] in {}".format(option, section,
+                                                                         config.configpath))
               has_error = True
 
     if has_error:
-      raise OptionsError("Invalid config entries detected. See log for details on which entries to update or remove.\n"
+      raise OptionsError("Invalid config entries detected. See log for details on which entries "
+                         "to update or remove.\n"
                          "(Specify --no-verify-config to disable this check.)")

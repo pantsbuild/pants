@@ -360,9 +360,6 @@ class Products(object):
     __nonzero__ = __bool__
 
   def __init__(self):
-    """
-    :API: public
-    """
     # TODO(John Sirois): Kill products and simply have users register ProductMapping subtypes
     # as data products.  Will require a class factory, like `ProductMapping.named(typename)`.
     self.products = {}  # type -> ProductMapping instance.

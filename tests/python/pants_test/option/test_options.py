@@ -605,7 +605,9 @@ class OptionsTest(unittest.TestCase):
         """
       ))
       tmp.flush()
-      cmdline = './pants --target-spec-file={filename} compile morx:tgt fleem:tgt'.format(
+      # Note that we prevent loading a real pants.ini during get_bootstrap_options().
+      cmdline = './pants --target-spec-file={filename} --pants-config-files="[]" ' \
+                'compile morx:tgt fleem:tgt'.format(
         filename=tmp.name)
       bootstrapper = OptionsBootstrapper(args=shlex.split(cmdline))
       bootstrap_options = bootstrapper.get_bootstrap_options().for_global_scope()
