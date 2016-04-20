@@ -16,15 +16,9 @@ from pants.option.scope import ScopeInfo
 
 
 class HelpPrinter(object):
-  """Prints help to the console.
-
-  :API: public
-  """
+  """Prints help to the console."""
 
   def __init__(self, options):
-    """
-    :API: public
-    """
     self._options = options
 
   @property
@@ -33,8 +27,6 @@ class HelpPrinter(object):
 
   def print_help(self):
     """Print help to the console.
-
-    :API: public
 
     :return: 0 on success, 1 on failure
     """
