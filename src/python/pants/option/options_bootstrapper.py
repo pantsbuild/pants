@@ -169,7 +169,7 @@ class OptionsBootstrapper(object):
           scope = section
         try:
           valid_options_under_scope = set(options.for_scope(scope))
-        # Only catch ConfigOptionError. Other OptionError will be raised directly.
+        # Only catch ConfigValidationError. Other exceptions will be raised directly.
         except Config.ConfigValidationError:
           error_log.append("Invalid scope [{}] in {}".format(section, config.configpath))
         else:
