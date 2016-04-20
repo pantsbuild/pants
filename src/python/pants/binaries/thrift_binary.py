@@ -54,6 +54,8 @@ class ThriftBinary(object):
   def version(self):
     """Returns the version of the thrift binary.
 
+    :API: public
+
     :returns string version: The thrift version number string.
     """
     return self._version
@@ -61,6 +63,8 @@ class ThriftBinary(object):
   @memoized_property
   def path(self):
     """Selects a thrift compiler binary matching the current os and architecture.
+
+    :API: public
 
     :returns: The absolute path to a locally bootstrapped thrift compiler binary.
     """
