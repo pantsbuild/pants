@@ -1089,7 +1089,7 @@ class IvyUtils(object):
     if provide_excludes:
       additional_excludes = tuple(provide_excludes)
       new_jars = OrderedDict()
-      for coordinate, jar in jars.items()
+      for coordinate, jar in jars.items():
         new_jars[coordinate] = jar.copy(excludes=jar.excludes + additional_excludes)
       jars = new_jars
 
