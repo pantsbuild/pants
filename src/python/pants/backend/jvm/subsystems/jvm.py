@@ -23,7 +23,7 @@ class JVM(Subsystem):
 
   # Broken out here instead of being inlined in the registration stanza,
   # because various tests may need to access these.
-  options_default = []
+  options_default = ['-Xmx256m']
 
   @classmethod
   def register_options(cls, register):

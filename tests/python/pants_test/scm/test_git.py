@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 import subprocess
+import types
 import unittest
 from contextlib import contextmanager
 from itertools import izip_longest
@@ -177,6 +178,26 @@ class GitTest(unittest.TestCase):
     with self.assertRaises(reader.MissingFileException):
       with reader.listdir('bogus'):
         pass
+
+  def test_lstat(self):
+    reader = self.git.repo_reader(self.initial_rev)
+    def lstat(*components):
+      return type(reader.lstat(os.path.join(*components)))
+    self.assertEquals(reader.Symlink, lstat('dir', 'relative-symlink'))
+    self.assertEquals(reader.Symlink, lstat('not-a-dir'))
+    self.assertEquals(reader.File, lstat('README'))
+    self.assertEquals(reader.Dir, lstat('dir'))
+    self.assertEquals(types.NoneType, lstat('nope-not-here'))
+
+  def test_readlink(self):
+    reader = self.git.repo_reader(self.initial_rev)
+    def readlink(*components):
+      return reader.readlink(os.path.join(*components))
+    self.assertEquals('dir/f', readlink('dir', 'relative-symlink'))
+    self.assertEquals(None, readlink('not-a-dir'))
+    self.assertEquals(None, readlink('README'))
+    self.assertEquals(None, readlink('dir'))
+    self.assertEquals(None, readlink('nope-not-here'))
 
   def test_open(self):
     reader = self.git.repo_reader(self.initial_rev)

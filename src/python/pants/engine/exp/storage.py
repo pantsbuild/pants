@@ -442,9 +442,8 @@ class Lmdb(KeyValueStore):
 
   # TODO make this more configurable through a subsystem.
 
-  # 256MB - some arbitrary maximum size database may grow to. Theoretical upper bound
-  # is the entire memory address space, i.e, 2^32 or 2^64.
-  MAX_DATABASE_SIZE = 256 * 1024 * 1024
+  # 256GB - some arbitrary maximum size database may grow to.
+  MAX_DATABASE_SIZE = 256 * 1024 * 1024 * 1024
 
   # writemap will use a writeable memory mapping to directly update storage, therefore
   # improves performance. But it may cause filesystems that don’t support sparse files,

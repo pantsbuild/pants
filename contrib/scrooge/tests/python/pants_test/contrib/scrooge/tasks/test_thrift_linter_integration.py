@@ -12,6 +12,25 @@ class ThriftLinterTest(PantsRunIntegrationTest):
 
   lint_error_token = "LINT-ERROR"
 
+  @classmethod
+  def hermetic(cls):
+    return True
+
+  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
+    full_config = {
+      'GLOBAL': {
+        'pythonpath': ["%(buildroot)s/contrib/scrooge/src/python"],
+        'backend_packages': ["pants.contrib.scrooge"]
+      },
+    }
+    if config:
+      for scope, scoped_cfgs in config.items():
+        updated = full_config.get(scope, {})
+        updated.update(scoped_cfgs)
+        full_config[scope] = updated
+    return super(ThriftLinterTest, self).run_pants(command, full_config, stdin_data, extra_env,
+                                                   **kwargs)
+
   @staticmethod
   def thrift_test_target(name):
     return 'contrib/scrooge/tests/thrift/org/pantsbuild/contrib/scrooge/thrift_linter:' + name
@@ -72,7 +91,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
 
   def test_bad_pants_ini_strict(self):
-    # thrift-linter fails if pants.ini has a thrift-linter:strict=True setting
+    # thrift-linter fails if pants.ini has a thrift-linter:strict=True setting.
     cmd = ['thrift-linter', self.thrift_test_target('bad-thrift-default')]
     pants_ini_config = {'thrift-linter': {'strict': True}}
     pants_run = self.run_pants(cmd, config=pants_ini_config)
