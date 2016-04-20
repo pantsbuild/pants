@@ -14,7 +14,6 @@ from pants.base.build_environment import get_default_pants_config_file
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
-from pants.option.errors import ConfigOptionError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
@@ -171,7 +170,7 @@ class OptionsBootstrapper(object):
         try:
           valid_options_under_scope = set(options.for_scope(scope))
         # Only catch ConfigOptionError. Other OptionError will be raised directly.
-        except ConfigOptionError:
+        except Config.ConfigValidationError:
           error_log.append("Invalid scope [{}] in {}".format(section, config.configpath))
         else:
           # All the options specified under [`section`] in `config` excluding bootstrap defaults.
@@ -183,6 +182,6 @@ class OptionsBootstrapper(object):
     if error_log:
       for error in error_log:
         logger.error(error)
-      raise ConfigOptionError("Invalid config entries detected. "
+      raise Config.ConfigValidationError("Invalid config entries detected. "
                               "See log for details on which entries to update or remove.\n"
                               "(Specify --no-verify-config to disable this check.)")

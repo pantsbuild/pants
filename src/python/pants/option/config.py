@@ -29,6 +29,9 @@ class Config(AbstractClass):
   class ConfigError(Exception):
     pass
 
+  class ConfigValidationError(ConfigError):
+    pass
+
   @classmethod
   def load(cls, configpaths, seed_values=None):
     """Loads config from the given paths.
