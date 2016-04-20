@@ -45,6 +45,9 @@ script: |
   sw_vers
   python --version
   java -version
+  echo "Bumping open file ulimit from `ulimit -n`..."
+  ulimit -n 8192 # This is probably higher than needed, 1024 limits on linux seem to work fine.
+  echo "...to `ulimit -n`"
   ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # The `notifications:` configuration will be programatically copied over from `.travis.yml` for
