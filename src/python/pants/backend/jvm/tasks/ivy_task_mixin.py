@@ -90,7 +90,7 @@ class IvyTaskMixin(TaskBase):
     # TODO: Register an --ivy-jvm-options here and use that, instead of the --jvm-options
     # registered by the task we mix into. That task may have intended those options for some
     # other JVM run than the Ivy one.
-    register('--soft-excludes', type=bool, advanced=True,
+    register('--soft-excludes', type=bool, advanced=True, fingerprint=True,
              help='If a target depends on a jar that is excluded by another target '
                   'resolve this jar anyway')
 
