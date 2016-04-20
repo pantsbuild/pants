@@ -247,7 +247,8 @@ class InvalidationCacheManager(object):
                fingerprint_strategy=None,
                invalidation_report=None,
                task_name=None,
-               task_version=None,):
+               task_version=None,
+               artifact_write_callback=lambda _: None):
     """
     :API: public
     """
