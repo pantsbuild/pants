@@ -1,40 +1,13 @@
 # The Engine Experiment
 
-This directory tree and its test sibling in `tests/python/pants_test/engine/exp/examples` serve as the base for
-code implementing the new tuple-based engine envisioned some time as far back as 2013.
+This directory tree and its test sibling in `tests/python/pants_test/engine/exp/examples`
+hosts examples that consume "the new engine" in fundamentally different ways. Some of
+the ideas explored here may not be fully realizable until a decision is reached to break BUILD
+file backwards compatibility.
 
-The code is limited in scope to proving out capabilities of the new engine concept:
-
-+ Can the engine schedule such and such a build request?
-+ Can task writer accomplish their goals with the engine APIs reasonably?
-+ Can a BUILD writer express BUILD rules reasonably.
-
-The code leaves out much that would be needed in a full execution model; notably option plumbing
-and product caching.  The presumption is that the bits left out are straight-forward to plumb and do
-not provide insight into the questions above.
-
-## History
-
-The need for an engine that could schedule all work as a result of linking required products to
-their producers in multiple rounds was identified sometime in the middle of 2013 as a result of
-new requirements on the `IdeaGen` task forced by the use of pants in the Twitter birdcage repo.  The
-design document for this "RoundEngine" is
-[here](https://docs.google.com/document/d/1MwOFcr4W6KbzPdbaj_ntJ36a0NRoiKyWLed0ziobsr4/edit#heading=h.rsohbvtm7zng).
-Some work was completed along these lines and an initial version of the `RoundEngine` was
-integrated into the pants mainline and is used today.
-
-Work stalled on the later phases of the `RoundEngine` and talks re-booted about the future of the
-`RoundEngine`.  Foursquare folks had been thinking about general problems with the `RoundEngine` as
-it stood and proposed the idea of a "tuple-engine".  With some license taken in representation, this
-idea took the `RoundEngine` to the extreme of generating a round for each target-task pair.  The
-pair formed the tuple of schedulable work and this concept combined with others to form the design
-[here][tuple-design].
-
-Meanwhile, need for fine-grained parallelism was acute to help speed up jvm compilation, especially
-in the context of scala and mixed scala & java builds.  Twitter spiked on a project to implement
-a target-level scheduling system scoped to just the jvm compilation tasks.  This bore fruit and
-served as further impetus to get a "tuple-engine" designed and constructed to bring the benefits
-seen in the jvm compilers to the wider pants world of tasks.
+Portions of the remainder of this document are historical: refer to
+`src/python/pants/engine/exp/README.md` for more information on the engine that was incubated
+with the work described here.
 
 ## Design Goals
 
@@ -106,7 +79,7 @@ There are two important outgrowths from the flexible edge-schema model:
    property.  These combine with graph support for `Serializable` object factories to allow for
    "target templating".  More accurately, a set of default properties for a `Struct` (or
    Target) can be written down in a BUILD file as an addressable object that is conceptually
-   abstract.  Other targets can then inherit properties and configurations from these templates. 
+   abstract.  Other targets can then inherit properties and configurations from these templates.
    This allows normalization of BUILD configuration in general.
 
 In addition to the new edge schema system, the `Serializable` basis of the object model allows for

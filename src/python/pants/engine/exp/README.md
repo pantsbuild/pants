@@ -2,9 +2,32 @@
 
 ## Scheduling
 
-In the current engine, work is scheduled and then later performed via the `Task` interface.  In the
-new engine execution occurs via simple functions, with inputs selected via an input
+In the current RoundEngine, work is scheduled and then later performed via the `Task` interface. In
+the new engine execution occurs via simple functions, with inputs selected via an input
 selection clause made up of `Selector` objects (described later).
+
+## History
+
+The need for an engine that could schedule all work as a result of linking required products to
+their producers in multiple rounds was identified sometime in the middle of 2013 as a result of
+new requirements on the `IdeaGen` task forced by the use of pants in the Twitter birdcage repo.  The
+design document for this "RoundEngine" is
+[here](https://docs.google.com/document/d/1MwOFcr4W6KbzPdbaj_ntJ36a0NRoiKyWLed0ziobsr4/edit#heading=h.rsohbvtm7zng).
+Some work was completed along these lines and an initial version of the `RoundEngine` was
+integrated into the pants mainline and is used today.
+
+Work stalled on the later phases of the `RoundEngine` and talks re-booted about the future of the
+`RoundEngine`.  Foursquare folks had been thinking about general problems with the `RoundEngine` as
+it stood and proposed the idea of a "tuple-engine".  With some license taken in representation, this
+idea took the `RoundEngine` to the extreme of generating a round for each target-task pair.  The
+pair formed the tuple of schedulable work and this concept combined with others to form the design
+[here][tuple-design].
+
+Meanwhile, need for fine-grained parallelism was acute to help speed up jvm compilation, especially
+in the context of scala and mixed scala & java builds.  Twitter spiked on a project to implement
+a target-level scheduling system scoped to just the jvm compilation tasks.  This bore fruit and
+served as further impetus to get a "tuple-engine" designed and constructed to bring the benefits
+seen in the jvm compilers to the wider pants world of tasks.
 
 ### API
 
@@ -20,8 +43,8 @@ which are made up of:
 The task triple fully declares the inputs and outputs for a function: there is no imperative
 API for requesting additional inputs during execution of a function. While a tight constraint,
 this has the advantage of forcing decomposition of work into functions which are loosely
-coupled by only the types of their inputs and outputs, and which are naturally isolated and
-parallelizable.
+coupled by only the types of their inputs and outputs, and which are naturally isolated, cacheable,
+and parallelizable.
 
 A function is guaranteed to only execute when all of its inputs are ready for use. The Scheduler
 considers executing a task function when it determines that it needs to produce the declared
@@ -59,13 +82,13 @@ by calling the `str` function:
 When the Scheduler wants to decide whether it can use this task function to create a string for a
 Subject, it will first see whether there are any ways to get an IntType for that Subject. If
 the subject is already of `type(subject) == IntType`, then the task function will be able to
-execute immediately! On the other hand, if the type _doesn't_ match, the Scheduler doesn't give up:
+execute immediately. On the other hand, if the type _doesn't_ match, the Scheduler doesn't give up:
 it will next look for any registered tasks functions that can compute an IntType Product for the
-Subject (and so on, recursively!).
+Subject (and so on, recursively.)
 
 This recursive type search leads to some very interesting (and, admittedly, somewhat "magical")
 properties. If there is any path through the graph of task functions that allows for conversion
-from one type to another, it will be found and executed!
+from one type to another, it will be found and executed.
 
 ### Selectors
 
@@ -84,7 +107,7 @@ and then concatentate that content into a string:
     (StringType, [SelectDependencies(FileContent, Files)], concat)
 
 This triple declares that: "for any Subject for which we can compute a 'Files' object, we can also
-compute a StringType", and each subgrapoh will contain an attempt to get FileContent for a different
+compute a StringType", and each subgraph will contain an attempt to get FileContent for a different
 File Subject.
 
 ### Variants
