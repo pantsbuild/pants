@@ -44,7 +44,7 @@ _SCALA_VERSIONS = {
 IDEA_PLUGIN_VERSION = '0.0.1'
 
 
-class PluginGen(IdeGen, ConsoleTask):
+class IdeaPluginGen(IdeGen, ConsoleTask):
   """Invoke IntelliJ Pants plugin (installation required) to create a project.
 
   The ideal workflow is to programmatically open idea -> select import -> import as pants project -> select project
@@ -74,7 +74,7 @@ class PluginGen(IdeGen, ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(PluginGen, cls).register_options(register)
+    super(IdeaPluginGen, cls).register_options(register)
     # TODO: https://github.com/pantsbuild/pants/issues/3198
     # scala/java-language level should use what Pants already knows.
     register('--open', type=bool, default=True,
@@ -85,7 +85,7 @@ class PluginGen(IdeGen, ConsoleTask):
              help='Program used to open the generated IntelliJ project.')
 
   def __init__(self, *args, **kwargs):
-    super(PluginGen, self).__init__(*args, **kwargs)
+    super(IdeaPluginGen, self).__init__(*args, **kwargs)
 
     self.open = self.get_options().open
 
