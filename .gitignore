@@ -16,6 +16,7 @@
 .buildcache/
 .coverage*
 .idea
+.cache
 .pants.d
 .pants.run
 .pants.workdir.file_lock

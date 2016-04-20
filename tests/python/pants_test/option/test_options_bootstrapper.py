@@ -24,7 +24,10 @@ class BootstrapOptionsTest(unittest.TestCase):
                                  pants_distdir=expected_vals[2])
 
   def _config_path(self, path):
-    return ["--pants-config-files=['{}']".format(path)]
+    if path is None:
+      return ["--pants-config-files=[]"]
+    else:
+      return ["--pants-config-files=['{}']".format(path)]
 
   def _test_bootstrap_options(self, config, env, args, **expected_entries):
     with temporary_file() as fp:
@@ -213,7 +216,8 @@ class BootstrapOptionsTest(unittest.TestCase):
 
   def test_bootstrap_short_options(self):
     def parse_options(*args):
-      return OptionsBootstrapper(args=list(args)).get_bootstrap_options().for_global_scope()
+      full_args = list(args) + self._config_path(None)
+      return OptionsBootstrapper(args=full_args).get_bootstrap_options().for_global_scope()
 
     # No short options passed - defaults presented.
     vals = parse_options()
@@ -231,7 +235,8 @@ class BootstrapOptionsTest(unittest.TestCase):
 
   def test_bootstrap_options_passthrough_dup_ignored(self):
     def parse_options(*args):
-      return OptionsBootstrapper(args=list(args)).get_bootstrap_options().for_global_scope()
+      full_args = list(args) + self._config_path(None)
+      return OptionsBootstrapper(args=full_args).get_bootstrap_options().for_global_scope()
 
     vals = parse_options('main', 'args', '-d/tmp/frogs', '--', '-d/tmp/logs')
     self.assertEqual('/tmp/frogs', vals.logdir)
