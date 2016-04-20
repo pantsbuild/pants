@@ -70,11 +70,6 @@ class IvyTaskMixin(TaskBase):
   extending NailgunTask).
   TODO: Get rid of this requirement by registering an --ivy-jvm-options below.
 
-  NB: Ivy reports are not relocatable in a cache, and a report must be present in order to
-  parse the graph structure of dependencies. Therefore, this mixin explicitly disables the
-  cache for its invalidation checks via the `use_cache=False` parameter. Tasks that extend
-  the mixin may safely enable task-level caching settings.
-
   :API: public
   """
 

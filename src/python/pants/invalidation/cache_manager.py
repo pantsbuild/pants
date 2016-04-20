@@ -269,7 +269,8 @@ class InvalidationCacheManager(object):
                fingerprint_strategy=None,
                invalidation_report=None,
                task_name=None,
-               task_version=None,):
+               task_version=None,
+               artifact_write_callback=lambda _: None):
     """
     :API: public
     """
@@ -279,6 +280,7 @@ class InvalidationCacheManager(object):
     self._invalidate_dependents = invalidate_dependents
     self._invalidator = BuildInvalidator(build_invalidator_dir)
     self._fingerprint_strategy = fingerprint_strategy
+    self._artifact_write_callback = artifact_write_callback
     self.invalidation_report = invalidation_report
 
   def update(self, vts):
@@ -287,10 +289,14 @@ class InvalidationCacheManager(object):
     :API: public
     """
     for vt in vts.versioned_targets:
-      self._invalidator.update(vt.cache_key)
-      vt.valid = True
-    self._invalidator.update(vts.cache_key)
-    vts.valid = True
+      if not vt.valid:
+        self._invalidator.update(vt.cache_key)
+        vt.valid = True
+        self._artifact_write_callback(vt)
+    if not vts.valid:
+      self._invalidator.update(vts.cache_key)
+      vts.valid = True
+      self._artifact_write_callback(vts)
 
   def force_invalidate(self, vts):
     """Force invalidation of a VersionedTargetSet.

@@ -355,8 +355,9 @@ class JvmCompile(NailgunTaskBase):
     classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
 
     fingerprint_strategy = self._fingerprint_strategy(classpath_product)
-    # Invalidation check. Everything inside the with block must succeed for the
-    # invalid targets to become valid.
+    # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
+    # we begin writing artifacts out to the cache immediately instead of waiting for
+    # all targets to finish.
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
                           fingerprint_strategy=fingerprint_strategy,
@@ -376,11 +377,12 @@ class JvmCompile(NailgunTaskBase):
       # Build any invalid targets (which will register products in the background).
       if invalidation_check.invalid_vts:
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
-
-        self.do_compile(invalidation_check,
-                           compile_contexts,
-                           invalid_targets,
-                           self.extra_compile_time_classpath_elements())
+        self.do_compile(
+          invalidation_check,
+          compile_contexts,
+          invalid_targets,
+          self.extra_compile_time_classpath_elements(),
+        )
 
       # Once compilation has completed, replace the classpath entry for each target with
       # its jar'd representation.
