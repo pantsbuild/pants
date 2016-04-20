@@ -57,6 +57,11 @@ class LocalPantsRunner(object):
     # Apply exiter options.
     self._exiter.apply_options(options)
 
+    # Option values are usually computed lazily on demand,
+    # but command line options are eagerly computed for validation.
+    for scope in options.scope_to_flags.keys():
+      options.for_scope(scope)
+
     # Verify the configs here.
     if options.for_global_scope().verify_config:
       options_bootstrapper.verify_configs_against_options(options)
