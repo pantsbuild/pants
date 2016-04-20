@@ -45,7 +45,9 @@ class ExpGraph(BuildGraph):
 
     This is an additive operation: any existing connections involving these nodes are preserved.
     """
-    addresses = set()
+    all_addresses = set()
+    new_targets = list()
+
     # Index the ProductGraph.
     # TODO: It's not very common to actually use the dependencies of a Node during a walk... should
     # consider removing those from that API.
@@ -61,17 +63,36 @@ class ExpGraph(BuildGraph):
       if type(node) is not SelectNode:
         continue
 
-      # We have a successfully parsed a LegacyBuildGraphNode.
-      target_adaptor = state.value.target_adaptor
+      # We have a successfully parsed LegacyBuildGraphNode.
+      target_adaptor, dependency_addresses = state.value
       address = target_adaptor.address
-      addresses.add(address)
+      all_addresses.add(address)
+
       if address not in self._target_by_address:
-        self._target_by_address[address] = self._instantiate_target(target_adaptor)
-      dependencies = state.value.dependency_addresses
-      self._target_dependencies_by_address[address] = dependencies
-      for dependency in dependencies:
-        self._target_dependees_by_address[dependency].add(address)
-    return addresses
+        new_targets.append(self._index_target(target_adaptor, dependency_addresses))
+
+    # Once the declared dependencies of all targets are indexed, inject their
+    # additional "traversable_dependency_specs".
+    for target in new_targets:
+      specs = list(target.traversable_dependency_specs) + list(target.traversable_specs)
+      if specs:
+        raise NotImplementedError(
+            'traversable_(dependency_)?specs not yet implemented for {}: {}'.format(target, specs))
+
+    return all_addresses
+
+  def _index_target(self, target_adaptor, dependencies):
+    """Instantiate the given target_adaptor, index it in the graph, and return it."""
+    # Instantiate the target.
+    address = target_adaptor.address
+    target = self._instantiate_target(target_adaptor)
+    self._target_by_address[address] = target
+
+    # Link its declared dependencies, which will be indexed independently.
+    self._target_dependencies_by_address[address] = dependencies
+    for dependency in dependencies:
+      self._target_dependees_by_address[dependency].add(address)
+    return target
 
   def _instantiate_sources(self, relpath, sources):
     """Converts captured `sources` arguments to what is expected by `Target.create_sources_field`.
@@ -112,32 +133,38 @@ class ExpGraph(BuildGraph):
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
 
-  def get_derived_from(self, address):
-    raise NotImplementedError('Not implemented.')
-
-  def get_concrete_derived_from(self, address):
-    raise NotImplementedError('Not implemented.')
-
-  def inject_target(self, target, dependencies=None, derived_from=None, synthetic=False):
-    raise NotImplementedError('Not implemented.')
-
-  def inject_dependency(self, dependent, dependency):
-    raise NotImplementedError('Not implemented.')
-
   def inject_synthetic_target(self,
                               address,
                               target_type,
                               dependencies=None,
                               derived_from=None,
                               **kwargs):
-    raise NotImplementedError('Not implemented.')
+    sources = kwargs.get('sources', None)
+    if sources is not None:
+      kwargs['sources'] = self._instantiate_sources(address.spec_path, sources)
+    target = target_type(name=address.target_name,
+                         address=address,
+                         build_graph=self,
+                         **kwargs)
+    self.inject_target(target,
+                       dependencies=dependencies,
+                       derived_from=derived_from,
+                       synthetic=True)
 
   def inject_address_closure(self, address):
-    raise NotImplementedError('Not implemented.')
+    if address in self._target_by_address:
+      return
+    for _ in self._inject([address]):
+      pass
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
-    request = self._scheduler.execution_request([LegacyBuildGraphNode], specs)
+    for address in self._inject(specs):
+      yield address
+
+  def _inject(self, subjects):
+    """Request LegacyBuildGraphNodes for each of the subjects, and yield resulting Addresses."""
+    request = self._scheduler.execution_request([LegacyBuildGraphNode], subjects)
     result = self._engine.execute(request)
     if result.error:
       raise result.error
