@@ -17,11 +17,13 @@ import org.pantsbuild.tools.junit.lib.MockTest4;
 import org.pantsbuild.tools.junit.lib.TestRegistry;
 import org.pantsbuild.tools.junit.lib.XmlReportAllIgnoredTest;
 import org.pantsbuild.tools.junit.lib.XmlReportAllPassingTest;
+import org.pantsbuild.tools.junit.lib.XmlReportFailingParameterizedTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailingTestRunnerTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailInSetupTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFirstTestIngoredTest;
 import org.pantsbuild.tools.junit.lib.XmlReportIgnoredTestSuiteTest;
 import org.pantsbuild.tools.junit.lib.XmlReportTest;
+import org.pantsbuild.tools.junit.lib.XmlReportTestSuite;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
@@ -302,6 +304,52 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
     assertEquals("0", testCase.getTime());
     assertNull(testCase.getError());
     assertNull(testCase.getFailure());
+  }
+
+  @Test
+  public void testXmlReportTestSuite() throws Exception {
+    String testClassName = XmlReportTestSuite.class.getCanonicalName();
+
+    File testXmlFile = runTestAndReturnXmlFile(testClassName, true);
+
+    // With a test suite we get back TEST-*.xml files for the test classes
+    // in the suite, not for the test suite class itself
+    testXmlFile = new File(testXmlFile.getParent(),
+        "TEST-" + XmlReportTest.class.getCanonicalName() + ".xml");
+    AntJunitXmlReportListener.TestSuite testSuite = parseTestXml(testXmlFile);
+
+    assertNotNull(testSuite);
+    assertEquals(4, testSuite.getTests());
+    assertEquals(1, testSuite.getFailures());
+    assertEquals(1, testSuite.getErrors());
+    assertEquals(1, testSuite.getSkipped());
+
+    testXmlFile = new File(testXmlFile.getParent(),
+        "TEST-" + XmlReportAllPassingTest.class.getCanonicalName() + ".xml");
+    testSuite = parseTestXml(testXmlFile);
+    assertNotNull(testSuite);
+    assertEquals(2, testSuite.getTests());
+    assertEquals(0, testSuite.getFailures());
+    assertEquals(0, testSuite.getErrors());
+    assertEquals(0, testSuite.getSkipped());
+  }
+
+  @Test
+  public void testXmlReportFailingParameterizedTest() throws Exception {
+    String testClassName = XmlReportFailingParameterizedTest.class.getCanonicalName();
+
+    AntJunitXmlReportListener.TestSuite testSuite = runTestAndParseXml(testClassName, true);
+
+    assertNotNull(testSuite);
+    assertEquals(4, testSuite.getTests());
+    assertEquals(1, testSuite.getFailures());
+    assertEquals(2, testSuite.getErrors());
+    assertEquals(0, testSuite.getSkipped());
+    assertTrue(Float.parseFloat(testSuite.getTime()) > 0);
+    assertEquals(testClassName, testSuite.getName());
+
+    List<AntJunitXmlReportListener.TestCase> testCases = testSuite.getTestCases();
+    assertEquals(4, testCases.size());
   }
 
   @Test
