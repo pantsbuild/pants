@@ -446,6 +446,17 @@ class BuildGraph(AbstractClass):
     :param Target derived_from: The Target this Target will derive from.
     """
 
+  def maybe_inject_address_closure(self, address):
+    """If the given address is not already injected to the graph, calls inject_address_closure.
+
+    :API: public
+
+    :param Address address: The address to inject.  Must be resolvable by `self._address_mapper` or
+                            else be the address of an already injected entity.
+    """
+    if not self.contains_address(address):
+      self.inject_address_closure(address)
+
   @abstractmethod
   def inject_address_closure(self, address):
     """Resolves, constructs and injects a Target and its transitive closure of dependencies.

@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TargetDefinitionException
-from pants.build_graph.address import Addresses
+from pants.build_graph.address import Address, Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.globs import BaseGlobs, Files
@@ -72,13 +72,16 @@ class ExpGraph(BuildGraph):
         new_targets.append(self._index_target(target_adaptor, dependency_addresses))
 
     # Once the declared dependencies of all targets are indexed, inject their
-    # additional "traversable_dependency_specs".
+    # additional "traversable_(dependency_)?specs".
     for target in new_targets:
-      specs = list(target.traversable_dependency_specs) + list(target.traversable_specs)
-      if specs:
-        raise NotImplementedError(
-            'traversable_(dependency_)?specs not yet implemented for {}: {}'.format(target, specs))
-
+      for spec in target.traversable_dependency_specs:
+        address = Address.parse(spec, relative_to=target.address.spec_path)
+        self.maybe_inject_address_closure(address)
+        if not any(address == t.address for t in target.dependencies):
+          self.inject_dependency(dependent=target.address, dependency=address)
+      for spec in target.traversable_specs:
+        address = Address.parse(spec, relative_to=target.address.spec_path)
+        self.maybe_inject_address_closure(address)
     return all_addresses
 
   def _index_target(self, target_adaptor, dependencies):
@@ -89,7 +92,7 @@ class ExpGraph(BuildGraph):
     self._target_by_address[address] = target
 
     # Link its declared dependencies, which will be indexed independently.
-    self._target_dependencies_by_address[address] = dependencies
+    self._target_dependencies_by_address[address].update(dependencies)
     for dependency in dependencies:
       self._target_dependees_by_address[dependency].add(address)
     return target

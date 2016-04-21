@@ -77,27 +77,17 @@ class MutableBuildGraph(BuildGraph):
             self.inject_dependency(target_address, dep_address)
         target = self.get_target(target_address)
 
-      def inject_spec_closure(spec):
-        # Check to see if the target is synthetic or not.  If we find a synthetic target then
-        # short circuit the inject_address_closure since mapper.spec_to_address expects an actual
-        # BUILD file to exist on disk.
-        maybe_synthetic_address = Address.parse(spec, relative_to=target_address.spec_path)
-        if not self.contains_address(maybe_synthetic_address):
-          addr = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
-          self.inject_address_closure(addr)
-
       for traversable_spec in target.traversable_dependency_specs:
-        inject_spec_closure(traversable_spec)
-        traversable_spec_target = self.get_target_from_spec(traversable_spec,
-                                                            relative_to=target_address.spec_path)
+        traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
+        self.maybe_inject_address_closure(traversable_address)
 
-        if traversable_spec_target not in target.dependencies:
-          self.inject_dependency(dependent=target.address,
-                                 dependency=traversable_spec_target.address)
+        if not any(traversable_address == t.address for t in target.dependencies):
+          self.inject_dependency(dependent=target.address, dependency=traversable_address)
           target.mark_transitive_invalidation_hash_dirty()
 
       for traversable_spec in target.traversable_specs:
-        inject_spec_closure(traversable_spec)
+        traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
+        self.maybe_inject_address_closure(traversable_address)
         target.mark_transitive_invalidation_hash_dirty()
 
     except AddressLookupError as e:

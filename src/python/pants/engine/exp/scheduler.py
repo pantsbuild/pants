@@ -600,7 +600,7 @@ class LocalScheduler(object):
               # All deps are already completed: mark this Node as a candidate for another step.
               candidates.add(step.node)
 
-      print('executed {} nodes in {} scheduling iterations. '
+      print('visited {} nodes in {} scheduling iterations. '
             'there have been {} total steps for {} total nodes.'.format(
               sum(1 for _ in self._product_graph.walk(execution_request.roots)),
               scheduling_iterations,
