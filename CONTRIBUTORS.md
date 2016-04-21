@@ -90,6 +90,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Neil Sanchala
 + Nick Howard
 + Nik Shkrob
++ Nitay Joffe
 + Oliver Gould
 + Patrick Lawson
 + Paul Groudas
