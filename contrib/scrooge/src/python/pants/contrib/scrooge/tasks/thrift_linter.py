@@ -20,8 +20,6 @@ class ThriftLintError(Exception):
 class ThriftLinter(NailgunTask):
   """Print linter warnings for thrift files."""
 
-  _CONFIG_SECTION = 'thrift-linter'
-
   @staticmethod
   def _is_thrift(target):
     return target.is_thrift
@@ -39,18 +37,12 @@ class ThriftLinter(NailgunTask):
                   'this value if it is set.')
     register('--linter-args', default=[], advanced=True, type=list, fingerprint=True,
              help='Additional options passed to the linter.')
-    register('--jvm-options', type=list, metavar='<option>...', advanced=True,
-             help='Run with these extra jvm options.')
     cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
   def product_types(cls):
     # Declare the product of this goal. Gen depends on thrift-linter.
     return ['thrift-linter']
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   @property
   def cache_target_dirs(self):
@@ -90,7 +82,6 @@ class ThriftLinter(NailgunTask):
       config_args.extend(['--include-path', p])
 
     args = config_args + list(paths)
-
 
 
     # If runjava returns non-zero, this marks the workunit as a

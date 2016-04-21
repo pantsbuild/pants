@@ -29,6 +29,9 @@ class Config(AbstractClass):
   class ConfigError(Exception):
     pass
 
+  class ConfigValidationError(ConfigError):
+    pass
+
   @classmethod
   def load(cls, configpaths, seed_values=None):
     """Loads config from the given paths.
@@ -108,6 +111,10 @@ class Config(AbstractClass):
                             raise_type=self.ConfigError)
 
   # Subclasses must implement.
+  def configs(self):
+    """Returns the underlying single-file configs represented by this object."""
+    raise NotImplementedError()
+
   def sources(self):
     """Returns the sources of this config as a list of filenames."""
     raise NotImplementedError()
@@ -145,6 +152,9 @@ class _EmptyConfig(Config):
   def sources(self):
     return []
 
+  def configs(self):
+    return []
+
   def sections(self):
     return []
 
@@ -168,6 +178,9 @@ class _SingleFileConfig(Config):
     super(_SingleFileConfig, self).__init__()
     self.configpath = configpath
     self.configparser = configparser
+
+  def configs(self):
+    return [self]
 
   def sources(self):
     return [self.configpath]
@@ -203,31 +216,34 @@ class _ChainedConfig(Config):
                     Later instances take precedence over earlier ones.
     """
     super(_ChainedConfig, self).__init__()
-    self.configs = list(reversed(configs))
+    self._configs = list(reversed(configs))
+
+  def configs(self):
+    return self._configs
 
   def sources(self):
-    return list(itertools.chain.from_iterable(cfg.sources() for cfg in self.configs))
+    return list(itertools.chain.from_iterable(cfg.sources() for cfg in self._configs))
 
   def sections(self):
     ret = OrderedSet()
-    for cfg in self.configs:
+    for cfg in self._configs:
       ret.update(cfg.sections())
     return ret
 
   def has_section(self, section):
-    for cfg in self.configs:
+    for cfg in self._configs:
       if cfg.has_section(section):
         return True
     return False
 
   def has_option(self, section, option):
-    for cfg in self.configs:
+    for cfg in self._configs:
       if cfg.has_option(section, option):
         return True
     return False
 
   def get_value(self, section, option):
-    for cfg in self.configs:
+    for cfg in self._configs:
       try:
         return cfg.get_value(section, option)
       except (configparser.NoSectionError, configparser.NoOptionError):
@@ -237,7 +253,7 @@ class _ChainedConfig(Config):
     raise configparser.NoOptionError(option, section)
 
   def get_source_for_option(self, section, option):
-    for cfg in self.configs:
+    for cfg in self._configs:
       if cfg.has_option(section, option):
         return cfg.get_source_for_option(section, option)
     return None

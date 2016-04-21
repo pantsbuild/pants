@@ -6,17 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import os
 import sys
 import threading
 from collections import defaultdict
 
-import six
-
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
-from pants.engine.exp.fs import Path, PathGlobs, Paths
+from pants.engine.exp.fs import PathGlobs
 from pants.engine.exp.nodes import (DependenciesNode, FilesystemNode, Node, Noop, ProjectionNode,
                                     Return, SelectNode, State, StepContext, TaskNode, Throw,
                                     Waiting)
@@ -183,18 +180,9 @@ class ProductGraph(object):
     logger.info('invalidated {} nodes'.format(invalidated_count))
     return invalidated_count
 
-  def _generate_fsnode_subjects(self, filenames):
-    """Given filenames, generate a set of subjects for invalidation predicate matching."""
-    file_paths = ((six.text_type(f), six.text_type(os.path.dirname(f))) for f in filenames)
-    for file_path, parent_dir_path in file_paths:
-      yield Path(file_path)
-      yield Path(parent_dir_path)  # Invalidate the parent dirs DirectoryListing.
-      # TODO: See https://github.com/pantsbuild/pants/issues/3117.
-      yield DescendantAddresses(parent_dir_path)
-
   def invalidate_files(self, filenames):
     """Given a set of changed filenames, invalidate all related FilesystemNodes in the graph."""
-    subjects = set(self._generate_fsnode_subjects(filenames))
+    subjects = set(FilesystemNode.generate_subjects(filenames))
     logger.debug('generated invalidation subjects: %s', subjects)
 
     def predicate(node):
@@ -350,13 +338,13 @@ class NodeBuilder(Closable):
     self._tasks = tasks
 
   def gen_nodes(self, subject, product, variants):
-    # Native filesystem operations.
-    if FilesystemNode.is_filesystem_product(product):
+    if FilesystemNode.is_filesystem_pair(type(subject), product):
+      # Native filesystem operations.
       yield FilesystemNode(subject, product, variants)
-
-    # Tasks.
-    for task, anded_clause in self._tasks[product]:
-      yield TaskNode(subject, product, variants, task, anded_clause)
+    else:
+      # Tasks.
+      for task, anded_clause in self._tasks[product]:
+        yield TaskNode(subject, product, variants, task, anded_clause)
 
   def select_node(self, selector, subject, variants):
     """Constructs a Node for the given Selector and the given Subject/Variants.
@@ -523,7 +511,7 @@ class LocalScheduler(object):
           elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
             yield DependenciesNode(subject, product, None, Addresses, None)
           elif type(subject) is PathGlobs:
-            yield DependenciesNode(subject, product, None, Paths, None)
+            yield DependenciesNode(subject, product, None, subject.ftype, None)
           else:
             raise ValueError('Unsupported root subject type: {}'.format(subject))
 

@@ -25,6 +25,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
@@ -55,7 +56,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.6'
+  DEFAULT_EXPORT_VERSION = '1.0.7'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -104,6 +105,11 @@ class ExportTask(IvyTaskMixin, PythonTask):
              help='Causes libraries with javadocs to be output.')
     register('--sources', type=bool,
              help='Causes sources to be output.')
+    # Required by IvyTaskMixin.
+    # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
+    # See also https://github.com/pantsbuild/pants/issues/3200.
+    register('--jvm-options', type=list, metavar='<option>...',
+             help='Run Ivy with these extra jvm options.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -249,6 +255,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
       if isinstance(current_target, JvmTarget):
         info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
         info['platform'] = current_target.platform.name
+        if hasattr(current_target, 'test_platform'):
+          info['test_platform'] = current_target.test_platform.name
 
       info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,
@@ -269,7 +277,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
           'target_level' : str(platform.target_level),
           'source_level' : str(platform.source_level),
           'args' : platform.args,
-        } for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items() }
+        } for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items() },
     }
 
     graph_info = {
@@ -279,7 +287,30 @@ class ExportTask(IvyTaskMixin, PythonTask):
     }
     jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
     if jvm_distributions:
+      deprecated_conditional(lambda: True, '0.0.89',
+                             'jvm_distributions is deprecated in favor of preferred_jvm_distributions.')
       graph_info['jvm_distributions'] = jvm_distributions
+
+    # `jvm_distributions` are static distribution settings from config,
+    # `preferred_jvm_distributions` are distributions that pants actually uses for the
+    # given platform setting.
+    graph_info['preferred_jvm_distributions'] = {}
+
+    def get_preferred_distribution(platform, strict):
+      try:
+        return JvmPlatform.preferred_jvm_distribution([platform], strict=strict)
+      except DistributionLocator.Error:
+        return None
+
+    for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items():
+      preferred_distributions = {}
+      for strict, strict_key in [(True, 'strict'), (False, 'non_strict')]:
+        dist = get_preferred_distribution(platform, strict=strict)
+        if dist:
+          preferred_distributions[strict_key] = dist.home
+
+      if preferred_distributions:
+        graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
 
     if classpath_products:
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)

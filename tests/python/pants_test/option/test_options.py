@@ -19,8 +19,9 @@ from pants.option.config import Config
 from pants.option.custom_types import file_option, target_option
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
                                  InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
-                                 NoOptionNames, OptionNameDash, OptionNameDoubleDash, ParseError,
-                                 RecursiveSubsystemOption, Shadowing)
+                                 NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
+                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
+                                 Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
@@ -605,7 +606,9 @@ class OptionsTest(unittest.TestCase):
         """
       ))
       tmp.flush()
-      cmdline = './pants --target-spec-file={filename} compile morx:tgt fleem:tgt'.format(
+      # Note that we prevent loading a real pants.ini during get_bootstrap_options().
+      cmdline = './pants --target-spec-file={filename} --pants-config-files="[]" ' \
+                'compile morx:tgt fleem:tgt'.format(
         filename=tmp.name)
       bootstrapper = OptionsBootstrapper(args=shlex.split(cmdline))
       bootstrap_options = bootstrapper.get_bootstrap_options().for_global_scope()
@@ -997,3 +1000,12 @@ class OptionsTest(unittest.TestCase):
 
     self.assertEqual(99, options.for_global_scope().b)
     self.assertTrue(options.for_global_scope().store_true_flag)
+
+  def test_double_registration(self):
+    options = Options.create(env={},
+                             config=self._create_config({}),
+                             known_scope_infos=OptionsTest._known_scope_infos,
+                             args=shlex.split('./pants'),
+                             option_tracker=OptionTracker())
+    options.register(GLOBAL_SCOPE, '--foo-bar')
+    self.assertRaises(OptionAlreadyRegistered, lambda: options.register(GLOBAL_SCOPE, '--foo-bar'))

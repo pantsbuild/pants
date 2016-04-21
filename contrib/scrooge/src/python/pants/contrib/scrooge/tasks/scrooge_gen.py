@@ -24,8 +24,6 @@ from twitter.common.collections import OrderedSet
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
-_CONFIG_SECTION = 'scrooge-gen'
-
 _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary, android=JavaLibrary)
 
 
@@ -40,8 +38,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     register('--verbose', type=bool, help='Emit verbose output.')
     register('--strict', fingerprint=True, type=bool,
              help='Enable strict compilation.')
-    register('--jvm-options', default=[], advanced=True, type=list,
-             help='Use these jvm options when running Scrooge.')
     register('--service-deps', default={}, advanced=True, type=dict,
              help='A map of language to targets to add as dependencies of '
                   'synthetic thrift libraries that contain services.')
@@ -63,10 +59,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     self._thrift_defaults = ThriftDefaults.global_instance()
     self._depinfo = None
 
-  @property
-  def config_section(self):
-    return _CONFIG_SECTION
-
   # TODO(benjy): Use regular os-located tmpfiles, as we do everywhere else.
   def _tempname(self):
     # don't assume the user's cwd is buildroot
@@ -86,12 +78,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
         try:
           dependencies.update(self.context.resolve(depspec))
         except AddressLookupError as e:
-          raise AddressLookupError('{message}\n  referenced from [{section}] key: '
-                                   'gen->deps->{category} in pants.ini'.format(
-                                      message=e,
-                                      section=_CONFIG_SECTION,
-                                      category=category
-                                    ))
+          raise AddressLookupError('{}\n  referenced from {} scope'.format(e, self.options_scope))
     return deps
 
   def execute_codegen(self, target, target_workdir):

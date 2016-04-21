@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.errors import OptionsError
+from pants.option.config import Config
 from pants.option.parser import Parser
 
 
@@ -38,7 +38,7 @@ class ParserHierarchy(object):
     try:
       return self._parser_by_scope[scope]
     except KeyError:
-      raise OptionsError('No such options scope: {}'.format(scope))
+      raise Config.ConfigValidationError('No such options scope: {}'.format(scope))
 
   def walk(self, callback):
     """Invoke callback on each parser, in pre-order depth-first order."""

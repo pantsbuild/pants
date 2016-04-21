@@ -7,23 +7,77 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import errno
 import fnmatch
+from abc import abstractproperty
 from os import sep as os_sep
 from os.path import join, normpath
 
+import six
 from twitter.common.collections.orderedset import OrderedSet
 
+from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Path(datatype('Path', ['path'])):
-  """A filesystem path, relative to the ProjectTree's buildroot."""
+class Stat(AbstractClass):
+  """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
+
+  Note that in order to preserve these invariants, end-user functions should never directly
+  instantiate Stat instances.
+  """
+
+  @abstractproperty
+  def path(self):
+    """:returns: The string path for this Stat."""
 
 
-class Paths(datatype('Paths', ['dependencies'])):
-  """A set of Path objects."""
+class File(datatype('File', ['path']), Stat):
+  """A file."""
+
+  def __new__(cls, path):
+    return super(File, cls).__new__(cls, six.text_type(path))
+
+
+class Dir(datatype('Dir', ['path']), Stat):
+  """A directory."""
+
+  def __new__(cls, path):
+    return super(Dir, cls).__new__(cls, six.text_type(path))
+
+
+class Link(datatype('Link', ['path']), Stat):
+  """A symbolic link."""
+
+  def __new__(cls, path):
+    return super(Link, cls).__new__(cls, six.text_type(path))
+
+
+class ReadLink(datatype('ReadLink', ['path'])):
+  """The result of reading a symbolic link."""
+
+  def __new__(cls, path):
+    return super(ReadLink, cls).__new__(cls, six.text_type(path))
+
+
+class Stats(datatype('Stats', ['files', 'dirs', 'links'])):
+  """Sets of File, Dir, and Link objects."""
+
+  def __new__(cls, files=tuple(), dirs=tuple(), links=tuple()):
+    return super(Stats, cls).__new__(cls, files, dirs, links)
+
+
+class Files(datatype('Files', ['dependencies'])):
+  """A set of File objects."""
+
+
+class Dirs(datatype('Dirs', ['dependencies'])):
+  """A set of Dir objects."""
+
+
+class Links(datatype('Links', ['dependencies'])):
+  """A set of Link objects."""
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -42,94 +96,97 @@ class FilesContent(datatype('FilesContent', ['dependencies'])):
 
 
 def _norm_with_dir(path):
-  """Form of `normpath` that preserves trailing slashes.
+  """Form of `normpath` that preserves a trailing slash-dot.
 
-  In this case, a trailing slash is used to explicitly indicate that a directory is
+  In this case, a trailing slash-dot is used to explicitly indicate that a directory is
   being matched.
   """
   normed = normpath(path)
-  if path.endswith(os_sep):
-    return normed + os_sep
+  if path.endswith(os_sep + '.'):
+    return normed + os_sep + '.'
   return normed
 
 
 class PathGlob(AbstractClass):
   """A filename pattern.
 
-  All PathGlob subclasses match zero or more paths, which differentiates them from Path
-  objects, which are expected to represent literal existing files.
+  All PathGlob subclasses represent in-progress recursion that may match zero or more Stats. The
+  leaves of a "tree" of PathGlobs will be Path objects which may or may not exist.
   """
 
   _DOUBLE = '**'
   _SINGLE = '*'
 
   @classmethod
-  def create_from_spec(cls, relative_to, filespec):
-    return cls._parse_spec(relative_to, _norm_with_dir(filespec).split(os_sep))
+  def create_from_spec(cls, ftype, canonical_at, filespec):
+    """Given a filespec, return a PathGlob object.
 
-  @classmethod
-  def _wildcard_part(cls, filespec_parts):
-    """Returns the index of the first double-wildcard or single-wildcard part in filespec_parts.
-
-    Only the first value of either kind will be returned, so at least one entry in the tuple will
-    always be None.
-    """
-    for i, part in enumerate(filespec_parts):
-      if cls._DOUBLE in part:
-        if part != cls._DOUBLE:
-          raise ValueError(
-              'Illegal component "{}" in filespec: {}'.format(part, join(*filespec_parts)))
-        return i, None
-      elif cls._SINGLE in part:
-        return None, i
-    return None, None
-
-  @classmethod
-  def _parse_spec(cls, relative_to, parts):
-    """Given the path components of a filespec, return a potentially nested PathGlob object.
+    :param ftype: The Stat subclass intended to be matched by this PathGlobs. TODO: this
+      value is only used by the Scheduler currently, which is weird. Move to a wrapper?
+    :param canonical_at: A path relative to the ProjectTree that is known to be
+      canonical. This requirement exists in order to avoid "accidentally"
+      traversing symlinks during expansion of a PathGlobs, which would break filesystem
+      invalidation. TODO: Consider asserting that this is a `realpath`.
+    :param filespec: A filespec, relative to canonical_at.
 
     TODO: Because `create_from_spec` is called recursively, this method should work harder to
     avoid splitting/joining. Optimization needed.
     """
-    double_index, single_index = cls._wildcard_part(parts)
-    if double_index is not None:
+
+    parts = _norm_with_dir(filespec).split(os_sep)
+    if cls._DOUBLE in parts[0]:
+      if parts[0] != cls._DOUBLE:
+        raise ValueError(
+            'Illegal component "{}" in filespec: {}'.format(parts[0], join(canonical_at, filespec)))
       # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
-      remainders = (join(*parts[double_index+1:]), join(*parts[double_index:]))
-      return PathDirWildcard(join(relative_to, *parts[:double_index]),
-                             parts[double_index],
-                             remainders)
-    elif single_index is None:
-      # A literal path.
-      return PathLiteral(join(relative_to, *parts))
-    elif single_index == (len(parts) - 1):
-      # There is a wildcard in the file basename of the path.
-      return PathWildcard(join(relative_to, *parts[:-1]), parts[-1])
+      remainders = (join(*parts[1:]), join(*parts[0:]))
+      return PathDirWildcard(ftype, canonical_at, parts[0], remainders)
+    elif cls._SINGLE not in parts[0]:
+      # A literal path component. Look up the first non-canonical component.
+      if len(parts) == 1:
+        return Path(join(canonical_at, parts[0]))
+      return PathLiteral(ftype, join(canonical_at, parts[0]), join(*parts[1:]))
+    elif len(parts) == 1:
+      # This is the path basename, and it contains a wildcard.
+      return PathWildcard(canonical_at, parts[0])
     else:
-      # There is a wildcard in (at least one of) the dirnames in the path.
-      remainders = (join(*parts[single_index + 1:]),)
-      return PathDirWildcard(join(relative_to, *parts[:single_index]),
-                             parts[single_index],
+      # This is a path dirname, and it contains a wildcard.
+      remainders = (join(*parts[1:]),)
+      return PathDirWildcard(ftype,
+                             canonical_at,
+                             parts[0],
                              remainders)
 
 
-class PathLiteral(datatype('PathLiteral', ['path']), PathGlob):
-  """A single literal PathGlob, which may or may not exist."""
+class Path(datatype('Path', ['path']), PathGlob):
+  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
+
+  def __new__(cls, path):
+    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
 
 
 class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob):
   """A PathGlob with a wildcard in the basename component."""
 
 
-class PathDirWildcard(datatype('PathDirWildcard', ['directory', 'wildcard', 'remainders']), PathGlob):
+class PathLiteral(datatype('PathLiteral', ['ftype', 'directory', 'remainder']), PathGlob):
+  """A PathGlob representing a partially-expanded literal Path.
+
+  While it still requires recursion, a PathLiteral is simpler to execute than either `wildcard`
+  type: it only needs to stat each directory on the way down, rather than listing them.
+  """
+
+
+class PathDirWildcard(datatype('PathDirWildcard', ['ftype', 'directory', 'wildcard', 'remainders']), PathGlob):
   """A PathGlob with a single or double-level wildcard in a directory name.
 
   Each remainders value is applied relative to each directory matched by the wildcard.
   """
 
 
-class PathGlobs(datatype('PathGlobs', ['dependencies'])):
+class PathGlobs(datatype('PathGlobs', ['ftype', 'dependencies'])):
   """A set of 'PathGlob' objects.
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
@@ -140,7 +197,7 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   """
 
   @classmethod
-  def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
+  def create(cls, ftype, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
     TODO: This currently sortof-executes parsing via 'to_filespec'. Should maybe push that out to
@@ -148,6 +205,7 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
     :param relative_to: The path that all patterns are relative to (which will itself be relative
                         to the buildroot).
+    :param ftype: A Stat subclass indicating which Stat type will be matched.
     :param files: A list of relative file paths to include.
     :type files: list of string.
     :param string globs: A relative glob pattern of files to include.
@@ -156,6 +214,7 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
     :param zglobs: A relative zsh-style glob pattern of files to include.
     :rtype: :class:`PathGlobs`
     """
+    relative_to = normpath(relative_to)
     filespecs = OrderedSet()
     for specs, pattern_cls in ((files, Globs),
                                (globs, Globs),
@@ -170,92 +229,124 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
       new_specs = res.get('globs', None)
       if new_specs:
         filespecs.update(new_specs)
-    return cls.create_from_specs(relative_to, filespecs)
+    return cls.create_from_specs(ftype, relative_to, filespecs)
 
   @classmethod
-  def create_from_specs(cls, relative_to, filespecs):
-    return cls(tuple(PathGlob.create_from_spec(relative_to, filespec) for filespec in filespecs))
+  def create_from_specs(cls, ftype, relative_to, filespecs):
+    return cls(ftype, tuple(PathGlob.create_from_spec(ftype, relative_to, filespec)
+                            for filespec in filespecs))
 
 
-class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 'dependencies'])):
-  """A list of Path objects for recursive subdirectories of the given directory."""
+class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'paths'])):
+  """A list of entry names representing a directory listing.
 
-
-class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'directories', 'files'])):
-  """Lists of file and directory Paths objects.
-
-  If exists=False, then both the directories and files lists will be empty.
+  If exists=False, then the entries list will be empty.
   """
 
 
 def list_directory(project_tree, directory):
   """List Paths directly below the given path, relative to the ProjectTree.
 
-  Returns a DirectoryListing containing directory and file paths relative to the ProjectTree.
-
   Currently ignores `.`-prefixed subdirectories, but should likely use `--ignore-patterns`.
     TODO: See https://github.com/pantsbuild/pants/issues/2956
 
-  Raises an exception if the path does not exist, or is not a directory.
+  Raises an exception if the path is not a directory.
+
+  :returns: A DirectoryListing.
   """
   try:
-    _, subdirs, subfiles = next(project_tree.walk(directory.path))
+    path = normpath(directory.path)
+    entries = [join(path, e) for e in project_tree.listdir(path)]
     return DirectoryListing(directory,
                             True,
-                            [Path(join(directory.path, subdir)) for subdir in subdirs
-                             if not subdir.startswith('.')],
-                            [Path(join(directory.path, subfile)) for subfile in subfiles])
+                            tuple(Path(e) for e in entries))
   except (IOError, OSError) as e:
     if e.errno == errno.ENOENT:
-      return DirectoryListing(directory, False, [], [])
+      return DirectoryListing(directory, False, tuple())
     else:
       raise e
 
 
-def recursive_subdirectories(directory, subdirectories_list):
-  """Given a directory and a list of RecursiveSubDirectories below it, flatten and return."""
-  directories = [directory] + [d for subdir in subdirectories_list for d in subdir.dependencies]
-  return RecursiveSubDirectories(directory, directories)
+def merge_stats(stats_list):
+  """Merge Stats lists."""
+  def generate(field):
+    for stats in stats_list:
+      for stat in getattr(stats, field):
+        yield stat
+  return Stats(files=tuple(generate('files')),
+               dirs=tuple(generate('dirs')),
+               links=tuple(generate('links')))
 
 
-def merge_paths(paths_list):
-  generated = set()
-  def generate():
-    for paths in paths_list:
-      for path in paths.dependencies:
-        if path in generated:
-          continue
-        generated.add(path)
-        yield path
-  return Paths(tuple(generate()))
+def apply_path_wildcard(stats, path_wildcard):
+  """Filter the given Stats object using the given PathWildcard."""
+  def filtered(entries):
+    return tuple(stat for stat in entries
+                 if fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
+  return Stats(files=filtered(stats.files), dirs=filtered(stats.dirs), links=filtered(stats.links))
 
 
-def filter_file_listing(directory_listing, path_wildcard):
-  paths = tuple(f for f in directory_listing.files
-                if fnmatch.fnmatch(f.path, path_wildcard.wildcard))
-  return Paths(paths)
+def apply_path_literal(dirs, path_literal):
+  """Given a PathLiteral, generate a PathGlobs object with a longer canonical_at prefix."""
+  ftype = path_literal.ftype
+  if len(dirs.dependencies) > 1:
+    raise AssertionError('{} matched more than one directory!: {}'.format(path_literal, dirs))
+  return PathGlobs(ftype, tuple(PathGlob.create_from_spec(ftype, d.path, path_literal.remainder)
+                                for d in dirs.dependencies))
 
 
-def filter_dir_listing(directory_listing, path_dir_wildcard):
+def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   """Given a PathDirWildcard, compute a PathGlobs object that encompasses its children.
 
-  The resulting PathGlobs object will be simplified relative to this wildcard, in the sense
-  that it will be relative to a subdirectory.
+  The resulting PathGlobs will have longer canonical prefixes than this wildcard, in the
+  sense that they will be relative to known-canonical subdirectories.
   """
-  paths = [f.path for f in directory_listing.directories
-           if fnmatch.fnmatch(f.path, path_dir_wildcard.wildcard)]
-  return PathGlobs(tuple(PathGlob.create_from_spec(p, remainder)
-                         for p in paths
-                         for remainder in path_dir_wildcard.remainders))
+  ftype = path_dir_wildcard.ftype
+  paths = [d.path for d in dirs.dependencies
+           if fnmatch.fnmatch(d.path, path_dir_wildcard.wildcard)]
+  return PathGlobs(ftype, tuple(PathGlob.create_from_spec(ftype, p, remainder)
+                                for p in paths
+                                for remainder in path_dir_wildcard.remainders))
 
 
-def path_exists(project_tree, path_literal):
-  path = path_literal.path
-  if path.endswith(os_sep):
-    exists = project_tree.isdir(path)
+def resolve_dir_links(direct_stats, linked_dirs):
+  return Dirs(tuple(d for dirs in (direct_stats.dirs, linked_dirs.dependencies) for d in dirs))
+
+
+def resolve_file_links(direct_stats, linked_files):
+  return Files(tuple(f for files in (direct_stats.files, linked_files.dependencies) for f in files))
+
+
+def merge_dirs(dirs_list):
+  return Dirs(tuple(d for dirs in dirs_list for d in dirs.dependencies))
+
+
+def merge_files(files_list):
+  return Files(tuple(f for files in files_list for f in files.dependencies))
+
+
+def read_link(project_tree, link):
+  return ReadLink(project_tree.readlink(link.path))
+
+
+def path_stat(project_tree, path_literal):
+  path = normpath(path_literal.path)
+  ptstat = project_tree.lstat(path)
+  if ptstat == None:
+    return Stats()
+
+  if ptstat == PTSTAT_FILE:
+    return Stats(files=(File(path),))
+  elif ptstat == PTSTAT_DIR:
+    return Stats(dirs=(Dir(path),))
+  elif ptstat == PTSTAT_LINK:
+    return Stats(links=(Link(path),))
   else:
-    exists = project_tree.isfile(path)
-  return Paths((Path(path),) if exists else ())
+    raise ValueError('Unrecognized stat type for {}, {}: {}'.format(project_tree, path, ptstat))
+
+
+def stat_to_path(stat):
+  return Path(stat.path)
 
 
 def files_content(file_contents):
@@ -273,25 +364,58 @@ def file_content(project_tree, path):
       raise e
 
 
+def identity(v):
+  return v
+
+
 def create_fs_tasks():
   """Creates tasks that consume the native filesystem Node type."""
   return [
-    (RecursiveSubDirectories,
-     [Select(Path),
-      SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
-     recursive_subdirectories),
-    (Paths,
-     [SelectDependencies(Paths, PathGlobs)],
-     merge_paths),
-    (Paths,
-     [SelectProjection(DirectoryListing, Path, ('directory',), PathWildcard),
+    # Glob execution.
+    (Stats,
+     [SelectProjection(Stats, Dir, ('directory',), PathWildcard),
       Select(PathWildcard)],
-     filter_file_listing),
+     apply_path_wildcard),
     (PathGlobs,
-     [SelectProjection(DirectoryListing, Path, ('directory',), PathDirWildcard),
+     [SelectProjection(Dirs, Path, ('directory',), PathLiteral),
+      Select(PathLiteral)],
+     apply_path_literal),
+    (PathGlobs,
+     [SelectProjection(Dirs, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
-     filter_dir_listing),
+     apply_path_dir_wildcard),
+  ] + [
+    # Link resolution.
+    (Dirs,
+     [Select(Stats),
+      SelectProjection(Dirs, Links, ('links',), Stats)],
+     resolve_dir_links),
+    (Dirs,
+     [SelectProjection(Dirs, Path, ('path',), ReadLink)],
+     identity),
+    (Files,
+     [Select(Stats),
+      SelectProjection(Files, Links, ('links',), Stats)],
+     resolve_file_links),
+    (Files,
+     [SelectProjection(Files, Path, ('path',), ReadLink)],
+     identity),
+  ] + [
+    # TODO: These are boilerplatey: aggregation should become native:
+    #   see https://github.com/pantsbuild/pants/issues/3169
+    (Stats,
+     [SelectDependencies(Stats, PathGlobs)],
+     merge_stats),
+    (Stats,
+     [SelectDependencies(Stats, DirectoryListing, field='paths')],
+     merge_stats),
+    (Files,
+     [SelectDependencies(Files, Links)],
+     merge_files),
+    (Dirs,
+     [SelectDependencies(Dirs, Links)],
+     merge_dirs),
     (FilesContent,
-     [SelectDependencies(FileContent, Paths)],
+     [SelectDependencies(FileContent, Files)],
      files_content),
   ]

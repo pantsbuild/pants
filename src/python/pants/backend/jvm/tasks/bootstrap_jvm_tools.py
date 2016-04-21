@@ -31,9 +31,9 @@ from pants.util.memo import memoized_property
 
 
 class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
-  def __init__(self, main, custom_rules=None):
+  def __init__(self, task, main, custom_rules=None):
     # The bootstrapper uses no custom confs in its resolves.
-    super(ShadedToolFingerprintStrategy, self).__init__(confs=None)
+    super(ShadedToolFingerprintStrategy, self).__init__(task, confs=None)
 
     self._main = main
     self._custom_rules = custom_rules
@@ -77,8 +77,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   @classmethod
   def register_options(cls, register):
     super(BootstrapJvmTools, cls).register_options(register)
-    # Must be registered with the shader- prefix, as IvyTaskMixin already registers --jvm-options.
-    # TODO: IvyTaskMixin should probably add an ivy- prefix; there's no reason to privilege it.
+    # Must be registered with the shader- prefix, as JarTask already registers --jvm-options
+    # (indirectly, via NailgunTask).
     register('--shader-jvm-options', type=list, metavar='<option>...',
              help='Run the tool shader with these extra jvm options.')
 
@@ -235,7 +235,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     return Shader.Factory.create(self.context)
 
   def _bootstrap_shaded_jvm_tool(self, jvm_tool, targets):
-    fingerprint_strategy = ShadedToolFingerprintStrategy(jvm_tool.main,
+    fingerprint_strategy = ShadedToolFingerprintStrategy(self, jvm_tool.main,
                                                          custom_rules=jvm_tool.custom_rules)
 
     with self.invalidated(targets,

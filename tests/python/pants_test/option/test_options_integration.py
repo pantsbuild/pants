@@ -14,6 +14,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class TestOptionsIntegration(PantsRunIntegrationTest):
 
+  @classmethod
+  def hermetic(cls):
+    return True
+
   def test_options_works_at_all(self):
     self.assert_success(self.run_pants(['options']))
 
@@ -122,7 +126,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           colors: False
           scope: options
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path), '--verify-config',
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn('ERROR] Invalid scope [invalid_scope]', pants_run.stderr_data)
@@ -140,7 +144,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           fail_fast: True
           invalid_option: True
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),'--verify-config',
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'invalid_option' under [test.junit]",
@@ -166,14 +170,46 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [test.junit]
           fail_fast: True
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path), '--verify-config',
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'invalid_global' under [GLOBAL]", pants_run.stderr_data)
       self.assertIn("ERROR] Invalid option 'another_invalid_global' under [GLOBAL]",
                     pants_run.stderr_data)
 
-  def test_command_line_option_used_by_goals(self):
+  def test_invalid_command_line_option_and_invalid_config(self):
+    """
+    Make sure invalid command line error will be thrown and exits.
+    """
+    with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
+      config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
+      with open(config_path, 'w+') as f:
+        f.write(dedent("""
+          [test.junit]
+          bad_option: True
+
+          [invalid_scope]
+          abc: 123
+        """))
+
+      # Run with invalid config and invalid command line option.
+      # Should error out with invalid command line option only.
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+                                  '--test-junit-invalid=ALL',
+                                  'goals'])
+      self.assert_failure(pants_run)
+      self.assertIn("Exception message: Unrecognized command line flags on scope 'test.junit': --invalid",
+                    pants_run.stderr_data)
+
+      # Run with invalid config only.
+      # Should error out with `bad_option` and `invalid_scope` in config.
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+                                  'goals'])
+      self.assert_failure(pants_run)
+      self.assertIn("ERROR] Invalid option 'bad_option' under [test.junit]", pants_run.stderr_data)
+      self.assertIn("ERROR] Invalid scope [invalid_scope]", pants_run.stderr_data)
+
+  def test_command_line_option_unused_by_goals(self):
     self.assert_success(self.run_pants(['goals', '--bundle-jvm-archive=zip']))
     self.assert_failure(self.run_pants(['goals', '--jvm-invalid=zip']))
 

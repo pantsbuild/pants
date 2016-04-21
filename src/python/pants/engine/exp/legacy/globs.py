@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 
+from pants.engine.exp.fs import Files as FSFiles
 from pants.engine.exp.fs import FileContent, PathGlobs
 from pants.engine.exp.nodes import Throw
 from pants.source import wrapped_globs
@@ -37,7 +38,7 @@ class BaseGlobs(AbstractClass):
     TODO: Simplify the engine API. See: https://github.com/pantsbuild/pants/issues/3070
     """
     filespecs = self.legacy_globs_class.to_filespec(self.patterns)
-    pathglobs = PathGlobs.create_from_specs(relpath, filespecs.get('globs', []))
+    pathglobs = PathGlobs.create_from_specs(FSFiles, relpath, filespecs.get('globs', []))
     lfc = LazyFilesContent(engine, scheduler, pathglobs)
     return wrapped_globs.FilesetWithSpec('',
                                          filespecs,

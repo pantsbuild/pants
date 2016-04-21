@@ -125,6 +125,8 @@ class _Goal(object):
     replace: Removes all existing tasks in this goal and installs this task.
     before: Places the task before the named task in the execution list.
     after: Places the task after the named task in the execution list.
+
+    :API: public
     """
     if [bool(place) for place in [first, replace, before, after]].count(True) > 1:
       raise GoalError('Can only specify one of first, replace, before or after')
@@ -178,6 +180,8 @@ class _Goal(object):
 
     Note: Does not relax a serialization requirement that originated
     from the uninstalled task's install() call.
+
+    :API: public
     """
     if name in self._task_type_by_name:
       self._task_type_by_name[name].options_scope = None

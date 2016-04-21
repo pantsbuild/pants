@@ -338,8 +338,6 @@ class JarPublish(ScmPublishMixin, JarTask):
                   'Or: --restart-at=src/java/com/twitter/common/base')
     register('--ivy_settings', advanced=True, default=None,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
-    register('--jvm-options', advanced=True, type=list,
-             help='Use these jvm options when running Ivy.')
     register('--repos', advanced=True, type=dict,
              help='Settings for repositories that can be pushed to. See '
                   'https://pantsbuild.github.io/publish.html for details.')

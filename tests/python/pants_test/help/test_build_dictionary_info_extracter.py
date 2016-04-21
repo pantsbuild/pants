@@ -24,16 +24,20 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
     class Test1(object):
       """First line.
 
-      Subsequent lines.
+      Subsequent
+      lines.
+
+        with indentations
+
       """
 
-    self.assertEqual('First line.',
+    self.assertEqual(('First line.', ['Subsequent', 'lines.', '', '  with indentations']),
                      BuildDictionaryInfoExtracter.get_description_from_docstring(Test1))
 
     class Test2(object):
       """Only one line."""
 
-    self.assertEqual('Only one line.',
+    self.assertEqual(('Only one line.', []),
                      BuildDictionaryInfoExtracter.get_description_from_docstring(Test2))
 
   def test_get_arg_descriptions_from_docstring(self):
@@ -181,9 +185,9 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
 
     extracter = BuildDictionaryInfoExtracter(bfa)
     args = BuildDictionaryInfoExtracter.basic_target_args
-    self.assertEquals([BuildSymbolInfo('target1', 'Target1 docstring.', args),
-                       BuildSymbolInfo('target2', 'Target2 docstring.', args),
-                       BuildSymbolInfo('target3', 'Target3 docstring.', args)],
+    self.assertEquals([BuildSymbolInfo('target1', 'Target1 docstring.', [], args),
+                       BuildSymbolInfo('target2', 'Target2 docstring.', [], args),
+                       BuildSymbolInfo('target3', 'Target3 docstring.', [], args)],
                       extracter.get_target_type_info())
 
   def test_get_object_info(self):
@@ -203,7 +207,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       context_aware_object_factories={},
     )
     extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.',
+    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.', [],
                                        [FunctionArg('bar', 'Bar details.', False, None),
                                         FunctionArg('baz', 'Baz details.', True, 42)])],
                       extracter.get_object_info())
@@ -225,7 +229,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       }
     )
     extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.',
+    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.', [],
                                        [FunctionArg('bar', 'Bar details.', False, None),
                                         FunctionArg('baz', 'Baz details.', True, 42)])],
                       extracter.get_object_factory_info())
@@ -248,7 +252,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       context_aware_object_factories={},
     )
     extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.',
+    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.', [],
                                        [FunctionArg('bar', 'Bar details.', False, None),
                                         FunctionArg('baz', 'Baz details.', True, 42)])],
                       extracter.get_object_info())

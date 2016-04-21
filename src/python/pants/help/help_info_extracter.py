@@ -17,8 +17,6 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
      'removal_hint', 'choices'])):
   """A container for help information for a single option.
 
-  :API: public
-
   registering_class: The type that registered the option.
   display_args: Arg strings suitable for display in help text, including value examples
                 (e.g., [-f, --[no]-foo-bar, --baz=<metavar>].)
@@ -38,17 +36,12 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   """
 
   def comma_separated_display_args(self):
-    """
-    :API: public
-    """
     return ', '.join(self.display_args)
 
 
 class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
                                      ['scope', 'basic', 'recursive', 'advanced'])):
   """A container for help information for a scope of options.
-
-  :API: public
 
   scope: The scope of the described options.
   basic|recursive|advanced: A list of OptionHelpInfo for the options in that group.
@@ -57,27 +50,19 @@ class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
 
 
 class HelpInfoExtracter(object):
-  """Extracts information useful for displaying help from option registration args.
-
-    :API: public
-  """
+  """Extracts information useful for displaying help from option registration args."""
 
   @classmethod
   def get_option_scope_help_info_from_parser(cls, parser):
     """Returns a dict of help information for the options registered on the given parser.
 
     Callers can format this dict into cmd-line help, HTML or whatever.
-
-    :API: public
     """
     return cls(parser.scope).get_option_scope_help_info(parser.option_registrations_iter())
 
   @staticmethod
   def compute_default(kwargs):
-    """Compute the default value to display in help for an option registered with these kwargs.
-
-    :API: public
-    """
+    """Compute the default value to display in help for an option registered with these kwargs."""
     ranked_default = kwargs.get('default')
     typ = kwargs.get('type', str)
 
@@ -98,10 +83,7 @@ class HelpInfoExtracter(object):
 
   @staticmethod
   def compute_metavar(kwargs):
-    """Compute the metavar to display in help for an option registered with these kwargs.
-
-    :API: public
-    """
+    """Compute the metavar to display in help for an option registered with these kwargs."""
     metavar = kwargs.get('metavar')
     if not metavar:
       typ = kwargs.get('type', str)
@@ -116,17 +98,11 @@ class HelpInfoExtracter(object):
     return metavar
 
   def __init__(self, scope):
-    """
-    :API: public
-    """
     self._scope = scope
     self._scope_prefix = scope.replace('.', '-')
 
   def get_option_scope_help_info(self, option_registrations_iter):
-    """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs) pairs.
-
-    :API: public
-    """
+    """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs) pairs."""
     basic_options = []
     recursive_options = []
     advanced_options = []
@@ -146,10 +122,7 @@ class HelpInfoExtracter(object):
                                advanced=advanced_options)
 
   def get_option_help_info(self, args, kwargs):
-    """Returns an OptionHelpInfo for the option registered with the given (args, kwargs).
-
-    :API: public
-    """
+    """Returns an OptionHelpInfo for the option registered with the given (args, kwargs)."""
     display_args = []
     scoped_cmd_line_args = []
     unscoped_cmd_line_args = []

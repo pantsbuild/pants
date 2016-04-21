@@ -136,18 +136,19 @@ class Bootstrapper(object):
       return cp
 
   def _bootstrap_ivy(self, bootstrap_jar_path):
+    options = self._ivy_subsystem.get_options()
     if not os.path.exists(bootstrap_jar_path):
       with temporary_file() as bootstrap_jar:
         fetcher = Fetcher()
         checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
         try:
-          logger.info('\nDownloading {}'.format(self._ivy_subsystem.get_options().bootstrap_jar_url))
+          logger.info('\nDownloading {}'.format(options.bootstrap_jar_url))
           # TODO: Capture the stdout of the fetcher, instead of letting it output
           # to the console directly.
-          fetcher.download(self._ivy_subsystem.get_options().bootstrap_jar_url,
+          fetcher.download(options.bootstrap_jar_url,
                            listener=fetcher.ProgressListener().wrap(checksummer),
                            path_or_fd=bootstrap_jar,
-                           timeout_secs=self._ivy_subsystem.get_options().bootstrap_fetch_timeout_secs)
+                           timeout_secs=options.bootstrap_fetch_timeout_secs)
           logger.info('sha1: {}'.format(checksummer.checksum))
           bootstrap_jar.close()
           touch(bootstrap_jar_path)
@@ -156,6 +157,6 @@ class Bootstrapper(object):
           raise self.Error('Problem fetching the ivy bootstrap jar! {}'.format(e))
 
     return Ivy(bootstrap_jar_path,
-               ivy_settings=self._ivy_subsystem.get_options().ivy_settings,
-               ivy_cache_dir=self._ivy_subsystem.get_options().cache_dir,
+               ivy_settings=options.bootstrap_ivy_settings or options.ivy_settings,
+               ivy_cache_dir=options.cache_dir,
                extra_jvm_options=self._ivy_subsystem.extra_jvm_options())
