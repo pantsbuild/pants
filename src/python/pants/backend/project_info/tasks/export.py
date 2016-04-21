@@ -284,11 +284,6 @@ class ExportTask(IvyTaskMixin, PythonTask):
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
     }
-    jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
-
-    # `jvm_distributions` are static distribution settings from config,
-    # `preferred_jvm_distributions` are distributions that pants actually uses for the
-    # given platform setting.
     graph_info['preferred_jvm_distributions'] = {}
 
     def get_preferred_distribution(platform, strict):
