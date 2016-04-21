@@ -1088,8 +1088,10 @@ class IvyUtils(object):
     # longer global.
     if provide_excludes:
       additional_excludes = tuple(provide_excludes)
-      jars = {coordinate: jar.copy(excludes=jar.excludes + additional_excludes)
-              for coordinate, jar in jars.items()}
+      new_jars = OrderedDict()
+      for coordinate, jar in jars.items():
+        new_jars[coordinate] = jar.copy(excludes=jar.excludes + additional_excludes)
+      jars = new_jars
 
     return jars.values(), global_excludes
 
