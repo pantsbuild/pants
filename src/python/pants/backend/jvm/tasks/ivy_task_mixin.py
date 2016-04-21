@@ -7,14 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-from hashlib import sha1
 
 from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, IvyResolveStep
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.task.task import TaskBase
@@ -24,10 +23,11 @@ from pants.util.memo import memoized_property
 logger = logging.getLogger(__name__)
 
 
-class IvyResolveFingerprintStrategy(FingerprintStrategy):
+# TODO(nh): We could fingerprint just the ivy options and not the task options.
+class IvyResolveFingerprintStrategy(TaskIdentityFingerprintStrategy):
 
-  def __init__(self, confs):
-    super(IvyResolveFingerprintStrategy, self).__init__()
+  def __init__(self, task, confs):
+    super(IvyResolveFingerprintStrategy, self).__init__(task)
     self._confs = sorted(confs or [])
 
   def compute_fingerprint(self, target):
@@ -47,7 +47,8 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     if not hash_elements_for_target:
       return None
 
-    hasher = sha1()
+    hasher = self._build_hasher(target)
+
     for conf in self._confs:
       hasher.update(conf)
 
@@ -89,7 +90,7 @@ class IvyTaskMixin(TaskBase):
     # TODO: Register an --ivy-jvm-options here and use that, instead of the --jvm-options
     # registered by the task we mix into. That task may have intended those options for some
     # other JVM run than the Ivy one.
-    register('--soft-excludes', type=bool, advanced=True,
+    register('--soft-excludes', type=bool, advanced=True, fingerprint=True,
              help='If a target depends on a jar that is excluded by another target '
                   'resolve this jar anyway')
 
@@ -213,7 +214,7 @@ class IvyTaskMixin(TaskBase):
 
     confs = confs or ('default',)
 
-    fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
+    fingerprint_strategy = IvyResolveFingerprintStrategy(self, confs)
 
     with self.invalidated(targets,
                           invalidate_dependents=invalidate_dependents,
