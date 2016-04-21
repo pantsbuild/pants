@@ -7,11 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import sys
+from contextlib import contextmanager
 
 import pkg_resources
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_environment import get_scm, pants_version
+from pants.base.build_environment import get_buildroot, get_scm, pants_version
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
 from pants.base.file_system_project_tree import FileSystemProjectTree
@@ -24,6 +25,15 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
+from pants.engine.exp.engine import LocalSerialEngine
+from pants.engine.exp.fs import create_fs_tasks
+from pants.engine.exp.graph import create_graph_tasks
+from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
+from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
+from pants.engine.exp.mapper import AddressMapper
+from pants.engine.exp.parser import SymbolTable
+from pants.engine.exp.scheduler import LocalScheduler
+from pants.engine.exp.storage import Storage
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
@@ -32,6 +42,7 @@ from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.logging.setup import setup_logging
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
@@ -39,15 +50,100 @@ from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import QuietTaskMixin
 from pants.util.filtering import create_filters, wrap_filters
+from pants.util.memo import memoized_method
 
 
 logger = logging.getLogger(__name__)
 
 
+# N.B. This should be top-level in the module for pickleability - don't nest it.
+class LegacySymbolTable(SymbolTable):
+  """A v1 SymbolTable facade for use with the v2 engine."""
+
+  @classmethod
+  @memoized_method
+  def aliases(cls):
+    """TODO: This is a nasty escape hatch to pass aliases to LegacyPythonCallbacksParser."""
+    _, build_config = OptionsInitializer(OptionsBootstrapper(), init_logging=False).setup()
+    return build_config.registered_aliases()
+
+  @classmethod
+  @memoized_method
+  def table(cls):
+    return {alias: TargetAdaptor for alias in cls.aliases().target_types}
+
+
+class EngineInitializer(object):
+  """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
+
+  @staticmethod
+  def parse_commandline_to_spec_roots(build_root=None, options=None, args=None):
+    build_root = build_root or get_buildroot()
+    if not options:
+      options, _ = OptionsInitializer(OptionsBootstrapper(args=args), init_logging=False).setup()
+    cmd_line_spec_parser = CmdLineSpecParser(build_root)
+    spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
+    return spec_roots, options
+
+  @staticmethod
+  def setup_scheduler(build_root):
+    storage = Storage.create(debug=False)
+    # Ignore any dotfile below build_root except `.` itself
+    project_tree = FileSystemProjectTree(build_root, ['.*'])
+    symbol_table_cls = LegacySymbolTable
+
+    # Register "literal" subjects required for these tasks.
+    # TODO: Replace with `Subsystems`.
+    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
+                                   parser_cls=LegacyPythonCallbacksParser)
+
+    # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
+    # ExpGraph will explicitly request the products it needs.
+    tasks = (
+      create_legacy_graph_tasks() +
+      create_fs_tasks() +
+      create_graph_tasks(address_mapper, symbol_table_cls)
+    )
+
+    return (
+      LocalScheduler(dict(), tasks, storage, project_tree),
+      storage,
+      symbol_table_cls
+    )
+
+  @classmethod
+  def setup_legacy_graph(cls, options=None):
+    build_root = get_buildroot()
+    spec_roots, options = cls.parse_commandline_to_spec_roots(build_root, options)
+    scheduler, storage, symbol_table_cls = cls.setup_scheduler(build_root)
+    engine = LocalSerialEngine(scheduler, storage)
+    return (scheduler, engine, storage, options, spec_roots, symbol_table_cls, ExpGraph)
+
+  @classmethod
+  @contextmanager
+  def open_legacy_graph(cls, *args, **kwargs):
+    (scheduler,
+     engine,
+     storage,
+     options,
+     spec_roots,
+     symbol_table_cls,
+     build_graph_cls) = cls.setup_legacy_graph(*args, **kwargs)
+
+    engine.start()
+    try:
+      graph = build_graph_cls(scheduler, engine, symbol_table_cls)
+      addresses = tuple(graph.inject_specs_closure(spec_roots))
+      yield graph, addresses, scheduler
+    finally:
+      logger.debug('cache stats: {}'.format(engine._cache.get_stats()))
+      engine.close()
+
+
 class OptionsInitializer(object):
   """Initializes global options and logging."""
 
-  def __init__(self, options_bootstrapper, working_set=None, exiter=sys.exit):
+  def __init__(self, options_bootstrapper, working_set=None, exiter=sys.exit, init_logging=True):
     """
     :param OptionsBootStrapper options_bootstrapper: An options bootstrapper instance.
     :param pkg_resources.WorkingSet working_set: The working set of the current run as returned by
@@ -57,6 +153,7 @@ class OptionsInitializer(object):
     self._options_bootstrapper = options_bootstrapper
     self._working_set = working_set or PluginResolver(self._options_bootstrapper).resolve()
     self._exiter = exiter
+    self._init_logging = init_logging
 
   def _setup_logging(self, global_options):
     """Sets global logging."""
@@ -90,7 +187,8 @@ class OptionsInitializer(object):
       )
 
     # Get logging setup prior to loading backends so that they can log as needed.
-    self._setup_logging(global_bootstrap_options)
+    if self._init_logging:
+      self._setup_logging(global_bootstrap_options)
 
     # Add any extra paths to python path (e.g., for loading extra source backends).
     for path in global_bootstrap_options.pythonpath:
@@ -151,13 +249,15 @@ class ReportingInitializer(object):
 
 
 class GoalRunnerFactory(object):
-  def __init__(self, root_dir, options, build_config, run_tracker, reporting, exiter=sys.exit):
+  def __init__(self, root_dir, options, build_config, run_tracker, reporting, build_graph=None,
+               exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
     :param Options options: The global, pre-initialized Options instance.
     :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
+    :param BuildGraph build_graph: A BuildGraph instance (for graph reuse, optional).
     :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
     """
     self._root_dir = root_dir
@@ -190,7 +290,7 @@ class GoalRunnerFactory(object):
       build_ignore_patterns,
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
-    self._build_graph = MutableBuildGraph(self._address_mapper)
+    self._build_graph = build_graph or MutableBuildGraph(self._address_mapper)
 
   def _get_project_tree(self, build_file_rev, pants_ignore):
     """Creates the project tree for build files for use in a given pants run."""
@@ -241,7 +341,9 @@ class GoalRunnerFactory(object):
     if self._global_options.enable_pantsd:
       # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
       with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
-        PantsDaemonLauncher.global_instance().maybe_launch()
+        pantsd_launcher = PantsDaemonLauncher.global_instance()
+        pantsd_launcher.set_engine_initializer(EngineInitializer)
+        pantsd_launcher.maybe_launch()
 
   def _is_quiet(self):
     return any(goal.has_task_of_type(QuietTaskMixin) for goal in self._goals) or self._explain

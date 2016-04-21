@@ -25,6 +25,6 @@ python_tests(
   sources = ['test_graph_invalidation.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/engine/exp/legacy:commands'
+    'src/python/pants/bin'
   ]
 )

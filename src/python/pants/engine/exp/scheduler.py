@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import threading
 from collections import defaultdict, deque
+from contextlib import contextmanager
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
@@ -203,7 +204,7 @@ class ProductGraph(object):
       _delete_node(entry)
 
     invalidated_count = len(invalidated_entries)
-    logger.info('invalidated {} nodes'.format(invalidated_count))
+    logger.info('invalidated {} of {} nodes'.format(invalidated_count, len(self)))
     return invalidated_count
 
   def invalidate_files(self, filenames):
@@ -547,6 +548,11 @@ class LocalScheduler(object):
   def product_graph(self):
     return self._product_graph
 
+  @contextmanager
+  def locked(self):
+    with self._product_graph_lock:
+      yield
+
   def root_entries(self, execution_request):
     """Returns the roots for the given ExecutionRequest as a dict from Node to State."""
     with self._product_graph_lock:
@@ -626,12 +632,14 @@ class LocalScheduler(object):
               # All deps are already completed: mark this Node as a candidate for another step.
               candidates.add(step.node)
 
-      logger.info('visited {} nodes in {} scheduling iterations. '
-                  'there have been {} total steps for {} total nodes.'.format(
-                    sum(1 for _ in self._product_graph.walk(execution_request.roots)),
-                    scheduling_iterations,
-                    self._step_id,
-                    len(self._product_graph)),)
+      logger.debug(
+        'visited %s nodes in %s scheduling iterations. '
+        'there have been %s total steps for %s total nodes.',
+        sum(1 for _ in self._product_graph.walk(execution_request.roots)),
+        scheduling_iterations,
+        self._step_id,
+        len(self._product_graph)
+      )
 
       if self._graph_validator is not None:
         self._graph_validator.validate(self._product_graph)
