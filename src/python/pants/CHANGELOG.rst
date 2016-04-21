@@ -11,40 +11,10 @@ in preparation for the 1.0 release.
 * Documentation leading up to 1.0
 * Engine work around handling of symlinks
 * Set a global -Xmx default for JVMs
+* improve cache hit rate with eager caching of zinc  
 
-New Engine Work
-~~~~~~~~~~~~~~~
-
-* [engine] Split engine docs from example docs
-  `RB #3734 <https://rbcommons.com/s/twitter/r/3734>`_
-
-* [engine] Only request literal Variants for Address objects
-  `RB #3724 <https://rbcommons.com/s/twitter/r/3724>`_
-
-* [engine] Implement symlink handling
-  `Issue #3189)) <https://github.com/pantsbuild/pants/issues/3189))>`_
-  `RB #3691 <https://rbcommons.com/s/twitter/r/3691>`_
-
-
-Option Changes
-~~~~~~~~~~~~~~
-
-* Add --bootstrap-ivy-settings option
-  `RB #3700 <https://rbcommons.com/s/twitter/r/3700>`_
-
-* Prioritize command line option error and add ConfigValidationError for option error differentiation.
-  `RB #3721 <https://rbcommons.com/s/twitter/r/3721>`_
-
-* Set a global -Xmx default for JVMs
-  `RB #3705 <https://rbcommons.com/s/twitter/r/3705>`_
-
-* Enforce that an option name isn't registered twice in a scope.
-  `Issue #3200) <https://github.com/pantsbuild/pants/issues/3200)>`_
-  `RB #3695 <https://rbcommons.com/s/twitter/r/3695>`_
-
-
-Public API Annotations
-~~~~~~~~~~~~~~~~~~~~~~
+API Changes
+~~~~~~~~~~~
 
 * Add public api markers
   `RB #3727 <https://rbcommons.com/s/twitter/r/3727>`_
@@ -54,36 +24,8 @@ Public API Annotations
   `RB #3718 <https://rbcommons.com/s/twitter/r/3718>`_
 
 
-CI Work
-~~~~~~~
-
-* Bump the open file ulimit on OSX.
-  `RB #3733 <https://rbcommons.com/s/twitter/r/3733>`_
-
-* Skip intermittently failing test_multiprocess_engine_multi.
-  `RB #3731 <https://rbcommons.com/s/twitter/r/3731>`_
-
-* pants build committing publish data for push of org.pantsbuild#junit-runner;1.0.5 
-  Prevent Travis-CI from running for this automated jar publish commit: 
-  http://docs.travis-ci.com/user/how-to-skip-a-build/ [ci skip]
-
-* pants build committing publish data for push of org.pantsbuild#args4j;0.0.11 
-  Prevent Travis-CI from running for this automated jar publish commit: 
-  http://docs.travis-ci.com/user/how-to-skip-a-build/ [ci skip]
-
-* pants build committing publish data for push of org.pantsbuild#junit-runner-annotations;0.0.11 
-  Prevent Travis-CI from running for this automated jar publish commit: 
-  http://docs.travis-ci.com/user/how-to-skip-a-build/ [ci skip]
-
-* pants build committing publish data for push of org.pantsbuild#junit-runner-withretry;0.0.9 
-  Prevent Travis-CI from running for this automated jar publish commit: 
-  http://docs.travis-ci.com/user/how-to-skip-a-build/ [ci skip]
-
 Bugfixes
 ~~~~~~~~
-
-* Write artifacts to the cache when vt.update() is called.
-  `RB #3722 <https://rbcommons.com/s/twitter/r/3722>`_
 
 * A few fixes to config path computation, esp. in tests.
   `RB #3709 <https://rbcommons.com/s/twitter/r/3709>`_
@@ -112,8 +54,18 @@ Bugfixes
   `RB #) <https://rbcommons.com/s/twitter/r/3710/)>`_
   `RB #3712 <https://rbcommons.com/s/twitter/r/3712>`_
 
-Documentation
-~~~~~~~~~~~~~
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Write artifacts to the cache when vt.update() is called.
+  `RB #3722 <https://rbcommons.com/s/twitter/r/3722>`_
+
+* Bump the open file ulimit on OSX.
+  `RB #3733 <https://rbcommons.com/s/twitter/r/3733>`_
+
+* Skip intermittently failing test_multiprocess_engine_multi.
+  `RB #3731 <https://rbcommons.com/s/twitter/r/3731>`_
 
 * Doc running pants from sources in other repos.
   `RB #3715 <https://rbcommons.com/s/twitter/r/3715>`_
@@ -127,14 +79,38 @@ Documentation
 * Show details in the builddict.
   `RB #3708 <https://rbcommons.com/s/twitter/r/3708>`_
 
-Misc
-~~~~
-
 * Add the Phabricator .arcconfig file.
   `RB #3728 <https://rbcommons.com/s/twitter/r/3728>`_
 
 * Use requests/Fetcher to fetch Node pre-installed's.
   `RB #3711 <https://rbcommons.com/s/twitter/r/3711>`_
+
+ Add --bootstrap-ivy-settings option
+  `RB #3700 <https://rbcommons.com/s/twitter/r/3700>`_
+
+* Prioritize command line option error and add ConfigValidationError for option error differentiation.
+  `RB #3721 <https://rbcommons.com/s/twitter/r/3721>`_
+
+* Set a global -Xmx default for JVMs
+  `RB #3705 <https://rbcommons.com/s/twitter/r/3705>`_
+
+* Enforce that an option name isn't registered twice in a scope.
+  `Issue #3200) <https://github.com/pantsbuild/pants/issues/3200)>`_
+  `RB #3695 <https://rbcommons.com/s/twitter/r/3695>`_
+
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Split engine docs from example docs
+  `RB #3734 <https://rbcommons.com/s/twitter/r/3734>`_
+
+* [engine] Only request literal Variants for Address objects
+  `RB #3724 <https://rbcommons.com/s/twitter/r/3724>`_
+
+* [engine] Implement symlink handling
+  `Issue #3189)) <https://github.com/pantsbuild/pants/issues/3189))>`_
+  `RB #3691 <https://rbcommons.com/s/twitter/r/3691>`_
 
 
 0.0.82 (04/15/2016)
