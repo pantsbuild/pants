@@ -63,9 +63,6 @@ class Context(object):
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, invalidation_report=None):
-    """
-    :API: public
-    """
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -147,17 +144,11 @@ class Context(object):
 
   @property
   def workspace(self):
-    """Returns the current workspace, if any.
-
-    :API: public
-    """
+    """Returns the current workspace, if any."""
     return self._workspace
 
   @property
   def invalidation_report(self):
-    """
-    :API: public
-    """
     return self._invalidation_report
 
   def __str__(self):

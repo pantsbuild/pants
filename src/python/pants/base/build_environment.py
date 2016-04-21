@@ -29,7 +29,10 @@ def pants_release():
 
 
 def get_buildroot():
-  """Returns the pants build root, calculating it if needed."""
+  """Returns the pants build root, calculating it if needed.
+
+  :API: public
+  """
   try:
     return BuildRoot().path
   except BuildRoot.NotFoundError as e:
@@ -64,7 +67,10 @@ _SCM = None
 
 
 def get_scm():
-  """Returns the pants Scm if any."""
+  """Returns the pants Scm if any.
+
+  :API: public
+  """
   # TODO(John Sirois): Extract a module/class to carry the bootstrap logic.
   global _SCM
   if not _SCM:

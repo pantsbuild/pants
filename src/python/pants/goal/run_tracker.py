@@ -148,24 +148,17 @@ class RunTracker(Subsystem):
     """Register the parent workunit for all work in the calling thread.
 
     Multiple threads may have the same parent (e.g., all the threads in a pool).
-
-    :API: public
     """
     self._threadlocal.current_workunit = parent_workunit
 
   def is_under_main_root(self, workunit):
-    """Is the workunit running under the main thread's root.
-
-    :API: public
-    """
+    """Is the workunit running under the main thread's root."""
     return workunit.root() == self._main_root_workunit
 
   def start(self, report):
     """Start tracking this pants run.
 
     report: an instance of pants.reporting.Report.
-
-    :API: public
     """
     self.report = report
     self.report.open()
@@ -177,10 +170,7 @@ class RunTracker(Subsystem):
     self.report.start_workunit(self._main_root_workunit)
 
   def set_root_outcome(self, outcome):
-    """Useful for setup code that doesn't have a reference to a workunit.
-
-    :API: public
-    """
+    """Useful for setup code that doesn't have a reference to a workunit."""
     self._main_root_workunit.set_outcome(outcome)
 
   @contextmanager
@@ -249,17 +239,12 @@ class RunTracker(Subsystem):
       self.end_workunit(workunit)
 
   def log(self, level, *msg_elements):
-    """Log a message against the current workunit.
-
-    :API: public
-    """
+    """Log a message against the current workunit."""
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
   @classmethod
   def post_stats(cls, url, stats, timeout=2):
     """POST stats to the given url.
-
-    :API: public
 
     :return: True if upload was successful, False otherwise.
     """
@@ -286,8 +271,6 @@ class RunTracker(Subsystem):
   def write_stats_to_json(cls, file_name, stats):
     """Write stats to a local json file.
 
-    :API: public
-
     :return: True if successfully written, False otherwise.
     """
     params = json.dumps(stats)
@@ -301,10 +284,7 @@ class RunTracker(Subsystem):
     return True
 
   def store_stats(self):
-    """Store stats about this run in local and optionally remote stats dbs.
-
-    :API: public
-    """
+    """Store stats about this run in local and optionally remote stats dbs."""
     stats = {
       'run_info': self.run_info.get_as_dict(),
       'cumulative_timings': self.cumulative_timings.get_all(),
@@ -337,8 +317,6 @@ class RunTracker(Subsystem):
     """This pants run is over, so stop tracking it.
 
     Note: If end() has been called once, subsequent calls are no-ops.
-
-    :API: public
     """
     if self._background_worker_pool:
       if self._aborted:
@@ -372,9 +350,6 @@ class RunTracker(Subsystem):
     self.store_stats()
 
   def end_workunit(self, workunit):
-    """
-    :API: public
-    """
     self.report.end_workunit(workunit)
     path, duration, self_time, is_tool = workunit.end()
 
@@ -386,9 +361,6 @@ class RunTracker(Subsystem):
       self.outcomes[path] = workunit.outcome_string(workunit.outcome())
 
   def get_background_root_workunit(self):
-    """
-    :API: public
-    """
     if self._background_root_workunit is None:
       self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                                 name='background', cmd=None)
@@ -397,9 +369,6 @@ class RunTracker(Subsystem):
     return self._background_root_workunit
 
   def background_worker_pool(self):
-    """
-    :API: public
-    """
     if self._background_worker_pool is None:  # Initialize lazily.
       self._background_worker_pool = WorkerPool(parent_workunit=self.get_background_root_workunit(),
                                                 run_tracker=self,
@@ -410,7 +379,5 @@ class RunTracker(Subsystem):
     """Shuts down the SubprocPool.
 
     N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
-
-    :API: public
     """
     SubprocPool.shutdown(self._aborted)

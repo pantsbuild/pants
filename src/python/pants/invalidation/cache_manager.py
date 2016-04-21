@@ -23,8 +23,6 @@ class VersionedTargetSet(object):
   When invalidating a single target, this can be used to represent that target as a singleton.
   When checking the artifact cache, this can also be used to represent a list of targets that are
   built together into a single artifact.
-
-  :API: public
   """
 
   @staticmethod
@@ -47,9 +45,6 @@ class VersionedTargetSet(object):
     return VersionedTargetSet(cache_manager, versioned_targets)
 
   def __init__(self, cache_manager, versioned_targets):
-    """
-    :API: public
-    """
     self._cache_manager = cache_manager
     self.versioned_targets = versioned_targets
     self.targets = [vt.target for vt in versioned_targets]
@@ -73,22 +68,17 @@ class VersionedTargetSet(object):
     self.is_incremental = False
 
   def update(self):
-    """
-    :API: public
-    """
     self._cache_manager.update(self)
 
   def force_invalidate(self):
-    """
-    :API: public
-    """
+    # Note: This method isn't exposted as Public because the api is not yet
+    # finalized, however it is currently used by Square for plugins.  There is
+    # an open OSS issue to finalize this API.  Please take care when changing
+    # until https://github.com/pantsbuild/pants/issues/2532 is resolved.
     self._cache_manager.force_invalidate(self)
 
   @property
   def has_results_dir(self):
-    """
-    :API: public
-    """
     return self._results_dir is not None
 
   @property
@@ -101,8 +91,6 @@ class VersionedTargetSet(object):
 
     The results_dir is represented by a stable symlink to the current_results_dir: consumers
     should generally prefer to access the stable directory.
-
-    :API: public
     """
     if self._results_dir is None:
       raise ValueError('No results_dir was created for {}'.format(self))
@@ -111,8 +99,6 @@ class VersionedTargetSet(object):
   @property
   def current_results_dir(self):
     """A unique directory that stores results for this version of these targets.
-
-    :API: public
     """
     if self._current_results_dir is None:
       raise ValueError('No results_dir was created for {}'.format(self))
@@ -126,8 +112,6 @@ class VersionedTargetSet(object):
 
     TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
     mutate them.
-
-    :API: public
     """
     if self._previous_results_dir is None:
       raise ValueError('There is no previous_results_dir for: {}'.format(self))
@@ -189,8 +173,6 @@ class VersionedTarget(VersionedTargetSet):
 
     If incremental=True, attempts to clone the results_dir for the previous version of this target
     to the new results dir. Otherwise, simply ensures that the results dir exists.
-
-    :API: public
     """
     # Generate unique and stable directory paths for this cache key.
     current_dir = self._results_dir_path(root_dir, self.cache_key, stable=False)
@@ -235,8 +217,6 @@ class InvalidationCheck(object):
 
   Tasks may need to perform no, some or all operations on either of these, depending on how they
   are implemented.
-
-  :API: public
   """
 
   def __init__(self, all_vts, invalid_vts):
@@ -255,8 +235,6 @@ class InvalidationCacheManager(object):
   """Manages cache checks, updates and invalidation keeping track of basic change
   and invalidation statistics.
   Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
-
-  :API: public
   """
 
   class CacheValidationError(Exception):
@@ -284,10 +262,7 @@ class InvalidationCacheManager(object):
     self.invalidation_report = invalidation_report
 
   def update(self, vts):
-    """Mark a changed or invalidated VersionedTargetSet as successfully processed.
-
-    :API: public
-    """
+    """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
     for vt in vts.versioned_targets:
       if not vt.valid:
         self._invalidator.update(vt.cache_key)
@@ -299,10 +274,7 @@ class InvalidationCacheManager(object):
       self._artifact_write_callback(vts)
 
   def force_invalidate(self, vts):
-    """Force invalidation of a VersionedTargetSet.
-
-    :API: public
-    """
+    """Force invalidation of a VersionedTargetSet."""
     for vt in vts.versioned_targets:
       self._invalidator.force_invalidate(vt.cache_key)
       vt.valid = False
@@ -320,8 +292,6 @@ class InvalidationCacheManager(object):
     target will be excluded from all_vts and invalid_vts.
 
     Callers can inspect these vts and rebuild the invalid ones, for example.
-
-    :API: public
     """
     all_vts = self.wrap_targets(targets, topological_order=topological_order)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
@@ -329,16 +299,10 @@ class InvalidationCacheManager(object):
 
   @property
   def task_name(self):
-    """
-    :API: public
-    """
     return self._task_name
 
   @property
   def task_version(self):
-    """
-    :API: public
-    """
     return self._task_version
 
   def wrap_targets(self, targets, topological_order=False):
@@ -346,8 +310,6 @@ class InvalidationCacheManager(object):
 
     If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will not
     have an associated VersionedTarget returned.
-
-    :API: public
 
     Returns a list of VersionedTargets, each representing one input target.
     """
@@ -363,9 +325,6 @@ class InvalidationCacheManager(object):
     return list(vt_iter())
 
   def previous_key(self, cache_key):
-    """
-    :API: public
-    """
     return self._invalidator.previous_key(cache_key)
 
   def _key_for(self, target):

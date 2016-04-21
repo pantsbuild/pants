@@ -14,7 +14,6 @@ from pants.base.build_environment import get_default_pants_config_file
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
-from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
@@ -161,8 +160,8 @@ class OptionsBootstrapper(object):
     :param options: Fully bootstrapped valid options.
     :return: None.
     """
-    has_error = False
-    for config in self._post_bootstrap_config.configs:
+    error_log = []
+    for config in self._post_bootstrap_config.configs():
       for section in config.sections():
         if section == GLOBAL_SCOPE_CONFIG_SECTION:
           scope = GLOBAL_SCOPE
@@ -170,17 +169,20 @@ class OptionsBootstrapper(object):
           scope = section
         try:
           valid_options_under_scope = set(options.for_scope(scope))
-        except OptionsError:
-          logger.error("Invalid scope [{}] in {}".format(section, config.configpath))
-          has_error = True
+        # Only catch ConfigValidationError. Other exceptions will be raised directly.
+        except Config.ConfigValidationError:
+          error_log.append("Invalid scope [{}] in {}".format(section, config.configpath))
         else:
           # All the options specified under [`section`] in `config` excluding bootstrap defaults.
-          all_options_under_scope = set(config.configparser.options(section)) - set(config.configparser.defaults())
+          all_options_under_scope = (set(config.configparser.options(section)) -
+                                     set(config.configparser.defaults()))
           for option in all_options_under_scope:
             if option not in valid_options_under_scope:
-              logger.error("Invalid option '{}' under [{}] in {}".format(option, section, config.configpath))
-              has_error = True
+              error_log.append("Invalid option '{}' under [{}] in {}".format(option, section, config.configpath))
 
-    if has_error:
-      raise OptionsError("Invalid config entries detected. See log for details on which entries to update or remove.\n"
-                         "(Specify --no-verify-config to disable this check.)")
+    if error_log:
+      for error in error_log:
+        logger.error(error)
+      raise Config.ConfigValidationError("Invalid config entries detected. "
+                              "See log for details on which entries to update or remove.\n"
+                              "(Specify --no-verify-config to disable this check.)")
