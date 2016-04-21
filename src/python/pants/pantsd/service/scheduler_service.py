@@ -19,22 +19,34 @@ class SchedulerService(PantsService):
   in memory.
   """
 
-  def __init__(self, scheduler, fs_event_service):
+  def __init__(self, fs_event_service, scheduler, engine, symbol_table_cls, build_graph_facade_cls,
+               parse_commandline_to_spec_roots):
     """
-    :param LocalScheduler scheduler: A Scheduler instance.
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
                                             filesystem event handlers.
+    :param LocalScheduler scheduler: A Scheduler instance.
+    :param Engine engine: An Engine instance.
+    :param class symbol_table_cls: The class representing the symbol table.
+    :param class build_graph_facade_cls: The class representing the legacy BuildGraph facade.
     """
     super(SchedulerService, self).__init__()
-    self._logger = logging.getLogger(__name__)
-
-    self._event_queue = Queue.Queue(maxsize=64)
-    self._scheduler = scheduler
     self._fs_event_service = fs_event_service
+    self._scheduler = scheduler
+    self._engine = engine
+    self._symbol_table_cls = symbol_table_cls
+    self._build_graph_facade_cls = build_graph_facade_cls
+    self._parse_commandline_to_spec_roots = parse_commandline_to_spec_roots
+
+    self._logger = logging.getLogger(__name__)
+    self._event_queue = Queue.Queue(maxsize=64)
 
   def setup(self):
-    """Registers filesystem event handlers on an FSEventService instance."""
+    """Service setup."""
+    # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
+
+    # Start the engine.
+    self._engine.start()
 
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
@@ -72,7 +84,26 @@ class SchedulerService(PantsService):
       self._handle_batch_event(files)
     self._event_queue.task_done()
 
+  def get_build_graph(self, args):
+    """Returns a factory that provides a legacy BuildGraph given a set of input specs."""
+    # N.B. This parses sys.argv by way of OptionsInitializer/OptionsBootstrapper prior to the main
+    # pants run to derive spec_roots for caching in the underlying scheduler.
+    with self._scheduler.locked():
+      self._logger.debug('execution commandline: %s', args)
+      spec_roots, _ = self._parse_commandline_to_spec_roots(args=args)
+      self._logger.debug('parsed spec_roots: %s', spec_roots)
+      graph = self._build_graph_facade_cls(self._scheduler, self._engine, self._symbol_table_cls)
+      all(graph.get_target(address) for address in graph.inject_specs_closure(spec_roots))
+      self._logger.debug('engine cache stats: {}'.format(self._engine._cache.get_stats()))
+    self._logger.debug('build_graph is: %s', graph)
+    return graph
+
   def run(self):
     """Main service entrypoint."""
     while not self.is_killed:
       self._process_event_queue()
+
+  def terminate(self):
+    """An extension of PantsService.terminate() that tears down the engine."""
+    self._engine.close()
+    super(SchedulerService, self).terminate()

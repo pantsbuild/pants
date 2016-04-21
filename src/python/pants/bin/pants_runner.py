@@ -9,7 +9,6 @@ import logging
 import os
 import sys
 
-from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -40,6 +39,10 @@ class PantsRunner(object):
         # this case, we fall back to LocalPantsRunner which seamlessly executes the requested
         # run and bootstraps pantsd for use in subsequent runs.
         logger.debug('caught client exception: {!r}, falling back to LocalPantsRunner'.format(e))
+
+    # N.B. Inlining this import speeds up the python thin client run by about 100ms.
+    from pants.bin.local_pants_runner import LocalPantsRunner
+
     return LocalPantsRunner(exiter, args, env, options_bootstrapper=options_bootstrapper).run()
 
   def run(self):

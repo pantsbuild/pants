@@ -56,10 +56,9 @@ class PantsDaemonLauncher(Subsystem):
     self._fs_event_enabled = options.fs_event_detection
     self._fs_event_workers = options.fs_event_workers
 
-    self._pantsd = None
-    self._scheduler = None
-    self._lock = OwnerPrintingInterProcessFileLock(
-      os.path.join(self._build_root, '.pantsd.startup'))
+    lock_location = os.path.join(self._build_root, '.pantsd.startup')
+    self._lock = OwnerPrintingInterProcessFileLock(lock_location)
+    self._engine_initializer = None
 
   @testable_memoized_property
   def pantsd(self):
@@ -69,8 +68,8 @@ class PantsDaemonLauncher(Subsystem):
   def watchman_launcher(self):
     return WatchmanLauncher.Factory.global_instance().create()
 
-  def set_scheduler(self, scheduler):
-    self._scheduler = scheduler
+  def set_engine_initializer(self, initializer):
+    self._engine_initializer = initializer
 
   def _setup_services(self, watchman):
     """Initialize pantsd services.
@@ -82,15 +81,29 @@ class PantsDaemonLauncher(Subsystem):
     # ultimately import the pantsd services in order to itself launch pantsd.
     from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
 
+    services = []
+    scheduler_service = None
+    if self._fs_event_enabled:
+      fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
+
+      (scheduler,
+       engine,
+       _, _, _,
+       symbol_table_cls,
+       legacy_graph_cls) = self._engine_initializer.setup_legacy_graph()
+      scheduler_service = SchedulerService(fs_event_service,
+                                           scheduler,
+                                           engine,
+                                           symbol_table_cls,
+                                           legacy_graph_cls,
+                                           self._engine_initializer.parse_commandline_to_spec_roots)
+      services.extend((fs_event_service, scheduler_service))
+
     pailgun_service = PailgunService((self._pailgun_host, self._pailgun_port),
                                      DaemonExiter,
-                                     DaemonPantsRunner)
-    services = [pailgun_service]
-
-    if self._fs_event_enabled and self._scheduler:
-      fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
-      scheduler_service = SchedulerService(self._scheduler, fs_event_service)
-      services.extend((fs_event_service, scheduler_service))
+                                     DaemonPantsRunner,
+                                     scheduler_service)
+    services.append(pailgun_service)
 
     # Construct a mapping of named ports used by the daemon's services. In the default case these
     # will be randomly assigned by the underlying implementation so we can't reference via options.

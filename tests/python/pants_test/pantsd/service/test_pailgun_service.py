@@ -23,7 +23,11 @@ class TestPailgunService(unittest.TestCase):
   def setUp(self):
     self.mock_exiter_class = mock.Mock(side_effect=Exception('should not be called'))
     self.mock_runner_class = mock.Mock(side_effect=Exception('should not be called'))
-    self.service = PailgunService((None, None), self.mock_exiter_class, self.mock_runner_class)
+    self.mock_scheduler_service = mock.Mock(side_effect=Exception('should not be called'))
+    self.service = PailgunService((None, None),
+                                  self.mock_exiter_class,
+                                  self.mock_runner_class,
+                                  self.mock_scheduler_service)
 
   @mock.patch.object(PailgunService, '_setup_pailgun', **PATCH_OPTS)
   def test_pailgun_property_values(self, mock_setup):

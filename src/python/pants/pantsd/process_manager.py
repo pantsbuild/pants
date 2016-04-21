@@ -175,7 +175,7 @@ class ProcessMetadataManager(object):
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
     meta_dir = cls._get_metadata_dir_by_name(name)
-    logging.debug('purging metadata directory: {}'.format(meta_dir))
+    logger.debug('purging metadata directory: {}'.format(meta_dir))
     try:
       rm_rf(meta_dir)
     except OSError as e:
@@ -399,6 +399,7 @@ class ProcessManager(ProcessMetadataManager):
     """
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
+    logger.debug('forking %s', self)
     pid = os.fork()
     if pid == 0:
       os.setsid()
@@ -408,7 +409,7 @@ class ProcessManager(ProcessMetadataManager):
           os.chdir(self._buildroot)
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
-          logging.critical(traceback.format_exc())
+          logger.critical(traceback.format_exc())
 
         os._exit(0)
       else:
@@ -416,7 +417,7 @@ class ProcessManager(ProcessMetadataManager):
           if write_pid: self.write_pid(second_pid)
           self.post_fork_parent(**post_fork_parent_opts or {})
         except Exception:
-          logging.critical(traceback.format_exc())
+          logger.critical(traceback.format_exc())
 
         os._exit(0)
     else:
@@ -440,14 +441,14 @@ class ProcessManager(ProcessMetadataManager):
         os.chdir(self._buildroot)
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
-        logging.critical(traceback.format_exc())
+        logger.critical(traceback.format_exc())
 
       os._exit(0)
     else:
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})
       except Exception:
-        logging.critical(traceback.format_exc())
+        logger.critical(traceback.format_exc())
 
   def pre_fork(self):
     """Pre-fork callback for subclasses."""
