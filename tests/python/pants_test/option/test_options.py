@@ -13,7 +13,7 @@ import warnings
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.base.deprecated import AlreadyRemovedError
+from pants.base.deprecated import CodeRemovedError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import file_option, target_option
@@ -701,8 +701,8 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual('BAR', defaulted_only_options.for_global_scope().pants_foo)
 
   def test_deprecated_option_past_removal(self):
-    """Ensure that expired options raise AlreadyRemovedError on attempted use."""
-    with self.assertRaises(AlreadyRemovedError):
+    """Ensure that expired options raise CodeRemovedError on attempted use."""
+    with self.assertRaises(CodeRemovedError):
       self._parse('./pants --global-crufty-expired=way2crufty').for_global_scope()
 
   @contextmanager

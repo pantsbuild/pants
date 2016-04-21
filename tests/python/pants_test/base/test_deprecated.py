@@ -10,8 +10,8 @@ from contextlib import contextmanager
 
 import pytest
 
-from pants.base.deprecated import (AlreadyRemovedError, BadDecoratorNestingError,
-                                   BadRemovalVersionError, MissingRemovalVersionError, deprecated,
+from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
+                                   CodeRemovedError, MissingRemovalVersionError, deprecated,
                                    deprecated_conditional, deprecated_module, warn_or_error)
 from pants.version import VERSION
 
@@ -136,24 +136,24 @@ def test_removal_version_bad():
 
 
 def test_removal_version_same():
-  with pytest.raises(AlreadyRemovedError):
+  with pytest.raises(CodeRemovedError):
     warn_or_error(VERSION, 'dummy description')
 
   @deprecated(VERSION)
   def test_func():
     pass
-  with pytest.raises(AlreadyRemovedError):
+  with pytest.raises(CodeRemovedError):
     test_func()
 
 
 def test_removal_version_lower():
-  with pytest.raises(AlreadyRemovedError):
+  with pytest.raises(CodeRemovedError):
     warn_or_error('0.0.27', 'dummy description')
 
   @deprecated('0.0.27')
   def test_func():
     pass
-  with pytest.raises(AlreadyRemovedError):
+  with pytest.raises(CodeRemovedError):
     test_func()
 
 

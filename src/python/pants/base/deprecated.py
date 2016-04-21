@@ -27,10 +27,13 @@ class BadRemovalVersionError(DeprecationApplicationError):
   """Indicates the supplied removal_version was not a valid semver string."""
 
 
-class AlreadyRemovedError(Exception):
+class CodeRemovedError(Exception):
   """Indicates that the removal_version is not in the future.
 
   I.e., that the option/function/module with that removal_version has already been removed.
+
+  Note, the code in question may not actually have been excised from the codebase yet, but
+  it may be at any time, and no control paths access it.
   """
 
 
@@ -50,7 +53,7 @@ def validate_removal_semver(removal_version):
 
   :param str removal_version: The pantsbuild.pants version which will remove the deprecated entity.
   :rtype: `pants.base.Revision`
-  :raises DeprecationApplicationError if the removal_version parameter is invalid.
+  :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   """
   if removal_version is None:
     raise MissingRemovalVersionError('The removal version must be provided.')
@@ -74,7 +77,7 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
                                             we can embed in warning/error messages.
   :param string hint: A message describing how to migrate from the removed entity.
   :param int stacklevel: The stacklevel to pass to warnings.warn.
-  :raises DeprecationApplicationError if the removal_version parameter is invalid.
+  :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   """
   removal_semver = validate_removal_semver(removal_version)
 
@@ -86,7 +89,7 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
   if removal_semver > PANTS_SEMVER:
     warnings.warn(msg, DeprecationWarning, stacklevel=stacklevel)
   else:
-    raise AlreadyRemovedError(msg)
+    raise CodeRemovedError(msg)
 
 
 def deprecated_conditional(predicate,
