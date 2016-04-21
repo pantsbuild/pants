@@ -29,8 +29,3 @@ class ScmPantsIgnoreTest(unittest.TestCase, PantsIgnoreTestBase):
   def tearDown(self):
     super(ScmPantsIgnoreTest, self).tearDown()
     self.cleanup()
-
-  def test_folder_slash(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["fruit/"])
-
-    self.assertEquals(set(), set(self._project_tree.glob1('fruit/', '*')))
