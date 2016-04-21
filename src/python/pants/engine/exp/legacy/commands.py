@@ -105,9 +105,9 @@ def open_exp_graph(*args, **kwargs):
 
 def dependencies():
   """Lists the transitive dependencies of targets under the current build root."""
-  with open_exp_graph() as (_, addresses, _):
-    for address in addresses:
-      print(address)
+  with open_exp_graph() as (graph, addresses, _):
+    for target in graph.closure([graph.get_target(a) for a in addresses]):
+      print(target.address.spec)
 
 
 def filemap():
