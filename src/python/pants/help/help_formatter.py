@@ -83,6 +83,6 @@ class HelpFormatter(object):
     lines.extend(['{}{}'.format(indent, s) for s in wrap(ohi.help, 76)])
     if ohi.deprecated_message:
       lines.append(self._maybe_red('{}{}.'.format(indent, ohi.deprecated_message)))
-      if ohi.deprecated_hint:
-        lines.append(self._maybe_red('{}{}'.format(indent, ohi.deprecated_hint)))
+      if ohi.removal_hint:
+        lines.append(self._maybe_red('{}{}'.format(indent, ohi.removal_hint)))
     return lines

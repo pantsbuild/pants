@@ -9,25 +9,22 @@ import copy
 import os
 import re
 import traceback
-import warnings
 from collections import defaultdict
 
 import six
 
-from pants.base.deprecated import check_deprecated_semver, deprecated_conditional
-from pants.base.revision import Revision
+from pants.base.deprecated import deprecated_conditional, validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.custom_types import (ListValueComponent, dict_option, file_option, list_option,
                                        target_list_option, target_option)
-from pants.option.errors import (BooleanOptionNameWithNo, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidKwarg, InvalidMemberType,
-                                 MemberTypeNotAllowed, NoOptionNames, OptionAlreadyRegistered,
-                                 OptionNameDash, OptionNameDoubleDash, ParseError,
-                                 RecursiveSubsystemOption, Shadowing)
+from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
+                                 InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
+                                 NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
+                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
+                                 Shadowing)
 from pants.option.option_util import is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
-from pants.version import PANTS_SEMVER
 
 
 class Parser(object):
@@ -296,13 +293,13 @@ class Parser(object):
       t = kwargs.get(kwarg_name)
       # First check for deprecated direct use of the internal types.
       if t == list_option:
-        deprecated_conditional(lambda: True, '0.0.83',
-                               'list_option is deprecated for option {} in scope {}. '
-                               'Use type=list.'.format(args[0], self.scope))
+        deprecated_conditional(lambda: True, '0.0.83', 'list_option',
+                               'Use type=list for option {} in scope {}.'.format(args[0],
+                                                                                 self.scope))
       elif t == dict_option:
-        deprecated_conditional(lambda: True, '0.0.83',
-                               'dict_option is deprecated for option {} in scope {}. '
-                               'Use type=dict.'.format(args[0], self.scope))
+        deprecated_conditional(lambda: True, '0.0.83', 'dict_option',
+                               'Use type=dict for option {} in scope {}.'.format(args[0],
+                                                                                 self.scope))
 
     check_deprecated_types('type')
     check_deprecated_types('member_type')
@@ -316,9 +313,8 @@ class Parser(object):
         kwargs['member_type'] = kwargs['type']
       kwargs['type'] = list
       del kwargs['action']
-      deprecated_conditional(lambda: True, '0.0.83',
-                             "action='append' is deprecated for option {} in scope {}. "
-                             "Use type=list.".format(args[0], self.scope))
+      deprecated_conditional(lambda: True, '0.0.83', "action='append'",
+                             'Use type=list for option {} in scope {}.'.format(args[0], self.scope))
 
     # Temporary munging to effectively turn type='target_list_option' options into list options,
     # with member type 'target_option', for uniform handling.
@@ -326,11 +322,9 @@ class Parser(object):
     if kwargs.get('type') == target_list_option:
       kwargs['type'] = list
       kwargs['member_type'] = target_option
-      deprecated_conditional(lambda: True, '0.0.83',
-                             'target_list_option is deprecated for option {} in scope {}. '
-                             'Use type=list, member_type=target_option.'.format(
-                               args[0], self.scope
-                             ))
+      deprecated_conditional(lambda: True, '0.0.83', 'target_list_option',
+                             'Use type=list, member_type=target_option '
+                             'for option {} in scope {}.'.format(args[0], self.scope))
 
     # Temporary munging to effectively turn action='store_true' into bool-typed options.
     # From here on, action='store_true' is an error.  Ditto for store_false.
@@ -339,16 +333,15 @@ class Parser(object):
       kwargs['type'] = bool
       kwargs['implicit_value'] = True
       del kwargs['action']
-      deprecated_conditional(lambda: True, '0.0.83',
-                             "action='store_true' is deprecated for option {} in scope {}. "
-                             "Use type=bool.".format(args[0], self.scope))
+      deprecated_conditional(lambda: True, '0.0.83', "action='store_true'",
+                             'Use type=bool for option {} in scope {}.'.format(args[0], self.scope))
     elif action == 'store_false':
       kwargs['type'] = bool
       kwargs['implicit_value'] = False
       del kwargs['action']
-      deprecated_conditional(lambda: True, '0.0.83',
-                             "action='store_false' is deprecated for option {} in scope {}. "
-                             "Use type=bool, implicit_value=False.".format(args[0], self.scope))
+      deprecated_conditional(lambda: True, '0.0.83', "action='store_false'",
+                             'Use type=bool, implicit_value=False '
+                             'for option {} in scope {}.'.format(args[0], self.scope))
 
     # Boolean options always have an implicit boolean-typed default.  They can never be None.
     # We make that default explicit here.
@@ -369,27 +362,17 @@ class Parser(object):
 
   def _check_deprecated(self, dest, kwargs):
     """Checks option for deprecation and issues a warning/error if necessary."""
-    deprecated_ver = kwargs.get('deprecated_version', None)
-    if deprecated_ver is not None:
-      msg = (
-        "Option '{dest}' in {scope} is deprecated and removed in version {removal_version}. {hint}"
-      ).format(dest=dest,
-               scope=self._scope_str(),
-               removal_version=deprecated_ver,
-               hint=kwargs.get('deprecated_hint', ''))
-
-      if PANTS_SEMVER >= Revision.semver(deprecated_ver):
-        # Once we've hit the deprecated_version, raise an error instead of warning. This allows for
-        # more actionable options hinting to continue beyond the deprecation period until removal.
-        raise DeprecatedOptionError(msg)
-      else:
-        # Out of range stacklevel to suppress printing src line.
-        warnings.warn('*** {}'.format(msg), DeprecationWarning, stacklevel=9999)
+    removal_version = kwargs.get('removal_version', None)
+    if removal_version is not None:
+      warn_or_error(removal_version,
+                    "option '{}' in {}".format(dest, self._scope_str()),
+                    kwargs.get('removal_hint', ''),
+                    stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
 
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'deprecated_version', 'deprecated_hint', 'removal_version', 'fromfile'
+    'fingerprint', 'removal_version', 'removal_hint', 'fromfile'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -430,9 +413,9 @@ class Parser(object):
       if kwarg not in self._allowed_registration_kwargs:
         error(InvalidKwarg, kwarg=kwarg)
 
-    deprecated_ver = kwargs.get('deprecated_version')
-    if deprecated_ver is not None:
-      check_deprecated_semver(deprecated_ver, check_expired=False)
+    removal_version = kwargs.get('removal_version')
+    if removal_version is not None:
+      validate_removal_semver(removal_version)
 
   def _existing_scope(self, arg):
     if arg in self._known_args:
@@ -561,7 +544,7 @@ class Parser(object):
                                          option=dest,
                                          value=ranked_val.value,
                                          rank=ranked_val.rank,
-                                         deprecation_version=kwargs.get('deprecated_version'),
+                                         deprecation_version=kwargs.get('removal_version'),
                                          details=details)
 
     # Helper function to check various validity constraints on final option values.

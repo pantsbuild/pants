@@ -12,7 +12,7 @@ from functools import wraps
 import six
 
 from pants.base.revision import Revision
-from pants.version import PANTS_SEMVER, VERSION
+from pants.version import PANTS_SEMVER
 
 
 class DeprecationApplicationError(Exception):
@@ -27,10 +27,13 @@ class BadRemovalVersionError(DeprecationApplicationError):
   """Indicates the supplied removal_version was not a valid semver string."""
 
 
-class PastRemovalVersionError(DeprecationApplicationError):
-  """Indicates the supplied removal_version is not in the future.
+class CodeRemovedError(Exception):
+  """Indicates that the removal_version is not in the future.
 
-  All deprecations must give at least until the next release for users to adapt.
+  I.e., that the option/function/module with that removal_version has already been removed.
+
+  Note, the code in question may not actually have been excised from the codebase yet, but
+  it may be at any time, and no control paths access it.
   """
 
 
@@ -38,31 +41,62 @@ class BadDecoratorNestingError(DeprecationApplicationError):
   """Indicates the @deprecated decorator was innermost in a sequence of layered decorators."""
 
 
-def check_deprecated_semver(removal_version, check_expired=True):
-  """Check to see if the removal version is < the current Pants version.
-   :param str removal_version: The pantsbuild.pants version which will remove the deprecated
-                              function.
-   :raises DeprecationApplicationError if the removal_version parameter is invalid or the version
-   is not an earlier version than the current release version.
+def get_deprecated_tense(removal_version, future_tense='will be', past_tense='was'):
+  """Provides the grammatical tense for a given deprecated version vs the current version."""
+  return future_tense if (Revision.semver(removal_version) >= PANTS_SEMVER) else past_tense
+
+
+def validate_removal_semver(removal_version):
+  """Validates that removal_version is a valid semver.
+
+  If so, returns that semver.  Raises an error otherwise.
+
+  :param str removal_version: The pantsbuild.pants version which will remove the deprecated entity.
+  :rtype: `pants.base.Revision`
+  :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   """
+  if removal_version is None:
+    raise MissingRemovalVersionError('The removal version must be provided.')
   if not isinstance(removal_version, six.string_types):
     raise BadRemovalVersionError('The removal_version must be a semver version string.')
-
   try:
-    removal_semver = Revision.semver(removal_version)
+    return Revision.semver(removal_version)
   except Revision.BadRevision as e:
     raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
                                  '{}'.format(removal_version, e))
 
-  if check_expired and removal_semver <= PANTS_SEMVER:
-    raise PastRemovalVersionError('The removal version must be greater than the current pants '
-                                  'version of {} - given {}'.format(VERSION, removal_version))
+
+def warn_or_error(removal_version, deprecated_entity_description, hint=None, stacklevel=3):
+  """Check the removal_version against the current pants version.
+
+  Issues a warning if the removal version is > current pants version, or an error otherwise.
+
+  :param string removal_version: The pantsbuild.pants version at which the deprecated entity
+                                 will be/was removed.
+  :param string deprecated_entity_description: A short description of the deprecated entity, that
+                                            we can embed in warning/error messages.
+  :param string hint: A message describing how to migrate from the removed entity.
+  :param int stacklevel: The stacklevel to pass to warnings.warn.
+  :raises DeprecationApplicationError: if the removal_version parameter is invalid.
+  """
+  removal_semver = validate_removal_semver(removal_version)
+
+  msg = 'DEPRECATED: {} {} removed in version {}.'.format(deprecated_entity_description,
+      get_deprecated_tense(removal_version), removal_version)
+  if hint:
+    msg += '\n  {}'.format(hint)
+
+  if removal_semver > PANTS_SEMVER:
+    warnings.warn(msg, DeprecationWarning, stacklevel=stacklevel)
+  else:
+    raise CodeRemovedError(msg)
 
 
 def deprecated_conditional(predicate,
                            removal_version,
-                           hint_message,
-                           stacklevel=3):
+                           entity_description,
+                           hint_message=None,
+                           stacklevel=4):
   """Marks a certain configuration as deprecated.
 
   The predicate is used to determine if that configuration is deprecated. It is a function that
@@ -74,18 +108,9 @@ def deprecated_conditional(predicate,
   :param int stacklevel: How far up in the stack do we go to find the calling fn to report
   :raises DeprecationApplicationError if the deprecation is applied improperly.
   """
-  if removal_version is None:
-    raise MissingRemovalVersionError('A removal_version must be specified for this deprecation.')
-
-  check_deprecated_semver(removal_version)
-
+  validate_removal_semver(removal_version)
   if predicate():
-    warning_message = ('\n{hint_message}'
-                       '\nWill be removed in version {removal_version}.'.format(
-      hint_message=hint_message,
-      removal_version=removal_version))
-
-    warnings.warn(warning_message, DeprecationWarning, stacklevel=stacklevel)
+    warn_or_error(removal_version, entity_description, hint_message, stacklevel=stacklevel)
 
 
 def deprecated(removal_version, hint_message=None):
@@ -106,29 +131,17 @@ def deprecated(removal_version, hint_message=None):
   :param str hint_message: An optional hint pointing to alternatives to the deprecation.
   :raises DeprecationApplicationError if the @deprecation is applied improperly.
   """
-  if removal_version is None:
-    raise MissingRemovalVersionError('A removal_version must be specified for this deprecation.')
-
-  check_deprecated_semver(removal_version)
-
+  validate_removal_semver(removal_version)
   def decorator(func):
     if not inspect.isfunction(func):
       raise BadDecoratorNestingError('The @deprecated decorator must be applied innermost of all '
                                      'decorators.')
 
-    warning_message = ('\n{module}.{func_name} is deprecated and will be removed in version '
-                       '{removal_version}').format(module=func.__module__,
-                                                   func_name=func.__name__,
-                                                   removal_version=removal_version)
-
-    if hint_message:
-      warning_message += (':\n' + hint_message)
-    else:
-      warning_message += '.'
+    func_full_name = '{}.{}'.format(func.__module__, func.__name__)
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-      warnings.warn(warning_message, DeprecationWarning, stacklevel=2)
+      warn_or_error(removal_version, func_full_name, hint_message)
       return func(*args, **kwargs)
     return wrapper
   return decorator
@@ -142,16 +155,4 @@ def deprecated_module(removal_version, hint_message=None):
 
   Arguments are as for deprecated(), above.
   """
-  if removal_version is None:
-    raise MissingRemovalVersionError('A removal_version must be specified for this deprecation.')
-
-  check_deprecated_semver(removal_version)
-
-  warning_message = ('\nModule is deprecated and will be removed in version '
-                     '{removal_version}').format(removal_version=removal_version)
-
-  if hint_message:
-    warning_message += (': ' + hint_message)
-  else:
-    warning_message += '.'
-  warnings.warn(warning_message, DeprecationWarning, stacklevel=2)
+  warn_or_error(removal_version, 'module', hint_message)

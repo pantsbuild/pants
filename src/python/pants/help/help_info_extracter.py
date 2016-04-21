@@ -7,15 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import namedtuple
 
-from pants.base.revision import Revision
+from pants.base import deprecated
 from pants.option.option_util import is_list_option
-from pants.version import PANTS_SEMVER
 
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
     ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
-     'typ', 'fromfile', 'default', 'help', 'deprecated_version', 'deprecated_message',
-     'deprecated_hint', 'choices'])):
+     'typ', 'fromfile', 'default', 'help', 'deprecated_message', 'removal_version',
+     'removal_hint', 'choices'])):
   """A container for help information for a single option.
 
   registering_class: The type that registered the option.
@@ -29,9 +28,10 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   fromfile: `True` if the option supports @fromfile value loading.
   default: The value of this option if no flags are specified (derived from config and env vars).
   help: The help message registered for this option.
-  deprecated_version: The version at which this option is to be removed, if any (None otherwise).
-  deprecated_message: A more verbose message explaining the deprecated_version (None otherwise).
-  deprecated_hint: A deprecation hint message registered for this option (None otherwise).
+  deprecated_message: If deprecated: A message explaining that this option is deprecated at
+                      removal_version.
+  removal_version: If deprecated: The version at which this option is to be removed.
+  removal_hint: If deprecated: The removal hint message registered for this option.
   choices: If this option has a constrained list of choices, a csv list of the choices.
   """
 
@@ -121,12 +121,6 @@ class HelpInfoExtracter(object):
                                recursive=recursive_options,
                                advanced=advanced_options)
 
-  def _get_deprecated_tense(self, deprecated_version, future_tense='Will be', past_tense='Was'):
-    """Provides the grammatical tense for a given deprecated version vs the current version."""
-    return future_tense if (
-      Revision.semver(deprecated_version) >= PANTS_SEMVER
-    ) else past_tense
-
   def get_option_help_info(self, args, kwargs):
     """Returns an OptionHelpInfo for the option registered with the given (args, kwargs)."""
     display_args = []
@@ -169,13 +163,13 @@ class HelpInfoExtracter(object):
     typ = kwargs.get('type', str)
     default = self.compute_default(kwargs)
     help_msg = kwargs.get('help', 'No help available.')
-    deprecated_version = kwargs.get('deprecated_version')
+    removal_version = kwargs.get('removal_version')
     deprecated_message = None
-    if deprecated_version:
-      deprecated_tense = self._get_deprecated_tense(deprecated_version)
+    if removal_version:
+      deprecated_tense = deprecated.get_deprecated_tense(removal_version)
       deprecated_message = 'DEPRECATED. {} removed in version: {}'.format(deprecated_tense,
-                                                                          deprecated_version)
-    deprecated_hint = kwargs.get('deprecated_hint')
+                                                                          removal_version)
+    removal_hint = kwargs.get('removal_hint')
     choices = ', '.join(kwargs.get('choices')) if kwargs.get('choices') else None
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
@@ -186,8 +180,8 @@ class HelpInfoExtracter(object):
                          fromfile=kwargs.get('fromfile', False),
                          default=default,
                          help=help_msg,
-                         deprecated_version=deprecated_version,
                          deprecated_message=deprecated_message,
-                         deprecated_hint=deprecated_hint,
+                         removal_version=removal_version,
+                         removal_hint=removal_hint,
                          choices=choices)
     return ret

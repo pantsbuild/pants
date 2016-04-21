@@ -95,10 +95,10 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': dict}, 'None')
 
   def test_deprecated(self):
-    kwargs = {'deprecated_version': '999.99.9', 'deprecated_hint': 'do not use this'}
+    kwargs = {'removal_version': '999.99.9', 'removal_hint': 'do not use this'}
     ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
-    self.assertEquals('999.99.9', ohi.deprecated_version)
-    self.assertEquals('do not use this', ohi.deprecated_hint)
+    self.assertEquals('999.99.9', ohi.removal_version)
+    self.assertEquals('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
 
   def test_fromfile(self):
