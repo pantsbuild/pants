@@ -145,6 +145,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Glob patterns for ignoring files when reading BUILD files. '
                   'Use to ignore unneeded directories or BUILD files. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
+    # this option is currently experimental
     register('--pants-ignore', advanced=True, type=list, fromfile=True,
              default=[],
              help='Ignore files that match the specified patterns '

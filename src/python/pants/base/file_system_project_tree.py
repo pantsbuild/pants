@@ -20,25 +20,32 @@ class FileSystemProjectTree(ProjectTree):
       raise ValueError('Absolute path "{}" not legal in {}.'.format(relpath, self))
     return os.path.join(self.build_root, relpath)
 
+  def _isdir_raw(self, relpath):
+    return os.path.isdir(self._join(relpath))
+
   def glob1(self, dir_relpath, glob):
-    if self.isignored(dir_relpath):
+    if self.isignored(self._append_trailing_slash(dir_relpath)):
       return []
 
     matched_files = glob1(self._join(dir_relpath), glob)
-    matched_files = self.filter_ignored([os.path.join(dir_relpath, p) for p in matched_files])
-    return [fast_relpath(p, dir_relpath) for p in matched_files]
+    matched_files = self.filter_ignored(
+      [self._append_slash_if_dir_path(os.path.join(dir_relpath, item)) for item in matched_files]
+    )
+    return [fast_relpath(p, dir_relpath).rstrip('/') for p in matched_files]
 
   def content(self, file_relpath):
     if self.isignored(file_relpath):
-      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(file_relpath))
+      self._raise_access_ignored(file_relpath)
 
     with open(self._join(file_relpath), 'rb') as source:
       return source.read()
 
   def isdir(self, relpath):
-    if self.isignored(relpath):
-      return False
-    return os.path.isdir(self._join(relpath))
+    if self._isdir_raw(relpath):
+      if not self.isignored(self._append_trailing_slash(relpath)):
+        return True
+
+    return False
 
   def isfile(self, relpath):
     if self.isignored(relpath):
@@ -46,13 +53,15 @@ class FileSystemProjectTree(ProjectTree):
     return os.path.isfile(self._join(relpath))
 
   def exists(self, relpath):
-    if self.isignored(relpath):
+    temp_path = self._append_slash_if_dir_path(relpath)
+    if self.isignored(temp_path):
       return False
     return os.path.exists(self._join(relpath))
 
   def lstat(self, relpath):
-    if self.isignored(relpath):
-      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
+    temp_path = self._append_slash_if_dir_path(relpath)
+    if self.isignored(temp_path):
+      self._raise_access_ignored(relpath)
 
     try:
       mode = os.lstat(self._join(relpath)).st_mode
@@ -71,17 +80,20 @@ class FileSystemProjectTree(ProjectTree):
         raise e
 
   def relative_readlink(self, relpath):
-    if self.isignored(relpath):
-      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
+    temp_path = self._append_slash_if_dir_path(relpath)
+    if self.isignored(temp_path):
+      self._raise_access_ignored(relpath)
     return os.readlink(self._join(relpath))
 
   def listdir(self, relpath):
-    if self.isignored(relpath):
-      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
+    if self.isignored(self._append_trailing_slash(relpath)):
+      self._raise_access_ignored(relpath)
 
     names = os.listdir(self._join(relpath))
-    file_list = self.filter_ignored([os.path.join(relpath, name) for name in names])
-    return [fast_relpath(f, relpath) for f in file_list]
+    file_list = self.filter_ignored(
+      [self._append_slash_if_dir_path(os.path.join(relpath, item)) for item in names]
+    )
+    return [fast_relpath(f, relpath).rstrip('/') for f in file_list]
 
   def walk(self, relpath, topdown=True):
     def onerror(error):

@@ -16,6 +16,8 @@ python_library(
   name = 'project_tree',
   sources = ['project_tree.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:pathspec',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',

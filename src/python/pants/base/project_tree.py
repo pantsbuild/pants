@@ -11,6 +11,7 @@ from abc import abstractmethod
 
 from pathspec.gitignore import GitIgnorePattern
 from pathspec.pathspec import PathSpec
+from twitter.common.collections import OrderedSet
 
 from pants.util.dirutil import fast_relpath
 from pants.util.meta import AbstractClass
@@ -31,11 +32,11 @@ class ProjectTree(AbstractClass):
   class AccessIgnoredPathError(Exception):
     """Raised when accessing a path which is ignored by pants"""
 
-  def __init__(self, build_root, pants_ignore = None):
+  def __init__(self, build_root, ignore_patterns = None):
     if not os.path.isabs(build_root):
       raise self.InvalidBuildRootError('ProjectTree build_root {} must be an absolute path.'.format(build_root))
     self.build_root = os.path.realpath(build_root)
-    self.ignore = PathSpec.from_lines(GitIgnorePattern, pants_ignore if pants_ignore else [])
+    self.ignore = PathSpec.from_lines(GitIgnorePattern, ignore_patterns if ignore_patterns else [])
 
   @abstractmethod
   def glob1(self, dir_relpath, glob):
@@ -86,14 +87,36 @@ class ProjectTree(AbstractClass):
     """Returns the content for file at path."""
 
   def isignored(self, relpath):
-    """Returns True id path matches pants ignore pattern"""
+    """Returns True if path matches pants ignore pattern"""
     match_result = list(self.ignore.match_files([relpath]))
     return match_result != []
 
   def filter_ignored(self, path_list):
     """Takes a list of paths and return a list of unignored files"""
-    ignored_paths = set(self.ignore.match_files(path_list))
-    return list(set(path_list) - ignored_paths)
+    ignored_paths = OrderedSet(self.ignore.match_files(path_list))
+    if len(ignored_paths) == 0:
+      return path_list
+
+    return list(OrderedSet(path_list) - ignored_paths)
+
+  def _raise_access_ignored(self, relpath):
+    """raise exception when accessing ignored path"""
+    raise self.AccessIgnoredPathError('The path {} is ignored in {}'.format(relpath, self))
+
+  def _append_trailing_slash(self, relpath):
+    """add a trailing slash if not already has one"""
+    return relpath if relpath.endswith(os.sep) else relpath + os.sep
+
+  def _append_slash_if_dir_path(self, relpath):
+    """for a dir path return a path that has a trailing slash"""
+    if self._isdir_raw(relpath):
+      return self._append_trailing_slash(relpath)
+
+    return relpath
+
+  @abstractmethod
+  def _isdir_raw(self, relpath):
+    """check if a path is a dir without considering ignore pattern"""
 
 
 class PTStat(datatype('PTStat', ['ftype'])):

@@ -49,8 +49,16 @@ python_library(
   name = 'project_tree_test_base',
   sources = ['project_tree_test_base.py'],
   dependencies = [
-    '3rdparty/python:pathspec',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
+  name = 'pants_ignore_test_base',
+  sources = ['pants_ignore_test_base.py'],
+  dependencies = [
+    ':project_tree_test_base',
   ]
 )
 
@@ -58,10 +66,8 @@ python_tests(
   name = 'pants_ignore_file_system',
   sources = ['test_pants_ignore_file_system.py'],
   dependencies = [
-    ':project_tree_test_base',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
-    'src/python/pants/util:dirutil',
+    ':pants_ignore_test_base',
+    'src/python/pants/base:file_system_project_tree',
   ]
 )
 
@@ -69,10 +75,9 @@ python_tests(
   name = 'pants_ignore_scm',
   sources = ['test_pants_ignore_scm.py'],
   dependencies = [
-    ':project_tree_test_base',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
-    'src/python/pants/util:dirutil',
+    ':pants_ignore_test_base',
+    'src/python/pants/base:scm_project_tree',
+    'src/python/pants/scm:git',
   ]
 )
 

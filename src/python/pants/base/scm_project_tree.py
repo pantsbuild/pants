@@ -11,42 +11,50 @@ import os
 from types import NoneType
 
 from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
+from pants.util.dirutil import fast_relpath
 
 
 logger = logging.getLogger(__name__)
 
 
 class ScmProjectTree(ProjectTree):
-  def __init__(self, build_root, scm, rev, pants_ignore=None):
-    super(ScmProjectTree, self).__init__(build_root, pants_ignore)
+  def __init__(self, build_root, scm, rev, ignore_patterns=None):
+    super(ScmProjectTree, self).__init__(build_root, ignore_patterns)
     self._scm = scm
     self._rev = rev
     self._reader = scm.repo_reader(rev)
     self._scm_worktree = os.path.realpath(scm.worktree)
 
   def _scm_relpath(self, build_root_relpath):
-    return os.path.relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree)
+    return fast_relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree)
+
+  def _isdir_raw(self, relpath):
+    return self._reader.isdir(self._scm_relpath(relpath))
 
   def glob1(self, dir_relpath, glob):
-    if self.isignored(dir_relpath):
+    if self.isignored(self._append_trailing_slash(dir_relpath)):
       return []
 
     files = self._reader.listdir(self._scm_relpath(dir_relpath))
     matched_files = [filename for filename in files if fnmatch.fnmatch(filename, glob)]
-    matched_files = self.filter_ignored([os.path.join(dir_relpath, p) for p in matched_files])
-    return [os.path.normpath(os.path.relpath(p, dir_relpath)) for p in matched_files]
+    matched_files = self.filter_ignored(
+      [self._append_slash_if_dir_path(os.path.join(dir_relpath, p)) for p in matched_files]
+    )
+    return [fast_relpath(p, dir_relpath).rstrip('/') for p in matched_files]
 
   def content(self, file_relpath):
     if self.isignored(file_relpath):
-      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(file_relpath))
+      self._raise_access_ignored(file_relpath)
 
     with self._reader.open(self._scm_relpath(file_relpath)) as source:
       return source.read()
 
   def isdir(self, relpath):
-    if self.isignored(relpath):
-      return False
-    return self._reader.isdir(self._scm_relpath(relpath))
+    if self._isdir_raw(relpath):
+      if not self.isignored(self._append_trailing_slash(relpath)):
+        return True
+
+    return False
 
   def isfile(self, relpath):
     if self.isignored(relpath):
@@ -54,13 +62,15 @@ class ScmProjectTree(ProjectTree):
     return self._reader.isfile(self._scm_relpath(relpath))
 
   def exists(self, relpath):
-    if self.isignored(relpath):
+    temp_path = self._append_slash_if_dir_path(relpath)
+    if self.isignored(temp_path):
       return False
     return self._reader.exists(self._scm_relpath(relpath))
 
   def lstat(self, relpath):
-    if self.isignored(relpath):
-      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
+    temp_path = self._append_slash_if_dir_path(relpath)
+    if self.isignored(temp_path):
+      self._raise_access_ignored(relpath)
 
     mode = type(self._reader.lstat(self._scm_relpath(relpath)))
     if mode == NoneType:
@@ -75,26 +85,28 @@ class ScmProjectTree(ProjectTree):
       raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 
   def relative_readlink(self, relpath):
-    if self.isignored(relpath):
-      raise self.AccessIgnoredPathError("The path {0} is ignored by pants".format(relpath))
+    temp_path = self._append_slash_if_dir_path(relpath)
+    if self.isignored(temp_path):
+      self._raise_access_ignored(relpath)
     return self._reader.readlink(self._scm_relpath(relpath))
 
   def listdir(self, relpath):
+    if self.isignored(self._append_trailing_slash(relpath)):
+      self._raise_access_ignored(relpath)
     return self.glob1(relpath, "*")
 
   def walk(self, relpath, topdown=True):
     for path, dirnames, filenames in self._do_walk(self._scm_relpath(relpath), topdown=topdown):
-      rel_root = os.path.relpath(os.path.join(self._scm_worktree, path), self.build_root)
-      norm_rel_root = os.path.normpath(rel_root) if rel_root != '.' else ''
+      rel_root = fast_relpath(os.path.join(self._scm_worktree, path), self.build_root)
 
-      matched_dirs = self.ignore.match_files(os.path.join(norm_rel_root, "{0}/".format(d)) for d in dirnames)
-      matched_files = self.ignore.match_files(os.path.join(norm_rel_root, f) for f in filenames)
+      matched_dirs = self.ignore.match_files(os.path.join(rel_root, "{0}/".format(d)) for d in dirnames)
+      matched_files = self.ignore.match_files(os.path.join(rel_root, f) for f in filenames)
 
       for matched_dir in matched_dirs:
-        dirnames.remove(matched_dir.replace(norm_rel_root, '').strip('/'))
+        dirnames.remove(matched_dir.replace(rel_root, '').strip('/'))
 
       for matched_file in matched_files:
-        filenames.remove(matched_file.replace(norm_rel_root, '').strip('/'))
+        filenames.remove(matched_file.replace(rel_root, '').strip('/'))
 
       yield (rel_root, dirnames, filenames)
 
