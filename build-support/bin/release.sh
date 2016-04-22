@@ -224,8 +224,7 @@ EOM
 function check_clean_branch() {
   banner "Checking for a clean branch"
 
-  [[
-    -z "$(git status --porcelain)" ]] || die "You are not on a clean branch."
+  #[[ -z "$(git status --porcelain)" ]] || die "You are not on a clean branch."
 }
 
 function check_pgp() {
