@@ -221,13 +221,11 @@ EOM
   die "$msg"
 }
 
-function check_clean_master() {
-  banner "Checking for a clean master branch"
+function check_clean_branch() {
+  banner "Checking for a clean branch"
 
   [[
-    -z "$(git status --porcelain)" &&
-    "$(git branch | grep -E '^\* ' | cut -d' ' -f2-)" == "master"
-  ]] || die "You are not on a clean master branch."
+    -z "$(git status --porcelain)" ]] || die "You are not on a clean branch."
 }
 
 function check_pgp() {
@@ -463,7 +461,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPi." && \
   (
-    check_origin && check_clean_master && check_pgp && check_owners && \
+    check_origin && check_clean_branch && check_pgp && check_owners && \
       dry_run_install && publish_packages && tag_release && publish_docs && \
       banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
