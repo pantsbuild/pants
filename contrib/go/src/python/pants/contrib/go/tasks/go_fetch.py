@@ -95,7 +95,7 @@ class GoFetch(GoTask):
       # not then run a recursive check on the returned and return the values provided by that call.
       if root == import_path:
         return root, vcs, url
-      elif import_path.starts_with(root):
+      elif import_path.startswith(root):
         return cls._check_for_meta_tag(root)
 
     return None, None, None

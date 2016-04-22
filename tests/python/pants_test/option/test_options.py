@@ -13,14 +13,15 @@ import warnings
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.base.deprecated import CodeRemovedError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import file_option, target_option
-from pants.option.errors import (BooleanOptionNameWithNo, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidKwarg, InvalidMemberType,
-                                 MemberTypeNotAllowed, NoOptionNames, OptionAlreadyRegistered,
-                                 OptionNameDash, OptionNameDoubleDash, ParseError,
-                                 RecursiveSubsystemOption, Shadowing)
+from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
+                                 InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
+                                 NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
+                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
+                                 Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
@@ -98,12 +99,12 @@ class OptionsTest(unittest.TestCase):
     register_global('--b', type=int, recursive=True)
 
     # Deprecated global options
-    register_global('--global-crufty', deprecated_version='999.99.9',
-                    deprecated_hint='use a less crufty global option')
-    register_global('--global-crufty-boolean', type=bool, deprecated_version='999.99.9',
-                    deprecated_hint='say no to crufty global options')
-    register_global('--global-crufty-expired', deprecated_version='0.0.1',
-                    deprecated_hint='use a less crufty global option')
+    register_global('--global-crufty', removal_version='999.99.9',
+                    removal_hint='use a less crufty global option')
+    register_global('--global-crufty-boolean', type=bool, removal_version='999.99.9',
+                      removal_hint='say no to crufty global options')
+    register_global('--global-crufty-expired', removal_version='0.0.1',
+                    removal_hint='use a less crufty global option')
 
     # For the design doc example test.
     options.register('compile', '--c', type=int, recursive=True)
@@ -111,11 +112,11 @@ class OptionsTest(unittest.TestCase):
     # Test deprecated options with a scope
     options.register('stale', '--still-good')
     options.register('stale', '--crufty',
-                     deprecated_version='999.99.9',
-                     deprecated_hint='use a less crufty stale scoped option')
+                     removal_version='999.99.9',
+                     removal_hint='use a less crufty stale scoped option')
     options.register('stale', '--crufty-boolean', type=bool,
-                     deprecated_version='999.99.9',
-                     deprecated_hint='say no to crufty, stale scoped options')
+                     removal_version='999.99.9',
+                     removal_hint='say no to crufty, stale scoped options')
 
     # For task identity test
     options.register('compile.scala', '--modifycompile', fingerprint=True)
@@ -703,8 +704,8 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual('BAR', defaulted_only_options.for_global_scope().pants_foo)
 
   def test_deprecated_option_past_removal(self):
-    """Ensure that expired options raise DeprecatedOptionError on attempted use."""
-    with self.assertRaises(DeprecatedOptionError):
+    """Ensure that expired options raise CodeRemovedError on attempted use."""
+    with self.assertRaises(CodeRemovedError):
       self._parse('./pants --global-crufty-expired=way2crufty').for_global_scope()
 
   @contextmanager
@@ -718,7 +719,8 @@ class OptionsTest(unittest.TestCase):
       self.assertEquals(1, len(w))
       self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
       warning_message = str(w[-1].message)
-      self.assertIn('is deprecated and removed in version', warning_message)
+      self.assertIn("will be removed in version",
+                    warning_message)
       self.assertIn(option_string, warning_message)
 
     with self.warnings_catcher() as w:

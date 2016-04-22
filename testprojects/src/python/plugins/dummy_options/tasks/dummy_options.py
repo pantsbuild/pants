@@ -17,8 +17,8 @@ class DummyOptionsTask(Task):
   @classmethod
   def register_options(cls, register):
     super(DummyOptionsTask, cls).register_options(register)
-    register('--dummy-crufty-expired', deprecated_version='0.0.1',
-                deprecated_hint='blah')
-    register('--dummy-crufty-deprecated-but-still-functioning', deprecated_version='999.99.9',
-                deprecated_hint='blah')
+    register('--dummy-crufty-expired', removal_version='0.0.1',
+                removal_hint='blah')
+    register('--dummy-crufty-deprecated-but-still-functioning', removal_version='999.99.9',
+                removal_hint='blah')
     register('--normal-option')
