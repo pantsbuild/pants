@@ -24,7 +24,7 @@ class FileSystemProjectTree(ProjectTree):
     return os.path.isdir(self._join(relpath))
 
   def glob1(self, dir_relpath, glob):
-    if self.isignored(self._append_trailing_slash(dir_relpath)):
+    if self.isignored(dir_relpath, directory=True):
       return []
 
     matched_files = glob1(self._join(dir_relpath), glob)
@@ -42,7 +42,7 @@ class FileSystemProjectTree(ProjectTree):
 
   def isdir(self, relpath):
     if self._isdir_raw(relpath):
-      if not self.isignored(self._append_trailing_slash(relpath)):
+      if not self.isignored(relpath, directory=True):
         return True
 
     return False
@@ -53,14 +53,12 @@ class FileSystemProjectTree(ProjectTree):
     return os.path.isfile(self._join(relpath))
 
   def exists(self, relpath):
-    temp_path = self._append_slash_if_dir_path(relpath)
-    if self.isignored(temp_path):
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
       return False
     return os.path.exists(self._join(relpath))
 
   def lstat(self, relpath):
-    temp_path = self._append_slash_if_dir_path(relpath)
-    if self.isignored(temp_path):
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
       self._raise_access_ignored(relpath)
 
     try:
@@ -80,15 +78,16 @@ class FileSystemProjectTree(ProjectTree):
         raise e
 
   def relative_readlink(self, relpath):
-    temp_path = self._append_slash_if_dir_path(relpath)
-    if self.isignored(temp_path):
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
       self._raise_access_ignored(relpath)
     return os.readlink(self._join(relpath))
 
   def listdir(self, relpath):
-    if self.isignored(self._append_trailing_slash(relpath)):
+    if self.isignored(relpath, directory=True):
       self._raise_access_ignored(relpath)
 
+    # TODO: use scandir which is backported from 3.x
+    # https://github.com/pantsbuild/pants/issues/3250
     names = os.listdir(self._join(relpath))
     file_list = self.filter_ignored(
       [self._append_slash_if_dir_path(os.path.join(relpath, item)) for item in names]
@@ -105,10 +104,10 @@ class FileSystemProjectTree(ProjectTree):
       matched_dirs = self.ignore.match_files([os.path.join(rel_root, "{0}/".format(d)) for d in dirs])
       matched_files = self.ignore.match_files([os.path.join(rel_root, f) for f in files])
       for matched_dir in matched_dirs:
-        dirs.remove(matched_dir.replace(rel_root, '').strip('/'))
+        dirs.remove(fast_relpath(matched_dir, rel_root).rstrip('/'))
 
       for matched_file in matched_files:
-        files.remove(matched_file.replace(rel_root, '').strip('/'))
+        files.remove(fast_relpath(matched_file, rel_root))
 
       yield rel_root, dirs, files
 

@@ -86,8 +86,10 @@ class ProjectTree(AbstractClass):
   def content(self, file_relpath):
     """Returns the content for file at path."""
 
-  def isignored(self, relpath):
+  def isignored(self, relpath, directory=False):
     """Returns True if path matches pants ignore pattern"""
+    if directory:
+      relpath = self._append_trailing_slash(relpath)
     match_result = list(self.ignore.match_files([relpath]))
     return match_result != []
 

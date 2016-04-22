@@ -32,7 +32,7 @@ class ScmProjectTree(ProjectTree):
     return self._reader.isdir(self._scm_relpath(relpath))
 
   def glob1(self, dir_relpath, glob):
-    if self.isignored(self._append_trailing_slash(dir_relpath)):
+    if self.isignored(dir_relpath, directory=True):
       return []
 
     files = self._reader.listdir(self._scm_relpath(dir_relpath))
@@ -51,7 +51,7 @@ class ScmProjectTree(ProjectTree):
 
   def isdir(self, relpath):
     if self._isdir_raw(relpath):
-      if not self.isignored(self._append_trailing_slash(relpath)):
+      if not self.isignored(relpath, directory=True):
         return True
 
     return False
@@ -62,14 +62,12 @@ class ScmProjectTree(ProjectTree):
     return self._reader.isfile(self._scm_relpath(relpath))
 
   def exists(self, relpath):
-    temp_path = self._append_slash_if_dir_path(relpath)
-    if self.isignored(temp_path):
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
       return False
     return self._reader.exists(self._scm_relpath(relpath))
 
   def lstat(self, relpath):
-    temp_path = self._append_slash_if_dir_path(relpath)
-    if self.isignored(temp_path):
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
       self._raise_access_ignored(relpath)
 
     mode = type(self._reader.lstat(self._scm_relpath(relpath)))
@@ -85,13 +83,12 @@ class ScmProjectTree(ProjectTree):
       raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 
   def relative_readlink(self, relpath):
-    temp_path = self._append_slash_if_dir_path(relpath)
-    if self.isignored(temp_path):
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
       self._raise_access_ignored(relpath)
     return self._reader.readlink(self._scm_relpath(relpath))
 
   def listdir(self, relpath):
-    if self.isignored(self._append_trailing_slash(relpath)):
+    if self.isignored(relpath, directory=True):
       self._raise_access_ignored(relpath)
     return self.glob1(relpath, "*")
 
@@ -103,10 +100,10 @@ class ScmProjectTree(ProjectTree):
       matched_files = self.ignore.match_files(os.path.join(rel_root, f) for f in filenames)
 
       for matched_dir in matched_dirs:
-        dirnames.remove(matched_dir.replace(rel_root, '').strip('/'))
+        dirnames.remove(fast_relpath(matched_dir, rel_root).rstrip('/'))
 
       for matched_file in matched_files:
-        filenames.remove(matched_file.replace(rel_root, '').strip('/'))
+        filenames.remove(fast_relpath(matched_file, rel_root))
 
       yield (rel_root, dirnames, filenames)
 
