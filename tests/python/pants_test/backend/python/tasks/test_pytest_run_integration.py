@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import time
+import unittest
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -21,6 +22,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout'])
     self.assert_success(pants_run)
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3255')
   def test_pytest_run_timeout_fails(self):
     start = time.time()
     pants_run = self.run_pants(['clean-all',
@@ -41,6 +43,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     # Ensure that the timeout message triggered.
     self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3255')
   def test_pytest_run_timeout_cant_terminate(self):
     start = time.time()
     terminate_wait = 2
