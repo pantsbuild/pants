@@ -225,7 +225,7 @@ function check_clean_branch() {
   banner "Checking for a clean branch"
 
   [[
-    -z "$(git status --porcelain)" && 
+    -z "$(git status --porcelain)" &&
     "$(git branch | grep -E '^\* ' | cut -d' ' -f2-)" =~ "(master)|([0-9]+.[0-9]+.x)"
   ]] || die "You are not on a clean branch."
 }
