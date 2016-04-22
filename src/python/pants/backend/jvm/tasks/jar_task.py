@@ -33,6 +33,8 @@ class Jar(object):
   Upon construction the jar is conceptually opened for writes.  The write methods are called to
   add to the jar's contents and then changes are finalized with a call to close.  If close is not
   called the staged changes will be lost.
+
+  :API: public
   """
 
   class Error(Exception):
@@ -326,7 +328,10 @@ class JarTask(NailgunTask):
 class JarBuilderTask(JarTask):
 
   class JarBuilder(AbstractClass):
-    """A utility to aid in adding the classes and resources associated with targets to a jar."""
+    """A utility to aid in adding the classes and resources associated with targets to a jar.
+
+    :API: public
+    """
 
     @staticmethod
     def _add_agent_manifest(agent, manifest):

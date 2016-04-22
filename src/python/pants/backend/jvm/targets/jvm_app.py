@@ -185,6 +185,8 @@ class JvmApp(Target):
   self-contained artifact suitable for deployment on some other machine.
   The artifact contains the executable jar, its dependencies, and
   extra files like config files, startup scripts, etc.
+
+  :API: public
   """
 
   def __init__(self, name=None, payload=None, binary=None, bundles=None, basename=None, **kwargs):

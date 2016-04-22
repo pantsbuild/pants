@@ -26,7 +26,10 @@ class DefaultFingerprintHashingMixin(object):
 
 
 class FingerprintStrategy(AbstractClass):
-  """A helper object for doing per-task, finer grained invalidation of Targets."""
+  """A helper object for doing per-task, finer grained invalidation of Targets.
+
+  :API: public
+  """
 
   @abstractmethod
   def compute_fingerprint(self, target):
