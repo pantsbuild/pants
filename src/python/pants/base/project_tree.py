@@ -39,36 +39,109 @@ class ProjectTree(AbstractClass):
     self.ignore = PathSpec.from_lines(GitIgnorePattern, ignore_patterns if ignore_patterns else [])
 
   @abstractmethod
-  def glob1(self, dir_relpath, glob):
+  def _glob1_raw(self, dir_relpath, glob):
     """Returns a list of paths in path that match glob"""
 
   @abstractmethod
-  def listdir(self, relpath):
+  def _listdir_raw(self, relpath):
     """Return the names of paths in the given directory."""
 
   @abstractmethod
-  def walk(self, relpath, topdown=True):
-    """Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path."""
-
-  @abstractmethod
-  def isdir(self, relpath):
+  def _isdir_raw(self, relpath):
     """Returns True if path is a directory"""
 
   @abstractmethod
-  def isfile(self, relpath):
-    """Returns True if path is a file"""
+  def _isfile_raw(self, relpath):
+    """returns True if path is a file"""
 
   @abstractmethod
-  def exists(self, relpath):
-    """Returns True if path exists"""
+  def _exists_raw(self, relpath):
+    """returns True if path exists"""
 
   @abstractmethod
-  def lstat(self, relpath):
+  def _content_raw(self, file_relpath):
+    """Returns the content for file at path."""
+
+  @abstractmethod
+  def _relative_readlink_raw(self, relpath):
+    """Execute `readlink` for the given path, which may result in a relative path."""
+
+  @abstractmethod
+  def _lstat_raw(self, relpath):
     """Without following symlinks, returns a PTStat object for the path, or None"""
 
   @abstractmethod
+  def _walk_raw(self, relpath, topdown=True):
+    """Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path."""
+
+  def glob1(self, dir_relpath, glob):
+    """Returns a list of paths in path that match glob"""
+    if self.isignored(dir_relpath, directory=True):
+      return []
+
+    matched_files = self._glob1_raw(dir_relpath, glob)
+    return self.filter_ignored(matched_files, dir_relpath)
+
+  def listdir(self, relpath):
+    """Return the names of paths in the given directory."""
+    if self.isignored(relpath, directory=True):
+      self._raise_access_ignored(relpath)
+
+    names = self._listdir_raw(relpath)
+    return self.filter_ignored(names, relpath)
+
+  def isdir(self, relpath):
+    """Returns True if path is a directory"""
+    if self._isdir_raw(relpath):
+      if not self.isignored(relpath, directory=True):
+        return True
+
+    return False
+
+  def isfile(self, relpath):
+    """Returns True if path is a file"""
+    if self.isignored(relpath):
+      return False
+    return self._isfile_raw(relpath)
+
+  def exists(self, relpath):
+    """Returns True if path exists"""
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
+      return False
+    return self._exists_raw(relpath)
+
+  def content(self, file_relpath):
+    """Returns the content for file at path."""
+    if self.isignored(file_relpath):
+      self._raise_access_ignored(file_relpath)
+
+    return self._content_raw(file_relpath)
+
   def relative_readlink(self, relpath):
     """Execute `readlink` for the given path, which may result in a relative path."""
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
+      self._raise_access_ignored(relpath)
+    return self._relative_readlink_raw(relpath)
+
+  def lstat(self, relpath):
+    """Without following symlinks, returns a PTStat object for the path, or None"""
+    if self.isignored(self._append_slash_if_dir_path(relpath)):
+      self._raise_access_ignored(relpath)
+
+    return self._lstat_raw(relpath)
+
+  def walk(self, relpath, topdown=True):
+    """Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path."""
+    for root, dirs, files in self._walk_raw(relpath, topdown):
+      matched_dirs = self.ignore.match_files([os.path.join(root, "{0}/".format(d)) for d in dirs])
+      matched_files = self.ignore.match_files([os.path.join(root, f) for f in files])
+      for matched_dir in matched_dirs:
+        dirs.remove(fast_relpath(matched_dir, root).rstrip('/'))
+
+      for matched_file in matched_files:
+        files.remove(fast_relpath(matched_file, root))
+
+      yield root, dirs, files
 
   def readlink(self, relpath):
     link_path = self.relative_readlink(relpath)
@@ -82,10 +155,6 @@ class ProjectTree(AbstractClass):
                                                  link_path))
     return fast_relpath(abs_normpath, self.build_root)
 
-  @abstractmethod
-  def content(self, file_relpath):
-    """Returns the content for file at path."""
-
   def isignored(self, relpath, directory=False):
     """Returns True if path matches pants ignore pattern"""
     if directory:
@@ -93,13 +162,14 @@ class ProjectTree(AbstractClass):
     match_result = list(self.ignore.match_files([relpath]))
     return match_result != []
 
-  def filter_ignored(self, path_list):
-    """Takes a list of paths and return a list of unignored files"""
-    ignored_paths = OrderedSet(self.ignore.match_files(path_list))
+  def filter_ignored(self, path_list, prefix=''):
+    """Takes a list of paths and returns a list of unignored files"""
+    prefixed_path_list = [self._append_slash_if_dir_path(os.path.join(prefix, item)) for item in path_list]
+    ignored_paths = OrderedSet(self.ignore.match_files(prefixed_path_list))
     if len(ignored_paths) == 0:
       return path_list
 
-    return list(OrderedSet(path_list) - ignored_paths)
+    return [fast_relpath(f, prefix).rstrip('/') for f in list(OrderedSet(prefixed_path_list) - ignored_paths)]
 
   def _raise_access_ignored(self, relpath):
     """raise exception when accessing ignored path"""
@@ -115,10 +185,6 @@ class ProjectTree(AbstractClass):
       return self._append_trailing_slash(relpath)
 
     return relpath
-
-  @abstractmethod
-  def _isdir_raw(self, relpath):
-    """check if a path is a dir without considering ignore pattern"""
 
 
 class PTStat(datatype('PTStat', ['ftype'])):

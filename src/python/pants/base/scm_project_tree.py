@@ -28,48 +28,30 @@ class ScmProjectTree(ProjectTree):
   def _scm_relpath(self, build_root_relpath):
     return fast_relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree)
 
+  def _glob1_raw(self, dir_relpath, glob):
+    files = self._reader.listdir(self._scm_relpath(dir_relpath))
+    return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
+
+  def _listdir_raw(self, relpath):
+    return self._reader.listdir(self._scm_relpath(relpath))
+
   def _isdir_raw(self, relpath):
     return self._reader.isdir(self._scm_relpath(relpath))
 
-  def glob1(self, dir_relpath, glob):
-    if self.isignored(dir_relpath, directory=True):
-      return []
+  def _isfile_raw(self, relpath):
+    return self._reader.isfile(self._scm_relpath(relpath))
 
-    files = self._reader.listdir(self._scm_relpath(dir_relpath))
-    matched_files = [filename for filename in files if fnmatch.fnmatch(filename, glob)]
-    matched_files = self.filter_ignored(
-      [self._append_slash_if_dir_path(os.path.join(dir_relpath, p)) for p in matched_files]
-    )
-    return [fast_relpath(p, dir_relpath).rstrip('/') for p in matched_files]
+  def _exists_raw(self, relpath):
+    return self._reader.exists(self._scm_relpath(relpath))
 
-  def content(self, file_relpath):
-    if self.isignored(file_relpath):
-      self._raise_access_ignored(file_relpath)
-
+  def _content_raw(self, file_relpath):
     with self._reader.open(self._scm_relpath(file_relpath)) as source:
       return source.read()
 
-  def isdir(self, relpath):
-    if self._isdir_raw(relpath):
-      if not self.isignored(relpath, directory=True):
-        return True
+  def _relative_readlink_raw(self, relpath):
+    return self._reader.readlink(self._scm_relpath(relpath))
 
-    return False
-
-  def isfile(self, relpath):
-    if self.isignored(relpath):
-      return False
-    return self._reader.isfile(self._scm_relpath(relpath))
-
-  def exists(self, relpath):
-    if self.isignored(self._append_slash_if_dir_path(relpath)):
-      return False
-    return self._reader.exists(self._scm_relpath(relpath))
-
-  def lstat(self, relpath):
-    if self.isignored(self._append_slash_if_dir_path(relpath)):
-      self._raise_access_ignored(relpath)
-
+  def _lstat_raw(self, relpath):
     mode = type(self._reader.lstat(self._scm_relpath(relpath)))
     if mode == NoneType:
       return None
@@ -82,30 +64,9 @@ class ScmProjectTree(ProjectTree):
     else:
       raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 
-  def relative_readlink(self, relpath):
-    if self.isignored(self._append_slash_if_dir_path(relpath)):
-      self._raise_access_ignored(relpath)
-    return self._reader.readlink(self._scm_relpath(relpath))
-
-  def listdir(self, relpath):
-    if self.isignored(relpath, directory=True):
-      self._raise_access_ignored(relpath)
-    return self.glob1(relpath, "*")
-
-  def walk(self, relpath, topdown=True):
+  def _walk_raw(self, relpath, topdown=True):
     for path, dirnames, filenames in self._do_walk(self._scm_relpath(relpath), topdown=topdown):
-      rel_root = fast_relpath(os.path.join(self._scm_worktree, path), self.build_root)
-
-      matched_dirs = self.ignore.match_files(os.path.join(rel_root, "{0}/".format(d)) for d in dirnames)
-      matched_files = self.ignore.match_files(os.path.join(rel_root, f) for f in filenames)
-
-      for matched_dir in matched_dirs:
-        dirnames.remove(fast_relpath(matched_dir, rel_root).rstrip('/'))
-
-      for matched_file in matched_files:
-        filenames.remove(fast_relpath(matched_file, rel_root))
-
-      yield (rel_root, dirnames, filenames)
+      yield fast_relpath(os.path.join(self._scm_worktree, path), self.build_root), dirnames, filenames
 
   def _do_walk(self, scm_relpath, topdown):
     """Helper method for _walk"""
