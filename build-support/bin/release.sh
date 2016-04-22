@@ -223,8 +223,8 @@ EOM
 
 function check_clean_branch() {
   banner "Checking for a clean branch"
-  
-  pattern = "(master)|([0-9]+\.[0-9]+\.x)"
+
+  pattern="(master)|([0-9]+\.[0-9]+\.x)"
   [[
     -z "$(git status --porcelain)" &&
     "$(git branch | grep -E '^\* ' | cut -d' ' -f2-)" =~ ${pattern}
