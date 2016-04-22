@@ -41,6 +41,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     # Ensure that the timeout message triggered.
     self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3255')
   def test_pytest_run_timeout_cant_terminate(self):
     start = time.time()
     terminate_wait = 2
