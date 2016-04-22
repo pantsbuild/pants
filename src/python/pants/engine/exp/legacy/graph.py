@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address, Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -14,6 +16,9 @@ from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
 from pants.engine.exp.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class ExpGraph(BuildGraph):
@@ -73,15 +78,26 @@ class ExpGraph(BuildGraph):
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
+    deps_to_inject = set()
+    addresses_to_inject = set()
+    def inject(target, dep_spec, is_dependency):
+      address = Address.parse(dep_spec, relative_to=target.address.spec_path)
+      if not any(address == t.address for t in target.dependencies):
+        addresses_to_inject.add(address)
+        if is_dependency:
+          deps_to_inject.add((target.address, address))
+
     for target in new_targets:
       for spec in target.traversable_dependency_specs:
-        address = Address.parse(spec, relative_to=target.address.spec_path)
-        self.maybe_inject_address_closure(address)
-        if not any(address == t.address for t in target.dependencies):
-          self.inject_dependency(dependent=target.address, dependency=address)
+        inject(target, spec, is_dependency=True)
       for spec in target.traversable_specs:
-        address = Address.parse(spec, relative_to=target.address.spec_path)
-        self.maybe_inject_address_closure(address)
+        inject(target, spec, is_dependency=False)
+
+    # Inject all addresses, then declare injected dependencies.
+    self.inject_addresses_closure(addresses_to_inject)
+    for target_address, dep_address in deps_to_inject:
+      self.inject_dependency(dependent=target_address, dependency=dep_address)
+
     return all_addresses
 
   def _index_target(self, target_adaptor, dependencies):
@@ -160,6 +176,13 @@ class ExpGraph(BuildGraph):
     for _ in self._inject([address]):
       pass
 
+  def inject_addresses_closure(self, addresses):
+    addresses = set(addresses) - set(self._target_by_address.keys())
+    if not addresses:
+      return
+    for _ in self._inject(addresses):
+      pass
+
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
     for address in self._inject(specs):
@@ -167,6 +190,7 @@ class ExpGraph(BuildGraph):
 
   def _inject(self, subjects):
     """Request LegacyBuildGraphNodes for each of the subjects, and yield resulting Addresses."""
+    logger.debug('Injecting to {}: {}'.format(self, subjects))
     request = self._scheduler.execution_request([LegacyBuildGraphNode], subjects)
     result = self._engine.execute(request)
     if result.error:
