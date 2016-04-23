@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import sys
 import threading
 from collections import defaultdict
 
@@ -601,12 +600,11 @@ class LocalScheduler(object):
               candidates.add(step.node)
 
       logger.info('visited {} nodes in {} scheduling iterations. '
-            'there have been {} total steps for {} total nodes.'.format(
-              sum(1 for _ in self._product_graph.walk(execution_request.roots)),
-              scheduling_iterations,
-              self._step_id,
-              len(self._product_graph.dependencies())),
-            file=sys.stderr)
+                  'there have been {} total steps for {} total nodes.'.format(
+                    sum(1 for _ in self._product_graph.walk(execution_request.roots)),
+                    scheduling_iterations,
+                    self._step_id,
+                    len(self._product_graph.dependencies())),)
 
       if self._graph_validator is not None:
         self._graph_validator.validate(self._product_graph)
