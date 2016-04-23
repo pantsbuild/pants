@@ -224,11 +224,11 @@ EOM
 function check_clean_branch() {
   banner "Checking for a clean branch"
 
-  pattern="(master)|([0-9]+\.[0-9]+\.x)"
-  [[
-    -z "$(git status --porcelain)" &&
-    "$(git branch | grep -E '^\* ' | cut -d' ' -f2-)" =~ ${pattern}
-  ]] || die "You are not on a clean branch matching: ${pattern}"
+  pattern="^(master)|([0-9]+\.[0-9]+\.x)$"
+  branch=$(git branch | grep -E '^\* ' | cut -d' ' -f2-)
+  [[ #-z "$(git status --porcelain)" &&
+     $branch =~ $pattern
+  ]] || die "You are not on a clean branch."
 }
 
 function check_pgp() {
