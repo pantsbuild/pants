@@ -87,11 +87,10 @@ class RESTfulArtifactCache(ArtifactCache):
   def _request(self, method, cache_key, body=None):
 
     session = RequestsSession.instance()
-    try:
-      with self.best_url_selector.select_best_url() as best_url:
-        url = self._url_for_key(best_url, cache_key)
-        logger.debug('Sending {0} request to {1}'.format(method, url))
-
+    with self.best_url_selector.select_best_url() as best_url:
+      url = self._url_for_key(best_url, cache_key)
+      logger.debug('Sending {0} request to {1}'.format(method, url))
+      try:
         if 'PUT' == method:
           response = session.put(url, data=body, timeout=self._timeout_secs)
         elif 'GET' == method:
@@ -111,10 +110,10 @@ class RESTfulArtifactCache(ArtifactCache):
           return None
         else:
           raise NonfatalArtifactCacheError('Failed to {0} {1}. Error: {2} {3}'
-                                           .format(method, url,
-                                                   response.status_code, response.reason))
-    except RequestException as e:
-      raise NonfatalArtifactCacheError(e)
+                                           .format(method, url, response.status_code, response.reason))
+      except RequestException as e:
+        raise NonfatalArtifactCacheError('Failed to {0} {1}. Error: {2}'
+                                           .format(method, url, e))
 
   def _url_for_key(self, url, cache_key):
     path_prefix = url.path.rstrip(b'/')
