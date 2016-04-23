@@ -226,7 +226,7 @@ function check_clean_branch() {
 
   pattern="^(master)|([0-9]+\.[0-9]+\.x)$"
   branch=$(git branch | grep -E '^\* ' | cut -d' ' -f2-)
-  [[ #-z "$(git status --porcelain)" &&
+  [[ -z "$(git status --porcelain)" &&
      $branch =~ $pattern
   ]] || die "You are not on a clean branch."
 }
