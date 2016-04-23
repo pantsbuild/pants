@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import cPickle as pickle
-import cStringIO as StringIO
+import StringIO
 import sys
 from abc import abstractmethod
 from binascii import hexlify
