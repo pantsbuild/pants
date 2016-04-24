@@ -15,8 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class JVM(Subsystem):
-  """A JVM invocation."""
+  """A JVM invocation.
 
+  :API: public
+  """
   options_scope = 'jvm'
 
   # Broken out here instead of being inlined in the registration stanza,
