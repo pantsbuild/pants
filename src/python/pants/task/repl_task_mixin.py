@@ -17,6 +17,8 @@ class ReplTaskMixin(MutexTaskMixin):
 
   By mixing in this class, REPL implementations ensure they are the only REPL that is being run in
   the current pants session.
+
+  :API: public
   """
 
   @classmethod
@@ -32,6 +34,8 @@ class ReplTaskMixin(MutexTaskMixin):
     :param targets: All the targets reachable in this run selected by this REPLs `select_targets`
                     method.
     :returns: Any session setup state needed by `launch_repl`
+
+    :API: public
     """
 
   @abstractmethod
@@ -39,6 +43,8 @@ class ReplTaskMixin(MutexTaskMixin):
     """Implementations should launch an interactive REPL session.
 
     :param session_setup:  The state returned from `setup_repl_session`
+
+    :API: public
     """
 
   def execute_for(self, targets):
