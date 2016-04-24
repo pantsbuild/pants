@@ -22,6 +22,8 @@ class PythonBinary(PythonTarget):
   scripts that contain a complete Python environment capable of
   running the target. For more information about pex files see
   http://pantsbuild.github.io/python-readme.html#how-pex-files-work.
+
+  :API: public
   """
 
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be

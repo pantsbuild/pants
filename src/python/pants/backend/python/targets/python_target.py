@@ -19,7 +19,10 @@ from pants.util.memo import memoized_property
 
 
 class PythonTarget(Target):
-  """Base class for all Python targets."""
+  """Base class for all Python targets.
+
+  :API: public
+  """
 
   def __init__(self,
                address=None,

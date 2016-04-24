@@ -10,7 +10,6 @@ import subprocess
 import tempfile
 import textwrap
 import unittest
-from collections import namedtuple
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
@@ -22,36 +21,42 @@ from pants.util.dirutil import chmod_plus_x, safe_open, safe_rmtree, touch
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
-EXE = namedtuple('Exe', ['relpath', 'contents'])
+class EXE(object):
+  def __init__(self, relpath, version=None):
+    self._relpath = relpath
+    self._version = version
 
+  @property
+  def relpath(self):
+    return self._relpath
 
-def exe(relpath, version=None):
-  contents = textwrap.dedent("""
-      #!/bin/sh
-      if [ $# -ne 3 ]; then
-        # Sanity check a classpath switch with a value plus the classname for main
-        echo "Expected 3 arguments, got $#: $@" >&2
-        exit 1
-      fi
-      echo "java.home=${{DIST_ROOT}}"
-      {}
-    """.format('echo "java.version={}"'.format(version) if version else '')).strip()
-  return EXE(relpath, contents=contents)
+  def contents(self, java_home):
+    return textwrap.dedent("""
+        #!/bin/sh
+        if [ $# -ne 3 ]; then
+          # Sanity check a classpath switch with a value plus the classname for main
+          echo "Expected 3 arguments, got $#: $@" >&2
+          exit 1
+        fi
+        echo "java.home={}"
+        {}
+      """.format(java_home,
+                 'echo "java.version={}"'.format(self._version) if self._version else '')).strip()
 
 
 @contextmanager
 def distribution(files=None, executables=None, java_home=None):
   with subsystem_instance(DistributionLocator):
     with temporary_dir() as dist_root:
-      with environment_as(DIST_ROOT=os.path.join(dist_root, java_home) if java_home else dist_root):
-        for f in maybe_list(files or ()):
-          touch(os.path.join(dist_root, f))
-        for executable in maybe_list(executables or (), expected_type=EXE):
-          path = os.path.join(dist_root, executable.relpath)
-          with safe_open(path, 'w') as fp:
-            fp.write(executable.contents or '')
-          chmod_plus_x(path)
-        yield dist_root
+      for f in maybe_list(files or ()):
+        touch(os.path.join(dist_root, f))
+      for executable in maybe_list(executables or (), expected_type=EXE):
+        path = os.path.join(dist_root, executable.relpath)
+        with safe_open(path, 'w') as fp:
+          java_home = os.path.join(dist_root, java_home) if java_home else dist_root
+          fp.write(executable.contents(java_home))
+        chmod_plus_x(path)
+      yield dist_root
 
 
 @contextmanager
@@ -72,34 +77,34 @@ class DistributionValidationTest(unittest.TestCase):
       with self.assertRaises(Distribution.Error):
         Distribution(bin_path=os.path.join(dist_root, 'bin')).validate()
 
-    with distribution(executables=exe('bin/java')) as dist_root:
+    with distribution(executables=EXE('bin/java')) as dist_root:
       Distribution(bin_path=os.path.join(dist_root, 'bin')).validate()
 
   def test_validate_jre(self):
-    with distribution(executables=exe('bin/java')) as dist_root:
+    with distribution(executables=EXE('bin/java')) as dist_root:
       Distribution(bin_path=os.path.join(dist_root, 'bin'), jdk=False).validate()
 
   def test_validate_jdk(self):
-    with distribution(executables=exe('bin/java')) as dist_root:
+    with distribution(executables=EXE('bin/java')) as dist_root:
       with self.assertRaises(Distribution.Error):
         Distribution(bin_path=os.path.join(dist_root, 'bin'), jdk=True).validate()
 
-    with distribution(executables=[exe('bin/java'), exe('bin/javac')]) as dist_root:
+    with distribution(executables=[EXE('bin/java'), EXE('bin/javac')]) as dist_root:
       Distribution(bin_path=os.path.join(dist_root, 'bin'), jdk=True).validate()
 
-    with distribution(executables=[exe('jre/bin/java'), exe('bin/javac')],
+    with distribution(executables=[EXE('jre/bin/java'), EXE('bin/javac')],
                       java_home='jre') as dist_root:
       Distribution(bin_path=os.path.join(dist_root, 'jre/bin'), jdk=True).validate()
 
   def test_validate_version(self):
-    with distribution(executables=exe('bin/java', '1.7.0_25')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_25')) as dist_root:
       with self.assertRaises(Distribution.Error):
         Distribution(bin_path=os.path.join(dist_root, 'bin'), minimum_version='1.7.0_45').validate()
-    with distribution(executables=exe('bin/java', '1.8.0_1')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.8.0_1')) as dist_root:
       with self.assertRaises(Distribution.Error):
         Distribution(bin_path=os.path.join(dist_root, 'bin'), maximum_version='1.8').validate()
 
-    with distribution(executables=exe('bin/java', '1.7.0_25')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_25')) as dist_root:
       Distribution(bin_path=os.path.join(dist_root, 'bin'), minimum_version='1.7.0_25').validate()
       Distribution(bin_path=os.path.join(dist_root, 'bin'),
                    minimum_version=Revision.lenient('1.6')).validate()
@@ -108,37 +113,37 @@ class DistributionValidationTest(unittest.TestCase):
                    maximum_version='1.7.999').validate()
 
   def test_validated_binary(self):
-    with distribution(files='bin/jar', executables=exe('bin/java')) as dist_root:
+    with distribution(files='bin/jar', executables=EXE('bin/java')) as dist_root:
       with self.assertRaises(Distribution.Error):
         Distribution(bin_path=os.path.join(dist_root, 'bin')).binary('jar')
 
-    with distribution(executables=[exe('bin/java'), exe('bin/jar')]) as dist_root:
+    with distribution(executables=[EXE('bin/java'), EXE('bin/jar')]) as dist_root:
       Distribution(bin_path=os.path.join(dist_root, 'bin')).binary('jar')
 
-    with distribution(executables=[exe('jre/bin/java'), exe('bin/jar')],
+    with distribution(executables=[EXE('jre/bin/java'), EXE('bin/jar')],
                       java_home='jre') as dist_root:
       with self.assertRaises(Distribution.Error):
         Distribution(bin_path=os.path.join(dist_root, 'jre', 'bin')).binary('jar')
 
-    with distribution(executables=[exe('jre/bin/java'), exe('bin/jar'), exe('bin/javac')],
+    with distribution(executables=[EXE('jre/bin/java'), EXE('bin/jar'), EXE('bin/javac')],
                       java_home='jre') as dist_root:
       Distribution(bin_path=os.path.join(dist_root, 'jre', 'bin')).binary('jar')
 
-    with distribution(executables=[exe('jre/bin/java'), exe('jre/bin/java_vm'), exe('bin/javac')],
+    with distribution(executables=[EXE('jre/bin/java'), EXE('jre/bin/java_vm'), EXE('bin/javac')],
                       java_home='jre') as dist_root:
       Distribution(bin_path=os.path.join(dist_root, 'jre', 'bin')).binary('java_vm')
 
   def test_validated_library(self):
-    with distribution(executables=exe('bin/java')) as dist_root:
+    with distribution(executables=EXE('bin/java')) as dist_root:
       with self.assertRaises(Distribution.Error):
         Distribution(bin_path=os.path.join(dist_root, 'bin')).find_libs(['tools.jar'])
 
-    with distribution(executables=exe('bin/java'), files='lib/tools.jar') as dist_root:
+    with distribution(executables=EXE('bin/java'), files='lib/tools.jar') as dist_root:
       dist = Distribution(bin_path=os.path.join(dist_root, 'bin'))
       self.assertEqual([os.path.join(dist_root, 'lib', 'tools.jar')],
                        dist.find_libs(['tools.jar']))
 
-    with distribution(executables=[exe('jre/bin/java'), exe('bin/javac')],
+    with distribution(executables=[EXE('jre/bin/java'), EXE('bin/javac')],
                       files=['lib/tools.jar', 'jre/lib/rt.jar'],
                       java_home='jre') as dist_root:
       dist = Distribution(bin_path=os.path.join(dist_root, 'jre/bin'))
@@ -190,73 +195,73 @@ class DistributionEnvLocationTest(BaseDistributionLocationEnvOnlyTest):
           DistributionLocator.locate()
 
   def test_locate_jdk_is_jre(self):
-    with distribution(executables=exe('bin/java')) as dist_root:
+    with distribution(executables=EXE('bin/java')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.locate(jdk=True)
 
   def test_locate_version_to_low(self):
-    with distribution(executables=exe('bin/java', '1.6.0')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.6.0')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.locate(minimum_version='1.7.0')
 
   def test_locate_version_to_high(self):
-    with distribution(executables=exe('bin/java', '1.8.0')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.8.0')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.locate(maximum_version='1.7.999')
 
   def test_locate_invalid_jdk_home(self):
-    with distribution(executables=exe('java')) as dist_root:
+    with distribution(executables=EXE('java')) as dist_root:
       with env(JDK_HOME=dist_root):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.locate()
 
   def test_locate_invalid_java_home(self):
-    with distribution(executables=exe('java')) as dist_root:
+    with distribution(executables=EXE('java')) as dist_root:
       with env(JAVA_HOME=dist_root):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.locate()
 
   def test_locate_jre_by_path(self):
-    with distribution(executables=exe('bin/java')) as dist_root:
+    with distribution(executables=EXE('bin/java')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         DistributionLocator.locate()
 
   def test_locate_jdk_by_path(self):
-    with distribution(executables=[exe('bin/java'), exe('bin/javac')]) as dist_root:
+    with distribution(executables=[EXE('bin/java'), EXE('bin/javac')]) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         DistributionLocator.locate(jdk=True)
 
   def test_locate_jdk_via_jre_path(self):
-    with distribution(executables=[exe('jre/bin/java'), exe('bin/javac')],
+    with distribution(executables=[EXE('jre/bin/java'), EXE('bin/javac')],
                       java_home='jre') as dist_root:
       with env(PATH=os.path.join(dist_root, 'jre', 'bin')):
         DistributionLocator.locate(jdk=True)
 
   def test_locate_version_greater_then_or_equal(self):
-    with distribution(executables=exe('bin/java', '1.7.0')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         DistributionLocator.locate(minimum_version='1.6.0')
 
   def test_locate_version_less_then_or_equal(self):
-    with distribution(executables=exe('bin/java', '1.7.0')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         DistributionLocator.locate(maximum_version='1.7.999')
 
   def test_locate_version_within_range(self):
-    with distribution(executables=exe('bin/java', '1.7.0')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         DistributionLocator.locate(minimum_version='1.6.0', maximum_version='1.7.999')
 
   def test_locate_via_jdk_home(self):
-    with distribution(executables=exe('bin/java')) as dist_root:
+    with distribution(executables=EXE('bin/java')) as dist_root:
       with env(JDK_HOME=dist_root):
         DistributionLocator.locate()
 
   def test_locate_via_java_home(self):
-    with distribution(executables=exe('bin/java')) as dist_root:
+    with distribution(executables=EXE('bin/java')) as dist_root:
       with env(JAVA_HOME=dist_root):
         DistributionLocator.locate()
 
@@ -267,8 +272,8 @@ class DistributionLinuxLocationTest(BaseDistributionLocationTest):
 
   @contextmanager
   def java_dist_dir(self):
-    with distribution(executables=exe('bin/java', version='1')) as jdk1_home:
-      with distribution(executables=exe('bin/java', version='2')) as jdk2_home:
+    with distribution(executables=EXE('bin/java', version='1')) as jdk1_home:
+      with distribution(executables=EXE('bin/java', version='2')) as jdk2_home:
         with temporary_dir() as java_dist_dir:
           jdk1_home_link = os.path.join(java_dist_dir, 'jdk1_home')
           jdk2_home_link = os.path.join(java_dist_dir, 'jdk2_home')
@@ -296,7 +301,7 @@ class DistributionLinuxLocationTest(BaseDistributionLocationTest):
 
   def test_default_to_path(self):
     with self.java_dist_dir() as (jdk1_home, jdk2_home):
-      with distribution(executables=exe('bin/java', version='3')) as path_jdk:
+      with distribution(executables=EXE('bin/java', version='3')) as path_jdk:
         with env(PATH=os.path.join(path_jdk, 'bin')):
           dist = DistributionLocator.locate(minimum_version='2')
           self.assertEqual(path_jdk, dist.home)
@@ -305,7 +310,7 @@ class DistributionLinuxLocationTest(BaseDistributionLocationTest):
 
   def test_locate_jdk_home_trumps(self):
     with self.java_dist_dir() as (jdk1_home, jdk2_home):
-      with distribution(executables=exe('bin/java', version='3')) as jdk_home:
+      with distribution(executables=EXE('bin/java', version='3')) as jdk_home:
         with env(JDK_HOME=jdk_home):
           dist = DistributionLocator.locate()
           self.assertEqual(jdk_home, dist.home)
@@ -316,7 +321,7 @@ class DistributionLinuxLocationTest(BaseDistributionLocationTest):
 
   def test_locate_java_home_trumps(self):
     with self.java_dist_dir() as (jdk1_home, jdk2_home):
-      with distribution(executables=exe('bin/java', version='3')) as java_home:
+      with distribution(executables=EXE('bin/java', version='3')) as java_home:
         with env(JAVA_HOME=java_home):
           dist = DistributionLocator.locate()
           self.assertEqual(java_home, dist.home)
@@ -338,8 +343,8 @@ class DistributionOSXLocationTest(BaseDistributionLocationTest):
 
   @contextmanager
   def java_home_exe(self):
-    with distribution(executables=exe('bin/java', version='1')) as jdk1_home:
-      with distribution(executables=exe('bin/java', version='2')) as jdk2_home:
+    with distribution(executables=EXE('bin/java', version='1')) as jdk1_home:
+      with distribution(executables=EXE('bin/java', version='2')) as jdk2_home:
         with temporary_dir() as tmpdir:
           osx_java_home_exe = os.path.join(tmpdir, 'java_home')
           with safe_open(osx_java_home_exe, 'w') as fp:
@@ -385,7 +390,7 @@ class DistributionOSXLocationTest(BaseDistributionLocationTest):
 
   def test_default_to_path(self):
     with self.java_home_exe() as (jdk1_home, jdk2_home):
-      with distribution(executables=exe('bin/java', version='3')) as path_jdk:
+      with distribution(executables=EXE('bin/java', version='3')) as path_jdk:
         with env(PATH=os.path.join(path_jdk, 'bin')):
           dist = DistributionLocator.locate(minimum_version='2')
           self.assertEqual(path_jdk, dist.home)
@@ -394,7 +399,7 @@ class DistributionOSXLocationTest(BaseDistributionLocationTest):
 
   def test_locate_jdk_home_trumps(self):
     with self.java_home_exe() as (jdk1_home, jdk2_home):
-      with distribution(executables=exe('bin/java', version='3')) as jdk_home:
+      with distribution(executables=EXE('bin/java', version='3')) as jdk_home:
         with env(JDK_HOME=jdk_home):
           dist = DistributionLocator.locate()
           self.assertEqual(jdk_home, dist.home)
@@ -405,7 +410,7 @@ class DistributionOSXLocationTest(BaseDistributionLocationTest):
 
   def test_locate_java_home_trumps(self):
     with self.java_home_exe() as (jdk1_home, jdk2_home):
-      with distribution(executables=exe('bin/java', version='3')) as java_home:
+      with distribution(executables=EXE('bin/java', version='3')) as java_home:
         with env(JAVA_HOME=java_home):
           dist = DistributionLocator.locate()
           self.assertEqual(java_home, dist.home)
@@ -428,52 +433,52 @@ class DistributionCachedTest(BaseDistributionLocationEnvOnlyTest):
     self.addCleanup(restore_cache)
 
   def test_cached_good_min(self):
-    with distribution(executables=exe('bin/java', '1.7.0_33')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_33')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         DistributionLocator.cached(minimum_version='1.7.0_25')
 
   def test_cached_good_max(self):
-    with distribution(executables=exe('bin/java', '1.7.0_33')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_33')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         DistributionLocator.cached(maximum_version='1.7.0_50')
 
   def test_cached_good_bounds(self):
-    with distribution(executables=exe('bin/java', '1.7.0_33')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_33')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         DistributionLocator.cached(minimum_version='1.6.0_35', maximum_version='1.7.0_55')
 
   def test_cached_too_low(self):
-    with distribution(executables=exe('bin/java', '1.7.0_33')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_33')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.cached(minimum_version='1.7.0_40')
 
   def test_cached_too_high(self):
-    with distribution(executables=exe('bin/java', '1.7.0_83')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_83')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.cached(maximum_version='1.7.0_55')
 
   def test_cached_low_fault(self):
-    with distribution(executables=exe('bin/java', '1.7.0_33')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_33')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.cached(minimum_version='1.7.0_35', maximum_version='1.7.0_55')
 
   def test_cached_high_fault(self):
-    with distribution(executables=exe('bin/java', '1.7.0_33')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_33')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.cached(minimum_version='1.6.0_00', maximum_version='1.6.0_50')
 
   def test_cached_conflicting(self):
-    with distribution(executables=exe('bin/java', '1.7.0_33')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_33')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(Distribution.Error):
           DistributionLocator.cached(minimum_version='1.7.0_00', maximum_version='1.6.0_50')
 
   def test_cached_bad_input(self):
-    with distribution(executables=exe('bin/java', '1.7.0_33')) as dist_root:
+    with distribution(executables=EXE('bin/java', '1.7.0_33')) as dist_root:
       with env(PATH=os.path.join(dist_root, 'bin')):
         with self.assertRaises(ValueError):
           DistributionLocator.cached(minimum_version=1.7, maximum_version=1.8)

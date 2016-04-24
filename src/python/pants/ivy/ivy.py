@@ -21,6 +21,8 @@ from pants.util.dirutil import safe_mkdir
 class Ivy(object):
   """Encapsulates the ivy cli taking care of the basic invocation letting you just worry about the
   args to pass to the cli itself.
+
+  :API: public
   """
 
   class Error(Exception):

@@ -22,6 +22,10 @@ from pants.util.memo import memoized_property
 
 
 class JvmBinaryTask(JarBuilderTask):
+  """Encapsulates operations to build or update JvmBinary jars.
+
+  :API: public
+  """
 
   @staticmethod
   def is_binary(target):

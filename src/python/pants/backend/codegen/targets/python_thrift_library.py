@@ -9,7 +9,10 @@ from pants.backend.python.targets.python_target import PythonTarget
 
 
 class PythonThriftLibrary(PythonTarget):
-  """A Python library generated from Thrift IDL files."""
+  """A Python library generated from Thrift IDL files.
+
+  :API: public
+  """
 
   def __init__(self, **kwargs):
     """

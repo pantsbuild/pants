@@ -12,7 +12,10 @@ from pants.util.meta import AbstractClass
 
 
 class Jarable(AbstractClass):
-  """A mixin that identifies a target as one that can provide a jar."""
+  """A mixin that identifies a target as one that can provide a jar.
+
+  :API: public
+  """
 
   @abstractproperty
   def identifier(self):
