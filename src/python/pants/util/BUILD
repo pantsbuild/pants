@@ -2,6 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name = 'argutil',
+  sources = ['argutil.py'],
+)
+
+python_library(
    name = 'contextutil',
    sources = ['contextutil.py'],
    dependencies = [
