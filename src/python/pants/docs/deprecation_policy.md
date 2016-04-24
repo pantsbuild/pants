@@ -40,7 +40,7 @@ For example, a method `baz` of class `Bar` defined at the top level of module `f
       :API: public
       """
 
-As a special exception, subsystem types marked `:API: public` implicitly have all their registered options exposed as `:API: public members`.
+As a special exception, subsystem types marked `:API: public` implicitly have all their registered options exposed as `:API: public` members.
 
 The following rules apply to definitions in the public API. No rules apply to definitions outside the public API. Those may be changed in any way at any time.
 
