@@ -53,7 +53,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
-      'testprojects/tests/java/org/pantsbuild/testproject/parallel.*',
     ]
 
     # May not succeed without java8 installed
