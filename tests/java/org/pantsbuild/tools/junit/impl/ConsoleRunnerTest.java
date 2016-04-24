@@ -11,6 +11,7 @@ import org.apache.commons.io.FileUtils;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
+import org.pantsbuild.tools.junit.ConsoleRunner;
 import org.pantsbuild.tools.junit.lib.FailingTestRunner;
 import org.pantsbuild.tools.junit.lib.FlakyTest;
 import org.pantsbuild.tools.junit.lib.MockTest4;
@@ -69,7 +70,8 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   @Test
   public void testShardedTesting12WithParallelThreads() {
     ConsoleRunnerImpl.main(asArgsArray(
-        "MockTest1 MockTest2 MockTest3 -test-shard 1/2 -parallel-threads 4 -default-parallel"));
+        "MockTest1 MockTest2 MockTest3 "
+        + "-test-shard 1/2 -parallel-threads 4 -default-concurrency PARALLEL_CLASSES"));
     assertEquals("test12 test21 test31", TestRegistry.getCalledTests());
   }
 
@@ -77,7 +79,8 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   public void testShardedTesting23WithParallelThreads() {
     // This tests a corner case when no tests from MockTest2 are going to run.
     ConsoleRunnerImpl.main(asArgsArray(
-        "MockTest1 MockTest2 MockTest3 -test-shard 2/3 -parallel-threads 3 -default-parallel"));
+        "MockTest1 MockTest2 MockTest3 "
+        + "-test-shard 2/3 -parallel-threads 3 -default-concurrency PARALLEL_CLASSES"));
     assertEquals("test13 test31", TestRegistry.getCalledTests());
   }
 
@@ -138,7 +141,8 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   public void testOutputDir() throws Exception {
     String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();
     ConsoleRunnerImpl.main(asArgsArray(
-        "MockTest4 -parallel-threads 1 -default-parallel -xmlreport -outdir " + outdir));
+        "MockTest4 -parallel-threads 1 -default-concurrency PARALLEL_CLASSES -xmlreport -outdir "
+            + outdir));
     Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
 
     String testClassName = MockTest4.class.getCanonicalName();
@@ -158,10 +162,12 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   @Test
   public void testSerialAnnotation() throws Exception {
     ConsoleRunnerImpl.main(asArgsArray(
-        "AnnotatedSerialTest1 AnnotatedSerialTest2 -default-parallel -parallel-threads 2"));
+        "AnnotatedSerialTest1 AnnotatedSerialTest2 "
+        + "-default-concurrency PARALLEL_CLASSES -parallel-threads 2"));
     assertEquals("astest1 astest2", TestRegistry.getCalledTests());
   }
 
+  /* LEGACY, remove after -default-parallel argument is removed */
   @Test
   public void testParallelDefaultParallel() throws Exception {
     ConsoleRunnerImpl.main(asArgsArray(
@@ -169,12 +175,37 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
     assertEquals("ptest1 ptest2", TestRegistry.getCalledTests());
   }
 
+  /* LEGACY, remove after -parallel-methods argument is removed */
   @Test
   public void testParallelMethodsDefaultParallel() throws Exception {
     ConsoleRunnerImpl.main(asArgsArray(
         "ParallelMethodsDefaultParallelTest1 ParallelMethodsDefaultParallelTest2"
-        + " -parallel-methods -parallel-threads 4 -default-parallel"));
+            + " -parallel-methods -parallel-threads 4 -default-parallel"));
     assertEquals("pmdptest11 pmdptest12 pmdptest21 pmdptest22", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testConcurrencyParallelClasses() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray(
+        "ParallelTest1 ParallelTest2 -parallel-threads 2 -default-concurrency PARALLEL_CLASSES"));
+    assertEquals("ptest1 ptest2", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testConcurrencyParallelBoth() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray(
+        "ParallelMethodsDefaultParallelTest1 ParallelMethodsDefaultParallelTest2"
+            + " -default-concurrency PARALLEL_BOTH -parallel-threads 4"));
+    assertEquals("pmdptest11 pmdptest12 pmdptest21 pmdptest22", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testConcurrencySerial() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray(
+        "SerialTest1 SerialTest2"
+            + " -default-concurrency SERIAL -parallel-threads 4"));
+    assertEquals("stest1 stest2", TestRegistry.getCalledTests());
+
   }
 
   @Test
@@ -399,5 +430,23 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
     assertEquals("java.lang.RuntimeException", testCase.getError().getType());
     assertThat(testCase.getError().getStacktrace(),
         containsString(FailingTestRunner.class.getCanonicalName() + ".getTestRules("));
+  }
+
+  @Test
+  public void testLegacyConcurrencyOptions() {
+    // New style option overrides old
+    assertEquals(Concurrency.SERIAL,
+        ConsoleRunnerImpl.computeConcurrencyOption(Concurrency.SERIAL, true, true));
+    assertEquals(Concurrency.PARALLEL_CLASSES,
+        ConsoleRunnerImpl.computeConcurrencyOption(Concurrency.PARALLEL_CLASSES, false, false));
+
+    assertEquals(Concurrency.SERIAL,
+        ConsoleRunnerImpl.computeConcurrencyOption(null, false, false));
+    assertEquals(Concurrency.SERIAL,
+        ConsoleRunnerImpl.computeConcurrencyOption(null, false, true));
+    assertEquals(Concurrency.PARALLEL_BOTH,
+        ConsoleRunnerImpl.computeConcurrencyOption(null, true, true));
+    assertEquals(Concurrency.PARALLEL_CLASSES,
+        ConsoleRunnerImpl.computeConcurrencyOption(null, true, false));
   }
 }
