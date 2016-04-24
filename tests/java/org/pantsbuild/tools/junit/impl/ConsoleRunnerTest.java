@@ -147,6 +147,27 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   }
 
   @Test
+  public void testParallelAnnotation() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray(
+      "AnnotatedParallelTest1 AnnotatedParallelTest2 -parallel-threads 2"));
+    assertEquals("aptest1 aptest2", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testSerialAnnotation() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray(
+        "AnnotatedSerialTest1 AnnotatedSerialTest2 -default-parallel -parallel-threads 2"));
+    assertEquals("astest1 astest2", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testParallelDefaultParallel() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray(
+        "ParallelTest1 ParallelTest2 -parallel-threads 2 -default-parallel"));
+    assertEquals("ptest1 ptest2", TestRegistry.getCalledTests());
+  }
+
+  @Test
   public void testParallelMethodsDefaultParallel() throws Exception {
     ConsoleRunnerImpl.main(asArgsArray(
         "ParallelMethodsDefaultParallelTest1 ParallelMethodsDefaultParallelTest2"
