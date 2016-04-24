@@ -49,7 +49,7 @@ def setup(options=None):
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
 
   storage = Storage.create(debug=False)
-  # ignore any dotfile below build_root
+  # Ignore any dotfile below build_root.
   project_tree = FileSystemProjectTree(build_root, ['.*'])
   symbol_table_cls = LegacyTable
 

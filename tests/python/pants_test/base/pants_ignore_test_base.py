@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -47,14 +47,18 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
   def cleanup(self):
     os.chdir(self.cwd)
-    self.rmdirs(self.base_dir)
+    self.rm_base_dir()
 
-  def test_ignore_pattern_blank_line(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, [""])
+  def _walk_tree(self):
     files_list = []
     for root, dirs, files in self._project_tree.walk(''):
       for file in files:
         files_list.append(os.path.join(root, file))
+    return files_list
+
+  def test_ignore_pattern_blank_line(self):
+    self._project_tree = self.mk_project_tree(self.root_dir, [""])
+    files_list = self._walk_tree()
 
     self.assertEquals({'apple', 'orange', 'banana',
                        'fruit/apple', 'fruit/orange', 'fruit/banana',
@@ -64,10 +68,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
   def test_ignore_pattern_comment(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ["#fruit", "#apple", "#banana"])
-    files_list = []
-    for root, dirs, files in self._project_tree.walk(''):
-      for file in files:
-        files_list.append(os.path.join(root, file))
+    files_list = self._walk_tree()
 
     self.assertEquals({'apple', 'orange', 'banana',
                        'fruit/apple', 'fruit/orange', 'fruit/banana',
@@ -77,10 +78,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
   def test_ignore_pattern_negate(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ["*an*", "!*na*"])
-    files_list = []
-    for root, dirs, files in self._project_tree.walk(''):
-      for file in files:
-        files_list.append(os.path.join(root, file))
+    files_list = self._walk_tree()
 
     self.assertEquals({'apple', 'banana',
                        'fruit/apple', 'fruit/banana',
@@ -90,10 +88,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
   def test_ignore_pattern_ends_with_slash(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ["fruit/"])
-    files_list = []
-    for root, dirs, files in self._project_tree.walk(''):
-      for file in files:
-        files_list.append(os.path.join(root, file))
+    files_list = self._walk_tree()
 
     self.assertEquals({'apple', 'banana', 'orange',
                        'grocery/fruit'
@@ -101,19 +96,13 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
   def test_ignore_pattern_no_slash(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ["fruit"])
-    files_list = []
-    for root, dirs, files in self._project_tree.walk(''):
-      for file in files:
-        files_list.append(os.path.join(root, file))
+    files_list = self._walk_tree()
 
     self.assertEquals({'apple', 'banana', 'orange'}, set(files_list))
 
   def test_ignore_pattern_has_slash(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ["fruit/apple"])
-    files_list = []
-    for root, dirs, files in self._project_tree.walk(''):
-      for file in files:
-        files_list.append(os.path.join(root, file))
+    files_list = self._walk_tree()
 
     self.assertEquals({'apple', 'banana', 'orange',
                        'fruit/banana', 'fruit/orange',
@@ -132,10 +121,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
   def test_ignore_pattern_leading_slash(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ["/apple"])
-    files_list = []
-    for root, dirs, files in self._project_tree.walk(''):
-      for file in files:
-        files_list.append(os.path.join(root, file))
+    files_list = self._walk_tree()
 
     self.assertEquals({'banana', 'orange',
                        'fruit/apple', 'fruit/banana', 'fruit/orange',
@@ -145,10 +131,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
   def test_ignore_pattern_wildcard(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ["/*e"])
-    files_list = []
-    for root, dirs, files in self._project_tree.walk(''):
-      for file in files:
-        files_list.append(os.path.join(root, file))
+    files_list = self._walk_tree()
 
     self.assertEquals({'banana',
                        'fruit/apple', 'fruit/banana', 'fruit/orange',
@@ -164,10 +147,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
   def test_ignore_pattern_two_asterisks(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ["/**/apple"])
-    files_list = []
-    for root, dirs, files in self._project_tree.walk(''):
-      for file in files:
-        files_list.append(os.path.join(root, file))
+    files_list = self._walk_tree()
 
     self.assertEquals({'banana', 'orange',
                        'fruit/banana', 'fruit/orange',
