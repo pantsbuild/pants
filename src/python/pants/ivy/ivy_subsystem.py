@@ -14,10 +14,8 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class IvySubsystem(Subsystem):
-  """Common configuration items for ivy tasks.
+  """Common configuration items for ivy tasks."""
 
-  :API: public
-  """
   options_scope = 'ivy'
 
   _DEFAULT_VERSION = '2.4.0'

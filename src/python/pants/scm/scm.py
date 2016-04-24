@@ -11,10 +11,7 @@ from pants.util.meta import AbstractClass
 
 
 class Scm(AbstractClass):
-  """Abstracts high-level scm operations needed by pants core and pants tasks.
-
-  :API: public
-  """
+  """Abstracts high-level scm operations needed by pants core and pants tasks."""
 
   class ScmException(Exception):
     """Indicates a problem interacting with the scm."""
