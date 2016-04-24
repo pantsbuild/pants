@@ -460,7 +460,7 @@ class DistributionLocator(Subsystem):
       for location in cls.global_instance().java_path_locations():
         yield location
 
-      for location in cls.environment_jvm_locations():
+      for location in cls._environment_jvm_locations():
         yield location
 
     for location in filter(None, search_path()):
@@ -475,14 +475,16 @@ class DistributionLocator(Subsystem):
                      .format(dist, minimum_version, maximum_version, jdk))
         return dist
       except (ValueError, Distribution.Error):
-
         pass
 
-
-    if minimum_version is not None and maximum_version is not None and maximum_version < minimum_version:
-      error_format = 'Pants configuration/options led to impossible constraints for {} distribution: minimum_version {}, maximum_version {}'
+    if (minimum_version is not None
+        and maximum_version is not None
+        and maximum_version < minimum_version):
+      error_format = ('Pants configuration/options led to impossible constraints for {} '
+                      'distribution: minimum_version {}, maximum_version {}')
     else:
-      error_format = 'Failed to locate a {} distribution with minimum_version {}, maximum_version {}'
+      error_format = ('Failed to locate a {} distribution with minimum_version {}, '
+                      'maximum_version {}')
     raise cls.Error(error_format.format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
 
   @classmethod
@@ -526,7 +528,7 @@ class DistributionLocator(Subsystem):
         pass
 
   @classmethod
-  def environment_jvm_locations(cls):
+  def _environment_jvm_locations(cls):
     def env_home(home_env_var):
       home = os.environ.get(home_env_var)
       return cls._Location.from_home(home) if home else None
