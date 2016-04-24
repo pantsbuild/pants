@@ -326,6 +326,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/java:util',
     'src/python/pants/task',
+    'src/python/pants/util:argutil',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
