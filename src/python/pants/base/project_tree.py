@@ -11,7 +11,6 @@ from abc import abstractmethod
 
 from pathspec.gitignore import GitIgnorePattern
 from pathspec.pathspec import PathSpec
-from twitter.common.collections import OrderedSet
 
 from pants.util.dirutil import fast_relpath
 from pants.util.meta import AbstractClass
@@ -175,13 +174,15 @@ class ProjectTree(AbstractClass):
     return len(match_result) > 0
 
   def filter_ignored(self, path_list, prefix=''):
-    """Takes a list of paths and returns a list of unignored files."""
+    """Takes a list of paths and filters out ignored ones."""
     prefixed_path_list = [self._append_slash_if_dir_path(os.path.join(prefix, item)) for item in path_list]
-    ignored_paths = OrderedSet(self.ignore.match_files(prefixed_path_list))
+    ignored_paths = list(self.ignore.match_files(prefixed_path_list))
     if len(ignored_paths) == 0:
       return path_list
 
-    return [fast_relpath(f, prefix).rstrip('/') for f in list(OrderedSet(prefixed_path_list) - ignored_paths)]
+    return [fast_relpath(f, prefix).rstrip('/') for f in
+            [path for path in prefixed_path_list if path not in ignored_paths]
+            ]
 
   def _raise_access_ignored(self, relpath):
     """Raises exception when accessing ignored path."""

@@ -15,32 +15,39 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     self.base_dir = self.make_base_dir()
     self.root_dir = os.path.join(self.base_dir, 'root')
 
-    # make 'root/'
+    self._all_files = set()
+
+    # Make 'root/'.
     self.makedirs('')
 
-    # make 'root/...'
-    self.touch('apple')
-    self.touch('orange')
-    self.touch('banana')
+    # Make 'root/...'.
+    files = ['apple', 'orange', 'banana']
+    self.touch_list(files)
+    self._all_files |= set(files)
 
-    # make 'root/fruit/'
+    # Make 'root/fruit/'.
     self.makedirs('fruit')
 
-    # make 'root/fruit/...'
-    self.touch('fruit/apple')
-    self.touch('fruit/orange')
-    self.touch('fruit/banana')
+    # Make 'root/fruit/...'.
+    files = ['fruit/apple', 'fruit/orange', 'fruit/banana']
+    self.touch_list(files)
+    self._all_files |= set(files)
 
-    # make 'root/fruit/fruit/'
+    # Make 'root/fruit/fruit/'.
     self.makedirs('fruit/fruit')
 
-    # make 'root/fruit/fruit/...'
-    self.touch('fruit/fruit/apple')
-    self.touch('fruit/fruit/orange')
-    self.touch('fruit/fruit/banana')
+    # Make 'root/fruit/fruit/...'.
+    files = ['fruit/fruit/apple', 'fruit/fruit/orange', 'fruit/fruit/banana']
+    self.touch_list(files)
+    self._all_files |= set(files)
 
+    # Make 'root/grocery/'.
     self.makedirs('grocery')
-    self.touch('grocery/fruit')
+
+    # Make 'root/grocery/fruit'.
+    files = ['grocery/fruit']
+    self.touch_list(files)
+    self._all_files |= set(files)
 
     self.cwd = os.getcwd()
     os.chdir(self.root_dir)
@@ -57,106 +64,88 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     return files_list
 
   def test_ignore_pattern_blank_line(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, [""])
+    self._project_tree = self.mk_project_tree(self.root_dir, [''])
     files_list = self._walk_tree()
 
-    self.assertEquals({'apple', 'orange', 'banana',
-                       'fruit/apple', 'fruit/orange', 'fruit/banana',
-                       'fruit/fruit/apple', 'fruit/fruit/orange', 'fruit/fruit/banana',
-                       'grocery/fruit'
-                       }, set(files_list))
+    self.assertEquals(self._all_files, set(files_list))
 
   def test_ignore_pattern_comment(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["#fruit", "#apple", "#banana"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['#fruit', '#apple', '#banana'])
     files_list = self._walk_tree()
 
-    self.assertEquals({'apple', 'orange', 'banana',
-                       'fruit/apple', 'fruit/orange', 'fruit/banana',
-                       'fruit/fruit/apple', 'fruit/fruit/orange', 'fruit/fruit/banana',
-                       'grocery/fruit'
-                       }, set(files_list))
+    self.assertEquals(self._all_files, set(files_list))
 
   def test_ignore_pattern_negate(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["*an*", "!*na*"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['*an*', '!*na*'])
     files_list = self._walk_tree()
 
-    self.assertEquals({'apple', 'banana',
-                       'fruit/apple', 'fruit/banana',
-                       'fruit/fruit/apple', 'fruit/fruit/banana',
-                       'grocery/fruit'
-                       }, set(files_list))
+    self.assertEquals(
+      self._all_files - {'orange', 'fruit/orange', 'fruit/fruit/orange'},
+      set(files_list)
+    )
 
   def test_ignore_pattern_ends_with_slash(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["fruit/"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['fruit/'])
     files_list = self._walk_tree()
 
-    self.assertEquals({'apple', 'banana', 'orange',
-                       'grocery/fruit'
-                       }, set(files_list))
+    self.assertEquals(
+      self._all_files - {'fruit/apple', 'fruit/banana', 'fruit/orange',
+                         'fruit/fruit/apple', 'fruit/fruit/banana', 'fruit/fruit/orange'},
+      set(files_list)
+    )
 
   def test_ignore_pattern_no_slash(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["fruit"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['fruit'])
     files_list = self._walk_tree()
 
-    self.assertEquals({'apple', 'banana', 'orange'}, set(files_list))
+    self.assertEquals(
+      self._all_files - {'fruit/apple', 'fruit/banana', 'fruit/orange',
+                         'fruit/fruit/apple', 'fruit/fruit/banana', 'fruit/fruit/orange',
+                         'grocery/fruit'},
+      set(files_list)
+    )
 
   def test_ignore_pattern_has_slash(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["fruit/apple"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['fruit/apple'])
     files_list = self._walk_tree()
 
-    self.assertEquals({'apple', 'banana', 'orange',
-                       'fruit/banana', 'fruit/orange',
-                       'fruit/fruit/apple', 'fruit/fruit/banana', 'fruit/fruit/orange',
-                       'grocery/fruit'
-                       }, set(files_list))
+    self.assertEquals(self._all_files - {'fruit/apple'}, set(files_list))
 
-    files_list = self._project_tree.glob1("fruit", "*")
+    files_list = self._project_tree.glob1('fruit', '*')
     self.assertEquals({'banana', 'orange', 'fruit'}, set(files_list))
 
-    files_list = self._project_tree.listdir("fruit")
+    files_list = self._project_tree.listdir('fruit')
     self.assertEquals({'banana', 'orange', 'fruit'}, set(files_list))
 
     with self.assertRaises(self._project_tree.AccessIgnoredPathError):
-      self._project_tree.content("fruit/apple")
+      self._project_tree.content('fruit/apple')
 
   def test_ignore_pattern_leading_slash(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["/apple"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['/apple'])
     files_list = self._walk_tree()
 
-    self.assertEquals({'banana', 'orange',
-                       'fruit/apple', 'fruit/banana', 'fruit/orange',
-                       'fruit/fruit/apple', 'fruit/fruit/banana', 'fruit/fruit/orange',
-                       'grocery/fruit'
-                       }, set(files_list))
+    self.assertEquals(self._all_files - {'apple'}, set(files_list))
 
   def test_ignore_pattern_wildcard(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["/*e"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['/*e'])
     files_list = self._walk_tree()
 
-    self.assertEquals({'banana',
-                       'fruit/apple', 'fruit/banana', 'fruit/orange',
-                       'fruit/fruit/apple', 'fruit/fruit/banana', 'fruit/fruit/orange',
-                       'grocery/fruit'
-                       }, set(files_list))
+    self.assertEquals(self._all_files - {'apple', 'orange'}, set(files_list))
 
-    files_list = self._project_tree.glob1("", "*e")
+    files_list = self._project_tree.glob1('', '*e')
     self.assertEquals(set(), set(files_list))
 
-    files_list = self._project_tree.listdir("")
+    files_list = self._project_tree.listdir('')
     self.assertEquals({'banana', 'fruit', 'grocery'}, set(files_list))
 
   def test_ignore_pattern_two_asterisks(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["/**/apple"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['/**/apple'])
     files_list = self._walk_tree()
 
-    self.assertEquals({'banana', 'orange',
-                       'fruit/banana', 'fruit/orange',
-                       'fruit/fruit/banana', 'fruit/fruit/orange',
-                       'grocery/fruit'
-                       }, set(files_list))
+    self.assertEquals(self._all_files - {'apple', 'fruit/apple', 'fruit/fruit/apple'}, set(files_list))
 
   def test_ignore_dir_path_ignore_1(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["fruit/fruit/"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['fruit/fruit/'])
 
     self.assertFalse(self._project_tree.isdir('fruit/fruit'))
     self.assertFalse(self._project_tree.exists('fruit/fruit'))
@@ -164,7 +153,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     self.assertEquals({'apple', 'banana', 'orange'}, set(self._project_tree.listdir('fruit')))
 
   def test_ignore_dir_path_ignore_2(self):
-    self._project_tree = self.mk_project_tree(self.root_dir, ["fruit/"])
+    self._project_tree = self.mk_project_tree(self.root_dir, ['fruit/'])
 
     self.assertFalse(self._project_tree.isdir('fruit'))
     self.assertFalse(self._project_tree.exists('fruit'))

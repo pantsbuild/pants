@@ -33,5 +33,9 @@ class ProjectTreeTestBase(AbstractClass):
   def touch(self, path):
     touch(self.fullpath(path))
 
+  def touch_list(self, path_list):
+    for path in path_list:
+      self.touch(path)
+
   def rm_base_dir(self):
     shutil.rmtree(self.base_dir)
