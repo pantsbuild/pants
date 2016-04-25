@@ -1,8 +1,8 @@
 RELEASE HISTORY
 ===============
 
-1.0.0-rc1 (05/1/2016)
----------------------
+1.0.0 (05/1/2016)
+-----------------
 
 This release has several changes related to documentation, CI fixes and work
 in preparation for the 1.0 release.
