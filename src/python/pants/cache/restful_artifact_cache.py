@@ -101,19 +101,19 @@ class RESTfulArtifactCache(ArtifactCache):
           response = session.delete(url, timeout=self._timeout_secs)
         else:
           raise ValueError('Unknown request method {0}'.format(method))
-
-        # Allow all 2XX responses. E.g., nginx returns 201 on PUT. HEAD may return 204.
-        if int(response.status_code / 100) == 2:
-          return response
-        elif response.status_code == 404:
-          logger.debug('404 returned for {0} request to {1}'.format(method, url))
-          return None
-        else:
-          raise NonfatalArtifactCacheError('Failed to {0} {1}. Error: {2} {3}'
-                                           .format(method, url, response.status_code, response.reason))
       except RequestException as e:
         raise NonfatalArtifactCacheError('Failed to {0} {1}. Error: {2}'
-                                           .format(method, url, e))
+                                         .format(method, url, e))
+      # Allow all 2XX responses. E.g., nginx returns 201 on PUT. HEAD may return 204.
+      if int(response.status_code / 100) == 2:
+        return response
+      elif response.status_code == 404:
+        logger.debug('404 returned for {0} request to {1}'.format(method, url))
+        return None
+      else:
+        raise NonfatalArtifactCacheError('Failed to {0} {1}. Error: {2} {3}'
+                                         .format(method, url,
+                                                 response.status_code, response.reason))
 
   def _url_for_key(self, url, cache_key):
     path_prefix = url.path.rstrip(b'/')
