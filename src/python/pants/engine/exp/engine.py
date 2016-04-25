@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import cPickle as pickle
 import functools
 import logging
 import multiprocessing
@@ -19,12 +20,6 @@ from pants.engine.exp.processing import StatefulPool
 from pants.engine.exp.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-
-
-try:
-  import cPickle as pickle
-except ImportError:
-  import pickle
 
 
 logger = logging.getLogger(__name__)

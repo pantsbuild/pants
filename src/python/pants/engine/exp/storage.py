@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import cPickle as pickle
-import cStringIO as StringIO
 import sys
 from abc import abstractmethod
 from binascii import hexlify
@@ -14,6 +13,8 @@ from collections import Counter
 from contextlib import closing
 from functools import total_ordering
 from hashlib import sha1
+from io import BytesIO
+from StringIO import StringIO
 from struct import Struct as StdlibStruct
 
 import lmdb
@@ -166,7 +167,7 @@ class Storage(Closable):
     Longer term see https://github.com/pantsbuild/pants/issues/2969
     """
     try:
-      with closing(StringIO.StringIO()) as buf:
+      with closing(BytesIO()) as buf:
         pickler = pickle.Pickler(buf, protocol=self._protocol)
         pickler.fast = 1
         pickler.dump(obj)
@@ -493,7 +494,7 @@ class Lmdb(KeyValueStore):
     with self._env.begin(db=self._db, buffers=True) as txn:
       value = txn.get(key)
       if value is not None:
-        return StringIO.StringIO(value)
+        return StringIO(value)
       return None
 
   def put(self, key, value):
