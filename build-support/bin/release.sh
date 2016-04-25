@@ -224,7 +224,11 @@ EOM
 function check_clean_branch() {
   banner "Checking for a clean branch"
 
-  [[ -z "$(git status --porcelain)" ]] || die "You are not on a clean branch."
+  pattern="^(master)|([0-9]+\.[0-9]+\.x)$"
+  branch=$(git branch | grep -E '^\* ' | cut -d' ' -f2-)
+  [[ -z "$(git status --porcelain)" &&
+     $branch =~ $pattern
+  ]] || die "You are not on a clean branch."
 }
 
 function check_pgp() {
@@ -323,7 +327,7 @@ function get_owners() {
 
   latest_package_path=$(
     curl -s https://pypi.python.org/pypi/${package_name} | \
-      grep -oE  "/pypi/${package_name}/[0-9]*\.[0-9]*\.[0-9]*" | head -n1
+        grep -oE  "/pypi/${package_name}/[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?" | head -n1
   )
   curl -s "https://pypi.python.org${latest_package_path}" | \
     grep -A1 "Owner" | tail -1 | \
