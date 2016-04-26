@@ -398,6 +398,8 @@ class KeyValueStore(Closable, AbstractClass):
     """Fetch the value for a given key.
 
     :param key: key in bytestring.
+    :param transform: optional function that is applied on the retrieved value from storage
+      before return, since the original value may be only valid within the context.
     :return: value can be either string-like or file-like, `None` if does not exist.
     """
 
