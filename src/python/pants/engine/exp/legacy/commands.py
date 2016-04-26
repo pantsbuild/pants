@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import sys
+import logging
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -25,6 +25,9 @@ from pants.engine.exp.storage import Storage
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.util.memo import memoized_method
+
+
+logger = logging.getLogger(__name__)
 
 
 class LegacyTable(SymbolTable):
@@ -92,7 +95,7 @@ def _open_scheduler(*args, **kwargs):
     yield scheduler, engine, symbol_table_cls, spec_roots
     maybe_launch_pantsd(options, scheduler)
   finally:
-    print('Cache stats: {}'.format(engine._cache.get_stats()), file=sys.stderr)
+    logger.debug('Cache stats: {}'.format(engine._cache.get_stats()))
     engine.close()
 
 
@@ -106,9 +109,9 @@ def open_exp_graph(*args, **kwargs):
 
 def dependencies():
   """Lists the transitive dependencies of targets under the current build root."""
-  with open_exp_graph() as (_, addresses, _):
-    for address in addresses:
-      print(address)
+  with open_exp_graph() as (graph, addresses, _):
+    for target in graph.closure([graph.get_target(a) for a in addresses]):
+      print(target.address.spec)
 
 
 def filemap():

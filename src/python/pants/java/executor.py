@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class Executor(AbstractClass):
-  """Executes java programs."""
+  """Executes java programs.
+
+  :API: public
+  """
 
   @staticmethod
   def _scrub_args(classpath, main, jvm_options, args, cwd):
@@ -36,7 +39,10 @@ class Executor(AbstractClass):
     return classpath, main, jvm_options, args, cwd
 
   class Error(Exception):
-    """Indicates an error launching a java program."""
+    """Indicates an error launching a java program.
+
+    :API: public
+    """
 
   class InvalidDistribution(ValueError):
     """Indicates an invalid Distribution was used to construct this runner."""
@@ -228,6 +234,10 @@ class SubprocessExecutor(Executor):
     """Spawns the java program passing any extra subprocess kwargs on to subprocess.Popen.
 
     Returns the Popen process object handle to the spawned java program subprocess.
+
+    :API: public
+
+    :raises: :class:`Executor.Error` if there is a problem spawning the subprocess.
     """
     cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
     return self._spawn(cmd, cwd, **subprocess_args)

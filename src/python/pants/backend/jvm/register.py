@@ -58,6 +58,7 @@ from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepComman
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
+from pants.base.deprecated import deprecated
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -169,10 +170,16 @@ def register_goals():
   task(name='detect-duplicates', action=DuplicateDetector).install()
 
   # Publishing.
-  task(
-    name='check_published_deps',
-    action=CheckPublishedDeps,
-  ).install('check_published_deps')
+  task(name='check-published-deps', action=CheckPublishedDeps).install('check-published-deps')
+
+  class CheckPublishedDepsDeprecated(CheckPublishedDeps):
+    """DEPRECATED: Use the check-published-deps goal instead."""
+
+    @deprecated('1.0.1', 'DEPRECATED: Use the check-published-deps goal instead.')
+    def console_output(self, targets):
+      return super(CheckPublishedDepsDeprecated, self).console_output(targets)
+
+  task(name='check_published_deps', action=CheckPublishedDepsDeprecated).install('check_published_deps')
 
   task(name='jar', action=JarPublish).install('publish')
 

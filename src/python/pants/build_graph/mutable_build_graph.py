@@ -26,77 +26,6 @@ class MutableBuildGraph(BuildGraph):
   def reset(self):
     super(MutableBuildGraph, self).reset()
     self._addresses_already_closed = set()
-    self._derived_from_by_derivative_address = {}
-    self.synthetic_addresses = set()
-
-  def get_derived_from(self, address):
-    parent_address = self._derived_from_by_derivative_address.get(address, address)
-    return self.get_target(parent_address)
-
-  def get_concrete_derived_from(self, address):
-    current_address = address
-    next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
-    while next_address != current_address:
-      current_address = next_address
-      next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
-    return self.get_target(current_address)
-
-  def inject_target(self, target, dependencies=None, derived_from=None, synthetic=False):
-    dependencies = dependencies or frozenset()
-    address = target.address
-
-    if address in self._target_by_address:
-      raise ValueError('A Target {existing_target} already exists in the BuildGraph at address'
-                       ' {address}.  Failed to insert {target}.'
-                       .format(existing_target=self._target_by_address[address],
-                               address=address,
-                               target=target))
-
-    if derived_from:
-      if not self.contains_address(derived_from.address):
-        raise ValueError('Attempted to inject synthetic {target} derived from {derived_from}'
-                         ' into the BuildGraph, but {derived_from} was not in the BuildGraph.'
-                         ' Synthetic Targets must be derived from no Target (None) or from a'
-                         ' Target already in the BuildGraph.'
-                         .format(target=target,
-                                 derived_from=derived_from))
-      self._derived_from_by_derivative_address[target.address] = derived_from.address
-
-    if derived_from or synthetic:
-      self.synthetic_addresses.add(address)
-
-    self._target_by_address[address] = target
-
-    for dependency_address in dependencies:
-      self.inject_dependency(dependent=address, dependency=dependency_address)
-
-  def inject_dependency(self, dependent, dependency):
-    if dependent not in self._target_by_address:
-      raise ValueError('Cannot inject dependency from {dependent} on {dependency} because the'
-                       ' dependent is not in the BuildGraph.'
-                       .format(dependent=dependent, dependency=dependency))
-
-    # TODO(pl): Unfortunately this is an unhelpful time to error due to a cycle.  Instead, we warn
-    # and allow the cycle to appear.  It is the caller's responsibility to call sort_targets on the
-    # entire graph to generate a friendlier CycleException that actually prints the cycle.
-    # Alternatively, we could call sort_targets after every inject_dependency/inject_target, but
-    # that could have nasty performance implications.  Alternative 2 would be to have an internal
-    # data structure of the topologically sorted graph which would have acceptable amortized
-    # performance for inserting new nodes, and also cycle detection on each insert.
-
-    if dependency not in self._target_by_address:
-      logger.warning('Injecting dependency from {dependent} on {dependency}, but the dependency'
-                     ' is not in the BuildGraph.  This probably indicates a dependency cycle, but'
-                     ' it is not an error until sort_targets is called on a subgraph containing'
-                     ' the cycle.'
-                     .format(dependent=dependent, dependency=dependency))
-
-    if dependency in self.dependencies_of(dependent):
-      logger.debug('{dependent} already depends on {dependency}'
-                   .format(dependent=dependent, dependency=dependency))
-    else:
-      self._target_dependencies_by_address[dependent].add(dependency)
-      self._target_dependees_by_address[dependency].add(dependent)
 
   def inject_synthetic_target(self,
                               address,
@@ -104,15 +33,6 @@ class MutableBuildGraph(BuildGraph):
                               dependencies=None,
                               derived_from=None,
                               **kwargs):
-    if self.contains_address(address):
-      raise ValueError('Attempted to inject synthetic {target_type} derived from {derived_from}'
-                       ' into the BuildGraph with address {address}, but there is already a Target'
-                       ' {existing_target} with that address'
-                       .format(target_type=target_type,
-                               derived_from=derived_from,
-                               address=address,
-                               existing_target=self.get_target(address)))
-
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self,
@@ -157,27 +77,17 @@ class MutableBuildGraph(BuildGraph):
             self.inject_dependency(target_address, dep_address)
         target = self.get_target(target_address)
 
-      def inject_spec_closure(spec):
-        # Check to see if the target is synthetic or not.  If we find a synthetic target then
-        # short circuit the inject_address_closure since mapper.spec_to_address expects an actual
-        # BUILD file to exist on disk.
-        maybe_synthetic_address = Address.parse(spec, relative_to=target_address.spec_path)
-        if not self.contains_address(maybe_synthetic_address):
-          addr = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
-          self.inject_address_closure(addr)
-
       for traversable_spec in target.traversable_dependency_specs:
-        inject_spec_closure(traversable_spec)
-        traversable_spec_target = self.get_target_from_spec(traversable_spec,
-                                                            relative_to=target_address.spec_path)
+        traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
+        self.maybe_inject_address_closure(traversable_address)
 
-        if traversable_spec_target not in target.dependencies:
-          self.inject_dependency(dependent=target.address,
-                                 dependency=traversable_spec_target.address)
+        if not any(traversable_address == t.address for t in target.dependencies):
+          self.inject_dependency(dependent=target.address, dependency=traversable_address)
           target.mark_transitive_invalidation_hash_dirty()
 
       for traversable_spec in target.traversable_specs:
-        inject_spec_closure(traversable_spec)
+        traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
+        self.maybe_inject_address_closure(traversable_address)
         target.mark_transitive_invalidation_hash_dirty()
 
     except AddressLookupError as e:
