@@ -25,6 +25,14 @@ from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
 
+def unpickle_func(value):
+  if isinstance(value, six.binary_type):
+    # loads for string-like values
+    return pickle.loads(value)
+  # load for file-like value from buffers
+  return pickle.load(value)
+
+
 @total_ordering
 class Key(object):
   """Holds the digest for the object, which uniquely identifies it.
@@ -171,16 +179,16 @@ class Storage(Closable):
         pickler.fast = 1
         pickler.dump(obj)
         blob = buf.getvalue()
+        # Hash the blob and store it if it does not exist.
+        key = Key.create(blob, type(obj), str(obj) if self._debug else None)
+
+        self._contents.put(key.digest, blob)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
       # `Exception` type here.
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
-    # Hash the blob and store it if it does not exist.
-    key = Key.create(blob, type(obj), str(obj) if self._debug else None)
-
-    self._contents.put(key.digest, blob)
     return key
 
   def puts(self, objs):
@@ -202,12 +210,8 @@ class Storage(Closable):
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
 
-    value = self._contents.get(key.digest)
-    if isinstance(value, six.binary_type):
-      # loads for string-like values
-      return self._assert_type_matches(pickle.loads(value), key.type)
-    # load for file-like value from buffers
-    return self._assert_type_matches(pickle.load(value), key.type)
+    value = self._contents.get(key.digest, unpickle_func)
+    return self._assert_type_matches(value, key.type)
 
   def add_mapping(self, from_key, to_key):
     """Establish one to one relationship from one Key to another Key.
