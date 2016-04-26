@@ -1,8 +1,6 @@
 Set up Your Source Tree for Pants
 =================================
 
-**As of November 2015, this more complex than it should be.**
-**The Pants community is actively working to simplify it.**
 If you're setting up the Pants build tool to work in your source tree, you need to
 configure Pants' behavior. (Once it's set up, most folks should be able
 [[to use Pants as normal|pants('src/docs:first_concepts')]]
