@@ -180,7 +180,8 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    self._project_tree = self._get_project_tree(self._global_options.build_file_rev)
+    pants_ignore = self._global_options.pants_ignore or []
+    self._project_tree = self._get_project_tree(self._global_options.build_file_rev, pants_ignore)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
     build_ignore_patterns = self._global_options.ignore_patterns or []
     self._address_mapper = BuildFileAddressMapper(
@@ -191,12 +192,12 @@ class GoalRunnerFactory(object):
     )
     self._build_graph = MutableBuildGraph(self._address_mapper)
 
-  def _get_project_tree(self, build_file_rev):
+  def _get_project_tree(self, build_file_rev, pants_ignore):
     """Creates the project tree for build files for use in a given pants run."""
     if build_file_rev:
-      return ScmProjectTree(self._root_dir, get_scm(), build_file_rev)
+      return ScmProjectTree(self._root_dir, get_scm(), build_file_rev, pants_ignore)
     else:
-      return FileSystemProjectTree(self._root_dir)
+      return FileSystemProjectTree(self._root_dir, pants_ignore)
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""

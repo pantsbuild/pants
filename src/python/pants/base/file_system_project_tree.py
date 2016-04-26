@@ -20,23 +20,31 @@ class FileSystemProjectTree(ProjectTree):
       raise ValueError('Absolute path "{}" not legal in {}.'.format(relpath, self))
     return os.path.join(self.build_root, relpath)
 
-  def glob1(self, dir_relpath, glob):
+  def _glob1_raw(self, dir_relpath, glob):
     return glob1(self._join(dir_relpath), glob)
 
-  def content(self, file_relpath):
+  def _listdir_raw(self, relpath):
+    # TODO: use scandir which is backported from 3.x
+    # https://github.com/pantsbuild/pants/issues/3250
+    return os.listdir(self._join(relpath))
+
+  def _isdir_raw(self, relpath):
+    return os.path.isdir(self._join(relpath))
+
+  def _isfile_raw(self, relpath):
+    return os.path.isfile(self._join(relpath))
+
+  def _exists_raw(self, relpath):
+    return os.path.exists(self._join(relpath))
+
+  def _content_raw(self, file_relpath):
     with open(self._join(file_relpath), 'rb') as source:
       return source.read()
 
-  def isdir(self, relpath):
-    return os.path.isdir(self._join(relpath))
+  def _relative_readlink_raw(self, relpath):
+    return os.readlink(self._join(relpath))
 
-  def isfile(self, relpath):
-    return os.path.isfile(self._join(relpath))
-
-  def exists(self, relpath):
-    return os.path.exists(self._join(relpath))
-
-  def lstat(self, relpath):
+  def _lstat_raw(self, relpath):
     try:
       mode = os.lstat(self._join(relpath)).st_mode
       if stat.S_ISLNK(mode):
@@ -53,15 +61,10 @@ class FileSystemProjectTree(ProjectTree):
       else:
         raise e
 
-  def relative_readlink(self, relpath):
-    return os.readlink(self._join(relpath))
-
-  def listdir(self, relpath):
-    return os.listdir(self._join(relpath))
-
-  def walk(self, relpath, topdown=True):
+  def _walk_raw(self, relpath, topdown=True):
     def onerror(error):
       raise OSError(getattr(error, 'errno', None), 'Failed to walk below {}'.format(relpath), error)
+
     for root, dirs, files in safe_walk(self._join(relpath),
                                        topdown=topdown,
                                        onerror=onerror):
