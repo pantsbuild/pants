@@ -4,6 +4,23 @@ RELEASE HISTORY
 1.0.0-rc3 (04/26/2016)
 ----------------------
 
+Cherry pick fixes for problems found in RC1
+
+API Changes
+~~~~~~~~~~~
+
+* Rename check_published_deps to check-published-deps to be consistent with dashes in goal names
+  `RB #3749 <https://rbcommons.com/twitter/r/3749>`
+
+Bugfixes
+~~~~~~~~
+
+* startswith() is the correct method for strings, not starts_with()
+  `RB #3744 <https://rbcommons.com/twitter/r/3744>`
+
+1.0.0-rc1 (04/22/2016)
+----------------------
+
 This release has several changes related to documentation, CI fixes and work
 in preparation for the 1.0 release.
 
@@ -11,10 +28,9 @@ in preparation for the 1.0 release.
 * Documentation leading up to 1.0
 * Engine work around handling of symlinks
 * Set a global -Xmx default for JVMs
-* improve cache hit rate with eager caching of zinc  
+* improve cache hit rate with eager caching of zinc
 
-API Changes
-~~~~~~~~~~~
+
 
 * Add public api markers
   `RB #3727 <https://rbcommons.com/s/twitter/r/3727>`_
@@ -487,7 +503,7 @@ Refactoring, Improvements, and Tooling
 
 * Remove unneeded args4j handler registrations that cause failures in
   tests and rename TestParser
-  
+
   `Issue #1727 <https://github.com/pantsbuild/pants/issues/1727>`_
   `RB #3571 <https://rbcommons.com/s/twitter/r/3571>`_
   `RB #3583 <https://rbcommons.com/s/twitter/r/3583>`_
