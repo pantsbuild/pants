@@ -404,7 +404,7 @@ class KeyValueStore(Closable, AbstractClass):
     """
 
   @abstractmethod
-  def put(self, key, value, transform=lambda x: bytes):
+  def put(self, key, value, transform=lambda x: bytes(x)):
     """Save the value under a key, but only once.
 
     The write once semantics is specifically provided for the content addressable use case.
@@ -435,10 +435,10 @@ class InMemoryDb(KeyValueStore):
   def get(self, key, transform=lambda x: x):
     return transform(self._storage.get(key))
 
-  def put(self, key, value, transform=lambda x: bytes):
+  def put(self, key, value, transform=lambda x: bytes(x)):
     if key in self._storage:
       return False
-    self._storage[key] = value
+    self._storage[key] = transform(value)
     return True
 
   def items(self):
@@ -511,7 +511,7 @@ class Lmdb(KeyValueStore):
     No need to do additional transform since value is to be persisted.
     """
     with self._env.begin(db=self._db, buffers=True, write=True) as txn:
-      return txn.put(key, value, overwrite=False)
+      return txn.put(key, transform(value), overwrite=False)
 
   def items(self):
     with self._env.begin(db=self._db, buffers=True) as txn:
