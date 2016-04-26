@@ -3,6 +3,7 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -334,8 +335,7 @@ public class ConsoleRunnerImpl {
   private final boolean xmlReport;
   private final File outdir;
   private final boolean perTestTimer;
-  private final boolean defaultParallel;
-  private final boolean parallelMethods;
+  private final Concurrency defaultConcurrency;
   private final int parallelThreads;
   private final int testShard;
   private final int numTestShards;
@@ -349,22 +349,26 @@ public class ConsoleRunnerImpl {
       boolean xmlReport,
       boolean perTestTimer,
       File outdir,
-      boolean defaultParallel,
-      boolean parallelMethods,
+      Concurrency defaultConcurrency,
       int parallelThreads,
       int testShard,
       int numTestShards,
       int numRetries,
       PrintStream out,
       PrintStream err) {
+
+    Preconditions.checkNotNull(outputMode);
+    Preconditions.checkNotNull(defaultConcurrency);
+    Preconditions.checkNotNull(out);
+    Preconditions.checkNotNull(err);
+
     this.failFast = failFast;
     this.outputMode = outputMode;
     this.xmlReport = xmlReport;
     this.perTestTimer = perTestTimer;
     this.outdir = outdir;
-    this.defaultParallel = defaultParallel;
+    this.defaultConcurrency = defaultConcurrency;
     this.parallelThreads = parallelThreads;
-    this.parallelMethods = parallelMethods;
     this.testShard = testShard;
     this.numTestShards = numTestShards;
     this.numRetries = numRetries;
@@ -424,7 +428,7 @@ public class ConsoleRunnerImpl {
     try {
       if (this.parallelThreads > 1) {
         ConcurrentCompositeRequest request = new ConcurrentCompositeRequest(
-            requests, this.defaultParallel, this.parallelMethods, this.parallelThreads);
+            requests, this.defaultConcurrency, this.parallelThreads);
         failures = core.run(request).getFailureCount();
       } else {
         for (Request request : requests) {
@@ -550,7 +554,7 @@ public class ConsoleRunnerImpl {
 
   private boolean shouldRunParallelMethods(Class<?> clazz) {
     // TODO(zundel): Add support for an annotation like TestParallelMethods.
-    return this.defaultParallel && this.parallelMethods;
+    return this.defaultConcurrency.shouldRunMethodsParallel();
   }
 
   // Loads classes without initializing them.  We just need the type, annotations and method
@@ -657,13 +661,20 @@ public class ConsoleRunnerImpl {
           usage = "Show a description of each test and timer for each test class.")
       private boolean perTestTimer;
 
+      // TODO(zundel): Combine -default-parallel and -paralel-methods together into a
+      // single argument:  -default-concurrency {serial, parallel, parallel_methods}
+      // TODO(zundel): Also add a @TestParallelMethods annotation
       @Option(name = "-default-parallel",
           usage = "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
       private boolean defaultParallel;
 
       @Option(name = "-parallel-methods",
-          usage = "Run methods within a class in parallel.")
+          usage = "EXPERIMENTAL: Run methods within a class in parallel.")
       private boolean parallelMethods;
+
+      @Option(name = "-default-concurrency",
+          usage = "Specify how to parallelize running tests.")
+      private Concurrency defaultConcurrency;
 
       private int parallelThreads = 0;
 
@@ -741,14 +752,16 @@ public class ConsoleRunnerImpl {
       exit(1);
     }
 
+    options.defaultConcurrency = computeConcurrencyOption(options.defaultConcurrency,
+        options.defaultParallel, options.parallelMethods);
+
     ConsoleRunnerImpl runner =
         new ConsoleRunnerImpl(options.failFast,
             options.outputMode,
             options.xmlReport,
             options.perTestTimer,
             options.outdir,
-            options.defaultParallel,
-            options.parallelMethods,
+            options.defaultConcurrency,
             options.parallelThreads,
             options.testShard,
             options.numTestShards,
@@ -772,6 +785,29 @@ public class ConsoleRunnerImpl {
     }
 
     runner.run(tests);
+  }
+
+  /**
+   * Used to convert the legacy -default-parallel and -parallel-methods options to the new
+   * style -default-concurrency values
+   */
+  @VisibleForTesting
+  static Concurrency computeConcurrencyOption(Concurrency defaultConcurrency,
+      boolean defaultParallel, boolean parallelMethods) {
+
+    if (defaultConcurrency != null) {
+      // -default-concurrency option present - use it.
+      return defaultConcurrency;
+    }
+
+    // Fall Back to using -default-parallel and -parallel-methods
+    if (!defaultParallel) {
+      return Concurrency.SERIAL;
+    }
+    if (parallelMethods) {
+      return Concurrency.PARALLEL_BOTH;
+    }
+    return Concurrency.PARALLEL_CLASSES;
   }
 
   public static final Predicate<Constructor<?>> IS_PUBLIC_CONSTRUCTOR =

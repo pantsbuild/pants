@@ -3,6 +3,7 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.LinkedList;
@@ -21,8 +22,7 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
   private final CompletionService<Void> completionService;
   private final Queue<Future<Void>> concurrentTasks;
   private final Queue<Runnable> serialTasks;
-  private final boolean defaultParallel;
-  private final boolean parallelMethods;
+  private final Concurrency defaultConcurrency;
 
   /**
    * A concurrent scheduler to run junit tests in parallel if possible, followed by tests that can
@@ -34,14 +34,13 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
    *
    * Call {@link org.junit.runners.ParentRunner#setScheduler} to use this scheduler.
    *
-   * @param defaultParallel  whether to unannotated classes in parallel
-   * @param parallelMethods run individual test methods in parallel
-   * @param numThreads       number of parallel threads to use, must be positive.
+   * @param defaultConcurrency  Describes how to parallelize unannotated classes.
+   * @param numThreads Number of parallel threads to use, must be positive.
    */
-  public ConcurrentRunnerScheduler(boolean defaultParallel, boolean parallelMethods,
+  public ConcurrentRunnerScheduler(Concurrency defaultConcurrency,
       int numThreads) {
-    this.defaultParallel = defaultParallel;
-    this.parallelMethods = parallelMethods;
+    Preconditions.checkNotNull(defaultConcurrency);
+    this.defaultConcurrency = defaultConcurrency;
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setDaemon(true)
         .setNameFormat("concurrent-junit-runner-%d")
@@ -75,12 +74,13 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
 
   private boolean shouldMethodsRunParallel() {
     // TODO(zundel): Add support for an annotation like TestParallelMethods.
-    return this.parallelMethods;
+    return defaultConcurrency.shouldRunMethodsParallel();
   }
 
   private boolean shouldClassRunParallel(Class<?> clazz) {
     return !clazz.isAnnotationPresent(TestSerial.class)
-        && (clazz.isAnnotationPresent(TestParallel.class) || this.defaultParallel);
+        && (clazz.isAnnotationPresent(TestParallel.class) ||
+        defaultConcurrency.shouldRunClassesParallel());
   }
 
   @Override

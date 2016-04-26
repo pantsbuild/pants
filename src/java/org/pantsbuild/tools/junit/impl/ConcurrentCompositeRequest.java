@@ -17,12 +17,11 @@ public class ConcurrentCompositeRequest extends CompositeRequest {
 
   private final ConcurrentRunnerScheduler runnerScheduler;
 
-  public ConcurrentCompositeRequest(List<Request> requests, boolean defaultParallel,
-      boolean parallelMethods, int numThreads)
+  public ConcurrentCompositeRequest(List<Request> requests, Concurrency defaultConcurrency,
+      int numThreads)
       throws InitializationError {
     super(requests);
-    this.runnerScheduler = new ConcurrentRunnerScheduler(defaultParallel, parallelMethods,
-        numThreads);
+    this.runnerScheduler = new ConcurrentRunnerScheduler(defaultConcurrency, numThreads);
     setScheduler(runnerScheduler);
   }
 
