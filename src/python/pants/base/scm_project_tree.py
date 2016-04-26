@@ -98,6 +98,17 @@ class ScmProjectTree(ProjectTree):
       (self._scm == other._scm) and
       (self._rev == other._rev))
 
+  def __getstate__(self):
+    odict = self.__dict__.copy()
+    del odict['_reader']
+    return odict
+
+  def __setstate__(self, dict):
+    scm = dict['_scm']
+    rev = dict['_rev']
+    self.__dict__.update(dict)
+    self._reader = scm.repo_reader(rev)
+
   def __ne__(self, other):
     return not self.__eq__(other)
 
