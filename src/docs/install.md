@@ -13,36 +13,20 @@ beginning, make sure your machine fits the requirements. At a minimum, pants req
 After you have pants installed, you'll need to
 [[Set up your code workspace to work with Pants|pants('src/docs:setup_repo')]].
 
+Recommended Installation
+------------------------
 
-The ./pants Runner Script
--------------------------
-
-We highly recommend invoking pants via a checked-in runner script named `pants` in the
-root of your workspace (aka the "buildroot").  Pants uses the presence of such a file, in the
-current working directory or in any of its ancestors, to detect the buildroot, e.g., when
-invoked in a subdirectory.
-
-If, for whatever reason, you don't want to run pants that way, you can also just check in an
-empty file named `pants` to act as a sentinel for the buildroot.
-
-Note that you can create whatever symlinks or extra wrapper scripts you like.  There's no absolute
-requirement that pants be invoked directly via `./pants`.  All pants cares about is the existence
-of a file named `pants` in the buildroot, and that file might as well be the runner script!
-
-
-Virtualenv-based Installation
------------------------------
-
-To set up pants in your repo, you can use our self-contained virtualenv-based `pants` bash script:
+To set up pants in your repo, we recommend installing our self-contained `pants` bash script
+in the root (ie, "buildroot") of your repo:
 
       :::bash
       curl -O https://pantsbuild.github.io/setup/pants
       chmod +x pants
       touch pants.ini
 
-The first time you run the new `./pants` script it will install the latest version of pants and then
-run it.  It's recommended though, that you pin the version of pants.  To do this, first find out the
-version of pants you just installed:
+The first time you run the new `./pants` script it will install the latest version of pants (using
+virtualenv) and then run it.  It's recommended though, that you pin the version of pants.  To do
+this, first find out the version of pants you just installed:
 
       :::bash
       ./pants -V
@@ -76,6 +60,21 @@ NB: The formatting of the plugins list is important; all lines below the `plugin
 indented by at least one white space to form logical continuation lines. This is standard for python
 ini files, see [RFC #822](http://tools.ietf.org/html/rfc822.html#section-3.1) section 3.1.1 for the
 full rules python uses to parse ini file entries.
+
+The ./pants Runner Script
+-------------------------
+
+We highly recommend invoking pants via a checked-in runner script named `pants` in the
+root of your workspace, as demonstrated above.  Pants uses the presence of such a file, in the
+current working directory or in any of its ancestors, to detect the buildroot, e.g., when
+invoked in a subdirectory.
+
+If, for whatever reason, you don't want to run pants that way, you can also just check in an
+empty file named `pants` to act as a sentinel for the buildroot.
+
+Note that you can create whatever symlinks or extra wrapper scripts you like.  There's no absolute
+requirement that pants be invoked directly via `./pants`.  All pants cares about is the existence
+of a file named `pants` in the buildroot, and that file might as well be the runner script!
 
 PEX-based Installation
 ----------------------
