@@ -2,6 +2,8 @@
 
 def shards = [:]
 
+def ci = "./build-support/bin/ci.sh"
+
 for (os in ["linux", "osx"]) {
 
   shards["${os}_self-checks"] = {
