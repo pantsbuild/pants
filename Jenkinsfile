@@ -2,17 +2,36 @@
 
 def shards = [:]
 
-shards["unit1"] = {
-  node {
-    checkout scm
-    sh "./build-support/bin/ci.sh -fkmsrcn -u 0/2 'Unit tests for pants and pants-plugins - shard 1'"
-  }
-}
+for (os in ["linux", "osx"]) {
 
-shards["unit2"] = {
-  node {
-    checkout scm
-    sh "./build-support/bin/ci.sh -fkmsrcn -u 1/2 'Unit tests for pants and pants-plugins - shard 2'"
+  shards["${os}_self-checks"] = {
+    node(os) {
+      checkout scm
+      sh "${ci} -cjlpn"
+    }
+  }
+
+  shards["${os}_contrib"] = {
+    node(os) {
+      checkout scm
+      sh "${ci} -fkmsrcjlp"
+    }
+  }
+
+  for (i in 0..9) {
+    def one_indexed = i + 1
+    shards["${os}_unit_tests_${one_indexed}_of_10"] = {
+      node(os) {
+        checkout scm
+        sh "${ci} -fkmsrcn -u ${i}/10"
+      }
+    }
+    shards["${os}_integration_tests_${one_indexed}_of_10"] = {
+      node(os) {
+        checkout scm
+        sh "${ci} -fkmsrjlpn -i ${i}/10"
+      }
+    }
   }
 }
 
