@@ -657,6 +657,9 @@ public class ConsoleRunnerImpl {
           usage = "Show a description of each test and timer for each test class.")
       private boolean perTestTimer;
 
+      // TODO(zundel): Combine -default-parallel and -paralel-methods together into a
+      // single argument:  -default-concurrency {serial, parallel, parallel_methods}
+      // TODO(zundel): Also add a @TestParallelMethods annotation
       @Option(name = "-default-parallel",
           usage = "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
       private boolean defaultParallel;
