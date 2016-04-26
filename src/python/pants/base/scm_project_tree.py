@@ -69,7 +69,10 @@ class ScmProjectTree(ProjectTree):
       yield fast_relpath(os.path.join(self._scm_worktree, path), self.build_root), dirnames, filenames
 
   def _do_walk(self, scm_relpath, topdown):
-    """Helper method for _walk"""
+    """
+    Helper method for _walk, works similarly to os.walk.
+    Check https://docs.python.org/2/library/os.html#os.walk for explanation on "topdown" parameter.
+    """
     if self._reader.isdir(scm_relpath):
       filenames = []
       dirnames = []
