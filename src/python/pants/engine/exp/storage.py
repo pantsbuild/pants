@@ -25,12 +25,20 @@ from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
 
-def unpickle_func(value):
+def _unpickle(value):
   if isinstance(value, six.binary_type):
     # Deserialize string values.
     return pickle.loads(value)
   # Deserialize values with file interface,
   return pickle.load(value)
+
+
+def _identity(value):
+  return value
+
+
+def _copy_bytes(value):
+  return bytes(value)
 
 
 @total_ordering
@@ -210,7 +218,7 @@ class Storage(Closable):
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
 
-    value = self._contents.get(key.digest, unpickle_func)
+    value = self._contents.get(key.digest, _unpickle)
     return self._assert_type_matches(value, key.type)
 
   def add_mapping(self, from_key, to_key):
@@ -394,7 +402,7 @@ class CacheStats(Counter):
 
 class KeyValueStore(Closable, AbstractClass):
   @abstractmethod
-  def get(self, key, transform=lambda x: x):
+  def get(self, key, transform=_identity):
     """Fetch the value for a given key.
 
     :param key: key in bytestring.
@@ -404,7 +412,7 @@ class KeyValueStore(Closable, AbstractClass):
     """
 
   @abstractmethod
-  def put(self, key, value, transform=lambda x: bytes(x)):
+  def put(self, key, value, transform=_copy_bytes):
     """Save the value under a key, but only once.
 
     The write once semantics is specifically provided for the content addressable use case.
@@ -432,10 +440,10 @@ class InMemoryDb(KeyValueStore):
   def __init__(self):
     self._storage = dict()
 
-  def get(self, key, transform=lambda x: x):
+  def get(self, key, transform=_identity):
     return transform(self._storage.get(key))
 
-  def put(self, key, value, transform=lambda x: bytes(x)):
+  def put(self, key, value, transform=_copy_bytes):
     if key in self._storage:
       return False
     self._storage[key] = transform(value)
@@ -492,7 +500,7 @@ class Lmdb(KeyValueStore):
   def path(self):
     return self._env.path()
 
-  def get(self, key, transform=lambda x: x):
+  def get(self, key, transform=_identity):
     """Return the value or `None` if the key does not exist.
 
     NB: Memory mapped storage returns a buffer object without copying keys or values, which
@@ -505,7 +513,7 @@ class Lmdb(KeyValueStore):
         return transform(StringIO.StringIO(value))
       return None
 
-  def put(self, key, value, transform=lambda x: x):
+  def put(self, key, value, transform=_identity):
     """Returning True if the key/value are actually written to the storage.
 
     No need to do additional transform since value is to be persisted.
