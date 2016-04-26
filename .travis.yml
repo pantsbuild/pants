@@ -49,7 +49,7 @@ cache:
 language: python
 
 python:
-  - "2.7"
+  - "2.7.11"
 
 install:
   - pip --quiet install coveralls
