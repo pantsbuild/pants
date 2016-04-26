@@ -390,7 +390,7 @@ class CacheStats(Counter):
 
 class KeyValueStore(Closable, AbstractClass):
   @abstractmethod
-  def get(self, key):
+  def get(self, key, transform=lambda x : x):
     """Fetch the value for a given key.
 
     :param key: key in bytestring.
@@ -398,7 +398,7 @@ class KeyValueStore(Closable, AbstractClass):
     """
 
   @abstractmethod
-  def put(self, key, value):
+  def put(self, key, value, transform=lambda x : x):
     """Save the value under a key, but only once.
 
     The write once semantics is specifically provided for the content addressable use case.
@@ -423,13 +423,13 @@ class InMemoryDb(KeyValueStore):
   def __init__(self):
     self._storage = dict()
 
-  def get(self, key):
-    return self._storage.get(key)
+  def get(self, key, transform=lambda x : x):
+    return transform(self._storage.get(key))
 
-  def put(self, key, value):
+  def put(self, key, value, transform=lambda x : x):
     if key in self._storage:
       return False
-    self._storage[key] = value
+    self._storage[key] = transform(value)
     return True
 
   def items(self):
@@ -483,7 +483,7 @@ class Lmdb(KeyValueStore):
   def path(self):
     return self._env.path()
 
-  def get(self, key):
+  def get(self, key, transform=lambda x : x):
     """Return the value or `None` if the key does not exist.
 
     NB: Memory mapped storage returns a buffer object without copying keys or values, which
@@ -493,13 +493,13 @@ class Lmdb(KeyValueStore):
     with self._env.begin(db=self._db, buffers=True) as txn:
       value = txn.get(key)
       if value is not None:
-        return StringIO.StringIO(value)
+        return transform(StringIO.StringIO(value))
       return None
 
-  def put(self, key, value):
+  def put(self, key, value, transform=lambda x : x):
     """Returning True if the key/value are actually written to the storage."""
     with self._env.begin(db=self._db, buffers=True, write=True) as txn:
-      return txn.put(key, value, overwrite=False)
+      return txn.put(key, transform(value), overwrite=False)
 
   def items(self):
     with self._env.begin(db=self._db, buffers=True) as txn:
