@@ -10,13 +10,13 @@ API Changes
 ~~~~~~~~~~~
 
 * Rename check_published_deps to check-published-deps to be consistent with dashes in goal names
-  `RB #3749 <https://rbcommons.com/twitter/r/3749>`
+  `RB #3749 <https://rbcommons.com/twitter/r/3749>`_
 
 Bugfixes
 ~~~~~~~~
 
 * startswith() is the correct method for strings, not starts_with()
-  `RB #3744 <https://rbcommons.com/twitter/r/3744>`
+  `RB #3744 <https://rbcommons.com/twitter/r/3744>`_
 
 1.0.0-rc1 (04/22/2016)
 ----------------------
