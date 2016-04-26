@@ -27,9 +27,9 @@ from pants.util.meta import AbstractClass
 
 def unpickle_func(value):
   if isinstance(value, six.binary_type):
-    # loads for string-like values
+    # Deserialize string values.
     return pickle.loads(value)
-  # load for file-like value from buffers
+  # Deserialize values with file interface,
   return pickle.load(value)
 
 
@@ -399,7 +399,7 @@ class KeyValueStore(Closable, AbstractClass):
 
     :param key: key in bytestring.
     :param transform: optional function that is applied on the retrieved value from storage
-      before return, since the original value may be only valid within the context.
+      before it is returned, since the original value may be only valid within the context.
     :return: value can be either string-like or file-like, `None` if does not exist.
     """
 
