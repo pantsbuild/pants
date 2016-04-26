@@ -1,4 +1,4 @@
 node {
-  scm checkout
+  checkout scm
   sh "./build-support/bin/ci.sh"
 }
