@@ -8,7 +8,7 @@ def allOSes = ["linux", "osx"]
 def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
   L:{
     node(os) {
-      "${ci} ${flags} ${typeFlag} ${shardNum}/${totalShards}"
+      "./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}"
     }
   }
 }
@@ -16,7 +16,7 @@ def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
 def ciShNode(os, flags) {
   L:{
     node(os) {
-      "${ci} ${flags}"
+      "./build-support/bin/ci.sh ${flags}"
     }
   }
 }
