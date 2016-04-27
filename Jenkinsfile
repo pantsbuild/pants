@@ -4,13 +4,10 @@ def shards = [:]
 
 def ci = "./build-support/bin/ci.sh"
 
-["linux", "osx"].each { os ->
+for (os in ["linux", "osx"]) {
 
-  echo("each ${os}")
   shards["${os}_self-checks"] = {
-    echo("shards ${os}")
     node(os) {
-      echo("node ${os}")
       checkout scm
       sh "${ci} -cjlpn"
     }
@@ -23,18 +20,18 @@ def ci = "./build-support/bin/ci.sh"
     }
   }
 
-  (0..9).each { n ->
-    def oneIndexed = n + 1
+  for (i in 0..9) {
+    def oneIndexed = i + 1
     shards["${os}_unit_tests_${oneIndexed}_of_10"] = {
       node(os) {
         checkout scm
-        sh "${ci} -fkmsrcn -u ${n}/10"
+        sh "${ci} -fkmsrcn -u ${i}/10"
       }
     }
     shards["${os}_integration_tests_${oneIndexed}_of_10"] = {
       node(os) {
         checkout scm
-        sh "${ci} -fkmsrjlpn -i ${n}/10"
+        sh "${ci} -fkmsrjlpn -i ${i}/10"
       }
     }
   }
