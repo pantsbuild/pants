@@ -21,14 +21,14 @@ for (os in ["linux", "osx"]) {
   }
 
   (0..9).each { n ->
-    def one_indexed = n + 1
-    shards["${os}_unit_tests_${one_indexed}_of_10"] = {
+    def oneIndexed = n + 1
+    shards["${os}_unit_tests_${oneIndexed}_of_10"] = {
       node(os) {
         checkout scm
         sh "${ci} -fkmsrcn -u ${n}/10"
       }
     }
-    shards["${os}_integration_tests_${one_indexed}_of_10"] = {
+    shards["${os}_integration_tests_${oneIndexed}_of_10"] = {
       node(os) {
         checkout scm
         sh "${ci} -fkmsrjlpn -i ${n}/10"
