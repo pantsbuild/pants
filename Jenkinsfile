@@ -8,7 +8,7 @@ def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
       sh(
         '''
         export CXX=g++
-        export XDG_CACHE_HOME="${WORKSPACE}/.cache/pantsbuild"
+        export XDG_CACHE_HOME="$(pwd)/.cache/pantsbuild"
         echo $XDG_CACHE_HOME
         ./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}
         '''.stripIndent()
@@ -24,7 +24,7 @@ def ciShNode(os, flags) {
       sh(
         '''
         export CXX=g++
-        export XDG_CACHE_HOME="${WORKSPACE}/.cache/pantsbuild"
+        export XDG_CACHE_HOME="$(pwd)/.cache/pantsbuild"
         echo $XDG_CACHE_HOME
         ./build-support/bin/ci.sh ${flags}
         '''.stripIndent()
