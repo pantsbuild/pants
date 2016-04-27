@@ -14,7 +14,7 @@ def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
 }
 
 def ciShNode(os, flags) {
-  {
+  L:{
     node(os) {
       "${ci} ${flags}"
     }
