@@ -11,6 +11,7 @@ import os
 from types import NoneType
 
 from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
+from pants.util.memo import memoized
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,10 @@ class ScmProjectTree(ProjectTree):
     self._rev = rev
     self._reader = scm.repo_reader(rev)
     self._scm_worktree = os.path.realpath(scm.worktree)
+
+  @memoized
+  def _reader(self):
+    return self._scm.repo_reader(self._rev)
 
   def _scm_relpath(self, build_root_relpath):
     return os.path.relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree)
@@ -97,17 +102,6 @@ class ScmProjectTree(ProjectTree):
       (self.build_root == other.build_root) and
       (self._scm == other._scm) and
       (self._rev == other._rev))
-
-  def __getstate__(self):
-    odict = self.__dict__.copy()
-    del odict['_reader']
-    return odict
-
-  def __setstate__(self, dict):
-    scm = dict['_scm']
-    rev = dict['_rev']
-    self.__dict__.update(dict)
-    self._reader = scm.repo_reader(rev)
 
   def __ne__(self, other):
     return not self.__eq__(other)
