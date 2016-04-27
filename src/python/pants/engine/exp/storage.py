@@ -37,10 +37,6 @@ def _identity(value):
   return value
 
 
-def _copy_bytes(value):
-  return bytes(value)
-
-
 @total_ordering
 class Key(object):
   """Holds the digest for the object, which uniquely identifies it.
@@ -412,16 +408,13 @@ class KeyValueStore(Closable, AbstractClass):
     """
 
   @abstractmethod
-  def put(self, key, value, transform=_copy_bytes):
+  def put(self, key, value):
     """Save the value under a key, but only once.
 
     The write once semantics is specifically provided for the content addressable use case.
 
     :param key: key in bytestring.
     :param value: value in bytestring.
-    :param transform: optional function that is applied on the input value before it is
-      saved to the storage, since the original value may be only valid within the context,
-      default is to play safe and make a copy.
     :return: `True` to indicate the write actually happens, i.e, first write, `False` for
       repeated writes of the same key.
     """
@@ -443,10 +436,13 @@ class InMemoryDb(KeyValueStore):
   def get(self, key, transform=_identity):
     return transform(self._storage.get(key))
 
-  def put(self, key, value, transform=_copy_bytes):
+  def put(self, key, value):
     if key in self._storage:
       return False
-    self._storage[key] = transform(value)
+
+    # Make a copy of the input value before it is saved to the storage, since the
+    # original value may be only valid within the context, this is to be safe.
+    self._storage[key] = bytes(value)
     return True
 
   def items(self):
@@ -513,13 +509,10 @@ class Lmdb(KeyValueStore):
         return transform(StringIO.StringIO(value))
       return None
 
-  def put(self, key, value, transform=_identity):
-    """Returning True if the key/value are actually written to the storage.
-
-    No need to do additional transform since value is to be persisted.
-    """
+  def put(self, key, value):
+    """Returning True if the key/value are actually written to the storage."""
     with self._env.begin(db=self._db, buffers=True, write=True) as txn:
-      return txn.put(key, transform(value), overwrite=False)
+      return txn.put(key, value, overwrite=False)
 
   def items(self):
     with self._env.begin(db=self._db, buffers=True) as txn:
