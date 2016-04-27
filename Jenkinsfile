@@ -6,7 +6,7 @@ def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
   L:{
     node(os) {
       checkout scm
-      "./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}"
+      sh "./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}"
     }
   }
 }
@@ -15,7 +15,7 @@ def ciShNode(os, flags) {
   L:{
     node(os) {
       checkout scm
-      "./build-support/bin/ci.sh ${flags}"
+      sh "./build-support/bin/ci.sh ${flags}"
     }
   }
 }
