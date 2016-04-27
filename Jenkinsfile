@@ -1,5 +1,6 @@
-
-
+sh "export FOO=bar"
+sh "echo $FOO"
+/*
 def shards = [:]
 
 def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
@@ -40,3 +41,4 @@ for (int i = 0; i < allOSes.size(); i++) {
 }
 
 parallel shards
+*/
