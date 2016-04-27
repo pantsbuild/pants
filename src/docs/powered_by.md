@@ -17,6 +17,7 @@ Organizations
 - [Whisk](https://whisk.com)
 - [Clover Health](http://www.cloverhealth.com/)
 - [QuizUp](https://www.quizup.com/)
+- [Grapeshot](https://www.grapeshot.com)
 
 Open Source Projects
 --------------------
