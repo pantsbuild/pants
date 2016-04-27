@@ -6,12 +6,12 @@ def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
     node(os) {
       checkout scm
       sh(
-        '''
+        """
         export CXX=g++
-        export XDG_CACHE_HOME="$(pwd)/.cache/pantsbuild"
-        echo $XDG_CACHE_HOME
+        export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
+        echo \$XDG_CACHE_HOME
         ./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}
-        '''.stripIndent()
+        """.toString().stripIndent()
       )
     }
   }
@@ -22,12 +22,12 @@ def ciShNode(os, flags) {
     node(os) {
       checkout scm
       sh(
-        '''
+        """
         export CXX=g++
-        export XDG_CACHE_HOME="$(pwd)/.cache/pantsbuild"
-        echo $XDG_CACHE_HOME
+        export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
+        echo \$XDG_CACHE_HOME
         ./build-support/bin/ci.sh ${flags}
-        '''.stripIndent()
+        """.toString().stripIndent()
       )
     }
   }
