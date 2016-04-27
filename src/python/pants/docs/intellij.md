@@ -4,7 +4,7 @@ Pants Development with IntelliJ IDEA
 This page documents how to develop pants with [IntelliJ
 IDEA](http://www.jetbrains.com/idea/). (To use IntelliJ with Pants, not
 necessarily to develop Pants itself, see
-[[Using Pants with IntelliJ IDEA|pants('src/docs:with_intellij')]].
+[[IDE Support|pants('src/docs:ide_support')]].
 
 IntelliJ Setup
 --------------

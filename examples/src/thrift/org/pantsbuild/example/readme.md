@@ -1,5 +1,5 @@
-Using Pants with Thrift Dependencies
-====================================
+Thrift
+======
 
 [Apache Thrift](http://thrift.apache.org/) is a popular framework for
 working with data types and service interfaces. It uses an Interface
@@ -176,7 +176,7 @@ Publishing
 ----------
 
 Publishing a *lang*\_thrift\_library is like
-[[publishing a "regular" library|pants('src/docs:publish')]]
+[[publishing a "regular" library|pants('examples/src/java/org/pantsbuild/example:publish')]]
 The targets use `provides`
 parameters. It might look something like:
 

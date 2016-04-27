@@ -4,7 +4,7 @@ This page describes how to make a versioned release of the Pants jvm
 tools to Maven Central.
 
 Releasing jvm tools largely follows the
-[[standard jar publishing process|pants('src/docs:publish')]], but has
+[[standard jar publishing process|pants('examples/src/java/org/pantsbuild/example:publish')]], but has
 some non-standard initial one-time setup.
 
 At a high level, releasing pants jvm artifacts involves:
