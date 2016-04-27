@@ -1,5 +1,8 @@
-sh "export FOO=bar"
-sh "echo $FOO"
+node ("linux") {
+  sh "export FOO=bar"
+  sh "echo $FOO"
+}
+
 /*
 def shards = [:]
 
