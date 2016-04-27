@@ -48,11 +48,12 @@ for (os in ["linux", "osx"]) {
 
   totalShards = 10
   for (shardNum in 1..totalShards) {
+    oneIndexed = shardNum
     zeroIndexed = shardNum - 1
-    shards["${os}_unit_tests_${shardNum}_of_${totalShards}"] = ciShShardedNode(
+    shards["${os}_unit_tests_${oneIndexed}_of_${totalShards}"] = ciShShardedNode(
       os, '-fkmsrcn', '-u', zeroIndexed, totalShards
     )
-    shards["${os}_integration_tests_${shardNum}_of_${totalShards}"] = ciShShardedNode(
+    shards["${os}_integration_tests_${oneIndexed}_of_${totalShards}"] = ciShShardedNode(
       os, '-fkmsrjlpn', '-i', zeroIndexed, totalShards
     )
   }
