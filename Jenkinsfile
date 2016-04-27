@@ -1,6 +1,10 @@
 node ("linux") {
-  sh 'export FOO=bar'
-  sh 'echo $FOO'
+  sh(
+    '''
+    export FOO=bar
+    echo $FOO
+    '''.stripIndent()
+  )
 }
 
 /*
