@@ -58,4 +58,4 @@ for (os in ["linux", "osx"]) {
   }
 }
 
-parallel shardspe
+parallel shards
