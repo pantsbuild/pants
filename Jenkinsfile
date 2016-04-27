@@ -3,7 +3,7 @@
 def shards = [:]
 
 def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
-  return {
+  { ->
     node(os) {
       checkout scm
       sh "./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}"
@@ -12,7 +12,7 @@ def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
 }
 
 def ciShNode(os, flags) {
-  return {
+  { ->
     node(os) {
       checkout scm
       sh "./build-support/bin/ci.sh ${flags}"
