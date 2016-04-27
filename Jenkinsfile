@@ -2,11 +2,10 @@
 
 def shards = [:]
 
-def allOSes = ["linux", "osx"]
-
 def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
   L:{
     node(os) {
+      checkout scm
       "./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}"
     }
   }
@@ -15,11 +14,13 @@ def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
 def ciShNode(os, flags) {
   L:{
     node(os) {
+      checkout scm
       "./build-support/bin/ci.sh ${flags}"
     }
   }
 }
 
+def allOSes = ["linux", "osx"]
 for (int i = 0; i < allOSes.size(); i++) {
   def os = allOSes.get(i)
 
