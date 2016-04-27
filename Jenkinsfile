@@ -4,7 +4,7 @@ def shards = [:]
 
 def ci = "./build-support/bin/ci.sh"
 
-for (os in ["linux", "osx"]) {
+["linux", "osx"].each { os ->
 
   shards["${os}_self-checks"] = {
     node(os) {
