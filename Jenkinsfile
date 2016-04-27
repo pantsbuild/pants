@@ -1,20 +1,18 @@
-node ("linux") {
-  sh(
-    '''
-    export FOO=bar
-    echo $FOO
-    '''.stripIndent()
-  )
-}
 
-/*
 def shards = [:]
 
 def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
   { ->
     node(os) {
       checkout scm
-      sh "./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}"
+      sh(
+        '''
+        export CXX=g++
+        export XDG_CACHE_HOME="${WORKSPACE}/.cache/pantsbuild"
+        echo $XDG_CACHE_HOME
+        ./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}
+        '''.stripIndent()
+      )
     }
   }
 }
@@ -23,7 +21,14 @@ def ciShNode(os, flags) {
   { ->
     node(os) {
       checkout scm
-      sh "./build-support/bin/ci.sh ${flags}"
+      sh(
+        '''
+        export CXX=g++
+        export XDG_CACHE_HOME="${WORKSPACE}/.cache/pantsbuild"
+        echo $XDG_CACHE_HOME
+        ./build-support/bin/ci.sh ${flags}
+        '''.stripIndent()
+      )
     }
   }
 }
@@ -48,4 +53,3 @@ for (int i = 0; i < allOSes.size(); i++) {
 }
 
 parallel shards
-*/
