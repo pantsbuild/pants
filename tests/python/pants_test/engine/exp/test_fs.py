@@ -57,7 +57,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
                 if type(n) is FilesystemNode]
     self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_literal(self):
     self.assert_walk(Files, ['4.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/1.txt', 'a/b/2'], ['a/b/1.txt', 'a/b/2'])
@@ -66,7 +66,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Files, ['a/3.txt'], ['a/3.txt'])
     self.assert_walk(Files, ['z.txt'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_literal_directory(self):
     self.assert_walk(Dirs, ['c.ln'], ['a/b'])
     self.assert_walk(Dirs, ['a'], ['a'])
@@ -74,7 +74,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Dirs, ['z'], [])
     self.assert_walk(Dirs, ['4.txt', 'a/3.txt'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_siblings(self):
     self.assert_walk(Files, ['*.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/*.txt'], ['a/b/1.txt'])
@@ -82,7 +82,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Files, ['a/b/*'], ['a/b/1.txt', 'a/b/2'])
     self.assert_walk(Files, ['*/0.txt'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_recursive(self):
     self.assert_walk(Files, ['**/*.txt.ln'], ['4.txt'])
     self.assert_walk(Files, ['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
@@ -90,14 +90,14 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Files, ['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/b/2'])
     self.assert_walk(Files, ['**/*.zzz'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_recursive_directory(self):
     self.assert_walk(Dirs, ['*'], ['a', 'a/b'])
     self.assert_walk(Dirs, ['*/*'], ['a/b'])
     self.assert_walk(Dirs, ['**/*'], ['a/b'])
     self.assert_walk(Dirs, ['*/*/*'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_files_content_literal(self):
     self.assert_content(['4.txt'], {'4.txt': 'four\n'})
     self.assert_content(['a/4.txt.ln'], {'4.txt': 'four\n'})
@@ -108,12 +108,13 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     with self.assertRaises(Exception):
       self.assert_content(['a/b'], {'a/b': 'nope\n'})
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_file(self):
     self.assert_fsnodes(Files, ['4.txt'], [
         (Path('4.txt'), Stats),
       ])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_symlink_file(self):
     self.assert_fsnodes(Files, ['c.ln/2'], [
         (Link('c.ln'), ReadLink),
@@ -129,7 +130,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         (Path('a/b/1.txt'), Stats),
       ])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_symlink_globbed_dir(self):
     self.assert_fsnodes(Files, ['*/2'], [
         # Glob the root.
@@ -149,7 +150,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         (Path('a/2'), Stats),
       ])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3189')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_symlink_globbed_file(self):
     self.assert_fsnodes(Files, ['d.ln/b/*.txt'], [
         # NB: Needs to stat every path on the way down to track whether
