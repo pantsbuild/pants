@@ -2,7 +2,6 @@
 
 def shards = [:]
 
-def ci = "./build-support/bin/ci.sh"
 def allOSes = ["linux", "osx"]
 
 def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
