@@ -1,40 +1,44 @@
 def shards = [:]
 
 def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
-  node(os) {
-    checkout scm
-    sh(
-      """
-      export CXX=g++
+  { ->
+    node(os) {
+      checkout scm
+      sh(
+        """
+        export CXX=g++
 
-      export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
-      echo \$XDG_CACHE_HOME
+        export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
+        echo \$XDG_CACHE_HOME
       
-      export PEX_ROOT="\$(pwd)/.cache/pex"
-      echo \$PEX_ROOT
+        export PEX_ROOT="\$(pwd)/.cache/pex"
+        echo \$PEX_ROOT
       
-      ./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}
-      """.toString().stripIndent()
-    )
+        ./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}
+        """.toString().stripIndent()
+      )
+    }
   }
 }
 
 def ciShNode(os, flags) {
-  node(os) {
-    checkout scm
-    sh(
-      """
-      export CXX=g++
+  { ->
+    node(os) {
+      checkout scm
+      sh(
+        """
+        export CXX=g++
       
-      export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
-      echo \$XDG_CACHE_HOME
+        export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
+        echo \$XDG_CACHE_HOME
       
-      export PEX_ROOT="\$(pwd)/.cache/pex"
-      echo \$PEX_ROOT
+        export PEX_ROOT="\$(pwd)/.cache/pex"
+        echo \$PEX_ROOT
       
-      ./build-support/bin/ci.sh ${flags}
-      """.toString().stripIndent()
-    )
+        ./build-support/bin/ci.sh ${flags}
+        """.toString().stripIndent()
+      )
+    }
   }
 }
 
