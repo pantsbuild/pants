@@ -36,7 +36,6 @@ python_library(
   sources = ['scm_project_tree.py'],
   dependencies = [
     ':project_tree',
-    'src/python/pants/util:memo',
   ]
 )
 
