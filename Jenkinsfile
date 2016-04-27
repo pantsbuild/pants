@@ -20,7 +20,7 @@ for (os in ["linux", "osx"]) {
     }
   }
 
-  for (i in 0..9) {
+  (0..9).each { n ->
     def one_indexed = i + 1
     shards["${os}_unit_tests_${one_indexed}_of_10"] = {
       node(os) {
