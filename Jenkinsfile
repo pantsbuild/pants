@@ -6,8 +6,11 @@ def ci = "./build-support/bin/ci.sh"
 
 ["linux", "osx"].each { os ->
 
+  echo("each ${os}")
   shards["${os}_self-checks"] = {
+    echo("shards ${os}")
     node(os) {
+      echo("node ${os}")
       checkout scm
       sh "${ci} -cjlpn"
     }
