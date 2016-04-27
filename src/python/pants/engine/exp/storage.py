@@ -25,6 +25,18 @@ from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
 
+def _unpickle(value):
+  if isinstance(value, six.binary_type):
+    # Deserialize string values.
+    return pickle.loads(value)
+  # Deserialize values with file interface,
+  return pickle.load(value)
+
+
+def _identity(value):
+  return value
+
+
 @total_ordering
 class Key(object):
   """Holds the digest for the object, which uniquely identifies it.
@@ -171,16 +183,16 @@ class Storage(Closable):
         pickler.fast = 1
         pickler.dump(obj)
         blob = buf.getvalue()
+        # Hash the blob and store it if it does not exist.
+        key = Key.create(blob, type(obj), str(obj) if self._debug else None)
+
+        self._contents.put(key.digest, blob)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
       # `Exception` type here.
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
-    # Hash the blob and store it if it does not exist.
-    key = Key.create(blob, type(obj), str(obj) if self._debug else None)
-
-    self._contents.put(key.digest, blob)
     return key
 
   def puts(self, objs):
@@ -202,12 +214,8 @@ class Storage(Closable):
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
 
-    value = self._contents.get(key.digest)
-    if isinstance(value, six.binary_type):
-      # loads for string-like values
-      return self._assert_type_matches(pickle.loads(value), key.type)
-    # load for file-like value from buffers
-    return self._assert_type_matches(pickle.load(value), key.type)
+    value = self._contents.get(key.digest, _unpickle)
+    return self._assert_type_matches(value, key.type)
 
   def add_mapping(self, from_key, to_key):
     """Establish one to one relationship from one Key to another Key.
@@ -390,10 +398,12 @@ class CacheStats(Counter):
 
 class KeyValueStore(Closable, AbstractClass):
   @abstractmethod
-  def get(self, key):
+  def get(self, key, transform=_identity):
     """Fetch the value for a given key.
 
     :param key: key in bytestring.
+    :param transform: optional function that is applied on the retrieved value from storage
+      before it is returned, since the original value may be only valid within the context.
     :return: value can be either string-like or file-like, `None` if does not exist.
     """
 
@@ -423,13 +433,16 @@ class InMemoryDb(KeyValueStore):
   def __init__(self):
     self._storage = dict()
 
-  def get(self, key):
-    return self._storage.get(key)
+  def get(self, key, transform=_identity):
+    return transform(self._storage.get(key))
 
   def put(self, key, value):
     if key in self._storage:
       return False
-    self._storage[key] = value
+
+    # Make a copy of the input value before it is saved to the storage, since the
+    # original value may be only valid within the context, this is to be safe.
+    self._storage[key] = bytes(value)
     return True
 
   def items(self):
@@ -483,7 +496,7 @@ class Lmdb(KeyValueStore):
   def path(self):
     return self._env.path()
 
-  def get(self, key):
+  def get(self, key, transform=_identity):
     """Return the value or `None` if the key does not exist.
 
     NB: Memory mapped storage returns a buffer object without copying keys or values, which
@@ -493,7 +506,7 @@ class Lmdb(KeyValueStore):
     with self._env.begin(db=self._db, buffers=True) as txn:
       value = txn.get(key)
       if value is not None:
-        return StringIO.StringIO(value)
+        return transform(StringIO.StringIO(value))
       return None
 
   def put(self, key, value):
