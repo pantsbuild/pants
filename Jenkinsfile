@@ -47,9 +47,9 @@ for (os in ["linux", "osx"]) {
   shards["${os}_contrib"] = ciShNode(os, '-fkmsrcjlp')
 
   totalShards = 10
-  for (shardNum in 1..totalShards) {
-    oneIndexed = shardNum
-    zeroIndexed = shardNum - 1
+  (0..<totalShards).each() {
+    zeroIndexed = it
+    oneIndexed = zeroIndexed + 1
     shards["${os}_unit_tests_${oneIndexed}_of_${totalShards}"] = ciShShardedNode(
       os, '-fkmsrcn', '-u', zeroIndexed, totalShards
     )
