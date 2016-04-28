@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.javac_plugin_setup import JavacPluginSetup
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 
 
@@ -19,6 +20,10 @@ class JavaLibrary(ExportableJvmLibrary):
 
   :API: public
   """
+
+  @classmethod
+  def subsystems(cls):
+    return super(JavaLibrary, cls).subsystems() + (JavacPluginSetup, )
 
   def __init__(self, *args, **kwargs):
     """

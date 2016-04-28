@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.javac_plugin_setup import JavacPluginSetup
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -26,7 +27,7 @@ class JvmTarget(Target, Jarable):
 
   @classmethod
   def subsystems(cls):
-    return super(JvmTarget, cls).subsystems() + (JvmPlatform,)
+    return super(JvmTarget, cls).subsystems() + (JavacPluginSetup, JvmPlatform)
 
   def __init__(self,
                address=None,
@@ -146,6 +147,21 @@ class JvmTarget(Target, Jarable):
       yield spec
     for resource_spec in self._resource_specs:
       yield resource_spec
+    # Add deps on anything we might need to find plugins.
+    # Note that this will also add deps from scala targets to javac plugins, but there's
+    # no real harm in that, and the alternative is to check for .java sources, which would
+    # eagerly evaluate all the globs, which would be a performance drag for goals that
+    # otherwise wouldn't do that (like `list`).
+    for spec in JavacPluginSetup.global_plugin_dependency_specs():
+      # Ensure that if this target is the plugin, we don't create a dep on ourself.
+      # Note that we can't do build graph dep checking here, so we will create a dep on our own
+      # deps, thus creating a cycle. Therefore an in-repo plugin that has JvmTarget deps
+      # can only be applied globally via JavacPluginSetup if you publish it first and then reference
+      # it as a JarLibrary (it can still be applied directly from the repo on targets that
+      # explicitly depend on it though). This is an unfortunate gotcha that will be addressed in
+      # the new engine.
+      if spec != self.address.spec:
+        yield spec
 
   @property
   def provides(self):

@@ -10,18 +10,8 @@ import os.path
 import time
 from unittest import expectedFailure, skipIf
 
-from pants.java.distribution.distribution import DistributionLocator
+from pants_test.backend.jvm.tasks.missing_jvm_check import missing_jvm
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
-
-
-def missing_jvm(version):
-  with subsystem_instance(DistributionLocator):
-    try:
-      DistributionLocator.cached(minimum_version=version, maximum_version='{}.9999'.format(version))
-      return False
-    except DistributionLocator.Error:
-      return True
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):

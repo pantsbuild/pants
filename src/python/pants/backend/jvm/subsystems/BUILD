@@ -32,6 +32,16 @@ python_library(
 )
 
 python_library(
+  name = 'javac_plugin_setup',
+  sources = ['javac_plugin_setup.py'],
+  dependencies = [
+    'src/python/pants/build_graph',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+  ],
+)
+
+python_library(
   name = 'jvm',
   sources = ['jvm.py'],
   dependencies = [
