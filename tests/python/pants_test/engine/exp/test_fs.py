@@ -181,6 +181,8 @@ class GitFSTest(unittest.TestCase, FSTestBase):
     worktree = self.mk_fs_tree(build_root_src).build_root
     with environment_as(GIT_DIR=gitdir, GIT_WORK_TREE=worktree):
       subprocess.check_call(['git', 'init'])
+      subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
+      subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
       for file in ['4.txt', 'a', 'c.ln', 'd.ln']:
         subprocess.check_call(['git', 'add', file])
       subprocess.check_call(['git', 'commit', '-am', 'Add project files.'])
