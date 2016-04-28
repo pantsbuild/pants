@@ -81,6 +81,7 @@ env:
 
 
 before_script: |
+  git --version
   ./build-support/bin/ci-sync.sh
   ./build-support/bin/install-android-sdk.sh
 
