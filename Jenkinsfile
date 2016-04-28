@@ -46,9 +46,9 @@ for (os in ["linux", "osx"]) {
   shards["${os}_self-checks"] = ciShNode(os, '-cjlpn')
   shards["${os}_contrib"] = ciShNode(os, '-fkmsrcjlp')
 
-  def totalShards = 10
-  (0..<totalShards).each { zeroIndexed ->
-    def oneIndexed = zeroIndexed + 1
+  int totalShards = 10
+  for (int zeroIndexed = 0; i < totalShards; i++) {
+    int oneIndexed = zeroIndexed + 1
     shards["${os}_unit_tests_${oneIndexed}_of_${totalShards}"] = ciShShardedNode(
       os, '-fkmsrcn', '-u', zeroIndexed, totalShards
     )
