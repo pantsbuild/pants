@@ -22,7 +22,7 @@ from pants.util.meta import AbstractClass
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
 
-class FSTestBase(AbstractClass, SchedulerTestBase):
+class FSTestBase(SchedulerTestBase, AbstractClass):
 
   _original_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test')
 
@@ -162,7 +162,7 @@ class FSTestBase(AbstractClass, SchedulerTestBase):
       ])
 
 
-class PosixFSTest(FSTestBase):
+class PosixFSTest(unittest.TestCase, FSTestBase):
 
   @contextmanager
   def mk_project_tree(self, build_root_src):
