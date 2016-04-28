@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 import unittest
 from abc import abstractmethod
 from contextlib import contextmanager
@@ -15,9 +14,6 @@ from pants.base.scm_project_tree import ScmProjectTree
 from pants.engine.exp.fs import (Dir, DirectoryListing, Dirs, FileContent, Files, Link, Path,
                                  PathGlobs, ReadLink, Stat, Stats)
 from pants.engine.exp.nodes import FilesystemNode
-from pants.scm.git import Git
-from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.meta import AbstractClass
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 from pants_test.testutils.git_util import Version, git_version, initialize_repo
@@ -179,5 +175,3 @@ class GitFSTest(unittest.TestCase, FSTestBase):
     worktree = self.mk_fs_tree(build_root_src).build_root
     with initialize_repo(worktree) as git_repo:
       yield ScmProjectTree(worktree, git_repo, 'HEAD')
-
-    safe_rmtree(worktree)
