@@ -44,6 +44,10 @@ class BuildGraph(AbstractClass):
     :API: public
     """
 
+    def __init__(self, addr):
+      super(BuildGraph.ManualSyntheticTargetError, self).__init__(
+          'Found a manually-defined target at synthetic address {}'.format(addr.spec))
+
   class DepthAgnosticWalk(object):
     """This is a utility class to aid in graph traversals that don't care about the depth."""
 

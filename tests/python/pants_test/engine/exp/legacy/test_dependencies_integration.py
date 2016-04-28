@@ -27,7 +27,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assert_deps(
         True,
         'examples/src/scala/org/pantsbuild/example/hello/welcome',
-        '//:scala_library_synthetic'
+        '//:scala-library-synthetic'
       )
 
   def test_missing(self):

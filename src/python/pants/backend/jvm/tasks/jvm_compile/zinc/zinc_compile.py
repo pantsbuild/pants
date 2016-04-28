@@ -62,8 +62,8 @@ class BaseZincCompile(JvmCompile):
     """Validate that all arguments match whitelisted regexes."""
     valid_patterns = {re.compile(p): v for p, v in whitelisted_args.items()}
 
-    def validate(arg_index):
-      arg = args[arg_index]
+    def validate(idx):
+      arg = args[idx]
       for pattern, has_argument in valid_patterns.items():
         if pattern.match(arg):
           return 2 if has_argument else 1
@@ -76,9 +76,10 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BaseZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
+    return (super(BaseZincCompile, cls).subsystem_dependencies() +
+            (ScalaPlatform, DistributionLocator))
 
-  @property
+  @classmethod
   def compiler_plugin_types(cls):
     """A tuple of target types which are compiler plugins."""
     return (AnnotationProcessor, ScalacPlugin)
@@ -270,16 +271,7 @@ class BaseZincCompile(JvmCompile):
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
               log_file, settings, fatal_warnings):
-    # We add compiler_classpath to ensure the scala-library jar is on the classpath.
-    # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
-    # usually need. Be more selective?
-    # TODO(John Sirois): Do we need to do this at all?  If adding scala-library to the classpath is
-    # only intended to allow target authors to omit a scala-library dependency, then ScalaLibrary
-    # already overrides traversable_dependency_specs to achieve the same end; arguably at a more
-    # appropriate level and certainly at a more appropriate granularity.
-    compile_classpath = self.compiler_classpath() + classpath
-
-    self._verify_zinc_classpath(self.get_options().pants_workdir, compile_classpath)
+    self._verify_zinc_classpath(self.get_options().pants_workdir, classpath)
     self._verify_zinc_classpath(self.get_options().pants_workdir, upstream_analysis.keys())
 
     zinc_args = []
@@ -287,7 +279,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend([
       '-log-level', self.get_options().level,
       '-analysis-cache', analysis_file,
-      '-classpath', ':'.join(compile_classpath),
+      '-classpath', ':'.join(classpath),
       '-d', classes_output_dir
     ])
     if not self.get_options().colors:
