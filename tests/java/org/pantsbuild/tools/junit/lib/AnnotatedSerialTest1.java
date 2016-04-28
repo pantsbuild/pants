@@ -21,7 +21,7 @@ import static org.junit.Assert.assertTrue;
  * the flags:
  * <pre>
  *  -default-parallel -parallel-threads 2
- * <pre>
+ * </pre>
  * when running with just these two classes as specs.
  * <p>
  * Uses a timeout, so its not completely deterministic, but it gives 3 seconds to allow any
