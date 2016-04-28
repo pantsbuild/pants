@@ -47,7 +47,7 @@ for (os in ["linux", "osx"]) {
   shards["${os}_contrib"] = ciShNode(os, '-fkmsrcjlp')
 
   int totalShards = 10
-  for (int zeroIndexed = 0; i < totalShards; i++) {
+  for (int zeroIndexed = 0; zeroIndexed < totalShards; zeroIndexed++) {
     int oneIndexed = zeroIndexed + 1
     shards["${os}_unit_tests_${oneIndexed}_of_${totalShards}"] = ciShShardedNode(
       os, '-fkmsrcn', '-u', zeroIndexed, totalShards
