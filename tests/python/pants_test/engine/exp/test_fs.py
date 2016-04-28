@@ -16,7 +16,7 @@ from pants.engine.exp.fs import (Dir, DirectoryListing, Dirs, FileContent, Files
 from pants.engine.exp.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
-from pants_test.testutils.git_util import Version, git_version, initialize_repo
+from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version, initialize_repo
 
 
 class FSTestBase(SchedulerTestBase, AbstractClass):
@@ -166,7 +166,8 @@ class PosixFSTest(unittest.TestCase, FSTestBase):
     yield self.mk_fs_tree(build_root_src)
 
 
-@unittest.skipIf(git_version() < Version('1.7.10'), 'The GitTest requires git >= 1.7.10.')
+@unittest.skipIf(git_version() < MIN_REQUIRED_GIT_VERSION,
+                 'The GitTest requires git >= {}.'.format(MIN_REQUIRED_GIT_VERSION))
 class GitFSTest(unittest.TestCase, FSTestBase):
 
   @contextmanager

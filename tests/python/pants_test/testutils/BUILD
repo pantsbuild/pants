@@ -26,6 +26,7 @@ python_library(
     'git_util.py',
   ],
   dependencies = [
+    'src/python/pants/base:revision',
     'src/python/pants/scm:git',
   ],
 )

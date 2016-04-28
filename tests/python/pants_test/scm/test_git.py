@@ -17,35 +17,16 @@ from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
-from pants_test.testutils.git_util import Version, git_version
+from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 
 
-class VersionTest(unittest.TestCase):
-
-  def test_equal(self):
-    self.assertEqual(Version('1'), Version('1.0.0.0'))
-    self.assertEqual(Version('1.0'), Version('1.0.0.0'))
-    self.assertEqual(Version('1.0.0'), Version('1.0.0.0'))
-    self.assertEqual(Version('1.0.0.0'), Version('1.0.0.0'))
-
-  def test_less(self):
-    self.assertTrue(Version('1.6') < Version('2'))
-    self.assertTrue(Version('1.6') < Version('1.6.1'))
-    self.assertTrue(Version('1.6') < Version('1.10'))
-
-  def test_greater(self):
-    self.assertTrue(Version('1.6.22') > Version('1'))
-    self.assertTrue(Version('1.6.22') > Version('1.6'))
-    self.assertTrue(Version('1.6.22') > Version('1.6.2'))
-    self.assertTrue(Version('1.6.22') > Version('1.6.21'))
-    self.assertTrue(Version('1.6.22') > Version('1.6.21.3'))
-
-
-@skipIf(git_version() < Version('1.7.10'), 'The GitTest requires git >= 1.7.10.')
+@skipIf(git_version() < MIN_REQUIRED_GIT_VERSION,
+        'The GitTest requires git >= {}.'.format(MIN_REQUIRED_GIT_VERSION))
 class GitTest(unittest.TestCase):
 
   @staticmethod
   def init_repo(remote_name, remote):
+    # TODO (peiyu) clean this up, use `git_util.initialize_repo`.
     subprocess.check_call(['git', 'init'])
     subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
     subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])

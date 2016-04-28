@@ -8,24 +8,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 import subprocess
 from contextlib import contextmanager
-from itertools import izip_longest
 
+from pants.base.revision import Revision
 from pants.scm.git import Git
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 
 
-class Version(object):
-
-  def __init__(self, text):
-    self._components = map(int, text.split('.'))
-
-  def __cmp__(self, other):
-    for ours, theirs in izip_longest(self._components, other._components, fillvalue=0):
-      difference = cmp(ours, theirs)
-      if difference != 0:
-        return difference
-    return 0
+MIN_REQUIRED_GIT_VERSION = Revision.semver('1.7.10')
 
 
 def git_version():
@@ -35,7 +25,7 @@ def git_version():
   assert process.returncode == 0, "Failed to determine git version."
   # stdout is like 'git version 1.9.1.598.g9119e8b\n'  We want '1.9.1.598'
   matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout)
-  return Version(matches.group(1))
+  return Revision.lenient(matches.group(1))
 
 
 @contextmanager
