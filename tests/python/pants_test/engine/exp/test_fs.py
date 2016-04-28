@@ -71,7 +71,6 @@ class FSTestBase(AbstractClass, SchedulerTestBase):
     self.assert_walk(Files, ['a/3.txt'], ['a/3.txt'])
     self.assert_walk(Files, ['z.txt'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_literal_directory(self):
     self.assert_walk(Dirs, ['c.ln'], ['a/b'])
     self.assert_walk(Dirs, ['a'], ['a'])
@@ -79,7 +78,6 @@ class FSTestBase(AbstractClass, SchedulerTestBase):
     self.assert_walk(Dirs, ['z'], [])
     self.assert_walk(Dirs, ['4.txt', 'a/3.txt'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_siblings(self):
     self.assert_walk(Files, ['*.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/*.txt'], ['a/b/1.txt'])
@@ -87,7 +85,6 @@ class FSTestBase(AbstractClass, SchedulerTestBase):
     self.assert_walk(Files, ['a/b/*'], ['a/b/1.txt', 'a/b/2'])
     self.assert_walk(Files, ['*/0.txt'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_recursive(self):
     self.assert_walk(Files, ['**/*.txt.ln'], ['4.txt'])
     self.assert_walk(Files, ['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
@@ -95,32 +92,27 @@ class FSTestBase(AbstractClass, SchedulerTestBase):
     self.assert_walk(Files, ['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/b/2'])
     self.assert_walk(Files, ['**/*.zzz'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_recursive_directory(self):
     self.assert_walk(Dirs, ['*'], ['a', 'a/b'])
     self.assert_walk(Dirs, ['*/*'], ['a/b'])
     self.assert_walk(Dirs, ['**/*'], ['a/b'])
     self.assert_walk(Dirs, ['*/*/*'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_files_content_literal(self):
     self.assert_content(['4.txt'], {'4.txt': 'four\n'})
     self.assert_content(['a/4.txt.ln'], {'4.txt': 'four\n'})
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_files_content_directory(self):
     with self.assertRaises(Exception):
       self.assert_content(['a/b/'], {'a/b/': 'nope\n'})
     with self.assertRaises(Exception):
       self.assert_content(['a/b'], {'a/b': 'nope\n'})
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_file(self):
     self.assert_fsnodes(Files, ['4.txt'], [
         (Path('4.txt'), Stats),
       ])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_symlink_file(self):
     self.assert_fsnodes(Files, ['c.ln/2'], [
         (Link('c.ln'), ReadLink),
@@ -136,7 +128,6 @@ class FSTestBase(AbstractClass, SchedulerTestBase):
         (Path('a/b/1.txt'), Stats),
       ])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_symlink_globbed_dir(self):
     self.assert_fsnodes(Files, ['*/2'], [
         # Glob the root.
@@ -156,7 +147,6 @@ class FSTestBase(AbstractClass, SchedulerTestBase):
         (Path('a/2'), Stats),
       ])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_symlink_globbed_file(self):
     self.assert_fsnodes(Files, ['d.ln/b/*.txt'], [
         # NB: Needs to stat every path on the way down to track whether
@@ -183,14 +173,14 @@ class GitFSTest(unittest.TestCase, FSTestBase):
   @contextmanager
   def mk_project_tree(self, build_root_src):
     gitdir = safe_mkdtemp()
-    worktree = self.mk_fs_tree(self._original_src).build_root
+    worktree = self.mk_fs_tree(build_root_src).build_root
     with environment_as(GIT_DIR=gitdir, GIT_WORK_TREE=worktree):
       subprocess.check_call(['git', 'init'])
       for file in ['4.txt', 'a', 'c.ln', 'd.ln']:
         subprocess.check_call(['git', 'add', file])
       subprocess.check_call(['git', 'commit', '-am', 'Add files.'])
 
-      yield ScmProjectTree(build_root_src, Git(gitdir=gitdir, worktree=worktree), 'HEAD')
+      yield ScmProjectTree(worktree, Git(gitdir=gitdir, worktree=worktree), 'HEAD')
 
     safe_rmtree(gitdir)
     safe_rmtree(worktree)

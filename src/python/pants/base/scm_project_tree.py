@@ -24,6 +24,7 @@ class ScmProjectTree(ProjectTree):
     self._rev = rev
     self._scm_worktree = os.path.realpath(scm.worktree)
 
+  @property
   @memoized
   def _reader(self):
     """Make this memoized such that `ScmProjectTree` is pickable."""
