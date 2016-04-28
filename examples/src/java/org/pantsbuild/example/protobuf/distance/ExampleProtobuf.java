@@ -5,7 +5,7 @@ package org.pantsbuild.example.protobuf.distance;
 
 import org.pantsbuild.example.distance.Distances;
 
-class ExampleProtobuf {
+public class ExampleProtobuf {
 
   private ExampleProtobuf() {
   }

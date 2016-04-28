@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def antlr4_jar(name):
-  return JarDependency(org='org.antlr', name=name, rev='4.1')
+  return JarDependency(org='org.antlr', name=name, rev='4.3')
 
 
 _DEFAULT_ANTLR_DEPS = {
