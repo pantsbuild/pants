@@ -87,7 +87,6 @@ before_script: |
 script: |
   uname -a
   java -version
-  git --version
   ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
