@@ -20,7 +20,7 @@ from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.meta import AbstractClass
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
-from pants_test.testutils.git_util import Version, git_version
+from pants_test.testutils.git_util import Version, git_version, initialize_repo
 
 
 class FSTestBase(SchedulerTestBase, AbstractClass):
@@ -175,19 +175,9 @@ class GitFSTest(unittest.TestCase, FSTestBase):
 
   @contextmanager
   def mk_project_tree(self, build_root_src):
-    gitdir = safe_mkdtemp()
-
     # Use mk_fs_tree only to feed the files for the git repo, not using its FileSystemProjectTree.
     worktree = self.mk_fs_tree(build_root_src).build_root
-    with environment_as(GIT_DIR=gitdir, GIT_WORK_TREE=worktree):
-      subprocess.check_call(['git', 'init'])
-      subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
-      subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
-      for file in ['4.txt', 'a', 'c.ln', 'd.ln']:
-        subprocess.check_call(['git', 'add', file])
-      subprocess.check_call(['git', 'commit', '-am', 'Add project files.'])
+    with initialize_repo(worktree) as git_repo:
+      yield ScmProjectTree(worktree, git_repo, 'HEAD')
 
-      yield ScmProjectTree(worktree, Git(gitdir=gitdir, worktree=worktree), 'HEAD')
-
-    safe_rmtree(gitdir)
     safe_rmtree(worktree)

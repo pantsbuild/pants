@@ -7,7 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 import subprocess
+from contextlib import contextmanager
 from itertools import izip_longest
+
+from pants.scm.git import Git
+from pants.util.contextutil import environment_as
+from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 
 
 class Version(object):
@@ -31,3 +36,19 @@ def git_version():
   # stdout is like 'git version 1.9.1.598.g9119e8b\n'  We want '1.9.1.598'
   matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout)
   return Version(matches.group(1))
+
+
+@contextmanager
+def initialize_repo(worktree):
+  """Initialize git repository for the given worktree."""
+  gitdir = safe_mkdtemp()
+  with environment_as(GIT_DIR=gitdir, GIT_WORK_TREE=worktree):
+    subprocess.check_call(['git', 'init'])
+    subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
+    subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
+    subprocess.check_call(['git', 'add', '.'])
+    subprocess.check_call(['git', 'commit', '-am', 'Add project files.'])
+
+    yield Git(gitdir=gitdir, worktree=worktree)
+
+    safe_rmtree(gitdir)

@@ -25,4 +25,7 @@ python_library(
   sources = [
     'git_util.py',
   ],
+  dependencies = [
+    'src/python/pants/scm:git',
+  ],
 )
