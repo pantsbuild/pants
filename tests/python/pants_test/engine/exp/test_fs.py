@@ -115,7 +115,6 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         (Path('4.txt'), Stats),
       ])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_symlink_file(self):
     self.assert_fsnodes(Files, ['c.ln/2'], [
         (Link('c.ln'), ReadLink),
