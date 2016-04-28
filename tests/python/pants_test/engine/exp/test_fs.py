@@ -20,6 +20,7 @@ from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.meta import AbstractClass
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
+from pants_test.testutils.git_util import Version, git_version
 
 
 class FSTestBase(SchedulerTestBase, AbstractClass):
@@ -114,6 +115,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         (Path('4.txt'), Stats),
       ])
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_nodes_symlink_file(self):
     self.assert_fsnodes(Files, ['c.ln/2'], [
         (Link('c.ln'), ReadLink),
@@ -169,6 +171,7 @@ class PosixFSTest(unittest.TestCase, FSTestBase):
     yield self.mk_fs_tree(build_root_src)
 
 
+@unittest.skipIf(git_version() < Version('1.7.10'), 'The GitTest requires git >= 1.7.10.')
 class GitFSTest(unittest.TestCase, FSTestBase):
 
   @contextmanager

@@ -6,12 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 import subprocess
 import types
 import unittest
 from contextlib import contextmanager
-from itertools import izip_longest
 from textwrap import dedent
 from unittest import skipIf
 
@@ -19,19 +17,7 @@ from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
-
-
-class Version(object):
-
-  def __init__(self, text):
-    self._components = map(int, text.split('.'))
-
-  def __cmp__(self, other):
-    for ours, theirs in izip_longest(self._components, other._components, fillvalue=0):
-      difference = cmp(ours, theirs)
-      if difference != 0:
-        return difference
-    return 0
+from pants_test.testutils.git_util import Version, git_version
 
 
 class VersionTest(unittest.TestCase):
@@ -53,16 +39,6 @@ class VersionTest(unittest.TestCase):
     self.assertTrue(Version('1.6.22') > Version('1.6.2'))
     self.assertTrue(Version('1.6.22') > Version('1.6.21'))
     self.assertTrue(Version('1.6.22') > Version('1.6.21.3'))
-
-
-def git_version():
-  """Get a Version() based on installed command-line git's version"""
-  process = subprocess.Popen(['git', '--version'], stdout=subprocess.PIPE)
-  (stdout, stderr) = process.communicate()
-  assert process.returncode == 0, "Failed to determine git version."
-  # stdout is like 'git version 1.9.1.598.g9119e8b\n'  We want '1.9.1.598'
-  matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout)
-  return Version(matches.group(1))
 
 
 @skipIf(git_version() < Version('1.7.10'), 'The GitTest requires git >= 1.7.10.')

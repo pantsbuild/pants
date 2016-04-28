@@ -19,3 +19,10 @@ python_library(
     'src/python/pants/util:contextutil',
   ],
 )
+
+python_library(
+  name = 'git_util',
+  sources = [
+    'git_util.py',
+  ],
+)
