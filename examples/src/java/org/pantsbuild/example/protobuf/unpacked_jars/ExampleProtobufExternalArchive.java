@@ -5,7 +5,7 @@ package org.pantsbuild.example.protobuf.unpacked_jars;
 
 import com.squareup.testing.protolib.External;
 
-class ExampleProtobufExternalArchive {
+public class ExampleProtobufExternalArchive {
   private ExampleProtobufExternalArchive() {
   }
 

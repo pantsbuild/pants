@@ -11,7 +11,7 @@ import org.pantsbuild.example.temperature.TemperatureService;
 /**
  * Simple example of creating a message with Wire and printing out its contents.
  */
-class WireTemperatureExample implements TemperatureService {
+public class WireTemperatureExample implements TemperatureService {
 
   public Temperature getTemperature(TemperatureRequest request) {
     return new Temperature.Builder().unit("celsius").number(19L).build();

@@ -3,7 +3,7 @@
 
 package org.pantsbuild.example.wire.roots;
 
-class WireRootsExample {
+public class WireRootsExample {
 
   public static void main(String[] args) {
   }

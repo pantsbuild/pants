@@ -10,7 +10,7 @@ import org.pantsbuild.example.temperature.Temperature;
 /**
  * Simple example of creating a message with Wire and printing out its contents.
  */
-class WireElementExample {
+public class WireElementExample {
 
   private WireElementExample() {
   }

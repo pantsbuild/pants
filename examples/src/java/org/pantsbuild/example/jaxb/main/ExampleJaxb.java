@@ -12,7 +12,7 @@ import java.io.IOException;
  * Tests Jaxb code generation in pants, using reader.VegetableReader and the sample.xml file
  * under org/pantsbuild/example/names/simple.xml
  */
-class ExampleJaxb {
+public class ExampleJaxb {
   private ExampleJaxb() {
   }
 

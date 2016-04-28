@@ -5,7 +5,7 @@ package org.pantsbuild.example.protobuf.imports;
 
 import org.pantsbuild.example.imports.TestImports;
 
-class ExampleProtobufImports {
+public class ExampleProtobufImports {
 
   private ExampleProtobufImports() {
   }
