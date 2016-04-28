@@ -174,12 +174,14 @@ class GitFSTest(unittest.TestCase, FSTestBase):
   @contextmanager
   def mk_project_tree(self, build_root_src):
     gitdir = safe_mkdtemp()
+
+    # Use mk_fs_tree only to feed the files for the git repo, not using its FileSystemProjectTree.
     worktree = self.mk_fs_tree(build_root_src).build_root
     with environment_as(GIT_DIR=gitdir, GIT_WORK_TREE=worktree):
       subprocess.check_call(['git', 'init'])
       for file in ['4.txt', 'a', 'c.ln', 'd.ln']:
         subprocess.check_call(['git', 'add', file])
-      subprocess.check_call(['git', 'commit', '-am', 'Add files.'])
+      subprocess.check_call(['git', 'commit', '-am', 'Add project files.'])
 
       yield ScmProjectTree(worktree, Git(gitdir=gitdir, worktree=worktree), 'HEAD')
 
