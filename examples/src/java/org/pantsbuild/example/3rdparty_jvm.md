@@ -124,6 +124,166 @@ transitive dependencies from JVM targets:
       ]
     )
 
+Managing Transitive Dependencies
+-------------------------------
+
+### The Problem
+
+If you have jars that pull in many transitive dependencies, you probably
+want to constrain which versions of those transitive dependencies you
+pull in. This is valuable for:
+
+  * Security concerns (you may want to avoid artifacts with known
+    vulnerabilities, or you may only want to use particular jars which you
+    trust).
+  * Predictable and consistent behavior across all projects in your
+    repository (described below).
+  * Caching concerns/build times (described below).
+
+Otherwise, you may have some targets that end up being built with
+version `1.2.3` of a transitive dependency, and others that get built with
+`4.5.6` of that dependency. Worse, the *same target* might be built with
+different versions of a transitive dependency depending on what other
+targets happen to be part of the same pants invocation. To illustrate
+this, consider the diagram below:
+
+<div>
+  <img alt="image" src="images/transitive-dependencies.png" style="display: block; max-height: 25ex; margin-left: auto; margin-right: auto;">
+</div>
+
+Assume `foo` and `bar` are binary targets. If you build a binary of `foo`
+with `./pants binary foo`, `foo` will be packaged with the `example` jar
+in addition to its transitive dependencies, which will be resolved as the
+`common` jar, version `1.2.3`.
+
+Likewise, if you run `./pants binary bar`, it will be packaged with `demo`,
+and the transitive dependencies of `demo`, which here is simply the `common`
+jar version `4.5.6`.
+
+However, if you run `./pants binary foo bar`, ivy will only resolve one
+version of `common-1.2.3`, which most likely means that both `foo` and `bar`
+will get `common` version `4.5.6` (because it is the more recent version).
+This is a problem, because it may be that `common-4.5.6` is not compatible
+with `3rdparty:example`, which will _break the `foo` binary at runtime_.
+
+More subtly, if you have many intermediate `java_library` targets between
+your `jvm_binaries` and your `jar_library` targets (which is normaly the
+case), simply changing which combination of `java_library` targets are in
+the same `./pants` invocation may invalidate the cache and force Pants to
+recompile them, even if their sources are unchanged. This is because they
+may resolve different versions of their transitive jar dependencies than
+the previous time they were compiled, which means their classpaths will be
+different. Getting a different classpath causes a cache-miss, forcing a
+recompile. In general recompiling when the classpath changes is the
+correct thing to do, however this means that unstable transitive
+dependencies will cause a lot of cache-thrashing. If you have a large
+repository with a large amount of code, recompiles get expensive.
+
+### Possible Solutions
+
+There are a few ways to avoid or work around these problems. A simple method
+is to use the [strict ivy conflict manager](http://ant.apache.org/ivy/history/2.4.0/settings/conflict-managers.html),
+which will cause the jar resolution to fail with an error if it detects two
+artifacts with conflicting versions. This has the advantage of forcing a dev
+to be aware of (and make a decision about) confliction versions.
+
+You could also disable transitive jar resolution altogether, and explicitly
+declare every dependency you need. This ensures that you have total control
+over your external dependencies, but can be difficult to maintain.
+
+The third option is using `managed_jar_dependencies`, to pin the versions of
+the subset of your transitive dependencies that you care about.
+
+### Managed Jar Dependencies
+
+Maven handles this problem with the `<dependencyManagement>`
+<a href="https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management">stanza</a>,
+and Pants has similar functionality via the `managed_jar_dependencies` target.
+
+You can set up your `3rdparty/BUILD` file like so:
+
+    :::python
+    managed_jar_dependencies(name='management',
+      artifacts=[
+        ':commons-io',
+        ':jersey-core',
+      ],
+    )
+
+    jar_library(name='commons-io',
+      jars=[
+        jar('commons-io', 'commons-io', '2.5'),
+      ],
+    )
+
+    jar_library(name='jersey-core',
+      jars=[
+        jar('com.sun.jersey', 'jersey-core', '1.19.1'),
+      ],
+    )
+
+And in `pants.ini`, add:
+
+    :::ini
+    [jar-dependency-management]
+    default_target: 3rdparty:management
+
+This will force all `jar_library` targets in your repository to use the
+versions of `commons-io` and `jersey-core` referenced by the `management`
+target. When resolving transitive dependencies, Pants will always choose
+the versions "pinned" by the managed dependencies target.
+
+If a `jar_library` omits the version for one of its `jar()`s, it will use
+the version defined in `managed_jar_dependencies`. If a `jar()` defines a
+version that _conflicts_ with the version set in `managed_jar_dependencies`,
+an error will be raised and the build will fail (though this behavior can
+be modified via the `conflict_strategy` option).
+
+This is a bit verbose, and entails a bit of duplicate code (you have to
+mention `jersey-core` 3 times in the above example). You can use the
+`managed_jar_libraries` target factory instead to make your `3rdparty/BUILD`
+definitions more concise.
+
+This example is equivalent to the one earlier, but using `managed_jar_libraries`
+instead:
+
+    :::python
+    managed_jar_libraries(name='management',
+      artifacts=[
+        jar('commons-io', 'commons-io', '2.5'),
+        jar('com.sun.jersey', 'jersey-core', '1.19.1'),
+      ],
+    )
+
+This automatically generates `jar_library` targets for you, and makes a
+`managed_jar_dependencies` target to reference them. (Note that you still
+need to make the same change to pants.ini).
+
+The generated library targets follow the naming convention
+`org.name.classifier.ext`, where `classifier` and `ext` are omitted if they
+are the default values.
+
+So in the above example will generate two `jar_library` targets, called
+`3rdparty:commons-io.commons-io` and `3rdparty:com.sun.jersey.jersey-core`.
+
+The artifacts list of `managed_jar_libraries` can also accept target
+addresses to already-existing `jar_libraries`, just like a normal
+`managed_jar_dependences` target. In this case, `managed_jar_libraries`
+will just use the referenced target, rather than generating a new one.
+
+With Pants you can create *multiple* `managed_jar_dependencies`.
+If you have more than one, for any particular `jar_library`, you can define
+which `managed_jar_dependencies` it uses explicitly (rather than using the
+default defined in `pants.ini`):
+
+    :::python
+    jar_library(name='org.apache.hadoop-alternate',
+      jars=[
+        jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
+      ],
+      managed_dependencies='3rdparty:management-alternate',
+    )
+
 <a pantsmark="test_3rdparty_jvm_snapshot"> </a>
 
 Using a SNAPSHOT JVM Dependency

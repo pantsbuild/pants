@@ -62,6 +62,7 @@
     "images/ossrh-publish-find-staging-repo.png": "src/python/pants/docs/images/ossrh-publish-find-staging-repo.png",
     "images/ossrh-publish-release-staging-repo.png": "src/python/pants/docs/images/ossrh-publish-release-staging-repo.png",
     "images/report-server-page.png": "src/python/pants/docs/images/report-server-page.png",
+    "images/transitive-dependencies.png": "src/python/pants/docs/images/transitive-dependencies.png",
     "robots.txt": "src/docs/robots.txt",
     "pants-logo.ico": "src/python/pants/docs/pants-logo.ico",
     "bootstrap-custom.min.css": "src/python/pants/docs/bootstrap-custom.min.css",
