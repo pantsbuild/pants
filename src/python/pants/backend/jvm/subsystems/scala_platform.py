@@ -69,10 +69,15 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                             cls._key_for_tool_version('scalac', version),
                             classpath=[cls._create_compiler_jardep(version)])
 
-    def register_scala_repl_tool(version, extra_deps=None):
+    def register_scala_repl_tool(version, with_jline=False):
       classpath = [cls._create_compiler_jardep(version)]  # Note: the REPL is in the compiler jar.
-      if extra_deps:
-        classpath.extend(extra_deps)
+      if with_jline:
+        jline_dep = JarDependency(
+            org = 'org.scala-lang',
+            name = 'jline',
+            rev = scala_build_info['2.10'].full_version
+        )
+        classpath.append(jline_dep)
       cls.register_jvm_tool(register,
                             cls._key_for_tool_version('scala-repl', version),
                             classpath=classpath)
@@ -96,15 +101,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register('--suffix-version', advanced=True, default=None,
              help='Scala suffix to be used when a custom version is specified.  For example 2.10.')
 
-    jline_dep = JarDependency(
-        org = 'org.scala-lang',
-        name = 'jline',
-        rev = scala_build_info['2.10'].full_version
-    )  # Dep is only used by scala 2.10.x
-
     # Register the fixed version tools.
     register_scala_compiler_tool('2.10')
-    register_scala_repl_tool('2.10', extra_deps=[jline_dep])
+    register_scala_repl_tool('2.10', with_jline=True)  # 2.10 repl requires jline.
     register_style_tool('2.10')
 
     register_scala_compiler_tool('2.11')
