@@ -226,10 +226,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @memoized_property
   def _resolved_dep_info(self):
-    if not self._depinfo:
-      self._depinfo = ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_deps),
-                                         self._resolve_deps(self.get_options().structs_deps))
-    return self._depinfo
+    return ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_deps),
+                              self._resolve_deps(self.get_options().structs_deps))
 
   @property
   def _copy_target_attributes(self):
