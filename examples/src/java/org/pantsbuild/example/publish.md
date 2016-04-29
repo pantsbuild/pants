@@ -38,7 +38,7 @@ Enabling Pants Publish
 ### Tell Pants about your Artifact Repository
 
 To tell Pants which artifact repository to publish to, [[Create a
-plugin|pants('src/python/pants/docs:howto_plugin')]] if you haven't already. Register it with Pants.
+plugin|pants('src/docs:howto_plugin')]] if you haven't already. Register it with Pants.
 
 In the plugin, define and register at least one `Repository` object in a `BUILD` file alias as
 shown in
@@ -154,9 +154,9 @@ Pants supports "publish plugins", which allow end-users to add additional, arbit
 published along with the primary artifact. For example, let's say that along with publishing your
 jar full of class files, you would also like to publish a companion file that contains some
 metadata -- code coverage info, source git repository, java version that created the jar, etc. By
-[[developing a task|pants('src/python/pants/docs:dev_tasks')]] in a
-[[plugin|pants('src/python/pants/docs:howto_plugin')]], you give Pants a new ability. [[Develop a
-Task to Publish "Extra" Artifacts|pants('src/python/pants/docs:dev_tasks_publish_extras')]] to find
+[[developing a task|pants('src/docs:dev_tasks')]] in a
+[[plugin|pants('src/docs:howto_plugin')]], you give Pants a new ability. [[Develop a
+Task to Publish "Extra" Artifacts|pants('src/docs:dev_tasks_publish_extras')]] to find
 out how to develop a special Task to include "extra" data with published artifacts.
 
 

@@ -44,4 +44,4 @@ Powered by Pants
 Contributing to Pants
 ---------------------
 
-+ [[Pants Developer Center|pants('src/python/pants/docs:readme')]]
++ [[Pants Developer Center|pants('src/docs:dev')]]
