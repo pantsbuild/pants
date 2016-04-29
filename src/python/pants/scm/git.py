@@ -94,7 +94,6 @@ class Git(Scm):
     worktree:  The path to the git repository working tree directory (typically '.').
     remote:    The default remote to use.
     branch:    The default remote branch to use.
-    log:       A log object that supports debug, info, and warn methods.
     """
     super(Scm, self).__init__()
 
