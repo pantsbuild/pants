@@ -19,6 +19,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.memo import memoized_property
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
@@ -213,19 +214,17 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     return deps
 
   def _thrift_dependencies_for_target(self, target):
+    dep_info = self._resolved_dep_info
+    target_declares_service = any(self._declares_service(source)
+                                  for source in target.sources_relative_to_buildroot())
     language = self._thrift_defaults.language(target)
-    if self._includes_a_service(target):
-      return self._resolved_dep_info().service[language]
-    else:
-      return self._resolved_dep_info().structs[language]
 
-  def _includes_a_service(self, target):
-    for source in target.sources_relative_to_buildroot():
-      if self._declares_service(source):
-        return True
+    if target_declares_service:
+      return dep_info.service[language]
     else:
-      return False
+      return dep_info.structs[language]
 
+  @memoized_property
   def _resolved_dep_info(self):
     if not self._depinfo:
       self._depinfo = ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_deps),
