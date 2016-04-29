@@ -70,7 +70,7 @@ ${PANTS_EXE} markdown --fragment \
 
 
 # invoke doc site generator.
-${PANTS_EXE} sitegen --config-path=src/python/pants/docs/docsite.json || \
+${PANTS_EXE} sitegen --config-path=src/docs/docsite.json || \
   die "Failed to generate doc site'."
 
 set +x
@@ -84,7 +84,7 @@ if [[ "${publish}" = "true" ]]; then
 continue."
   fi
   (
-    ${REPO_ROOT}/src/python/pants/docs/publish_via_git.sh \
+    ${REPO_ROOT}/src/docs/publish_via_git.sh \
       https://github.com/pantsbuild/pantsbuild.github.io.git \
       ${publish_path} && \
     do_open ${url}/index.html

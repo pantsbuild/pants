@@ -28,7 +28,7 @@ of the task class.
 
 **Option help** When registering a `Task` option, pass a `help` parameter to describe that option.
 
-!inc[start-at=register_options&end-at=help=](../core_tasks/list_goals.py)
+!inc[start-at=register_options&end-at=help=](../python/pants/core_tasks/list_goals.py)
 
 ### Target types and other `BUILD` file symbols
 
@@ -93,7 +93,7 @@ The site generator
 takes "raw" `.html` files, "wraps" them in a template with some
 navigation UI, and writes out the resulting `.html` files.
 
-You configure this with `src/python/pants/docs/docsite.json`:
+You configure this with `src/docs/docsite.json`:
 
 `sources`:<br>
 Map of pages to the `.html` files they're generated from. E.g.,

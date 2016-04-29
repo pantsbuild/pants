@@ -54,7 +54,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   # Patch version x.x.1 : Increment this field when a minor format change that just adds information
   #   that an application can safely ignore.
   #
-  # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
+  # Note format changes in src/docs/export.md and update the Changelog section.
   #
   DEFAULT_EXPORT_VERSION = '1.0.7'
 
