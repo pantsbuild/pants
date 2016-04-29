@@ -12,6 +12,7 @@ from types import NoneType
 
 from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
 from pants.util.dirutil import fast_relpath
+from pants.util.memo import memoized
 
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,13 @@ class ScmProjectTree(ProjectTree):
     super(ScmProjectTree, self).__init__(build_root, ignore_patterns)
     self._scm = scm
     self._rev = rev
-    self._reader = scm.repo_reader(rev)
     self._scm_worktree = os.path.realpath(scm.worktree)
+
+  @property
+  @memoized
+  def _reader(self):
+    """Make this memoized such that `ScmProjectTree` is pickable."""
+    return self._scm.repo_reader(self._rev)
 
   def _scm_relpath(self, build_root_relpath):
     return fast_relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree)

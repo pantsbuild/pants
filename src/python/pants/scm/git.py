@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import StringIO
 import subprocess
@@ -26,6 +27,9 @@ NUL = ensure_binary('\0')
 SPACE = ensure_binary(' ')
 NEWLINE = ensure_binary('\n')
 EMPTY_STRING = ensure_binary("")
+
+
+logger = logging.getLogger(__name__)
 
 
 class Git(Scm):
@@ -82,7 +86,7 @@ class Git(Scm):
     if result != 0:
       raise raise_type(failure_msg or '{} failed with exit code {}'.format(' '.join(cmd), result))
 
-  def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None, log=None):
+  def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None):
     """Creates a git scm proxy that assumes the git repository is in the cwd by default.
 
     binary:    The path to the git binary to use, 'git' by default.
@@ -90,7 +94,6 @@ class Git(Scm):
     worktree:  The path to the git repository working tree directory (typically '.').
     remote:    The default remote to use.
     branch:    The default remote branch to use.
-    log:       A log object that supports debug, info, and warn methods.
     """
     super(Scm, self).__init__()
 
@@ -99,12 +102,6 @@ class Git(Scm):
     self._gitdir = os.path.realpath(gitdir) if gitdir else os.path.join(self._worktree, '.git')
     self._remote = remote
     self._branch = branch
-
-    if log:
-      self._log = log
-    else:
-      import logging
-      self._log = logging.getLogger(__name__)
 
   def current_rev_identifier(self):
     return 'HEAD'
@@ -210,12 +207,12 @@ class Git(Scm):
       self._check_call(['rebase', 'FETCH_HEAD'], raise_type=Scm.LocalException)
     except Scm.LocalException as e:
       if leave_clean:
-        self._log.debug('Cleaning up after failed rebase')
+        logger.debug('Cleaning up after failed rebase')
         try:
           self._check_call(['rebase', '--abort'], raise_type=Scm.LocalException)
         except Scm.LocalException as abort_exc:
-          self._log.debug('Failed to up after failed rebase')
-          self._log.debug(traceback.format_exc(abort_exc))
+          logger.debug('Failed to up after failed rebase')
+          logger.debug(traceback.format_exc(abort_exc))
           # But let the original exception propagate, since that's the more interesting one
       raise e
 
@@ -276,7 +273,7 @@ class Git(Scm):
     return [self._gitcmd, '--git-dir=' + self._gitdir, '--work-tree=' + self._worktree] + args
 
   def _log_call(self, cmd):
-    self._log.debug('Executing: ' + ' '.join(cmd))
+    logger.debug('Executing: ' + ' '.join(cmd))
 
   def repo_reader(self, rev):
     return GitRepositoryReader(self, rev)
