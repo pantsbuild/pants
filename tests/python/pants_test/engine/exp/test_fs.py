@@ -53,7 +53,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 
     # Validate that FilesystemNodes for exactly the given subjects are reachable under this
     # request.
-    fs_nodes = [n for ((n, _), _) in scheduler.product_graph.walk(roots=request.roots)
+    fs_nodes = [n for n, _ in scheduler.product_graph.walk(roots=request.roots)
                 if type(n) is FilesystemNode]
     self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
 
