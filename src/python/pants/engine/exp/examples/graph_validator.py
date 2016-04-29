@@ -67,6 +67,8 @@ class GraphValidator(object):
       # TODO: this does multiple walks.
       used_literal_deps = set()
       for dep in dependencies:
+        if dep.subject != root.subject:
+          continue
         for product in self._collect_consumed_inputs(product_graph, dep):
           if product in self._literal_types:
             used_literal_deps.add(product)

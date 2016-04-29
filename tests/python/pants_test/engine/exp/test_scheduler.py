@@ -27,9 +27,9 @@ class SchedulerTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
-    self.scheduler, storage = setup_json_scheduler(build_root)
-    self.storage = storage
-    self.engine = LocalSerialEngine(self.scheduler, storage)
+    self.scheduler, self.storage = setup_json_scheduler(build_root)
+    self.pg = self.scheduler.product_graph
+    self.engine = LocalSerialEngine(self.scheduler, self.storage)
 
     self.guava = Address.parse('3rdparty/jvm:guava')
     self.thrift = Address.parse('src/thrift/codegen/simple')
@@ -54,12 +54,11 @@ class SchedulerTest(unittest.TestCase):
                      {node for node, _ in walk
                       if node.product == product and isinstance(node, node_type) and node.variants == variants})
 
-  def build_and_walk(self, build_request, failures=False):
+  def build_and_walk(self, build_request):
     """Build and then walk the given build_request, returning the walked graph as a list."""
-    predicate = (lambda _: True) if failures else None
     result = self.engine.execute(build_request)
     self.assertIsNone(result.error)
-    return list(self.scheduler.product_graph.walk(build_request.roots, predicate=predicate))
+    return list(self.scheduler.product_graph.walk(build_request.roots))
 
   def request(self, goals, *addresses):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
@@ -81,14 +80,14 @@ class SchedulerTest(unittest.TestCase):
     self.assertEquals(type(root), DependenciesNode)
     self.assertEquals(Return([return_value]), root_state)
     self.assertIn((node, Return(return_value)),
-                  [(d, self.pg.state(d)) for d in self.pg.dependencies_of(node)])
+                  [(d, self.pg.state(d)) for d in self.pg.dependencies_of(root)])
 
   def assert_root_failed(self, walk, node, thrown_type):
     """Asserts that the first Node in a walk was a DependenciesNode with a Throw result."""
     root, root_state = walk[0]
     self.assertEquals(type(root), DependenciesNode)
     self.assertEquals(Throw, type(root_state))
-    dependencies = [(d, self.pg.state(d)) for d in self.pg.dependencies_of(node)]
+    dependencies = [(d, self.pg.state(d)) for d in self.pg.dependencies_of(root)]
     self.assertIn((node, thrown_type), [(k, type(v.exc))
                                         for k, v in dependencies if type(v) is Throw])
 
@@ -187,7 +186,7 @@ class SchedulerTest(unittest.TestCase):
     # Confirm that the produced jars had the appropriate versions.
     self.assertEquals({Jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
                        Jar('com.google.guava', 'guava', '18.0')},
-                      {ret.value for (node, ret), _ in walk
+                      {ret.value for node, ret in walk
                        if node.product == Jar and isinstance(node, SelectNode)})
 
   def test_dependency_inference(self):
@@ -206,7 +205,7 @@ class SchedulerTest(unittest.TestCase):
   def test_multiple_classpath_entries(self):
     """Multiple Classpath products for a single subject currently cause a failure."""
     build_request = self.request(['compile'], self.java_multi)
-    walk = self.build_and_walk(build_request, failures=True)
+    walk = self.build_and_walk(build_request)
 
     # Validate that the root failed.
     self.assert_root_failed(walk,
@@ -220,7 +219,7 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    root, root_state = walk[0][0]
+    root, root_state = walk[0]
     root_value = root_state.value
     self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
