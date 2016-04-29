@@ -54,8 +54,8 @@ class GraphValidator(object):
         continue
       if type(state) is not Noop:
         continue
-      dependencies = product_graph.dependencies_of(node)
-      missing_products = {d.product for d in dependencies if type(product_graph.state(d)) is Noop}
+      sub_deps = [d for d in product_graph.dependencies_of(node) if d.subject == root.subject]
+      missing_products = {d.product for d in sub_deps if type(product_graph.state(d)) is Noop}
       if not missing_products:
         continue
 
@@ -66,9 +66,7 @@ class GraphValidator(object):
       # There was at least one dep successfully (recursively) satisfied via a literal.
       # TODO: this does multiple walks.
       used_literal_deps = set()
-      for dep in dependencies:
-        if dep.subject != root.subject:
-          continue
+      for dep in sub_deps:
         for product in self._collect_consumed_inputs(product_graph, dep):
           if product in self._literal_types:
             used_literal_deps.add(product)

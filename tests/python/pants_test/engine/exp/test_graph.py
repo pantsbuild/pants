@@ -123,9 +123,9 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     return root_entries[0]
 
   def walk(self, scheduler, address):
-    """Return a list of all (Node, Key) tuples reachable from the given Address."""
+    """Return a list of all (Node, State) tuples reachable from the given Address."""
     root, _ = self._populate(scheduler, address)
-    return list(e for e, _ in scheduler.product_graph.walk([root], predicate=lambda _: True))
+    return list(e for e in scheduler.product_graph.walk([root], predicate=lambda n, s: True))
 
   def resolve_failure(self, scheduler, address):
     root, state = self._populate(scheduler, address)
