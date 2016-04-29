@@ -202,12 +202,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEquals('java7', targets[target_name]['platform'])
       self.assertEquals(
         {
-          'darwin': ['/Library/JDK'],
-          'linux': ['/usr/lib/jdk7', u'/usr/lib/jdk8'],
-        },
-        json_data['jvm_distributions'])
-      self.assertEquals(
-        {
           'default_platform' : 'java7',
           'platforms': {
             'java7': {
