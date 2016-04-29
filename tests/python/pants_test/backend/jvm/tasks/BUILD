@@ -577,6 +577,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
+  timeout=300,
   tags = {'integration'},
 )
 

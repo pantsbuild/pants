@@ -66,7 +66,6 @@ class CustomScalaTest(NailgunTaskTestBase):
       'scala-platform': {
         'version': 'custom',
         'suffix_version': '2.10',
-        'runtime_spec': '//:scala-library-custom',
       }
     }
     with subsystem_instance(ScalaPlatform, **options):
@@ -92,7 +91,7 @@ class CustomScalaTest(NailgunTaskTestBase):
 
   def test_custom_lib_spec(self):
     with self.scala_platform_setup():
-      self.make_target('//:scala-library-custom',
+      self.make_target('//:scala-library',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
       scala_target = self.make_target('a/scala:pass', ScalaLibrary, sources=['pass.scala'])
