@@ -85,7 +85,7 @@ continue."
   fi
   (
     ${REPO_ROOT}/src/python/pants/docs/publish_via_git.sh \
-      https://github.com/pantsbuild/pantsbuild.github.io.git \
+      git@github.com:pantsbuild/pantsbuild.github.io.git \
       ${publish_path} && \
     do_open ${url}/index.html
   ) || die "Publish to ${url} failed."
