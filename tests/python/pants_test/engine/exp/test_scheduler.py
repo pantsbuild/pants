@@ -51,7 +51,7 @@ class SchedulerTest(unittest.TestCase):
 
     variants = tuple(variants.items()) if variants else None
     self.assertEqual({node_type(subject, product, variants, variant_key) for subject in subjects},
-                     {node for (node, _), _ in walk
+                     {node for node, _ in walk
                       if node.product == product and isinstance(node, node_type) and node.variants == variants})
 
   def build_and_walk(self, build_request, failures=False):
@@ -77,16 +77,18 @@ class SchedulerTest(unittest.TestCase):
 
   def assert_root(self, walk, node, return_value):
     """Asserts that the first Node in a walk was a DependenciesNode with the single given result."""
-    ((root, root_state), dependencies) = walk[0]
+    root, root_state = walk[0]
     self.assertEquals(type(root), DependenciesNode)
     self.assertEquals(Return([return_value]), root_state)
-    self.assertIn((node, Return(return_value)), dependencies)
+    self.assertIn((node, Return(return_value)),
+                  [(d, self.pg.state(d)) for d in self.pg.dependencies_of(node)])
 
   def assert_root_failed(self, walk, node, thrown_type):
     """Asserts that the first Node in a walk was a DependenciesNode with a Throw result."""
-    ((root, root_state), dependencies) = walk[0]
+    root, root_state = walk[0]
     self.assertEquals(type(root), DependenciesNode)
     self.assertEquals(Throw, type(root_state))
+    dependencies = [(d, self.pg.state(d)) for d in self.pg.dependencies_of(node)]
     self.assertIn((node, thrown_type), [(k, type(v.exc))
                                         for k, v in dependencies if type(v) is Throw])
 
@@ -235,7 +237,7 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    root, root_state = walk[0][0]
+    root, root_state = walk[0]
     root_value = root_state.value
     self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
@@ -287,14 +289,14 @@ class ProductGraphTest(unittest.TestCase):
   def test_walk(self):
     nodes = list('ABCDEF')
     self._mk_chain(self.pg, nodes)
-    walked_nodes = list((node for (node, _), _ in self.pg.walk(nodes[0])))
+    walked_nodes = list((node for node, _ in self.pg.walk(nodes[0])))
     self.assertEquals(nodes, walked_nodes)
 
   def test_invalidate_all(self):
     chain_list = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
     invalidators = (
       self.pg.invalidate,
-      functools.partial(self.pg.invalidate, lambda node: node == 'Z')
+      functools.partial(self.pg.invalidate, lambda node, _: node == 'Z')
     )
 
     for invalidator in invalidators:
@@ -325,7 +327,7 @@ class ProductGraphTest(unittest.TestCase):
     self._mk_chain(comparison_pg, chain_b)
 
     # Invalidate one of the chains in the primary graph from the right-most node.
-    self.pg.invalidate(lambda node: node == chain_a[-1])
+    self.pg.invalidate(lambda node, _: node == chain_a[-1])
 
     # Ensure the final state of the primary graph matches the comparison graph.
     self.assertEquals(self.pg.completed_nodes(), comparison_pg.completed_nodes())
@@ -335,7 +337,7 @@ class ProductGraphTest(unittest.TestCase):
 
   def test_invalidate_count(self):
     self._mk_chain(self.pg, list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
-    invalidated_count = self.pg.invalidate(lambda node: node == 'I')
+    invalidated_count = self.pg.invalidate(lambda node, _: node == 'I')
     self.assertEquals(invalidated_count, 9)
 
   def test_invalidate_partial_identity_check(self):
@@ -349,7 +351,7 @@ class ProductGraphTest(unittest.TestCase):
     self.assertTrue(before_nodes)
 
     # Invalidate all nodes under Q.
-    self.pg.invalidate(lambda node: node == chain[index_of_q])
+    self.pg.invalidate(lambda node, _: node == chain[index_of_q])
     self.assertTrue(self.pg.completed_nodes())
 
     def _label_tuples(collection, name):
