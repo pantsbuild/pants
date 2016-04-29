@@ -43,6 +43,8 @@ done
 # TODO(benjy): Instead of invoking Pants multiple times, these actions should be chained using
 # products, like everything else.
 
+set -x
+
 ${PANTS_EXE} reference \
   --pants-reference-template=reference/pants_reference_body.html \
   --build-dictionary-template=reference/build_dictionary_body.html \
@@ -71,6 +73,8 @@ ${PANTS_EXE} markdown --fragment \
 ${PANTS_EXE} sitegen --config-path=src/python/pants/docs/docsite.json || \
   die "Failed to generate doc site'."
 
+set +x
+
 do_open "${REPO_ROOT}/dist/docsite/index.html"
 
 if [[ "${publish}" = "true" ]]; then
@@ -86,4 +90,3 @@ continue."
     do_open ${url}/index.html
   ) || die "Publish to ${url} failed."
 fi
-

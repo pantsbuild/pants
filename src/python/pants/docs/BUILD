@@ -3,8 +3,8 @@ page(
   source='readme.md',
   links=[
     ':branching_strategy',
-    ':credits',
     ':dev_tasks',
+    ':dev_tasks_publish_extras',
     ':docs',
     ':export',
     ':howto_ask',
@@ -22,11 +22,6 @@ page(
 page(
   name='branching_strategy',
   source='branching_strategy.md',
-)
-
-page(
-  name='credits',
-  source='credits.md',
 )
 
 page(
@@ -97,7 +92,7 @@ page(
   name='intellij',
   source='intellij.md',
   links=[
-    'src/docs:with_intellij',
+    'src/docs:ide_support',
   ])
 
 page(
@@ -122,7 +117,7 @@ page(
   name='release_jvm',
   source='release_jvm.md',
   links=[
-    'src/docs:publish',
+    'examples/src/java/org/pantsbuild/example:publish',
   ]
 )
 

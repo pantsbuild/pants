@@ -33,7 +33,7 @@ especially relevant.
 > "extra stuff" (e.g.: start scripts, config files) use a `jvm_app`
 > which allows you to include files in the bundle directory that
 > supplement the binary jar and its dependencies. You can learn
-> more about <a pantsref="jvm_bundles">bundles</a>
+> more about <a pantsref="jvm_bundles">bundles</a>.
 
 **Runnable Binary**
 
@@ -60,7 +60,7 @@ especially relevant.
 >
 > Pants can `publish` a JVM library so code in other repos can use it;
 > if the `*_library` target has a `provides` parameter, that specifies
-> the repo/address at which to [[publish|pants('src/docs:publish')]].
+> the repo/address at which to [[publish|pants('examples/src/java/org/pantsbuild/example:publish')]].
 >
 > An `annotation_processor` BUILD target defines a Java library one
 > containing one or more annotation processors.

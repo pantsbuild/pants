@@ -1,71 +1,32 @@
 JVM 3rdparty Pattern
 ====================
 
-In general, we use the
-[[3rdparty idiom|pants('src/docs:3rdparty')]] to organize
-dependencies on code from outside the source tree. This document
+In general, we recommend the [[3rdparty idiom|pants('src/docs:3rdparty')]]
+for organizing dependencies on code from outside the source tree. This document
 describes how to make this work for JVM (Java or Scala) code.
 
-Your JVM code can pull in code written elsewhere. Pants uses
-[Ivy](http://ant.apache.org/ivy/), a tool based on Maven's jar-sharing.
+Your JVM code can depend on external, third-party libraries. Pants uses
+[Ivy](http://ant.apache.org/ivy/) to resolve and retrieve these JAR files.
 You should know the ([Maven/Ivy groupId, artifactId, and
 version](http://maven.apache.org/guides/mini/guide-central-repository-upload.html))
 you want to use.
 
-The 3rdparty pattern described here eases avoiding diamond dependency
-problems and version conflicts. If your code depends on artifacts `foo`
-and `bar`; and if `foo` and `bar` depend on different versions of the
-`baz` artifact; then some code will be linked together with a version of
-`baz` it didn't "expect." Tracking versioned dependencies in one place
-makes it easier to reason about them.
-
 3rdparty/jvm
 ------------
 
-**The JVM part of 3rdparty is organized by org (Maven groupId).**
-For an example of a repo with 3rdparty arranged this way, see
-[twitter/commons](https://github.com/twitter/commons/tree/master/3rdparty/jvm).
-(Pants' own 3rdparty isn't organized this way; it doesn't have enough 3rdparty
-dependencies for this to make sense.)
-Under there, see if there's already a `3rdparty/jvm/path/to/org/BUILD` file.
-If there isn't, then you want to create one. E.g., to import
-`com.sun.jersey-apache-client`, look in `3rdparty/jvm/com/sun` for a
-likely-looking `BUILD` file--in this example,
-`3rdparty/jvm/com/google/sun/jersey/BUILD`.
+If you have a small to medium number of third-party dependencies, you can define
+them all in a single `3rdparty/jvm/BUILD` file.  If you have a large number, it
+may make sense to organize them in multiple subdirectories, say by category or by publisher.
 
-In the appropriate `BUILD` file, you want to find a
-<a pantsref="bdict_jar_library">`jar_library`</a>
-with the <a pantsref="bdict_jar">`jar`</a>s you want:
+In the appropriate `BUILD` file, you create a <a pantsref="bdict_jar_library">`jar_library`</a>
+referencing the <a pantsref="bdict_jar">`jar`</a>s you want:
 
 !inc[start-at=junit&end-before=scalatest](../../../../../../3rdparty/BUILD)
 
-Here, the
-<a pantsref="bdict_jar_library">`jar_library`</a>'s name
-defines a target address that
-other build targets can refer to. The
-<a pantsref="bdict_jar">`jar`</a>s refer to jars known to
-your Ivy resolver.
+Here, the <a pantsref="bdict_jar_library">`jar_library`</a>'s name
+defines a target address that other build targets can refer to. The
+<a pantsref="bdict_jar">`jar`</a>s refer to jars that Ivy can resolve and fetch.
 
-If there's already a `jar` importing the code you want but with a
-*different* version, then you probably want to talk to other folks in
-your organization to agree on one version. (If there's already a `jar`
-importing the code you want with the version you want, then great. Leave
-it there.)
-
-(You don't *need* a tree of `BUILD` files; you could instead have, e.g., one `3rdparty/jvm/BUILD`
-file. Pants' own repo has its JVM 3rdparty targets in just one `BUILD` file. That works fine because
-Pants doesn't have many 3rdparty JVM dependencies. But as the number of these dependencies grows,
-it makes more sense to set up a directory tree. In a large organization, a tree can ease some
-common tasks. For example, `git log` quickly answers questions like "Who set up this dependency?
-Who cares if I bump the version?")
-
-Additionally, some families of jars have different groupId's but are
-logically part of the same project, or need to have their rev's kept in
-sync. For example, (`com.fasterxml.jackson.core`,
-`com.fasterxml.jackson.dataformat`). Sometimes it makes sense to define
-these in a single build file, such as
-`3rdparty/jvm/com/fasterxml/jackson/BUILD` for the jackson family of
-jars.
 
 Your Code's BUILD File
 ----------------------
@@ -109,18 +70,9 @@ explicitly when you depend on the binary copy of the *far* dependency:
       ]
     )
 
-Troubleshooting a JVM Dependencies Problem
-------------------------------------------
+Controlling JAR Dependency Versions
+-----------------------------------
 
-If you're working in JVM (Java or Scala) and suspect you're pulling in different versions of some
-package, you can dump your dependency "tree" with versions with an Ivy resolve report.
-To generate a report for a target such as the `junit`-using `hello/greet` example tests:
-
-    :::bash
-    $ ./pants resolve.ivy --open examples/tests/java/org/pantsbuild/example/hello/greet
-
-Ivy's report shows which which package is pulling in the package-version you didn't expect.
-(It might not be clear which version you *want*; but at least you've narrowed down the problem.)
 
 **If you notice a small number of wrong-version things,** then in a JVM
 target, you can depend on a `jar` that specifies a version and sets

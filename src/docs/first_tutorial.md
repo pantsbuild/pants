@@ -1,12 +1,10 @@
-First Tutorial
-==============
+Tutorial
+========
 
-This tutorial walks you through some first steps with Pants build:
-invoking commands, looking at the files that define build-able things.
+This tutorial walks you through some first steps with Pants.
 It assumes you're already familiar with
-[[basic Pants build concepts|pants('src/docs:first_concepts')]].
-It assumes you're
-working in a source tree that already has `pants` installed (such as
+[[basic Pants build concepts|pants('src/docs:first_concepts')]],
+amd that you're working in a source tree that already has `pants` installed (such as
 Pants's own repo:
 [pantsbuild/pants](https://github.com/pantsbuild/pants)).
 
@@ -18,16 +16,14 @@ Pants "bootstrap" itself, downloading and compiling things it needs:
 
 Now you're ready to invoke pants for more useful things.
 
-You invoke pants with *goals* (like `test` or `bundle`) and the *build
-targets* to use (like
+You invoke pants with *goals* (like `test` or `bundle`) and the *targets* to use (like
 `examples/tests/java/org/pantsbuild/example/hello/greet:greet`). For
 example,
 
     :::bash
     $ ./pants test examples/tests/java/org/pantsbuild/example/hello/greet:greet
 
-Goals (the "verbs" of Pants) produce new files from Targets (the
-"nouns").
+Goals (the "verbs" of Pants) produce new files from targets (the "nouns").
 
 As a code author, you define your code's build targets in BUILD files. A
 build target might produce some output file[s]; it might have sources
@@ -261,16 +257,18 @@ they still work.
 A target definition in a `BUILD` file looks something like
 
     :::python
-    scala_library(
+    java_library(
       name='util',
-      dependencies = ['3rdparty:commons-math',
-                      '3rdparty:thrift',
-                      'src/main/scala/com/foursquare/auth',
-                      ':base'],
-      sources=globs('*.scala'),
+      dependencies = [
+        '3rdparty:commons-math',
+        '3rdparty:thrift',
+        'src/java/org/pantsbuild/auth',
+        ':base'
+      ],
+      sources=globs('*.java'),
     )
 
-Here, `scala_library` is the target's *type*. Different target types
+Here, `java_library` is the target's *type*. Different target types
 support different arguments. The following arguments are pretty common:
 
 **name**<br>

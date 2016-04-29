@@ -154,7 +154,7 @@ When calling the `register` function, passing a few additional arguments
 will affect the behaviour of the registered option. The most common parameters are:
 
 - `type`: Constrains the type of the option. Takes a python type constructor (one of `bool`, `str`, `int`, `float`, `list`, `dict`), or a
-  special option type constructor like `target_option` from [pants.option.custom_types](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/custom_types.py). 
+  special option type constructor like `target_option` from [pants.option.custom_types](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/custom_types.py).
   If not specified, the option will be a string.
 - `default`: Sets a default value that will be used if the option is not specified by the user.
 - `advanced`: Indicates that an option is intended either for use by power users, or for use in

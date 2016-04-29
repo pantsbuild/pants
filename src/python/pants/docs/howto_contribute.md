@@ -194,7 +194,7 @@ To make sure it gets seen by the appropriate people and that they have
 the appropriate context, add:
 
 - `pants-reviews` to the Groups field
-- Any specific [pants committers](https://www.rbcommons.com/s/twitter/users/) 
+- Any specific [pants committers](https://www.rbcommons.com/s/twitter/users/)
   who should review your change to the People field
 - The pull request number from your Github pull request in the Bug field
 - Your git branch name in the Branch field.

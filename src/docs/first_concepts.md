@@ -1,32 +1,17 @@
-Pants Conceptual Overview
-=========================
+Pants Concepts
+==============
 
-Pants is a build system for software. It works particularly well for a source code workspace
-containing many distinct but interdependent pieces.
-
-Pants is similar to `make`, `maven`, `ant`, `gradle`, `sbt`, etc.; but
-pants pursues different design goals. Pants optimizes for
-
--   building multiple, dependent things from source
--   building code in a variety of languages
--   speed of build execution
-
-A Pants build "sees" only the target it's building and the transitive
-dependencies of that target. This approach works well for a big
-repository containing several things; a tool that builds everything
-would bog down.
+To use Pants effectively, it helps to understand a few concepts:
 
 Goals and Targets
 -----------------
-
-To use Pants, you must understand a few concepts:
 
 **Goals** are the "verbs" of Pants.<br>
 When you invoke Pants, you name goals on the command line to say what
 Pants should do. For example, to run tests, you would invoke Pants with
 the `test` goal. To create a bundle--an archive containing a runnable
 binary and resource files--you would invoke Pants with the `bundle`
-goal. These goals are built into Pants.
+goal.
 
 **Targets** are the "nouns" of Pants, things pants can act upon.<br>
 You annotate your source code with `BUILD` files to define these

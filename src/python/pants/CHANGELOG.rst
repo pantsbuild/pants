@@ -1,4 +1,4 @@
-RELEASE HISTORY
+Release History
 ===============
 
 1.0.0-rc3 (04/26/2016)

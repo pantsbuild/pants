@@ -146,8 +146,9 @@ class MarkdownToHtml(Task):
         page = self.context.build_graph.get_target(address)
         anchor = match.group(2) or ''
         if not page:
-          raise TaskError('Invalid markdown link to pants target: "{}". '.format(match.group(1)) +
-                          'Is your page missing a dependency on this target?')
+          raise TaskError('Invalid markdown link to pants target: "{}" when processing {}. '
+                          'Is your page missing a dependency on this target?'.format(
+                          match.group(1), source))
         alias, url = url_builder(page)
         return alias, url + anchor
       else:

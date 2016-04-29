@@ -5,28 +5,28 @@
 
 
 body {
-  background-color: #eee;
+  background-color: #fff;
   color: #111;
   font-family: "Lato","proxima-nova","Helvetica Neue",Arial,sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
   color: #006;
-  margin: 1em 0 0 -0.01em;
+  margin: 1em 0 0.3em -0.01em;
 }
 
-/* 64px above for build status
-   300px on left to leave room for bignav,
-   40em below so jumping to anchor link works OK close to content bottom
- */
+.navbar-brand-img {
+  padding-top: 9px;
+}
+
 .mainflow {
-  margin: 64px 1rem 40em 300px;
+  margin-bottom: 40em; /* So jumping to anchor link works OK close to content bottom. */
   line-height: 24px;
 }
 
 a:link, a:visited {
   text-decoration: none;
-  color: #007;
+  color: #027bce;
 }
 
 a:hover {
@@ -35,52 +35,18 @@ a:hover {
 
 pre {
   border: 1px solid #ddd;
-  padding: 2px;
+  padding: 5px 10px 5px 10px;
   color: #006;
   white-space: pre-wrap;
 }
 
 ul, ol, dl {
-  margin: 0;
+  margin: 0 0 0.8em 0;
   padding: 0;
 }
 
 ul li, ol li {
   margin-left: 24px;
-}
-
-/* "Pilcrows": each heading has a link to it, next to it. Handy for
- *  copy-pasting section links in chat.
- */
-table.h-plus-pilcrow {
-  border-spacing: 0;
-}
-
-table.h-plus-pilcrow td {
-  padding: 0;
-  vertical-align: top;
-}
-
-div.pilcrow-div {
-  margin: 0;
-}
-
-/* Pilcrow links are transparent until hovered over */
-a.pilcrow-link, a.pilcrow-link:link,a.pilcrow-link:visited {
-  font-size: 150%;
-  color: transparent;
-  text-decoration: none;
-}
-
-/* Most links get a background color when hovered over; but not
-   Pilcrow links. */
-table.h-plus-pilcrow:hover, table.h-plus-pilcrow:hover a:hover {
-  background-color: transparent;
-  color: #002;
-}
-
-table.h-plus-pilcrow:hover a.pilcrow-link {
-  color: #04a;
 }
 
 nav {
@@ -94,125 +60,41 @@ nav {
   div.mainflow { margin-left: 2px; }
 }
 
-/* navtoggler button appears top-left of skinny screens */
-@media screen and (min-width: 769px){
-  #navtoggler { display: none; }
-}
-
-#navtoggler {
-  position: absolute;
-  left: 4px;
-  top: 4px;
-  font-size: 200%;
-  background-color: #fff;
-  color: #55acee;
-  border: 1px solid #888;
-  border-radius: 2px;
-  z-index: 10;
-}
-#navtoggler:hover {
-  cursor: pointer;
-}
-
-
-/* "breadcrumbs" arrow-nav at top of content*/
-nav.breadcrumbs ul {
-  margin: 0;
-  padding: 0;
-}
-
-nav.breadcrumbs ul li {
-  display: inline;
-  list-style-type: none;
-  margin-left: 0;
-}
-
-nav.breadcrumbs ul li:before {
-  content: "←";
-}
-
-nav.breadcrumbs ul li:first-child:before {
-  content: none; /* no arrow */
-}
-
-/* bignav search box and site-wide TOC on page left-hand side */
-nav.bignav {
-  font-size: larger;
-  position: absolute;
-  top: 0;
-  left: 0;
-  margin: 0;
-  max-width: 272px;
-  background-color: #55acee;
-}
-
-.bignav-logo {
-  text-align: center;
-  margin-top: 4px;
-}
-.bignav-logo img {
-  border: 3px solid #55acee;
-  border-radius: 3px;
-}
-
-nav.bignav form.search {
-  padding: 1em 0;
-}
-
-/* text entry for search terms */
-nav.bignav form.search input.query {
-  width: 246px;
-  margin-left: 4px;
-  background-color: #fff;
-  padding: 0.5em 8px;
-  border: 1px solid #147;
-  border-radius: 20px;
-}
-
 /* Site-wide table of contents */
-nav.bignav .site-toc {
-  color: white;
-  background-color: #444;
-}
 
 .site-toc ul {
   padding: 0.3rem 0;
+  margin: 0;
   list-style-type: none;
 }
 
-/* toc-here: within the site TOC, the entry for this page */
-.site-toc li.toc-here {
-  background-color: #777;
+.site-toc li.toc-link a {
+  color: #027bce;
 }
-.site-toc ul li {
-  margin: 0.6rem .8em;
-  padding-right: 0.5rem;
-}
-.site-toc ul li a {
-  color: white;
-}
-/* mainflow links get a white background on hover; bignav links get
-   a black one to contrast w/white text */
-.site-toc li:hover, .site-toc li:hover a:hover {
-  background-color: black;
-  color: white;
-}
-/* ...and the this-page TOC entry has its own hover look */
-.site-toc li.toc-here:hover, .site-toc li.toc-here:hover a:hover {
+
+.site-toc li.toc-here, .site-toc li.toc-link:hover, .site-toc li.toc-link:hover a {
   background-color: #e5e7f3;
   color: black;
+}
+
+.site-toc ul li.toc-heading {
+  padding-left: 0;
+  padding-top: 1em;
+  font-size: larger;
 }
 
 .site-toc ul li.toc-h0 {
   padding-left: 0;
 }
+
 .site-toc ul li.toc-h1 {
   padding-left: 0.5em;
+  margin-top: 0.5em;
 }
 
 .site-toc ul li.toc-h2 {
   padding-left: 1.5em;
-  font-size: medium;
+  font-size: smaller;
 }
 
 .site-toc ul li.toc-h3 {
@@ -220,6 +102,7 @@ nav.bignav .site-toc {
   font-size: smaller;
   color: #eee;
 }
+
 .site-toc ul li.toc-h4 {
   padding-left: 3.5em;
   font-size: smaller;
@@ -227,15 +110,22 @@ nav.bignav .site-toc {
 }
 
 /* page's table of contents */
+
+.codehilite {
+  /* The pygments codehilite background color bleeds under the toc's float, and we don't
+     need it anyway, so we forcefully override it here. */
+  background-color: #fff !important;
+}
+
 nav.pagetoc {
   float: right;
   margin: 0 1em 0 1em;
-  background-color: #55acee;
   width: 300px;
 }
 
 nav.pagetoc ul {
   padding: 1.0em 0;
+  margin: 0;
   list-style-type: none;
   background-color: #dde;
 }
@@ -265,7 +155,6 @@ nav.pagetoc ul li.toc-h4 {
   padding-left: 3.0em;
 }
 
-/* show the build/test/coverage status on each page */
 div.ci-status {
   position: absolute;
   top: 0;
@@ -292,3 +181,12 @@ div.ci-status img {
   background-color: #fff;
 }
 
+.index-report-server-page-img {
+  border: 1px solid black;
+  float: right;
+  margin: 2px;
+}
+
+.index-intro-text {
+  clear: right;
+}

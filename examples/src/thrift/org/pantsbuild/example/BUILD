@@ -2,5 +2,5 @@ page(
   name='readme',
   source='readme.md',
   links=[
-    'src/docs:publish',
+    'examples/src/java/org/pantsbuild/example:publish',
   ])
