@@ -315,7 +315,8 @@ class InvalidationCacheManager(object):
     """
     def vt_iter():
       if topological_order:
-        sorted_targets = [t for t in reversed(sort_targets(targets)) if t in targets]
+        target_set = set(targets)
+        sorted_targets = [t for t in reversed(sort_targets(targets)) if t in target_set]
       else:
         sorted_targets = sorted(targets)
       for target in sorted_targets:
