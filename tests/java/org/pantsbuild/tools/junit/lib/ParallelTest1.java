@@ -16,7 +16,7 @@ import static org.junit.Assert.assertTrue;
  * to succeed, both test classes  must be running at the same time. Intended to test the flags
  * <pre>
  * -default-parallel -parallel-threads 2
- * <pre>
+ * </pre>
  * when running with just these two classes as specs.
  * <p>
  * Runs in on the order of 10 milliseconds locally, but it may take longer on a CI machine to spin
