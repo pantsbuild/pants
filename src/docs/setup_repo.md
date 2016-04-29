@@ -69,7 +69,7 @@ Pants looks in `BUILD.tools` for that target.  Below is an example of BUILD.tool
 the default minor version for 2.10.  For these changes to take effect you would need to set
 --scala-platform-version to 'custom'.
 
-!inc(../../testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin/custom_211_scalatools.build)
+!inc(../../testprojects/src/scala/org/pantsbuild/testproject/custom_scala_platform/custom_211_scalatools.build)
 
 Additional tools can be defined as follows in BUILD.tools:
 

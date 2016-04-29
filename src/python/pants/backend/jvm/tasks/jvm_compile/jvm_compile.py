@@ -186,7 +186,7 @@ class JvmCompile(NailgunTaskBase):
   def name(cls):
     return cls._name
 
-  @property
+  @classmethod
   def compiler_plugin_types(cls):
     """A tuple of target types which are compiler plugins."""
     return ()
@@ -442,7 +442,7 @@ class JvmCompile(NailgunTaskBase):
       path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
       safe_mkdir(os.path.dirname(path), clean=False)
       with open(path, 'w') as f:
-        f.write(text)
+        f.write(text.encode('utf-8'))
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
                    log_file, progress_message, settings, fatal_warnings, counter):
@@ -573,7 +573,7 @@ class JvmCompile(NailgunTaskBase):
         if type(declared) == Target:
           for r in resolve(declared):
             yield r
-        elif isinstance(declared, self.compiler_plugin_types):
+        elif isinstance(declared, self.compiler_plugin_types()):
           for r in declared.closure(bfs=True, **self._target_closure_kwargs):
             yield r
         else:
@@ -664,11 +664,11 @@ class JvmCompile(NailgunTaskBase):
         return True
       return os.path.exists(compile_context.analysis_file)
 
-    def work_for_vts(vts, compile_context):
-      progress_message = compile_context.target.address.spec
+    def work_for_vts(vts, ctx):
+      progress_message = ctx.target.address.spec
 
       # Capture a compilation log if requested.
-      log_file = compile_context.log_file if self._capture_log else None
+      log_file = ctx.log_file if self._capture_log else None
 
       # Double check the cache before beginning compilation
       hit_cache = check_cache(vts)
@@ -676,52 +676,52 @@ class JvmCompile(NailgunTaskBase):
       if not hit_cache:
         # Compute the compile classpath for this target.
         cp_entries = self._compute_classpath_entries(classpath_products,
-                                                     compile_context,
+                                                     ctx,
                                                      extra_compile_time_classpath)
         # TODO: always provide transitive analysis, but not always all classpath entries?
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
         # Write analysis to a temporary file, and move it to the final location on success.
-        tmp_analysis_file = "{}.tmp".format(compile_context.analysis_file)
+        tmp_analysis_file = "{}.tmp".format(ctx.analysis_file)
         if should_compile_incrementally(vts):
           # If this is an incremental compile, rebase the analysis to our new classes directory.
-          self._analysis_tools.rebase_from_path(compile_context.analysis_file,
+          self._analysis_tools.rebase_from_path(ctx.analysis_file,
                                                 tmp_analysis_file,
                                                 vts.previous_results_dir,
                                                 vts.results_dir)
         else:
           # Otherwise, simply ensure that it is empty.
           safe_delete(tmp_analysis_file)
-        target, = vts.targets
-        fatal_warnings = self._compute_language_property(target, lambda x: x.fatal_warnings)
+        tgt, = vts.targets
+        fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         self._compile_vts(vts,
-                          compile_context.sources,
+                          ctx.sources,
                           tmp_analysis_file,
                           upstream_analysis,
                           cp_entries,
-                          compile_context.classes_dir,
+                          ctx.classes_dir,
                           log_file,
                           progress_message,
-                          target.platform,
+                          tgt.platform,
                           fatal_warnings,
                           counter)
-        os.rename(tmp_analysis_file, compile_context.analysis_file)
-        self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
+        os.rename(tmp_analysis_file, ctx.analysis_file)
+        self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.
-        self.write_extra_resources(compile_context)
+        self.write_extra_resources(ctx)
 
         # Jar the compiled output.
-        self._create_context_jar(compile_context)
+        self._create_context_jar(ctx)
 
       # Update the products with the latest classes.
-      self._register_vts([compile_context])
+      self._register_vts([ctx])
 
     jobs = []
     invalid_target_set = set(invalid_targets)
-    for vts in invalid_vts:
+    for ivts in invalid_vts:
       # Invalidated targets are a subset of relevant targets: get the context for this one.
-      compile_target = vts.targets[0]
+      compile_target = ivts.targets[0]
       compile_context = compile_contexts[compile_target]
       compile_target_closure = compile_target.closure()
 
@@ -729,13 +729,13 @@ class JvmCompile(NailgunTaskBase):
       invalid_dependencies = (compile_target_closure & invalid_target_set) - [compile_target]
 
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
-                      functools.partial(work_for_vts, vts, compile_context),
+                      functools.partial(work_for_vts, ivts, compile_context),
                       [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
                       self._size_estimator(compile_context.sources),
                       # If compilation and analysis work succeeds, validate the vts.
                       # Otherwise, fail it.
-                      on_success=vts.update,
-                      on_failure=vts.force_invalidate))
+                      on_success=ivts.update,
+                      on_failure=ivts.force_invalidate))
     return jobs
 
   def _create_context_jar(self, compile_context):
@@ -772,9 +772,9 @@ class JvmCompile(NailgunTaskBase):
     """Computes and returns the sources (relative to buildroot) for the given target."""
     def resolve_target_sources(target_sources):
       resolved_sources = []
-      for target in target_sources:
-        if target.has_sources():
-          resolved_sources.extend(target.sources_relative_to_buildroot())
+      for tgt in target_sources:
+        if tgt.has_sources():
+          resolved_sources.extend(tgt.sources_relative_to_buildroot())
       return resolved_sources
 
     sources = [s for s in target.sources_relative_to_buildroot() if self._sources_predicate(s)]
@@ -797,12 +797,12 @@ class JvmCompile(NailgunTaskBase):
     if selector(target) is not None:
       return selector(target)
 
-    property = False
+    prop = False
     if target.has_sources('.java'):
-      property |= selector(Java.global_instance())
+      prop |= selector(Java.global_instance())
     if target.has_sources('.scala'):
-      property |= selector(ScalaPlatform.global_instance())
-    return property
+      prop |= selector(ScalaPlatform.global_instance())
+    return prop
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.
