@@ -81,7 +81,6 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Files, ['a/b/*'], ['a/b/1.txt', 'a/b/2'])
     self.assert_walk(Files, ['*/0.txt'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_recursive(self):
     self.assert_walk(Files, ['**/*.txt.ln'], ['4.txt'])
     self.assert_walk(Files, ['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
@@ -95,7 +94,6 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Dirs, ['**/*'], ['a/b'])
     self.assert_walk(Dirs, ['*/*/*'], [])
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_files_content_literal(self):
     self.assert_content(['4.txt'], {'4.txt': 'four\n'})
     self.assert_content(['a/4.txt.ln'], {'4.txt': 'four\n'})
@@ -176,3 +174,11 @@ class GitFSTest(unittest.TestCase, FSTestBase):
     worktree = self.mk_fs_tree(build_root_src).build_root
     with initialize_repo(worktree) as git_repo:
       yield ScmProjectTree(worktree, git_repo, 'HEAD')
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_walk_recursive(self):
+    super(GitFSTest, self).test_walk_recursive()
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_files_content_literal(self):
+    super(GitFSTest, self).test_files_content_literal()
