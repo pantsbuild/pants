@@ -140,7 +140,7 @@ origin on `github.com/pantsbuild/pants`.
 Most test are runnable as regular Pants test targets. To find tests that work with a particular
 feature, you might explore `tests/python/pants_tests/.../BUILD`.
 
-Before [[contributing a change to Pants|pants('src/python/pants/docs:howto_contribute')]],
+Before [[contributing a change to Pants|pants('src/docs:howto_contribute')]],
 make sure it passes **all** of our continuous integration (CI) tests: everything builds,
 all tests pass. To try all the CI tests in a few configurations, you can run the same script
 that our Travis CI does. This can take a while, but it's a good idea to run it before you

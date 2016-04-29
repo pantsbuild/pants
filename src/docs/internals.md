@@ -36,7 +36,7 @@ and install it in the existing Goal. A Task looks at the environment and
 Targets, invokes some tool, generates things, and reports
 success/failure. If you're giving Pants the ability to do something new,
 you're probably adding a Task. See
-[[Developing a Pants Task|pants('src/python/pants/docs:dev_tasks')]].
+[[Developing a Pants Task|pants('src/docs:dev_tasks')]].
 
 **Plugin (or "Backend")**<br>
 Collection of Targets, Goals, Tasks, Commands to do something useful. At
@@ -92,4 +92,4 @@ Defining a Task
 Defining a new Task tells Pants of some new action it can take. This
 might be a new goal or adding new functionality in an existing goal
 (e.g., telling the "gen" code-generation goal about some new way to
-generate code). See [[Developing a Pants Task|pants('src/python/pants/docs:dev_tasks')]].
+generate code). See [[Developing a Pants Task|pants('src/docs:dev_tasks')]].

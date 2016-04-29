@@ -138,4 +138,4 @@ by expanding the `stderr` nodes.
 Questions, Issues, Bug Reports
 ------------------------------
 
-See [[How to Ask|pants('src/python/pants/docs:howto_ask')]]
+See [[How to Ask|pants('src/docs:howto_ask')]]
