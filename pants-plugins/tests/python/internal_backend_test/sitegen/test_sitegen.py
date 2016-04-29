@@ -186,21 +186,6 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
     self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
 
-  def test_breadcrumbs(self):
-    # Our "site" has a simple outline.
-    # Do we get the correct info from that to generate
-    # "breadcrumbs" navigating from one page up to the top?
-    rendered = sitegen.render_html('subdir/page2',
-                                   self.config,
-                                   self.soups,
-                                   self.precomputed,
-                                   """
-                                   {{#breadcrumbs}}
-                                   LINK={{link}} TEXT={{text}}
-                                   {{/breadcrumbs}}
-                                   """)
-    self.assertIn('LINK=../index.html TEXT=Pants Build System', rendered)
-
   def test_site_toc(self):
     # Our "site" has a simple outline.
     # Do we get the correct info from that to generate
