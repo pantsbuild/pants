@@ -13,6 +13,11 @@ page(
 )
 
 page(
+  name='1.0',
+  source='1.0.md',
+)
+
+page(
   name='build_files',
   source='build_files.md',
   links=[
@@ -49,6 +54,7 @@ page(
   source='index.md',
   links=[
     ':3rdparty',
+    ':1.0',
     ':announce_201409',
     ':build_files',
     ':first_concepts',

@@ -22,7 +22,6 @@ Adding support for other languages, frameworks and code generators is straightfo
 Pants is a collaborative open-source project, built and used by Twitter, Foursquare, Square,
 Medium and [[other companies|pants('src/docs:powered_by')]].
 
-
 Getting Started
 ---------------
 

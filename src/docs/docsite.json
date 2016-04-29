@@ -1,5 +1,6 @@
 {
   "sources": {
+    "1.0": "dist/markdown/html/src/docs/1.0.html",
     "3rdparty": "dist/markdown/html/src/docs/3rdparty.html",
     "3rdparty_jvm": "dist/markdown/html/examples/src/java/org/pantsbuild/example/3rdparty_jvm.html",
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
