@@ -25,7 +25,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_property
@@ -73,11 +72,6 @@ class BaseZincCompile(JvmCompile):
     arg_index = 0
     while arg_index < len(args):
       arg_index += validate(arg_index)
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return (super(BaseZincCompile, cls).subsystem_dependencies() +
-            (ScalaPlatform, DistributionLocator))
 
   @classmethod
   def compiler_plugin_types(cls):
@@ -206,6 +200,16 @@ class BaseZincCompile(JvmCompile):
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
 
+    try:
+      # Zinc takes advantage of tools.jar if it's presented in classpath.
+      # For example com.sun.tools.javac.Main is used for in process java compilation.
+      self.set_distribution(jdk=True)
+      self._tools_jar = self.dist.find_libs(['tools.jar'])
+    except TaskError:
+      self.context.log.info('Failed to locate tools.jar. '
+                            'Install a JDK to increase performance of Zinc.')
+      self._tools_jar = []
+
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
@@ -223,21 +227,11 @@ class BaseZincCompile(JvmCompile):
     raise NotImplementedError()
 
   def create_analysis_tools(self):
-    return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis,
+    return AnalysisTools(self.dist.real_home, ZincAnalysisParser(), ZincAnalysis,
                          get_buildroot(), self.get_options().pants_workdir)
 
   def zinc_classpath(self):
-    # Zinc takes advantage of tools.jar if it's presented in classpath.
-    # For example com.sun.tools.javac.Main is used for in process java compilation.
-    def locate_tools_jar():
-      try:
-        return DistributionLocator.cached(jdk=True).find_libs(['tools.jar'])
-      except DistributionLocator.Error:
-        self.context.log.info('Failed to locate tools.jar. '
-                              'Install a JDK to increase performance of Zinc.')
-        return []
-
-    return self.tool_classpath('zinc') + locate_tools_jar()
+    return self.tool_classpath('zinc') + self._tools_jar
 
   def compiler_classpath(self):
     return ScalaPlatform.global_instance().compiler_classpath(self.context.products)

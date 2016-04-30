@@ -18,7 +18,6 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.java.distribution.distribution import DistributionLocator
 
 
 logger = logging.getLogger(__name__)
@@ -46,10 +45,6 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
   @classmethod
   def is_wire_compiler_jar(cls, jar):
     return 'com.squareup.wire' == jar.org and 'wire-compiler' == jar.name
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(WireGen, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
