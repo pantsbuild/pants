@@ -284,6 +284,27 @@ class ProductGraphTest(unittest.TestCase):
     self.assertEquals({'A'}, self.pg.dependents_of('B'))
     self.assertEquals({'A'}, self.pg.dependents_of('C'))
 
+  def test_cycle_simple(self):
+    self.pg.update_state('A', Waiting(['B']))
+    self.pg.update_state('B', Waiting(['A']))
+    # NB: Order matters: the second insertion is the one tracked as a cycle.
+    self.assertEquals({'B'}, self.pg.dependencies_of('A'))
+    self.assertEquals(set(), self.pg.dependencies_of('B'))
+    self.assertEquals(set(), self.pg.cyclic_dependencies_of('A'))
+    self.assertEquals({'A'}, self.pg.cyclic_dependencies_of('B'))
+
+  def test_cycle_indirect(self):
+    self.pg.update_state('A', Waiting(['B']))
+    self.pg.update_state('B', Waiting(['C']))
+    self.pg.update_state('C', Waiting(['A']))
+
+    self.assertEquals({'B'}, self.pg.dependencies_of('A'))
+    self.assertEquals({'C'}, self.pg.dependencies_of('B'))
+    self.assertEquals(set(), self.pg.dependencies_of('C'))
+    self.assertEquals(set(), self.pg.cyclic_dependencies_of('A'))
+    self.assertEquals(set(), self.pg.cyclic_dependencies_of('B'))
+    self.assertEquals({'A'}, self.pg.cyclic_dependencies_of('C'))
+
   def test_walk(self):
     nodes = list('ABCDEF')
     self._mk_chain(self.pg, nodes)
