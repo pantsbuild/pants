@@ -32,11 +32,11 @@ def List shardList() {
     shards << [os: os, branchName: branchName, flags: flags]
   }
 
-  branchName = System.getenv('BRANCH_NAME')
+  String branchName = System.getenv('GIT_BRANCH')
   println("Listing desired shards for branch: ${branchName}")
 
   nodes = ['linux': 10]
-  if (branchName == 'master') {
+  if (branchName == 'origin/master') {
     // We only add OSX to the mix on master commits since our 1 mac-mini is currently a severe
     // throughput bottleneck.
     nodes['osx'] = 2
