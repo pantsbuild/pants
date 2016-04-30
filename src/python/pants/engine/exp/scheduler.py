@@ -272,25 +272,20 @@ class ProductGraph(object):
 
     return self.invalidate(predicate)
 
-  def walk(self, roots, predicate=None, edge_predicate=None, dependents=False):
+  def walk(self, roots, predicate=None, dependents=False):
     """Yields Nodes and their States depth-first in pre-order, starting from the given roots.
 
     Each node entry is a tuple of (Node, State).
 
-    The given predicate is applied to Node entries, and the given edge_predicate is applied
-    to edges between Nodes. Both predicates eliminate the subgraphs which do not match.
-    The default predicates eliminate all `Noop` subgraphs.
+    The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
+    that don't match it. The default predicate eliminates all `Noop` subgraphs.
     """
-    def _default_predicate(node, state):
+    def _default_walk_predicate(node, state):
       return type(state) is not Noop
-    predicate = predicate or _default_predicate
-
-    raw_adjacencies = self.dependents_of if dependents else self.dependencies_of
-    def _filtered_adjacencies(node):
-      return [an for an in raw_adjacencies(node) if edge_predicate(node, an)]
-    adjacencies = _filtered_adjacencies if edge_predicate else raw_adjacencies
+    predicate = predicate or _default_walk_predicate
 
     walked = set()
+    adjacencies = self.dependents_of if dependents else self.dependencies_of
     def _walk(nodes):
       for node in nodes:
         if node in walked:
