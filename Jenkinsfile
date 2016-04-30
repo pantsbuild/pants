@@ -32,12 +32,12 @@ def List shardList() {
     shards << [os: os, branchName: branchName, flags: flags]
   }
 
-  println("env: ${env}")
-  String branchName = env.GIT_BRANCH
-  println("Listing desired shards for branch: ${branchName}")
+  String changeUrl = env.CHANGE_URL
+  println("Listing desired shards for : ${changeUrl}")
 
   nodes = ['linux': 10]
-  if (branchName == 'origin/master') {
+  isPullRequest = changeUrl ==~ 'https://github.com/pantsbuild/pants/pull/[0-9]+'
+  if (!isPullRequest) {
     // We only add OSX to the mix on master commits since our 1 mac-mini is currently a severe
     // throughput bottleneck.
     nodes['osx'] = 2
