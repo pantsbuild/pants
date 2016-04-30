@@ -158,13 +158,14 @@ class ProductGraph(object):
       del self._dependencies[node]
       self._cyclic_dependencies.pop(node, None)
 
-    def all_predicate(_): return True
+    def all_predicate(node, state): return True
     predicate = predicate or all_predicate
 
-    invalidated_roots = list(node for node in self._node_results.keys() if predicate(node))
-    invalidated_nodes = list(node for (node, _), _ in self.walk(roots=invalidated_roots,
-                                                                predicate=all_predicate,
-                                                                dependents=True))
+    invalidated_roots = list(node for node, state in self._node_results.items()
+                             if predicate(node, state))
+    invalidated_nodes = list(node for node, _ in self.walk(roots=invalidated_roots,
+                                                           predicate=all_predicate,
+                                                           dependents=True))
 
     # Sever dependee->dependent relationships in the graph for all given invalidated nodes.
     for node in invalidated_nodes:
@@ -184,49 +185,39 @@ class ProductGraph(object):
     subjects = set(FilesystemNode.generate_subjects(filenames))
     logger.debug('generated invalidation subjects: %s', subjects)
 
-    def predicate(node):
+    def predicate(node, state):
       return type(node) is FilesystemNode and node.subject in subjects
 
     return self.invalidate(predicate)
 
   def walk(self, roots, predicate=None, dependents=False):
-    """Yields Nodes depth-first in pre-order, starting from the given roots.
+    """Yields Nodes and their States depth-first in pre-order, starting from the given roots.
 
-    Each node entry is actually a tuple of (Node, State), and each yielded value is
-    a tuple of (node_entry, dep_node_entries).
+    Each node entry is a tuple of (Node, State).
 
     The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
     that don't match it. The default predicate eliminates all `Noop` subgraphs.
-
-    TODO: Not very many consumers actually need the dependency list here: should drop it and
-    allow them to request it specifically.
     """
-    def _default_walk_predicate(entry):
-      node, state = entry
+    def _default_walk_predicate(node, state):
       return type(state) is not Noop
     predicate = predicate or _default_walk_predicate
 
-    def _filtered_entries(nodes):
-      all_entries = [(n, self.state(n)) for n in nodes]
-      if not predicate:
-        return all_entries
-      return [entry for entry in all_entries if predicate(entry)]
-
     walked = set()
     adjacencies = self.dependents_of if dependents else self.dependencies_of
-    def _walk(entries):
-      for entry in entries:
-        node, state = entry
+    def _walk(nodes):
+      for node in nodes:
         if node in walked:
           continue
         walked.add(node)
+        state = self.state(node)
+        if not predicate(node, state):
+          continue
 
-        deps = _filtered_entries(adjacencies(node))
-        yield (entry, deps)
-        for e in _walk(deps):
+        yield (node, state)
+        for e in _walk(adjacencies(node)):
           yield e
 
-    for entry in _walk(_filtered_entries(roots)):
+    for entry in _walk(roots):
       yield entry
 
   def visualize(self, roots):
@@ -271,12 +262,15 @@ class ProductGraph(object):
     yield '  concentrate=true;'
     yield '  rankdir=LR;'
 
-    for ((node, node_state), dependency_entries) in self.walk(roots):
+    for (node, node_state) in self.walk(roots):
       node_str = format_node(node, node_state)
 
       yield ' "{}" [style=filled, fillcolor={}];'.format(node_str, format_color(node, node_state))
 
-      for (dep, dep_state) in dependency_entries:
+      for dep in self.dependencies_of(node):
+        dep_state = self.state(dep)
+        if type(dep_state) is Noop:
+          continue
         yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
 
     yield '}'

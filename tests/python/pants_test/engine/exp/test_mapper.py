@@ -204,7 +204,6 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
       self.resolve(spec)
 
     # Exists on disk, but not yet in memory.
-    # NB: Graph invalidation not yet implemented.
     build_file = os.path.join(self.build_root, 'a/c/c.BUILD.json')
     with safe_open(build_file, 'w') as fp:
       fp.write('{"type_alias": "struct", "name": "c"}')

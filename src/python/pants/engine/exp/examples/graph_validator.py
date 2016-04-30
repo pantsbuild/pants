@@ -31,11 +31,10 @@ class GraphValidator(object):
     """Walks successful nodes under the root for its subject, and returns all products used."""
     consumed_inputs = set()
     # Walk into successful nodes for the same subject under this root.
-    def predicate(entry):
-      node, state = entry
+    def predicate(node, state):
       return root.subject == node.subject and type(state) is Return
     # If a product was successfully selected, record it.
-    for ((node, _), _) in product_graph.walk([root], predicate=predicate):
+    for node, _ in product_graph.walk([root], predicate=predicate):
       if type(node) is SelectNode:
         consumed_inputs.add(node.product)
     return consumed_inputs
@@ -47,16 +46,16 @@ class GraphValidator(object):
     """
     partials = defaultdict(lambda: defaultdict(list))
     # Walk all nodes for the same subject under this root.
-    def predicate(entry):
-      node, state = entry
+    def predicate(node, state):
       return root.subject == node.subject
-    for ((node, state), dependencies) in product_graph.walk([root], predicate=predicate):
+    for node, state in product_graph.walk([root], predicate=predicate):
       # Look for unsatisfied TaskNodes with at least one unsatisfied dependency.
       if type(node) is not TaskNode:
         continue
       if type(state) is not Noop:
         continue
-      missing_products = {dep.product for dep, state in dependencies if type(state) is Noop}
+      sub_deps = [d for d in product_graph.dependencies_of(node) if d.subject == root.subject]
+      missing_products = {d.product for d in sub_deps if type(product_graph.state(d)) is Noop}
       if not missing_products:
         continue
 
@@ -67,7 +66,7 @@ class GraphValidator(object):
       # There was at least one dep successfully (recursively) satisfied via a literal.
       # TODO: this does multiple walks.
       used_literal_deps = set()
-      for dep, _ in dependencies:
+      for dep in sub_deps:
         for product in self._collect_consumed_inputs(product_graph, dep):
           if product in self._literal_types:
             used_literal_deps.add(product)

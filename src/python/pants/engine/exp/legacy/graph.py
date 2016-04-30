@@ -54,9 +54,7 @@ class ExpGraph(BuildGraph):
     new_targets = list()
 
     # Index the ProductGraph.
-    # TODO: It's not very common to actually use the dependencies of a Node during a walk... should
-    # consider removing those from that API.
-    for ((node, state), _) in self._graph.walk(roots=roots):
+    for node, state in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyBuildGraphNode values.
       if type(state) is Throw:
         raise AddressLookupError(
