@@ -23,28 +23,28 @@ def ciShNode(String os, String flags) {
   }
 }
 
-class Shard {
-  String os
-  String branchName
-  String flags
+interface Shard {
+  def String os()
+  def String branchName()
+  def String flags()
 }
 
 @NonCPS
 def List<Shard> shardList() {
   def shards = []
   ['linux': 10, 'osx': 2].each { os, totalShards ->
-    shards << new Shard(os: os, branchName: "${os}_self-checks", flags: '-cjlpn')
-    shards << new Shard(os: os, branchName: "${os}_contrib", flags: '-fkmsrcjlp')
+    shards << [os: os, branchName: "${os}_self-checks", flags: '-cjlpn'] as Shard
+    shards << [os: os, branchName: "${os}_contrib", flags: '-fkmsrcjlp'] as Shard
 
     for (int shard in 0..<totalShards) {
       String shardName = "${shard + 1}_of_${totalShards}"   
       String shardId = "${shard}/${totalShards}"
-      shards << new Shard(os: os,
-                          branchName: "${os}_unit_tests_${shardName}",
-                          flags: "-fkmsrcn -u ${shardId}")
-      shards << new Shard(os: os,
-                          branchName: "${os}_integration_tests_${shardName}",
-                          flags: "-fkmsrjlpn -i ${shardId}")
+      shards << [os: os,
+                 branchName: "${os}_unit_tests_${shardName}",
+                 flags: "-fkmsrcn -u ${shardId}"] as Shard
+      shards << [os: os,
+                 branchName: "${os}_integration_tests_${shardName}",
+                 flags: "-fkmsrjlpn -i ${shardId}"] as Shard
     }
   }
   return shards
