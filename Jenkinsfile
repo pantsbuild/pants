@@ -21,21 +21,26 @@ def ciShNode(os, flags) {
   }
 }
 
-// Build up a map from pipeline step name to a callable that allocates a node for the step.
-def shards = [:]
+/**
+ * Returns a map from pipeline branch name to a callable that allocates a node for the branch point.
+ */
+@NonCPS
+def buildShards() {
+  def shards = [:] 
+  for (os in ['linux', 'osx']) {
+    shards["${os}_self-checks"] = ciShNode(os, '-cjlpn')
+    shards["${os}_contrib"] = ciShNode(os, '-fkmsrcjlp')
 
-for (os in ['linux', 'osx']) {
-  shards["${os}_self-checks"] = ciShNode(os, '-cjlpn')
-  shards["${os}_contrib"] = ciShNode(os, '-fkmsrcjlp')
-
-  int totalShards = 10
-  for (int shard in 0..<totalShards) {
-    String shardName = "${shard + 1}_of_${totalShards}"   
-    String shardId = "${shard}/${totalShards}"
-    shards["${os}_unit_tests_${shardName}"] = ciShNode(os, "-fkmsrcn -u ${shardId}")
-    shards["${os}_integration_tests_${shardName}"] = ciShNode(os, "-fkmsrjlpn -i ${shardId}")
+    int totalShards = 10
+    for (int shard in 0..<totalShards) {
+      String shardName = "${shard + 1}_of_${totalShards}"   
+      String shardId = "${shard}/${totalShards}"
+      shards["${os}_unit_tests_${shardName}"] = ciShNode(os, "-fkmsrcn -u ${shardId}")
+      shards["${os}_integration_tests_${shardName}"] = ciShNode(os, "-fkmsrjlpn -i ${shardId}")
+    }
   }
+  return shards
 }
 
 // Now launch all the pipeline steps in parallel.
-parallel shards
+parallel buildShards()
