@@ -1,3 +1,5 @@
+package pants
+
 def ciShNode(String os, String flags) {
   { ->
     node(os) {
