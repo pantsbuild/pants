@@ -28,11 +28,13 @@ logger = logging.getLogger(__name__)
 class ProductGraph(object):
 
   class Entry(object):
-    __slots__ = ('state', 'dependencies', 'dependents', 'cyclic_dependencies')
+    __slots__ = ('state', 'level', 'dependencies', 'dependents', 'cyclic_dependencies')
 
     def __init__(self):
       # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
       self.state = None
+      # Level for cycle detection. Levels represent a pseudo-topological ordering of Nodes.
+      self.level = 1
       # Sets of dependency/dependent Nodes.
       self.dependencies = set()
       self.dependents = set()
@@ -43,6 +45,7 @@ class ProductGraph(object):
 
     def __eq__(self, other):
       return (self.state == other.state and
+              self.level == other.level and
               self.dependents == other.dependents and
               self.dependencies == other.dependencies and
               self.cyclic_dependencies == other.cyclic_dependencies)
@@ -86,32 +89,82 @@ class ProductGraph(object):
     else:
       raise State.raise_unrecognized(state)
 
-  def _detect_cycle(self, src, dest):
-    """Given a src and a dest, each of which _might_ already exist in the graph, detect cycles.
+  def _detect_cycle(self, v, w):
+    """Given a src (v) and a dest (w), each of which _might_ exist in the graph, detect cycles.
 
-    Returns True if a cycle would be created by adding an edge from src->dest.
+    Implements the sparse-graph algorithm from:
+      "A New Approach to Incremental Cycle Detection and Related Problems"
+        - Bender, Fineman, Gilbert, Tarjan
+
+    Returns True if a cycle would be created by adding an edge from v->w.
     """
-    parents = set()
-    walked = set()
-    def _walk(node):
-      if node in parents:
-        return True
-      if node in walked:
-        return False
-      parents.add(node)
-      walked.add(node)
 
-      for dep in self.dependencies_of(node):
-        found = _walk(dep)
-        if found:
-          return found
-      parents.discard(node)
+    # TODO: adjust the algorithm not to mutate the levels?
+    levels = self._node_levels.copy()
+    # delta = min(m^(1/2), n^(2/3))
+    delta = min(len(levels)**(1/2),
+                sum(len(edges) for edges in self.dependencies().values())**(2/3))
+    def same_level_as(node):
+      node_level = levels[node]
+      return lambda candidate, _: levels[candidate] == node_level
+
+    # Step 1
+    if levels[v] < levels[w]:
+      # Step 4: no cycle will be created: return.
       return False
 
-    # Initialize the path with src (since the edge from src->dest may not actually exist), and
-    # then walk from the dest.
-    parents.add(src)
-    return _walk(dest)
+    B = set()
+
+    # Step 2: search backward within the same level.
+    #   Case A: If w is visited, stop and report a cycle.
+    #   Case B: If the search completes without traversing at least `delta` arcs and
+    #     k(w) = k(v), go to Step 4 (the levels remain a pseudo topological ordering).
+    #   Case C: If the search completes without traversing at least `delta` arcs and
+    #     k(w) < k(v), set k(w) = k(v).
+    #   Case D: If the search traverses at least delta arcs, set k(w) = k(v) + 1 and B = {v}.
+    traversed = 0
+    for n in self.walk([v], predicate=same_level_as(v), dependents=True):
+      if n == w:
+        # Case A: Adding v->w would create a cycle.
+        return True
+      B.add(n)
+      traversed += 1
+      if traversed >= delta:
+        break
+    if traversed < delta:
+      if levels[v] == levels[w]
+        # Case B: Levels are stable, and no cycle would be created.
+        return False
+      else:
+        # Case C: Continue to Step 3.
+        levels[w] = levels[v]
+    else:
+      # Case D: We reached the bound for the backward search: continue to Step 3.
+      levels[w] = levels[v] + 1
+      B = {v}
+
+    # Step 3: search forward, traversing only edges that increase the level.
+    #   Case A: If y in B, stop and report a cycle.
+    #   Case B: If k(x) = k(y), add (x, y) to in(y).
+    #   Case C: If k(x) > k(y), set k(y) = k(x), set in(y) = {(x, y)}, and add all arcs
+    #     in out(y) to those to be traversed.
+    def _walk_forward(x):
+      for y in self.dependencies_of(x):
+        if y in B:
+          # Case A: a Node reached during the backwards search was also reached during the
+          # forward search.
+          return True
+        if levels[x] > levels[y]:
+          # Case C: Update the levels and traverse the edge.
+          levels[y] = levels[x]
+          if _walk_forward(y):
+            return True
+        else:
+          # Case B: Our 'in' set is computed by filtering the dependencies list; pass.
+          pass
+      return False
+
+    return _walk_forward(w)
 
   def _add_dependencies(self, node, entry, dependencies):
     """Adds dependency edges from the given src Node to the given dependency Nodes.
@@ -219,17 +272,23 @@ class ProductGraph(object):
 
     return self.invalidate(predicate)
 
-  def walk(self, roots, predicate=None, dependents=False):
+  def walk(self, roots, predicate=None, edge_predicate=None, dependents=False):
     """Yields Nodes and their States depth-first in pre-order, starting from the given roots.
 
     Each node entry is a tuple of (Node, State).
 
-    The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
-    that don't match it. The default predicate eliminates all `Noop` subgraphs.
+    The given predicate is applied to Node entries, and the given edge_predicate is applied
+    to edges between Nodes. Both predicates eliminate the subgraphs which do not match.
+    The default predicates eliminate all `Noop` subgraphs.
     """
-    def _default_walk_predicate(node, state):
+    def _default_predicate(node, state):
       return type(state) is not Noop
-    predicate = predicate or _default_walk_predicate
+    predicate = predicate or _default_predicate
+
+    raw_adjacencies = self.dependents_of if dependents else self.dependencies_of
+    def _filtered_adjacencies(node):
+      return [an for an in raw_adjacencies(node) if edge_predicate(node, an)]
+    adjacencies = _filtered_adjacencies if edge_predicate else raw_adjacencies
 
     walked = set()
     def _walk(nodes):
