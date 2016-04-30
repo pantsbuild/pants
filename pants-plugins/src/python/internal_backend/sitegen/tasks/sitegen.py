@@ -43,7 +43,7 @@ class SiteGen(Task):
   @classmethod
   def register_options(cls, register):
     super(SiteGen, cls).register_options(register)
-    register('--config-path', type=list, help='Path to .json file describing site structure')
+    register('--config-path', type=list, help='Path to .json file describing site structure.')
 
   def execute(self):
     if not self.get_options().config_path:
@@ -59,7 +59,7 @@ class SiteGen(Task):
 
 
 def load_config(json_path):
-  """Load config info from a .json file and return it"""
+  """Load config info from a .json file and return it."""
   with open(json_path) as json_file:
     config = json.loads(json_file.read().decode('utf8'))
   # sanity-test the config:
@@ -68,7 +68,7 @@ def load_config(json_path):
 
 
 def load_soups(config):
-  """Generate BeautifulSoup AST for each page listed in config"""
+  """Generate BeautifulSoup AST for each page listed in config."""
   soups = {}
   for page, path in config['sources'].items():
     with open(path, 'rb') as orig_file:
@@ -91,13 +91,14 @@ class Precomputed(object):
 class PrecomputedPageInfo(object):
   """Info we compute (and preserve) for each page before we mutate things."""
 
-  def __init__(self, title, toc=None):
+  def __init__(self, title, show_toc):
     """
     :param title: Page title
-    :param toc: Page table of contents
+    :param show_toc: True iff we should show a toc for this page.
     """
     self.title = title
-    self.toc = toc or []
+    self.show_toc = show_toc
+    self.toc = []
 
 
 def precompute_pantsrefs(soups):
@@ -141,11 +142,12 @@ def precompute_pantsrefs(soups):
 
 def precompute(config, soups):
   """Return info we want to compute (and preserve) before we mutate things."""
+  show_toc = config.get('show_toc', {})
   page = {}
   pantsrefs = precompute_pantsrefs(soups)
   for p, soup in soups.items():
     title = get_title(soup) or p
-    page[p] = PrecomputedPageInfo(title=title)
+    page[p] = PrecomputedPageInfo(title=title, show_toc=show_toc.get(p, True))
   return Precomputed(page=page, pantsref=pantsrefs)
 
 
@@ -177,8 +179,7 @@ _heading_re = re.compile('^h[1-6]$')  # match heading tag names h1,h2,h3,...
 
 
 def rel_href(src, dst):
-  """if src is 'foo/bar.html' and dst is 'garply.html#frotz' return relative
-     link '../garply.html#frotz'
+  """For src='foo/bar.html', dst='garply.html#frotz' return relative link '../garply.html#frotz'.
   """
   src_dir = os.path.dirname(src)
   return os.path.relpath(dst, src_dir)
@@ -216,36 +217,6 @@ def ensure_headings_linkable(soups):
             break
 
 
-def add_here_links(soups):
-  """Add the "pilcrow" links.
-
-  If the user hovers over a section, we want show a symbol that links to
-  this section.
-
-  Wraps header+pilcrow in a div w/css class h-plus-pilcrow.
-  """
-  for soup in soups.values():
-    for tag in soup.find_all(_heading_re):
-      anchor = tag.get('id') or tag.get('name')
-      if not anchor:
-        continue
-      new_table = beautiful_soup("""
-      <table class="h-plus-pilcrow">
-        <tbody>
-        <tr>
-          <td class="h-plus-pilcrow-holder"></td>
-          <td><div class="pilcrow-div">
-            <a href="#{anchor}" class="pilcrow-link">¶</a>
-          </div></td>
-        </tr>
-        </tbody>
-      </table>
-      """.format(anchor=anchor))
-      tag.replace_with(new_table)
-      header_holder = new_table.find(attrs={'class': 'h-plus-pilcrow-holder'})
-      header_holder.append(tag)
-
-
 def link_pantsrefs(soups, precomputed):
   """Transorm soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
   for (page, soup) in soups.items():
@@ -263,13 +234,9 @@ def transform_soups(config, soups, precomputed):
   fixup_internal_links(config, soups)
   ensure_headings_linkable(soups)
 
-  # Before add_here_links, which transforms soups in a way such that
-  # bs4 doesn't "find" headings. Do this after ensure_headings_linkable
-  # so that there will be links.
+  # Do this after ensure_headings_linkable so that there will be links.
   generate_page_tocs(soups, precomputed)
-
   link_pantsrefs(soups, precomputed)
-  add_here_links(soups)
 
 
 def get_title(soup):
@@ -284,6 +251,12 @@ def generate_site_toc(config, precomputed, here):
 
   def recurse(tree, depth_so_far):
     for node in tree:
+      if 'heading' in node:
+        heading = node['heading']
+        site_toc.append(dict(depth=depth_so_far,
+                             link=None,
+                             text=heading,
+                             here=False))
       if 'page' in node and node['page'] != 'index':
         dst = node['page']
         if dst == here:
@@ -299,35 +272,6 @@ def generate_site_toc(config, precomputed, here):
   if 'tree' in config:
     recurse(config['tree'], 0)
   return site_toc
-
-
-def generate_breadcrumbs(config, precomputed, here):
-  """return template data for breadcrumbs"""
-  breadcrumb_pages = []
-
-  def recurse(tree, pages_so_far):
-    pages_so_far_next = []
-    for node in tree:
-      if 'page' in node:
-        pages_so_far_next = pages_so_far + [node['page']]
-      if 'page' in node and node['page'] == here:
-        return pages_so_far_next
-      if 'children' in node:
-        r = recurse(node['children'], pages_so_far_next)
-        if r:
-          return r
-    return None
-
-  if 'tree' in config:
-    r = recurse(config['tree'], [])
-    if r:
-      breadcrumb_pages = r
-  breadcrumbs_template_data = []
-  for page in breadcrumb_pages:
-    breadcrumbs_template_data.append(dict(
-        link=os.path.relpath(page + '.html', os.path.dirname(here)),
-        text=precomputed.page[page].title))
-  return breadcrumbs_template_data
 
 
 def hdepth(tag):
@@ -348,7 +292,8 @@ def hdepth(tag):
 
 def generate_page_tocs(soups, precomputed):
   for name, soup in soups.items():
-    precomputed.page[name].toc = generate_page_toc(soup)
+    if precomputed.page[name].show_toc:
+      precomputed.page[name].toc = generate_page_toc(soup)
 
 
 def generate_page_toc(soup):
@@ -389,7 +334,6 @@ def render_html(dst, config, soups, precomputed, template):
     body_html = '{0}'.format(soup)
   html = renderer.render(template,
                          body_html=body_html,
-                         breadcrumbs=generate_breadcrumbs(config, precomputed, dst),
                          generated=generate_generated(config, dst),
                          site_toc=generate_site_toc(config, precomputed, dst),
                          has_page_toc=bool(precomputed.page[dst].toc),

@@ -80,7 +80,7 @@ You can also run the binary "from source" with the `run` goal:
     14:32:01 00:00     [py]
     14:32:02 00:01       [run]
     Hello, Whirled!
-    
+
     14:32:02 00:01     [jvm]
                    SUCCESS
     $
@@ -200,9 +200,9 @@ turn on to see what's going on in the background:
       Dumping library: PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))
       Dumping requirement: ansicolors==1.0.2
       Dumping distribution: .../ansicolors-1.0.2-py2-none-any.whl
-    
+
     15:11:42 00:01       [run]
-    Python 2.7.5 (default, Mar  9 2014, 22:15:05) 
+    Python 2.7.5 (default, Mar  9 2014, 22:15:05)
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
     (InteractiveConsole)
@@ -308,13 +308,13 @@ parameters:
                          ============== test session starts ===============
                          platform darwin -- Python 2.7.5 -- py-1.4.26 -- pytest-2.6.4
                          plugins: cov, timeout
-                         collected 2 items 
-                         
+                         collected 2 items
+
                          examples/tests/python/example_test/hello/greet/greet.py .
-                         
+
                          ========= 1 tests deselected by '-kreq' ==========
                          ===== 1 passed, 1 deselected in 0.05 seconds =====
-                         
+
     10:43:05 00:02     [junit]
     10:43:05 00:02     [specs]
                    SUCCESS

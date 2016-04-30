@@ -12,8 +12,3 @@ page(
   source='3rdparty_py.md',
   links=[
     'src/docs:3rdparty'])
-
-page(
-  name='pex_design',
-  source='pex_design.md'
-)

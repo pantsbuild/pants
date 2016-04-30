@@ -4,8 +4,8 @@ page(
   links=[
     ':3rdparty_jvm',
     ':from_maven',
+    ':publish',
     'examples/src/scala/org/pantsbuild/example:readme',
-    'src/docs:publish',
     'src/docs:first_concepts',
     'src/docs:first_tutorial',
   ]
@@ -17,6 +17,11 @@ page(
   links=[
     ':3rdparty_jvm',
   ],
+)
+
+page(
+  name='publish',
+  source='publish.md',
 )
 
 page(

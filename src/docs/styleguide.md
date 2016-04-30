@@ -6,7 +6,7 @@ This document tries to cover some of the common style issues that new contributo
 first contributions to the project.
 
 A number of style checks are already automated. Some of these are covered by the pre-commit script
-([[setup instructions|pants('src/python/pants/docs:howto_contribute')#getting-pants-source-code]]).
+([[setup instructions|pants('src/docs:howto_contribute')#getting-pants-source-code]]).
 Others are run as when tests are run.
 
 Beyond that, we've got a number of guidelines that haven't been automated.

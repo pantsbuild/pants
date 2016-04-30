@@ -6,7 +6,7 @@ it to change somewhat.*
 
 This page documents how to develop a Pants plugin, a set of code that
 defines new Pants functionality. If you
-[[develop a new task|pants('src/python/pants/docs:dev_tasks')]]
+[[develop a new task|pants('src/docs:dev_tasks')]]
 or target to add to Pants (or to
 override an existing part of Pants), a plugin gives you a way to
 register your code with Pants.

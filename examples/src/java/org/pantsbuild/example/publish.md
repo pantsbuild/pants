@@ -1,53 +1,164 @@
 Publishing Artifacts
 ====================
 
-A library owner/maintainer can *publish* versioned artifacts that folks
-elsewhere can fetch and import. In the JVM world, these are jars (with
-poms) on a server that Maven (or Ivy) looks for. (In the Python world,
-these are eggs; but as of early 2014, Pants doesn't help publish these.)
+A JVM library owner/maintainer can *publish* versioned JARs and other artifacts that
+other repos can fetch and import as third-party dependencies.
 
-This page talks about publishing artifacts. We assume you already know
-enough about Pants to *build* the library that underlies an artifact. To
-*use* an artifact that has already been published from some other source
-tree, see
-[[Third-Party Dependencies|pants('src/docs:3rdparty')]].
-(To use a artifact that has been published from
-*your own* source tree... don't do that. Instead, depend on the
-`*_library` build target.)
-
-It's tricky to keep track of versions, label artifacts with versions,
-and upload those artifacts. Pants eases these tasks.
-
-A library's build target specifies where to publish it. For example, a
-<a pantsref="bdict_java_library">`java_library`</a>
-build target can have a `provides` parameter of type
-<a pantsref="bdict_artifact">`artifact`</a>.
-The `artifact` specifies an "address" similar to
-what you might see in `3rdparty` `BUILD` files: an artifact's location.
-It does *not* specify a version; that changes each time you publish.
+A <a pantsref="bdict_java_library">`java_library`</a> target can have a `provides` parameter of type
+<a pantsref="bdict_artifact">`artifact`</a>. The `artifact` specifies the published artifact's
+coordinates, except that it does *not* specify a version; that changes each time you publish.
 For an example, see
 [examples/src/java/org/pantsbuild/example/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/org/pantsbuild/example/hello/greet/BUILD):
 
-!inc[start-at=java_library](../../examples/src/java/org/pantsbuild/example/hello/greet/BUILD)
+!inc[start-at=java_library](./hello/greet/BUILD)
 
 (That `repo=` parameter assumes someone has set up your Pants configuration to know about that
 artifact repository. If that assumption is false, keep reading to find out how to set this up.)
 
 Pants' `publish` goal builds the library, bumps the library's version
-number, and uploads the library to its repository. Actually, it does
-quite a bit more than that.
+number, and uploads the library to its repository.
 
-It uses [Semantic Versioning ("semver")](http://semver.org/) for
-versioning. Versions are dotted number triads (e.g., 2.5.6); when Pants
+The publishing mechanism uses [Semantic Versioning ("semver")](http://semver.org/) for
+versioning. Versions are dotted number triples (e.g., 2.5.6); when Pants
 bumps a version, it specifically bumps the patch number part. Thus, if
 the current version is 2.5.6, Pants bumps to 2.5.7. To publish a minor
 or major version instead of a patch, you override the version number on
 the command line.
 
-**The pushdb:** To "remember" version numbers, Pants uses the pushdb.
+**The pushdb:** To "remember" version numbers, Pants uses the _pushdb_.
 The pushdb is a text file under source control. It lists artifacts with
 their current version numbers and SHAs. When you publish artifacts,
 pants edits this file and pushes it to the origin.
+
+<a pantsmark="setup_publish"></a>
+
+Enabling Pants Publish
+----------------------
+
+### Tell Pants about your Artifact Repository
+
+To tell Pants which artifact repository to publish to, [[Create a
+plugin|pants('src/docs:howto_plugin')]] if you haven't already. Register it with Pants.
+
+In the plugin, define and register at least one `Repository` object in a `BUILD` file alias as
+shown in
+[`src/python/internal_backend/repositories/register.py`](https://github.com/pantsbuild/pants/blob/master/src/python/internal_backend/repositories/register.py).
+
+`BUILD` targets can use this Repository's alias as the `repo` parameter to an <a
+pantsref="bdict_artifact">`artifact`</a>. For example,
+[examples/src/java/org/pantsbuild/example/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/org/pantsbuild/example/hello/greet/BUILD)
+refers to the `public` repository defined above. (Notice it's a Python object, not a string.)
+
+!inc[start-at=java_library](./hello/greet/BUILD)
+
+If you get an error that the repo name (here, `public`) isn't defined, your plugin didn't register
+with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.
+
+In your `pants.ini` file, set up a `[publish.jar]` section. In that section,
+create a `dict` called `repos`. It should contain a section for each `Repository` object that you
+defined in your plugin:
+
+    :::ini
+    [publish.jar]
+    repos: {
+      'public': {  # must match the name of the `Repository` object that you defined in your plugin.
+        'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
+                                         # in your custom ivysettings.xml.
+        'auth': 'build-support:netrc',   # Pants spec to a 'credentials()' or
+                                         # 'netrc_credentials()' object.
+        'help': 'Configure your ~/.netrc for maven.example.com access.'
+      },
+      'testing': {
+        'resolver': 'artifactory.example.com',
+        'auth': 'build-support:netrc',
+        'help': 'Configure your ~/.netrc for artifactory.example.com access.'
+      },
+    }
+
+If your repository requires authentication, add a `~/.netrc` file. Here is a sample file, that
+matches the `repos` specified above:
+
+    machine maven.example.com
+      login someuser
+      password password123
+
+    machine artifactory.example.com
+      login someuser
+      password someotherpassword123
+
+And place the following in a `BUILD` file somewhere in your repository (`build-support/BUILD` is a
+good place, and is used in the example above):
+
+    netrc_credentials(name = 'netrc')
+
+Next, tell Ivy how to publish to your repository. Add a new `ivysettings.xml` file to your repo
+with the additional information needed to publish artifacts. Here is an example to get you started:
+
+    :::xml
+    <?xml version="1.0"?>
+
+    <ivysettings>
+      <settings defaultResolver="chain-repos"/>
+      <!-- The ${login} and ${password} values come from a netrc_credentials() object in a BUILD
+           file, which is fed by '~/.netrc'.  There must be a '~/.netrc' machine entry which
+           matches a resolver in the "repos" object in 'pants.ini', which also matches the 'host' in
+           this XML block.
+
+           machine <hostname>
+             login <login>
+             password <password>
+
+           The realm must match the kind of repository you are publishing to. For Sonotype Nexus, use:
+
+           realm="Sonatype Nexus Repository Manager"
+
+        -->
+      <credentials host="artifactory.example.com"
+                   realm="Artifactory Realm"
+                   username="${login}"
+                   passwd="${password}"/>
+
+      <resolvers>
+        <chain name="chain-repos" returnFirst="true">
+           <ibiblio name="artifactory.example.com"
+                         m2compatible="true"
+                         usepoms="true"
+                         root="https://artifactory.example.com/content/groups/public/"/>
+        </chain>
+
+        <url name="artifactory.example.com" m2compatible="true">
+          <artifact pattern="https://artifactory.example.com/libs-releases-local/[organization]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]"/>
+        </url>
+      </resolvers>
+    </ivysettings>
+
+With this file in place, add a `[publish.jar]` section to `pants.ini`, and tell pants to use
+the custom Ivy settings when publishing:
+
+    :::ini
+    [publish.jar]
+    ivy_settings: %(pants_supportdir)s/ivy/ivysettings_for_publishing.xml
+
+<a pantsmark="setup_publish_restrict_branch"> </a>
+
+### Restricting Publish to "Release Branch"
+
+Your organization might have a notion of a special "release branch": you want publishing
+to happen on this source control branch, which you maintain extra-carefully.
+You can set this branch using the `restrict_push_branches` option in the
+`[publish.jar]` section of your `pants.ini` file.
+
+### Task to Publish "Extra" Artifacts
+
+Pants supports "publish plugins", which allow end-users to add additional, arbitrary files to be
+published along with the primary artifact. For example, let's say that along with publishing your
+jar full of class files, you would also like to publish a companion file that contains some
+metadata -- code coverage info, source git repository, java version that created the jar, etc. By
+[[developing a task|pants('src/docs:dev_tasks')]] in a
+[[plugin|pants('src/docs:howto_plugin')]], you give Pants a new ability. [[Develop a
+Task to Publish "Extra" Artifacts|pants('src/docs:dev_tasks_publish_extras')]] to find
+out how to develop a special Task to include "extra" data with published artifacts.
+
 
 Life of a Publish
 -----------------
@@ -314,11 +425,3 @@ locally-published artifact. If the artifact is a jar, then in the
 3rdparty
 <a pantsref="bdict_jar">`jar` target</a>, set `mutable=True` and change the
 version number.
-
-Setting Up Your Workspace
--------------------------
-
-To get Pants publish working in the first place, someone needs to
-<a pantsref="setup_publish">configure your codebase</a>
-to register one or more
-artifact repositories and, optionally, enable some features.

@@ -16,6 +16,7 @@ python_tests(
     ':scheduler_test_base',
     'src/python/pants/engine/exp:fs',
     'src/python/pants/engine/exp:nodes',
+    'tests/python/pants_test/testutils:git_util',
   ]
 )
 

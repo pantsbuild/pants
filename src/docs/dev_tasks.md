@@ -38,12 +38,12 @@ Task Installation: Associate Task with Goal[s]
 
 Defining a Task is nice, but doesn't hook it up so users can get to it.
 *Install* a task to make it available to users. To do this, you register
-it with Pants, associating it with a goal. A [[plugin's|pants('src/python/pants/docs:howto_plugin')]] `register.py`
+it with Pants, associating it with a goal. A [[plugin's|pants('src/docs:howto_plugin')]] `register.py`
 registers goals in its `register_goals` function. Here's an excerpt from
 [Pants' own Python
 backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/python/register.py):
 
-!inc[start-at=def register_goals](../backend/python/register.py)
+!inc[start-at=def register_goals](../python/pants/backend/python/register.py)
 
 That `task(...)` is a name for
 `pants.goal.task_registrar.TaskRegistrar`. Calling its `install` method
@@ -79,12 +79,12 @@ tell Pants about these inter-task dependencies...
 The "early" task class defines a `product_types` class method that
 returns a list of strings:
 
-!inc[start-at=  def product_types&end-at=runtime_classpath](../backend/jvm/tasks/resources_task.py)
+!inc[start-at=  def product_types&end-at=runtime_classpath](../python/pants/backend/jvm/tasks/resources_task.py)
 
 The "late" task defines a `prepare` method that calls
 `round_manager.require_data` to "require" one of those same strings:
 
-!inc[start-at=  def prepare&end-at=runtime_classpath](../backend/jvm/tasks/detect_duplicates.py)
+!inc[start-at=  def prepare&end-at=runtime_classpath](../python/pants/backend/jvm/tasks/detect_duplicates.py)
 
 Pants uses this information to determine which tasks must run first to
 prepare data required by other tasks. (If one task requires data that no
@@ -95,7 +95,7 @@ by other tasks. If one product is especially "expensive" to make, perhaps your t
 do so if another task will use it. Use `self.context.products.isrequired` to find out if a task
 required a product type:
 
-!inc[start-at=products.isrequired(&end-before=def](../backend/jvm/tasks/jvmdoc_gen.py)
+!inc[start-at=products.isrequired(&end-before=def](../python/pants/backend/jvm/tasks/jvmdoc_gen.py)
 
 Task Implementation Versioning
 ------------------------------
@@ -122,7 +122,7 @@ Tasks may be configured via the options system.
 To define an option, implement your Task's `register_options`
 class method and call the passed-in `register` function:
 
-!inc[start-at=  def register_options&end-before=--confs](../backend/jvm/tasks/checkstyle.py)
+!inc[start-at=  def register_options&end-before=--confs](../python/pants/backend/jvm/tasks/checkstyle.py)
 
 Option values are available via `self.get_options()`:
 
@@ -154,7 +154,7 @@ When calling the `register` function, passing a few additional arguments
 will affect the behaviour of the registered option. The most common parameters are:
 
 - `type`: Constrains the type of the option. Takes a python type constructor (one of `bool`, `str`, `int`, `float`, `list`, `dict`), or a
-  special option type constructor like `target_option` from [pants.option.custom_types](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/custom_types.py). 
+  special option type constructor like `target_option` from [pants.option.custom_types](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/custom_types.py).
   If not specified, the option will be a string.
 - `default`: Sets a default value that will be used if the option is not specified by the user.
 - `advanced`: Indicates that an option is intended either for use by power users, or for use in

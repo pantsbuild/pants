@@ -2,14 +2,14 @@ Pants Contributors Guide
 ========================
 
 This page documents how to make contributions to Pants. If you've
-[[developed a change to Pants|pants('src/python/pants/docs:howto_develop')]],
+[[developed a change to Pants|pants('src/docs:howto_develop')]],
 it passes all tests, and
 you'd like to "send it upstream", here's what to do:
 
 Questions, Issues, Bug Reports
 ------------------------------
 
-See [[How To Ask|pants('src/python/pants/docs:howto_ask')]]
+See [[How To Ask|pants('src/docs:howto_ask')]]
 
 Join the Conversation
 ---------------------
@@ -126,9 +126,9 @@ the `pantsbuild/pants` repo's master branch, use these commands:
 ### Making the Change
 
 You might want to familiarize yourself with the
-[[Pants Internals|pants('src/python/pants/docs:internals')]],
-[[Pants Developers Guide|pants('src/python/pants/docs:howto_develop')]], and the
-[[Pants Style Guide|pants('src/python/pants/docs:styleguide')]].
+[[Pants Internals|pants('src/docs:internals')]],
+[[Pants Developers Guide|pants('src/docs:howto_develop')]], and the
+[[Pants Style Guide|pants('src/docs:styleguide')]].
 
 Create a new branch off master and make changes.
 
@@ -140,7 +140,7 @@ so, then along with changing code...
 
 +   Update `src/python/pants/CHANGELOG.rst`.
 +   Consider updating the
-    [[user documentation|pants('src/python/pants/docs:docs')]].
+    [[user documentation|pants('src/docs:docs')]].
 
 ### Run the CI Tests
 
@@ -194,7 +194,7 @@ To make sure it gets seen by the appropriate people and that they have
 the appropriate context, add:
 
 - `pants-reviews` to the Groups field
-- Any specific [pants committers](https://www.rbcommons.com/s/twitter/users/) 
+- Any specific [pants committers](https://www.rbcommons.com/s/twitter/users/)
   who should review your change to the People field
 - The pull request number from your Github pull request in the Bug field
 - Your git branch name in the Branch field.

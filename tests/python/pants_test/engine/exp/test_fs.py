@@ -8,21 +8,23 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 from abc import abstractmethod
+from contextlib import contextmanager
 
 from pants.base.scm_project_tree import ScmProjectTree
 from pants.engine.exp.fs import (Dir, DirectoryListing, Dirs, FileContent, Files, Link, Path,
                                  PathGlobs, ReadLink, Stat, Stats)
 from pants.engine.exp.nodes import FilesystemNode
-from pants.scm.git import Git
 from pants.util.meta import AbstractClass
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
+from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version, initialize_repo
 
 
 class FSTestBase(SchedulerTestBase, AbstractClass):
 
-  _build_root_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test')
+  _original_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test')
 
   @abstractmethod
+  @contextmanager
   def mk_project_tree(self, build_root_src):
     """Construct a ProjectTree for the given src path."""
     pass
@@ -31,31 +33,31 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     return PathGlobs.create_from_specs(ftype, relative_to, filespecs)
 
   def assert_walk(self, ftype, filespecs, files):
-    project_tree = self.mk_project_tree(self._build_root_src)
-    scheduler, storage = self.mk_scheduler(project_tree=project_tree)
-    result = self.execute(scheduler, storage, Stat, self.specs(ftype, '', *filespecs))[0]
-    self.assertEquals(set(files), set([p.path for p in result]))
+    with self.mk_project_tree(self._original_src) as project_tree:
+      scheduler, storage = self.mk_scheduler(project_tree=project_tree)
+      result = self.execute(scheduler, storage, Stat, self.specs(ftype, '', *filespecs))[0]
+      self.assertEquals(set(files), set([p.path for p in result]))
 
   def assert_content(self, filespecs, expected_content):
-    project_tree = self.mk_project_tree(self._build_root_src)
-    scheduler, storage = self.mk_scheduler(project_tree=project_tree)
-    result = self.execute(scheduler, storage, FileContent, self.specs(Files, '', *filespecs))[0]
-    def validate(e):
-      self.assertEquals(type(e), FileContent)
-      return True
-    actual_content = {f.path: f.content for f in result if validate(f)}
-    self.assertEquals(expected_content, actual_content)
+    with self.mk_project_tree(self._original_src) as project_tree:
+      scheduler, storage = self.mk_scheduler(project_tree=project_tree)
+      result = self.execute(scheduler, storage, FileContent, self.specs(Files, '', *filespecs))[0]
+      def validate(e):
+        self.assertEquals(type(e), FileContent)
+        return True
+      actual_content = {f.path: f.content for f in result if validate(f)}
+      self.assertEquals(expected_content, actual_content)
 
   def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
-    project_tree = self.mk_project_tree(self._build_root_src)
-    scheduler, storage = self.mk_scheduler(project_tree=project_tree)
-    request = self.execute_request(scheduler, storage, Stat, self.specs(ftype, '', *filespecs))
+    with self.mk_project_tree(self._original_src) as project_tree:
+      scheduler, storage = self.mk_scheduler(project_tree=project_tree)
+      request = self.execute_request(scheduler, storage, Stat, self.specs(ftype, '', *filespecs))
 
-    # Validate that FilesystemNodes for exactly the given subjects are reachable under this
-    # request.
-    fs_nodes = [n for n, _ in scheduler.product_graph.walk(roots=request.roots)
-                if type(n) is FilesystemNode]
-    self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
+      # Validate that FilesystemNodes for exactly the given subjects are reachable under this
+      # request.
+      fs_nodes = [n for n, _ in scheduler.product_graph.walk(roots=request.roots)
+                  if type(n) is FilesystemNode]
+      self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
 
   def test_walk_literal(self):
     self.assert_walk(Files, ['4.txt'], ['4.txt'])
@@ -157,13 +159,26 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 
 class PosixFSTest(unittest.TestCase, FSTestBase):
 
+  @contextmanager
   def mk_project_tree(self, build_root_src):
-    return self.mk_fs_tree(build_root_src)
+    yield self.mk_fs_tree(build_root_src)
 
 
-# TODO: See https://github.com/pantsbuild/pants/issues/3189
-@unittest.expectedFailure
+@unittest.skipIf(git_version() < MIN_REQUIRED_GIT_VERSION,
+                 'The GitTest requires git >= {}.'.format(MIN_REQUIRED_GIT_VERSION))
 class GitFSTest(unittest.TestCase, FSTestBase):
 
+  @contextmanager
   def mk_project_tree(self, build_root_src):
-    return ScmProjectTree(build_root_src, Git(worktree=build_root_src), 'HEAD')
+    # Use mk_fs_tree only to feed the files for the git repo, not using its FileSystemProjectTree.
+    worktree = self.mk_fs_tree(build_root_src).build_root
+    with initialize_repo(worktree) as git_repo:
+      yield ScmProjectTree(worktree, git_repo, 'HEAD')
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_walk_recursive(self):
+    super(GitFSTest, self).test_walk_recursive()
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_files_content_literal(self):
+    super(GitFSTest, self).test_files_content_literal()
