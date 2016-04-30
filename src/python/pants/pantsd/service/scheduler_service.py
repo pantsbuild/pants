@@ -90,7 +90,7 @@ class SchedulerService(PantsService):
     # pants run to derive spec_roots for caching in the underlying scheduler.
     with self._scheduler.locked():
       self._logger.debug('execution commandline: %s', args)
-      spec_roots, _ = self._parse_commandline_to_spec_roots(args=args)
+      spec_roots = self._parse_commandline_to_spec_roots(args=args)
       self._logger.debug('parsed spec_roots: %s', spec_roots)
       graph = self._build_graph_facade_cls(self._scheduler, self._engine, self._symbol_table_cls)
       all(graph.get_target(address) for address in graph.inject_specs_closure(spec_roots))
