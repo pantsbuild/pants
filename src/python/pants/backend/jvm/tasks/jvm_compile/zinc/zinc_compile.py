@@ -201,15 +201,14 @@ class BaseZincCompile(JvmCompile):
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
 
+    self.set_distribution(jdk=True)
     try:
-      # Zinc takes advantage of tools.jar if it's presented in classpath.
-      # For example com.sun.tools.javac.Main is used for in process java compilation.
-      self.set_distribution(jdk=True)
+      # Zinc uses com.sun.tools.javac.Main for in-process java compilation.
+      # If not present Zinc attempts to spawn an external javac, but we want to keep
+      # everything in our selected distribution, so we don't allow it to do that.
       self._tools_jar = self.dist.find_libs(['tools.jar'])
-    except (TaskError, Distribution.Error):
-      self.context.log.info('Failed to locate tools.jar. '
-                            'Install a JDK to increase performance of Zinc.')
-      self._tools_jar = []
+    except Distribution.Error as e:
+      raise TaskError(e)
 
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
