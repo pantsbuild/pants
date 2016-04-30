@@ -43,12 +43,10 @@ def List shardList() {
   return shards
 }
 
-/**
- * Returns a map from pipeline branch name to a callable that allocates a CI node shard.
- */
 def Map<String, Closure<Void>> buildShards(List shards) {
   return shards.collectEntries { shard -> [(shard.branchName): ciShNode(shard.os, shard.flags)] }
 }
 
-// Now launch all the pipeline steps in parallel.
-parallel buildShards(shardList())
+Map<String, Closure<Void>> shards = buildShards(shardList())
+parallel shards
+
