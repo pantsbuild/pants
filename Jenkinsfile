@@ -21,10 +21,14 @@ def ciShNode(String os, String flags) {
   }
 }
 
+// NB: This marks the function as not needing serialization to nodes; ie it runs only on the master.
 @NonCPS
 def List shardList() {
   List shards = []
   def addShard = { String os, String branchName, String flags ->
+    // NB: We use maps instead of a simple `Shard` struct class because the jenkins pipeline
+    // security sandbox disallows `new Shard(...)` and offers no way to approve the action.
+    // If this could be figured out we could use `List<Shard>` here and in `buildShards` below.
     shards << [os: os, branchName: branchName, flags: flags]
   }
 
