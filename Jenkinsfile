@@ -54,10 +54,14 @@ def Map<String, Closure<Void>> buildShards(List shards) {
   return shardsByBranch
 }
 
-sh("""
-echo "Env vars on the master:"
-set
-""")
+node('master') {
+  sh(
+    """
+    echo "Env vars on the master:"
+    set
+    """.toString().stripIndent()
+  )
+}
 
 Map<String, Closure<Void>> shards = buildShards(shardList())
 parallel shards
