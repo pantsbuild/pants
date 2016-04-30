@@ -43,7 +43,11 @@ def List shardList() {
 }
 
 def Map<String, Closure<Void>> buildShards(List shards) {
-  return shards.collectEntries { shard -> [(shard.branchName): ciShNode(shard.os, shard.flags)] }
+  Map<String, Closure<Void>> shardsByBranch = [:]
+  for (shard in shards) {
+    shardsByBranch[shard.branchName] = ciShNode(shard.os, shard.flags)
+  }
+  return shardsByBranch
 }
 
 Map<String, Closure<Void>> shards = buildShards(shardList())
