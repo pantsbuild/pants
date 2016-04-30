@@ -1,5 +1,5 @@
-def ciShNode(String os, String flags) {
-  { ->
+def Closure<Void> ciShNodeSpawner(String os, String flags) {
+  return { ->
     node(os) {
       wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 1, 'defaultBg': 2]) {
         checkout scm
@@ -49,10 +49,15 @@ def List shardList() {
 def Map<String, Closure<Void>> buildShards(List shards) {
   Map<String, Closure<Void>> shardsByBranch = [:]
   for (shard in shards) {
-    shardsByBranch[shard.branchName] = ciShNode(shard.os, shard.flags)
+    shardsByBranch[shard.branchName] = ciShNodeSpawner(shard.os, shard.flags)
   }
   return shardsByBranch
 }
+
+sh("""
+echo "Env vars on the master:"
+set
+""")
 
 Map<String, Closure<Void>> shards = buildShards(shardList())
 parallel shards
