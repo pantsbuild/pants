@@ -57,7 +57,7 @@ def List shardList() {
     addShard(os, "${os}_contrib", '-fkmsrcjlp')
 
     for (int shard in 0..<totalShards) {
-      String shardName = "${shard + 1}_of_${totalShards}"   
+      String shardName = "${shard + 1}_of_${totalShards}"
       String shardId = "${shard}/${totalShards}"
       addShard(os, "${os}_unit_tests_${shardName}", "-fkmsrcn -u ${shardId}")
       addShard(os, "${os}_integration_tests_${shardName}", "-fkmsrjlpn -i ${shardId}")
