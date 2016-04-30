@@ -32,8 +32,9 @@ def List shardList() {
     shards << [os: os, branchName: branchName, flags: flags]
   }
 
+  println("env: ${env}")
   String branchName = env.GIT_BRANCH
-  println("Listing desired shards for branch: ${branchName} ${GIT_BRANCH}")
+  println("Listing desired shards for branch: ${branchName}")
 
   nodes = ['linux': 10]
   if (branchName == 'origin/master') {
