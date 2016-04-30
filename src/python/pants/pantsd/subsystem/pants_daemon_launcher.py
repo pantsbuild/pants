@@ -88,7 +88,6 @@ class PantsDaemonLauncher(Subsystem):
 
       (scheduler,
        engine,
-       _, _, _,
        symbol_table_cls,
        legacy_graph_cls) = self._engine_initializer.setup_legacy_graph()
       scheduler_service = SchedulerService(fs_event_service,

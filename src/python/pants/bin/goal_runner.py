@@ -77,16 +77,15 @@ class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
   @staticmethod
-  def parse_commandline_to_spec_roots(build_root=None, options=None, args=None):
-    build_root = build_root or get_buildroot()
+  def parse_commandline_to_spec_roots(options=None, args=None, build_root=None):
     if not options:
       options, _ = OptionsInitializer(OptionsBootstrapper(args=args), init_logging=False).setup()
-    cmd_line_spec_parser = CmdLineSpecParser(build_root)
+    cmd_line_spec_parser = CmdLineSpecParser(build_root or get_buildroot())
     spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
-    return spec_roots, options
+    return spec_roots
 
   @staticmethod
-  def setup_scheduler(build_root):
+  def _setup_scheduler(build_root):
     storage = Storage.create(debug=False)
     # Ignore any dotfile below build_root except `.` itself
     project_tree = FileSystemProjectTree(build_root, ['.*'])
@@ -112,23 +111,17 @@ class EngineInitializer(object):
     )
 
   @classmethod
-  def setup_legacy_graph(cls, options=None):
+  def setup_legacy_graph(cls):
     build_root = get_buildroot()
-    spec_roots, options = cls.parse_commandline_to_spec_roots(build_root, options)
-    scheduler, storage, symbol_table_cls = cls.setup_scheduler(build_root)
+    scheduler, storage, symbol_table_cls = cls._setup_scheduler(build_root)
     engine = LocalSerialEngine(scheduler, storage)
-    return (scheduler, engine, storage, options, spec_roots, symbol_table_cls, ExpGraph)
+    return (scheduler, engine, symbol_table_cls, ExpGraph)
 
   @classmethod
   @contextmanager
-  def open_legacy_graph(cls, *args, **kwargs):
-    (scheduler,
-     engine,
-     storage,
-     options,
-     spec_roots,
-     symbol_table_cls,
-     build_graph_cls) = cls.setup_legacy_graph(*args, **kwargs)
+  def open_legacy_graph(cls, options=None):
+    spec_roots = cls.parse_commandline_to_spec_roots(options)
+    scheduler, engine, symbol_table_cls, build_graph_cls = cls.setup_legacy_graph()
 
     engine.start()
     try:
@@ -136,7 +129,7 @@ class EngineInitializer(object):
       addresses = tuple(graph.inject_specs_closure(spec_roots))
       yield graph, addresses, scheduler
     finally:
-      logger.debug('cache stats: {}'.format(engine._cache.get_stats()))
+      logger.debug('engine cache stats: {}'.format(engine._cache.get_stats()))
       engine.close()
 
 
