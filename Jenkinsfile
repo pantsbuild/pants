@@ -32,7 +32,17 @@ def List shardList() {
     shards << [os: os, branchName: branchName, flags: flags]
   }
 
-  ['linux': 10, 'osx': 2].each { os, totalShards ->
+  branchName = System.getenv('BRANCH_NAME')
+  println("Listing desired shards for branch: ${branchName}")
+
+  nodes = ['linux': 10]
+  if (branchName == 'master') {
+    // We only add OSX to the mix on master commits since our 1 mac-mini is currently a severe
+    // throughput bottleneck.
+    nodes['osx'] = 2
+  }
+
+  nodes.each { os, totalShards ->
     addShard(os, "${os}_self-checks", '-cjlpn')
     addShard(os, "${os}_contrib", '-fkmsrcjlp')
 
@@ -52,15 +62,6 @@ def Map<String, Closure<Void>> buildShards(List shards) {
     shardsByBranch[shard.branchName] = ciShNodeSpawner(shard.os, shard.flags)
   }
   return shardsByBranch
-}
-
-node('master') {
-  sh(
-    """
-    echo "Env vars on the master:"
-    set
-    """.toString().stripIndent()
-  )
 }
 
 Map<String, Closure<Void>> shards = buildShards(shardList())
