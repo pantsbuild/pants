@@ -25,6 +25,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
+from pants.java.distribution.distribution import Distribution
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_property
@@ -205,7 +206,7 @@ class BaseZincCompile(JvmCompile):
       # For example com.sun.tools.javac.Main is used for in process java compilation.
       self.set_distribution(jdk=True)
       self._tools_jar = self.dist.find_libs(['tools.jar'])
-    except TaskError:
+    except (TaskError, Distribution.Error):
       self.context.log.info('Failed to locate tools.jar. '
                             'Install a JDK to increase performance of Zinc.')
       self._tools_jar = []
