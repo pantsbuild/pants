@@ -32,7 +32,7 @@ def List shardList() {
     shards << [os: os, branchName: branchName, flags: flags]
   }
 
-  String branchName = System.getenv('GIT_BRANCH')
+  String branchName = env.GIT_BRANCH
   println("Listing desired shards for branch: ${branchName}")
 
   nodes = ['linux': 10]
