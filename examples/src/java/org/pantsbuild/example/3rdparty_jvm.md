@@ -47,32 +47,29 @@ And your Java code might have:
 "Round Trip" Dependencies
 -------------------------
 
-Depending on your workspace's relation with the rest of the world, you
-might want to look out for "round trip" dependencies. You can publish an
-artifact *near* generated from your workspace's source code and consume
-a third-party artifact *far* that depends on *near*. If you're not
-careful, you might depend on two versions of the *near* code: the local
-source code and an artifact you published a while ago.
+It is possible for your code to exist as source in the repo but
+also be published as a binary to an external repository. If you happen to pull in any
+third party artifacts, they may express a dependency on the published
+version of the artifact.  This means that the classpath will contain
+both the version in the repo compiled from source and an older version
+that was previously published.  In this case, you want to be sure that
+when pants always prefers the version built from source.
 
-When consuming such third-party artifacts, ensure that your source dependencies
-have `provides` clauses (*near*), and then add the source dependencies
-explicitly when you depend on the binary copy of the *far* dependency:
+Fortunately, the remedy for this is simple.  If you add a `provides=`
+parameter that matches the one used to publish the artifact, pants
+will always prefer the local target definition to the
+published jar.
 
     :::python
-    jar_library(name='far',
-      jars=[
-        jar(org='org.archie', name='far', rev='0.0.18'),
-      ]
-      dependencies=[
-        # including the local version of source manually will cause the binary
-        # dependency to be automatically excluded:
-        'util/near',
-      ]
-    )
+    jar_library(name='api',
+      sources = globs('*.java'),
+      provides = artifact(org='org.archie',
+                          name='api',
+                          repo=myrepo,)
+	)
 
 Controlling JAR Dependency Versions
 -----------------------------------
-
 
 **If you notice a small number of wrong-version things,** then in a JVM
 target, you can depend on a `jar` that specifies a version and sets
