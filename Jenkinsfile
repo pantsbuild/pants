@@ -1,61 +1,41 @@
-def shards = [:]
-
-def ciShShardedNode(os, flags, typeFlag, shardNum, totalShards) {
-  { ->
-    node(os) {
-      checkout scm
-      sh(
-        """
-        export CXX=g++
-
-        export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
-        echo \$XDG_CACHE_HOME
-
-        export PEX_ROOT="\$(pwd)/.cache/pex"
-        echo \$PEX_ROOT
-
-        ./build-support/bin/ci.sh ${flags} ${typeFlag} ${shardNum}/${totalShards}
-        """.toString().stripIndent()
-      )
-    }
-  }
-}
-
 def ciShNode(os, flags) {
   { ->
     node(os) {
-      checkout scm
-      sh(
-        """
-        export CXX=g++
+      wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 1, 'defaultBg': 2]) {
+        checkout scm
+        sh(
+          """
+          export CXX=g++
 
-        export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
-        echo \$XDG_CACHE_HOME
+          export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
+          echo \$XDG_CACHE_HOME
 
-        export PEX_ROOT="\$(pwd)/.cache/pex"
-        echo \$PEX_ROOT
+          export PEX_ROOT="\$(pwd)/.cache/pex"
+          echo \$PEX_ROOT
 
-        ./build-support/bin/ci.sh ${flags}
-        """.toString().stripIndent()
-      )
+          ./build-support/bin/ci.sh ${flags}
+          """.toString().stripIndent()
+        )
+      }
     }
   }
 }
 
-for (os in ["linux", "osx"]) {
+// Build up a map from pipeline step name to a callable that allocates a node for the step.
+def shards = [:]
+
+for (os in ['linux', 'osx']) {
   shards["${os}_self-checks"] = ciShNode(os, '-cjlpn')
   shards["${os}_contrib"] = ciShNode(os, '-fkmsrcjlp')
 
   int totalShards = 10
-  for (int zeroIndexed = 0; zeroIndexed < totalShards; zeroIndexed++) {
-    int oneIndexed = zeroIndexed + 1
-    shards["${os}_unit_tests_${oneIndexed}_of_${totalShards}"] = ciShShardedNode(
-      os, '-fkmsrcn', '-u', zeroIndexed, totalShards
-    )
-    shards["${os}_integration_tests_${oneIndexed}_of_${totalShards}"] = ciShShardedNode(
-      os, '-fkmsrjlpn', '-i', zeroIndexed, totalShards
-    )
+  for (int shard in 0..<totalShards) {
+    String shardName = "${shard + 1}_of_${totalShards}"   
+    String shardId = "${shard}/${totalShards}"
+    shards["${os}_unit_tests_${shardName}"] = ciShNode(os, "-fkmsrcn -u ${shardId}")
+    shards["${os}_integration_tests_${shardName}"] = ciShNode(os, "-fkmsrjlpn -i ${shardId}")
   }
 }
 
+// Now launch all the pipeline steps in parallel.
 parallel shards
