@@ -57,3 +57,12 @@ Pants: `run.jvm --jvm-debug`
 **Run one test in the debugger**<br>
 Maven: `-Dtest=com.foo.BarSpec -Dmaven.surefire.debug=true test`<br>
 Pants: `test.junit --jvm-debug --test=com.foo.BarSpec`
+
+**Build a binary package**<br>
+Maven: `package`<br>
+Pants: `binary`<br>
+
+**Look at dependent projects or artifacts**<br>
+Maven: `dependency:analyze`<br>
+Pants: `depmap`<br>
+Pants: `resolve.ivy --open`<br>
