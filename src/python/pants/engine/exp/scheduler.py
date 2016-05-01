@@ -44,8 +44,9 @@ class ProductGraph(object):
       self.cyclic_dependencies = set()
 
     def __eq__(self, other):
+      # NB: We do not include the `level` value in equality, because it is operation-
+      # order dependent.
       return (self.state == other.state and
-              self.level == other.level and
               self.dependents == other.dependents and
               self.dependencies == other.dependencies and
               self.cyclic_dependencies == other.cyclic_dependencies)
@@ -114,6 +115,13 @@ class ProductGraph(object):
     parents.add(src)
     return _walk(dest)
 
+  def _level(self, node):
+    # TODO: remove in favor of tighter integration in _detect_cycle.
+    entry = self._nodes.get(node, None)
+    if not entry:
+      return 1
+    return entry.level
+
   def _detect_cycle(self, v, w):
     """Given a src (v) and a dest (w), each of which _might_ exist in the graph, detect cycles.
 
@@ -121,70 +129,82 @@ class ProductGraph(object):
       "A New Approach to Incremental Cycle Detection and Related Problems"
         - Bender, Fineman, Gilbert, Tarjan
 
+    # TODO: The mutation of levels would likely cause inconsistencies in case of a cycle.
+    # see whether we need them at all.
+
     Returns True if a cycle would be created by adding an edge from v->w.
     """
 
     # delta = min(m^(1/2), n^(2/3))
-    expected_edge_count = sum(len(edges) for edges in self.dependencies().values())
-    assert self._edge_count == expected_edge_count
-    delta = min(self._edge_count**(1/2), len(self.dependencies())**(2/3))
+    delta = min(self._edge_count**(1/2), len(self)**(2/3))
     def same_level_as(node):
-      node_level = self._levels[node]
-      return lambda candidate, _: self._levels[candidate] == node_level
+      node_level = self._level(node)
+      return lambda candidate, _: self._level(candidate) == node_level
 
     # Step 1
-    if self._levels[v] < self._levels[w]:
+    if self._level(v) < self._level(w):
       # Step 4: no cycle will be created: return.
       return False
 
-    B = set()
+    def set_w_level(level):
+      # Since w may not exist before this algorithm begins, setting its level involves
+      # potentially initializing its entry.
+      self._nodes.setdefault(w, self.Entry()).level = level
+
+    B = {v}
 
     # Step 2: search backward within the same level.
-    #   Case A: If w is visited, stop and report a cycle.
-    #   Case B: If the search completes without traversing at least `delta` arcs and
+    #   2.a: If w is visited, stop and report a cycle.
+    #   2.b: If the search completes without traversing at least `delta` arcs and
     #     k(w) = k(v), go to Step 4 (the levels remain a pseudo topological ordering).
-    #   Case C: If the search completes without traversing at least `delta` arcs and
+    #   2.c: If the search completes without traversing at least `delta` arcs and
     #     k(w) < k(v), set k(w) = k(v).
-    #   Case D: If the search traverses at least delta arcs, set k(w) = k(v) + 1 and B = {v}.
+    #   2.d: If the search traverses at least delta arcs, set k(w) = k(v) + 1 and B = {v}.
     traversed = 0
     for n, _ in self.walk([v], predicate=same_level_as(v), dependents=True):
+      if n == v:
+        continue
       if n == w:
-        # Case A: Adding v->w would create a cycle.
+        # 2.a: Adding v->w would create a cycle.
         return True
       B.add(n)
       traversed += 1
       if traversed >= delta:
         break
     if traversed < delta:
-      if self._levels[v] == self._levels[w]:
-        # Case B: Levels are stable, and no cycle would be created.
+      if self._level(v) == self._level(w):
+        # 2.b: Levels are stable, and no cycle would be created.
         return False
       else:
-        # Case C: Continue to Step 3.
-        self._levels[w] = self._levels[v]
+        # 2.c: Continue to Step 3.
+        set_w_level(self._level(v))
     else:
-      # Case D: We reached the bound for the backward search: continue to Step 3.
-      self._levels[w] = self._levels[v] + 1
+      # 2.d: We reached the bound for the backward search: continue to Step 3.
+      set_w_level(self._level(v) + 1)
       B = {v}
 
     # Step 3: search forward, traversing only edges that increase the level.
-    #   Case A: If y in B, stop and report a cycle.
-    #   Case B: If k(x) = k(y), add (x, y) to in(y).
-    #   Case C: If k(x) > k(y), set k(y) = k(x), set in(y) = {(x, y)}, and add all arcs
+    #   3.a: If y in B, stop and report a cycle.
+    #   3.b: If k(x) = k(y), add (x, y) to in(y).
+    #   3.c: If k(x) > k(y), set k(y) = k(x), set in(y) = {(x, y)}, and add all arcs
     #     in out(y) to those to be traversed.
     def _walk_forward(x):
       for y in self.dependencies_of(x):
-        if y in B:
-          # Case A: a Node reached during the backwards search was also reached during the
+        if y == x:
+          continue
+        elif y in B:
+          # 3.a: a Node reached during the backwards search was also reached during the
           # forward search.
           return True
-        if self._levels[x] > self._levels[y]:
-          # Case C: Update the levels and traverse the edge.
-          self._levels[y] = self._levels[x]
+        elif self._level(x) > self._level(y):
+          # 3.c: Update the levels and traverse the edge.
+          self._nodes[y].level = self._level(x)
           if _walk_forward(y):
             return True
+          else:
+            pass
         else:
-          # Case B: Our 'in' set is computed by filtering the dependencies list; pass.
+          # 3.b: Our 'in' set is computed by filtering the dependencies list; pass.
           pass
       return False
 
@@ -267,8 +287,8 @@ class ProductGraph(object):
         self.dependents_of(associated).discard(node)
 
     def _delete_node(node):
-      self._edge_count -= len(self._dependencies[node])
-      del self._nodes[node]
+      entry = self._nodes.pop(node)
+      self._edge_count -= len(entry.dependencies)
 
     def all_predicate(node, state): return True
     predicate = predicate or all_predicate
@@ -315,7 +335,6 @@ class ProductGraph(object):
     predicate = predicate or _default_walk_predicate
 
     walked = set()
-    adjacencies = self.dependents_of if dependents else self.dependencies_of
     def _walk(nodes):
       for node in nodes:
         if node in walked:
