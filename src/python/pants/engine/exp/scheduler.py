@@ -27,7 +27,12 @@ logger = logging.getLogger(__name__)
 
 class ProductGraph(object):
 
-  class Entry(object):
+  class _Entry(object):
+    """An entry representing a Node in the ProductGraph.
+
+    Equality for this object is intentionally `identity` for efficiency purposes: strutural
+    equality can be implemented by comparing the result of the `structure` method.
+    """
     __slots__ = ('node', 'state', 'level', 'dependencies', 'dependents', 'cyclic_dependencies')
 
     def __init__(self, node):
@@ -36,17 +41,24 @@ class ProductGraph(object):
       self.state = None
       # Level for cycle detection. Levels represent a pseudo-topological ordering of Nodes.
       self.level = 1
-      # Sets of dependency/dependent Nodes.
+      # Sets of dependency/dependent _Entry objects.
       self.dependencies = set()
       self.dependents = set()
-      # Illegal/cyclic dependencies. We prevent cyclic dependencies from being introduced into the
+      # Illegal/cyclic dependency Nodes. We prevent cyclic dependencies from being introduced into the
       # dependencies/dependents lists themselves, but track them independently in order to provide
       # context specific error messages when they are introduced.
       self.cyclic_dependencies = set()
 
+    def structure(self):
+      return (self.node,
+              self.state,
+              {d.node for d in self.dependencies},
+              {d.node for d in self.dependents},
+              self.cyclic_dependencies)
+
   def __init__(self, validator=None):
     self._validator = validator or Node.validate_node
-    # A dict of Node->Entry.
+    # A dict of Node->_Entry.
     self._nodes = dict()
     # The total count of non-cyclic edges is used to bound cycle searches.
     self._edge_count = 0
@@ -68,10 +80,7 @@ class ProductGraph(object):
 
   def update_state(self, node, state):
     """Updates the Node with the given State, creating any Nodes which do not already exist."""
-    self._validator(node)
-    entry = self._nodes.get(node, None)
-    if not entry:
-      self._nodes[node] = entry = self.Entry(node)
+    entry = self._ensure_entry(node)
     if entry.state is not None:
       raise ValueError('Node {} is already completed:\n  {}\n  {}'
                        .format(node, entry.state, state))
@@ -83,43 +92,30 @@ class ProductGraph(object):
     else:
       raise State.raise_unrecognized(state)
 
-  def _level(self, node):
-    # TODO: remove in favor of tighter integration in _detect_cycle.
-    entry = self._nodes.get(node, None)
-    if not entry:
-      return 1
-    return entry.level
-
   def _detect_cycle(self, v, w):
-    """Given a src (v) and a dest (w), each of which _might_ exist in the graph, detect cycles.
+    """Given src (v) and dest (w) entries, detect cycles.
 
     Implements the sparse-graph algorithm from:
       "A New Approach to Incremental Cycle Detection and Related Problems"
         - Bender, Fineman, Gilbert, Tarjan
 
-    # TODO: The mutation of levels would likely cause inconsistencies in case of a cycle.
-    # see whether we need them at all.
+    TODO: The mutation of levels would likely cause inconsistencies in case of a cycle:
+    should switch back to raising a Throw on the requestor.
 
     Returns True if a cycle would be created by adding an edge from v->w.
     """
 
     # delta = min(m^(1/2), n^(2/3))
     delta = min(self._edge_count**(1/2), len(self)**(2/3))
-    def same_level_as(node):
-      node_level = self._level(node)
-      return lambda candidate, _: self._level(candidate) == node_level
+    def same_level_as(entry):
+      return lambda candidate: candidate.level == entry.level
 
     # Step 1
-    if self._level(v) < self._level(w):
+    if v.level < w.level:
       # Step 4: no cycle will be created: return.
       return False
 
-    def set_w_level(level):
-      # Since w may not exist before this algorithm begins, setting its level involves
-      # potentially initializing its entry.
-      self._nodes.setdefault(w, self.Entry(w)).level = level
-
-    B = {v}
+    B = {v.node}
 
     # Step 2: search backward within the same level.
     #   2.a: If w is visited, stop and report a cycle.
@@ -129,27 +125,27 @@ class ProductGraph(object):
     #     k(w) < k(v), set k(w) = k(v).
     #   2.d: If the search traverses at least delta arcs, set k(w) = k(v) + 1 and B = {v}.
     traversed = 0
-    for n, _ in self.walk([v], predicate=same_level_as(v), dependents=True):
+    for n in self._walk_entries([v], same_level_as(v), dependents=True):
       if n == v:
         continue
       if n == w:
         # 2.a: Adding v->w would create a cycle.
         return True
-      B.add(n)
+      B.add(n.node)
       traversed += 1
       if traversed >= delta:
         break
     if traversed < delta:
-      if self._level(v) == self._level(w):
+      if v.level == w.level:
         # 2.b: Levels are stable, and no cycle would be created.
         return False
       else:
         # 2.c: Continue to Step 3.
-        set_w_level(self._level(v))
+        w.level = v.level
     else:
       # 2.d: We reached the bound for the backward search: continue to Step 3.
-      set_w_level(self._level(v) + 1)
-      B = {v}
+      w.level = v.level + 1
+      B = {v.node}
 
     # Step 3: search forward, traversing only edges that increase the level.
     #   3.a: If y in B, stop and report a cycle.
@@ -157,16 +153,14 @@ class ProductGraph(object):
     #   3.c: If k(x) > k(y), set k(y) = k(x), set in(y) = {(x, y)}, and add all arcs
     #     in out(y) to those to be traversed.
     def _walk_forward(x):
-      for y in self.dependencies_of(x):
-        if y == x:
-          continue
-        elif y in B:
+      for y in x.dependencies:
+        if y.node in B:
           # 3.a: a Node reached during the backwards search was also reached during the
           # forward search.
           return True
-        elif self._level(x) > self._level(y):
+        elif x.level > y.level:
           # 3.c: Update the levels and traverse the edge.
-          self._nodes[y].level = self._level(x)
+          y.level = x.level
           if _walk_forward(y):
             return True
           else:
@@ -178,7 +172,15 @@ class ProductGraph(object):
 
     return _walk_forward(w)
 
-  def _add_dependencies(self, node, entry, dependencies):
+  def _ensure_entry(self, node):
+    """Returns the Entry for the given Node, creates it if it does not already exist."""
+    entry = self._nodes.get(node, None)
+    if not entry:
+      self._validator(node)
+      self._nodes[node] = entry = self._Entry(node)
+    return entry
+
+  def _add_dependencies(self, node, node_entry, dependencies):
     """Adds dependency edges from the given src Node to the given dependency Nodes.
 
     Executes cycle detection: if adding one of the given dependencies would create
@@ -186,21 +188,19 @@ class ProductGraph(object):
     cycle path, and the dependencies are not introduced.
     """
 
-    def _add_dependent(dependency):
-      self._nodes.setdefault(dependency, self.Entry(dependency)).dependents.add(node)
-
     # Add deps. Any deps which would cause a cycle are added to cyclic_dependencies instead,
     # and ignored except for the purposes of Step execution.
     for dependency in dependencies:
-      if dependency in entry.dependencies:
+      dependency_entry = self._ensure_entry(dependency)
+      if dependency_entry in node_entry.dependencies:
         continue
-      self._validator(dependency)
-      if self._detect_cycle(node, dependency):
-        entry.cyclic_dependencies.add(dependency)
+
+      if self._detect_cycle(node_entry, dependency_entry):
+        node_entry.cyclic_dependencies.add(dependency)
       else:
         self._edge_count += 1
-        entry.dependencies.add(dependency)
-        _add_dependent(dependency)
+        node_entry.dependencies.add(dependency_entry)
+        dependency_entry.dependents.add(node_entry)
 
   def completed_nodes(self):
     """In linear time, yields the states of any Nodes which have completed."""
@@ -209,36 +209,36 @@ class ProductGraph(object):
         yield node, entry.state
 
   def dependents(self):
-    """Yields the dependents lists for all Nodes."""
+    """In linear time, yields the dependents lists for all Nodes."""
     for node, entry in self._nodes.items():
-      yield node, entry.dependents
+      yield node, [d.node for d in entry.dependents]
 
   def dependencies(self):
-    """Yields the dependencies lists for all Nodes."""
+    """In linear time, yields the dependencies lists for all Nodes."""
     for node, entry in self._nodes.items():
-      yield node, entry.dependencies
+      yield node, [d.node for d in entry.dependencies]
 
   def cyclic_dependencies(self):
-    """Yields the cyclic_dependencies lists for all Nodes."""
+    """In linear time, yields the cyclic_dependencies lists for all Nodes."""
     for node, entry in self._nodes.items():
       yield node, entry.cyclic_dependencies
 
   def dependents_of(self, node):
     entry = self._nodes.get(node, None)
-    if not entry:
-      return tuple()
-    return entry.dependents
+    if entry:
+      for d in entry.dependents:
+        yield d.node
 
   def dependencies_of(self, node):
     entry = self._nodes.get(node, None)
-    if not entry:
-      return tuple()
-    return entry.dependencies
+    if entry:
+      for d in entry.dependencies:
+        yield d.node
 
   def cyclic_dependencies_of(self, node):
     entry = self._nodes.get(node, None)
     if not entry:
-      return tuple()
+      return set()
     return entry.cyclic_dependencies
 
   def invalidate(self, predicate=None):
@@ -246,33 +246,34 @@ class ProductGraph(object):
 
     :param func predicate: A predicate that matches Node objects for all nodes in the graph.
     """
-    def _sever_dependents(node):
-      for associated in self.dependencies_of(node):
-        self.dependents_of(associated).discard(node)
+    def _sever_dependents(entry):
+      for associated_entry in entry.dependencies:
+        associated_entry.dependents.discard(entry)
 
-    def _delete_node(node):
-      entry = self._nodes.pop(node)
+    def _delete_node(entry):
+      actual_entry = self._nodes.pop(entry.node)
+      assert entry is actual_entry
       self._edge_count -= len(entry.dependencies)
 
     def all_predicate(node, state): return True
     predicate = predicate or all_predicate
 
-    invalidated_roots = list(node for node, entry in self._nodes.items()
-                             if predicate(node, entry.state))
-    invalidated_nodes = list(node for node, _ in self.walk(roots=invalidated_roots,
-                                                           predicate=all_predicate,
-                                                           dependents=True))
+    invalidated_root_entries = list(entry for entry in self._nodes.values()
+                                    if predicate(entry.node, entry.state))
+    invalidated_entries = list(entry for entry in self._walk_entries(invalidated_root_entries,
+                                                                     lambda _: True,
+                                                                     dependents=True))
 
     # Sever dependee->dependent relationships in the graph for all given invalidated nodes.
-    for node in invalidated_nodes:
-      _sever_dependents(node)
+    for entry in invalidated_entries:
+      _sever_dependents(entry)
 
     # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
-    for node in invalidated_nodes:
-      logger.debug('invalidating node: %r', node)
-      _delete_node(node)
+    for entry in invalidated_entries:
+      logger.debug('invalidating node: %r', entry.node)
+      _delete_node(entry)
 
-    invalidated_count = len(invalidated_nodes)
+    invalidated_count = len(invalidated_entries)
     logger.info('invalidated {} nodes'.format(invalidated_count))
     return invalidated_count
 
@@ -294,25 +295,40 @@ class ProductGraph(object):
     The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
     that don't match it. The default predicate eliminates all `Noop` subgraphs.
     """
-    def _default_walk_predicate(node, state):
-      return type(state) is not Noop
-    predicate = predicate or _default_walk_predicate
+    def _default_entry_predicate(entry):
+      return type(entry.state) is not Noop
+    def _entry_predicate(entry):
+      return predicate(entry.node, entry.state)
+    entry_predicate = _entry_predicate if predicate else _default_entry_predicate
 
+    root_entries = list()
+    for root in roots:
+      entry = self._nodes.get(root, None)
+      if entry:
+        root_entries.append(entry)
+
+    walked_nodes = set()
+    for entry in self._walk_entries(root_entries, entry_predicate, dependents=dependents):
+      if entry.node in walked_nodes:
+        raise ValueError('>>> walk returned Node twice! {}'.format(entry))
+      walked_nodes.add(entry.node)
+      yield (entry.node, entry.state)
+
+  def _walk_entries(self, root_entries, entry_predicate, dependents=False):
     walked = set()
-    def _walk(nodes):
-      for node in nodes:
-        if node in walked:
+    def _walk(entries):
+      for entry in entries:
+        if entry in walked:
           continue
-        walked.add(node)
-        entry = self._nodes[node]
-        if not predicate(node, entry.state):
+        walked.add(entry)
+        if not entry_predicate(entry):
           continue
 
-        yield (node, entry.state)
+        yield entry
         for e in _walk(entry.dependents if dependents else entry.dependencies):
           yield e
 
-    for entry in _walk(roots):
+    for entry in _walk(root_entries):
       yield entry
 
   def visualize(self, roots):
