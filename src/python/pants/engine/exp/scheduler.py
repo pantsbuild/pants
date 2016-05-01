@@ -27,44 +27,62 @@ logger = logging.getLogger(__name__)
 
 class ProductGraph(object):
 
+  class Entry(object):
+    __slots__ = ('state', 'dependencies', 'dependents', 'cyclic_dependencies')
+
+    def __init__(self):
+      # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
+      self.state = None
+      # Sets of dependency/dependent Nodes.
+      self.dependencies = set()
+      self.dependents = set()
+      # Illegal/cyclic dependencies. We prevent cyclic dependencies from being introduced into the
+      # dependencies/dependents lists themselves, but track them independently in order to provide
+      # context specific error messages when they are introduced.
+      self.cyclic_dependencies = set()
+
+    def __eq__(self, other):
+      return (self.state == other.state and
+              self.dependents == other.dependents and
+              self.dependencies == other.dependencies and
+              self.cyclic_dependencies == other.cyclic_dependencies)
+
+    def __ne__(self, other):
+      return not (self == other)
+
   def __init__(self, validator=None):
     self._validator = validator or Node.validate_node
 
-    # A dict from Node to its computed value: if a Node hasn't been computed yet, it will not
-    # be present here.
-    self._node_results = dict()
-    # Dicts from Nodes to sets of dependency/dependent Nodes.
-    self._dependencies = defaultdict(set)
-    self._dependents = defaultdict(set)
-    # Illegal/cyclic dependencies. We prevent cyclic dependencies from being introduced into the
-    # dependencies/dependents lists themselves, but track them independently in order to provide
-    # context specific error messages when they are introduced.
-    self._cyclic_dependencies = defaultdict(set)
+    # A dict of Node->Entry a Node with no edges to other Nodes.
+    self._nodes = dict()
 
   def __len__(self):
-    return len(self._dependents)
-
-  def _set_state(self, node, state):
-    existing_state = self._node_results.get(node, None)
-    if existing_state is not None:
-      raise ValueError('Node {} is already completed:\n  {}\n  {}'
-                       .format(node, existing_state, state))
-    elif type(state) not in [Return, Throw, Noop]:
-      raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
-    self._node_results[node] = state
+    return len(self._nodes)
 
   def is_complete(self, node):
-    return node in self._node_results
+    entry = self._nodes.get(node, None)
+    if not entry:
+      return False
+    return entry.state is not None
 
   def state(self, node):
-    return self._node_results.get(node, None)
+    entry = self._nodes.get(node, None)
+    if not entry:
+      return None
+    return entry.state
 
   def update_state(self, node, state):
-    """Updates the Node with the given State."""
+    """Updates the Node with the given State, creating any Nodes which do not already exist."""
+    self._validator(node)
+    entry = self._nodes.setdefault(node, self.Entry())
+    if entry.state is not None:
+      raise ValueError('Node {} is already completed:\n  {}\n  {}'
+                       .format(node, entry.state, state))
+
     if type(state) in [Return, Throw, Noop]:
-      self._set_state(node, state)
+      entry.state = state
     elif type(state) is Waiting:
-      self._add_dependencies(node, state.dependencies)
+      self._add_dependencies(node, entry, state.dependencies)
     else:
       raise State.raise_unrecognized(state)
 
@@ -95,53 +113,67 @@ class ProductGraph(object):
     parents.add(src)
     return _walk(dest)
 
-  def _add_dependencies(self, node, dependencies):
+  def _add_dependencies(self, node, entry, dependencies):
     """Adds dependency edges from the given src Node to the given dependency Nodes.
 
     Executes cycle detection: if adding one of the given dependencies would create
     a cycle, then the _source_ Node is marked as a Noop with an error indicating the
     cycle path, and the dependencies are not introduced.
     """
-    self._validator(node)
-    if self.is_complete(node):
-      raise ValueError('Node {} is already completed, and cannot be updated.'.format(node))
 
-    # Add deps. Any deps which would cause a cycle are added to _cyclic_dependencies instead,
+    def _add_dependent(dependency):
+      self._nodes.setdefault(dependency, self.Entry()).dependents.add(node)
+
+    # Add deps. Any deps which would cause a cycle are added to cyclic_dependencies instead,
     # and ignored except for the purposes of Step execution.
-    node_dependencies = self._dependencies[node]
-    node_cyclic_dependencies = self._cyclic_dependencies[node]
     for dependency in dependencies:
-      if dependency in node_dependencies:
+      if dependency in entry.dependencies:
         continue
       self._validator(dependency)
       if self._detect_cycle(node, dependency):
-        node_cyclic_dependencies.add(dependency)
+        entry.cyclic_dependencies.add(dependency)
       else:
-        node_dependencies.add(dependency)
-        self._dependents[dependency].add(node)
-        # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
-        self._dependencies[dependency]
+        entry.dependencies.add(dependency)
+        _add_dependent(dependency)
 
   def completed_nodes(self):
-    return self._node_results
+    """In linear time, yields the states of any Nodes which have completed."""
+    for node, entry in self._nodes.items():
+      if entry.state is not None:
+        yield node, entry.state
 
   def dependents(self):
-    return self._dependents
+    """Yields the dependents lists for all Nodes."""
+    for node, entry in self._nodes.items():
+      yield node, entry.dependents
 
   def dependencies(self):
-    return self._dependencies
+    """Yields the dependencies lists for all Nodes."""
+    for node, entry in self._nodes.items():
+      yield node, entry.dependencies
 
   def cyclic_dependencies(self):
-    return self._cyclic_dependencies
+    """Yields the cyclic_dependencies lists for all Nodes."""
+    for node, entry in self._nodes.items():
+      yield node, entry.cyclic_dependencies
 
   def dependents_of(self, node):
-    return self._dependents[node]
+    entry = self._nodes.get(node, None)
+    if not entry:
+      return tuple()
+    return entry.dependents
 
   def dependencies_of(self, node):
-    return self._dependencies[node]
+    entry = self._nodes.get(node, None)
+    if not entry:
+      return tuple()
+    return entry.dependencies
 
   def cyclic_dependencies_of(self, node):
-    return self._cyclic_dependencies[node]
+    entry = self._nodes.get(node, None)
+    if not entry:
+      return tuple()
+    return entry.cyclic_dependencies
 
   def invalidate(self, predicate=None):
     """Invalidate nodes and their subgraph of dependents given a predicate.
@@ -149,20 +181,17 @@ class ProductGraph(object):
     :param func predicate: A predicate that matches Node objects for all nodes in the graph.
     """
     def _sever_dependents(node):
-      for associated in self._dependencies[node]:
-        self._dependents[associated].discard(node)
+      for associated in self.dependencies_of(node):
+        self.dependents_of(associated).discard(node)
 
     def _delete_node(node):
-      del self._node_results[node]
-      del self._dependents[node]
-      del self._dependencies[node]
-      self._cyclic_dependencies.pop(node, None)
+      del self._nodes[node]
 
     def all_predicate(node, state): return True
     predicate = predicate or all_predicate
 
-    invalidated_roots = list(node for node, state in self._node_results.items()
-                             if predicate(node, state))
+    invalidated_roots = list(node for node, entry in self._nodes.items()
+                             if predicate(node, entry.state))
     invalidated_nodes = list(node for node, _ in self.walk(roots=invalidated_roots,
                                                            predicate=all_predicate,
                                                            dependents=True))
@@ -598,7 +627,7 @@ class LocalScheduler(object):
                     sum(1 for _ in self._product_graph.walk(execution_request.roots)),
                     scheduling_iterations,
                     self._step_id,
-                    len(self._product_graph.dependencies())),)
+                    len(self._product_graph)),)
 
       if self._graph_validator is not None:
         self._graph_validator.validate(self._product_graph)
