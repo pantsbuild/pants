@@ -315,20 +315,17 @@ class ProductGraph(object):
       yield (entry.node, entry.state)
 
   def _walk_entries(self, root_entries, entry_predicate, dependents=False):
+    stack = list(root_entries)
     walked = set()
-    def _walk(entries):
-      for entry in entries:
-        if entry in walked:
-          continue
-        walked.add(entry)
-        if not entry_predicate(entry):
-          continue
+    while stack:
+      entry = stack.pop()
+      if entry in walked:
+        continue
+      walked.add(entry)
+      if not entry_predicate(entry):
+        continue
+      stack.extend(entry.dependents if dependents else entry.dependencies)
 
-        yield entry
-        for e in _walk(entry.dependents if dependents else entry.dependencies):
-          yield e
-
-    for entry in _walk(root_entries):
       yield entry
 
   def visualize(self, roots):
