@@ -58,6 +58,8 @@ class ProductGraph(object):
 
     # A dict of Node->Entry a Node with no edges to other Nodes.
     self._nodes = dict()
+    # The total count of non-cyclic edges is used to bound cycle searches.
+    self._edge_count = 0
 
   def __len__(self):
     return len(self._nodes)
@@ -122,17 +124,16 @@ class ProductGraph(object):
     Returns True if a cycle would be created by adding an edge from v->w.
     """
 
-    # TODO: adjust the algorithm not to mutate the levels?
-    levels = self._node_levels.copy()
     # delta = min(m^(1/2), n^(2/3))
-    delta = min(len(levels)**(1/2),
-                sum(len(edges) for edges in self.dependencies().values())**(2/3))
+    expected_edge_count = sum(len(edges) for edges in self.dependencies().values())
+    assert self._edge_count == expected_edge_count
+    delta = min(self._edge_count**(1/2), len(self.dependencies())**(2/3))
     def same_level_as(node):
-      node_level = levels[node]
-      return lambda candidate, _: levels[candidate] == node_level
+      node_level = self._levels[node]
+      return lambda candidate, _: self._levels[candidate] == node_level
 
     # Step 1
-    if levels[v] < levels[w]:
+    if self._levels[v] < self._levels[w]:
       # Step 4: no cycle will be created: return.
       return False
 
@@ -146,7 +147,7 @@ class ProductGraph(object):
     #     k(w) < k(v), set k(w) = k(v).
     #   Case D: If the search traverses at least delta arcs, set k(w) = k(v) + 1 and B = {v}.
     traversed = 0
-    for n in self.walk([v], predicate=same_level_as(v), dependents=True):
+    for n, _ in self.walk([v], predicate=same_level_as(v), dependents=True):
       if n == w:
         # Case A: Adding v->w would create a cycle.
         return True
@@ -155,15 +156,15 @@ class ProductGraph(object):
       if traversed >= delta:
         break
     if traversed < delta:
-      if levels[v] == levels[w]:
+      if self._levels[v] == self._levels[w]:
         # Case B: Levels are stable, and no cycle would be created.
         return False
       else:
         # Case C: Continue to Step 3.
-        levels[w] = levels[v]
+        self._levels[w] = self._levels[v]
     else:
       # Case D: We reached the bound for the backward search: continue to Step 3.
-      levels[w] = levels[v] + 1
+      self._levels[w] = self._levels[v] + 1
       B = {v}
 
     # Step 3: search forward, traversing only edges that increase the level.
@@ -177,9 +178,9 @@ class ProductGraph(object):
           # Case A: a Node reached during the backwards search was also reached during the
           # forward search.
           return True
-        if levels[x] > levels[y]:
+        if self._levels[x] > self._levels[y]:
           # Case C: Update the levels and traverse the edge.
-          levels[y] = levels[x]
+          self._levels[y] = self._levels[x]
           if _walk_forward(y):
             return True
         else:
@@ -206,13 +207,14 @@ class ProductGraph(object):
       if dependency in entry.dependencies:
         continue
       self._validator(dependency)
-      if self._legacy_detect_cycle(node, dependency):
-        print('>>> legacy algorithm detected a cycle.')
-        if not self._detect_cycle(node, dependency):
-          raise ValueError('New cycle detection did not trigger for {}\n  -> {}'.format(node, dependency))
-        print('>>> ...as did the new algorithm.')
+      if self._detect_cycle(node, dependency):
+        print('>>> new algorithm detected a cycle.')
+        if not self._legacy_detect_cycle(node, dependency):
+          raise ValueError('Old cycle detection did not trigger for {}\n  -> {}'.format(node, dependency))
+        print('>>> ...as did the old algorithm.')
         entry.cyclic_dependencies.add(dependency)
       else:
+        self._edge_count += 1
         entry.dependencies.add(dependency)
         _add_dependent(dependency)
 
@@ -265,6 +267,7 @@ class ProductGraph(object):
         self.dependents_of(associated).discard(node)
 
     def _delete_node(node):
+      self._edge_count -= len(self._dependencies[node])
       del self._nodes[node]
 
     def all_predicate(node, state): return True
