@@ -20,6 +20,7 @@ from pants.util.dirutil import safe_mkdir, safe_walk
 Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
 
 
+# TODO: Shouldn't this be a NailgunTask?
 class JvmdocGen(JvmTask):
 
   @classmethod

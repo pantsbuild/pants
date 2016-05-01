@@ -62,6 +62,10 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     except DistributionLocator.Error as e:
       raise TaskError(e)
 
+  @property
+  def dist(self):
+    return self._dist
+
   def create_java_executor(self):
     """Create java executor that uses this task's ng daemon, if allowed.
 
