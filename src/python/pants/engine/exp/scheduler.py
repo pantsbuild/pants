@@ -132,7 +132,7 @@ class ProductGraph(object):
       if traversed >= delta:
         break
     if traversed < delta:
-      if levels[v] == levels[w]
+      if levels[v] == levels[w]:
         # Case B: Levels are stable, and no cycle would be created.
         return False
       else:
