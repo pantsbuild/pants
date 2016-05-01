@@ -92,85 +92,15 @@ class ProductGraph(object):
     else:
       raise State.raise_unrecognized(state)
 
-  def _detect_cycle(self, v, w):
-    """Given src (v) and dest (w) entries, detect cycles.
+  def _detect_cycle(self, src, dest):
+    """Given src and dest entries, each of which _might_ already exist in the graph, detect cycles.
 
-    Implements the sparse-graph algorithm from:
-      "A New Approach to Incremental Cycle Detection and Related Problems"
-        - Bender, Fineman, Gilbert, Tarjan
-
-    TODO: The mutation of levels would likely cause inconsistencies in case of a cycle:
-    should switch back to raising a Throw on the requestor.
-
-    Returns True if a cycle would be created by adding an edge from v->w.
+    Returns True if a cycle would be created by adding an edge from src->dest.
     """
-
-    # delta = min(m^(1/2), n^(2/3))
-    delta = min(self._edge_count**(1/2), len(self)**(2/3))
-    def same_level_as(entry):
-      return lambda candidate: candidate.level == entry.level
-
-    # Step 1
-    if v.level < w.level:
-      # Step 4: no cycle will be created: return.
-      return False
-
-    B = {v.node}
-
-    # Step 2: search backward within the same level.
-    #   2.a: If w is visited, stop and report a cycle.
-    #   2.b: If the search completes without traversing at least `delta` arcs and
-    #     k(w) = k(v), go to Step 4 (the levels remain a pseudo topological ordering).
-    #   2.c: If the search completes without traversing at least `delta` arcs and
-    #     k(w) < k(v), set k(w) = k(v).
-    #   2.d: If the search traverses at least delta arcs, set k(w) = k(v) + 1 and B = {v}.
-    traversed = 0
-    for n in self._walk_entries([v], same_level_as(v), dependents=True):
-      if n == v:
-        continue
-      if n == w:
-        # 2.a: Adding v->w would create a cycle.
+    for entry in self._walk_entries([dest], entry_predicate=lambda _: True):
+      if entry == src:
         return True
-      B.add(n.node)
-      traversed += 1
-      if traversed >= delta:
-        break
-    if traversed < delta:
-      if v.level == w.level:
-        # 2.b: Levels are stable, and no cycle would be created.
-        return False
-      else:
-        # 2.c: Continue to Step 3.
-        w.level = v.level
-    else:
-      # 2.d: We reached the bound for the backward search: continue to Step 3.
-      w.level = v.level + 1
-      B = {v.node}
-
-    # Step 3: search forward, traversing only edges that increase the level.
-    #   3.a: If y in B, stop and report a cycle.
-    #   3.b: If k(x) = k(y), add (x, y) to in(y).
-    #   3.c: If k(x) > k(y), set k(y) = k(x), set in(y) = {(x, y)}, and add all arcs
-    #     in out(y) to those to be traversed.
-    def _walk_forward(x):
-      for y in x.dependencies:
-        if y.node in B:
-          # 3.a: a Node reached during the backwards search was also reached during the
-          # forward search.
-          return True
-        elif x.level > y.level:
-          # 3.c: Update the levels and traverse the edge.
-          y.level = x.level
-          if _walk_forward(y):
-            return True
-          else:
-            pass
-        else:
-          # 3.b: Our 'in' set is computed by filtering the dependencies list; pass.
-          pass
-      return False
-
-    return _walk_forward(w)
+    return False
 
   def _ensure_entry(self, node):
     """Returns the Entry for the given Node, creates it if it does not already exist."""
