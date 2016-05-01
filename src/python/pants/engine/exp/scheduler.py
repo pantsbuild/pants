@@ -83,29 +83,6 @@ class ProductGraph(object):
     else:
       raise State.raise_unrecognized(state)
 
-  def _legacy_detect_cycle(self, src, dest):
-    parents = set()
-    walked = set()
-    def _walk(node):
-      if node in parents:
-        return True
-      if node in walked:
-        return False
-      parents.add(node)
-      walked.add(node)
-
-      for dep in self.dependencies_of(node):
-        found = _walk(dep)
-        if found:
-          return found
-      parents.discard(node)
-      return False
-
-    # Initialize the path with src (since the edge from src->dest may not actually exist), and
-    # then walk from the dest.
-    parents.add(src)
-    return _walk(dest)
-
   def _level(self, node):
     # TODO: remove in favor of tighter integration in _detect_cycle.
     entry = self._nodes.get(node, None)
@@ -219,10 +196,6 @@ class ProductGraph(object):
         continue
       self._validator(dependency)
       if self._detect_cycle(node, dependency):
-        print('>>> new algorithm detected a cycle.')
-        if not self._legacy_detect_cycle(node, dependency):
-          raise ValueError('Old cycle detection did not trigger for {}\n  -> {}'.format(node, dependency))
-        print('>>> ...as did the old algorithm.')
         entry.cyclic_dependencies.add(dependency)
       else:
         self._edge_count += 1
