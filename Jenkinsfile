@@ -7,10 +7,16 @@ Refer to Jenkins2.0 pipeline and Jenkinsfile docs here:
    https://jenkins.io/doc/pipeline/steps/
 */
 
+def void ansiColor(Closure<Void> wrapped) {
+  wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 1, 'defaultBg': 2]) {
+    wrapped()
+  }
+}
+
 def Closure<Void> ciShNodeSpawner(String os, String flags) {
   return { ->
     node(os) {
-      wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 1, 'defaultBg': 2]) {
+      ansiColor {
         checkout scm
         sh(
           """
