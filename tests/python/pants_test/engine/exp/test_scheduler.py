@@ -305,6 +305,19 @@ class ProductGraphTest(unittest.TestCase):
     self.assertEquals(set(), self.pg.cyclic_dependencies_of('B'))
     self.assertEquals({'A'}, self.pg.cyclic_dependencies_of('C'))
 
+  def test_cycle_long(self):
+    # Creating a long chain is allowed.
+    nodes = list(range(0, 100))
+    self._mk_chain(self.pg, nodes, states=(Waiting,))
+    walked_nodes = [node for node, _ in self.pg.walk([nodes[0]])]
+    self.assertEquals(nodes, walked_nodes)
+
+    # Closing the chain is not.
+    begin, end = nodes[0], nodes[-1]
+    self.pg.update_state(end, Waiting([begin]))
+    self.assertEquals(set(), self.pg.dependencies_of(end))
+    self.assertEquals({begin}, self.pg.cyclic_dependencies_of(end))
+
   def test_walk(self):
     nodes = list('ABCDEF')
     self._mk_chain(self.pg, nodes)
