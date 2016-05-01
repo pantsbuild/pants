@@ -232,18 +232,17 @@ class ProductGraph(object):
     predicate = predicate or _default_walk_predicate
 
     walked = set()
-    adjacencies = self.dependents_of if dependents else self.dependencies_of
     def _walk(nodes):
       for node in nodes:
         if node in walked:
           continue
         walked.add(node)
-        state = self.state(node)
-        if not predicate(node, state):
+        entry = self._nodes[node]
+        if not predicate(node, entry.state):
           continue
 
-        yield (node, state)
-        for e in _walk(adjacencies(node)):
+        yield (node, entry.state)
+        for e in _walk(entry.dependents if dependents else entry.dependencies):
           yield e
 
     for entry in _walk(roots):
