@@ -598,7 +598,7 @@ class DistributionLocator(Subsystem):
   def all_jdk_paths(self):
     """Get all explicitly configured JDK paths.
 
-    :return: mapping of os  name -> list of jdk_paths
+    :return: mapping of os name -> list of jdk_paths
     :rtype: dict of string -> list of string
     """
     return self._normalized_jdk_paths

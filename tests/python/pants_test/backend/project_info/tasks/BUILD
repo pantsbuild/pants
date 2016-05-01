@@ -72,6 +72,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:osutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
     'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
