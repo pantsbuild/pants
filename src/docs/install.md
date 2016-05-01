@@ -56,8 +56,7 @@ follows:
 Pants notices you changed your plugins and it installs them.
 NB: The formatting of the plugins list is important; all lines below the `plugins:` line must be
 indented by at least one white space to form logical continuation lines. This is standard for python
-ini files, see [RFC #822](http://tools.ietf.org/html/rfc822.html#section-3.1) section 3.1.1 for the
-full rules python uses to parse ini file entries.
+ini files, see [[Options|pants('src/docs:options')]].
 
 The ./pants Runner Script
 -------------------------

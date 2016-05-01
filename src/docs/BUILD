@@ -89,6 +89,7 @@ page(
   source='install.md',
   links=[
     ':setup_repo',
+    ':options',
   ]
 )
 
