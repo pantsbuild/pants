@@ -28,9 +28,10 @@ logger = logging.getLogger(__name__)
 class ProductGraph(object):
 
   class Entry(object):
-    __slots__ = ('state', 'level', 'dependencies', 'dependents', 'cyclic_dependencies')
+    __slots__ = ('node', 'state', 'level', 'dependencies', 'dependents', 'cyclic_dependencies')
 
-    def __init__(self):
+    def __init__(self, node):
+      self.node = node
       # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
       self.state = None
       # Level for cycle detection. Levels represent a pseudo-topological ordering of Nodes.
@@ -43,21 +44,9 @@ class ProductGraph(object):
       # context specific error messages when they are introduced.
       self.cyclic_dependencies = set()
 
-    def __eq__(self, other):
-      # NB: We do not include the `level` value in equality, because it is operation-
-      # order dependent.
-      return (self.state == other.state and
-              self.dependents == other.dependents and
-              self.dependencies == other.dependencies and
-              self.cyclic_dependencies == other.cyclic_dependencies)
-
-    def __ne__(self, other):
-      return not (self == other)
-
   def __init__(self, validator=None):
     self._validator = validator or Node.validate_node
-
-    # A dict of Node->Entry a Node with no edges to other Nodes.
+    # A dict of Node->Entry.
     self._nodes = dict()
     # The total count of non-cyclic edges is used to bound cycle searches.
     self._edge_count = 0
@@ -80,7 +69,9 @@ class ProductGraph(object):
   def update_state(self, node, state):
     """Updates the Node with the given State, creating any Nodes which do not already exist."""
     self._validator(node)
-    entry = self._nodes.setdefault(node, self.Entry())
+    entry = self._nodes.get(node, None)
+    if not entry:
+      self._nodes[node] = entry = self.Entry(node)
     if entry.state is not None:
       raise ValueError('Node {} is already completed:\n  {}\n  {}'
                        .format(node, entry.state, state))
@@ -149,7 +140,7 @@ class ProductGraph(object):
     def set_w_level(level):
       # Since w may not exist before this algorithm begins, setting its level involves
       # potentially initializing its entry.
-      self._nodes.setdefault(w, self.Entry()).level = level
+      self._nodes.setdefault(w, self.Entry(w)).level = level
 
     B = {v}
 
@@ -219,7 +210,7 @@ class ProductGraph(object):
     """
 
     def _add_dependent(dependency):
-      self._nodes.setdefault(dependency, self.Entry()).dependents.add(node)
+      self._nodes.setdefault(dependency, self.Entry(dependency)).dependents.add(node)
 
     # Add deps. Any deps which would cause a cycle are added to cyclic_dependencies instead,
     # and ignored except for the purposes of Step execution.
