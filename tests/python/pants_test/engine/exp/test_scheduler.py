@@ -387,8 +387,8 @@ class ProductGraphTest(unittest.TestCase):
       self.assertFalse(node in before_nodes, 'node:\n{}\nwasnt properly removed'.format(node))
 
       for associated in (entry.dependencies, entry.dependents, entry.cyclic_dependencies):
-        for associated_node in associated:
+        for associated_entry in associated:
           self.assertFalse(
-            associated_node in before_nodes,
-            'node:\n{}\nis still associated with:\n{}\nin {}'.format(associated_node, node, entry)
+            associated_entry.node in before_nodes,
+            'node:\n{}\nis still associated with:\n{}\nin {}'.format(node, associated_entry.node, entry)
           )
