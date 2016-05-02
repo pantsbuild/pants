@@ -20,7 +20,7 @@ To set up pants in your repo, we recommend installing our self-contained `pants`
 in the root (ie, "buildroot") of your repo:
 
       :::bash
-      curl -O https://pantsbuild.github.io/setup/pants && chmod +x pants && touch pants.ini
+      curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants && touch pants.ini
 
 The first time you run the new `./pants` script it will install the latest version of pants (using
 virtualenv) and then run it.  It's recommended though, that you pin the version of pants.  To do
