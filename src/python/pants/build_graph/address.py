@@ -195,7 +195,7 @@ class Address(object):
 
   def __eq__(self, other):
     if not isinstance(other, Address):
-      return NotImplemented
+      return False
     return (self._spec_path == other._spec_path and
             self._target_name == other._target_name)
 
@@ -203,10 +203,7 @@ class Address(object):
     return self._hash
 
   def __ne__(self, other):
-    equality = self.__eq__(other)
-    if equality is NotImplemented:
-      return NotImplemented
-    return not equality
+    return not self == other
 
   def __repr__(self):
     return self.spec
