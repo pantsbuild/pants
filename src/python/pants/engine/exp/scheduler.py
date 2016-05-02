@@ -33,14 +33,12 @@ class ProductGraph(object):
     Equality for this object is intentionally `identity` for efficiency purposes: strutural
     equality can be implemented by comparing the result of the `structure` method.
     """
-    __slots__ = ('node', 'state', 'level', 'dependencies', 'dependents', 'cyclic_dependencies')
+    __slots__ = ('node', 'state', 'dependencies', 'dependents', 'cyclic_dependencies')
 
     def __init__(self, node):
       self.node = node
       # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
       self.state = None
-      # Level for cycle detection. Levels represent a pseudo-topological ordering of Nodes.
-      self.level = 1
       # Sets of dependency/dependent _Entry objects.
       self.dependencies = set()
       self.dependents = set()
