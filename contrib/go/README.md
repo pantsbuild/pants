@@ -42,7 +42,7 @@ Since the workspaces constructed by pants internally for compilation are hidden,
 
 ## Testing
 
-// Test goal
+You can run your Go tests with `./pants test [go targets]`. Any standard Go tests found amongst the targets will be compiled and run with output sent to the console.
 
 ## Working with other Go ecosystem tools
 
