@@ -13,7 +13,8 @@ from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin
 class PEP8Error(Nit):
   def __init__(self, python_file, code, line_number, text):
     line_range = python_file.line_range(line_number)
-    super(PEP8Error, self).__init__(code, Nit.ERROR, python_file, text, line_range)
+    lines = python_file.lines[line_range]
+    super(PEP8Error, self).__init__(code, Nit.ERROR, python_file, text, line_range, lines)
 
 
 class PantsReporter(pep8.BaseReport):
