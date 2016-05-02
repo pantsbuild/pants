@@ -36,7 +36,9 @@ Installed goals:
 
 ## Building
 
-// Compile and binary goals
+You can build your code with `./pants compile [go targets]`. This will operate in a pants controlled (and hidden) workspace that knits together your local Go source with fetched, versioned third party code.
+
+Since the workspaces constructed by pants internally for compilation are hidden, they aren't useful for retrieving final products. To surface a binary for use in deploys or ad-hoc testing you can `./pants binary [go binary targets]`. This will re-use any progress made by `./pants compile` in its Pants-controlled workspace and the binaries will be emitted under `dist/go/bin` by default.
 
 ## Testing
 
