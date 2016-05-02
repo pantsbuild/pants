@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from colors import green
 
 from pants.base.build_environment import get_buildroot
-from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer
+from pants.bin.goal_runner import GoalRunner
+from pants.bin.options_initializer import OptionsInitializer
+from pants.bin.reporting_initializer import ReportingInitializer
 from pants.bin.repro import Reproducer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
