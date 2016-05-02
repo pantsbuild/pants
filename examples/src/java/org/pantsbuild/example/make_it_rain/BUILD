@@ -4,6 +4,7 @@
 java_library(name='make_it_rain',
   sources=['MakeItRain.java',],
   dependencies=[
+    '3rdparty:thrift-0.9.2',
     'examples/src/thrift/org/pantsbuild/example/distance:distance-java',
     'examples/src/thrift/org/pantsbuild/example/precipitation:precipitation-java',
   ],
