@@ -1,8 +1,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# NOTE(mateo): These deps need to be forced for buildgen since this is a target bag with no source to parse.
 python_library(
   name='test_infra',
+  dependencies=[
+    'tests/python/pants_test:base_test',                                  # Force dep for buildgen.
+    'tests/python/pants_test:int-test',                                   # Force dep for buildgen.
+    'tests/python/pants_test/jvm:jar_task_test_base',                     # Force dep for buildgen.
+    'tests/python/pants_test/jvm:nailgun_task_test_base',                 # Force dep for buildgen.
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',                # Force dep for buildgen.
+    'tests/python/pants_test/engine:engine_test_base',                    # Force dep for buildgen.
+  ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
     description='Test support for writing pants plugins.',

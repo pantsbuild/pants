@@ -4,15 +4,6 @@
 
 
 python_library(
-  name = 'android_task',
-  sources = ['android_task.py'],
-  dependencies = [
-    'contrib/android/src/python/pants/contrib/android:android_distribution',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
   name = 'aapt_builder',
   sources = ['aapt_builder.py'],
   dependencies = [
@@ -46,6 +37,15 @@ python_library(
   dependencies = [
     ':android_task',
     'contrib/android/src/python/pants/contrib/android/targets:android',
+  ],
+)
+
+python_library(
+  name = 'android_task',
+  sources = ['android_task.py'],
+  dependencies = [
+    'contrib/android/src/python/pants/contrib/android:android_distribution',
+    'src/python/pants/task',
   ],
 )
 

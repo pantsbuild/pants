@@ -39,6 +39,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks:binary_create',
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
     'src/python/pants/backend/jvm/tasks:bundle_create',
+    'src/python/pants/backend/jvm/tasks:checkstyle',              # Force dep for buildgen.
     'src/python/pants/backend/jvm/tasks:check_published_deps',
     'src/python/pants/backend/jvm/tasks:detect_duplicates',
     'src/python/pants/backend/jvm/tasks:ivy_imports',
@@ -56,6 +57,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks:prepare_services',
     'src/python/pants/backend/jvm/tasks:run_jvm_prep_command',
     'src/python/pants/backend/jvm/tasks:scala_repl',
+    'src/python/pants/backend/jvm/tasks:scalastyle',              # Force dep for buildgen.
     'src/python/pants/backend/jvm/tasks:scaladoc_gen',
     'src/python/pants/backend/jvm/tasks:unpack_jars',
     'src/python/pants/base:deprecated',

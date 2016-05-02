@@ -14,7 +14,7 @@ python_library(
   provides=pants_setup_py(
     name='pantsbuild.pants',
     description='A bottom-up build tool.',
-    namespace_packages=['pants', 'pants.backend'],
+    namespace_packages=['pants', 'pants.backend', 'internal_backend'],
   ).with_binaries(
     pants='src/python/pants/bin:pants',
   )
