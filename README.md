@@ -4,7 +4,7 @@ Pants is a build system for software projects in a variety of languages.
 It works particularly well for a source code repository that contains
 many distinct projects.
 
-Friendly documentation: http://pantsbuild.github.io/
+Friendly documentation: http://pantsbuild.org/
 
 We release to [PyPI](https://pypi.python.org/pypi)
 [![version](https://img.shields.io/pypi/v/pantsbuild.pants.svg)](https://pypi.python.org/pypi/pantsbuild.pants)
