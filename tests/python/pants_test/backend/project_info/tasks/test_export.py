@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
+import textwrap
+from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
@@ -23,19 +25,19 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
-from pants.base.revision import Revision
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
-from pants.java.distribution.distribution import Distribution, DistributionLocator
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import chmod_plus_x, safe_open
+from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
 from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
-
   @classmethod
   def task_type(cls):
     return Export
@@ -173,7 +175,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def execute_export(self, *specs):
     context = self.context(target_roots=[self.target(spec) for spec in specs])
-    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
+    context.products.safe_create_data('compile_classpath',
+                                      init_func=ClasspathProducts.init_func(self.pants_workdir))
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()),
                                     context.products.get_data('compile_classpath')))
@@ -394,12 +397,38 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     # But not the origin target
     self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
 
+  @contextmanager
+  def fake_distribution(self, version):
+    with temporary_dir() as java_home:
+      path = os.path.join(java_home, 'bin/java')
+      with safe_open(path, 'w') as fp:
+        fp.write(textwrap.dedent("""
+          #!/bin/sh
+          echo java.version={version}
+        """.format(version=version)).strip())
+      chmod_plus_x(path)
+      yield java_home
+
   def test_preferred_jvm_distributions(self):
-    with temporary_dir() as strict_jdk_home:
-      with temporary_dir() as non_strict_jdk_home:
-        strict_cache_key = (Revision(1, 6), Revision(1, 6, 9999), False)
-        non_strict_cache_key = (Revision(1, 6), None, False)
-        DistributionLocator._CACHE[strict_cache_key] = Distribution(home_path=strict_jdk_home)
-        DistributionLocator._CACHE[non_strict_cache_key] = Distribution(home_path=non_strict_jdk_home)
-        self.assertEqual({'strict': strict_jdk_home, 'non_strict': non_strict_jdk_home},
-                         self.execute_export_json()['preferred_jvm_distributions']['java6'])
+    self.set_options_for_scope('jvm-platform',
+                               default_platform='java9999',
+                               platforms={
+                                 'java9999': {'target': '9999'},
+                                 'java10000': {'target': '10000'}
+                               })
+
+    with self.fake_distribution(version='9999') as strict_home:
+      with self.fake_distribution(version='10000') as non_strict_home:
+        self.set_options_for_scope('jvm-distributions',
+                                   paths={
+                                     normalize_os_name(get_os_name()): [
+                                       strict_home,
+                                       non_strict_home
+                                     ]
+                                   })
+        with subsystem_instance(DistributionLocator) as locator:
+          locator._reset()  # Make sure we get a fresh read from the options set just above.
+
+          export_json = self.execute_export_json()
+          self.assertEqual({'strict': strict_home, 'non_strict': non_strict_home},
+                           export_json['preferred_jvm_distributions']['java9999'])
