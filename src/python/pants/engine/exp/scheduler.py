@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import threading
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
@@ -93,7 +93,10 @@ class ProductGraph(object):
       raise State.raise_unrecognized(state)
 
   def _detect_cycle(self, src, dest):
-    """Given src and dest entries, each of which _might_ already exist in the graph, detect cycles.
+    """Detect whether adding an edge from src to dest would create a cycle.
+
+    :param src: Source entry: must exist in the graph.
+    :param dest: Destination entry: must exist in the graph.
 
     Returns True if a cycle would be created by adding an edge from src->dest.
     """
@@ -103,7 +106,7 @@ class ProductGraph(object):
     return False
 
   def _ensure_entry(self, node):
-    """Returns the Entry for the given Node, creates it if it does not already exist."""
+    """Returns the Entry for the given Node, creating it if it does not already exist."""
     entry = self._nodes.get(node, None)
     if not entry:
       self._validator(node)
@@ -237,15 +240,11 @@ class ProductGraph(object):
       if entry:
         root_entries.append(entry)
 
-    walked_nodes = set()
     for entry in self._walk_entries(root_entries, entry_predicate, dependents=dependents):
-      if entry.node in walked_nodes:
-        raise ValueError('>>> walk returned Node twice! {}'.format(entry))
-      walked_nodes.add(entry.node)
       yield (entry.node, entry.state)
 
   def _walk_entries(self, root_entries, entry_predicate, dependents=False):
-    stack = list(root_entries)
+    stack = deque(root_entries)
     walked = set()
     while stack:
       entry = stack.pop()

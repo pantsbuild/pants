@@ -53,7 +53,7 @@ def setup(options=None):
 
   storage = Storage.create(debug=False)
   # Ignore any dotfile below build_root except . itself
-  project_tree = FileSystemProjectTree(build_root, ['.*', 'build-support/pants_dev_deps.venv/', 'build-support/rbt.venv/'])
+  project_tree = FileSystemProjectTree(build_root, ['.*', 'build-support/*.venv/'])
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.
