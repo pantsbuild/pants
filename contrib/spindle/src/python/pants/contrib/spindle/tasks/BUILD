@@ -12,7 +12,9 @@ python_library(
   name = 'spindle_gen',
   sources = ['spindle_gen.py'],
   dependencies = [
+    '3rdparty/python:twitter.common.dirutil',
     'contrib/spindle/src/python/pants/contrib/spindle/targets',
+    'contrib/spindle/src/python/pants/contrib/spindle/targets:spindle_thrift_library',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -20,7 +22,5 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'src/python/pants/option',
-    'src/python/pants/util:dirutil',
   ],
 )

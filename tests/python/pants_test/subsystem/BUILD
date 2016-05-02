@@ -4,8 +4,7 @@
 python_tests(
   name='subsystem',
   sources=['test_subsystem.py'],
-  dependencies=[
-    '3rdparty/python:pytest',
+  dependencies = [
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
@@ -14,7 +13,8 @@ python_tests(
 python_library(
   name='subsystem_utils',
   sources=['subsystem_util.py'],
-  dependencies=[
+  dependencies = [
+    'src/python/pants/option',
     'src/python/pants/subsystem',
     'tests/python/pants_test/option/util',
   ],

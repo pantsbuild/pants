@@ -4,9 +4,8 @@
 python_tests(
   name='examples_integration',
   sources=['test_examples_integration.py'],
-  dependencies=[
+  dependencies = [
     ':base',
-    'tests/python/pants_test/testutils:mock_logger',
   ],
   tags = {'integration'},
 )
@@ -15,9 +14,8 @@ python_tests(
   name='testprojects_integration',
   timeout=600,
   sources=['test_testprojects_integration.py'],
-  dependencies=[
+  dependencies = [
     ':base',
-    'tests/python/pants_test/testutils:mock_logger',
   ],
   tags = {'integration'},
 )
@@ -25,7 +23,7 @@ python_tests(
 python_library(
   name='base',
   sources=['base_project_integration_test.py'],
-  dependencies=[
+  dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
 )

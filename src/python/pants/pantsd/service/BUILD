@@ -5,8 +5,8 @@ python_library(
   name = 'pants_service',
   sources = ['pants_service.py'],
   dependencies = [
-    'src/python/pants/util:meta'
-  ]
+    'src/python/pants/util:meta',
+  ],
 )
 
 python_library(
@@ -15,8 +15,8 @@ python_library(
   dependencies = [
     '3rdparty/python:futures',
     ':pants_service',
-    'src/python/pants/pantsd:watchman'
-  ]
+    'src/python/pants/pantsd:watchman',
+  ],
 )
 
 python_library(
@@ -24,15 +24,14 @@ python_library(
   sources = ['pailgun_service.py'],
   dependencies = [
     ':pants_service',
-    'src/python/pants/pantsd:pailgun_server'
-  ]
+    'src/python/pants/pantsd:pailgun_server',
+  ],
 )
 
 python_library(
   name = 'scheduler_service',
   sources = ['scheduler_service.py'],
   dependencies = [
-    '3rdparty/python:six',
-    ':pants_service'
-  ]
+    ':pants_service',
+  ],
 )

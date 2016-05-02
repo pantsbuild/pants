@@ -8,5 +8,5 @@ python_library(
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/goal:task_registrar',
-  ]
+  ],
 )

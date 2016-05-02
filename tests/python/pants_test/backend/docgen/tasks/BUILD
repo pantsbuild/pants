@@ -11,7 +11,6 @@ python_tests(
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/docgen/tasks',
     'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ],
   coverage = [

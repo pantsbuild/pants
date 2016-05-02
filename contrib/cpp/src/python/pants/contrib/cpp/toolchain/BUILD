@@ -7,5 +7,4 @@ python_library(
   sources=[
     'cpp_toolchain.py',
   ],
-  dependencies=[],
 )

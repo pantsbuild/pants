@@ -7,8 +7,6 @@ python_tests(
   dependencies = [
     'contrib/spindle/src/python/pants/contrib/spindle/targets:spindle_thrift_library',
     'contrib/spindle/src/python/pants/contrib/spindle/tasks:spindle_gen',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',

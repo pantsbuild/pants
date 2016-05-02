@@ -5,8 +5,8 @@ python_library(
   name = 'ivy',
   sources = globs('*.py'),
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    '3rdparty/python:twitter.common.collections',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
@@ -15,5 +15,5 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )

@@ -14,7 +14,7 @@ target(
 python_library(
   name='node_module',
   sources=['node_module.py'],
-  dependencies=[
+  dependencies = [
     ':node_package',
     'src/python/pants/base:payload',
   ],
@@ -23,7 +23,7 @@ python_library(
 python_library(
   name='node_preinstalled_module',
   sources=['node_preinstalled_module.py'],
-  dependencies=[
+  dependencies = [
     ':node_module',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
@@ -33,7 +33,7 @@ python_library(
 python_library(
   name='node_remote_module',
   sources=['node_remote_module.py'],
-  dependencies=[
+  dependencies = [
     ':node_package',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
@@ -43,19 +43,19 @@ python_library(
 python_library(
   name='node_package',
   sources=['node_package.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-  ]
+  ],
 )
 
 python_library(
   name='node_test',
   sources=['node_test.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-  ]
+  ],
 )

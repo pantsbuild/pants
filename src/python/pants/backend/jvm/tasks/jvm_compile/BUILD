@@ -24,16 +24,15 @@ python_library(
   sources = ['analysis_parser.py'],
   dependencies = [
     'src/python/pants/base:exceptions',
-  ]
+  ],
 )
 
 python_library(
   name = 'analysis_tools',
   sources = ['analysis_tools.py'],
   dependencies = [
-    'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_library(
@@ -41,18 +40,17 @@ python_library(
   sources = ['compile_context.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_library(
   name = 'jvm_classpath_publisher',
   sources = ['jvm_classpath_publisher.py'],
   dependencies = [
-    ':jvm_compile',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
+    'src/python/pants/java:util',
     'src/python/pants/task',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:fileutil',
-  ]
+  ],
 )
 
 python_library(
@@ -74,7 +72,6 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/goal:products',
-    'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
@@ -98,7 +95,6 @@ python_library(
   name = 'zinc',
   sources = globs('zinc/*.py'),
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     ':analysis',
     ':analysis_parser',
@@ -107,13 +103,14 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/zinc',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:workunit',
     'src/python/pants/java/distribution',
-    'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

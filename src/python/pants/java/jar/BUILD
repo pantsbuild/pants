@@ -4,7 +4,7 @@
 python_library(
   name='manifest',
   sources=['manifest.py'],
-  dependencies=[
+  dependencies = [
     '3rdparty/python:six',
-  ]
+  ],
 )

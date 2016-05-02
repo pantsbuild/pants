@@ -4,16 +4,15 @@
 python_library(
   name='option',
   sources=globs('*.py'),
-  dependencies=[
-    '3rdparty/python:ansicolors',
+  dependencies = [
     '3rdparty/python:six',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/util:eval',
     'src/python/pants/util:meta',
     'src/python/pants/util:strutil',
-  ]
+  ],
 )
 
 target(

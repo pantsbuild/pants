@@ -4,12 +4,11 @@
 python_library(
   name='node_distribution',
   sources=['node_distribution.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/binaries:binary_util',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
   ],
 )

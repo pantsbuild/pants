@@ -11,4 +11,6 @@ page(
   name='3rdparty_py',
   source='3rdparty_py.md',
   links=[
-    'src/docs:3rdparty'])
+    'src/docs:3rdparty'
+  ]
+)

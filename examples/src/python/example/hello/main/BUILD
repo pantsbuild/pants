@@ -3,7 +3,8 @@
 
 # Like Hello world, but built with Pants.
 
-python_binary(name='main',
+python_binary(
+  name='main',
   dependencies=[
     'examples/src/python/example/hello/greet:greet',
   ],

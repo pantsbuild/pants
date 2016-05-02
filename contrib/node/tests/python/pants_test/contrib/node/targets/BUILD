@@ -4,17 +4,17 @@
 python_tests(
   name='node_remote_module',
   sources=['test_node_remote_module.py'],
-  dependencies=[
+  dependencies = [
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
-    'tests/python/pants_test:base_test'
-  ]
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
   name='node_package',
   sources=['test_node_package.py'],
-  dependencies=[
+  dependencies = [
     'contrib/node/src/python/pants/contrib/node/targets:node_package',
-    'tests/python/pants_test:base_test'
-  ]
+    'tests/python/pants_test:base_test',
+  ],
 )

@@ -28,8 +28,8 @@ python_library(
   name='version',
   sources=['version.py'],
   dependencies = [
-    "src/python/pants/base:revision"
-  ]
+    'src/python/pants/base:revision',
+  ],
 )
 
 page(

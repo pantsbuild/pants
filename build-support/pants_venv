@@ -7,7 +7,6 @@ source ${REPO_ROOT}/build-support/common.sh
 
 REQUIREMENTS=(
   ${REPO_ROOT}/3rdparty/python/requirements.txt
-  ${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt
   ${REPO_ROOT}/pants-plugins/3rdparty/python/requirements.txt
 )
 

@@ -7,13 +7,13 @@ python_library(
   resource_targets=[
     ':resources'
   ],
-  dependencies=[
+  dependencies = [
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
-  ]
+  ],
 )
 
 resources(

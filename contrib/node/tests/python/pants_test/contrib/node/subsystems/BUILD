@@ -4,8 +4,8 @@
 python_tests(
   name='node_distribution',
   sources=['test_node_distribution.py'],
-  dependencies=[
+  dependencies = [
     'contrib/node/src/python/pants/contrib/node/subsystems:node_distribution',
     'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
+  ],
 )

@@ -4,7 +4,7 @@
 python_tests(
   name='scalajs_repl_integration',
   sources=['test_scalajs_repl_integration.py'],
-  dependencies=[
+  dependencies = [
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},

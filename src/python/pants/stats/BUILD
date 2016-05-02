@@ -7,5 +7,5 @@ python_library(
   dependencies = [
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )

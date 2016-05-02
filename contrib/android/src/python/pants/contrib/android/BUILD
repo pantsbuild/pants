@@ -21,31 +21,31 @@ contrib_plugin(
 python_library(
   name='android_config_util',
   sources =['android_config_util.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_library(
   name='android_distribution',
   sources=['distribution/android_distribution.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_library(
   name='keystore_resolver',
   sources=['keystore/keystore_resolver.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/option',
-  ]
+  ],
 )
 
 python_library(
   name='android_manifest_parser',
   sources =['android_manifest_parser.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/util:xml_parser',
-  ]
+  ],
 )

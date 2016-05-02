@@ -3,30 +3,22 @@
 
 python_library(
   name='tasks',
-  dependencies=[
-    ':scrooge_gen',
-    ':thrift_linter',
-  ],
 )
 
 python_library(
   name='scrooge_gen',
   sources=['scrooge_gen.py'],
-  dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':java_thrift_library_fingerprint_strategy',
+  dependencies = [
+    '3rdparty/python:twitter.common.collections',
     ':thrift_util',
     'src/python/pants/backend/codegen/subsystems:thrift_defaults',
     'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/tasks:all',
+    'src/python/pants/backend/codegen/tasks:simple_codegen_task',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'src/python/pants/option',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
@@ -35,7 +27,7 @@ python_library(
 python_library(
   name='thrift_linter',
   sources=['thrift_linter.py'],
-  dependencies=[
+  dependencies = [
     ':thrift_util',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
@@ -52,7 +44,7 @@ python_library(
 python_library(
   name='java_thrift_library_fingerprint_strategy',
   sources=['java_thrift_library_fingerprint_strategy.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/base:fingerprint_strategy',
   ],

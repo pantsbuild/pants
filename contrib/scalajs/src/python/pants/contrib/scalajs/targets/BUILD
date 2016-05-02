@@ -6,8 +6,7 @@ python_library(
   dependencies = [
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',

@@ -6,5 +6,5 @@ python_tests(
   sources = ['test_jar_dependency_utils.py'],
   dependencies = [
     'src/python/pants/backend/jvm:jar_dependency_utils',
-  ]
+  ],
 )

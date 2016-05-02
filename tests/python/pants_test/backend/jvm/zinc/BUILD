@@ -5,7 +5,8 @@ python_tests(
   name = 'zinc',
   sources = globs('*.py'),
   dependencies = [
+    '3rdparty/python:six',
     'src/python/pants/backend/jvm/zinc',
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )

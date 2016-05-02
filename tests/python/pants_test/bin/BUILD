@@ -7,6 +7,7 @@ python_tests(
   dependencies = [
     'src/python/pants/bin',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/option/util',
     'tests/python/pants_test/option:testing',
   ],
 )
@@ -14,7 +15,7 @@ python_tests(
 python_tests(
   name='exe_integration',
   sources=['test_exe_integration.py'],
-  dependencies=[
+  dependencies = [
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -25,67 +26,67 @@ python_tests(
   sources = ['test_extension_loader.py'],
   dependencies = [
     'src/python/pants/base:exceptions',
+    'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/subsystem',
-  ]
+    'src/python/pants/task',
+  ],
 )
 
 python_tests(
   name='goal_runner',
   sources=['test_goal_runner.py'],
-  dependencies=[
-    '3rdparty/python:setuptools',
+  dependencies = [
+    '3rdparty/python:pytest',
     'src/python/pants/base:exceptions',
     'src/python/pants/bin',
     'src/python/pants/option',
-  ]
+  ],
 )
 
 python_tests(
   name='plugin_resolver',
   sources=['test_plugin_resolver.py'],
-  dependencies=[
+  dependencies = [
     '3rdparty/python:pex',
-    '3rdparty/python:setuptools',
+    '3rdparty/python:pytest',
     'src/python/pants/bin',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_tests(
   name='repro',
   sources=['test_repro.py'],
-  dependencies=[
+  dependencies = [
     ':repro_mixin',
     'src/python/pants/bin',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_tests(
   name='repro_ignore',
   sources=['test_repro_ignore.py'],
-  dependencies=[
+  dependencies = [
     ':repro_mixin',
     'src/python/pants/base:build_root',
     'src/python/pants/bin',
     'src/python/pants/fs',
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ]
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ],
 )
 
 python_library(
   name='repro_mixin',
   sources=['repro_mixin.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )

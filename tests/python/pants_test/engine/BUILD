@@ -8,7 +8,7 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -18,7 +18,6 @@ python_tests(
     ':engine_test_base',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine',
-    'tests/python/pants_test/base:context_utils',
   ],
 )
 

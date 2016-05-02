@@ -6,8 +6,9 @@ python_library(
   name = 'build_graph',
   sources = globs('*.py'),
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:pathspec',
     '3rdparty/python:six',
+    '3rdparty/python:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_target_factory',
@@ -17,13 +18,13 @@ python_library(
     'src/python/pants/base:parse_context',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
+    'src/python/pants/base:specs',
     'src/python/pants/base:validation',
-    'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:netrc',
-  ]
+  ],
 )

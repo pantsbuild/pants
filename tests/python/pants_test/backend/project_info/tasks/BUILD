@@ -20,7 +20,7 @@ python_tests(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -33,7 +33,7 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -69,27 +69,26 @@ python_tests(
     'src/python/pants/backend/project_info/tasks:export',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:revision',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
+    'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
-    'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
-  ]
+  ],
 )
 
 python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
+    '3rdparty/python:twitter.common.collections',
     ':resolve_jars_test_mixin',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/ivy',
-    'src/python/pants/java/distribution',
-    'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
   ],
@@ -101,8 +100,8 @@ python_tests(
   sources = ['test_filedeps.py'],
   dependencies = [
     'src/python/pants/backend/codegen:plugin',
-    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:filedeps',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
@@ -115,9 +114,9 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/project_info/tasks:ide_gen',
     'src/python/pants/source',
-    'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -125,7 +124,7 @@ python_tests(
   sources = ['test_idea_integration.py'],
   dependencies = [
     ':resolve_jars_test_mixin',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],

@@ -8,7 +8,7 @@ python_library(
     'android_integration_test.py',
   ],
   dependencies = [
-    'src/python/pants/java/distribution:distribution',
+    'src/python/pants/java/distribution',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
   ],
@@ -20,13 +20,12 @@ python_library(
     'test_android_base.py',
   ],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:twitter.common.collections',
     'contrib/android/src/python/pants/contrib/android/targets:android',
-    'contrib/android/src/python/pants/contrib/android/tasks:all',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -37,7 +36,7 @@ python_tests(
   dependencies = [
     'contrib/android/src/python/pants/contrib/android:android_config_util',
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_tests(
@@ -48,7 +47,7 @@ python_tests(
   dependencies = [
     'contrib/android/src/python/pants/contrib/android:android_manifest_parser',
     'tests/python/pants_test/util:xml_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -57,12 +56,12 @@ python_tests(
     'test_android_distribution.py',
   ],
   dependencies = [
+    ':android_base',
     'contrib/android/src/python/pants/contrib/android:android_distribution',
-    'contrib/android/tests/python/pants_test/contrib/android:android_base',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -73,5 +72,5 @@ python_tests(
   dependencies = [
     'contrib/android/src/python/pants/contrib/android:keystore_resolver',
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )

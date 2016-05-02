@@ -8,6 +8,6 @@ python_library(
     'src/python/pants/backend/jvm/tasks:checkstyle',
     'src/python/pants/backend/jvm/tasks:scalastyle',
     'src/python/pants/goal:task_registrar',
-  ]
+  ],
 )
 

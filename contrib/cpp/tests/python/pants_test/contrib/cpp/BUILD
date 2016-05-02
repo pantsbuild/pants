@@ -7,9 +7,8 @@ python_tests(
   sources=[
     'test_cpp_integration.py'
   ],
-  dependencies=[
-    'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
-    'src/python/pants/util:contextutil',
+  dependencies = [
+    'contrib/cpp/src/python/pants/contrib/cpp/toolchain',
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},
@@ -20,9 +19,8 @@ python_tests(
   sources=[
     'test_cpp_toolchain.py',
   ],
-  dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
+  dependencies = [
+    'contrib/cpp/src/python/pants/contrib/cpp/toolchain',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],

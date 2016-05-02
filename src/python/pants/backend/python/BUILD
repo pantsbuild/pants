@@ -13,23 +13,11 @@ python_library(
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
-  ]
+  ],
 )
 
 python_library(
   name = 'all_utils',
-  dependencies = [
-    ':antlr_builder',
-    ':code_generator',
-    ':interpreter_cache',
-    ':python_artifact',
-    ':python_chroot',
-    ':python_requirement',
-    ':python_requirements',
-    ':python_setup',
-    ':sdist_builder',
-    ':thrift_builder',
-  ]
 )
 
 page(
@@ -45,10 +33,8 @@ python_library(
   sources = ['python_setup.py'],
   dependencies = [
     '3rdparty/python:pex',
-    '3rdparty/python:setuptools',
-    'src/python/pants/option',
     'src/python/pants/subsystem',
-  ]
+  ],
 )
 
 python_library(
@@ -60,17 +46,17 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/ivy',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_library(
   name = 'code_generator',
   sources = ['code_generator.py'],
   dependencies = [
+    '3rdparty/python:twitter.common.dirutil',
     ':sdist_builder',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    'src/python/pants/util:dirutil'
-  ]
+    'src/python/pants/util:dirutil',
+  ],
 )
 
 
@@ -80,17 +66,17 @@ python_library(
   dependencies = [
     '3rdparty/python:pex',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_library(
   name = 'pants_requirement',
   sources = ['pants_requirement.py'],
   dependencies = [
-    'src/python/pants/backend/python:python_requirement',
+    ':python_requirement',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
-  ]
+  ],
 )
 
 
@@ -106,8 +92,8 @@ python_library(
   name = 'python_chroot',
   sources = ['python_chroot.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:pex',
+    '3rdparty/python:twitter.common.collections',
     ':antlr_builder',
     ':python_requirement',
     ':thrift_builder',
@@ -116,7 +102,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/invalidation',
-    'src/python/pants/util:dirutil'
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -135,17 +121,18 @@ python_library(
   sources = ['sdist_builder.py'],
   dependencies = [
     '3rdparty/python:pex',
-  ]
+  ],
 )
 
 python_library(
   name = 'thrift_builder',
   sources = ['thrift_builder.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:twitter.common.collections',
     ':code_generator',
+    'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-  ]
+  ],
 )

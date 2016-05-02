@@ -7,8 +7,8 @@ python_library(
   dependencies = [
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
-    'src/python/pants/util:dirutil'
-  ]
+    'src/python/pants/util:dirutil',
+  ],
 )
 
 python_library(
@@ -17,27 +17,27 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     'src/python/pants/java:nailgun_protocol',
-    'src/python/pants/util:socket'
-  ]
+    'src/python/pants/util:socket',
+  ],
 )
 
 python_library(
   name = 'watchman',
   sources = ['watchman.py'],
   dependencies = [
+    ':process_manager',
+    ':watchman_client',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:retry',
-    ':process_manager',
-    ':watchman_client'
-  ]
+  ],
 )
 
 python_library(
   name = 'watchman_client',
   sources = ['watchman_client.py'],
   dependencies = [
-    '3rdparty/python:pywatchman'
-  ]
+    '3rdparty/python:pywatchman',
+  ],
 )
 
 python_library(
@@ -45,6 +45,9 @@ python_library(
   sources = ['pants_daemon.py'],
   dependencies = [
     '3rdparty/python:setproctitle',
-    'src/python/pants/goal:run_tracker'
-  ]
+    ':process_manager',
+    'src/python/pants/goal',
+    'src/python/pants/goal:run_tracker',
+    'src/python/pants/logging',
+  ],
 )

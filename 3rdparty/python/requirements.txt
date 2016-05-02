@@ -23,4 +23,7 @@ setproctitle==1.1.9
 setuptools==5.4.1
 six>=1.9.0,<2
 thrift==0.9.1
+twitter.common.collections>=0.3.1,<0.4
+twitter.common.confluence>=0.3.1,<0.4
+twitter.common.dirutil>=0.3.1,<0.4
 wheel==0.24.0

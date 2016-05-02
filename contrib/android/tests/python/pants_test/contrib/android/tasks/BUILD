@@ -18,7 +18,6 @@ python_tests(
     'test_aapt_builder_integration.py',
   ],
   dependencies = [
-    'src/python/pants/util:contextutil',
     'contrib/android/tests/python/pants_test/contrib/android:android_integration_test',
   ],
   tags = {'integration'},
@@ -30,7 +29,7 @@ python_tests(
     'test_aapt_gen.py',
   ],
   dependencies = [
-    'contrib/android/src/python/pants/contrib/android/tasks:all',
+    'contrib/android/src/python/pants/contrib/android/tasks:aapt_gen',
     'contrib/android/tests/python/pants_test/contrib/android:android_base',
   ],
 )
@@ -42,7 +41,6 @@ python_tests(
   ],
   dependencies = [
     'contrib/android/tests/python/pants_test/contrib/android:android_integration_test',
-    'src/python/pants/util:contextutil',
   ],
   tags = {'integration'},
 )
@@ -53,7 +51,7 @@ python_tests(
     'test_aapt_task.py',
   ],
   dependencies = [
-    'contrib/android/src/python/pants/contrib/android/tasks:all',
+    'contrib/android/src/python/pants/contrib/android/tasks:aapt_gen',
     'contrib/android/tests/python/pants_test/contrib/android:android_base',
   ],
 )
@@ -64,11 +62,10 @@ python_tests(
     'test_dx_compile.py',
   ],
   dependencies = [
-    'contrib/android/src/python/pants/contrib/android/tasks:all',
+    'contrib/android/src/python/pants/contrib/android/tasks:dx_compile',
     'contrib/android/tests/python/pants_test/contrib/android:android_base',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
-    'src/python/pants/goal:products',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -120,7 +117,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_import_products',
     'src/python/pants/backend/jvm:jar_dependency_utils',
-    'src/python/pants/fs:fs',
+    'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
@@ -145,7 +142,6 @@ python_tests(
   dependencies = [
     'contrib/android/src/python/pants/contrib/android/tasks:zipalign',
     'contrib/android/tests/python/pants_test/contrib/android:android_base',
-    'src/python/pants/util:contextutil',
   ],
 )
 

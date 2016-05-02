@@ -6,7 +6,6 @@ python_tests(
   sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mox',
-    '3rdparty/python:six',
     'src/python/pants/process',
-  ]
+  ],
 )

@@ -7,12 +7,13 @@ python_library(
   resource_targets=[
     ':resources',
   ],
-  dependencies=[
+  dependencies = [
     '3rdparty/python:six',
     'src/python/pants/base:revision',
     'src/python/pants/java:util',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
     'src/python/pants/util:osutil',
   ],
 )
