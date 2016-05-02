@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     ':build_root',
     'src/python/pants/scm',
+    'src/python/pants/scm:git',     # (mateo) Force a buildgen dep for an inlined import.
     'src/python/pants:version',
   ],
 )
