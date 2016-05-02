@@ -92,7 +92,7 @@ class EngineInitializer(object):
   @classmethod
   @contextmanager
   def open_legacy_graph(cls, options=None):
-    spec_roots = cls.parse_commandline_to_spec_roots(options)
+    spec_roots = cls.parse_commandline_to_spec_roots(options=options)
     scheduler, engine, symbol_table_cls, build_graph_cls = cls.setup_legacy_graph()
 
     engine.start()
