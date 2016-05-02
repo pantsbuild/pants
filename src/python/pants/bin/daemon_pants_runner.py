@@ -67,7 +67,7 @@ class DaemonPantsRunner(ProcessManager):
     :param Exiter exiter: The Exiter instance for this run.
     :param list args: The arguments (i.e. sys.argv) for this run.
     :param dict env: The environment (i.e. os.environ) for this run.
-    :param BuildGraph build_graph: A primed BuildGraph instance.
+    :param BuildGraph build_graph: A BuildGraph instance.
     """
     super(DaemonPantsRunner, self).__init__(name=self._make_identity())
     self._socket = socket
