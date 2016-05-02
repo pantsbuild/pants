@@ -87,6 +87,17 @@ continue."
     ${REPO_ROOT}/src/docs/publish_via_git.sh \
       https://github.com/pantsbuild/pantsbuild.github.io.git \
       ${publish_path} && \
+      ${REPO_ROOT}/src/docs/publish_via_git.sh \
+      https://github.com/benjyw/benjyw.github.io.git \
+      ${publish_path} && \
     do_open ${url}/index.html
   ) || die "Publish to ${url} failed."
 fi
+
+# Note that we push the docs to two repos: pantsbuild.github.io and benjyw.github.io.
+# The latter is where we redirect www.pantsbuild.org to via CNAME. We can't redirect
+# to the former because then HTTPS won't work (the cert is for pantsbuild.github.io).
+# This way we have working https URLs when needed, but also an http-only version at the
+# more respectable domain of pantsbuild.org.
+# This is a stopgap workaround until we can host the docsite ourselves, under our own
+# SSL cert.
