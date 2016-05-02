@@ -92,6 +92,10 @@ class EngineInitializer(object):
   @classmethod
   @contextmanager
   def open_legacy_graph(cls, options=None):
+    """A context manager that yields a usable, legacy ExpGraph by way of the v2 scheduler.
+
+    This is used primarily for testing and non-daemon runs.
+    """
     spec_roots = cls.parse_commandline_to_spec_roots(options=options)
     scheduler, engine, symbol_table_cls, build_graph_cls = cls.setup_legacy_graph()
 
