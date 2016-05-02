@@ -15,7 +15,7 @@ import six
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK
-from pants.engine.exp.selectors import Select, SelectDependencies, SelectProjection
+from pants.engine.exp.selectors import Collection, Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -68,18 +68,6 @@ class Stats(datatype('Stats', ['files', 'dirs', 'links'])):
     return super(Stats, cls).__new__(cls, files, dirs, links)
 
 
-class Files(datatype('Files', ['dependencies'])):
-  """A set of File objects."""
-
-
-class Dirs(datatype('Dirs', ['dependencies'])):
-  """A set of Dir objects."""
-
-
-class Links(datatype('Links', ['dependencies'])):
-  """A set of Link objects."""
-
-
 class FileContent(datatype('FileContent', ['path', 'content'])):
   """The content of a file, or None if it did not exist."""
 
@@ -89,10 +77,6 @@ class FileContent(datatype('FileContent', ['path', 'content'])):
 
   def __str__(self):
     return repr(self)
-
-
-class FilesContent(datatype('FilesContent', ['dependencies'])):
-  """List of FileContent objects."""
 
 
 def _norm_with_dir(path):
@@ -363,6 +347,12 @@ def file_content(project_tree, path):
 
 def identity(v):
   return v
+
+
+Files = Collection.of(File)
+Dirs = Collection.of(Dir)
+FilesContent = Collection.of(FileContent)
+Links = Collection.of(Link)
 
 
 def create_fs_tasks():

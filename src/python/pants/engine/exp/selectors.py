@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import sys
 from abc import abstractproperty
 
+from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -66,3 +68,23 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
 class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
   optional = False
+
+
+class Collection(object):
+  """
+  Singleton Collection Type. The ambition is to gain native support for flattening,
+  so methods like <pants.engine.exp.fs.merge_files> won't have to be defined separately.
+  Related to: https://github.com/pantsbuild/pants/issues/3169
+  """
+
+  @classmethod
+  @memoized
+  def of(cls, element_type, fields=('dependencies',)):
+    type_name = b'{}({!r})'.format(cls.__name__, element_type)
+
+    collection_of_type = type(type_name, (cls, datatype("{}s".format(element_type.__name__), fields)), {})
+
+    # Expose the custom class type at the module level to be pickle compatible.
+    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
+
+    return collection_of_type
