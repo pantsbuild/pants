@@ -32,6 +32,7 @@ class OptionsInitializer(object):
     :param pkg_resources.WorkingSet working_set: The working set of the current run as returned by
                                                  PluginResolver.resolve().
     :param func exiter: A function that accepts an exit code value and exits (for tests).
+    :param bool init_logging: Whether or not to initialize logging as part of options init.
     """
     self._options_bootstrapper = options_bootstrapper
     self._working_set = working_set or PluginResolver(self._options_bootstrapper).resolve()
