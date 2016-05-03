@@ -55,6 +55,8 @@ class PantsDaemonLauncher(Subsystem):
     self._pailgun_port = options.pailgun_port
     self._fs_event_enabled = options.fs_event_detection
     self._fs_event_workers = options.fs_event_workers
+    self._path_ignore_patterns = options.pants_ignore
+    # TODO(kwlzn): Thread filesystem path ignores here to Watchman's subscription registration.
 
     lock_location = os.path.join(self._build_root, '.pantsd.startup')
     self._lock = OwnerPrintingInterProcessFileLock(lock_location)
@@ -89,7 +91,7 @@ class PantsDaemonLauncher(Subsystem):
       (scheduler,
        engine,
        symbol_table_cls,
-       legacy_graph_cls) = self._engine_initializer.setup_legacy_graph()
+       legacy_graph_cls) = self._engine_initializer.setup_legacy_graph(self._path_ignore_patterns)
       scheduler_service = SchedulerService(fs_event_service,
                                            scheduler,
                                            engine,

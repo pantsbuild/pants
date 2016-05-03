@@ -57,10 +57,18 @@ class EngineInitializer(object):
     return spec_roots
 
   @staticmethod
-  def _setup_scheduler(build_root):
+  def setup_legacy_graph(path_ignore_patterns):
+    """Construct and return the components necessary for ExpGraph construction.
+
+    :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
+                                      usually taken from the `--pants-ignore` global option.
+    :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
+    """
+
+    build_root = get_buildroot()
     storage = Storage.create(debug=False)
     # Ignore any dotfile below build_root except `.` itself
-    project_tree = FileSystemProjectTree(build_root, ['.*'])
+    project_tree = FileSystemProjectTree(build_root, path_ignore_patterns)
     symbol_table_cls = LegacySymbolTable
 
     # Register "literal" subjects required for these tasks.
@@ -76,28 +84,30 @@ class EngineInitializer(object):
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
 
-    return (
-      LocalScheduler(dict(), tasks, storage, project_tree),
-      storage,
-      symbol_table_cls
-    )
-
-  @classmethod
-  def setup_legacy_graph(cls):
-    build_root = get_buildroot()
-    scheduler, storage, symbol_table_cls = cls._setup_scheduler(build_root)
+    scheduler = LocalScheduler(dict(), tasks, storage, project_tree)
     engine = LocalSerialEngine(scheduler, storage)
+
     return (scheduler, engine, symbol_table_cls, ExpGraph)
 
   @classmethod
   @contextmanager
-  def open_legacy_graph(cls, options=None):
+  def open_legacy_graph(cls, options=None, path_ignore_patterns=None):
     """A context manager that yields a usable, legacy ExpGraph by way of the v2 scheduler.
 
     This is used primarily for testing and non-daemon runs.
+
+    :param Options options: An Options object to use for this run.
+    :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
+                                      usually taken from the `--pants-ignore` global option.
+                                      Defaults to: ['.*']
+    :yields: A tuple of (graph, addresses, scheduler).
     """
+    path_ignore_patterns = path_ignore_patterns or ['.*']
     spec_roots = cls.parse_commandline_to_spec_roots(options=options)
-    scheduler, engine, symbol_table_cls, build_graph_cls = cls.setup_legacy_graph()
+    (scheduler,
+     engine,
+     symbol_table_cls,
+     build_graph_cls) = cls.setup_legacy_graph(path_ignore_patterns)
 
     engine.start()
     try:
