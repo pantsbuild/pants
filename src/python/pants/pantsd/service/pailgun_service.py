@@ -16,7 +16,7 @@ from pants.pantsd.service.pants_service import PantsService
 class PailgunService(PantsService):
   """A service that runs the Pailgun server."""
 
-  def __init__(self, bind_addr, exiter_class, runner_class, scheduler_service):
+  def __init__(self, bind_addr, exiter_class, runner_class, scheduler_service, spec_parser):
     """
     :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
     :param class exiter_class: The Exiter class to be used for Pailgun runs.
@@ -27,6 +27,7 @@ class PailgunService(PantsService):
     self._exiter_class = exiter_class
     self._runner_class = runner_class
     self._scheduler_service = scheduler_service
+    self._parse_commandline_to_spec_roots = spec_parser
 
     self._logger = logging.getLogger(__name__)
     self._pailgun = None
@@ -47,14 +48,20 @@ class PailgunService(PantsService):
     def runner_factory(sock, arguments, environment):
       exiter = self._exiter_class(sock)
       build_graph = None
+
+      self._logger.debug('execution commandline: %s', arguments)
+      # N.B. This parses sys.argv by way of OptionsInitializer/OptionsBootstrapper prior to
+      # the main pants run to derive spec_roots for caching in the underlying scheduler.
+      spec_roots = self._parse_commandline_to_spec_roots(args=arguments)
+      self._logger.debug('parsed spec_roots: %s', spec_roots)
       try:
         self._logger.debug('requesting BuildGraph from %s', self._scheduler_service)
         # N.B. This call is made in the pre-fork daemon context for reach and reuse of the resident
         # scheduler for BuildGraph construction.
-        build_graph = self._scheduler_service.get_build_graph(arguments)
+        build_graph = self._scheduler_service.get_build_graph(spec_roots)
       except Exception:
-        self._logger.debug('encountered exception during SchedulerService.get_build_graph():\n{}'
-                           .format(traceback.format_exc()))
+        self._logger.debug('encountered exception during SchedulerService.get_build_graph():\n%s',
+                           traceback.format_exc())
       return self._runner_class(sock, exiter, arguments, environment, build_graph)
 
     return PailgunServer(self._bind_addr, runner_factory)
