@@ -46,4 +46,4 @@ You can run your Go tests with `./pants test [go targets]`. Any [standard Go tes
 
 ## Working with other Go ecosystem tools
 
-// The go-env and go goals (GOROOT/GOPATH)
+Go and the Go ecosystem provide rich tool support. From native Go tools like `go list` and `go vet` to editors like `vim` and Sublime that have plugins supporting Go symbol resolution and more. These tools all rely on a `GOROOT` and a `GOPATH` to know where to find binaries and code to operate against. Since pants controls the Go workspace these tools are unuseable without knowledge of the Pants-synthesized workspaces.  Enter the `./pants go` and `./pants go-env` goals.
