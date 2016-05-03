@@ -92,6 +92,8 @@ class PantsDaemonLauncher(Subsystem):
        engine,
        symbol_table_cls,
        legacy_graph_cls) = self._engine_initializer.setup_legacy_graph(self._path_ignore_patterns)
+      # TODO(kwlzn): Circle back to improve the coupling between
+      # `EngineInitializer.setup_legacy_graph` + `SchedulerService.__init__`.
       scheduler_service = SchedulerService(fs_event_service,
                                            scheduler,
                                            engine,
