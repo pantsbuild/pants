@@ -88,12 +88,12 @@ class SchedulerService(PantsService):
     """Returns a factory that provides a legacy BuildGraph given a set of input specs."""
     # N.B. This parses sys.argv by way of OptionsInitializer/OptionsBootstrapper prior to the main
     # pants run to derive spec_roots for caching in the underlying scheduler.
+    self._logger.debug('execution commandline: %s', args)
+    spec_roots = self._parse_commandline_to_spec_roots(args=args)
+    self._logger.debug('parsed spec_roots: %s', spec_roots)
+    graph = self._build_graph_facade_cls(self._scheduler, self._engine, self._symbol_table_cls)
     with self._scheduler.locked():
-      self._logger.debug('execution commandline: %s', args)
-      spec_roots = self._parse_commandline_to_spec_roots(args=args)
-      self._logger.debug('parsed spec_roots: %s', spec_roots)
-      graph = self._build_graph_facade_cls(self._scheduler, self._engine, self._symbol_table_cls)
-      all(graph.get_target(address) for address in graph.inject_specs_closure(spec_roots))
+      all(graph.inject_specs_closure(spec_roots))
       self._logger.debug('engine cache stats: {}'.format(self._engine._cache.get_stats()))
     self._logger.debug('build_graph is: %s', graph)
     return graph
