@@ -20,7 +20,8 @@ class PantsDaemonLauncherTest(BaseTest):
     super(PantsDaemonLauncherTest, self).setUp()
     self.launcher = create_subsystem(PantsDaemonLauncher,
                                      pants_workdir='/pants_workdir',
-                                     level='info')
+                                     level='info',
+                                     pants_ignore=['.*'])
     self.mock_pantsd = mock.create_autospec(PantsDaemon, spec_set=True)
     self.launcher.pantsd = self.mock_pantsd
 
