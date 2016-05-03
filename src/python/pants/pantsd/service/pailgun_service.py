@@ -60,8 +60,8 @@ class PailgunService(PantsService):
         # scheduler for BuildGraph construction.
         build_graph = self._scheduler_service.get_build_graph(spec_roots)
       except Exception:
-        self._logger.debug('encountered exception during SchedulerService.get_build_graph():\n%s',
-                           traceback.format_exc())
+        self._logger.warning('encountered exception during SchedulerService.get_build_graph():\n%s',
+                             traceback.format_exc())
       return self._runner_class(sock, exiter, arguments, environment, build_graph)
 
     return PailgunServer(self._bind_addr, runner_factory)
