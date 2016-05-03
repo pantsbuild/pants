@@ -19,8 +19,7 @@ class SchedulerService(PantsService):
   in memory.
   """
 
-  def __init__(self, fs_event_service, scheduler, engine, symbol_table_cls, build_graph_facade_cls,
-               parse_commandline_to_spec_roots):
+  def __init__(self, fs_event_service, scheduler, engine, symbol_table_cls, build_graph_facade_cls):
     """
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
                                             filesystem event handlers.
@@ -35,7 +34,6 @@ class SchedulerService(PantsService):
     self._engine = engine
     self._symbol_table_cls = symbol_table_cls
     self._build_graph_facade_cls = build_graph_facade_cls
-    self._parse_commandline_to_spec_roots = parse_commandline_to_spec_roots
 
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=64)
@@ -84,17 +82,12 @@ class SchedulerService(PantsService):
       self._handle_batch_event(files)
     self._event_queue.task_done()
 
-  def get_build_graph(self, args):
+  def get_build_graph(self, spec_roots):
     """Returns a factory that provides a legacy BuildGraph given a set of input specs."""
-    # N.B. This parses sys.argv by way of OptionsInitializer/OptionsBootstrapper prior to the main
-    # pants run to derive spec_roots for caching in the underlying scheduler.
-    self._logger.debug('execution commandline: %s', args)
-    spec_roots = self._parse_commandline_to_spec_roots(args=args)
-    self._logger.debug('parsed spec_roots: %s', spec_roots)
     graph = self._build_graph_facade_cls(self._scheduler, self._engine, self._symbol_table_cls)
     with self._scheduler.locked():
       all(graph.inject_specs_closure(spec_roots))
-      self._logger.debug('engine cache stats: {}'.format(self._engine._cache.get_stats()))
+    self._logger.debug('engine cache stats: {}'.format(self._engine._cache.get_stats()))
     self._logger.debug('build_graph is: %s', graph)
     return graph
 

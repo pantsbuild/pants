@@ -94,14 +94,14 @@ class PantsDaemonLauncher(Subsystem):
                                            scheduler,
                                            engine,
                                            symbol_table_cls,
-                                           legacy_graph_cls,
-                                           self._engine_initializer.parse_commandline_to_spec_roots)
+                                           legacy_graph_cls)
       services.extend((fs_event_service, scheduler_service))
 
     pailgun_service = PailgunService((self._pailgun_host, self._pailgun_port),
                                      DaemonExiter,
                                      DaemonPantsRunner,
-                                     scheduler_service)
+                                     scheduler_service,
+                                     self._engine_initializer.parse_commandline_to_spec_roots)
     services.append(pailgun_service)
 
     # Construct a mapping of named ports used by the daemon's services. In the default case these
