@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import sys
-from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
@@ -23,15 +22,6 @@ from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.engine.round_engine import RoundEngine
-from pants.engine.v2.engine import LocalSerialEngine
-from pants.engine.v2.fs import create_fs_tasks
-from pants.engine.v2.graph import create_graph_tasks
-from pants.engine.v2.legacy.graph import ExpGraph, create_legacy_graph_tasks
-from pants.engine.v2.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
-from pants.engine.v2.mapper import AddressMapper
-from pants.engine.v2.parser import SymbolTable
-from pants.engine.v2.scheduler import LocalScheduler
-from pants.engine.v2.storage import Storage
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
@@ -42,7 +32,6 @@ from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
 from pants.task.task import QuietTaskMixin
 from pants.util.filtering import create_filters, wrap_filters
-from pants.util.memo import memoized_method
 
 
 logger = logging.getLogger(__name__)

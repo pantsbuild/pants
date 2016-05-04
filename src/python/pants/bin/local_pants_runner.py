@@ -23,7 +23,7 @@ class LocalPantsRunner(object):
     :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
-    :param BuildGraph build_graph: A primed BuildGraph instance for graph reuse (optional).
+    :param BuildGraph build_graph: A BuildGraph instance for graph reuse (optional).
     :param OptionsBootstrapper options_bootstrapper: An optional existing OptionsBootstrapper.
     """
     self._exiter = exiter
