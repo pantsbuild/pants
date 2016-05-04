@@ -127,9 +127,10 @@ class ExpGraph(BuildGraph):
       kwargs.pop('dependencies')
       # Replace the sources argument with a FilesetWithSpecs instance, or None.
       kwargs.pop('spec_path')
-      kwargs.pop('sources', None)
+      if sources in kwargs:
+        kwargs['sources'] = fileset_with_spec
       # Instantiate.
-      return target_cls(build_graph=self, sources=fileset_with_spec, **kwargs)
+      return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
       raise
     except Exception as e:
