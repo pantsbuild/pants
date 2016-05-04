@@ -21,7 +21,8 @@ class PantsDaemonLauncherTest(BaseTest):
 
   @contextmanager
   def pants_daemon_launcher(self, options=None):
-    with subsystem_instance(PantsDaemonLauncher.Factory, **options or {}) as factory:
+    options = options or {}
+    with subsystem_instance(PantsDaemonLauncher.Factory, **options) as factory:
       pdl = factory.create(None)
       pdl.pantsd = self.mock_pantsd
       pdl.watchman_launcher = self.mock_watchman_launcher
