@@ -201,11 +201,7 @@ def reify_legacy_graph(target_adaptor, dependencies, fileset_with_spec):
 
 
 def fileset_with_spec(target_adaptor, source_files_content):
-  """Given a TargetAdaptor and FilesContent for its source field, create an EagerFilesetWithSpec.
-  
-  The TargetAdaptor is needed in orderfrom which it was parsed, and the pre-computed FilesContent
-  for the BaseGlobs.
-  """
+  """Given a TargetAdaptor and FilesContent for its source field, create an EagerFilesetWithSpec."""
   base_globs = target_adaptor.sources_base_globs
   file_hashes = {fc.path: sha1(fc.content).digest() for fc in source_files_content.dependencies}
   return EagerFilesetWithSpec('', base_globs.filespecs, file_hashes)
@@ -214,7 +210,7 @@ def fileset_with_spec(target_adaptor, source_files_content):
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
-    # Recursively requests LegacyGraphNodes for TargetAdaptors, which will result in a
+    # Recursively requests LegacyTargets for TargetAdaptors, which will result in a
     # transitive graph walk.
     (LegacyTarget,
      [Select(TargetAdaptor),
