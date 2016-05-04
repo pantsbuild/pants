@@ -21,6 +21,9 @@ class PailgunService(PantsService):
     :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
     :param class exiter_class: The Exiter class to be used for Pailgun runs.
     :param class runner_class: The PantsRunner class to be used for Pailgun runs.
+    :param SchedulerService scheduler_service: The SchedulerService instance for access to the
+                                               resident scheduler.
+    :param func spec_parser: The function for parsing commandline arguments to spec roots.
     """
     super(PailgunService, self).__init__()
     self._bind_addr = bind_addr
