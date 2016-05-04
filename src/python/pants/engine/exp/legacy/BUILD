@@ -37,6 +37,7 @@ python_library(
     'src/python/pants/engine/exp:parser',
     'src/python/pants/engine/exp:selectors',
     'src/python/pants/source',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',
   ],
 )

@@ -69,7 +69,7 @@ class SourcesField(PayloadField):
   def _compute_fingerprint(self):
     hasher = sha1()
     hasher.update(self.rel_path)
-    for source in sorted(self.relative_to_buildroot()):
+    for source in sorted(self.source_paths):
       hasher.update(source)
       hasher.update(self.sources.file_hash(source))
     return hasher.hexdigest()

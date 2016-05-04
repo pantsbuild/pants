@@ -56,11 +56,11 @@ class FilesetWithSpec(AbstractClass):
 
   @abstractproperty
   def files(self):
-    """Return the concrete set of files matched by this FilesetWithSpec."""
+    """Return the concrete set of files matched by this FilesetWithSpec, relative to `self.rel_root`."""
 
   @abstractmethod
   def file_hash(self, path):
-    """Given a path (assumed to be a member of self.files), returns a unique hash for that file."""
+    """Given a path (which should be a member of self.files), returns a unique hash for that file."""
 
   def __iter__(self):
     return self.files.__iter__()
@@ -105,7 +105,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
     return self._files_calculator()
 
   def file_hash(self, path):
-    with open(os.path.join(get_buildroot(), path), 'rb') as f:
+    with open(os.path.join(get_buildroot(), self.rel_root, path), 'rb') as f:
       return sha1(f.read()).digest()
 
 

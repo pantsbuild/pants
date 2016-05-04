@@ -17,6 +17,7 @@ from pants.engine.exp.legacy.structs import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
 
 
@@ -144,9 +145,6 @@ class ExpGraph(BuildGraph):
                               dependencies=None,
                               derived_from=None,
                               **kwargs):
-    sources = kwargs.get('sources', None)
-    if sources is not None:
-      kwargs['sources'] = self._instantiate_sources(address.spec_path, sources)
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self,
@@ -202,9 +200,11 @@ def reify_legacy_graph(target_adaptor, dependencies, fileset_with_spec):
 
 def fileset_with_spec(target_adaptor, source_files_content):
   """Given a TargetAdaptor and FilesContent for its source field, create an EagerFilesetWithSpec."""
+  spec_path = target_adaptor.spec_path
   base_globs = target_adaptor.sources_base_globs
-  file_hashes = {fc.path: sha1(fc.content).digest() for fc in source_files_content.dependencies}
-  return EagerFilesetWithSpec('', base_globs.filespecs, file_hashes)
+  file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
+                 for fc in source_files_content.dependencies}
+  return EagerFilesetWithSpec(spec_path, base_globs.filespecs, file_hashes)
 
 
 def create_legacy_graph_tasks():
