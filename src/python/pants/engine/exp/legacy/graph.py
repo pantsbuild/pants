@@ -112,10 +112,7 @@ class ExpGraph(BuildGraph):
       self._target_dependees_by_address[dependency].add(address)
     return target
 
-  def _instantiate_sources(self, source_files_content):
-    """Given a FilesContent object, instantiate a FilesetWithSpec object."""
-
-  def _instantiate_target(self, target_adaptor, source_files_content):
+  def _instantiate_target(self, target_adaptor, fileset_with_spec):
     """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target.
 
     TODO: This assumes that the SymbolTable used for parsing matches the SymbolTable passed
@@ -132,7 +129,7 @@ class ExpGraph(BuildGraph):
       kwargs.pop('spec_path')
       kwargs.pop('sources', None)
       # Instantiate.
-      return target_cls(build_graph=self, **kwargs)
+      return target_cls(build_graph=self, sources=fileset_with_spec, **kwargs)
     except TargetDefinitionException:
       raise
     except Exception as e:
