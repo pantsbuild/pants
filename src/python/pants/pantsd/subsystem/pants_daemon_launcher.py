@@ -51,16 +51,16 @@ class PantsDaemonLauncher(object):
       """
       build_root = get_buildroot()
       options = self.global_instance().get_options()
-      return PantsDaemonLauncher(build_root,
-                                 options.pants_workdir,
-                                 engine_initializer,
-                                 options.log_dir,
-                                 options.level.upper(),
-                                 options.pailgun_host,
-                                 options.pailgun_port,
-                                 options.fs_event_detection,
-                                 options.fs_event_workers,
-                                 options.pants_ignore)
+      return PantsDaemonLauncher(build_root=build_root,
+                                 pants_workdir=options.pants_workdir,
+                                 engine_initializer=engine_initializer,
+                                 log_dir=options.log_dir,
+                                 log_level=options.level.upper(),
+                                 pailgun_host=options.pailgun_host,
+                                 pailgun_port=options.pailgun_port,
+                                 fs_event_enabled=options.fs_event_detection,
+                                 fs_event_workers=options.fs_event_workers,
+                                 path_ignore_patterns=options.pants_ignore)
 
   def __init__(self,
                build_root,
@@ -138,11 +138,13 @@ class PantsDaemonLauncher(object):
                                            legacy_graph_cls)
       services.extend((fs_event_service, scheduler_service))
 
-    pailgun_service = PailgunService((self._pailgun_host, self._pailgun_port),
-                                     DaemonExiter,
-                                     DaemonPantsRunner,
-                                     scheduler_service,
-                                     self._engine_initializer.parse_commandline_to_spec_roots)
+    pailgun_service = PailgunService(
+      bind_addr=(self._pailgun_host, self._pailgun_port),
+      exiter_class=DaemonExiter,
+      runner_class=DaemonPantsRunner,
+      scheduler_service=scheduler_service,
+      spec_parser=self._engine_initializer.parse_commandline_to_spec_roots
+    )
     services.append(pailgun_service)
 
     # Construct a mapping of named ports used by the daemon's services. In the default case these
