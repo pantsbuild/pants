@@ -111,18 +111,19 @@ class FilesetRelPathWrapper(AbstractClass):
       if not isinstance(pattern, string_types):
         raise ValueError("Expected string patterns for {}: got {}".format(cls.__name__, patterns))
 
-    raw_excludes = kwargs.pop('exclude', [])
-    if isinstance(raw_excludes, string_types):
-      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+#    raw_excludes = kwargs.pop('exclude', [])
+#    if isinstance(raw_excludes, string_types):
+#      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+#
+#    # You can't subtract raw strings from globs
+#    def ensure_string_wrapped_in_list(element):
+#      if isinstance(element, string_types):
+#        return [element]
+#      else:
+#        return element
 
-    # You can't subtract raw strings from globs
-    def ensure_string_wrapped_in_list(element):
-      if isinstance(element, string_types):
-        return [element]
-      else:
-        return element
-
-    excludes = [ensure_string_wrapped_in_list(exclude) for exclude in raw_excludes]
+#    excludes = [ensure_string_wrapped_in_list(exclude) for exclude in raw_excludes]
+    excludes = cls.process_raw_excludes(kwargs.pop('exclude', []))
 
     # making sure there are no unknown arguments.
     unknown_args = set(kwargs.keys()) - cls.KNOWN_PARAMETERS
@@ -160,6 +161,20 @@ class FilesetRelPathWrapper(AbstractClass):
 
     # Check if the glob path has the correct root.
     return os.path.commonprefix([root, glob_path]) != root
+
+  @classmethod
+  def process_raw_excludes(cls, raw_excludes):
+    if isinstance(raw_excludes, string_types):
+      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+
+    # You can't subtract raw strings from globs
+    def ensure_string_wrapped_in_list(element):
+      if isinstance(element, string_types):
+        return [element]
+      else:
+        return element
+
+    return [ensure_string_wrapped_in_list(exclude) for exclude in raw_excludes]
 
   @classmethod
   def to_filespec(cls, args, root='', excludes=None):
