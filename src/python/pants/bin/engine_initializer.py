@@ -67,7 +67,6 @@ class EngineInitializer(object):
 
     build_root = get_buildroot()
     storage = Storage.create(debug=False)
-    # Ignore any dotfile below build_root except `.` itself
     project_tree = FileSystemProjectTree(build_root, path_ignore_patterns)
     symbol_table_cls = LegacySymbolTable
 
