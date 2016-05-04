@@ -19,21 +19,19 @@ class SchedulerService(PantsService):
   in memory.
   """
 
-  def __init__(self, fs_event_service, scheduler, engine, symbol_table_cls, build_graph_facade_cls):
+  def __init__(self, fs_event_service, legacy_graph_helper):
     """
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
                                             filesystem event handlers.
-    :param LocalScheduler scheduler: A Scheduler instance.
-    :param Engine engine: An Engine instance.
-    :param class symbol_table_cls: The class representing the symbol table.
-    :param class build_graph_facade_cls: The class representing the legacy BuildGraph facade.
+    :param LegacyGraphHelper legacy_graph_helper: The LegacyGraphHelper instance for graph
+                                                  construction.
     """
     super(SchedulerService, self).__init__()
     self._fs_event_service = fs_event_service
-    self._scheduler = scheduler
-    self._engine = engine
-    self._symbol_table_cls = symbol_table_cls
-    self._build_graph_facade_cls = build_graph_facade_cls
+    self._scheduler = legacy_graph_helper.scheduler
+    self._engine = legacy_graph_helper.engine
+    self._symbol_table_cls = legacy_graph_helper.symbol_table_cls
+    self._build_graph_facade_cls = legacy_graph_helper.build_graph_facade_cls
 
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=64)

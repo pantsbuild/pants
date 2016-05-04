@@ -125,17 +125,8 @@ class PantsDaemonLauncher(object):
     if self._fs_event_enabled:
       fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
 
-      (scheduler,
-       engine,
-       symbol_table_cls,
-       legacy_graph_cls) = self._engine_initializer.setup_legacy_graph(self._path_ignore_patterns)
-      # TODO(kwlzn): Circle back to improve the coupling between
-      # `EngineInitializer.setup_legacy_graph` + `SchedulerService.__init__`.
-      scheduler_service = SchedulerService(fs_event_service,
-                                           scheduler,
-                                           engine,
-                                           symbol_table_cls,
-                                           legacy_graph_cls)
+      legacy_graph_helper = self._engine_initializer.setup_legacy_graph(self._path_ignore_patterns)
+      scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
       services.extend((fs_event_service, scheduler_service))
 
     pailgun_service = PailgunService(
