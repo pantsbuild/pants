@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+from collections import namedtuple
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -43,6 +44,13 @@ class LegacySymbolTable(SymbolTable):
   @memoized_method
   def table(cls):
     return {alias: TargetAdaptor for alias in cls.aliases().target_types}
+
+
+class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler',
+                                                         'engine',
+                                                         'symbol_table_cls',
+                                                         'legacy_graph_cls'])):
+  """A container for the components necessary to construct a legacy BuildGraph facade."""
 
 
 class EngineInitializer(object):
@@ -86,7 +94,7 @@ class EngineInitializer(object):
     scheduler = LocalScheduler(dict(), tasks, storage, project_tree)
     engine = LocalSerialEngine(scheduler, storage)
 
-    return (scheduler, engine, symbol_table_cls, ExpGraph)
+    return LegacyGraphHelper(scheduler, engine, symbol_table_cls, ExpGraph)
 
   @classmethod
   @contextmanager
