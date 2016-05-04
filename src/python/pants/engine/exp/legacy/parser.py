@@ -12,18 +12,10 @@ import six
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
-from pants.engine.exp.legacy.globs import Globs, RGlobs, ZGlobs
-from pants.engine.exp.objects import Locatable, Serializable
+from pants.engine.exp.legacy.structs import Globs, RGlobs, TargetAdaptor, ZGlobs
+from pants.engine.exp.objects import Serializable
 from pants.engine.exp.parser import Parser
-from pants.engine.exp.struct import StructWithDeps
 from pants.util.memo import memoized_method, memoized_property
-
-
-class TargetAdaptor(StructWithDeps, Locatable):
-  """A Struct to imitate the existing Target.
-
-  Extending StructWithDeps causes the class to have a `dependencies` field marked Addressable.
-  """
 
 
 class LegacyPythonCallbacksParser(Parser):

@@ -5,14 +5,42 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import collections
 from abc import abstractproperty
 
 from pants.engine.exp.fs import Files as FSFiles
-from pants.engine.exp.fs import FileContent, PathGlobs
-from pants.engine.exp.nodes import Throw
+from pants.engine.exp.fs import PathGlobs
+from pants.engine.exp.objects import Locatable
+from pants.engine.exp.struct import StructWithDeps
 from pants.source import wrapped_globs
-from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
+
+
+class TargetAdaptor(StructWithDeps, Locatable):
+  """A Struct to imitate the existing Target.
+
+  Extending StructWithDeps causes the class to have a `dependencies` field marked Addressable.
+  """
+
+  @property
+  def sources_base_globs(self):
+    """Return a BaseGlobs for this Target's sources."""
+    if isinstance(self.sources, BaseGlobs):
+      return self.sources
+    elif self.sources is None:
+      return Files()
+    elif isinstance(self.sources, collections.Sequence):
+      return Files(*self.sources)
+    else:
+      raise ValueError('TODO: Could not construct PathGlobs from {}'.format(self.sources))
+
+  @property
+  def sources_path_globs(self):
+    """Converts captured `sources` arguments to a PathGlobs object.
+
+    This field may be projected to request files or file content for the paths in the sources field.
+    """
+    return self.sources_base_globs.to_path_globs(self.spec_path)
 
 
 class BaseGlobs(AbstractClass):
@@ -27,51 +55,14 @@ class BaseGlobs(AbstractClass):
     """The corresponding `wrapped_globs` class for this BaseGlobs."""
 
   def __init__(self, *patterns, **kwargs):
-    self.patterns = patterns
+    self.filespecs = self.legacy_globs_class.to_filespec(patterns)
     if kwargs:
       # TODO
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))
 
-  def to_fileset_with_spec(self, engine, scheduler, relpath):
-    """Return a `FilesetWithSpec` object for these files, computed using the given engine.
-
-    TODO: Simplify the engine API. See: https://github.com/pantsbuild/pants/issues/3070
-    """
-    filespecs = self.legacy_globs_class.to_filespec(self.patterns)
-    pathglobs = PathGlobs.create_from_specs(FSFiles, relpath, filespecs.get('globs', []))
-    lfc = LazyFilesContent(engine, scheduler, pathglobs)
-    return wrapped_globs.FilesetWithSpec('',
-                                         filespecs,
-                                         files_calculator=lfc.files,
-                                         file_content_calculator=lfc.file_content)
-
-
-class LazyFilesContent(object):
-  def __init__(self, engine, scheduler, pathglobs):
-    self._engine = engine
-    self._scheduler = scheduler
-    self._pathglobs = pathglobs
-
-  @memoized_property
-  def _file_contents(self):
-    # Execute a request for content for the computed PathGlobs.
-    # TODO: It might be useful to split requesting FileContent from requesting Paths, but
-    # in realistic cases this just populates caches that will be used for followup builds.
-    request = self._scheduler.execution_request([FileContent], [self._pathglobs])
-    result = self._engine.execute(request)
-    if result.error:
-      raise result.error
-    # Expect a value containing the list of Path results.
-    value, = result.root_products.values()
-    if type(value) is Throw:
-      raise ValueError('Failed to compute sources for {}: {}'.format(self._pathglobs, value.exc))
-    return {fc.path: fc.content for fc in value.value}
-
-  def files(self):
-    return self._file_contents.keys()
-
-  def file_content(self, path):
-    return self._file_contents.get(path, None)
+  def to_path_globs(self, relpath):
+    """Return a PathGlobs object representing this BaseGlobs class."""
+    return PathGlobs.create_from_specs(FSFiles, relpath, self.filespecs.get('globs', []))
 
 
 class Files(BaseGlobs):

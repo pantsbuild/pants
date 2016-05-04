@@ -71,7 +71,7 @@ class SourcesField(PayloadField):
     hasher.update(self.rel_path)
     for source in sorted(self.relative_to_buildroot()):
       hasher.update(source)
-      hasher.update(self.sources.file_content(source))
+      hasher.update(self.sources.file_hash(source))
     return hasher.hexdigest()
 
   def _validate_sources(self, sources):

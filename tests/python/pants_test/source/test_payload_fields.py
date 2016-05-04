@@ -62,7 +62,7 @@ class PayloadTest(BaseTest):
   def test_passes_fileset_with_spec_through(self):
     self.create_file('foo/a.txt', 'a_contents')
 
-    fileset = FilesetWithSpec('foo', 'a.txt', lambda: ['a.txt'])
+    fileset = LazyFilesetWithSpec('foo', 'a.txt', lambda: ['a.txt'])
     sf = SourcesField(sources=fileset)
 
     self.assertIs(fileset, sf.sources)
