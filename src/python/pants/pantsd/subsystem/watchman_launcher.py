@@ -15,7 +15,7 @@ from pants.util.memo import testable_memoized_property
 
 
 class WatchmanLauncher(object):
-  """Encapsulates access to Watchman."""
+  """A subsystem that encapsulates access to Watchman."""
 
   class Factory(Subsystem):
     options_scope = 'watchman'

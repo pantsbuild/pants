@@ -130,8 +130,7 @@ class GoalRunnerFactory(object):
     if self._global_options.enable_pantsd:
       # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
       with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
-        pantsd_launcher = PantsDaemonLauncher.global_instance()
-        pantsd_launcher.set_engine_initializer(EngineInitializer)
+        pantsd_launcher = PantsDaemonLauncher.Factory.global_instance().create(EngineInitializer)
         pantsd_launcher.maybe_launch()
 
   def _is_quiet(self):
@@ -198,7 +197,7 @@ class GoalRunner(object):
   @classmethod
   def subsystems(cls):
     # Subsystems used outside of any task.
-    return {SourceRootConfig, Reporting, Reproducer, RunTracker, PantsDaemonLauncher}
+    return {SourceRootConfig, Reporting, Reproducer, RunTracker, PantsDaemonLauncher.Factory}
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir
