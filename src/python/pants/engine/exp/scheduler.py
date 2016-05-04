@@ -30,7 +30,7 @@ class ProductGraph(object):
   class _Entry(object):
     """An entry representing a Node in the ProductGraph.
 
-    Equality for this object is intentionally `identity` for efficiency purposes: strutural
+    Equality for this object is intentionally `identity` for efficiency purposes: structural
     equality can be implemented by comparing the result of the `structure` method.
     """
     __slots__ = ('node', 'state', 'dependencies', 'dependents', 'cyclic_dependencies')
@@ -66,9 +66,7 @@ class ProductGraph(object):
 
   def is_complete(self, node):
     entry = self._nodes.get(node, None)
-    if not entry:
-      return False
-    return entry.state is not None
+    return entry and entry.state is not None
 
   def state(self, node):
     entry = self._nodes.get(node, None)
@@ -86,7 +84,7 @@ class ProductGraph(object):
     if type(state) in [Return, Throw, Noop]:
       entry.state = state
     elif type(state) is Waiting:
-      self._add_dependencies(node, entry, state.dependencies)
+      self._add_dependencies(entry, state.dependencies)
     else:
       raise State.raise_unrecognized(state)
 
@@ -99,7 +97,7 @@ class ProductGraph(object):
     Returns True if a cycle would be created by adding an edge from src->dest.
     """
     for entry in self._walk_entries([dest], entry_predicate=lambda _: True):
-      if entry == src:
+      if entry is src:
         return True
     return False
 
@@ -111,7 +109,7 @@ class ProductGraph(object):
       self._nodes[node] = entry = self._Entry(node)
     return entry
 
-  def _add_dependencies(self, node, node_entry, dependencies):
+  def _add_dependencies(self, node_entry, dependencies):
     """Adds dependency edges from the given src Node to the given dependency Nodes.
 
     Executes cycle detection: if adding one of the given dependencies would create
@@ -232,7 +230,7 @@ class ProductGraph(object):
       return predicate(entry.node, entry.state)
     entry_predicate = _entry_predicate if predicate else _default_entry_predicate
 
-    root_entries = list()
+    root_entries = []
     for root in roots:
       entry = self._nodes.get(root, None)
       if entry:
