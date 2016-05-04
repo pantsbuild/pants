@@ -6,9 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import fnmatch
-from hashlib import sha1
 import os
-from abc import abstractproperty, abstractmethod
+from abc import abstractmethod, abstractproperty
+from hashlib import sha1
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset

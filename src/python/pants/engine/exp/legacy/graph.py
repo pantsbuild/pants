@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from hashlib import sha1
 import logging
+from hashlib import sha1
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
@@ -127,7 +127,7 @@ class ExpGraph(BuildGraph):
       kwargs.pop('dependencies')
       # Replace the sources argument with a FilesetWithSpecs instance, or None.
       kwargs.pop('spec_path')
-      if sources in kwargs:
+      if 'sources' in kwargs:
         kwargs['sources'] = fileset_with_spec
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
@@ -196,7 +196,7 @@ class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies', 'sources
 def reify_legacy_graph(target_adaptor, dependencies, fileset_with_spec):
   """Given a TargetAdaptor and LegacyTargets for its deps, return a LegacyTarget."""
   return LegacyTarget(target_adaptor,
-                      [d.target_adaptor.address for d in dependencies],
+                      [d.adaptor.address for d in dependencies],
                       fileset_with_spec)
 
 

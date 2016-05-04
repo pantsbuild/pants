@@ -16,7 +16,8 @@ from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
-from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
+from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser
+from pants.engine.exp.legacy.structs import TargetAdaptor
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.nodes import FilesystemNode
 from pants.engine.exp.parser import SymbolTable

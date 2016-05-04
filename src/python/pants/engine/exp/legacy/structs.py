@@ -25,10 +25,10 @@ class TargetAdaptor(StructWithDeps, Locatable):
   @property
   def sources_base_globs(self):
     """Return a BaseGlobs for this Target's sources."""
-    if isinstance(self.sources, BaseGlobs):
-      return self.sources
-    elif self.sources is None:
+    if getattr(self, 'sources', None) is None:
       return Files()
+    elif isinstance(self.sources, BaseGlobs):
+      return self.sources
     elif isinstance(self.sources, collections.Sequence):
       return Files(*self.sources)
     else:
