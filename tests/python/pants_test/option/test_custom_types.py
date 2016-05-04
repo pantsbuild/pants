@@ -52,6 +52,10 @@ class CustomTypesTest(unittest.TestCase):
     self._do_test(["a'"], "a'")
     self._do_test(["\"a'"], "\"a'")
     self._do_test(["'a\""], "'a\"")
+    self._do_test(['a"""a'], 'a"""a')
+    self._do_test(['1,2'], '1,2')
+    self._do_test([1, 2], '+[1,2]')
+    self._do_test(['\\'], '\\')
 
   def test_unicode_comments(self):
     """We had a bug where unicode characters in comments would cause the option parser to fail.
