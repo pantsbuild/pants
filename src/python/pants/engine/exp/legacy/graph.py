@@ -200,7 +200,7 @@ def reify_legacy_graph(target_adaptor, dependencies, fileset_with_spec):
                       fileset_with_spec)
 
 
-def base_globs_to_fileset_with_spec(target_adaptor, source_files_content):
+def fileset_with_spec(target_adaptor, source_files_content):
   """Given a TargetAdaptor and FilesContent for its source field, create an EagerFilesetWithSpec.
   
   The TargetAdaptor is needed in orderfrom which it was parsed, and the pre-computed FilesContent
@@ -224,5 +224,5 @@ def create_legacy_graph_tasks():
     (EagerFilesetWithSpec,
      [Select(TargetAdaptor),
       SelectProjection(FilesContent, PathGlobs, ('sources_path_globs',), TargetAdaptor)],
-     base_globs_to_fileset_with_spec),
+     fileset_with_spec),
   ]
