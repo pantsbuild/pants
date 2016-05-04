@@ -16,10 +16,11 @@ class LuaToResources(PrepareResources):
   This is useful for stacks that execute Lua inside the JVM.
   Note that this is registered as "lua-to-resources" (with dashes).
   """
+
   def __init__(self, *args, **kwargs):
-      super(LuaToResources, self).__init__(*args, **kwargs)
+    super(LuaToResources, self).__init__(*args, **kwargs)
 
   def find_all_relevant_resources_targets(self):
-      def has_lua_files(target):
-        return isinstance(target, LuaLibrary)
-      return self.context.targets(predicate=has_lua_files)
+    def has_lua_files(target):
+      return isinstance(target, LuaLibrary)
+    return self.context.targets(predicate=has_lua_files)

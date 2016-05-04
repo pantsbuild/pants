@@ -21,6 +21,7 @@ def build_file_aliases():
     }
   )
 
+
 def register_goals():
   task(name='thrift-linter', action=ThriftLinter).install()
   task(name='scrooge', action=ScroogeGen).install('gen')
