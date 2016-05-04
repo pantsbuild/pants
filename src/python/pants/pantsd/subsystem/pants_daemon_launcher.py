@@ -19,48 +19,88 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import testable_memoized_property
 
 
-class PantsDaemonLauncher(Subsystem):
+class PantsDaemonLauncher(object):
   """A subsystem that manages the configuration and launching of pantsd."""
 
-  options_scope = 'pantsd'
+  class Factory(Subsystem):
+    options_scope = 'pantsd'
 
-  @classmethod
-  def register_options(cls, register):
-    register('--pailgun-host', advanced=True, default='127.0.0.1',
-             help='The host to bind the pants nailgun server to.')
-    register('--pailgun-port', advanced=True, type=int, default=0,
-             help='The port to bind the pants nailgun server to. Defaults to a random port.')
-    register('--log-dir', advanced=True, default=None,
-             help='The directory to log pantsd output to.')
-    register('--fs-event-detection', advanced=True, type=bool,
-             help='Whether or not to use filesystem event detection. Experimental.')
-    register('--fs-event-workers', advanced=True, type=int, default=4,
-             help='The number of workers to use for the filesystem event service executor pool.'
-                  ' Experimental.')
+    @classmethod
+    def register_options(cls, register):
+      register('--pailgun-host', advanced=True, default='127.0.0.1',
+               help='The host to bind the pants nailgun server to.')
+      register('--pailgun-port', advanced=True, type=int, default=0,
+               help='The port to bind the pants nailgun server to. Defaults to a random port.')
+      register('--log-dir', advanced=True, default=None,
+               help='The directory to log pantsd output to.')
+      register('--fs-event-detection', advanced=True, type=bool,
+               help='Whether or not to use filesystem event detection. Experimental.')
+      register('--fs-event-workers', advanced=True, type=int, default=4,
+               help='The number of workers to use for the filesystem event service executor pool.'
+                    ' Experimental.')
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(PantsDaemonLauncher, cls).subsystem_dependencies() + (WatchmanLauncher.Factory,)
+    @classmethod
+    def subsystem_dependencies(cls):
+      return super(PantsDaemonLauncher.Factory,
+                   cls).subsystem_dependencies() + (WatchmanLauncher.Factory,)
 
-  def __init__(self, *args, **kwargs):
-    super(PantsDaemonLauncher, self).__init__(*args, **kwargs)
-    self._logger = logging.getLogger(__name__)
-    self._build_root = get_buildroot()
+    def create(self, engine_initializer=None):
+      """
+      :param class engine_initializer: The class representing the EngineInitializer. Only necessary
+                                       for startup.
+      """
+      build_root = get_buildroot()
+      options = self.global_instance().get_options()
+      return PantsDaemonLauncher(build_root,
+                                 options.pants_workdir,
+                                 engine_initializer,
+                                 options.log_dir,
+                                 options.level.upper(),
+                                 options.pailgun_host,
+                                 options.pailgun_port,
+                                 options.fs_event_detection,
+                                 options.fs_event_workers,
+                                 options.pants_ignore)
 
-    options = self.get_options()
-    self._pants_workdir = options.pants_workdir
-    self._log_dir = options.log_dir
-    self._log_level = options.level.upper()
-    self._pailgun_host = options.pailgun_host
-    self._pailgun_port = options.pailgun_port
-    self._fs_event_enabled = options.fs_event_detection
-    self._fs_event_workers = options.fs_event_workers
-    self._path_ignore_patterns = options.pants_ignore
+  def __init__(self,
+               build_root,
+               pants_workdir,
+               engine_initializer,
+               log_dir,
+               log_level,
+               pailgun_host,
+               pailgun_port,
+               fs_event_enabled,
+               fs_event_workers,
+               path_ignore_patterns):
+    """
+    :param str build_root: The path of the build root.
+    :param str pants_workdir: The path of the pants workdir.
+    :param class engine_initializer: The class representing the EngineInitializer.
+    :param str log_dir: The path for pantsd logs.
+    :param str log_level: The log level for pantsd logs (derived from the pants log level).
+    :param str pailgun_host: The bind address for the Pailgun server.
+    :param int pailgun_port: The bind port for the Pailgun server.
+    :param bool fs_event_enabled: Whether or not to enable fs event detection (Watchman) for graph
+                                  invalidation.
+    :param int fs_event_workers: The number of workers to use for processing the fs event queue.
+    :param list path_ignore_patterns: A list of ignore patterns for filesystem operations.
+    """
+    self._build_root = build_root
+    self._pants_workdir = pants_workdir
+    self._engine_initializer = engine_initializer
+    self._log_dir = log_dir
+    self._log_level = log_level
+    self._pailgun_host = pailgun_host
+    self._pailgun_port = pailgun_port
+    self._fs_event_enabled = fs_event_enabled
+    self._fs_event_workers = fs_event_workers
+    self._path_ignore_patterns = path_ignore_patterns
     # TODO(kwlzn): Thread filesystem path ignores here to Watchman's subscription registration.
 
     lock_location = os.path.join(self._build_root, '.pantsd.startup')
     self._lock = OwnerPrintingInterProcessFileLock(lock_location)
-    self._engine_initializer = None
+    self._logger = logging.getLogger(__name__)
 
   @testable_memoized_property
   def pantsd(self):
@@ -69,9 +109,6 @@ class PantsDaemonLauncher(Subsystem):
   @testable_memoized_property
   def watchman_launcher(self):
     return WatchmanLauncher.Factory.global_instance().create()
-
-  def set_engine_initializer(self, initializer):
-    self._engine_initializer = initializer
 
   def _setup_services(self, watchman):
     """Initialize pantsd services.
