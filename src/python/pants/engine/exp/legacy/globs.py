@@ -83,10 +83,12 @@ class LazyFilesContent(object):
     included = result.root_products[request.roots[0]]
     excluded = result.root_products[request.roots[1]]
 
-    if type(included) is Throw:
-      raise ValueError('Failed to compute sources for {}: {}'.format(self._pathglobs, included.exc))
-    if type(excluded) is Throw:
-      raise ValueError('Failed to compute sources for {}: {}'.format(self._excluded_pathglobs, excluded.exc))
+    def _check_throw(pairs):
+      for subject, product in pairs:
+        if type(product) is Throw:
+          raise ValueError('Failed to compute sources for {}: {}'.format(subject, product.exc))
+
+    _check_throw([(self._pathglobs, included), (self._excluded_pathglobs, excluded)])
 
     return {fc.path: fc.content for fc in included.value if fc not in excluded.value}
 

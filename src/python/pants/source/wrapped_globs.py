@@ -111,18 +111,6 @@ class FilesetRelPathWrapper(AbstractClass):
       if not isinstance(pattern, string_types):
         raise ValueError("Expected string patterns for {}: got {}".format(cls.__name__, patterns))
 
-#    raw_excludes = kwargs.pop('exclude', [])
-#    if isinstance(raw_excludes, string_types):
-#      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
-#
-#    # You can't subtract raw strings from globs
-#    def ensure_string_wrapped_in_list(element):
-#      if isinstance(element, string_types):
-#        return [element]
-#      else:
-#        return element
-
-#    excludes = [ensure_string_wrapped_in_list(exclude) for exclude in raw_excludes]
     excludes = cls.process_raw_excludes(kwargs.pop('exclude', []))
 
     # making sure there are no unknown arguments.

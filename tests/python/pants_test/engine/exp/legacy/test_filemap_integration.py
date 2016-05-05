@@ -22,3 +22,14 @@ class FilemapIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
   def test_scala_examples(self):
     self.do_filemap(True, 'examples/src/scala/org/pantsbuild/example/::')
+
+  def test_exclude_files(self):
+    path_prefix = 'testprojects/tests/python/pants/file_sets/'
+    stdout_data = self.do_filemap(True, path_prefix + '::').stdout_data
+    test_out = {s.split(' ')[0].replace(path_prefix, '')
+                for s in stdout_data.split('\n') if s.startswith(path_prefix)}
+
+    self.assertEquals({'a.py', 'aa.py', 'aabb.py',
+                       'dir1/aa.py', 'dir1/ab.py', 'dir1/aabb.py',
+                       'dir1/dirdir1/aa.py'
+                       }, test_out)

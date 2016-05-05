@@ -21,6 +21,7 @@ python_library(
     'src/python/pants/engine/exp:fs',
     'src/python/pants/engine/exp:nodes',
     'src/python/pants/source',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],
