@@ -9,6 +9,7 @@ import collections
 from abc import abstractproperty
 
 from pants.build_graph.address import Addresses
+from pants.engine.exp.addressable import Exactly, addressable_list
 from pants.engine.exp.fs import Files as FSFiles
 from pants.engine.exp.fs import PathGlobs
 from pants.engine.exp.objects import Locatable
@@ -58,6 +59,20 @@ class BundleAdaptor(Struct):
 
   Bundles have filesets which we need to capture in order to execute them in the engine.
   """
+
+
+class JvmAppAdaptor(TargetAdaptor):
+  def __init__(self, bundles=None, **kwargs):
+    """
+    :param list bundles: A list of `BundleAdaptor` objects
+    """
+    super(JvmAppAdaptor, self).__init__(**kwargs)
+    self.bundles = bundles
+
+  @addressable_list(Exactly(BundleAdaptor))
+  def bundles(self):
+    """The BundleAdaptors for this JvmApp."""
+    return self.bundles
 
 
 class BaseGlobs(AbstractClass):

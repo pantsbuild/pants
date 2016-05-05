@@ -197,6 +197,9 @@ class LegacySourcesField(datatype('LegacySourcesField', ['sources'])):
 
 def reify_legacy_graph(target_adaptor, dependencies, sources_field):
   """Given a TargetAdaptor and LegacyTargets for its deps, return a LegacyTarget."""
+  if target_adaptor.type_alias == 'jvm_app':
+    # TODO:
+    print('>>> {}: {}'.format(target_adaptor, target_adaptor.bundles))
   return LegacyTarget(target_adaptor,
                       [d.adaptor.address for d in dependencies],
                       sources_field.sources)

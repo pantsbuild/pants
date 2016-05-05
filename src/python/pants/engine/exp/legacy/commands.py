@@ -17,7 +17,7 @@ from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
 from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.exp.legacy.structs import TargetAdaptor
+from pants.engine.exp.legacy.structs import JvmAppAdaptor, TargetAdaptor
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.nodes import FilesystemNode
 from pants.engine.exp.parser import SymbolTable
@@ -42,7 +42,12 @@ class LegacyTable(SymbolTable):
   @classmethod
   @memoized_method
   def table(cls):
-    return {alias: TargetAdaptor for alias in cls.aliases().target_types}
+    def target_type(alias):
+      if alias == 'jvm_app':
+        return JvmAppAdaptor
+      else:
+        return TargetAdaptor
+    return {alias: target_type(alias) for alias in cls.aliases().target_types}
 
 
 def setup(options=None):
