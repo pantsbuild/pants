@@ -1,0 +1,17 @@
+{
+  "builders": [{
+    "type": "amazon-ebs",
+    "region": "us-east-1",
+    "source_ami": "ami-840910ee",
+    "instance_type": "r3.xlarge",
+    "ssh_username": "ubuntu",
+    "ami_name": "pantsbuild-jenkins-slave.{{timestamp}}"
+  }],
+  "provisioners": [{
+    "type": "shell",
+    "scripts": [
+      "jenkins-slave.packages.sh",
+      "jenkins-slave.customize.sh"
+    ]
+  }]
+}

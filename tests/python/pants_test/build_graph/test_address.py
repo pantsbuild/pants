@@ -109,6 +109,8 @@ class BaseAddressTest(unittest.TestCase):
 
 class AddressTest(BaseAddressTest):
   def test_equivalence(self):
+    self.assertNotEqual("Not really an address", Address('a/b', 'c'))
+
     self.assertEqual(Address('a/b', 'c'), Address('a/b', 'c'))
     self.assertEqual(Address('a/b', 'c'), Address.parse('a/b:c'))
     self.assertEqual(Address.parse('a/b:c'), Address.parse('a/b:c'))

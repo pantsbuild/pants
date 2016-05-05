@@ -87,7 +87,7 @@ class GraphValidator(object):
 
     # Locate roots: those who do not have any dependents for the same subject.
     roots = set()
-    for node, dependents in product_graph.dependents().items():
+    for node, dependents in product_graph.dependents():
       if any(d.subject == node.subject for d in dependents):
         # Node had a dependent for its subject: was not a root.
         continue

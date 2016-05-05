@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
-import itertools
 import os
 import unittest
 
@@ -281,9 +280,43 @@ class ProductGraphTest(unittest.TestCase):
 
   def test_dependency_edges(self):
     self.pg.update_state('A', Waiting(['B', 'C']))
-    self.assertEquals({'B', 'C'}, self.pg.dependencies_of('A'))
-    self.assertEquals({'A'}, self.pg.dependents_of('B'))
-    self.assertEquals({'A'}, self.pg.dependents_of('C'))
+    self.assertEquals({'B', 'C'}, set(self.pg.dependencies_of('A')))
+    self.assertEquals({'A'}, set(self.pg.dependents_of('B')))
+    self.assertEquals({'A'}, set(self.pg.dependents_of('C')))
+
+  def test_cycle_simple(self):
+    self.pg.update_state('A', Waiting(['B']))
+    self.pg.update_state('B', Waiting(['A']))
+    # NB: Order matters: the second insertion is the one tracked as a cycle.
+    self.assertEquals({'B'}, set(self.pg.dependencies_of('A')))
+    self.assertEquals(set(), set(self.pg.dependencies_of('B')))
+    self.assertEquals(set(), set(self.pg.cyclic_dependencies_of('A')))
+    self.assertEquals({'A'}, set(self.pg.cyclic_dependencies_of('B')))
+
+  def test_cycle_indirect(self):
+    self.pg.update_state('A', Waiting(['B']))
+    self.pg.update_state('B', Waiting(['C']))
+    self.pg.update_state('C', Waiting(['A']))
+
+    self.assertEquals({'B'}, set(self.pg.dependencies_of('A')))
+    self.assertEquals({'C'}, set(self.pg.dependencies_of('B')))
+    self.assertEquals(set(), set(self.pg.dependencies_of('C')))
+    self.assertEquals(set(), set(self.pg.cyclic_dependencies_of('A')))
+    self.assertEquals(set(), set(self.pg.cyclic_dependencies_of('B')))
+    self.assertEquals({'A'}, set(self.pg.cyclic_dependencies_of('C')))
+
+  def test_cycle_long(self):
+    # Creating a long chain is allowed.
+    nodes = list(range(0, 100))
+    self._mk_chain(self.pg, nodes, states=(Waiting,))
+    walked_nodes = [node for node, _ in self.pg.walk([nodes[0]])]
+    self.assertEquals(nodes, walked_nodes)
+
+    # Closing the chain is not.
+    begin, end = nodes[0], nodes[-1]
+    self.pg.update_state(end, Waiting([begin]))
+    self.assertEquals(set(), set(self.pg.dependencies_of(end)))
+    self.assertEquals({begin}, set(self.pg.cyclic_dependencies_of(end)))
 
   def test_walk(self):
     nodes = list('ABCDEF')
@@ -308,10 +341,7 @@ class ProductGraphTest(unittest.TestCase):
 
       invalidator()
 
-      self.assertFalse(self.pg.completed_nodes())
-      self.assertFalse(self.pg.dependents())
-      self.assertFalse(self.pg.dependencies())
-      self.assertFalse(self.pg.cyclic_dependencies())
+      self.assertFalse(self.pg._nodes)
 
   def test_invalidate_partial(self):
     comparison_pg = ProductGraph(validator=lambda _: True)
@@ -328,11 +358,10 @@ class ProductGraphTest(unittest.TestCase):
     # Invalidate one of the chains in the primary graph from the right-most node.
     self.pg.invalidate(lambda node, _: node == chain_a[-1])
 
-    # Ensure the final state of the primary graph matches the comparison graph.
-    self.assertEquals(self.pg.completed_nodes(), comparison_pg.completed_nodes())
-    self.assertEquals(self.pg.dependents(), comparison_pg.dependents())
-    self.assertEquals(self.pg.dependencies(), comparison_pg.dependencies())
-    self.assertEquals(self.pg.cyclic_dependencies(), comparison_pg.cyclic_dependencies())
+    # Ensure the final structure of the primary graph matches the comparison graph.
+    pg_structure = {n: e.structure() for n, e in self.pg._nodes.items()}
+    comparison_structure = {n: e.structure() for n, e in comparison_pg._nodes.items()}
+    self.assertEquals(pg_structure, comparison_structure)
 
   def test_invalidate_count(self):
     self._mk_chain(self.pg, list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
@@ -342,40 +371,24 @@ class ProductGraphTest(unittest.TestCase):
   def test_invalidate_partial_identity_check(self):
     # Create a graph with a chain from A..Z.
     chain = self._mk_chain(self.pg, list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
-    self.assertTrue(self.pg.completed_nodes())
+    self.assertTrue(list(self.pg.completed_nodes()))
 
     # Track the pre-invaliation nodes (from A..Q).
     index_of_q = chain.index('Q')
-    before_nodes = filter(lambda node: node in chain[:index_of_q + 1], self.pg.completed_nodes())
+    before_nodes = [node for node, _ in self.pg.completed_nodes() if node in chain[:index_of_q + 1]]
     self.assertTrue(before_nodes)
 
     # Invalidate all nodes under Q.
     self.pg.invalidate(lambda node, _: node == chain[index_of_q])
-    self.assertTrue(self.pg.completed_nodes())
-
-    def _label_tuples(collection, name):
-      for item in collection:
-        yield tuple(list(item) + [name])
+    self.assertTrue(list(self.pg.completed_nodes()))
 
     # Check that the root node and all fs nodes were removed via a identity checks.
-    chain = itertools.chain(
-      _label_tuples(self.pg.completed_nodes().items(), 'completed_nodes'),
-      _label_tuples(self.pg.dependents().items(), 'dependents'),
-      _label_tuples(self.pg.dependencies().items(), 'dependencies'),
-      _label_tuples(self.pg.cyclic_dependencies().items(), 'cyclic_dependencies')
-    )
+    for node, entry in self.pg._nodes.items():
+      self.assertFalse(node in before_nodes, 'node:\n{}\nwasnt properly removed'.format(node))
 
-    for node, associated, collection_name in chain:
-      self.assertFalse(
-        node in before_nodes,
-        'node:\n{}\nwasnt properly removed from {}'.format(node, collection_name)
-      )
-
-      if isinstance(associated, set):
-        for associated_node in associated:
+      for associated in (entry.dependencies, entry.dependents, entry.cyclic_dependencies):
+        for associated_entry in associated:
           self.assertFalse(
-            associated_node in before_nodes,
-            'node:\n{}\nis still associated with:\n{}\nin {}'.format(associated_node,
-                                                                     node,
-                                                                     collection_name)
+            associated_entry.node in before_nodes,
+            'node:\n{}\nis still associated with:\n{}\nin {}'.format(node, associated_entry.node, entry)
           )

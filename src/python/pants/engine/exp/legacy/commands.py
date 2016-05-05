@@ -53,7 +53,7 @@ def setup(options=None):
 
   storage = Storage.create(debug=False)
   # Ignore any dotfile below build_root except . itself
-  project_tree = FileSystemProjectTree(build_root, ['.*'])
+  project_tree = FileSystemProjectTree(build_root, ['.*', 'build-support/*.venv/'])
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.
@@ -126,6 +126,6 @@ def filemap():
 def fsnodes():
   """Prints out all of the FilesystemNodes in the Scheduler for debugging purposes."""
   with open_exp_graph() as (_, _, scheduler):
-    for node in scheduler.product_graph.completed_nodes():
+    for node, _ in scheduler.product_graph.completed_nodes():
       if type(node) is FilesystemNode:
         print(node)

@@ -45,6 +45,8 @@ Going forward its expected new subsystem types are just factories for options-co
 
 The following rules apply to definitions in the public API. No rules apply to definitions outside the public API. Those may be changed in any way at any time.
 
+In the case of a legal requirement to change API's we will make our best effort to minimize impact for plugin developers.
+
 Allowed API Changes
 -------------------
 
@@ -58,6 +60,7 @@ Allowed API Changes
 - Adding/removing/renaming any module or method not marked `:API: public` in the docstring.
 - Fixing bugs.
   - Exceptions for severe or special case bugs may be considered on a case-by-case basis.
+- API changes that would normally be disallowed but are legally required.
 
 Disallowed API Changes
 ----------------------
