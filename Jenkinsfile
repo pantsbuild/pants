@@ -27,7 +27,7 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
           LOCAL_CACHE="\$(pwd)/.cache"
           export XDG_CACHE_HOME="\${LOCAL_CACHE}/pantsbuild"
           export PEX_ROOT="\${LOCAL_CACHE}/pex"
-          export PANTS_IVY_CACHE_DIR="\${LOCAL_CACHE}/ivy
+          export PANTS_IVY_CACHE_DIR="\${LOCAL_CACHE}/ivy"
 
           # For c/c++ contrib plugin tests.
           export CXX=g++
