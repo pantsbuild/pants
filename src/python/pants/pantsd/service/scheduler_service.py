@@ -84,7 +84,8 @@ class SchedulerService(PantsService):
     """Returns a factory that provides a legacy BuildGraph given a set of input specs."""
     graph = self._build_graph_facade_cls(self._scheduler, self._engine, self._symbol_table_cls)
     with self._scheduler.locked():
-      all(graph.inject_specs_closure(spec_roots))
+      for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
+        pass
     self._logger.debug('engine cache stats: %s', self._engine._cache.get_stats())
     self._logger.debug('build_graph is: %s', graph)
     return graph
