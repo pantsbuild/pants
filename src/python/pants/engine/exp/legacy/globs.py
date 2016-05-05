@@ -88,7 +88,8 @@ class LazyFilesContent(object):
 
     _check_throw([(self._pathglobs, included), (self._excluded_pathglobs, excluded)])
 
-    return {fc.path: fc.content for fc in included.value if fc not in set(excluded.value)}
+    excluded_set = set(excluded.value)
+    return {fc.path: fc.content for fc in included.value if fc not in excluded_set}
 
   def files(self):
     return self._file_contents.keys()
