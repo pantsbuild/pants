@@ -17,6 +17,7 @@ python_library(
   name='structs',
   sources=['structs.py'],
   dependencies=[
+    'src/python/pants/build_graph',
     'src/python/pants/engine/exp:fs',
     'src/python/pants/engine/exp:objects',
     'src/python/pants/engine/exp:struct',

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 from abc import abstractproperty
 
+from pants.build_graph.address import Addresses
 from pants.engine.exp.fs import Files as FSFiles
 from pants.engine.exp.fs import PathGlobs
 from pants.engine.exp.objects import Locatable
@@ -23,16 +24,25 @@ class TargetAdaptor(StructWithDeps, Locatable):
   """
 
   @property
+  def has_deferred_sources(self):
+    """Returns true if this target has "deferred" sources: see graph.LegacySourcesField."""
+    return isinstance(getattr(self, 'sources', None), Addresses)
+
+  @property
   def sources_base_globs(self):
-    """Return a BaseGlobs for this Target's sources."""
-    if getattr(self, 'sources', None) is None:
+    """Return a BaseGlobs for this Target's sources field."""
+    sources = getattr(self, 'sources', None)
+    if sources is None:
       return Files()
-    elif isinstance(self.sources, BaseGlobs):
-      return self.sources
-    elif isinstance(self.sources, collections.Sequence):
-      return Files(*self.sources)
+    elif self.has_deferred_sources:
+      # Report as empty for now, to allow it to be reified later.
+      return Files()
+    elif isinstance(sources, BaseGlobs):
+      return sources
+    elif isinstance(sources, collections.Sequence):
+      return Files(*sources)
     else:
-      raise ValueError('TODO: Could not construct PathGlobs from {}'.format(self.sources))
+      raise ValueError('TODO: Could not construct PathGlobs from {}'.format(sources))
 
   @property
   def sources_path_globs(self):

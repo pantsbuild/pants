@@ -185,17 +185,37 @@ class ExpGraph(BuildGraph):
 
 
 class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies', 'sources'])):
-  """A node to represent a node in the legacy BuildGraph.
+  """A class to represent a node and edges in the legacy BuildGraph.
 
   The ExpGraph implementation inspects only these entries in the ProductGraph.
   """
 
 
-def reify_legacy_graph(target_adaptor, dependencies, fileset_with_spec):
+class LegacySourcesField(datatype('LegacySourcesField', ['sources'])):
+  """Either `FilesetWithSpec` or `Addresses` are allowed as Target.sources."""
+
+
+def reify_legacy_graph(target_adaptor, dependencies, sources_field):
   """Given a TargetAdaptor and LegacyTargets for its deps, return a LegacyTarget."""
   return LegacyTarget(target_adaptor,
                       [d.adaptor.address for d in dependencies],
-                      fileset_with_spec)
+                      sources_field.sources)
+
+
+def legacy_sources_field(target_adaptor, fileset_with_spec):
+  """Given a TargetAdaptor and a FilesetWithSpec create a LegacySourcesField.
+
+  If the Target has deferred sources, the creation of the FilesetWithSpec was a noop: we
+  don't support having both.
+
+  NB: once ivy is implemented in the engine, we can fetch sources natively here, and/or
+  refactor how deferred sources are implemented.
+    see: https://github.com/pantsbuild/pants/issues/2997
+  """
+  if target_adaptor.has_deferred_sources:
+    return LegacySourcesField(target_adaptor.sources)
+  else:
+    return LegacySourcesField(fileset_with_spec)
 
 
 def fileset_with_spec(target_adaptor, source_files_content):
@@ -215,8 +235,12 @@ def create_legacy_graph_tasks():
     (LegacyTarget,
      [Select(TargetAdaptor),
       SelectDependencies(LegacyTarget, TargetAdaptor),
-      Select(EagerFilesetWithSpec)],
+      Select(LegacySourcesField)],
      reify_legacy_graph),
+    (LegacySourcesField,
+     [Select(TargetAdaptor),
+      Select(EagerFilesetWithSpec)],
+     legacy_sources_field),
     (EagerFilesetWithSpec,
      [Select(TargetAdaptor),
       SelectProjection(FilesContent, PathGlobs, ('sources_path_globs',), TargetAdaptor)],
