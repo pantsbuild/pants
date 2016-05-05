@@ -32,7 +32,6 @@ class BaseGlobs(AbstractClass):
     self.excludes = self.legacy_globs_class.process_raw_excludes(kwargs.pop('exclude', []))
 
     if kwargs:
-      # TODO
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))
 
   def to_fileset_with_spec(self, engine, scheduler, relpath):
@@ -48,8 +47,7 @@ class BaseGlobs(AbstractClass):
         for file_path in file_set:
           excluded_patterns.append(fast_relpath(file_path, relpath))
       else:
-        for pattern in exclude:
-          excluded_patterns.append(pattern)
+        excluded_patterns.extend(exclude)
 
     excluded_filespecs = self.legacy_globs_class.to_filespec(excluded_patterns)
 
@@ -90,7 +88,7 @@ class LazyFilesContent(object):
 
     _check_throw([(self._pathglobs, included), (self._excluded_pathglobs, excluded)])
 
-    return {fc.path: fc.content for fc in included.value if fc not in excluded.value}
+    return {fc.path: fc.content for fc in included.value if fc not in set(excluded.value)}
 
   def files(self):
     return self._file_contents.keys()

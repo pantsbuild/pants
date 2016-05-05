@@ -23,13 +23,43 @@ class FilemapIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_scala_examples(self):
     self.do_filemap(True, 'examples/src/scala/org/pantsbuild/example/::')
 
-  def test_exclude_files(self):
-    path_prefix = 'testprojects/tests/python/pants/file_sets/'
-    stdout_data = self.do_filemap(True, path_prefix + '::').stdout_data
-    test_out = {s.split(' ')[0].replace(path_prefix, '')
-                for s in stdout_data.split('\n') if s.startswith(path_prefix)}
+  TEST_EXCLUDE_FILES = {'a.py', 'aa.py', 'aaa.py', 'ab.py', 'aabb.py',
+                        'dir1/a.py', 'dir1/aa.py', 'dir1/aaa.py', 'dir1/ab.py', 'dir1/aabb.py',
+                        'dir1/dirdir1/a.py', 'dir1/dirdir1/aa.py', 'dir1/dirdir1/ab.py'}
 
-    self.assertEquals({'a.py', 'aa.py', 'aabb.py',
-                       'dir1/aa.py', 'dir1/ab.py', 'dir1/aabb.py',
-                       'dir1/dirdir1/aa.py'
-                       }, test_out)
+  def _extract_exclude_output(self, test_name):
+    path_prefix = 'testprojects/tests/python/pants/file_sets/'
+    stdout_data = self.do_filemap(True, '{}:{}'.format(path_prefix, test_name)).stdout_data
+    return {s.split(' ')[0].replace(path_prefix, '')
+            for s in stdout_data.split('\n') if s.startswith(path_prefix)}
+
+  def test_exclude_string(self):
+    test_out = self._extract_exclude_output('exclude_string')
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aaa.py', 'dir1/aaa.py'},
+                      test_out)
+
+  def test_exclude_globs(self):
+    test_out = self._extract_exclude_output('exclude_globs')
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aabb.py', 'dir1/dirdir1/aa.py'},
+                      test_out)
+
+  def test_exclude_rglobs(self):
+    test_out = self._extract_exclude_output('exclude_rglobs')
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'ab.py', 'aabb.py', 'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
+                      test_out)
+
+  def test_exclude_zglobs(self):
+    test_out = self._extract_exclude_output('exclude_zglobs')
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
+                      test_out)
+
+  def test_exclude_nested(self):
+    test_out = self._extract_exclude_output('exclude_nested')
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'ab.py', 'dir1/dirdir1/ab.py'},
+                      test_out)
+
+  def test_exclude_composite(self):
+    test_out = self._extract_exclude_output('exclude_composite')
+    self.assertEquals(self.TEST_EXCLUDE_FILES -
+                      {'aaa.py', 'ab.py', 'dir1/a.py', 'dir1/ab.py', 'dir1/dirdir1/a.py', 'dir1/dirdir1/ab.py'},
+                      test_out)

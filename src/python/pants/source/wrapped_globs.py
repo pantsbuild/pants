@@ -150,8 +150,8 @@ class FilesetRelPathWrapper(AbstractClass):
     # Check if the glob path has the correct root.
     return os.path.commonprefix([root, glob_path]) != root
 
-  @classmethod
-  def process_raw_excludes(cls, raw_excludes):
+  @staticmethod
+  def process_raw_excludes(raw_excludes):
     if isinstance(raw_excludes, string_types):
       raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
 
