@@ -31,7 +31,7 @@ class SchedulerService(PantsService):
     self._scheduler = legacy_graph_helper.scheduler
     self._engine = legacy_graph_helper.engine
     self._symbol_table_cls = legacy_graph_helper.symbol_table_cls
-    self._build_graph_facade_cls = legacy_graph_helper.build_graph_facade_cls
+    self._build_graph_facade_cls = legacy_graph_helper.legacy_graph_cls
 
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=64)
