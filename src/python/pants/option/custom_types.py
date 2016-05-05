@@ -148,7 +148,7 @@ class ListValueComponent(object):
       val = _convert(value[1:], (list, tuple))
     elif isinstance(value, six.string_types):
       action = cls.EXTEND
-      val = _convert('[r"""{}"""]'.format(value), list)
+      val = [value]
     else:
       action = cls.EXTEND
       val = _convert('[{}]'.format(value), list)
