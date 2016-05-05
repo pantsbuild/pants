@@ -34,15 +34,15 @@ class TargetAdaptor(StructWithDeps, Locatable):
     sources = getattr(self, 'sources', None)
     if sources is None:
       return Files()
+    elif isinstance(sources, collections.Sequence):
+      return Files(*sources)
+    elif isinstance(sources, BaseGlobs):
+      return sources
     elif self.has_deferred_sources:
       # Report as empty for now, to allow it to be reified later.
       return Files()
-    elif isinstance(sources, BaseGlobs):
-      return sources
-    elif isinstance(sources, collections.Sequence):
-      return Files(*sources)
     else:
-      raise ValueError('TODO: Could not construct PathGlobs from {}'.format(sources))
+      raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
   @property
   def sources_path_globs(self):
