@@ -73,7 +73,7 @@ class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
 class Collection(object):
   """
   Singleton Collection Type. The ambition is to gain native support for flattening,
-  so methods like <pants.engine.exp.fs.merge_files> won't have to be defined separately.
+  so methods like <pants.engine.v2.fs.merge_files> won't have to be defined separately.
   Related to: https://github.com/pantsbuild/pants/issues/3169
   """
 

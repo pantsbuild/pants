@@ -21,7 +21,7 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-class ExpGraph(BuildGraph):
+class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
   This implementation is backed by a Scheduler that is able to resolve LegacyBuildGraphNodes.
@@ -39,10 +39,10 @@ class ExpGraph(BuildGraph):
     self._graph = scheduler.product_graph
     self._target_types = symbol_table_cls.aliases().target_types
     self._engine = engine
-    super(ExpGraph, self).__init__()
+    super(LegacyBuildGraph, self).__init__()
 
   def reset(self):
-    super(ExpGraph, self).reset()
+    super(LegacyBuildGraph, self).reset()
     self._index([node for node, _ in self._graph.completed_nodes()])
 
   def _index(self, roots):
@@ -201,7 +201,7 @@ class ExpGraph(BuildGraph):
 class LegacyBuildGraphNode(datatype('LegacyGraphNode', ['target_adaptor', 'dependency_addresses'])):
   """A Node to represent a node in the legacy BuildGraph.
 
-  The ExpGraph implementation inspects only these entries in the ProductGraph.
+  The LegacyBuildGraph implementation inspects only these entries in the ProductGraph.
   """
 
 
