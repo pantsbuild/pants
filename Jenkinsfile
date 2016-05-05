@@ -23,13 +23,14 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
         checkout scm
         sh(
           """
+          # Various caches isolated to the shard dir to work around races.
+          LOCAL_CACHE="\$(pwd)/.cache"
+          export XDG_CACHE_HOME="\${LOCAL_CACHE}/pantsbuild"
+          export PEX_ROOT="\${LOCAL_CACHE}/pex"
+          export PANTS_IVY_CACHE_DIR="\${LOCAL_CACHE}/ivy
+
+          # For c/c++ contrib plugin tests.
           export CXX=g++
-
-          export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
-          echo \$XDG_CACHE_HOME
-
-          export PEX_ROOT="\$(pwd)/.cache/pex"
-          echo \$PEX_ROOT
 
           ./build-support/bin/ci.sh ${flags}
           """.toString().stripIndent()
