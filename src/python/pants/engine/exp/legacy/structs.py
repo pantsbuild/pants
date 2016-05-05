@@ -12,7 +12,7 @@ from pants.build_graph.address import Addresses
 from pants.engine.exp.fs import Files as FSFiles
 from pants.engine.exp.fs import PathGlobs
 from pants.engine.exp.objects import Locatable
-from pants.engine.exp.struct import StructWithDeps
+from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.meta import AbstractClass
 
@@ -51,6 +51,13 @@ class TargetAdaptor(StructWithDeps, Locatable):
     This field may be projected to request files or file content for the paths in the sources field.
     """
     return self.sources_base_globs.to_path_globs(self.spec_path)
+
+
+class BundleAdaptor(Struct):
+  """A Struct to capture the args for the `bundle` object.
+
+  Bundles have filesets which we need to capture in order to execute them in the engine.
+  """
 
 
 class BaseGlobs(AbstractClass):

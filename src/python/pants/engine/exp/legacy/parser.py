@@ -12,7 +12,7 @@ import six
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
-from pants.engine.exp.legacy.structs import Globs, RGlobs, TargetAdaptor, ZGlobs
+from pants.engine.exp.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
 from pants.engine.exp.objects import Serializable
 from pants.engine.exp.parser import Parser
 from pants.util.memo import memoized_method, memoized_property
@@ -86,6 +86,7 @@ class LegacyPythonCallbacksParser(Parser):
     symbols['globs'] = Globs
     symbols['rglobs'] = RGlobs
     symbols['zglobs'] = ZGlobs
+    symbols['bundle'] = BundleAdaptor
 
     return symbols, parse_context
 
