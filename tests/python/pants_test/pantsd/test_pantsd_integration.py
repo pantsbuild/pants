@@ -9,9 +9,15 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class TestPantsDaemonIntegration(PantsRunIntegrationTest):
+  def _print_pantsd_log(self, workdir):
+    # Surface the pantsd log for easy viewing via pytest's `-s` (don't redirect stdio) option.
+    print('pantsd.log:\n')
+    with open('{}/pantsd/pantsd.log'.format(workdir)) as f:
+      for line in f:
+        print(line, end='')
+
   def test_pantsd_run(self):
-    pantsd_config = {'GLOBAL': {'enable_pantsd': True},
-                     'pantsd': {'fs_event_detection': True}}
+    pantsd_config = {'GLOBAL': {'enable_pantsd': True, 'level': 'debug'}}
 
     with self.temporary_workdir() as workdir:
       # Explicitly kill any running pantsd instances for the current buildroot.
@@ -42,8 +48,37 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config)
       )
 
-      # Surface the pantsd log for easy viewing via pytest's `-s` (don't redirect stdio) option.
-      print('pantsd.log:\n')
-      with open('{}/pantsd/pantsd.log'.format(workdir)) as f:
-        for line in f:
-          print(line, end='')
+      self._print_pantsd_log(workdir)
+
+  def test_pantsd_run_with_watchman(self):
+    pantsd_config = {'GLOBAL': {'enable_pantsd': True,
+                                'level': 'debug'},
+                     'pantsd': {'fs_event_detection': True}}
+
+    with self.temporary_workdir() as workdir:
+      # Explicitly kill any running pantsd instances for the current buildroot.
+      self.assert_success(
+        self.run_pants_with_workdir(['kill-pantsd'], workdir)
+      )
+
+      # Start pantsd implicitly via a throwaway invocation.
+      self.assert_success(
+        self.run_pants_with_workdir(['help'], workdir, pantsd_config)
+      )
+
+      # This run should execute via pantsd testing the end to end client/server.
+      self.assert_success(
+        self.run_pants_with_workdir(['list', '3rdparty/python::'], workdir, pantsd_config)
+      )
+
+      # And again using the cached BuildGraph.
+      self.assert_success(
+        self.run_pants_with_workdir(['list', '3rdparty/python::'], workdir, pantsd_config)
+      )
+
+      # Explicitly kill pantsd (from a pantsd-launched runner).
+      self.assert_success(
+        self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config)
+      )
+
+      self._print_pantsd_log(workdir)
