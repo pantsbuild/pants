@@ -12,7 +12,7 @@ from pants.backend.project_info.tasks.ensime_gen import EnsimeGen
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.backend.project_info.tasks.idea_gen import IdeaGen
-from pants.backend.project_info.tasks.plugin_gen import IdeaPluginGen
+from pants.backend.project_info.tasks.idea_plugin_gen import IdeaPluginGen
 from pants.goal.task_registrar import TaskRegistrar as task
 
 

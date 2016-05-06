@@ -12,7 +12,7 @@ python_library(
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
-    ':plugin_gen',
+    ':idea_plugin_gen',
   ],
 )
 
@@ -151,8 +151,8 @@ python_library(
 )
 
 python_library(
-  name = 'plugin_gen',
-  sources = ['plugin_gen.py'],
+  name = 'idea_plugin_gen',
+  sources = ['idea_plugin_gen.py'],
   resource_targets = [
     ':idea_resources',
   ],
