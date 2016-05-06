@@ -23,13 +23,14 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
         checkout scm
         sh(
           """
+          # Work around various concurrency issues associated with tools that use paths under the
+          # HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
+          # use of them would support concurrent usage robustly, at which point this hack could be
+          # removed.
+          export HOME="\$(pwd)/.home"
+
+          # For c/c++ contrib plugin tests.
           export CXX=g++
-
-          export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
-          echo \$XDG_CACHE_HOME
-
-          export PEX_ROOT="\$(pwd)/.cache/pex"
-          echo \$PEX_ROOT
 
           ./build-support/bin/ci.sh ${flags}
           """.toString().stripIndent()
