@@ -96,7 +96,7 @@ and then ssh into it and inspect it. Here is an example using
                             "PublicIpAddress": "52.207.240.194",
 
 3. Log in to the instance over ssh.
-    The `ubuntu` user is configured for password-less sudo should you need it:
+    The `ubuntu` user is configured for password-less `sudo` should you need it:
 
         $ ssh ubuntu@52.207.240.194
         The authenticity of host '52.207.240.194 (52.207.240.194)' can't be established.
