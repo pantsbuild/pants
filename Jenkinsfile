@@ -20,6 +20,17 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
   return { ->
     node(os) {
       ansiColor {
+        Closure<String> instanceData = { item ->
+          return "http://169.254.169.254/latest/meta-data/${item}".toURL().text
+        }
+        echo("""
+          Running on:
+              node id: ${env.NODE_NAME}
+               ami id: ${instanceData('ami-id')}
+          instance id: ${instanceData('instance-id')}
+                 host: ${instanceData('public-ipv4')}
+        """)
+
         checkout scm
 
         /*
@@ -50,11 +61,8 @@ def List shardList() {
     shards << [os: os, branchName: branchName, flags: flags]
   }
 
-  String changeUrl = env.CHANGE_URL
-  println("Listing desired shards for : ${changeUrl}")
-
   nodes = ['linux': 10]
-  isPullRequest = changeUrl ==~ 'https://github.com/pantsbuild/pants/pull/[0-9]+'
+  isPullRequest = env.CHANGE_URL ==~ 'https://github.com/pantsbuild/pants/pull/[0-9]+'
   if (!isPullRequest) {
     // We only add OSX to the mix on master commits since our 1 mac-mini is currently a severe
     // throughput bottleneck.
