@@ -23,11 +23,11 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
         checkout scm
         sh(
           """
-          # Various caches isolated to the shard dir to work around races.
-          LOCAL_CACHE="\$(pwd)/.cache"
-          export XDG_CACHE_HOME="\${LOCAL_CACHE}/pantsbuild"
-          export PEX_ROOT="\${LOCAL_CACHE}/pex"
-          export PANTS_IVY_CACHE_DIR="\${LOCAL_CACHE}/ivy"
+          # Work around various concurrency issues associated with tools that use paths under the
+          # HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
+          # use of them would support concurrent usage robustly, at which point this hack could be
+          # removed.
+          export HOME="\$(pwd)/.home"
 
           # For c/c++ contrib plugin tests.
           export CXX=g++
