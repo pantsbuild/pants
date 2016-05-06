@@ -9,20 +9,28 @@ enhancement and folks will help steer you in the right direction.
 
 ## Updating the AMI
 
+The Jenkins slave AMI is tied tightly to its base AMI and the class of instance-types it expects to
+be deployed on. The base AMI is `ami-840910ee`, which is a 64 bit Ubuntu 16.04 LTS (Xenial) image
+from Canonical. The expected deployment instance-types are assumed to have local instance storage
+provided by an SSD with TRIM support presented through the `/dev/xvdb` device. With these things in
+mind, you can make changes to the Jenkins slave AMI as follows:
+
 1. Download and install [packer](https://www.packer.io/downloads.html) if you have not already.
 
 2. Modify build scripts to make the changes you want (e.g. install packages via `apt`).
-    An AMI build uses a small template file, `jenkins-slave.json` described
-    [here](https://www.packer.io/docs/templates/introduction.html). Our template offloads most work
-    provisioning the image to a series of shell scripts. It's these scripts you'll likely need to
-    modify. If it makes sense to break out a new script, just make sure to add it to the `scripts`
-    list in `jenkins-slave.json`.
+    An AMI build uses a small template file, [`jenkins-slave.json`]
+    (https://github.com/pantsbuild/pants/blob/master/build-support/packer/jenkins-slave.json)
+    described [here](https://www.packer.io/docs/templates/introduction.html). Our template offloads
+    most work provisioning the image to a series of shell scripts. It's these scripts you'll likely
+    need to modify. If it makes sense to break out a new script, just make sure to add it to the
+    `scripts` list in `jenkins-slave.json`.
 
 3. Build the new AMI.
-    Ensure you have a `~/.aws/credentials` ini file and that you have a section with your
-    pantsbuild `aws_access_key_id` and `aws_secret_access_key`. Assuming the section is named
-    `pantsbuild`, issue this command (The `packer-io` binary may be spelled `packer` on your
-    machine):
+    Ensure you have a [`~/.aws/credentials`]
+    (http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-config-files)
+    ini file and that you have a section with your pantsbuild `aws_access_key_id` and
+    `aws_secret_access_key`. Assuming the section is named `pantsbuild`, issue this command (The 
+    `packer-io` binary may be spelled `packer` on your machine):
 
         $ AWS_PROFILE=pantsbuild packer-io build jenkins-slave.json
 
@@ -96,7 +104,7 @@ and then ssh into it and inspect it. Here is an example using
                             "PublicIpAddress": "52.207.240.194",
 
 3. Log in to the instance over ssh.
-    The ubuntu user is configured for password-less sudo should you need it:
+    The `ubuntu` user is configured for password-less `sudo` should you need it:
 
         $ ssh ubuntu@52.207.240.194
         The authenticity of host '52.207.240.194 (52.207.240.194)' can't be established.
@@ -116,7 +124,7 @@ and then ssh into it and inspect it. Here is an example using
 
         ubuntu@ip-172-31-9-190:~$ 
 
-4. Terminate the instance after you're done using.
+4. Terminate the instance after you're done using it.
     We're charged for these, so don't forget to kill the instance:
 
         $ AWS_PROFILE=pantsbuild aws ec2 terminate-instances \
@@ -125,11 +133,10 @@ and then ssh into it and inspect it. Here is an example using
 
 ### Configure Jenkins to use the AMI
 
-Ideally you'll have launched an instance manually using the AMI you created to vet it. When you're
-confident in the image, navigate to
-[Jenkins > Manage Jenkins > Configure System](http://jenkins.pantsbuild.org/configure). Towards the
-bottom of the page you'll find an `AMI ID` field in the `AMIs` section. Enter the AMI id here and
-click the `Check AMI` button to verify Jenkins can access it. A Successful id-edit and check is
-shown below:
+Ideally you'll have launched an instance manually using the AMI you created in order to vet it.
+When you're confident in the image, navigate to [Jenkins > Manage Jenkins > Configure System]
+(http://jenkins.pantsbuild.org/configure). Towards the bottom of the page you'll find an `AMI ID`
+field in the `AMIs` section. Enter the AMI id here and click the `Check AMI` button to verify
+Jenkins can access it. A Successful id-edit and check is shown below:
 
 ![image](images/check-ami-success.png)
