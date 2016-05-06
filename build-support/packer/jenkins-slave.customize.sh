@@ -124,15 +124,23 @@ cat << UNIT_FILE | sudo tee /etc/systemd/system/jenkins-slave-connect.service
 # See systemd unit file docs for more info:
 #   https://www.freedesktop.org/software/systemd/man/systemd.unit.html
 #   https://www.freedesktop.org/software/systemd/man/systemd.service.html
+#   https://www.freedesktop.org/software/systemd/man/systemd.special.html
 
 [Unit]
 Description=Starts Jenkins Master JNLP connector.
-After=network.target local-fs.target
+After=network-online.target mnt-xvdb.mount
+Requires=network-online.target mnt-xvdb.mount
+
+# This disables re-start rate-limiting.  Since our slave instances
+# are dedicated to this service and this service alone, it makes sense
+# to allow the JNLP connector to restart as much as it needs until it
+# connects or the Jenkins master kills the slave on timeout from its end.
+StartLimitInterval=0
 
 [Service]
 Type=simple
 
-# These runs as root and in sequence; importantly they are idempotent.
+# These run as root and in sequence; importantly they are idempotent.
 PermissionsStartOnly=true
 ExecStartPre=/bin/mkdir -p /mnt/xvdb/jenkins
 ExecStartPre=/bin/chown jenkins:jenkins /mnt/xvdb/jenkins
@@ -142,7 +150,7 @@ User=jenkins
 ExecStart=/home/jenkins/bin/jenkins-slave-connect.sh /mnt/xvdb/jenkins
 
 # Ideally we'd use on-failure but the jenkins.jar exits 0 for error conditions.
-# Since a Jenkins Slave should always be JNLP connected to the master to be useful.
+# Since a Jenkins Slave should always be JNLP connected to the master to be useful,
 # this is probably a fine setting as a result.
 Restart=always
 
