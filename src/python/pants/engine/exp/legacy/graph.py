@@ -13,7 +13,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.fs import FilesContent, PathGlobs
-from pants.engine.exp.legacy.structs import TargetAdaptor
+from pants.engine.exp.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec
@@ -191,61 +191,57 @@ class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies', 'sources
   """
 
 
-class LegacySourcesField(datatype('LegacySourcesField', ['sources'])):
-  """Either `FilesetWithSpec` or `Addresses` are allowed as Target.sources."""
+class HydratedField(datatype('HydratedField', ['name', 'value'])):
+  """A wrapper for a fully constructed replacement kwarg for a LegacyTarget."""
 
 
-def reify_legacy_graph(target_adaptor, dependencies, sources_field):
-  """Given a TargetAdaptor and LegacyTargets for its deps, return a LegacyTarget."""
-  if target_adaptor.type_alias == 'jvm_app':
-    # TODO:
-    print('>>> {}: {}'.format(target_adaptor, target_adaptor.bundles))
-  return LegacyTarget(target_adaptor,
-                      [d.adaptor.address for d in dependencies],
-                      sources_field.sources)
+def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
+  """Construct a LegacyTarget from a TargetAdaptor, its deps, and hydrated versions of its adapted fields."""
+  kwargs = target_adaptor.kwargs()
+  for field in hydrated_fields:
+    kwargs[field.name] = field.value
+  return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
 
 
-def legacy_sources_field(target_adaptor, fileset_with_spec):
-  """Given a TargetAdaptor and a FilesetWithSpec create a LegacySourcesField.
-
-  If the Target has deferred sources, the creation of the FilesetWithSpec was a noop: we
-  don't support having both.
-
-  NB: once ivy is implemented in the engine, we can fetch sources natively here, and/or
-  refactor how deferred sources are implemented.
-    see: https://github.com/pantsbuild/pants/issues/2997
-  """
-  if target_adaptor.has_deferred_sources:
-    return LegacySourcesField(target_adaptor.sources)
-  else:
-    return LegacySourcesField(fileset_with_spec)
-
-
-def fileset_with_spec(target_adaptor, source_files_content):
-  """Given a TargetAdaptor and FilesContent for its source field, create an EagerFilesetWithSpec."""
-  spec_path = target_adaptor.spec_path
-  base_globs = target_adaptor.sources_base_globs
+def hydrate_sources(sources_field, source_files_content):
+  """Given a SourcesField and FilesContent for its path_globs, create an EagerFilesetWithSpec."""
+  spec_path = sources_field.spec_path
+  filespecs = sources_field.filespecs
   file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
                  for fc in source_files_content.dependencies}
-  return EagerFilesetWithSpec(spec_path, base_globs.filespecs, file_hashes)
+  return HydratedField('sources', EagerFilesetWithSpec(spec_path, filespecs, file_hashes))
+
+
+def hydrate_bundles(bundles_field, files_content_list):
+  """Given a BundlesField and FilesContent for each of its filesets create a list of BundleAdaptors."""
+  bundles = []
+  zipped = zip(bundles_field.bundles, bundles_field.filespecs_list, files_content_list)
+  for bundle, filespecs, files_content in zipped:
+    spec_path = bundles_field.spec_path
+    file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
+                  for fc in files_content.dependencies}
+    kwargs = bundle.kwargs()
+    kwargs['fileset'] = EagerFilesetWithSpec(spec_path, filespecs, file_hashes)
+    bundles.append(BundleAdaptor(**kwargs))
+  return HydratedField('bundles', bundles)
 
 
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
-    # Recursively requests LegacyTargets for TargetAdaptors, which will result in a
-    # transitive graph walk.
+    # Recursively requests the dependencies and adapted fields of TargetAdaptors, which
+    # will result in an eager, transitive graph walk.
     (LegacyTarget,
      [Select(TargetAdaptor),
-      SelectDependencies(LegacyTarget, TargetAdaptor),
-      Select(LegacySourcesField)],
+      SelectDependencies(LegacyTarget, TargetAdaptor, 'dependencies'),
+      SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors')],
      reify_legacy_graph),
-    (LegacySourcesField,
-     [Select(TargetAdaptor),
-      Select(EagerFilesetWithSpec)],
-     legacy_sources_field),
-    (EagerFilesetWithSpec,
-     [Select(TargetAdaptor),
-      SelectProjection(FilesContent, PathGlobs, ('sources_path_globs',), TargetAdaptor)],
-     fileset_with_spec),
+    (HydratedField,
+     [Select(SourcesField),
+      SelectProjection(FilesContent, PathGlobs, ('path_globs',), SourcesField)],
+     hydrate_sources),
+    (HydratedField,
+     [Select(BundlesField),
+      SelectDependencies(FilesContent, BundlesField, 'path_globs_list')],
+     hydrate_bundles),
   ]

@@ -16,6 +16,7 @@ from pants.engine.exp.objects import Locatable
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 class TargetAdaptor(StructWithDeps, Locatable):
@@ -25,39 +26,45 @@ class TargetAdaptor(StructWithDeps, Locatable):
   """
 
   @property
-  def has_deferred_sources(self):
-    """Returns true if this target has "deferred" sources: see graph.LegacySourcesField."""
-    return isinstance(getattr(self, 'sources', None), Addresses)
+  def has_concrete_sources(self):
+    """Returns true if this target has non-deferred sources.
 
-  @property
-  def sources_base_globs(self):
-    """Return a BaseGlobs for this Target's sources field."""
-    sources = getattr(self, 'sources', None)
-    if sources is None:
-      return Files()
-    elif isinstance(sources, collections.Sequence):
-      return Files(*sources)
-    elif isinstance(sources, BaseGlobs):
-      return sources
-    elif self.has_deferred_sources:
-      # Report as empty for now, to allow it to be reified later.
-      return Files()
-    else:
-      raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
-
-  @property
-  def sources_path_globs(self):
-    """Converts captured `sources` arguments to a PathGlobs object.
-
-    This field may be projected to request files or file content for the paths in the sources field.
+    NB: once ivy is implemented in the engine, we can fetch sources natively here, and/or
+    refactor how deferred sources are implemented.
+      see: https://github.com/pantsbuild/pants/issues/2997
     """
-    return self.sources_base_globs.to_path_globs(self.spec_path)
+    sources = getattr(self, 'sources', None)
+    return sources is not None and not isinstance(sources, Addresses)
+
+  @property
+  def field_adaptors(self):
+    """Returns a tuple of Fields for captured fields which need additional treatment."""
+    if not self.has_concrete_sources:
+      return tuple()
+    base_globs = BaseGlobs.from_sources_field(self.sources)
+    path_globs = base_globs.to_path_globs(self.spec_path)
+    return (SourcesField(self.spec_path, base_globs.filespecs, path_globs),)
+
+
+class Field(object):
+  """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
+
+
+class SourcesField(datatype('SourcesField', ['spec_path', 'filespecs', 'path_globs']), Field):
+  """Represents the `sources` argument, which is eagerly computed in-engine for caching purposes."""
+
+
+class BundlesField(datatype('BundlesField', ['bundles', 'spec_path', 'filespecs_list', 'path_globs_list']), Field):
+  """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
 
 class BundleAdaptor(Struct):
   """A Struct to capture the args for the `bundle` object.
 
   Bundles have filesets which we need to capture in order to execute them in the engine.
+
+  TODO: Bundles should arguably be Targets, but that distinction blurs in the `exp` examples
+  package, where a Target is just a collection of configuration.
   """
 
 
@@ -74,9 +81,39 @@ class JvmAppAdaptor(TargetAdaptor):
     """The BundleAdaptors for this JvmApp."""
     return self.bundles
 
+  @property
+  def field_adaptors(self):
+    field_adaptors = super(JvmAppAdaptor, self).field_adaptors
+    if getattr(self, 'bundles', None) is None:
+      return field_adaptors
+    # Construct a field for the `bundles` argument.
+    filespecs_list = []
+    path_globs_list = []
+    for bundle in self.bundles:
+      base_globs = BaseGlobs.from_sources_field(bundle.fileset)
+      filespecs_list.append(base_globs.filespecs)
+      path_globs_list.append(base_globs.to_path_globs(self.spec_path))
+    bundles_field = BundlesField(self.bundles, self.spec_path, filespecs_list, path_globs_list)
+    return field_adaptors + (bundles_field,)
+
 
 class BaseGlobs(AbstractClass):
   """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
+
+  @staticmethod
+  def from_sources_field(sources):
+    """Return a BaseGlobs for the given sources field.
+
+    Sources may be None, a sequence, or a BaseGlobs instance.
+    """
+    if sources is None:
+      return Files()
+    elif isinstance(sources, collections.Sequence):
+      return Files(*sources)
+    elif isinstance(sources, BaseGlobs):
+      return sources
+    else:
+      raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
   @abstractproperty
   def path_globs_kwarg(self):
