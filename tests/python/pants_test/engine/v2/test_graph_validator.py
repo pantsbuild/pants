@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.engine.v2.examples.graph_validator import PartiallyConsumedInputsError
+from pants_test.engine.v2.examples.graph_validator import PartiallyConsumedInputsError
 from pants_test.engine.v2.test_scheduler import SchedulerTest
 
 

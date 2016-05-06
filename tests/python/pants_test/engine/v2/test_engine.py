@@ -11,9 +11,9 @@ from contextlib import closing, contextmanager
 
 from pants.build_graph.address import Address
 from pants.engine.v2.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
-from pants.engine.v2.examples.planners import Classpath, setup_json_scheduler
 from pants.engine.v2.nodes import Return, SelectNode
 from pants.engine.v2.storage import Cache, Storage
+from pants_test.engine.v2.examples.planners import Classpath, setup_json_scheduler
 
 
 class EngineTest(unittest.TestCase):

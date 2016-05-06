@@ -13,13 +13,13 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.v2.addressable import Addresses
 from pants.engine.v2.engine import LocalSerialEngine
-from pants.engine.v2.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
-                                               Jar, JavaSources, ThriftSources,
-                                               setup_json_scheduler)
 from pants.engine.v2.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                    Throw, Waiting)
 from pants.engine.v2.scheduler import ProductGraph
 from pants.util.contextutil import temporary_dir
+from pants_test.engine.v2.examples.planners import (ApacheThriftJavaConfiguration, Classpath,
+                                                    GenGoal, Jar, JavaSources, ThriftSources,
+                                                    setup_json_scheduler)
 
 
 class SchedulerTest(unittest.TestCase):

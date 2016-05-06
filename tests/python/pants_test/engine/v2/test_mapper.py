@@ -16,7 +16,6 @@ from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.v2.addressable import SubclassesOf, addressable_list
 from pants.engine.v2.engine import LocalSerialEngine
-from pants.engine.v2.examples.parsers import JsonParser
 from pants.engine.v2.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.v2.mapper import (AddressFamily, AddressMap, AddressMapper,
                                     DifferingFamiliesError, DuplicateNameError, ResolveError,
@@ -26,6 +25,7 @@ from pants.engine.v2.parser import SymbolTable
 from pants.engine.v2.storage import Storage
 from pants.engine.v2.struct import HasStructs, Struct
 from pants.util.dirutil import safe_open
+from pants_test.engine.v2.examples.parsers import JsonParser
 from pants_test.engine.v2.scheduler_test_base import SchedulerTestBase
 
 

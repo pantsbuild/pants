@@ -44,7 +44,7 @@ python_tests(
   dependencies=[
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
-    'src/python/pants/engine/v2/examples:planners',
+    'tests/python/pants_test/engine/v2/examples:planners',
     'src/python/pants/engine/v2:engine',
     'src/python/pants/engine/v2:scheduler',
   ]
@@ -55,7 +55,7 @@ python_tests(
   sources=['test_graph.py'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine/v2/examples:parsers',
+    'tests/python/pants_test/engine/v2/examples:parsers',
     'src/python/pants/engine/v2:graph',
     'src/python/pants/engine/v2:mapper',
     'src/python/pants/engine/v2:parser',
@@ -70,7 +70,7 @@ python_tests(
   dependencies=[
     ':scheduler_test_base',
     'src/python/pants/build_graph',
-    'src/python/pants/engine/v2/examples:parsers',
+    'tests/python/pants_test/engine/v2/examples:parsers',
     'src/python/pants/engine/v2:mapper',
     'src/python/pants/engine/v2:storage',
     'src/python/pants/engine/v2:struct',
@@ -82,7 +82,7 @@ python_tests(
   name='parsers',
   sources=['test_parsers.py'],
   dependencies=[
-    'src/python/pants/engine/v2/examples:parsers',
+    'tests/python/pants_test/engine/v2/examples:parsers',
     'src/python/pants/engine/v2:objects',
   ]
 )
@@ -101,7 +101,7 @@ python_tests(
   coverage=['pants.engine.v2.nodes', 'pants.engine.v2.scheduler'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine/v2/examples:planners',
+    'tests/python/pants_test/engine/v2/examples:planners',
     'src/python/pants/engine/v2:engine',
     'src/python/pants/engine/v2:scheduler',
   ]

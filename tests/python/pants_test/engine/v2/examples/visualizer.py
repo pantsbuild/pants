@@ -13,9 +13,9 @@ from textwrap import dedent
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.binaries import binary_util
 from pants.engine.v2.engine import LocalSerialEngine
-from pants.engine.v2.examples.planners import setup_json_scheduler
 from pants.engine.v2.fs import Files, PathGlobs
 from pants.util.contextutil import temporary_file_path
+from pants_test.engine.v2.examples.planners import setup_json_scheduler
 
 
 def visualize_execution_graph(scheduler, storage, request):

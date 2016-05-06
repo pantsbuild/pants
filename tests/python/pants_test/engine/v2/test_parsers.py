@@ -10,8 +10,8 @@ import unittest
 from textwrap import dedent
 
 from pants.engine.v2 import parser
-from pants.engine.v2.examples import parsers
 from pants.engine.v2.objects import Resolvable
+from pants_test.engine.v2.examples import parsers
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.

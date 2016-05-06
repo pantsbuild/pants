@@ -12,14 +12,14 @@ from pants.build_graph.address import Address
 from pants.engine.v2.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
                                          addressable_list)
 from pants.engine.v2.engine import LocalSerialEngine
-from pants.engine.v2.examples.parsers import (JsonParser, PythonAssignmentsParser,
-                                              PythonCallbacksParser)
 from pants.engine.v2.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.v2.mapper import AddressMapper, ResolveError
 from pants.engine.v2.nodes import Noop, Return, Throw
 from pants.engine.v2.parser import SymbolTable
 from pants.engine.v2.storage import Storage
 from pants.engine.v2.struct import HasStructs, Struct, StructWithDeps
+from pants_test.engine.v2.examples.parsers import (JsonParser, PythonAssignmentsParser,
+                                                   PythonCallbacksParser)
 from pants_test.engine.v2.scheduler_test_base import SchedulerTestBase
 
 

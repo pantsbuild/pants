@@ -75,7 +75,7 @@ python_library(
 
 python_binary(
   name='viz',
-  entry_point='pants.engine.v2.examples.visualizer:main_addresses',
+  entry_point='pants_test.engine.v2.examples.visualizer:main_addresses',
   dependencies=[
     ':visualizer'
   ]
@@ -83,7 +83,7 @@ python_binary(
 
 python_binary(
   name='viz-fs',
-  entry_point='pants.engine.v2.examples.visualizer:main_filespecs',
+  entry_point='pants_test.engine.v2.examples.visualizer:main_filespecs',
   dependencies=[
     ':visualizer'
   ]

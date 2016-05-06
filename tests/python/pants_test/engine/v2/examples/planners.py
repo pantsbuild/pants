@@ -15,9 +15,6 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.v2.addressable import SubclassesOf, addressable_list
-from pants.engine.v2.examples.graph_validator import GraphValidator
-from pants.engine.v2.examples.parsers import JsonParser
-from pants.engine.v2.examples.sources import Sources
 from pants.engine.v2.fs import Dirs, File, FileContent, FilesContent, PathGlobs, create_fs_tasks
 from pants.engine.v2.graph import create_graph_tasks
 from pants.engine.v2.mapper import AddressFamily, AddressMapper
@@ -29,6 +26,9 @@ from pants.engine.v2.storage import Storage
 from pants.engine.v2.struct import HasStructs, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
+from pants_test.engine.v2.examples.graph_validator import GraphValidator
+from pants_test.engine.v2.examples.parsers import JsonParser
+from pants_test.engine.v2.examples.sources import Sources
 
 
 def printing_func(func):

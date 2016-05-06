@@ -12,7 +12,7 @@ with the work described here.
 ## Design Goals
 
 The design doc is [linked][tuple-design] above, but some goals and direction are further explained
-here in light of the actual code to land in the `pants/engine/exp/examples` package.
+here in light of the actual code to land in the `pants_test/engine/exp/examples` package.
 
 4 primary concerns can be seen as driving much of the design, in no particular order:
 
