@@ -9,6 +9,11 @@ enhancement and folks will help steer you in the right direction.
 
 ## Updating the AMI
 
+The AMI is currently tied tightly to two assumptions. It's based off of AMI `ami-840910ee`, which
+is a 64 bit Ubuntu 16.04 LTS (Xenial) image from Canonical. It also expects that the EC2 instance
+it is deployed to has local instance storage provided by an SSD with TRIM support presented through
+the `/dev/xvdb` device.
+
 1. Download and install [packer](https://www.packer.io/downloads.html) if you have not already.
 
 2. Modify build scripts to make the changes you want (e.g. install packages via `apt`).
@@ -96,7 +101,7 @@ and then ssh into it and inspect it. Here is an example using
                             "PublicIpAddress": "52.207.240.194",
 
 3. Log in to the instance over ssh.
-    The ubuntu user is configured for password-less sudo should you need it:
+    The `ubuntu` user is configured for password-less `sudo` should you need it:
 
         $ ssh ubuntu@52.207.240.194
         The authenticity of host '52.207.240.194 (52.207.240.194)' can't be established.
@@ -116,7 +121,7 @@ and then ssh into it and inspect it. Here is an example using
 
         ubuntu@ip-172-31-9-190:~$ 
 
-4. Terminate the instance after you're done using.
+4. Terminate the instance after you're done using it.
     We're charged for these, so don't forget to kill the instance:
 
         $ AWS_PROFILE=pantsbuild aws ec2 terminate-instances \
