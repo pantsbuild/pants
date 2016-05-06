@@ -19,7 +19,10 @@ from pants_test.subsystem.subsystem_util import subsystem_instance
 def _distribution_locator(**options):
   with subsystem_instance(DistributionLocator, **options) as locator:
     locator._reset()  # Force a fresh locator.
-    yield locator
+    try:
+      yield locator
+    finally:
+      locator._reset()  # And make sure we we clean up the values we cache.
 
 
 def _get_two_distributions():
