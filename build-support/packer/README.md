@@ -9,6 +9,11 @@ enhancement and folks will help steer you in the right direction.
 
 ## Updating the AMI
 
+The AMI is currently tied tightly to two assumptions. It's based off of AMI `ami-840910ee`, which
+is a 64 bit Ubuntu 16.04 LTS (Xenial) image from Canonical. It also expects that the EC2 instance
+it is deployed to has local instance storage provided by an SSD with TRIM support presented through
+the `/dev/xvdb` device.
+
 1. Download and install [packer](https://www.packer.io/downloads.html) if you have not already.
 
 2. Modify build scripts to make the changes you want (e.g. install packages via `apt`).
