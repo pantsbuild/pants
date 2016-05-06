@@ -29,7 +29,7 @@ mind, you can make changes to the Jenkins slave AMI as follows:
     Ensure you have a [`~/.aws/credentials`]
     (http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-config-files)
     ini file and that you have a section with your pantsbuild `aws_access_key_id` and
-    `aws_secret_access_key`. Assuming the section is named `pantsbuild`, issue this command (The 
+    `aws_secret_access_key`. Assuming the section is named `pantsbuild`, issue this command (The
     `packer-io` binary may be spelled `packer` on your machine):
 
         $ AWS_PROFILE=pantsbuild packer-io build jenkins-slave.json
@@ -122,7 +122,7 @@ and then ssh into it and inspect it. Here is an example using
         0 updates are security updates.
 
 
-        ubuntu@ip-172-31-9-190:~$ 
+        ubuntu@ip-172-31-9-190:~$
 
 4. Terminate the instance after you're done using it.
     We're charged for these, so don't forget to kill the instance:
