@@ -11,7 +11,7 @@ from pants_test.engine.v2.examples.graph_validator import PartiallyConsumedInput
 from pants_test.engine.v2.test_scheduler import SchedulerTest
 
 
-class ExperimentalSchedulerTest(SchedulerTest, unittest.TestCase):
+class GraphValidatorSchedulerTest(SchedulerTest, unittest.TestCase):
   def test_no_variant_thrift(self):
     """No `thrift` variant is configured, and so no configuration is selected."""
     build_request = self.request(['compile'], self.no_variant_thrift)

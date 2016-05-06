@@ -6,13 +6,13 @@ the ideas explored here may not be fully realizable until a decision is reached 
 file backwards compatibility.
 
 Portions of the remainder of this document are historical: refer to
-`src/python/pants/engine/exp/README.md` for more information on the engine that was incubated
+`src/python/pants/engine/v2/README.md` for more information on the engine that was incubated
 with the work described here.
 
 ## Design Goals
 
 The design doc is [linked][tuple-design] above, but some goals and direction are further explained
-here in light of the actual code to land in the `pants_test/engine/exp/examples` package.
+here in light of the actual code to land in the `pants_test/engine/v2/examples` package.
 
 4 primary concerns can be seen as driving much of the design, in no particular order:
 
