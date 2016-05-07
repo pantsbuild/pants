@@ -10,7 +10,6 @@ import os
 import pkgutil
 import shutil
 import subprocess
-import tempfile
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.project_info.tasks.ide_gen import IdeGen
@@ -19,7 +18,7 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.binaries import binary_util
 from pants.task.console_task import ConsoleTask
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 
 
@@ -192,10 +191,9 @@ class IdeaPluginGen(IdeGen, ConsoleTask):
   def _generate_to_tempfile(self, generator):
     """Applies the specified generator to a temp file and returns the path to that file.
     We generate into a temp file so that we don't lose any manual customizations on error."""
-    (output_fd, output_path) = tempfile.mkstemp()
-    with os.fdopen(output_fd, 'w') as output:
+    with temporary_file(cleanup=False) as output:
       generator.write(output)
-    return output_path
+      return output.name
 
   def execute(self):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
