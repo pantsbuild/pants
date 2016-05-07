@@ -24,21 +24,6 @@ from pants.util.dirutil import safe_mkdir
 
 _TEMPLATE_BASEDIR = 'templates/idea'
 
-_VERSIONS = {
-  '9': '12',  # 9 and 12 are ipr/iml compatible
-  '10': '12',  # 10 and 12 are ipr/iml compatible
-  '11': '12',  # 11 and 12 are ipr/iml compatible
-  '12': '12'
-}
-
-_SCALA_VERSION_DEFAULT = '2.9'
-_SCALA_VERSIONS = {
-  '2.8': 'Scala 2.8',
-  _SCALA_VERSION_DEFAULT: 'Scala 2.9',
-  '2.10': 'Scala 2.10',
-  '2.10-virt': 'Scala 2.10 virtualized'
-}
-
 # Follow `export.py` for versioning strategy.
 IDEA_PLUGIN_VERSION = '0.0.1'
 
