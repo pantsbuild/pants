@@ -6,7 +6,7 @@ Refer to Jenkins2.0 pipeline and Jenkinsfile docs here:
    https://jenkins.io/doc/pipeline/jenkinsfile/
    https://jenkins.io/doc/pipeline/steps/
 
-NB: The linux slaves are configured as described in `build-support/packer/README.md` and the osx
+NB: The linux slaves are configured as described in `build-support/aws/ec2/packer/README.md` and the osx
 slave(s) are currently cowboyed by hand.
 */
 
@@ -20,17 +20,6 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
   return { ->
     node(os) {
       ansiColor {
-        Closure<String> instanceData = { item ->
-          return "http://169.254.169.254/latest/meta-data/${item}".toURL().text
-        }
-        echo("""
-          Running on:
-              node id: ${env.NODE_NAME}
-               ami id: ${instanceData('ami-id')}
-          instance id: ${instanceData('instance-id')}
-                 host: ${instanceData('public-ipv4')}
-        """)
-
         // Avoid failing on transient git issues.
         retry(2) {
           checkout scm
@@ -47,7 +36,10 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
         // For c/c++ contrib plugin tests.
         env.CXX = "g++"
 
-        sh("./build-support/bin/ci.sh ${flags}")
+        sh("""
+          ./build-support/aws/ec2/ci/print_node_info.sh
+          ./build-support/bin/ci.sh ${flags}
+          """)
       }
     }
   }

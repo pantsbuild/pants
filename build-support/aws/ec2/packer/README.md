@@ -19,7 +19,7 @@ mind, you can make changes to the Jenkins slave AMI as follows:
 
 2. Modify build scripts to make the changes you want (e.g. install packages via `apt`).
     An AMI build uses a small template file, [`jenkins-slave.json`]
-    (https://github.com/pantsbuild/pants/blob/master/build-support/packer/jenkins-slave.json)
+    (https://github.com/pantsbuild/pants/blob/master/build-support/aws/ec2/packer/jenkins-slave.json)
     described [here](https://www.packer.io/docs/templates/introduction.html). Our template offloads
     most work provisioning the image to a series of shell scripts. It's these scripts you'll likely
     need to modify. If it makes sense to break out a new script, just make sure to add it to the
@@ -116,7 +116,7 @@ and then ssh into it and inspect it. Here is an example using
         *** This is a pantsbuild.org Jenkins Slave ***
 
         To configure, see:
-          https://github.com/pantsbuild/pants/blob/master/build-support/packer/README.md
+          https://github.com/pantsbuild/pants/blob/master/build-support/aws/ec2/packer/README.md
 
         0 packages can be updated.
         0 updates are security updates.
