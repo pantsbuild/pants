@@ -89,11 +89,15 @@ script: |
   java -version
   ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
-# We accept the default travis-ci email author+comitter notification
-# for now which is enabled even with no `notifications` config.
-# notifications:
-#   email: ...
 
 after_success:
   coveralls
 
+# We accept the default travis-ci email author+comitter notification
+# for now which is enabled even with no `notifications` config.
+# notifications:
+#   email: ...
+notifications:
+  slack:
+    rooms:
+      secure: IUGXUQlN9XxDEmZ+0AuyKco4R33hyUfGnmPBK1oOUFVzapVJllgAL/tKUWxFbwbWBZCF6s3XVMgW6abfKIOLwpgYFbsWdVPCyFg4qAXkPwVidyrgIqsLq1QTIGWtlWI402emFSMAItaLaZ8hWifbAFsjs
