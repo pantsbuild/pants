@@ -21,20 +21,19 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
     node(os) {
       ansiColor {
         checkout scm
-        sh(
-          """
-          # Work around various concurrency issues associated with tools that use paths under the
-          # HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
-          # use of them would support concurrent usage robustly, at which point this hack could be
-          # removed.
-          export HOME="\$(pwd)/.home"
 
-          # For c/c++ contrib plugin tests.
-          export CXX=g++
+        /*
+         * Work around various concurrency issues associated with tools that use paths under the
+         * HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
+         * use of them would support concurrent usage robustly, at which point this hack could be
+         * removed.
+         */
+        env.HOME = "${pwd()}/.home"
 
-          ./build-support/bin/ci.sh ${flags}
-          """.toString().stripIndent()
-        )
+        // For c/c++ contrib plugin tests.
+        env.CXX = "g++"
+
+        sh("./build-support/bin/ci.sh ${flags}")
       }
     }
   }
