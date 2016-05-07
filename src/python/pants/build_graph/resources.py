@@ -36,7 +36,7 @@ class Resources(Target):
     })
     super(Resources, self).__init__(address=address, payload=payload, **kwargs)
 
-  def has_sources(self, extension=None):
+  def has_sources(self, extension=None, skip_deferred_sources=False):
     """``Resources`` never own sources of any particular native type, like for example
     ``JavaLibrary``.
 

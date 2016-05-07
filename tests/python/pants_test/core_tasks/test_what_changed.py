@@ -19,6 +19,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.from_target import FromTarget
+from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.resources import Resources
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.workspace import Workspace
@@ -41,6 +42,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
         'java_thrift_library': JavaThriftLibrary,
         'java_protobuf_library': JavaProtobufLibrary,
         'python_thrift_library': PythonThriftLibrary,
+        'prep_command': PrepCommand,
       },
       context_aware_object_factories={
         'globs': Globs,
@@ -364,6 +366,55 @@ class WhatChangedTest(WhatChangedTestBasic):
       'root/proto:external-source',
       'root/proto:external-source-jars',
       workspace=self.workspace(files=['root/proto/BUILD'])
+    )
+
+  def test_library_depends_on_prep_command(self):
+    PrepCommand.add_goal('compile')
+    self.add_to_build_file('root/src/java/prep', dedent("""
+      java_library(name='lib',
+        dependencies=[
+          ':compile-prep-command',
+        ],
+        sources=globs('*.java'),
+      )
+
+      prep_command(name='compile-prep-command',
+        goal='compile',
+        prep_executable='touch',
+        prep_args=['/tmp/prep_command_result']
+      )
+    """))
+
+    self.assert_console_output(
+      'root/src/java/prep:lib',
+      workspace=self.workspace(files=['root/src/java/prep/Hello.java'])
+    )
+
+  def test_library_resources_prep_command(self):
+    PrepCommand.add_goal('compile')
+    self.add_to_build_file('root/src/java/prep_resources', dedent("""
+      java_library(name='lib',
+        resources = [
+          ':resources'
+        ],
+        sources=globs('*.java'),
+      )
+
+      resources(name='resources',
+        sources = from_target(':compile-prep-command'),
+        dependencies = [],
+      )
+
+      prep_command(name='compile-prep-command',
+        goal='compile',
+        prep_executable = 'touch',
+        prep_args=['/tmp/prep_command_result']
+      )
+    """))
+
+    self.assert_console_output(
+      'root/src/java/prep_resources:lib',
+      workspace=self.workspace(files=['root/src/java/prep_resources/Hello.java'])
     )
 
   def test_globs_in_resources(self):

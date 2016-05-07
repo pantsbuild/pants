@@ -11,6 +11,9 @@ from textwrap import dedent
 from pants.backend.graph_info.tasks.filemap import Filemap
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.from_target import FromTarget
+from pants.build_graph.prep_command import PrepCommand
+from pants.build_graph.resources import Resources
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -19,8 +22,13 @@ class FilemapTest(ConsoleTaskTestBase):
   def alias_groups(self):
     return BuildFileAliases(
       targets={
+        'prep_command': PrepCommand,
         'python_library': PythonLibrary,
+        'resources': Resources,
       },
+      context_aware_object_factories={
+        'from_target': FromTarget,
+      }
     )
 
   @classmethod
@@ -69,3 +77,20 @@ class FilemapTest(ConsoleTaskTestBase):
                self.target('common/src/py/c'),
                self.target('common/src/py/a')]
     )
+
+  def test_deferred_resources(self):
+    PrepCommand.add_goal('compile')
+    self.add_to_build_file('root/src/java/prep_resources', dedent("""
+      resources(name='resources',
+        sources = from_target(':compile-prep-command'),
+        dependencies = [],
+      )
+
+      prep_command(name='compile-prep-command',
+        goal='compile',
+        prep_executable = 'touch',
+        prep_args=['/tmp/prep_command_result']
+      )
+    """))
+
+    self.assert_console_output(targets=[self.target('root/src/java/prep_resources:resources')])
