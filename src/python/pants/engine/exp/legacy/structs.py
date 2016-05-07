@@ -12,17 +12,16 @@ from pants.build_graph.address import Addresses
 from pants.engine.exp.addressable import Exactly, addressable_list
 from pants.engine.exp.fs import Files as FSFiles
 from pants.engine.exp.fs import PathGlobs
-from pants.engine.exp.objects import Locatable
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class TargetAdaptor(StructWithDeps, Locatable):
+class TargetAdaptor(StructWithDeps):
   """A Struct to imitate the existing Target.
 
-  Extending StructWithDeps causes the class to have a `dependencies` field marked Addressable.
+  Extends StructWithDeps to add a `dependencies` field marked Addressable.
   """
 
   @property
@@ -42,20 +41,43 @@ class TargetAdaptor(StructWithDeps, Locatable):
     if not self.has_concrete_sources:
       return tuple()
     base_globs = BaseGlobs.from_sources_field(self.sources)
-    path_globs = base_globs.to_path_globs(self.spec_path)
-    return (SourcesField(self.spec_path, base_globs.filespecs, path_globs),)
+    path_globs = base_globs.to_path_globs(self.address.spec_path)
+    return (SourcesField(self.address, base_globs.filespecs, path_globs),)
 
 
 class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype('SourcesField', ['spec_path', 'filespecs', 'path_globs']), Field):
-  """Represents the `sources` argument, which is eagerly computed in-engine for caching purposes."""
+class SourcesField(datatype('SourcesField', ['address', 'filespecs', 'path_globs']), Field):
+  """Represents the `sources` argument for a particular Target.
+
+  Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
+  API efficiently; once tasks are explicitly requesting particular Products for Targets,
+  lazy construction will be more natural.
+  """
+
+  def __eq__(self, other):
+    return type(self) == type(other) and self.address == other.address
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __hash__(self):
+    return hash(self.address)
 
 
-class BundlesField(datatype('BundlesField', ['bundles', 'spec_path', 'filespecs_list', 'path_globs_list']), Field):
+class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
+
+  def __eq__(self, other):
+    return type(self) == type(other) and self.address == other.address
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __hash__(self):
+    return hash(self.address)
 
 
 class BundleAdaptor(Struct):
@@ -92,8 +114,11 @@ class JvmAppAdaptor(TargetAdaptor):
     for bundle in self.bundles:
       base_globs = BaseGlobs.from_sources_field(bundle.fileset)
       filespecs_list.append(base_globs.filespecs)
-      path_globs_list.append(base_globs.to_path_globs(self.spec_path))
-    bundles_field = BundlesField(self.bundles, self.spec_path, filespecs_list, path_globs_list)
+      path_globs_list.append(base_globs.to_path_globs(self.address.spec_path))
+    bundles_field = BundlesField(self.address,
+                                 self.bundles,
+                                 filespecs_list,
+                                 path_globs_list)
     return field_adaptors + (bundles_field,)
 
 

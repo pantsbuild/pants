@@ -104,7 +104,7 @@ class ExpGraph(BuildGraph):
     """Instantiate the given LegacyTarget, index it in the graph, and return a Target."""
     # Instantiate the target.
     address = legacy_target.adaptor.address
-    target = self._instantiate_target(legacy_target.adaptor, legacy_target.sources)
+    target = self._instantiate_target(legacy_target.adaptor)
     self._target_by_address[address] = target
 
     # Link its declared dependencies, which will be indexed independently.
@@ -113,7 +113,7 @@ class ExpGraph(BuildGraph):
       self._target_dependees_by_address[dependency].add(address)
     return target
 
-  def _instantiate_target(self, target_adaptor, fileset_with_spec):
+  def _instantiate_target(self, target_adaptor):
     """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target.
 
     TODO: This assumes that the SymbolTable used for parsing matches the SymbolTable passed
@@ -123,13 +123,9 @@ class ExpGraph(BuildGraph):
     """
     target_cls = self._target_types[target_adaptor.type_alias]
     try:
-      # Pop dependencies/sources/spec_path, which were already consumed during construction.
+      # Pop dependencies, which were already consumed during construction.
       kwargs = target_adaptor.kwargs()
       kwargs.pop('dependencies')
-      # Replace the sources argument with a FilesetWithSpecs instance, or None.
-      kwargs.pop('spec_path')
-      if 'sources' in kwargs:
-        kwargs['sources'] = fileset_with_spec
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
@@ -184,7 +180,7 @@ class ExpGraph(BuildGraph):
       yield address
 
 
-class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies', 'sources'])):
+class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies'])):
   """A class to represent a node and edges in the legacy BuildGraph.
 
   The ExpGraph implementation inspects only these entries in the ProductGraph.
@@ -205,7 +201,7 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
 
 def hydrate_sources(sources_field, source_files_content):
   """Given a SourcesField and FilesContent for its path_globs, create an EagerFilesetWithSpec."""
-  spec_path = sources_field.spec_path
+  spec_path = sources_field.address.spec_path
   filespecs = sources_field.filespecs
   file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
                  for fc in source_files_content.dependencies}
@@ -217,7 +213,7 @@ def hydrate_bundles(bundles_field, files_content_list):
   bundles = []
   zipped = zip(bundles_field.bundles, bundles_field.filespecs_list, files_content_list)
   for bundle, filespecs, files_content in zipped:
-    spec_path = bundles_field.spec_path
+    spec_path = bundles_field.address.spec_path
     file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
                   for fc in files_content.dependencies}
     kwargs = bundle.kwargs()
