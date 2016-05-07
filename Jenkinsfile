@@ -31,7 +31,10 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
                  host: ${instanceData('public-ipv4')}
         """)
 
-        checkout scm
+        // Avoid failing on transient git issues.
+        retry(2) {
+          checkout scm
+        }
 
         /*
          * Work around various concurrency issues associated with tools that use paths under the
