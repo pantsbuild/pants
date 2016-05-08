@@ -12,6 +12,8 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
 from pants.engine.exp.fs import (Dir, DirectoryListing, File, FileContent, Link, Path, ReadLink,
                                  Stats, file_content, list_directory, path_stat, read_link)
+from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
+                                        SelectVariant)
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -92,10 +94,8 @@ class Node(AbstractClass):
   def step(self, dependency_states, step_context):
     """Given a dict of the dependency States for this Node, returns the current State of the Node.
 
-    The NodeBuilder parameter provides a way to construct Nodes that require information about
-    installed tasks.
-
-    TODO: The NodeBuilder is now a StepContext... rename everywhere.
+    The StepContext parameter provides a way to construct Nodes that require information about
+    installed tasks, or to access the filesystem.
 
     After this method returns a non-Waiting state, it will never be visited again for this Node.
 
@@ -425,5 +425,22 @@ class StepContext(object):
     return self._node_builder.gen_nodes(subject, product, variants)
 
   def select_node(self, selector, subject, variants):
-    """Constructs a Node for the given Selector and the given Subject/Variants."""
-    return self._node_builder.select_node(selector, subject, variants)
+    """Constructs a Node for the given Selector and the given Subject/Variants.
+
+    This method is decoupled from Selector classes in order to allow the `selector` package to not
+    need a dependency on the `nodes` package.
+    """
+    selector_type = type(selector)
+    if selector_type is Select:
+      return SelectNode(subject, selector.product, variants, None)
+    elif selector_type is SelectVariant:
+      return SelectNode(subject, selector.product, variants, selector.variant_key)
+    elif selector_type is SelectDependencies:
+      return DependenciesNode(subject, selector.product, variants, selector.deps_product, selector.field)
+    elif selector_type is SelectProjection:
+      return ProjectionNode(subject, selector.product, variants, selector.projected_subject, selector.fields, selector.input_product)
+    elif selector_type is SelectLiteral:
+      # NB: Intentionally ignores subject parameter to provide a literal subject.
+      return SelectNode(selector.subject, selector.product, variants, None)
+    else:
+      raise ValueError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))

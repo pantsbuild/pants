@@ -80,7 +80,7 @@ class Collection(object):
   @classmethod
   @memoized
   def of(cls, element_type, fields=('dependencies',)):
-    type_name = b'{}({!r})'.format(cls.__name__, element_type)
+    type_name = b'{}({})'.format(cls.__name__, element_type.__name__)
 
     collection_of_type = type(type_name, (cls, datatype("{}s".format(element_type.__name__), fields)), {})
 

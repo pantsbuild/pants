@@ -43,6 +43,7 @@ python_library(
   sources=['fs.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':selectors',
     'src/python/pants/base:project_tree',
     'src/python/pants/source',
     'src/python/pants/util:meta',
@@ -82,6 +83,7 @@ python_library(
     ':addressable',
     ':fs',
     ':objects',
+    ':selectors',
     ':struct',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',
