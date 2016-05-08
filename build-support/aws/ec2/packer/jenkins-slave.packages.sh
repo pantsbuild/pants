@@ -11,11 +11,12 @@ export DEBIAN_FRONTEND=noninteractive
 # Ensure we have `add-apt-repository`.
 sudo apt-get -y install software-properties-common
 
-# Pants itself + python backend.
+# Pants itself, python backend tests, jenkins-slave-connect.
 # ===
 sudo add-apt-repository -y --update ppa:fkrull/deadsnakes
 PYTHONS=(
-  # Without this we only have binaries for `python2.7` and `python3`, but no `python` link.
+  # Without this we only have binaries for `python2.7` and `python3`,
+  # but no `python` link.
   python-minimal
 
   # 2.6 is needed for unit tests that exercise platform constraints.
@@ -33,7 +34,7 @@ PYTHONS=(
 )
 sudo apt-get -y install ${PYTHONS[@]}
 
-# JVM backend.
+# JVM backend and jenkins-slave-connect.
 # ===
 sudo add-apt-repository -y --update ppa:openjdk-r/ppa
 OPEN_JDKS=(
@@ -63,12 +64,12 @@ sudo update-java-alternatives --set java-1.8.0-openjdk-amd64
 # ===
 sudo apt-get -y install g++
 
-# CI scripts and miscelaneous tasks.
+# CI scripts and miscellaneous tasks.
 # ===
 # NB: Many of these packages come in the base image but are spelled out
 # explicity here for completeness.
 MISC=(
-  coreutils
+  coreutils # This provides tr, cut, etc.
   gawk
   grep
   sed
@@ -77,6 +78,11 @@ MISC=(
   openssl # Used for md5 hashing.
   perl # Needed by sloccount.
   git
+  python-requests # For jenkins-slave-connect.
 )
 sudo apt-get -y install ${MISC[@]}
+
+# Finally, top off all our packages.
+sudo apt-get -y update
+sudo apt-get -y upgrade
 

@@ -12,6 +12,7 @@ if curl --max-time 1 ${IP} &>/dev/null; then
   cat << INFO
 Running on:
       node id: ${NODE_NAME}
+       labels: ${JENKINS_LABELS}
        ami id: $(instance_data "ami-id")
   instance id: $(instance_data "instance-id")
          host: $(instance_data "public-ipv4")
