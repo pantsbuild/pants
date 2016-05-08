@@ -37,7 +37,7 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
         env.CXX = "g++"
 
         sh("""
-          ./build-support/aws/ec2/ci/print_node_info.sh
+          ./build-support/ci/print_node_info.sh
           ./build-support/bin/ci.sh ${flags}
           """)
       }
