@@ -29,22 +29,26 @@ the releaser would tag commits to the branch with a full version number and rc v
 example: 'v1.0.0-rc1'
 
 ## Release Cadence
-### Major and Minor Releases
 Release candidates will happen every 2 weeks, provided there are enough user facing changes to
 warrant a new release.  Of the two weeks 5 business days would be allocated to bugfixes and
 testing by pants contributors.  If there are not enough changes in the release cycle or a blocking
 problem is found then that release candidate then the release will happen in the next release
 window.
 
+During a particular release cycle, it's likely that releases for multiple stable branches
+will be needed. As an example: release candidates for a patch release `1.0.1` might be outstanding
+at the same time as release candidates for a minor release `1.1.0`.
+
+### Major and Minor Releases
 The decision to do a major or a minor release will be based on the impact of the changes.
 Major releases signify larger more breaking changes.  Minor releases however should be compatible
 with the last two minor releases.  In other words if a feature is deprecated in version 1.2.x you
 should be able to continue using that feature at least through version 1.4.0.
 
 ### Patch Releases
-In order to allow us to react quickly to bugs patch fixes will be released as needed and may
-include backporting fixes from newer release versions.  These releases would update the minor
-version number and should be [[beckwards compataible|pants('src/docs:deprecation_policy')]].
+In order to allow us to react quickly to bugs, patch fixes will be released as needed and may
+include backporting fixes from newer release versions.  These releases would update the patch
+version number and should be [[backwards compatible|pants('src/docs:deprecation_policy')]].
 
 Patch releases will be tagged with
 full version and rc number similar to normal releases.  For example: 'v1.0.2-rc3'

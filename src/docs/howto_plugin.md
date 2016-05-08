@@ -1,9 +1,6 @@
 Developing a Pants Plugin
 =========================
 
-*As of September 2014, this process is new and still evolving;* *expect
-it to change somewhat.*
-
 This page documents how to develop a Pants plugin, a set of code that
 defines new Pants functionality. If you
 [[develop a new task|pants('src/docs:dev_tasks')]]
@@ -24,10 +21,10 @@ there.
 Simple Configuration
 --------------------
 
-If you want to extend Pants without adding any 3rd Party libraries that aren't already referenced by
-Pants, you can use the following technique using sources stored directly
-in your repo.  All you need to do is add the directory where your plugin sources are stored
-to `PYTHONPATH` and put the package where the plugin is defined in `pants.ini`.
+If you want to extend Pants without adding any 3rd-party libraries that aren't already referenced by
+Pants, you can use the following technique using sources stored directly in your repo.
+All you need to do is name the package where the plugin is defined, and the pythonpath entry to
+load it from.
 
 In the example below, the stock `JvmBinary` target will subclassed so that a custom task (not shown)
 can consume it specifically but disregard regular `JvmBinary` instances (using `isinstance()`).
@@ -49,12 +46,12 @@ can consume it specifically but disregard regular `JvmBinary` instances (using `
           pass
 
 
-- Create `plugins/hadoop_binary/register.py` to register the functions in your plugin.  When registering a
-backend in pants.ini, register.py is used by the pants plugin api to register new functions
+- Create `src/python/yourorg/pants/hadoop_binary/register.py` to register the functions in your plugin.  When registering a
+backend in `pants.ini`, register.py is used by the pants plugin api to register new functions
 exposed in build files, targets, tasks and goals:
 
         :::python
-        # plugins/hadoop_binary/register.py
+        # src/python/yourorg/pants/hadoop_binary/register.py
 
         from pants.build_graph.build_file_aliases import BuildFileAliases
         from hadoop_binary.target import HadoopBinary
@@ -66,57 +63,45 @@ exposed in build files, targets, tasks and goals:
             },
           )
 
-- Update your `pants` wrapper script to include the `plugins/` directory on `PYTHONPATH`:
 
-        :::bash
-        PYTHONPATH=plugins:${PYTHONPATH}
-        export PYTHONPATH
-
-- In `pants.ini`, add your new plugins directory to the list of backends to load when pants starts.
-This instructs pants to look for a module named `hadoop_binary.register` and invoke
-it.
+- In `pants.ini`, add your new plugin package to the list of backends to load when pants starts.
+This instructs pants to load a module named `yourorg.pants.hadoop_binary.register`.
 
         :::python
         [GLOBAL]
+        pythonpath: [
+          "%(buildroot)s/src/python",
+        ]
         backend_packages: [
-            "hadoop_binary",
+            "yourorg.pants.hadoop_binary",
           ]
+
+Note that you can also set the PYTHONPATH in your `./pants` wrapper script, instead of in
+`pants.ini`, if you have other reasons to do so.
 
 Examples from `twitter/commons`
 -------------------------------
 
 For an example of a code repo with plugins to add features to Pants when building in that repo,
 take a look at [`twitter/commons`](https://github.com/twitter/commons), especially its
-[`pants-plugin` directory](https://github.com/twitter/commons).
+[`pants-plugins` directory](https://github.com/twitter/commons/tree/32011ab5351fea23e8c70e24e752540b06d1389f/pants-plugins).
 
-This repo has a [`pants` wrapper script](https://github.com/twitter/commons/blob/master/pants)
-that script adds `pants-plugins/src/python` to `PYTHONPATH`.
-
-The repo's [`pants.ini` file](https://github.com/twitter/commons/blob/master/pants) has a
+The repo's [`pants.ini` file](https://github.com/twitter/commons/blob/32011ab5351fea23e8c70e24e752540b06d1389f/pants.ini) has a
 `backend_packages` entry listing the plugin packages (packages with `register.py` files):
 
     :::python
     [GLOBAL]
+    pythonpath: [
+        "%(buildroot)s/pants-plugins/src/python",
+      ]
     backend_packages: [
-        'twitter.common.pants.jvm.args',
         'twitter.common.pants.jvm.extras',
         'twitter.common.pants.python.commons',
-    ]
+        'pants.contrib.python.checks',
+      ]
 
 The [`...jvm/extras/register.py`](https://github.com/twitter/commons/blob/master/pants-plugins/src/python/twitter/common/pants/jvm/extras/register.py)
 file registers a `checkstyle` goal. To find the code for this task, come back to the
 `pantsbuild/pants` repo: Pants defines the
-[`Checkstyle` task class](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/tasks/checkstyle.py) but doesn't register it. But other Pants workspaces can register it, as
-`twitter/commons` illustrates.
-
-The [`...jvm/args/register.py`](https://github.com/twitter/commons/blob/master/pants-plugins/src/python/twitter/common/pants/jvm/args/register.py)
-registers a goal, `args-apt`. This plugin also defines the
-[`Task` class for this goal](https://github.com/twitter/commons/blob/master/pants-plugins/src/python/twitter/common/pants/jvm/args/tasks/resource_mapper.py).
-
-(Somewhat confusingly, `twitter/commons`' has a `BUILD` file so it can publish its plugins as a
-`setup_py` artifact. If you only use your plugin to build code in the *same* workspace,
-your plugin directory tree does *not* need any `BUILD` files. By publishing this plugin, Twitter can
-use its code in other workspaces, e.g., Twitter's internal codebase. Other folks can use it too:
-introduce a dependency on `twitter.common.pants` and add entries to their `pants.ini backend_packages`
-section.)
-
+[`Checkstyle` task class](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/tasks/checkstyle.py) but doesn't register it. 
+But other Pants workspaces can register it, as `twitter/commons` illustrates.

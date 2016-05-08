@@ -5,6 +5,9 @@ Refer to Jenkins2.0 pipeline and Jenkinsfile docs here:
    https://jenkins.io/doc/pipeline/
    https://jenkins.io/doc/pipeline/jenkinsfile/
    https://jenkins.io/doc/pipeline/steps/
+
+NB: The linux slaves are configured as described in `build-support/packer/README.md` and the osx
+slave(s) are currently cowboyed by hand.
 */
 
 def void ansiColor(Closure<Void> wrapped) {
