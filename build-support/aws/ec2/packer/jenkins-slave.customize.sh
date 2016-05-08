@@ -102,7 +102,7 @@ username, password = None, None
 for arg in args:
   key, value = arg.split('=', 1)
   if key == 'JENKINS_URL':
-    params[key] = re.sub(r'/$', '', value)
+    value = re.sub(r'/$', '', value)
   elif key == 'USER_DATA':
     value = base64.b64decode(value)
     username, password = value.split(':', 1)
