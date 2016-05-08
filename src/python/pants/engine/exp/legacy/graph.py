@@ -69,8 +69,7 @@ class ExpGraph(BuildGraph):
       if type(node) is not SelectNode:
         continue
 
-      # We have a successfully parsed LegacyTarget, which includes its declared dependencies
-      # and sources.
+      # We have a successfully parsed LegacyTarget, which includes its declared dependencies.
       address = state.value.adaptor.address
       all_addresses.add(address)
       if address not in self._target_by_address:
