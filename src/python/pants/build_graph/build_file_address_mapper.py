@@ -248,7 +248,7 @@ class BuildFileAddressMapper(object):
       logger.debug('excludes:\n  {excludes}'
                    .format(excludes='\n  '.join(self._exclude_target_regexps)))
       targets = ', '.join(excluded_target_map[self._UNMATCHED_KEY])
-      logger.debug('Targets after excludes: {targets}'.format(targets=targets))
+      logger.debug('Targets after excludes: %s', targets)
       excluded_count = 0
       for pattern, targets in six.iteritems(excluded_target_map):
         if pattern != self._UNMATCHED_KEY:

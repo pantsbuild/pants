@@ -85,7 +85,7 @@ class Options(object):
 
   @classmethod
   def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None,
-             option_tracker=None,):
+             option_tracker=None):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
