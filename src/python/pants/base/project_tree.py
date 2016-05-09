@@ -35,6 +35,7 @@ class ProjectTree(AbstractClass):
     if not os.path.isabs(build_root):
       raise self.InvalidBuildRootError('ProjectTree build_root {} must be an absolute path.'.format(build_root))
     self.build_root = os.path.realpath(build_root)
+    logger.debug('ProjectTree ignore_patterns: %s', ignore_patterns)
     self.ignore = PathSpec.from_lines(GitIgnorePattern, ignore_patterns if ignore_patterns else [])
 
   @abstractmethod
