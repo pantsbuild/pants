@@ -325,28 +325,44 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
   def is_cacheable(self):
     return True
 
-  def step(self, dependency_states, step_context):
-    # Compute dependencies.
-    dep_values = []
-    dependencies = [step_context.select_node(selector, self.subject, self.variants)
-                    for selector in self.clause]
+  def _resolve(self, dep_node, dependency_states, step_context):
+    """Given a Node and all input dependencies, return a State for the dep.
 
-    # If all dependency Nodes are Return, execute the Node.
-    for dep_select, dep_key in zip(self.clause, dependencies):
-      dep_state = dependency_states.get(dep_key, None)
-      if dep_state is None or type(dep_state) == Waiting:
-        return Waiting(dependencies)
+    TODO: This inlines execution of all non-Task/Filesystem nodes, which could maybe
+    be cleaner/more-general? We actually use an explicit Dependencies node at the root
+    though. And overall, inlining everywhere is not going to be particularly good for
+    debuggability.
+    """
+    if type(dep_node) in (DependenciesNode, ProjectionNode, SelectNode):
+      return dep_node.step(dependency_states, step_context)
+    else:
+      return dependency_states.get(dep_node, Waiting([dep_node]))
+
+  def step(self, dependency_states, step_context):
+    # Compute dependencies for the Node, or determine whether it is a Noop.
+    waiting = False
+    dependencies = []
+    dep_values = []
+    for selector in self.clause:
+      dep_node = step_context.select_node(selector, self.subject, self.variants)
+      dep_state = self._resolve(dep_node, dependency_states, step_context)
+      if type(dep_state) == Waiting:
+        waiting = True
+        dependencies.extend(dep_state.dependencies)
       elif type(dep_state) == Return:
         dep_values.append(dep_state.value)
       elif type(dep_state) == Noop:
-        if dep_select.optional:
+        if selector.optional:
           dep_values.append(None)
         else:
-          return Noop('Was missing (at least) input {}.'.format(dep_key))
+          return Noop('Was missing (at least) input {}.'.format(dep_node))
       elif type(dep_state) == Throw:
         return dep_state
       else:
         State.raise_unrecognized(dep_state)
+    # If any clause was still waiting on dependencies, indicate it; else execute.
+    if waiting:
+      return Waiting(dependencies)
     try:
       return Return(self.func(*dep_values))
     except Exception as e:
