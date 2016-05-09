@@ -13,15 +13,15 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.options_initializer import OptionsInitializer
-from pants.engine.v2.engine import LocalSerialEngine
-from pants.engine.v2.fs import create_fs_tasks
-from pants.engine.v2.graph import create_graph_tasks
-from pants.engine.v2.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
-from pants.engine.v2.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
-from pants.engine.v2.mapper import AddressMapper
-from pants.engine.v2.parser import SymbolTable
-from pants.engine.v2.scheduler import LocalScheduler
-from pants.engine.v2.storage import Storage
+from pants.engine.engine import LocalSerialEngine
+from pants.engine.fs import create_fs_tasks
+from pants.engine.graph import create_graph_tasks
+from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
+from pants.engine.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
+from pants.engine.mapper import AddressMapper
+from pants.engine.parser import SymbolTable
+from pants.engine.scheduler import LocalScheduler
+from pants.engine.storage import Storage
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
 
