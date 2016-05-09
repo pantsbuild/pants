@@ -15,6 +15,7 @@ python_tests(
   name = 'filemap_integration',
   sources = ['test_filemap_integration.py'],
   dependencies = [
+    'src/python/pants/base:file_system_project_tree',
     'tests/python/pants_test:int-test'
   ],
   tags = {'integration'},
