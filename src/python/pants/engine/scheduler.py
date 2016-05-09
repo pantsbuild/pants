@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import threading
+import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
 
@@ -23,6 +24,14 @@ from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
+
+
+class CompletedNodeException(ValueError):
+  """Indicates an attempt to change a Node that is already completed."""
+
+
+class IncompleteDependencyException(ValueError):
+  """Indicates an attempt to complete a Node that has incomplete dependencies."""
 
 
 class ProductGraph(object):
@@ -58,8 +67,6 @@ class ProductGraph(object):
     self._validator = validator or Node.validate_node
     # A dict of Node->_Entry.
     self._nodes = dict()
-    # The total count of non-cyclic edges is used to bound cycle searches.
-    self._edge_count = 0
 
   def __len__(self):
     return len(self._nodes)
@@ -78,10 +85,18 @@ class ProductGraph(object):
     """Updates the Node with the given State, creating any Nodes which do not already exist."""
     entry = self._ensure_entry(node)
     if entry.state is not None:
-      raise ValueError('Node {} is already completed:\n  {}\n  {}'
-                       .format(node, entry.state, state))
+      # It's important not to allow state changes on completed Nodes, because that invariant
+      # is used in cycle detection to avoid walking into completed Nodes.
+      raise CompletedNodeException('Node {} is already completed:\n  {}\n  {}'
+                                   .format(node, entry.state, state))
 
     if type(state) in [Return, Throw, Noop]:
+      # Validate that a completed Node depends only on other completed Nodes.
+      for dep in entry.dependencies:
+        if dep.state is None:
+          raise IncompleteDependencyException(
+              'Cannot complete {} with {} while it has an incomplete dep:\n  {}'
+                .format(node, state, dep.node))
       entry.state = state
     elif type(state) is Waiting:
       self._add_dependencies(entry, state.dependencies)
@@ -96,7 +111,11 @@ class ProductGraph(object):
 
     Returns True if a cycle would be created by adding an edge from src->dest.
     """
-    for entry in self._walk_entries([dest], entry_predicate=lambda _: True):
+    # We disallow adding new edges outbound from completed Nodes, and no completed Node can have
+    # a path to an uncompleted Node. Thus, we can truncate our search for cycles at any completed
+    # Node.
+    is_not_completed = lambda e: e.state is None
+    for entry in self._walk_entries([dest], entry_predicate=is_not_completed):
       if entry is src:
         return True
     return False
@@ -127,7 +146,6 @@ class ProductGraph(object):
       if self._detect_cycle(node_entry, dependency_entry):
         node_entry.cyclic_dependencies.add(dependency)
       else:
-        self._edge_count += 1
         node_entry.dependencies.add(dependency_entry)
         dependency_entry.dependents.add(node_entry)
 
@@ -182,7 +200,6 @@ class ProductGraph(object):
     def _delete_node(entry):
       actual_entry = self._nodes.pop(entry.node)
       assert entry is actual_entry
-      self._edge_count -= len(entry.dependencies)
 
     def all_predicate(node, state): return True
     predicate = predicate or all_predicate
@@ -584,6 +601,7 @@ class LocalScheduler(object):
     with self._product_graph_lock:
       # Yield nodes that are ready, and then compute new ones.
       scheduling_iterations = 0
+      start_time = time.time()
       while True:
         # Create Steps for candidates that are ready to run, and not already running.
         ready = dict()
@@ -632,10 +650,10 @@ class LocalScheduler(object):
               candidates.add(step.node)
 
       logger.debug(
-        'visited %s nodes in %s scheduling iterations. '
+        'ran %s scheduling iterations in %f seconds. '
         'there have been %s total steps for %s total nodes.',
-        sum(1 for _ in self._product_graph.walk(execution_request.roots)),
         scheduling_iterations,
+        time.time() - start_time,
         self._step_id,
         len(self._product_graph)
       )
