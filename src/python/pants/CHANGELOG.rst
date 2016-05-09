@@ -1,6 +1,245 @@
 Release History
 ===============
 
+1.1.0-pre0 (05/09/2016)
+----------------------
+
+The `1.1.M-preN` releases start here - Pants is building to the minor version `M`,
+and is `N` releases towards that milestone.
+
+This release has several changes to tooling, lots of documentation updates, and some minor api changes.
+
+
+API Changes
+~~~~~~~~~~~
+
+* Add support for pants-ignore to ProjectTree
+  `RB #3698 <https://rbcommons.com/s/twitter/r/3698>`_
+
+* New -default-concurrency parameter to junit-runner
+  `RB #3707 <https://rbcommons.com/s/twitter/r/3707>`_
+  `RB #3753 <https://rbcommons.com/s/twitter/r/3753>`_
+
+* rename check_published_deps to check-published-deps to be consistent with dashes in goal names
+  `RB #3749 <https://rbcommons.com/s/twitter/r/3749>`_
+
+* Make :API: public types useable.
+  `RB #3752 <https://rbcommons.com/s/twitter/r/3752>`_
+
+* Add public API markers to targets and base tasks used by plugins.
+  `RB #3746 <https://rbcommons.com/s/twitter/r/3746>`_
+
+* De-publicize a FAPP private method.
+  `RB #3750 <https://rbcommons.com/s/twitter/r/3750>`_
+
+
+New Features
+~~~~~~~~~~~~
+
+* Enhance parallel testing junit_tests
+  `Issue #3209 <https://github.com/pantsbuild/pants/issues/3209>`_
+  `RB #3707 <https://rbcommons.com/s/twitter/r/3707>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* Ensure `DistributionLocator` is `_reset` after tests.
+  `RB #3832 <https://rbcommons.com/s/twitter/r/3832>`_
+
+* Handle values for list options that end with quotes
+  `RB #3813 <https://rbcommons.com/s/twitter/r/3813>`_
+
+* Addresses should not equal things that are not addresses.
+  `RB #3791 <https://rbcommons.com/s/twitter/r/3791>`_
+
+* Add transitive dep required by javac 8.
+  `RB #3808 <https://rbcommons.com/s/twitter/r/3808>`_
+
+* Fix distribution tests in the face of many javas.
+  `RB #3778 <https://rbcommons.com/s/twitter/r/3778>`_
+
+* Fixup `PEP8Error` to carry lines.
+  `RB #3647 <https://rbcommons.com/s/twitter/r/3647>`_
+  `RB #3806 <https://rbcommons.com/s/twitter/r/3806>`_
+
+* Use NailgunTask's Java distribution consistently.
+  `RB #3793 <https://rbcommons.com/s/twitter/r/3793>`_
+
+* The thrift dep is indirect but required under JDK8.
+  `RB #3787 <https://rbcommons.com/s/twitter/r/3787>`_
+
+* Fix relative path in publish script.
+  `RB #3789 <https://rbcommons.com/s/twitter/r/3789>`_
+
+* Remove a failing test for deleted functionality.
+  `RB #3783 <https://rbcommons.com/s/twitter/r/3783>`_
+
+* Fixup `PythonChrootTest.test_thrift_issues_2005`.
+  `RB #3774 <https://rbcommons.com/s/twitter/r/3774>`_
+
+* Fix JDK 8 javadoc errors.
+  `RB #3773 <https://rbcommons.com/s/twitter/r/3773>`_
+
+* Fix `DIST_ROOT` trample in `test_distribution.py`.
+  `RB #3747 <https://rbcommons.com/s/twitter/r/3747>`_
+
+* Skip flaky pytest timeout failure ITs.
+  `RB #3748 <https://rbcommons.com/s/twitter/r/3748>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Expose JENKINS_LABELS to slaves.
+  `RB #3844 <https://rbcommons.com/s/twitter/r/3844>`_
+
+* Move node info to a script.
+  `RB #3842 <https://rbcommons.com/s/twitter/r/3842>`_
+
+* Retry git operations up to 2 times.
+  `RB #3841 <https://rbcommons.com/s/twitter/r/3841>`_
+
+* Add instance debug data to shard output.
+  `RB #3837 <https://rbcommons.com/s/twitter/r/3837>`_
+
+* Improve `jenkins-slave-connect.service` robustness.
+  `RB #3836 <https://rbcommons.com/s/twitter/r/3836>`_
+
+* Use `env` and `pwd()` to get rid of $ escaping.
+  `RB #3835 <https://rbcommons.com/s/twitter/r/3835>`_
+
+* Improve the packer docs.
+  `RB #3834 <https://rbcommons.com/s/twitter/r/3834>`_
+
+* Isolate Jenkins CI ivy caches.
+  `RB #3829 <https://rbcommons.com/s/twitter/r/3829>`_
+
+* Comment on release concurrency in the docs
+  `RB #3827 <https://rbcommons.com/s/twitter/r/3827>`_
+
+* Update plugin doc.
+  `RB #3811 <https://rbcommons.com/s/twitter/r/3811>`_
+
+* Use packer to create the jenkins linux slave AMI.
+  `RB #3825 <https://rbcommons.com/s/twitter/r/3825>`_
+
+* Upgrade cloc to 1.66.
+  `RB #3820 <https://rbcommons.com/s/twitter/r/3820>`_
+
+* Add an explicit legal exception to deprecation policy
+  `RB #3809 <https://rbcommons.com/s/twitter/r/3809>`_
+
+* Add a Jenkins2.0 CI configuration.
+  `RB #3799 <https://rbcommons.com/s/twitter/r/3799>`_
+
+* Scrooge gen: Cache resolved scrooge deps
+  `RB #3790 <https://rbcommons.com/s/twitter/r/3790>`_
+
+* Front Page update
+  `RB #3807 <https://rbcommons.com/s/twitter/r/3807>`_
+
+* remove 'staging' url from 1.0 release
+
+* Fix various hardwired links to point to pantsbuild.org.
+  `RB #3805 <https://rbcommons.com/s/twitter/r/3805>`_
+
+* Push the docsite to benjyw.github.io as well as pantsbuild.github.io.
+  `RB #3802 <https://rbcommons.com/s/twitter/r/3802>`_
+
+* Add -L to allow curl to redirect in case we decide to move website later
+  `RB #3804 <https://rbcommons.com/s/twitter/r/3804>`_
+
+* Merge back in some content from the options page
+  `RB #3767 <https://rbcommons.com/s/twitter/r/3767>`_
+  `RB #3795 <https://rbcommons.com/s/twitter/r/3795>`_
+
+* Update the community page
+  `RB #3801 <https://rbcommons.com/s/twitter/r/3801>`_
+
+* Updates for documentation followon from Radical site redesign
+  `RB #3794 <https://rbcommons.com/s/twitter/r/3794>`_
+
+* Use a set for the contains check in topo order path for invalidation
+  `RB #3786 <https://rbcommons.com/s/twitter/r/3786>`_
+
+* Rework ScalaPlatform.
+  `RB #3779 <https://rbcommons.com/s/twitter/r/3779>`_
+
+* Pants 1.0 Release announcement
+  `RB #3781 <https://rbcommons.com/s/twitter/r/3781>`_
+
+* Revisit the 'Why Use Pants' doc
+  `RB #3788 <https://rbcommons.com/s/twitter/r/3788>`_
+
+* Move src/python/pants/docs to src/docs.
+  `RB #3782 <https://rbcommons.com/s/twitter/r/3782>`_
+
+* Adding managed_jar_dependencies docs to 3rdparty_jvm.md.
+  `RB #3776 <https://rbcommons.com/s/twitter/r/3776>`_
+
+* Radical makeover of docsite.
+  `RB #3767 <https://rbcommons.com/s/twitter/r/3767>`_
+
+* Add changelog items from 1.0.x branch
+  `RB #3772 <https://rbcommons.com/s/twitter/r/3772>`_
+
+* Upgrade to pex 1.1.6.
+  `RB #3768 <https://rbcommons.com/s/twitter/r/3768>`_
+
+* convert RequestException into a more standard NonfatalArtifactCacheError
+  `RB #3754 <https://rbcommons.com/s/twitter/r/3754>`_
+
+* [docs] Remove setup difficulty caveat, and highlight install script
+  `RB #3764 <https://rbcommons.com/s/twitter/r/3764>`_
+
+* add JUnit XML tests for a TestSuite and a Parameterized Test
+  `RB #3758 <https://rbcommons.com/s/twitter/r/3758>`_
+
+* Adding Grapeshot to the Powered by page, approved by Katie Lucas of Grapeshot
+  `RB #3760 <https://rbcommons.com/s/twitter/r/3760>`_
+
+* Upgrade default go from 1.6.1 to 1.6.2.
+  `RB #3755 <https://rbcommons.com/s/twitter/r/3755>`_
+
+* Upgrade to pex 1.1.5.
+  `RB #3743 <https://rbcommons.com/s/twitter/r/3743>`_
+
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Don't cycle-detect into completed Nodes
+  `RB #3848 <https://rbcommons.com/s/twitter/r/3848>`_
+
+* Migrate `pants.engine.exp` to `pants.engine.v2`.
+  `RB #3798 <https://rbcommons.com/s/twitter/r/3798>`_
+  `RB #3800 <https://rbcommons.com/s/twitter/r/3800>`_
+
+* [pantsd] Build graph caching via v2 engine integration.
+  `RB #3798 <https://rbcommons.com/s/twitter/r/3798>`_
+
+* [engine] Walk references in the ProductGraph
+  `RB #3803 <https://rbcommons.com/s/twitter/r/3803>`_
+
+* [engine] Add support for collection wrapping a class
+  `RB #3769 <https://rbcommons.com/s/twitter/r/3769>`_
+
+* [engine] Simplify ProductGraph.walk
+  `RB #3792 <https://rbcommons.com/s/twitter/r/3792>`_
+
+* [engine] Make ScmProjectTree pickable and fix most GitFSTest tests
+  `Issue #3281 <https://github.com/pantsbuild/pants/issues/3281>`_
+  `RB #3770 <https://rbcommons.com/s/twitter/r/3770>`_
+
+* [engine] bug fix: to pickle/unpickle within the proper context
+  `RB #3751 <https://rbcommons.com/s/twitter/r/3751>`_
+  `RB #3761 <https://rbcommons.com/s/twitter/r/3761>`_
+
+* [engine] Support for synthetic target injection
+  `RB #3738 <https://rbcommons.com/s/twitter/r/3738>`_
+
+
 1.0.0-rc3 (04/26/2016)
 ----------------------
 

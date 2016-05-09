@@ -294,7 +294,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
     }
     jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
     if jvm_distributions:
-      deprecated_conditional(lambda: True, '0.0.89',
+      deprecated_conditional(lambda: True, '1.1.0-pre6',
                              'jvm_distributions is deprecated in favor of '
                              'preferred_jvm_distributions.')
       graph_info['jvm_distributions'] = jvm_distributions
