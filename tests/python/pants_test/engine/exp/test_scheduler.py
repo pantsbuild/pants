@@ -18,7 +18,8 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
                                                 setup_json_scheduler)
 from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                     Throw, Waiting)
-from pants.engine.exp.scheduler import CompletedNodeException, ProductGraph, IncompleteDependencyException
+from pants.engine.exp.scheduler import (CompletedNodeException, IncompleteDependencyException,
+                                        ProductGraph)
 from pants.util.contextutil import temporary_dir
 
 
