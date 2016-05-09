@@ -126,6 +126,9 @@ response = requests.get('{JENKINS_URL}/computer/{SLAVE_NAME}/config.xml'.format(
 if response.status_code == requests.codes.ok:
   labels = ' '.join(l.text for l in ET.fromstring(response.text).findall('label'))
   os.putenv('JENKINS_LABELS', labels)
+  print('Discovered JENKINS_LABELS: {}'.format(labels))
+else:
+  print('Failed to determine JENKINS_LABELS: {}'.format(response.status_code))
 
 os.system('java -jar {workdir}/slave.jar -noReconnect'
           ' -jnlpUrl {JENKINS_URL}/computer/{SLAVE_NAME}/slave-agent.jnlp'
@@ -145,8 +148,10 @@ cat << UNIT_FILE | sudo tee /etc/systemd/system/jenkins-slave-connect.service
 
 [Unit]
 Description=Starts Jenkins Master JNLP connector.
-After=network-online.target mnt-xvdb.mount
-Requires=network-online.target mnt-xvdb.mount
+# NB: The cloud-init.target must be waited for since part of its job is
+# (re)mounting /dev/xvdb.
+After=network-online.target cloud-init.target
+Requires=network-online.target cloud-init.target
 
 # This disables re-start rate-limiting.  Since our slave instances
 # are dedicated to this service and this service alone, it makes sense
