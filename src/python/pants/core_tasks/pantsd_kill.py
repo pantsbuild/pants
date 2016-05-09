@@ -16,6 +16,6 @@ class PantsDaemonKill(Task):
 
   def execute(self):
     try:
-      PantsDaemonLauncher.global_instance().terminate()
+      PantsDaemonLauncher.Factory.global_instance().create().terminate()
     except ProcessManager.NonResponsiveProcess as e:
       raise TaskError('failure while terminating pantsd: {}'.format(e))

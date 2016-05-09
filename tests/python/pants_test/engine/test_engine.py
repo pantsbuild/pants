@@ -1,61 +1,86 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.exceptions import TaskError
-from pants.engine.engine import Engine
-from pants_test.engine.base_engine_test import EngineTestBase
+import os
+import unittest
+from contextlib import closing, contextmanager
+
+from pants.build_graph.address import Address
+from pants.engine.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
+from pants.engine.nodes import Return, SelectNode
+from pants.engine.storage import Cache, Storage
+from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
 
 
-class EngineTest(EngineTestBase):
-  class RecordingEngine(Engine):
-    def __init__(self, action=None):
-      super(EngineTest.RecordingEngine, self).__init__()
-      self._action = action
-      self._attempts = []
-
-    @property
-    def attempts(self):
-      return self._attempts
-
-    def attempt(self, context, goals):
-      self._attempts.append((context, goals))
-      if self._action:
-        self._action()
-
+class EngineTest(unittest.TestCase):
   def setUp(self):
-    super(EngineTest, self).setUp()
-    self._context = self.context()
+    build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
+    self.scheduler, self.storage = setup_json_scheduler(build_root, debug=True)
+    self.cache = Cache.create(Storage.create())
 
-  def assert_attempt(self, engine, *goal_names):
-    self.assertEqual(1, len(engine.attempts))
+    self.java = Address.parse('src/java/codegen/simple')
 
-    context, goals = engine.attempts[0]
-    self.assertEqual(self._context, context)
-    self.assertEqual(self.as_goals(*goal_names), goals)
+  def request(self, goals, *addresses):
+    return self.scheduler.build_request(goals=goals,
+                                        subjects=addresses)
 
-  def test_execute_success(self):
-    engine = self.RecordingEngine()
-    result = engine.execute(self._context, self.as_goals('one', 'two'))
-    self.assertEqual(0, result)
-    self.assert_attempt(engine, 'one', 'two')
+  def assert_engine(self, engine):
+    result = engine.execute(self.request(['compile'], self.java))
+    self.assertEqual({SelectNode(self.java, Classpath, None, None):
+                      Return(Classpath(creator='javac'))},
+                     result.root_products)
+    self.assertIsNone(result.error)
 
-  def _throw(self, error):
-    def throw():
-      raise error
-    return throw
+  @contextmanager
+  def multiprocessing_engine(self, pool_size=None):
+    with closing(LocalMultiprocessEngine(self.scheduler, self.storage, self.cache,
+                                         pool_size=pool_size, debug=True)) as e:
+      e.start()
+      yield e
 
-  def test_execute_raise(self):
-    engine = self.RecordingEngine(action=self._throw(TaskError()))
-    result = engine.execute(self._context, self.as_goals('three'))
-    self.assertEqual(1, result)
-    self.assert_attempt(engine, 'three')
+  def test_serial_engine_simple(self):
+    engine = LocalSerialEngine(self.scheduler, self.storage, self.cache)
+    self.assert_engine(engine)
 
-  def test_execute_code(self):
-    engine = self.RecordingEngine(action=self._throw(TaskError(exit_code=42)))
-    result = engine.execute(self._context, self.as_goals('four', 'five', 'six'))
-    self.assertEqual(42, result)
-    self.assert_attempt(engine, 'four', 'five', 'six')
+  def test_multiprocess_engine_multi(self):
+    with self.multiprocessing_engine() as engine:
+      self.assert_engine(engine)
+
+  def test_multiprocess_engine_single(self):
+    with self.multiprocessing_engine(pool_size=1) as engine:
+      self.assert_engine(engine)
+
+  def test_multiprocess_unpickleable(self):
+    build_request = self.request(['unpickleable'], self.java)
+
+    with self.multiprocessing_engine() as engine:
+      with self.assertRaises(SerializationError):
+        engine.execute(build_request)
+
+  def test_rerun_with_cache(self):
+    with self.multiprocessing_engine() as engine:
+      self.assert_engine(engine)
+
+      cache_stats = engine._cache.get_stats()
+      # First run all misses.
+      self.assertTrue(cache_stats.hits == 0)
+
+      # Save counts for the first run to prepare for another run.
+      max_steps, misses, total = self.scheduler._step_id, cache_stats.misses, cache_stats.total
+
+      self.scheduler.product_graph.invalidate()
+      self.assert_engine(engine)
+
+      # Second run executes same number of steps, and are all cache hits, no more misses.
+      self.assertEquals(max_steps * 2, self.scheduler._step_id)
+      self.assertEquals(total * 2, cache_stats.total)
+      self.assertEquals(misses, cache_stats.misses)
+      self.assertTrue(cache_stats.hits > 0)
+
+      # Ensure we cache no more than what can be cached.
+      for request, result in engine._cache.items():
+        self.assertTrue(request[0].is_cacheable)
