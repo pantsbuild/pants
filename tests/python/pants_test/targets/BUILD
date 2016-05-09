@@ -3,9 +3,6 @@
 
 python_library(
   name = 'base',
-  dependencies = [
-    'tests/python/pants_test:base_test',
-  ],
 )
 
 python_tests(
@@ -22,20 +19,20 @@ python_tests(
   name = 'sort_targets',
   sources = ['test_sort_targets.py'],
   dependencies = [
-    ':base',
     'src/python/pants/build_graph',
-  ]
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
   name = 'java_agent',
   sources = ['test_java_agent.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -51,22 +48,22 @@ python_tests(
   name = 'python_binary',
   sources = ['test_python_binary.py'],
   dependencies = [
-    ':base',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/build_graph',
-  ]
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
   name = 'scala_library',
   sources = ['test_scala_library.py'],
   dependencies = [
-    ':base',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/build_graph',
-  ]
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -88,6 +85,6 @@ python_tests(
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test'
-  ]
+    'tests/python/pants_test:base_test',
+  ],
 )

@@ -4,8 +4,8 @@
 python_tests(
   name='binary_util',
   sources=['test_binary_util.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/binaries:binary_util',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )

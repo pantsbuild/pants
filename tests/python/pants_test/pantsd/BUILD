@@ -3,11 +3,6 @@
 
 python_library(
   name = 'test_deps',
-  dependencies = [
-    '3rdparty/python:mock',
-    '3rdparty/python:pytest',
-    'tests/python/pants_test:base_test'
-  ]
 )
 
 python_tests(
@@ -15,9 +10,12 @@ python_tests(
   sources = ['test_process_manager.py'],
   coverage = ['pants.pantsd.process_manager'],
   dependencies = [
-    ':test_deps',
-    'src/python/pants/pantsd:process_manager'
-  ]
+    '3rdparty/python:mock',
+    '3rdparty/python:psutil',
+    'src/python/pants/pantsd:process_manager',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ],
 )
 
 python_tests(
@@ -25,9 +23,12 @@ python_tests(
   sources = ['test_watchman.py'],
   coverage = ['pants.pantsd.watchman'],
   dependencies = [
-    ':test_deps',
-    'src/python/pants/pantsd:watchman'
-  ]
+    '3rdparty/python:mock',
+    '3rdparty/python:pywatchman',
+    'src/python/pants/pantsd:watchman',
+    'src/python/pants/pantsd:watchman_client',
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -35,9 +36,10 @@ python_tests(
   sources = ['test_watchman_client.py'],
   coverage = ['pants.pantsd.watchman_client'],
   dependencies = [
-    ':test_deps',
-    'src/python/pants/pantsd:watchman_client'
-  ]
+    '3rdparty/python:mock',
+    'src/python/pants/pantsd:watchman_client',
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -45,9 +47,10 @@ python_tests(
   sources = ['test_pailgun_server.py'],
   coverage = ['pants.pantsd.pailgun_server'],
   dependencies = [
-    ':test_deps',
-    'src/python/pants/pantsd:pailgun_server'
-  ]
+    '3rdparty/python:mock',
+    'src/python/pants/java:nailgun_protocol',
+    'src/python/pants/pantsd:pailgun_server',
+  ],
 )
 
 python_tests(
@@ -55,18 +58,19 @@ python_tests(
   sources = ['test_pants_daemon.py'],
   coverage = ['pants.pantsd.pants_daemon'],
   dependencies = [
-    ':test_deps',
-    'src/python/pants/pantsd:pants_daemon',
+    '3rdparty/python:mock',
     'src/python/pants/pantsd/service:pants_service',
-    'src/python/pants/util:contextutil'
-  ]
+    'src/python/pants/pantsd:pants_daemon',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
   name = 'pantsd_integration',
   sources = ['test_pantsd_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test'
+    'tests/python/pants_test:int-test',
   ],
   tags = {'integration'}
 )

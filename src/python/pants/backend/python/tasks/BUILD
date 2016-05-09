@@ -4,15 +4,11 @@
 python_library(
   name='python',
   sources=globs('*.py'),
-  dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python:coverage',
+  dependencies = [
     '3rdparty/python:pex',
-    '3rdparty/python:pytest',
-    '3rdparty/python:pytest-cov',
-    '3rdparty/python:setuptools',
     '3rdparty/python:six',
+    '3rdparty/python:twitter.common.collections',
+    '3rdparty/python:twitter.common.dirutil',
     'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:antlr_builder',
@@ -23,14 +19,12 @@ python_library(
     'src/python/pants/backend/python:thrift_builder',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:generator',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:specs',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:thrift_util',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
-    'src/python/pants/option',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -38,7 +32,5 @@ python_library(
     'src/python/pants/util:meta',
     'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
-    'src/python/pants/util:xml_parser',
-    'src/python/pants/util:timeout',
-  ]
+  ],
 )

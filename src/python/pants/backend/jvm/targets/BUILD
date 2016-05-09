@@ -1,14 +1,5 @@
 
 python_library(
-  name = 'all',
-  dependencies = [
-    ':jvm',
-    ':java',
-    ':scala',
-  ],
-)
-
-python_library(
   name = 'jvm',
   sources = [
     'benchmark.py',
@@ -27,19 +18,19 @@ python_library(
     'unpacked_jars.py',
   ],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:six',
+    '3rdparty/python:twitter.common.collections',
+    '3rdparty/python:twitter.common.dirutil',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:validation',
     'src/python/pants/build_graph',
     'src/python/pants/source',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:netrc',
@@ -56,9 +47,12 @@ python_library(
     'java_tests.py',
   ],
   dependencies = [
-    ':jvm',
     '3rdparty/python:six',
+    ':jvm',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
   ],
 )
 
@@ -70,12 +64,9 @@ python_library(
     'scala_jar_dependency.py',
   ],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jvm',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:validation',
     'src/python/pants/build_graph',
-    'src/python/pants/util:memo',
   ],
 )

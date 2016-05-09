@@ -6,9 +6,9 @@ python_tests(
   sources = ['test_source_root.py'],
   dependencies = [
     'src/python/pants/source',
-    'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -17,8 +17,7 @@ python_tests(
   dependencies = [
     'src/python/pants/source',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
+  ],
 )
 
 python_tests(
@@ -29,5 +28,5 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/source',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )

@@ -9,9 +9,8 @@ python_library(
     'cpp_library.py',
     'cpp_target.py',
   ],
-  dependencies=[
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
+  dependencies = [
+    'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
   ],

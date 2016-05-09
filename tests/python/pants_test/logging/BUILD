@@ -4,7 +4,7 @@
 python_tests(
   name='logging',
   sources=globs('*.py'),
-  dependencies=[
+  dependencies = [
     '3rdparty/python:six',
     'src/python/pants/logging',
     'src/python/pants/util:contextutil',

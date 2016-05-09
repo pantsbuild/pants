@@ -11,10 +11,10 @@ target(
 python_library(
   name='sitegen',
   sources=['sitegen.py'],
-  dependencies=[
+  dependencies = [
+    '3rdparty/python:pystache',
     '3rdparty/python:six',
-    'pants-plugins/3rdparty/python:beautifulsoup4',
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
-  ]
+  ],
 )

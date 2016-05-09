@@ -9,10 +9,10 @@ python_library(
 python_library(
    name = 'contextutil',
    sources = ['contextutil.py'],
-   dependencies = [
-     '3rdparty/python:six',
-     ':dirutil',
-   ],
+  dependencies = [
+    '3rdparty/python:six',
+    ':dirutil',
+  ],
 )
 
 python_library(
@@ -28,7 +28,7 @@ python_library(
   sources = ['eval.py'],
   dependencies = [
     '3rdparty/python:six',
-  ]
+  ],
 )
 
 python_library(
@@ -42,7 +42,6 @@ python_library(
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
-  dependencies = [],
 )
 
 python_library(
@@ -85,7 +84,7 @@ python_library(
   sources = ['rwbuf.py'],
   dependencies = [
     '3rdparty/python:six',
-  ]
+  ],
 )
 
 python_library(

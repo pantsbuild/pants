@@ -6,10 +6,12 @@ python_tests(
   sources = ['test_watchman_launcher.py'],
   coverage = ['pants.pantsd.subsystem.watchman_launcher'],
   dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
+    '3rdparty/python:mock',
+    'src/python/pants/pantsd/subsystem:watchman_launcher',
+    'src/python/pants/pantsd:watchman',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'src/python/pants/pantsd/subsystem:watchman_launcher'
-  ]
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -17,8 +19,10 @@ python_tests(
   sources = ['test_pants_daemon_launcher.py'],
   coverage = ['pants.pantsd.subsystem.pants_daemon_launcher'],
   dependencies = [
+    '3rdparty/python:mock',
     'src/python/pants/pantsd/subsystem:pants_daemon_launcher',
-    'tests/python/pants_test/pantsd:test_deps',
-    'tests/python/pants_test/subsystem:subsystem_utils'
-  ]
+    'src/python/pants/pantsd:pants_daemon',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:base_test',
+  ],
 )

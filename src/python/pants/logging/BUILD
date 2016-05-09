@@ -4,7 +4,7 @@
 python_library(
   name='logging',
   sources=globs('*.py'),
-  dependencies=[
+  dependencies = [
     'src/python/pants/util:dirutil',
   ],
 )

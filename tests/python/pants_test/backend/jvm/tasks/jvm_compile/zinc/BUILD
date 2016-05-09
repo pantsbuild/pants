@@ -5,7 +5,8 @@
 python_tests(
   name='zinc_compile_integration',
   sources=['test_zinc_compile_integration.py'],
-  dependencies=[
+  dependencies = [
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   timeout = 300,

@@ -4,5 +4,4 @@
 python_library(
   name = 'stty_utils',
   sources = ['stty_utils.py'],
-  dependencies = []
 )

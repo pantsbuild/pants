@@ -5,7 +5,6 @@ python_library(
   name = 'scm',
   sources = ['scm.py'],
   dependencies = [
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',
   ],
 )

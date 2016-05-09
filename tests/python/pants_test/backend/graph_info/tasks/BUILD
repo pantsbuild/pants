@@ -6,13 +6,13 @@ python_tests(
   name='cloc',
   sources=['test_cloc.py'],
   coverage=['pants.backend.graph_info.tasks.cloc'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -23,10 +23,11 @@ python_tests(
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -35,7 +36,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -68,11 +69,12 @@ python_tests(
   sources = ['test_listtargets.py'],
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/build_graph',
+    'src/python/pants/backend/jvm:artifact',
+    'src/python/pants/backend/jvm:repository',
+    'src/python/pants/backend/jvm:scala_artifact',
     'src/python/pants/backend/python/targets:python',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
@@ -103,11 +105,11 @@ python_tests(
 python_tests(
   name='paths',
   sources=['test_paths.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -124,9 +126,9 @@ python_tests(
 python_tests(
   name='target_filter_task_mixin',
   sources=['test_target_filter_task_mixin.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
 )

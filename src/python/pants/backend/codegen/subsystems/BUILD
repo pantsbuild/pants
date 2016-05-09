@@ -4,7 +4,7 @@
 python_library(
   name='thrift_defaults',
   sources=['thrift_defaults.py'],
-  dependencies=[
+  dependencies = [
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/subsystem',
   ],

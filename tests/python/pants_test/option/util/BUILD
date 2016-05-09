@@ -4,7 +4,7 @@
 python_library(
   name='util',
   sources=globs('*.py'),
-  dependencies=[
+  dependencies = [
     'src/python/pants/option',
   ],
 )

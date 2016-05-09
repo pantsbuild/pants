@@ -5,12 +5,12 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:twitter.common.collections',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/goal:context',
     'tests/python/pants_test/option/util',
-  ]
+  ],
 )
 
 python_tests(
@@ -20,7 +20,7 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
-  ]
+  ],
 )
 
 python_library(
@@ -30,19 +30,21 @@ python_library(
     '3rdparty/python:pathspec',
     'src/python/pants/base:build_file',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_tests(
   name = 'filesystem_build_file',
   sources = ['test_filesystem_build_file.py'],
   dependencies = [
-    ':build_file_test_base',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    '3rdparty/python:twitter.common.collections',
+    ':build_file_test_base',
     'src/python/pants/base:build_file',
+    'src/python/pants/base:file_system_project_tree',
+    'src/python/pants/base:project_tree',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_library(
@@ -51,7 +53,7 @@ python_library(
   dependencies = [
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
-  ]
+  ],
 )
 
 python_library(
@@ -59,7 +61,7 @@ python_library(
   sources = ['pants_ignore_test_base.py'],
   dependencies = [
     ':project_tree_test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -68,7 +70,7 @@ python_tests(
   dependencies = [
     ':pants_ignore_test_base',
     'src/python/pants/base:file_system_project_tree',
-  ]
+  ],
 )
 
 python_tests(
@@ -78,16 +80,17 @@ python_tests(
     ':pants_ignore_test_base',
     'src/python/pants/base:scm_project_tree',
     'src/python/pants/scm:git',
-  ]
+  ],
 )
 
 python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],
   dependencies = [
+    '3rdparty/python:pytest',
     'src/python/pants/base:deprecated',
     'src/python/pants:version',
-  ]
+  ],
 )
 
 python_tests(
@@ -95,21 +98,19 @@ python_tests(
   sources = ['test_build_root.py'],
   dependencies = [
     'src/python/pants/base:build_root',
-    'tests/python/pants_test:base_test',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )
 
 python_tests(
   name = 'cmd_line_spec_parser',
   sources = ['test_cmd_line_spec_parser.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/build_graph',
+    'src/python/pants/base:specs',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -118,7 +119,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:fingerprint_strategy',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -126,8 +127,7 @@ python_tests(
   sources = ['test_generator.py'],
   dependencies = [
     'src/python/pants/base:generator',
-    'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -137,19 +137,20 @@ python_tests(
     '3rdparty/python:mox',
     'src/python/pants/base:hash_utils',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
   name = 'payload',
   sources = ['test_payload.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
+    'src/python/pants/source',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -160,7 +161,7 @@ python_tests(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
     'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -168,8 +169,7 @@ python_tests(
   sources = ['test_revision.py'],
   dependencies = [
     'src/python/pants/base:revision',
-    'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
@@ -178,26 +178,26 @@ python_tests(
   dependencies = [
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
-  ]
+  ],
 )
 
 python_tests(
   name = 'scm_build_file',
   sources = ['test_scm_build_file.py'],
   dependencies = [
+    '3rdparty/python:twitter.common.collections',
     ':build_file_test_base',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:scm_project_tree',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_tests(
   name = 'bundle_integration',
   sources = [ 'test_bundle_integration.py' ],
   dependencies = [
+    'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -218,8 +218,9 @@ python_tests(
   sources = ['test_worker_pool.py'],
   dependencies = [
     'src/python/pants/base:worker_pool',
+    'src/python/pants/base:workunit',
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_tests(
@@ -227,5 +228,5 @@ python_tests(
   sources = ['test_validation.py'],
   dependencies = [
     'src/python/pants/base:validation',
-  ]
+  ],
 )

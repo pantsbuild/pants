@@ -8,5 +8,5 @@ python_library(
     '3rdparty/python:fasteners',
     '3rdparty/python:psutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
 )

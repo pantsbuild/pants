@@ -4,12 +4,15 @@
 python_tests(
   name='testing',
   sources=globs('*.py', exclude=[globs('*_integration.py')]),
-  dependencies=[
-    '3rdparty/python:pytest',
+  dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:strutil',
     'tests/python/pants_test:base_test',
   ],
 )
@@ -19,7 +22,7 @@ python_tests(
   sources=[
     'test_options_integration.py',
   ],
-  dependencies=[
+  dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],

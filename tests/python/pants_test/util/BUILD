@@ -16,7 +16,7 @@ python_tests(
   coverage = ['pants.util.contextutil'],
   dependencies = [
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_tests(
@@ -24,12 +24,12 @@ python_tests(
   sources = ['test_dirutil.py'],
   coverage = ['pants.util.dirutil'],
   dependencies = [
-    '3rdparty/python:mox',
     '3rdparty/python:mock',
-    '3rdparty/python:pytest',
-    'src/python/pants/util:dirutil',
+    '3rdparty/python:mox',
+    '3rdparty/python:six',
     'src/python/pants/util:contextutil',
-  ]
+    'src/python/pants/util:dirutil',
+  ],
 )
 
 python_tests(
@@ -38,7 +38,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:six',
     'src/python/pants/util:eval',
-  ]
+  ],
 )
 
 python_tests(
@@ -47,7 +47,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
-  ]
+  ],
 )
 
 python_tests(
@@ -55,7 +55,7 @@ python_tests(
   sources = ['test_filtering.py'],
   dependencies = [
     'src/python/pants/util:filtering',
-  ]
+  ],
 )
 
 python_tests(
@@ -63,7 +63,7 @@ python_tests(
   sources = ['test_memo.py'],
   dependencies = [
     'src/python/pants/util:memo',
-  ]
+  ],
 )
 
 python_tests(
@@ -71,7 +71,7 @@ python_tests(
   sources = ['test_meta.py'],
   dependencies = [
     'src/python/pants/util:meta',
-  ]
+  ],
 )
 
 python_tests(
@@ -80,7 +80,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/util:netrc',
-  ]
+  ],
 )
 
 python_tests(
@@ -88,15 +88,15 @@ python_tests(
   sources = ['test_osutil.py'],
   dependencies = [
     'src/python/pants/util:osutil',
-  ]
+  ],
 )
 
 python_tests(
   name = 'process_handler',
   sources = ['test_process_handler.py'],
   dependencies = [
-    'src/python/pants/util:process_handler'
-  ]
+    'src/python/pants/util:process_handler',
+  ],
 )
 
 python_tests(
@@ -105,7 +105,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/util:retry',
-  ]
+  ],
 )
 
 python_tests(
@@ -115,7 +115,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/util:socket',
-  ]
+  ],
 )
 
 python_tests(
@@ -123,7 +123,7 @@ python_tests(
   sources = ['test_strutil.py'],
   dependencies = [
     'src/python/pants/util:strutil',
-  ]
+  ],
 )
 
 python_tests(
@@ -131,7 +131,7 @@ python_tests(
   sources = ['test_timeout.py'],
   dependencies = [
     'src/python/pants/util:timeout',
-  ]
+  ],
 )
 
 python_library(
@@ -139,14 +139,14 @@ python_library(
   sources = ['xml_test_base.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_tests(
   name = 'xml_parser',
   sources = ['test_xml_parser.py'],
   dependencies = [
+    ':xml_test_base',
     'src/python/pants/util:xml_parser',
-    'tests/python/pants_test/util:xml_test_base',
-  ]
+  ],
 )

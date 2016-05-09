@@ -6,9 +6,9 @@ python_tests(
   sources = ['test_pants_service.py'],
   coverage = ['pants.pantsd.service.pants_service'],
   dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/pantsd/service:pants_service'
-  ]
+    'src/python/pants/pantsd/service:pants_service',
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -16,9 +16,11 @@ python_tests(
   sources = ['test_fs_event_service.py'],
   coverage = ['pants.pantsd.service.fs_event_service'],
   dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/pantsd/service:fs_event_service'
-  ]
+    '3rdparty/python:mock',
+    'src/python/pants/pantsd/service:fs_event_service',
+    'src/python/pants/pantsd:watchman',
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -26,7 +28,7 @@ python_tests(
   sources = ['test_pailgun_service.py'],
   coverage = ['pants.pantsd.service.pailgun_service'],
   dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/pantsd/service:pailgun_service'
-  ]
+    '3rdparty/python:mock',
+    'src/python/pants/pantsd/service:pailgun_service',
+  ],
 )

@@ -1,3 +1,0 @@
-twitter.common.collections>=0.3.1,<0.4
-twitter.common.confluence>=0.3.1,<0.4
-twitter.common.dirutil>=0.3.1,<0.4

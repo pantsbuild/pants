@@ -5,7 +5,7 @@ python_tests(
   name = 'dependencies_integration',
   sources = ['test_dependencies_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test'
+    'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
   timeout = 90,
@@ -15,7 +15,7 @@ python_tests(
   name = 'filemap_integration',
   sources = ['test_filemap_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test'
+    'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
 )
@@ -25,6 +25,6 @@ python_tests(
   sources = ['test_graph_invalidation.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/engine/exp/legacy:commands'
-  ]
+    'src/python/pants/engine/exp/legacy:commands',
+  ],
 )

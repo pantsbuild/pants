@@ -4,12 +4,13 @@
 python_library(
   name='source',
   sources=globs('*.py'),
-  dependencies=[
+  dependencies = [
     '3rdparty/python:six',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.dirutil',
     'src/python/pants/base:build_environment',
-    'src/python/pants/option',
+    'src/python/pants/base:payload_field',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
-  ]
+    'src/python/pants/util:meta',
+  ],
 )
