@@ -7,9 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.fs.archive import ZIP
-from pants.util.contextutil import temporary_dir
-
 
 def exact_files(directory, ignore_links=False):
   """Returns the relative files contained in the directory.
@@ -68,27 +65,4 @@ def check_symlinks(directory, symlinks=True):
       p = os.path.join(root, f)
       if symlinks ^ os.path.islink(p):
         return False
-  return True
-
-
-def check_zip_file_content(zip_file, expected_files):
-  """Check zip file contains expected files as well as verify their contents are as expected.
-
-  :API: public
-
-  :param zip_file: Path to the zip file.
-  :param expected_files: A map from file path included in the zip to its content. Set content
-    to `None` to skip checking.
-  :return:
-  """
-  with temporary_dir() as workdir:
-    ZIP.extract(zip_file, workdir)
-    if not contains_exact_files(workdir, expected_files.keys()):
-      return False
-
-    for rel_path in expected_files:
-      path = os.path.join(workdir, rel_path)
-      if expected_files[rel_path] and not check_file_content(path, expected_files[rel_path]):
-        return False
-
   return True
