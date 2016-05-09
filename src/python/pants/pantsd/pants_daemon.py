@@ -12,10 +12,10 @@ import threading
 
 from setproctitle import setproctitle as set_process_title
 
-from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.logging.setup import setup_logging
 from pants.pantsd.process_manager import ProcessManager
+from pants.pantsd.util import clean_global_runtime_state
 
 
 class _StreamLogger(object):
@@ -119,17 +119,6 @@ class PantsDaemon(ProcessManager):
 
     self._logger.debug('logging initialized')
 
-  def _clean_runtime_state(self):
-    """Resets the runtime state from running ./pants -> running in the fork()'d daemon context."""
-    # TODO(kwlzn): Make this logic available to PantsRunner et al for inline state reset before
-    # pants runs to improve testability and avoid potential bitrot.
-
-    # Reset RunTracker state.
-    RunTracker.global_instance().reset(reset_options=False)
-
-    # Reset Goals and Tasks.
-    Goal.clear()
-
   def _setup_services(self, services):
     for service in services:
       self._logger.info('setting up service {}'.format(service))
@@ -174,7 +163,7 @@ class PantsDaemon(ProcessManager):
     self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
     # Purge as much state as possible from the pants run that launched us.
-    self._clean_runtime_state()
+    clean_global_runtime_state()
 
     # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
     set_process_title('pantsd [{}]'.format(self._build_root))

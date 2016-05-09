@@ -15,7 +15,7 @@ from pants.util.memo import testable_memoized_property
 
 
 class WatchmanLauncher(object):
-  """Encapsulates access to Watchman."""
+  """A subsystem that encapsulates access to Watchman."""
 
   class Factory(Subsystem):
     options_scope = 'watchman'
@@ -66,7 +66,11 @@ class WatchmanLauncher(object):
   @staticmethod
   def _convert_log_level(level):
     """Convert a given pants log level string into a watchman log level string."""
-    return {'warn': '0', 'info': '1', 'debug': '2'}.get(level, '1')
+    # N.B. Enabling true Watchman debug logging (log level 2) can generate an absurd amount of log
+    # data (10s of gigabytes over the course of an ~hour for an active fs) and is not particularly
+    # helpful except for debugging Watchman itself. Thus, here we intentionally avoid this level
+    # in the mapping of pants log level -> watchman.
+    return {'warn': '0', 'info': '1', 'debug': '1'}.get(level, '1')
 
   @testable_memoized_property
   def watchman(self):

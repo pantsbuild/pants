@@ -33,8 +33,8 @@ python_tests(
 )
 
 python_tests(
-  name='goal_runner',
-  sources=['test_goal_runner.py'],
+  name='options_initializer',
+  sources=['test_options_initializer.py'],
   dependencies=[
     '3rdparty/python:setuptools',
     'src/python/pants/base:exceptions',

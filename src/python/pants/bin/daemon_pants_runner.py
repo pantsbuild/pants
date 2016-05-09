@@ -14,10 +14,11 @@ from contextlib import contextmanager
 from setproctitle import setproctitle as set_process_title
 
 from pants.bin.exiter import Exiter
-from pants.bin.pants_runner import LocalPantsRunner
+from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
+from pants.pantsd.util import clean_global_runtime_state
 from pants.util.contextutil import stdio_as
 
 
@@ -60,18 +61,20 @@ class DaemonPantsRunner(ProcessManager):
   N.B. this class is primarily used by the PailgunService in pantsd.
   """
 
-  def __init__(self, socket, exiter, args, env):
+  def __init__(self, socket, exiter, args, env, build_graph):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param Exiter exiter: The Exiter instance for this run.
     :param list args: The arguments (i.e. sys.argv) for this run.
     :param dict env: The environment (i.e. os.environ) for this run.
+    :param BuildGraph build_graph: A BuildGraph instance.
     """
     super(DaemonPantsRunner, self).__init__(name=self._make_identity())
     self._socket = socket
     self._exiter = exiter
     self._args = args
     self._env = env
+    self._build_graph = build_graph
 
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
@@ -126,8 +129,11 @@ class DaemonPantsRunner(ProcessManager):
 
     # Invoke a Pants run with stdio redirected.
     with self._nailgunned_stdio(self._socket):
+      # Clean global state.
+      clean_global_runtime_state()
+
       try:
-        LocalPantsRunner(self._exiter, self._args, self._env).run()
+        LocalPantsRunner(self._exiter, self._args, self._env, self._build_graph).run()
       except KeyboardInterrupt:
         self._exiter.exit(1, msg='Interrupted by user.\n')
       except Exception:
