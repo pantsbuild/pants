@@ -12,7 +12,7 @@ from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.engine.engine import Engine
+from pants.engine.legacy_engine import Engine
 from pants.engine.round_manager import RoundManager
 
 

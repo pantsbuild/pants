@@ -6,7 +6,7 @@ Refer to Jenkins2.0 pipeline and Jenkinsfile docs here:
    https://jenkins.io/doc/pipeline/jenkinsfile/
    https://jenkins.io/doc/pipeline/steps/
 
-NB: The linux slaves are configured as described in `build-support/packer/README.md` and the osx
+NB: The linux slaves are configured as described in `build-support/aws/ec2/packer/README.md` and the osx
 slave(s) are currently cowboyed by hand.
 */
 
@@ -20,20 +20,26 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
   return { ->
     node(os) {
       ansiColor {
-        checkout scm
-        sh(
-          """
-          export CXX=g++
+        // Avoid failing on transient git issues.
+        retry(3) {
+          checkout scm
+        }
 
-          export XDG_CACHE_HOME="\$(pwd)/.cache/pantsbuild"
-          echo \$XDG_CACHE_HOME
+        /*
+         * Work around various concurrency issues associated with tools that use paths under the
+         * HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
+         * use of them would support concurrent usage robustly, at which point this hack could be
+         * removed.
+         */
+        env.HOME = "${pwd()}/.home"
 
-          export PEX_ROOT="\$(pwd)/.cache/pex"
-          echo \$PEX_ROOT
+        // For c/c++ contrib plugin tests.
+        env.CXX = "g++"
 
+        sh("""
+          ./build-support/ci/print_node_info.sh
           ./build-support/bin/ci.sh ${flags}
-          """.toString().stripIndent()
-        )
+          """)
       }
     }
   }
@@ -50,11 +56,8 @@ def List shardList() {
     shards << [os: os, branchName: branchName, flags: flags]
   }
 
-  String changeUrl = env.CHANGE_URL
-  println("Listing desired shards for : ${changeUrl}")
-
   nodes = ['linux': 10]
-  isPullRequest = changeUrl ==~ 'https://github.com/pantsbuild/pants/pull/[0-9]+'
+  isPullRequest = env.CHANGE_URL ==~ 'https://github.com/pantsbuild/pants/pull/[0-9]+'
   if (!isPullRequest) {
     // We only add OSX to the mix on master commits since our 1 mac-mini is currently a severe
     // throughput bottleneck.

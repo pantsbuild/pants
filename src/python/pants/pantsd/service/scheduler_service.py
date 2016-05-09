@@ -19,22 +19,30 @@ class SchedulerService(PantsService):
   in memory.
   """
 
-  def __init__(self, scheduler, fs_event_service):
+  def __init__(self, fs_event_service, legacy_graph_helper):
     """
-    :param LocalScheduler scheduler: A Scheduler instance.
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
                                             filesystem event handlers.
+    :param LegacyGraphHelper legacy_graph_helper: The LegacyGraphHelper instance for graph
+                                                  construction.
     """
     super(SchedulerService, self).__init__()
-    self._logger = logging.getLogger(__name__)
-
-    self._event_queue = Queue.Queue(maxsize=64)
-    self._scheduler = scheduler
     self._fs_event_service = fs_event_service
+    self._scheduler = legacy_graph_helper.scheduler
+    self._engine = legacy_graph_helper.engine
+    self._symbol_table_cls = legacy_graph_helper.symbol_table_cls
+    self._build_graph_facade_cls = legacy_graph_helper.legacy_graph_cls
+
+    self._logger = logging.getLogger(__name__)
+    self._event_queue = Queue.Queue(maxsize=64)
 
   def setup(self):
-    """Registers filesystem event handlers on an FSEventService instance."""
+    """Service setup."""
+    # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
+
+    # Start the engine.
+    self._engine.start()
 
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
@@ -72,7 +80,22 @@ class SchedulerService(PantsService):
       self._handle_batch_event(files)
     self._event_queue.task_done()
 
+  def get_build_graph(self, spec_roots):
+    """Returns a factory that provides a legacy BuildGraph given a set of input specs."""
+    graph = self._build_graph_facade_cls(self._scheduler, self._engine, self._symbol_table_cls)
+    with self._scheduler.locked():
+      for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
+        pass
+    self._logger.debug('engine cache stats: %s', self._engine._cache.get_stats())
+    self._logger.debug('build_graph is: %s', graph)
+    return graph
+
   def run(self):
     """Main service entrypoint."""
     while not self.is_killed:
       self._process_event_queue()
+
+  def terminate(self):
+    """An extension of PantsService.terminate() that tears down the engine."""
+    self._engine.close()
+    super(SchedulerService, self).terminate()
