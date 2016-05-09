@@ -25,6 +25,14 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
+class CompletedNodeException(ValueError):
+  """Indicates an attempt to change a Node that is already completed."""
+
+
+class IncompleteDependencyException(ValueError):
+  """Indicates an attempt to complete a Node that has incomplete dependencies."""
+
+
 class ProductGraph(object):
 
   class _Entry(object):
@@ -78,10 +86,18 @@ class ProductGraph(object):
     """Updates the Node with the given State, creating any Nodes which do not already exist."""
     entry = self._ensure_entry(node)
     if entry.state is not None:
-      raise ValueError('Node {} is already completed:\n  {}\n  {}'
-                       .format(node, entry.state, state))
+      # It's important not to allow state changes on completed Nodes, because that invariant
+      # is used in cycle detection to avoid walking into completed Nodes.
+      raise CompletedNodeException('Node {} is already completed:\n  {}\n  {}'
+                                   .format(node, entry.state, state))
 
     if type(state) in [Return, Throw, Noop]:
+      # Validate that a completed Node depends only on other completed Nodes.
+      for dep in entry.dependencies:
+        if dep.state is None:
+          raise IncompleteDependencyException(
+              'Cannot complete {} with {} while it has an incomplete dep:\n  {}'
+                .format(node, state, dep.node))
       entry.state = state
     elif type(state) is Waiting:
       self._add_dependencies(entry, state.dependencies)
@@ -96,7 +112,11 @@ class ProductGraph(object):
 
     Returns True if a cycle would be created by adding an edge from src->dest.
     """
-    for entry in self._walk_entries([dest], entry_predicate=lambda _: True):
+    # We disallow adding new edges outbound from completed Nodes, and no completed Node can have
+    # a path to an uncompleted Node. Thus, we can truncate our search for cycles at any completed
+    # Node.
+    is_not_completed = lambda e: e.state is None
+    for entry in self._walk_entries([dest], entry_predicate=is_not_completed):
       if entry is src:
         return True
     return False

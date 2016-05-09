@@ -18,7 +18,7 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
                                                 setup_json_scheduler)
 from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                     Throw, Waiting)
-from pants.engine.exp.scheduler import ProductGraph
+from pants.engine.exp.scheduler import CompletedNodeException, ProductGraph, IncompleteDependencyException
 from pants.util.contextutil import temporary_dir
 
 
@@ -271,12 +271,23 @@ class ProductGraphTest(unittest.TestCase):
   @classmethod
   def _mk_chain(cls, graph, sequence, states=[Waiting, Return]):
     """Create a chain of dependencies (e.g. 'A'->'B'->'C'->'D') in the graph from a sequence."""
-    prior_item = sequence[0]
     for state in states:
-      for item in sequence:
-        graph.update_state(prior_item, state([item]))
-        prior_item = item
+      dest = None
+      for src in reversed(sequence):
+        graph.update_state(src, state([dest] if dest else []))
+        dest = src
     return sequence
+
+  def test_disallow_completed_state_change(self):
+    self.pg.update_state('A', Return('done!'))
+    with self.assertRaises(CompletedNodeException):
+      self.pg.update_state('A', Waiting(['B']))
+
+  def test_disallow_completing_with_incomplete_deps(self):
+    self.pg.update_state('A', Waiting(['B']))
+    self.pg.update_state('B', Waiting(['C']))
+    with self.assertRaises(IncompleteDependencyException):
+      self.pg.update_state('A', Return('done!'))
 
   def test_dependency_edges(self):
     self.pg.update_state('A', Waiting(['B', 'C']))
