@@ -284,7 +284,7 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   """
   ftype = path_dir_wildcard.ftype
   paths = [d.path for d in dirs.dependencies
-           if fnmatch.fnmatch(basename(d.path), path_dir_wildcard.wildcard)] # will d.path ends with '/'?
+           if fnmatch.fnmatch(basename(d.path), path_dir_wildcard.wildcard)]
   return PathGlobs(ftype, tuple(PathGlob.create_from_spec(ftype, p, remainder)
                                 for p in paths
                                 for remainder in path_dir_wildcard.remainders))

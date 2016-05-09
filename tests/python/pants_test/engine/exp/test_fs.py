@@ -86,6 +86,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Files, ['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
     self.assert_walk(Files, ['*.txt', '**/*.txt'], ['a/3.txt', 'a/b/1.txt', '4.txt'])
     self.assert_walk(Files, ['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/b/2'])
+    self.assert_walk(Files, ['**/3.t*t'], ['a/3.txt'])
     self.assert_walk(Files, ['**/*.zzz'], [])
 
   def test_walk_recursive_directory(self):

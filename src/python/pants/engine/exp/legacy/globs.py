@@ -35,10 +35,7 @@ class BaseGlobs(AbstractClass):
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))
 
   def to_fileset_with_spec(self, engine, scheduler, relpath):
-    """Return a `FilesetWithSpec` object for these files, computed using the given engine.
-
-    TODO: Simplify the engine API. See: https://github.com/pantsbuild/pants/issues/3070
-    """
+    """Return a `FilesetWithSpec` object for these files, computed using the given engine."""
     filespecs = self.legacy_globs_class.to_filespec(self.patterns)
     excluded_patterns = []
     for exclude in self.excludes:
