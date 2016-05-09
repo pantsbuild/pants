@@ -13,15 +13,15 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.options_initializer import OptionsInitializer
-from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.fs import create_fs_tasks
-from pants.engine.exp.graph import create_graph_tasks
-from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
-from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
-from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.parser import SymbolTable
-from pants.engine.exp.scheduler import LocalScheduler
-from pants.engine.exp.storage import Storage
+from pants.engine.engine import LocalSerialEngine
+from pants.engine.fs import create_fs_tasks
+from pants.engine.graph import create_graph_tasks
+from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
+from pants.engine.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
+from pants.engine.mapper import AddressMapper
+from pants.engine.parser import SymbolTable
+from pants.engine.scheduler import LocalScheduler
+from pants.engine.storage import Storage
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
 
@@ -66,7 +66,7 @@ class EngineInitializer(object):
 
   @staticmethod
   def setup_legacy_graph(path_ignore_patterns):
-    """Construct and return the components necessary for ExpGraph construction.
+    """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                       usually taken from the `--pants-ignore` global option.
@@ -84,7 +84,7 @@ class EngineInitializer(object):
                                    parser_cls=LegacyPythonCallbacksParser)
 
     # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
-    # ExpGraph will explicitly request the products it needs.
+    # LegacyBuildGraph will explicitly request the products it needs.
     tasks = (
       create_legacy_graph_tasks() +
       create_fs_tasks() +
@@ -94,12 +94,12 @@ class EngineInitializer(object):
     scheduler = LocalScheduler(dict(), tasks, storage, project_tree)
     engine = LocalSerialEngine(scheduler, storage)
 
-    return LegacyGraphHelper(scheduler, engine, symbol_table_cls, ExpGraph)
+    return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
 
   @classmethod
   @contextmanager
   def open_legacy_graph(cls, options=None, path_ignore_patterns=None):
-    """A context manager that yields a usable, legacy ExpGraph by way of the v2 scheduler.
+    """A context manager that yields a usable, legacy LegacyBuildGraph by way of the v2 scheduler.
 
     This is used primarily for testing and non-daemon runs.
 
