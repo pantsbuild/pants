@@ -4,7 +4,7 @@ Release History
 1.1.0-pre0 (05/09/2016)
 ----------------------
 
-The `1.1.M-preN` releases start here - Pants is building to the minor version `M`,
+The `1.1.0-preN` releases start here - Pants is building to the 1.1.0 release candidates
 and is `N` releases towards that milestone.
 
 This release has several changes to tooling, lots of documentation updates, and some minor api changes.
