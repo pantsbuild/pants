@@ -5,6 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import platform
+import unittest
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -50,6 +53,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
       self._print_pantsd_log(workdir)
 
+  @unittest.skipIf(platform.system() != 'Darwin', 'https://github.com/pantsbuild/pants/issues/3377')
   def test_pantsd_run_with_watchman(self):
     pantsd_config = {'GLOBAL': {'enable_pantsd': True,
                                 'level': 'debug'},
