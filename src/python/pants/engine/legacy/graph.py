@@ -12,7 +12,7 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
-from pants.engine.fs import FilesContent, PathGlobs
+from pants.engine.fs import Files, FilesContent, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, SelectNode, State, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
@@ -198,12 +198,15 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
   return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
 
 
-def hydrate_sources(sources_field, source_files_content):
+def hydrate_sources(sources_field, source_files_content, excluded_source_files):
   """Given a SourcesField and FilesContent for its path_globs, create an EagerFilesetWithSpec."""
+  excluded = {f.path for f in excluded_source_files.dependencies}
   spec_path = sources_field.address.spec_path
   filespecs = sources_field.filespecs
+  print('>>> filespecs are {}; included/excluded are: {} / {}'.format(filespecs, [fc.path for fc in source_files_content.dependencies], excluded))
   file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
-                 for fc in source_files_content.dependencies}
+                 for fc in source_files_content.dependencies
+                 if fc.path not in excluded}
   return HydratedField('sources', EagerFilesetWithSpec(spec_path, filespecs, file_hashes))
 
 
@@ -233,7 +236,8 @@ def create_legacy_graph_tasks():
      reify_legacy_graph),
     (HydratedField,
      [Select(SourcesField),
-      SelectProjection(FilesContent, PathGlobs, ('path_globs',), SourcesField)],
+      SelectProjection(FilesContent, PathGlobs, ('path_globs',), SourcesField),
+      SelectProjection(Files, PathGlobs, ('excluded_path_globs',), SourcesField)],
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),

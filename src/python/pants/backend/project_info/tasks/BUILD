@@ -12,6 +12,7 @@ python_library(
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
+    ':idea_plugin_gen',
   ],
 )
 
@@ -137,19 +138,35 @@ python_library(
   name = 'idea_gen',
   sources = ['idea_gen.py'],
   resource_targets = [
-    ':idea_gen_resources',
+    ':idea_resources',
   ],
   dependencies = [
     ':ide_gen',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
+    'src/python/pants/scm:git',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'idea_plugin_gen',
+  sources = ['idea_plugin_gen.py'],
+  resource_targets = [
+    ':idea_resources',
+  ],
+  dependencies = [
+    ':ide_gen',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:generator',
     'src/python/pants/scm:git',
     'src/python/pants/util:dirutil',
   ],
 )
 
 resources(
-  name = 'idea_gen_resources',
+  name = 'idea_resources',
   sources = globs('templates/idea/*.mustache'),
 )

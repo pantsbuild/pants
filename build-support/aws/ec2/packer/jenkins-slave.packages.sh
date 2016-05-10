@@ -78,7 +78,6 @@ MISC=(
   openssl # Used for md5 hashing.
   perl # Needed by sloccount.
   git
-  python-requests # For jenkins-slave-connect.
 )
 sudo apt-get -y install ${MISC[@]}
 

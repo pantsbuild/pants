@@ -72,7 +72,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     register('--java', type=bool, default=True,
              help='Includes java sources in the project; otherwise compiles them and adds them '
                   'to the project classpath.')
-    register('--java-language-level', type=int, default=7,
+    register('--java-language-level', type=int, default=8,
              help='Sets the java language and jdk used to compile the project\'s java sources.')
     register('--java-jdk-name', default=None,
              help='Sets the jdk used to compile the project\'s java sources. If unset the default '

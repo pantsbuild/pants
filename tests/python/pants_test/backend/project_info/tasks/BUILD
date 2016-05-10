@@ -94,6 +94,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 120,
 )
 
 python_tests(
@@ -127,6 +128,15 @@ python_tests(
     ':resolve_jars_test_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'idea_plugin_integration',
+  sources = ['test_idea_plugin_integration.py'],
+  dependencies = [
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

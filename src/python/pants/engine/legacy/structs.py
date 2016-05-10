@@ -41,15 +41,15 @@ class TargetAdaptor(StructWithDeps):
     if not self.has_concrete_sources:
       return tuple()
     base_globs = BaseGlobs.from_sources_field(self.sources)
-    path_globs = base_globs.to_path_globs(self.address.spec_path)
-    return (SourcesField(self.address, base_globs.filespecs, path_globs),)
+    path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
+    return (SourcesField(self.address, base_globs.filespecs, path_globs, excluded_path_globs),)
 
 
 class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype('SourcesField', ['address', 'filespecs', 'path_globs']), Field):
+class SourcesField(datatype('SourcesField', ['address', 'filespecs', 'path_globs', 'excluded_path_globs']), Field):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -140,6 +140,16 @@ class BaseGlobs(AbstractClass):
     else:
       raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
+  @classmethod
+  def _filespec_for_excludes(cls, raw_excludes):
+    excluded_patterns = []
+    for exclude in cls.legacy_globs_class.process_raw_excludes(raw_excludes):
+      exclude_filespecs = cls.from_sources_field(exclude).filespecs
+      if exclude_filespecs.get('exclude', []):
+        raise ValueError('Nested excludes are not supported: got {}'.format(raw_excludes))
+      excluded_patterns.extend(exclude_filespecs.get('globs', []))
+    return cls.legacy_globs_class.to_filespec(excluded_patterns)
+
   @abstractproperty
   def path_globs_kwarg(self):
     """The name of the `PathGlobs` parameter corresponding to this BaseGlobs instance."""
@@ -149,14 +159,25 @@ class BaseGlobs(AbstractClass):
     """The corresponding `wrapped_globs` class for this BaseGlobs."""
 
   def __init__(self, *patterns, **kwargs):
-    self.filespecs = self.legacy_globs_class.to_filespec(patterns)
+    self._filespecs = self.legacy_globs_class.to_filespec(patterns).get('globs', [])
+    raw_excludes = kwargs.pop('exclude', [])
+    self._excluded_filespecs = self._filespec_for_excludes(raw_excludes).get('globs', [])
+
     if kwargs:
       # TODO
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))
 
+  @property
+  def filespecs(self):
+    """Return a filespecs dict representing both globs and excludes."""
+    return {'globs': self._filespecs, 'exclude': self._excluded_filespecs}
+
   def to_path_globs(self, relpath):
-    """Return a PathGlobs object representing this BaseGlobs class."""
-    return PathGlobs.create_from_specs(FSFiles, relpath, self.filespecs.get('globs', []))
+    """Return two PathGlobs representing the included and excluded Files for these patterns."""
+    return (
+        PathGlobs.create_from_specs(FSFiles, relpath, self._filespecs),
+        PathGlobs.create_from_specs(FSFiles, relpath, self._excluded_filespecs)
+      )
 
 
 class Files(BaseGlobs):
