@@ -17,9 +17,9 @@ import org.junit.runners.ParentRunner;
 import org.junit.runners.model.InitializationError;
 
 /**
- * A JUnit {@link Request} that is composed of a list of {@link Request}s.
+ * A JUnit Runner that handles a list of {@link Request}s.
  */
-public class CompositeRequest extends ParentRunner<Request> {
+public class CompositeRequestRunner extends ParentRunner<Request> {
 
   private final List<Request> requests;
 
@@ -28,7 +28,7 @@ public class CompositeRequest extends ParentRunner<Request> {
    * @param requests List of requests to be composed of.
    * @throws InitializationError
    */
-  public CompositeRequest(List<Request> requests) throws InitializationError {
+  public CompositeRequestRunner(List<Request> requests) throws InitializationError {
     // Note: this works for now, Suite constructor also calls super(null), but it may break some
     // point in future, in which case fall back to implementing Runner may be necessary.
     super(null);
@@ -75,5 +75,4 @@ public class CompositeRequest extends ParentRunner<Request> {
       eachNotifier.addFailure(e);
     }
   }
-
 }
