@@ -9,7 +9,7 @@ import errno
 import fnmatch
 from abc import abstractproperty
 from os import sep as os_sep
-from os.path import join, normpath
+from os.path import basename, join, normpath
 
 import six
 from twitter.common.collections.orderedset import OrderedSet
@@ -263,7 +263,7 @@ def apply_path_wildcard(stats, path_wildcard):
   """Filter the given Stats object using the given PathWildcard."""
   def filtered(entries):
     return tuple(stat for stat in entries
-                 if fnmatch.fnmatch(stat.path, path_wildcard.wildcard))
+                 if fnmatch.fnmatch(basename(stat.path), path_wildcard.wildcard))
   return Stats(files=filtered(stats.files), dirs=filtered(stats.dirs), links=filtered(stats.links))
 
 
@@ -284,7 +284,7 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   """
   ftype = path_dir_wildcard.ftype
   paths = [d.path for d in dirs.dependencies
-           if fnmatch.fnmatch(d.path, path_dir_wildcard.wildcard)]
+           if fnmatch.fnmatch(basename(d.path), path_dir_wildcard.wildcard)]
   return PathGlobs(ftype, tuple(PathGlob.create_from_spec(ftype, p, remainder)
                                 for p in paths
                                 for remainder in path_dir_wildcard.remainders))
