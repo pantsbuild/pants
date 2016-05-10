@@ -50,7 +50,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
 
   def test_exclude_globs(self):
     test_out = self._extract_exclude_output('exclude_globs')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aabb.py', 'dir1/dirdir1/aa.py'},
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aabb.py', 'dir1/aabb.py', 'dir1/dirdir1/aa.py'},
                       test_out)
 
   def test_exclude_rglobs(self):
@@ -60,16 +60,11 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
 
   def test_exclude_zglobs(self):
     test_out = self._extract_exclude_output('exclude_zglobs')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
-                      test_out)
-
-  def test_exclude_nested(self):
-    test_out = self._extract_exclude_output('exclude_nested')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'ab.py', 'dir1/dirdir1/ab.py'},
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'ab.py', 'aabb.py', 'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
                       test_out)
 
   def test_exclude_composite(self):
     test_out = self._extract_exclude_output('exclude_composite')
     self.assertEquals(self.TEST_EXCLUDE_FILES -
-                      {'aaa.py', 'ab.py', 'dir1/a.py', 'dir1/ab.py', 'dir1/dirdir1/a.py', 'dir1/dirdir1/ab.py'},
+                      {'a.py', 'aaa.py', 'dir1/a.py', 'dir1/dirdir1/a.py'},
                       test_out)
