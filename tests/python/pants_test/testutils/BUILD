@@ -14,10 +14,6 @@ python_library(
   sources = [
     'file_test_util.py',
   ],
-  dependencies = [
-    'src/python/pants/fs',
-    'src/python/pants/util:contextutil',
-  ],
 )
 
 python_library(
