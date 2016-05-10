@@ -13,6 +13,13 @@ This release has several changes to tooling, lots of documentation updates, and 
 API Changes
 ~~~~~~~~~~~
 
+* Add 'transitve' and 'scope' attributes to export of target
+  `RB #3582 <https://rbcommons.com/s/twitter/r/3582>`_
+  `RB #3845 <https://rbcommons.com/s/twitter/r/3845>`_
+
+* Add Support for "exclude" to globs in BUILD files
+  `RB #3828 <https://rbcommons.com/s/twitter/r/3828>`_
+
 * Add support for pants-ignore to ProjectTree
   `RB #3698 <https://rbcommons.com/s/twitter/r/3698>`_
 
@@ -36,6 +43,10 @@ API Changes
 New Features
 ~~~~~~~~~~~~
 
+* Introduce `idea-plugin` goal to invoke intellij pants plugin via CLI
+  `Issue #58 <https://github.com/pantsbuild/intellij-pants-plugin/issues/58>`_
+  `RB #3664 <https://rbcommons.com/s/twitter/r/3664>`_
+
 * Enhance parallel testing junit_tests
   `Issue #3209 <https://github.com/pantsbuild/pants/issues/3209>`_
   `RB #3707 <https://rbcommons.com/s/twitter/r/3707>`_
@@ -43,6 +54,9 @@ New Features
 
 Bugfixes
 ~~~~~~~~
+
+* Use `JarBuilder` to build jars.
+  `RB #3851 <https://rbcommons.com/s/twitter/r/3851>`_
 
 * Ensure `DistributionLocator` is `_reset` after tests.
   `RB #3832 <https://rbcommons.com/s/twitter/r/3832>`_
@@ -90,6 +104,15 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Convert from JNLP to ssh.
+  `RB #3855 <https://rbcommons.com/s/twitter/r/3855>`_
+
+* Skip test_pantsd_run_with_watchman on Linux.
+  `RB #3853 <https://rbcommons.com/s/twitter/r/3853>`_
+
+* Fixup jenkins-slave-connect.service pre-reqs.
+  `RB #3849 <https://rbcommons.com/s/twitter/r/3849>`_
 
 * Expose JENKINS_LABELS to slaves.
   `RB #3844 <https://rbcommons.com/s/twitter/r/3844>`_
