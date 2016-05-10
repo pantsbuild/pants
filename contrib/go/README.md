@@ -27,12 +27,12 @@ Installed goals:
 
 ## Codebase Requirements
 
-// Single source root for src, seperate single for 3rdaprty
+// TODO(John Sirois): Single source root for src, seperate single for 3rdaprty
 
 ## Codebase setup and maintenance
 
-// Seeding BUILD roots and buildgen.go goal
-// 3rdparty pinning
+// TODO(John Sirois): Seeding BUILD roots and buildgen.go goal
+// TODO(John Sirois): 3rdparty pinning
 
 ## Building
 
