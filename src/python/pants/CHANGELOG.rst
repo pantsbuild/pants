@@ -2,10 +2,11 @@ Release History
 ===============
 
 1.1.0-pre0 (05/09/2016)
-----------------------
+-----------------------
 
-The `1.1.0-preN` releases start here - Pants is building to the 1.1.0 release candidates
-and is `N` releases towards that milestone.
+The **1.1.0-preN** releases start here.
+
+Pants is building to the **1.1.0** release candidates and is **N** releases towards that milestone.
 
 This release has several changes to tooling, lots of documentation updates, and some minor api changes.
 
@@ -26,9 +27,6 @@ API Changes
 * New -default-concurrency parameter to junit-runner
   `RB #3707 <https://rbcommons.com/s/twitter/r/3707>`_
   `RB #3753 <https://rbcommons.com/s/twitter/r/3753>`_
-
-* rename check_published_deps to check-published-deps to be consistent with dashes in goal names
-  `RB #3749 <https://rbcommons.com/s/twitter/r/3749>`_
 
 * Make :API: public types useable.
   `RB #3752 <https://rbcommons.com/s/twitter/r/3752>`_
