@@ -1,5 +1,6 @@
 Created by running `build-support/bin/contributors.sh`.
 
++ Aaron Mitchell
 + Alan Paulin
 + Alexander Johnson
 + Alyssa Pohahau
@@ -39,6 +40,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Harley Cooper
 + Hwasung Lee
 + Igor Morozov
++ Ikai Lan
 + Itay Donanhirsh
 + Ity Kaul
 + Jackson Davis
@@ -90,6 +92,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Neil Sanchala
 + Nick Howard
 + Nik Shkrob
++ Nitay Joffe
 + Oliver Gould
 + Patrick Lawson
 + Paul Groudas
@@ -117,3 +120,4 @@ Created by running `build-support/bin/contributors.sh`.
 + Ugo Di Girolamo
 + Wei An
 + Yi Cheng
++ Yujie Chen
