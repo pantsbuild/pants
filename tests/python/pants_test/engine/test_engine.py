@@ -10,7 +10,8 @@ import unittest
 from contextlib import closing, contextmanager
 
 from pants.build_graph.address import Address
-from pants.engine.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
+from pants.engine.engine import (LocalMultiprocessEngine, LocalSerialEngine, LocalThreadEngine,
+                                 SerializationError)
 from pants.engine.nodes import Return, SelectNode
 from pants.engine.storage import Cache, Storage
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
@@ -42,6 +43,13 @@ class EngineTest(unittest.TestCase):
       e.start()
       yield e
 
+  @contextmanager
+  def thread_engine(self, pool_size=None):
+    with closing(LocalThreadEngine(self.scheduler, self.storage, self.cache,
+                                         pool_size=pool_size, debug=True)) as e:
+      e.start()
+      yield e
+
   def test_serial_engine_simple(self):
     engine = LocalSerialEngine(self.scheduler, self.storage, self.cache)
     self.assert_engine(engine)
@@ -52,6 +60,10 @@ class EngineTest(unittest.TestCase):
 
   def test_multiprocess_engine_single(self):
     with self.multiprocessing_engine(pool_size=1) as engine:
+      self.assert_engine(engine)
+
+  def test_thread_engine_single(self):
+    with self.thread_engine(pool_size=1) as engine:
       self.assert_engine(engine)
 
   def test_multiprocess_unpickleable(self):
