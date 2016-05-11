@@ -177,9 +177,13 @@ class LegacyBuildGraph(BuildGraph):
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
+    # LegacyTarget roots will be every other element starting
+    # from the 0th position in `request.roots`.
     self._index(request.roots[0::2])
 
     addresses = set()
+    # Address roots will be every other element starting
+    # from the 1st position in `request.roots`.
     for address_root in request.roots[1::2]:
       address_state = self._scheduler.root_entries(request)[address_root]
       addresses.update(maybe_list(address_state.value, Address))
