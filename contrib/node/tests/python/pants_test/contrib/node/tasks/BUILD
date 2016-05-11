@@ -16,6 +16,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  timeout=180,
   tags={'integration'},
 )
 
@@ -25,6 +26,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  timeout=90,
   tags={'integration'},
 )
 
@@ -34,6 +36,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  timeout=240,
   tags={'integration'},
 )
 
