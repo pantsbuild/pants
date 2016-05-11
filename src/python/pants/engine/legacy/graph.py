@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 from hashlib import sha1
 
+from twitter.common.collections import maybe_list
+
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -175,13 +177,15 @@ class LegacyBuildGraph(BuildGraph):
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
-    import pprint
-    logger.debug(pprint.pformat(request.roots))
-    legacy_target_root, address_root = request.roots
-    self._index([legacy_target_root])
+    self._index(request.roots[0::2])
 
-    address_state = self._scheduler.root_entries(request)[address_root]
-    return address_state.value
+    addresses = set()
+    for address_root in request.roots[1::2]:
+      address_state = self._scheduler.root_entries(request)[address_root]
+      addresses.update(maybe_list(address_state.value, Address))
+
+    logger.debug('addresses: {}'.format(addresses))
+    return addresses
 
 
 class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies'])):
