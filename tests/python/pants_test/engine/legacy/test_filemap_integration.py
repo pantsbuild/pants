@@ -31,7 +31,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
   def setUp(self):
     super(FilemapIntegrationTest, self).setUp()
     self.path_prefix = 'testprojects/tests/python/pants/file_sets/'
-    project_tree = FileSystemProjectTree(abspath(self.path_prefix), ['BUILD'])
+    project_tree = FileSystemProjectTree(abspath(self.path_prefix), ['BUILD', '.*'])
     scan_set = set()
     for root, dirs, files in project_tree.walk(''):
       scan_set.update({join(root, f) for f in files})
@@ -50,7 +50,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
 
   def test_exclude_globs(self):
     test_out = self._extract_exclude_output('exclude_globs')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aabb.py', 'dir1/aabb.py', 'dir1/dirdir1/aa.py'},
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aabb.py', 'dir1/dirdir1/aa.py'},
                       test_out)
 
   def test_exclude_rglobs(self):
