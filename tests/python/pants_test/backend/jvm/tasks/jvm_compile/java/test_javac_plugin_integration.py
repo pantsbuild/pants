@@ -29,8 +29,9 @@ class JavacPluginIntegrationTest(BaseCompileIT):
       }
     }
     if global_plugin:
-      config['javac-plugin-setup'] = {
-        'deps': 'examples/src/java/org/pantsbuild/example/plugin:simple_javac_plugin'
+      config['java'] = {
+        'compiler_plugin_deps':
+          'examples/src/java/org/pantsbuild/example/plugin:simple_javac_plugin'
       }
 
     with self.temporary_workdir() as workdir:
