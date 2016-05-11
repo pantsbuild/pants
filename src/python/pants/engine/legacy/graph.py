@@ -44,10 +44,6 @@ class LegacyBuildGraph(BuildGraph):
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
 
-  def reset(self):
-    super(LegacyBuildGraph, self).reset()
-    self._index([node for node, _ in self._graph.completed_nodes()])
-
   def _index(self, roots):
     """Index from the given roots into the storage provided by the base class.
 
