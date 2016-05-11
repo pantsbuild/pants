@@ -27,6 +27,7 @@ def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
     for state in states:
       state.close()
 
+
 class StatefulThreadPool(object):
   """A multiprocessing.Pool-alike with stateful workers running the same function.
 
@@ -74,6 +75,7 @@ class StatefulThreadPool(object):
       thread.join(deadline - time())
       if thread.is_alive():
         print('failed to terminate thread.')
+
 
 class StatefulPool(object):
   """A multiprocessing.Pool-alike with stateful workers running the same function.

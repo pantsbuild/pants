@@ -11,7 +11,6 @@ import multiprocessing
 import traceback
 from abc import abstractmethod
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
@@ -173,6 +172,7 @@ def _execute_step(cache_save, debug, process_state, step):
     logger.warn(traceback.format_exc())
     return (step_id, e)
 
+
 def _thread_initializer(node_builder, storage):
   """Another picklable top-level function that provides multi-processes' initial states.
 
@@ -201,10 +201,6 @@ def _stateful_thread_wrapper(executor, initializer, function, item):
 
 
 class AsyncEngine(Engine):
-  def _submit(self, step):
-    _try_pickle(step)
-    self._pool.submit(step)
-
   def _submit(self, step):
     _try_pickle(step)
     self._pool.submit(step)
