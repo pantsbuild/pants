@@ -36,6 +36,8 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
         // For c/c++ contrib plugin tests.
         env.CXX = "g++"
 
+        env.PANTS_TEST_PYTEST_OPTIONS = "-vvs"
+
         sh("""
           ./build-support/ci/print_node_info.sh
           ./build-support/bin/ci.sh ${flags}
