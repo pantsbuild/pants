@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import time
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.pantsd.watchman import Watchman
@@ -88,15 +87,11 @@ class WatchmanLauncher(object):
       try:
         self.watchman.launch()
       except (self.watchman.ExecutionError, self.watchman.InvalidCommandOutput) as e:
-        self._logger.critical('failed to launch watchman: {exc!r})'.format(exc=e))
-        return False
+        self._logger.fatal('failed to launch watchman: {!r})'.format(e))
+        raise
 
     self._logger.debug('watchman is running, pid={pid} socket={socket}'
                        .format(pid=self.watchman.pid, socket=self.watchman.socket))
-    # TODO(kwlzn): This sleep is currently helpful based on empirical testing with older watchman
-    # versions, but should go away quickly once we embed watchman fetching in pants and uprev both
-    # the binary and client versions.
-    time.sleep(5)  # Allow watchman to quiesce before sending commands.
     return self.watchman
 
   def terminate(self):

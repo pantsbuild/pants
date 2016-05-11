@@ -53,7 +53,8 @@ class TestWatchmanLauncher(BaseTest):
 
     with self.watchman_launcher() as wl:
       wl.watchman = mock_watchman
-      self.assertFalse(wl.maybe_launch())
+      with self.assertRaises(wl.watchman.ExecutionError):
+        wl.maybe_launch()
 
     mock_watchman.is_alive.assert_called_once_with()
     mock_watchman.launch.assert_called_once_with()
