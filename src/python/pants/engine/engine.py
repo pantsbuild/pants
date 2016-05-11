@@ -97,6 +97,9 @@ class Engine(AbstractClass):
     self._storage.close()
     self._cache.close()
 
+  def get_cache_stats(self):
+    return self._cache.get_stats()
+
   def _should_cache(self, step_request):
     return step_request.node.is_cacheable
 
