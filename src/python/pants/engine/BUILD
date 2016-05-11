@@ -47,6 +47,7 @@ python_library(
     ':storage',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:meta',
+    '3rdparty/python:futures',
   ]
 )
 
