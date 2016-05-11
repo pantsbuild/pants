@@ -56,7 +56,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.8'
+  DEFAULT_EXPORT_VERSION = '1.0.7'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -199,20 +199,13 @@ class ExportTask(IvyTaskMixin, PythonTask):
         # NB: is_code_gen should be removed when export format advances to 1.1.0 or higher
         'is_code_gen': current_target.is_codegen,
         'is_synthetic': current_target.is_synthetic,
-        'pants_target_type': self._get_pants_target_alias(type(current_target)),
+        'pants_target_type': self._get_pants_target_alias(type(current_target))
       }
 
       if not current_target.is_synthetic:
         info['globs'] = current_target.globs_relative_to_buildroot()
         if self.get_options().sources:
           info['sources'] = list(current_target.sources_relative_to_buildroot())
-
-      if not current_target.transitive:
-        info['transitive'] = False
-
-      scope_string = str(current_target.scope)
-      if scope_string:
-        info['scope'] = scope_string
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
