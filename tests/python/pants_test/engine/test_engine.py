@@ -10,8 +10,8 @@ import unittest
 from contextlib import closing, contextmanager
 
 from pants.build_graph.address import Address
-from pants.engine.engine import (LocalMultiprocessEngine, LocalSerialEngine, LocalThreadEngine,
-                                 SerializationError)
+from pants.engine.engine import (LocalMultiprocessEngine, LocalMultithreadingEngine,
+                                 LocalSerialEngine, SerializationError)
 from pants.engine.nodes import Return, SelectNode
 from pants.engine.storage import Cache, Storage
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
@@ -45,7 +45,7 @@ class EngineTest(unittest.TestCase):
 
   @contextmanager
   def thread_engine(self, pool_size=None):
-    with closing(LocalThreadEngine(self.scheduler, self.storage, self.cache,
+    with closing(LocalMultithreadingEngine(self.scheduler, self.storage, self.cache,
                                          pool_size=pool_size, debug=True)) as e:
       e.start()
       yield e

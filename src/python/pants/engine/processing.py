@@ -6,6 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from multiprocessing import Process, Queue
+from threading import Thread
+from time import time
 
 
 def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
@@ -25,6 +27,53 @@ def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
     for state in states:
       state.close()
 
+class StatefulThreadPool(object):
+  """A multiprocessing.Pool-alike with stateful workers running the same function.
+
+  Note: there is no exception handling wrapping the function, so it should handle its
+  own exceptions and return a failure result if need be.
+
+  :param pool_size: The number of workers.
+  :param initializer: To provide the initial states for each worker.
+  :param function: The function which will be executed for each input object, and receive
+    the worker's state and the current input. Should return the value that will be returned
+    to the calling thread.
+  """
+
+  def __init__(self, pool_size, initializer, function):
+    super(StatefulThreadPool, self).__init__()
+
+    self._pool_size = pool_size
+
+    self._send = Queue()
+    self._recv = Queue()
+
+    self._threads = [Thread(target=_stateful_pool_loop,
+                            name="processing-pool-{}".format(i),
+                            args=(self._recv, self._send, initializer, function))
+                       for i in range(pool_size)]
+
+  def start(self):
+    for process in self._threads:
+      process.start()
+
+  def submit(self, item):
+    if item is None:
+      raise ValueError('Only non-None inputs are supported.')
+    self._send.put(item, block=True)
+
+  def await_one_result(self):
+    return self._recv.get(block=True)
+
+  def close(self):
+    for _ in self._threads:
+      self._send.put(None, block=False)
+    deadline = 10 + time()
+    print('got to close. Yay!')
+    for thread in self._threads:
+      thread.join(deadline - time())
+      if thread.is_alive():
+        print('failed to terminate thread.')
 
 class StatefulPool(object):
   """A multiprocessing.Pool-alike with stateful workers running the same function.
