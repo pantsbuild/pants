@@ -13,6 +13,7 @@ import unittest
 
 from pants.util.contextutil import (Timer, environment_as, open_zip, pushd, stdio_as, temporary_dir,
                                     temporary_file)
+from pants.util.util_config import UtilConfig
 
 
 class ContextutilTest(unittest.TestCase):
@@ -175,3 +176,15 @@ class ContextutilTest(unittest.TestCase):
 
     self.assertEquals(sys.stdout, old_stdout)
     self.assertEquals(sys.stderr, old_stderr)
+
+  def test_permissions(self):
+    with temporary_file(permissions=0700) as f:
+      self.assertEquals(0700, os.stat(f.name)[0] & 0777)
+
+    with temporary_dir(permissions=0030) as path:
+      self.assertEquals(0030, os.stat(path)[0] & 0777)
+
+  def test_permissions_config(self):
+    UtilConfig.configurables['temporary_file_mode'].set_value('705')
+    with temporary_dir() as path:
+      self.assertEquals(0705, os.stat(path)[0] & 0777)
