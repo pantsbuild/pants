@@ -32,18 +32,19 @@ class JavacPluginSetup(Subsystem):
     # We have hundreds of tests that use JvmTargets, either as a core part of the test, or
     # incidentally when testing build graph functionality, and it would be onerous to make them
     # all set up a subsystem they don't care about.
-    if cls.has_options():
+    # See https://github.com/pantsbuild/pants/issues/3409.
+    if cls.is_initialized():
       return cls.global_instance().plugin_dependency_specs()
     else:
       return []
 
   def __init__(self, *args, **kwargs):
     super(JavacPluginSetup, self).__init__(*args, **kwargs)
-    # Parse the specs in order to normalize them, so we can do string comparisons on them.
     opts = self.get_options()
     # TODO: This check is a continuation of the hack that allows tests to pass without caring
     # about this subsystem.
     if hasattr(opts, 'deps'):
+      # Parse the specs in order to normalize them, so we can do string comparisons on them.
       self._dependency_specs = [Address.parse(spec).spec for spec in self.get_options().deps]
     else:
       self._dependency_specs = []

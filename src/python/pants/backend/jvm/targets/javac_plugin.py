@@ -15,7 +15,8 @@ class JavacPlugin(JavaLibrary):
 
     """
     :param classname: The fully qualified plugin class name - required.
-    :param plugin: The name of the plugin. Defaults to name if not supplied.
+    :param plugin: The name of the plugin. Defaults to name if not supplied.  These are the names
+                   passed to javac's -Xplugin flag.
     """
 
     super(JavacPlugin, self).__init__(*args, **kwargs)

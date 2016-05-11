@@ -9,7 +9,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
-def missing_jvm(version):
+def is_missing_jvm(version):
   with subsystem_instance(DistributionLocator):
     try:
       DistributionLocator.cached(minimum_version=version, maximum_version='{}.9999'.format(version))

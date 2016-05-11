@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from unittest import skipIf
 
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
-from pants_test.backend.jvm.tasks.missing_jvm_check import missing_jvm
+from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
 
-@skipIf(missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
+@skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
 class JavacPluginIntegrationTest(BaseCompileIT):
   # A target without a dep on the plugin.
   independent_tgt = 'testprojects/src/java/org/pantsbuild/testproject/publish/hello/main'
