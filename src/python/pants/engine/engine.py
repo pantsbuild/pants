@@ -205,11 +205,63 @@ class AsyncEngine(Engine):
     _try_pickle(step)
     self._pool.submit(step)
 
+  def _submit(self, step):
+    _try_pickle(step)
+    self._pool.submit(step)
+
+  def start(self):
+    self._pool.start()
+
   def close(self):
     super(AsyncEngine, self).close()
+    self._pool.close()
+
+  def submit_until(self, pending_submission, in_flight, n):
+    """Submit pending while there's capacity, and more than `n` items pending_submission."""
+    to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
+    submitted = 0
+    for _ in range(to_submit):
+      step, promise = pending_submission.pop(last=False)
+
+      if step.step_id in in_flight:
+        raise Exception('{} is already in_flight!'.format(step))
+
+      step = self._storage.key_for_request(step)
+      result = self._maybe_cache_get(step)
+      if result is not None:
+        # Skip in_flight on cache hit.
+        promise.success(result)
+      else:
+        in_flight[step.step_id] = promise
+        self._submit(step)
+        submitted += 1
+    return submitted
+
+  def await_one(self, in_flight):
+    """Await one completed step, and remove it from in_flight."""
+    if not in_flight:
+      raise Exception('Awaited an empty pool!')
+    step_id, result = self._pool.await_one_result()
+    if isinstance(result, Exception):
+      raise result
+    result = self._storage.resolve_result(result)
+    if step_id not in in_flight:
+      raise Exception(
+        'Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
+    in_flight.pop(step_id).success(result)
+
+  @abstractmethod
+  def reduce(self, execution_request):
+    """Reduce the given execution graph returning its root products.
+
+    :param execution_request: The description of the goals to achieve.
+    :type execution_request: :class:`ExecutionRequest`
+    :returns: The root products promised by the execution graph.
+    :rtype: dict of (:class:`Promise`, product)
+    """
 
 
-class LocalMultithreadingEngine(Engine):
+class LocalMultithreadingEngine(AsyncEngine):
   """An engine that runs tasks locally and in parallel when possible using a thread pool."""
 
   def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
@@ -234,56 +286,19 @@ class LocalMultithreadingEngine(Engine):
     self._pool = StatefulThreadPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
-  def _submit(self, step):
-    _try_pickle(step)
-    self._pool.submit(step)
-
-  def start(self):
-    self._pool.start()
-
   def reduce(self, execution_request):
+    # The main reduction loop:
+    # 1. Whenever we don't have enough work to saturate the pool, request more.
+    # 2. Whenever the pool is not saturated, submit currently pending work.
+
     # Step instances which have not been submitted yet.
     # TODO: Scheduler now only sends work once, so a deque should be fine here.
     pending_submission = OrderedSet()
     # Dict from step id to a Promise for Steps that have been submitted.
     in_flight = dict()
+    submit_until = functools.partial(self.submit_until, pending_submission, in_flight)
+    await_one = functools.partial(self.await_one, in_flight)
 
-    def submit_until(n):
-      """Submit pending while there's capacity, and more than `n` items pending_submission."""
-      to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
-      submitted = 0
-      for _ in range(to_submit):
-        step, promise = pending_submission.pop(last=False)
-
-        if step.step_id in in_flight:
-          raise Exception('{} is already in_flight!'.format(step))
-
-        step = self._storage.key_for_request(step)
-        result = self._maybe_cache_get(step)
-        if result is not None:
-          # Skip in_flight on cache hit.
-          promise.success(result)
-        else:
-          in_flight[step.step_id] = promise
-          self._submit(step)
-          submitted += 1
-      return submitted
-
-    def await_one():
-      """Await one completed step, and remove it from in_flight."""
-      if not in_flight:
-        raise Exception('Awaited an empty pool!')
-      step_id, result = self._pool.await_one_result()
-      if isinstance(result, Exception):
-        raise result
-      result = self._storage.resolve_result(result)
-      if step_id not in in_flight:
-        raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
-      in_flight.pop(step_id).success(result)
-
-    # The main reduction loop:
-    # 1. Whenever we don't have enough work to saturate the pool, request more.
-    # 2. Whenever the pool is not saturated, submit currently pending work.
     for step_batch in self._scheduler.schedule(execution_request):
       if not step_batch:
         # A batch should only be empty if all dependency work is currently blocked/running.
@@ -304,12 +319,8 @@ class LocalMultithreadingEngine(Engine):
       submit_until(self._pool_size)
       await_one()
 
-  def close(self):
-    super(LocalMultithreadingEngine, self).close()
-    self._pool.close()
 
-
-class LocalMultiprocessEngine(Engine):
+class LocalMultiprocessEngine(AsyncEngine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
   def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
@@ -334,56 +345,19 @@ class LocalMultiprocessEngine(Engine):
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
-  def _submit(self, step):
-    _try_pickle(step)
-    self._pool.submit(step)
-
-  def start(self):
-    self._pool.start()
-
   def reduce(self, execution_request):
+    # The main reduction loop:
+    # 1. Whenever we don't have enough work to saturate the pool, request more.
+    # 2. Whenever the pool is not saturated, submit currently pending work.
+
     # Step instances which have not been submitted yet.
     # TODO: Scheduler now only sends work once, so a deque should be fine here.
     pending_submission = OrderedSet()
     # Dict from step id to a Promise for Steps that have been submitted.
     in_flight = dict()
+    submit_until = functools.partial(self.submit_until, pending_submission, in_flight)
+    await_one = functools.partial(self.await_one, in_flight)
 
-    def submit_until(n):
-      """Submit pending while there's capacity, and more than `n` items pending_submission."""
-      to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
-      submitted = 0
-      for _ in range(to_submit):
-        step, promise = pending_submission.pop(last=False)
-
-        if step.step_id in in_flight:
-          raise Exception('{} is already in_flight!'.format(step))
-
-        step = self._storage.key_for_request(step)
-        result = self._maybe_cache_get(step)
-        if result is not None:
-          # Skip in_flight on cache hit.
-          promise.success(result)
-        else:
-          in_flight[step.step_id] = promise
-          self._submit(step)
-          submitted += 1
-      return submitted
-
-    def await_one():
-      """Await one completed step, and remove it from in_flight."""
-      if not in_flight:
-        raise Exception('Awaited an empty pool!')
-      step_id, result = self._pool.await_one_result()
-      if isinstance(result, Exception):
-        raise result
-      result = self._storage.resolve_result(result)
-      if step_id not in in_flight:
-        raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
-      in_flight.pop(step_id).success(result)
-
-    # The main reduction loop:
-    # 1. Whenever we don't have enough work to saturate the pool, request more.
-    # 2. Whenever the pool is not saturated, submit currently pending work.
     for step_batch in self._scheduler.schedule(execution_request):
       if not step_batch:
         # A batch should only be empty if all dependency work is currently blocked/running.
@@ -403,7 +377,3 @@ class LocalMultiprocessEngine(Engine):
     while pending_submission or in_flight:
       submit_until(self._pool_size)
       await_one()
-
-  def close(self):
-    super(LocalMultiprocessEngine, self).close()
-    self._pool.close()
