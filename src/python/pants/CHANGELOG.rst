@@ -379,12 +379,6 @@ Bugfixes
 * startswith() is the correct method for strings, not starts_with()
   `RB #3744 <https://rbcommons.com/twitter/r/3744>`_
 
-New Features
-~~~~~~~~~~~~
-
-* Support for `.lua` file generation from Scrooge.
-  `RB #3823 <https://rbcommons.com/s/twitter/r/3823>`_
-
 1.0.0-rc1 (04/22/2016)
 ----------------------
 
