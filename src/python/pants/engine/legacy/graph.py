@@ -169,19 +169,20 @@ class LegacyBuildGraph(BuildGraph):
     """Request LegacyTargets for each of the subjects, and yield resulting Addresses."""
     logger.debug('Injecting to {}: {}'.format(self, subjects))
     request = self._scheduler.execution_request([LegacyTarget, Address], subjects)
+
+    address_roots = filter(lambda root: root.product is LegacyTarget, request.roots)
+    legacy_target_roots = filter(lambda root: root.product is Address, request.roots)
+
     result = self._engine.execute(request)
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
-    # LegacyTarget roots will be every other element starting
-    # from the 0th position in `request.roots`.
-    self._index(request.roots[0::2])
+    self._index(address_roots)
 
     addresses = set()
-    # Address roots will be every other element starting
-    # from the 1st position in `request.roots`.
-    for address_root in request.roots[1::2]:
+    for address_root in legacy_target_roots:
       address_state = self._scheduler.root_entries(request)[address_root]
+      logger.info(address_state.value)
       addresses.update(maybe_list(address_state.value, Address))
 
     logger.debug('addresses: {}'.format(addresses))
