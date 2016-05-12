@@ -140,23 +140,23 @@ class GoFetch(GoTask):
       for vt in invalidation_check.all_vts:
         go_remote_lib = vt.target
         gopath = vt.results_dir
-        fetcher = self._get_fetcher(go_remote_lib.import_path)
+        pkg = go_remote_lib.import_path
+        fetcher = self._get_fetcher(pkg)
 
         if not vt.valid:
-          meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(go_remote_lib.import_path)
+          meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(pkg)
 
           if meta_root:
             root = fetcher.root(meta_root)
           else:
-            root = fetcher.root(go_remote_lib.import_path)
+            root = fetcher.root(pkg)
 
-          fetch_dir = os.path.join(self.workdir, 'fetches')
-          root_dir = os.path.join(fetch_dir, root)
+          root_dir = os.path.join(self.workdir, 'fetches', root)
 
           # Only fetch each remote root once.
           if not os.path.exists(root_dir):
             with temporary_dir() as tmp_fetch_root:
-              fetcher.fetch(go_remote_lib.import_path, dest=tmp_fetch_root,
+              fetcher.fetch(pkg, dest=tmp_fetch_root,
                             rev=go_remote_lib.rev, meta_repo_url=meta_repo_url)
               safe_mkdir(root_dir)
               for path in os.listdir(tmp_fetch_root):
@@ -177,33 +177,31 @@ class GoFetch(GoTask):
           for path in os.listdir(root_dir):
             os.symlink(os.path.join(root_dir, path), os.path.join(dest_dir, path))
 
-        # Map the fetched remote sources.
-        pkg = go_remote_lib.import_path
+          # Map the fetched remote sources.
+          for remote_import_path in self._get_remote_import_paths(pkg, gopath=gopath):
+            fetcher = self._get_fetcher(remote_import_path)
+            remote_root = fetcher.root(remote_import_path)
+            spec_path = os.path.join(go_remote_lib.target_base, remote_root)
+
+            package_path = GoRemoteLibrary.remote_package_path(remote_root, remote_import_path)
+            target_name = package_path or os.path.basename(remote_root)
+
+            address = Address(spec_path, target_name)
+            if address not in all_known_addresses:
+              try:
+                # If we've already resolved a package from this remote root, its ok to define an
+                # implicit synthetic remote target for all other packages in the same remote root.
+                implicit_ok = any(spec_path == a.spec_path for a in all_known_addresses)
+
+                remote_lib = self._resolve(go_remote_lib, address, package_path, implicit_ok)
+                resolved_remote_libs.add(remote_lib)
+                all_known_addresses.add(address)
+              except self.UndeclaredRemoteLibError as e:
+                undeclared_deps[go_remote_lib].add((remote_import_path, e.address))
+            self.context.build_graph.inject_dependency(go_remote_lib.address, address)
         go_remote_lib_src[go_remote_lib] = os.path.join(gopath, 'src', pkg)
 
-        for remote_import_path in self._get_remote_import_paths(pkg, gopath=gopath):
-          fetcher = self._get_fetcher(remote_import_path)
-          remote_root = fetcher.root(remote_import_path)
-          spec_path = os.path.join(go_remote_lib.target_base, remote_root)
-
-          package_path = GoRemoteLibrary.remote_package_path(remote_root, remote_import_path)
-          target_name = package_path or os.path.basename(remote_root)
-
-          address = Address(spec_path, target_name)
-          if address not in all_known_addresses:
-            try:
-              # If we've already resolved a package from this remote root, its ok to define an
-              # implicit synthetic remote target for all other packages in the same remote root.
-              implicit_ok = any(spec_path == a.spec_path for a in all_known_addresses)
-
-              remote_lib = self._resolve(go_remote_lib, address, package_path, implicit_ok)
-              resolved_remote_libs.add(remote_lib)
-              all_known_addresses.add(address)
-            except self.UndeclaredRemoteLibError as e:
-              undeclared_deps[go_remote_lib].add((remote_import_path, e.address))
-          self.context.build_graph.inject_dependency(go_remote_lib.address, address)
-
-  # Recurse after the invalidated block, so the libraries we downloaded are now "valid"
+    # Recurse after the invalidated block, so the libraries we downloaded are now "valid"
     # and thus we don't try to download a library twice.
     trans_undeclared_deps = self._transitive_download_remote_libs(resolved_remote_libs,
                                                                   all_known_addresses)
