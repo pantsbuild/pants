@@ -168,26 +168,6 @@ The following is an abbreviated export file from a command in the pants repo:
 
 # Export Format Changes
 
-## 1.0.8
-
-Conditionally added 'transitive' and 'scope' fields to target
-
-## 1.0.7
-
-Added 'test_platform' to target and 'preferred_jvm_distributions' section
-
-## 1.0.6
-
-Added 'is_synthetic' field to target
-
-## 1.0.5
-
-Added 'id' to target
-
-## 1.0.4
-
-If a target class is registered under multiple aliases returns the last one
-
 ## 1.0.3
 
 Added information about jdk settings

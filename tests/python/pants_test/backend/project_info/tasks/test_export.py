@@ -217,8 +217,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def test_version(self):
     result = self.execute_export_json('project_info:first')
-    # If you have to update this test, make sure export.md is updated with changelog notes
-    self.assertEqual('1.0.8', result['version'])
+    self.assertEqual('1.0.7', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
@@ -278,7 +277,6 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
            'package_prefix': 'this.is.a.source'
          },
       ],
-      'scope' : 'default',
       'target_type': 'SOURCE',
       'pants_target_type': 'scala_library',
       'platform': 'java6',
