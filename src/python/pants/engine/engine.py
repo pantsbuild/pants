@@ -9,13 +9,13 @@ import functools
 import logging
 import multiprocessing
 import traceback
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.engine.objects import SerializationError
-from pants.engine.processing import StatefulPool, StatefulThreadPool
+from pants.engine.processing import StatefulProcessPool, StatefulThreadPool
 from pants.engine.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -165,42 +165,45 @@ def _execute_step(cache_save, debug, process_state, step):
     return storage.key_for_result(result)
 
   try:
-    return (step_id, execute())
+    return step_id, execute()
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
     logger.warn(traceback.format_exc())
-    return (step_id, e)
-
-
-def _thread_initializer(node_builder, storage):
-  """Another picklable top-level function that provides multi-processes' initial states.
-
-  States are returned as a tuple. States are `Closable` so they can be cleaned up once
-  processes are done.
-  """
-  return (node_builder, storage)
-
-
-def _process_initializer(node_builder, storage):
-  """Another picklable top-level function that provides multi-processes' initial states.
-
-  States are returned as a tuple. States are `Closable` so they can be cleaned up once
-  processes are done.
-  """
-  return (node_builder, Storage.clone(storage))
-
-
-def _stateful_thread_wrapper(executor, initializer, function, item):
-  states = initializer()
-  try:
-    return executor.submit(function, states, item)
-  finally:
-    for state in states:
-      state.close()
+    return step_id, e
 
 
 class AsyncEngine(Engine):
+  def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
+    """
+    :param scheduler: The local scheduler for creating execution graphs.
+    :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
+    :param storage: The storage instance for serializables keyed by their hashes.
+    :type storage: :class:`pants.engine.storage.Storage`
+    :param cache: The cache instance for storing execution results, by default it uses the same
+      Storage instance if not specified.
+    :type cache: :class:`pants.engine.storage.Cache`
+    :param int pool_size: The number of worker processes to use; by default 2 processes per core will
+                          be used.
+    :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
+    """
+    super(AsyncEngine, self).__init__(scheduler, storage, cache)
+    self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
+
+    execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
+    node_builder = scheduler.node_builder()
+    process_initializer = functools.partial(self._initializer, node_builder, self._storage)
+    self._pool = self._pool_factory(self._pool_size, process_initializer, execute_step)
+    self._debug = debug
+
+  @abstractproperty
+  def _pool_factory(self):
+    return NotImplemented
+
+  @abstractproperty
+  def _initializer(self):
+    return NotImplemented
+
   def _submit(self, step):
     _try_pickle(step)
     self._pool.submit(step)
@@ -257,30 +260,25 @@ class AsyncEngine(Engine):
     """
 
 
+def _thread_initializer(node_builder, storage):
+  """Another pickle-able top-level function that provides multi-processes' initial states.
+
+  States are returned as a tuple. States are `Closable` so they can be cleaned up once
+  processes are done.
+  """
+  return node_builder, storage
+
+
 class LocalMultithreadingEngine(AsyncEngine):
   """An engine that runs tasks locally and in parallel when possible using a thread pool."""
 
-  def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
-    """
-    :param scheduler: The local scheduler for creating execution graphs.
-    :type scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
-    :param storage: The storage instance for serializables keyed by their hashes.
-    :type storage: :class:`pants.engine.exp.storage.Storage`
-    :param cache: The cache instance for storing execution results, by default it uses the same
-      Storage instance if not specified.
-    :type cache: :class:`pants.engine.exp.storage.Cache`
-    :param int pool_size: The number of worker processes to use; by default 2 processes per core will
-                          be used.
-    :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
-    """
-    super(LocalMultithreadingEngine, self).__init__(scheduler, storage, cache)
-    self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
+  @property
+  def _pool_factory(self):
+    return StatefulThreadPool
 
-    execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
-    node_builder = scheduler.node_builder()
-    process_initializer = functools.partial(_thread_initializer, node_builder, self._storage)
-    self._pool = StatefulThreadPool(self._pool_size, process_initializer, execute_step)
-    self._debug = debug
+  @property
+  def _initializer(self):
+    return _thread_initializer
 
   def reduce(self, execution_request):
     # The main reduction loop:
@@ -316,30 +314,25 @@ class LocalMultithreadingEngine(AsyncEngine):
       await_one()
 
 
+def _process_initializer(node_builder, storage):
+  """Another pickle-able top-level function that provides multi-processes' initial states.
+
+  States are returned as a tuple. States are `Closable` so they can be cleaned up once
+  processes are done.
+  """
+  return node_builder, Storage.clone(storage)
+
+
 class LocalMultiprocessEngine(AsyncEngine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
-    """
-    :param scheduler: The local scheduler for creating execution graphs.
-    :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
-    :param storage: The storage instance for serializables keyed by their hashes.
-    :type storage: :class:`pants.engine.storage.Storage`
-    :param cache: The cache instance for storing execution results, by default it uses the same
-      Storage instance if not specified.
-    :type cache: :class:`pants.engine.storage.Cache`
-    :param int pool_size: The number of worker processes to use; by default 2 processes per core will
-                          be used.
-    :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
-    """
-    super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
-    self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
+  @property
+  def _pool_factory(self):
+    return StatefulProcessPool
 
-    execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
-    node_builder = scheduler.node_builder()
-    process_initializer = functools.partial(_process_initializer, node_builder, self._storage)
-    self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
-    self._debug = debug
+  @property
+  def _initializer(self):
+    return _process_initializer
 
   def reduce(self, execution_request):
     # The main reduction loop:

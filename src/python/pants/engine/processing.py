@@ -5,9 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from abc import abstractproperty
 from multiprocessing import Process, Queue
-from threading import Thread
-from time import time
+
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 
 def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
@@ -28,8 +29,8 @@ def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
       state.close()
 
 
-class StatefulThreadPool(object):
-  """A multiprocessing.Pool-alike with stateful workers running the same function.
+class StatefulBasePool(object):
+  """A Thread.Pool-alike with stateful workers running the same function.
 
   Note: there is no exception handling wrapping the function, so it should handle its
   own exceptions and return a failure result if need be.
@@ -41,22 +42,27 @@ class StatefulThreadPool(object):
     to the calling thread.
   """
 
+  @abstractproperty
+  def _pool_constructor(self):
+    """Allow the child class to define the type of pool.
+
+    The pool must be concurrent.futures like
+    """
+
   def __init__(self, pool_size, initializer, function):
-    super(StatefulThreadPool, self).__init__()
+    super(StatefulBasePool, self).__init__()
 
     self._pool_size = pool_size
 
     self._send = Queue()
     self._recv = Queue()
 
-    self._threads = [Thread(target=_stateful_pool_loop,
-                            name="processing-pool-{}".format(i),
-                            args=(self._recv, self._send, initializer, function))
-                       for i in range(pool_size)]
+    self._executor = self._pool_constructor(max_workers=self._pool_size)
+    self._fn_args = (self._recv, self._send, initializer, function)
 
   def start(self):
-    for process in self._threads:
-      process.start()
+    for _ in range(self._pool_size):
+      self._executor.submit(_stateful_pool_loop, *self._fn_args)
 
   def submit(self, item):
     if item is None:
@@ -67,17 +73,30 @@ class StatefulThreadPool(object):
     return self._recv.get(block=True)
 
   def close(self):
-    for _ in self._threads:
-      self._send.put(None, block=False)
-    deadline = 10 + time()
-    print('got to close. Yay!')
-    for thread in self._threads:
-      thread.join(deadline - time())
-      if thread.is_alive():
-        print('failed to terminate thread.')
+    for _ in range(self._pool_size):
+      self._send.put(None)
+    self._executor.shutdown()
 
 
-class StatefulPool(object):
+class StatefulThreadPool(StatefulBasePool):
+  """A Thread.Pool-alike with stateful workers running the same function.
+
+  Note: there is no exception handling wrapping the function, so it should handle its
+  own exceptions and return a failure result if need be.
+
+  :param pool_size: The number of workers.
+  :param initializer: To provide the initial states for each worker.
+  :param function: The function which will be executed for each input object, and receive
+    the worker's state and the current input. Should return the value that will be returned
+    to the calling thread.
+  """
+
+  @property
+  def _pool_constructor(self):
+    return ThreadPoolExecutor
+
+
+class StatefulProcessPool(StatefulBasePool):
   """A multiprocessing.Pool-alike with stateful workers running the same function.
 
   Note: there is no exception handling wrapping the function, so it should handle its
@@ -90,8 +109,12 @@ class StatefulPool(object):
     to the calling thread.
   """
 
+  @property
+  def _pool_constructor(self):
+    return ProcessPoolExecutor
+
   def __init__(self, pool_size, initializer, function):
-    super(StatefulPool, self).__init__()
+    super(StatefulProcessPool, self).__init__(pool_size, initializer, function)
 
     self._pool_size = pool_size
 
@@ -105,14 +128,6 @@ class StatefulPool(object):
   def start(self):
     for process in self._processes:
       process.start()
-
-  def submit(self, item):
-    if item is None:
-      raise ValueError('Only non-None inputs are supported.')
-    self._send.put(item, block=True)
-
-  def await_one_result(self):
-    return self._recv.get(block=True)
 
   def close(self):
     for _ in self._processes:
