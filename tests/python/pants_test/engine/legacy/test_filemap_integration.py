@@ -21,8 +21,8 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
       self.assert_failure(pants_run)
     return pants_run
 
-  def test_scala_examples(self):
-    self.do_filemap(True, 'examples/src/scala/org/pantsbuild/example/::')
+  def test_testprojects(self):
+    self.do_filemap(True, 'testprojects::')
 
   TEST_EXCLUDE_FILES = {'a.py', 'aa.py', 'aaa.py', 'ab.py', 'aabb.py',
                         'dir1/a.py', 'dir1/aa.py', 'dir1/aaa.py', 'dir1/ab.py', 'dir1/aabb.py',

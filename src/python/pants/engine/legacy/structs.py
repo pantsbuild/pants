@@ -67,7 +67,7 @@ class SourcesField(datatype('SourcesField', ['address', 'filespecs', 'path_globs
     return hash(self.address)
 
 
-class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
+class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list', 'excluded_path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
   def __eq__(self, other):
@@ -111,14 +111,18 @@ class JvmAppAdaptor(TargetAdaptor):
     # Construct a field for the `bundles` argument.
     filespecs_list = []
     path_globs_list = []
+    excluded_path_globs_list = []
     for bundle in self.bundles:
       base_globs = BaseGlobs.from_sources_field(bundle.fileset)
       filespecs_list.append(base_globs.filespecs)
-      path_globs_list.append(base_globs.to_path_globs(self.address.spec_path))
+      path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
+      path_globs_list.append(path_globs)
+      excluded_path_globs_list.append(excluded_path_globs)
     bundles_field = BundlesField(self.address,
                                  self.bundles,
                                  filespecs_list,
-                                 path_globs_list)
+                                 path_globs_list,
+                                 excluded_path_globs_list)
     return field_adaptors + (bundles_field,)
 
 

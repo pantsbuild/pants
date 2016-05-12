@@ -46,10 +46,6 @@ class LegacyBuildGraph(BuildGraph):
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
 
-  def reset(self):
-    super(LegacyBuildGraph, self).reset()
-    self._index([node for node, _ in self._graph.completed_nodes()])
-
   def _index(self, roots):
     """Index from the given roots into the storage provided by the base class.
 
@@ -211,28 +207,37 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
   return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
 
 
-def hydrate_sources(sources_field, source_files_content, excluded_source_files):
-  """Given a SourcesField and FilesContent for its path_globs, create an EagerFilesetWithSpec."""
+def _eager_fileset_with_spec(spec_path, filespecs, source_files_content, excluded_source_files):
   excluded = {f.path for f in excluded_source_files.dependencies}
-  spec_path = sources_field.address.spec_path
-  filespecs = sources_field.filespecs
-  print('>>> filespecs are {}; included/excluded are: {} / {}'.format(filespecs, [fc.path for fc in source_files_content.dependencies], excluded))
   file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
                  for fc in source_files_content.dependencies
                  if fc.path not in excluded}
-  return HydratedField('sources', EagerFilesetWithSpec(spec_path, filespecs, file_hashes))
+  return EagerFilesetWithSpec(spec_path, filespecs, file_hashes)
 
 
-def hydrate_bundles(bundles_field, files_content_list):
+def hydrate_sources(sources_field, source_files_content, excluded_source_files):
+  """Given a SourcesField and FilesContent for its path_globs, create an EagerFilesetWithSpec."""
+  fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
+                                               sources_field.filespecs,
+                                               source_files_content,
+                                               excluded_source_files)
+  return HydratedField('sources', fileset_with_spec)
+
+
+def hydrate_bundles(bundles_field, files_content_list, excluded_files_list):
   """Given a BundlesField and FilesContent for each of its filesets create a list of BundleAdaptors."""
   bundles = []
-  zipped = zip(bundles_field.bundles, bundles_field.filespecs_list, files_content_list)
-  for bundle, filespecs, files_content in zipped:
+  zipped = zip(bundles_field.bundles,
+               bundles_field.filespecs_list,
+               files_content_list,
+               excluded_files_list)
+  for bundle, filespecs, files_content, excluded_files in zipped:
     spec_path = bundles_field.address.spec_path
-    file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
-                  for fc in files_content.dependencies}
     kwargs = bundle.kwargs()
-    kwargs['fileset'] = EagerFilesetWithSpec(spec_path, filespecs, file_hashes)
+    kwargs['fileset'] = _eager_fileset_with_spec(spec_path,
+                                                 filespecs,
+                                                 files_content,
+                                                 excluded_files)
     bundles.append(BundleAdaptor(**kwargs))
   return HydratedField('bundles', bundles)
 
@@ -254,6 +259,7 @@ def create_legacy_graph_tasks():
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),
-      SelectDependencies(FilesContent, BundlesField, 'path_globs_list')],
+      SelectDependencies(FilesContent, BundlesField, 'path_globs_list'),
+      SelectDependencies(Files, BundlesField, 'excluded_path_globs_list')],
      hydrate_bundles),
   ]
