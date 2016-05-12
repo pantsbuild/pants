@@ -33,6 +33,11 @@ class GoFetch(GoTask):
   def product_types(cls):
     return ['go_remote_lib_src']
 
+  @classmethod
+  def register_options(cls, register):
+    register('--follow-meta-tag', advanced=True, type=bool, default=True,
+             help='follow url in meta tag in webpage for source')
+
   @property
   def cache_target_dirs(self):
     # TODO(John Sirois): See TODO in _transitive_download_remote_libs, re-consider how artifact
@@ -143,7 +148,8 @@ class GoFetch(GoTask):
         fetcher = self._get_fetcher(go_remote_lib.import_path)
 
         if not vt.valid:
-          meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(go_remote_lib.import_path)
+          meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(go_remote_lib.import_path) \
+                                                    if self.get_options().follow_meta_tag else (None, None, None)
 
           if meta_root:
             root = fetcher.root(meta_root)
