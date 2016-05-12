@@ -18,7 +18,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
@@ -106,15 +106,17 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
           'rpc_style {} not supported: expected one of {}.'.format(rpc_style, _RPC_STYLES))
     return rpc_style
 
+  @memoized_method
   def _registered_language_aliases(self):
     return self.get_options().target_types
 
+  @memoized_method
   def _target_type_for_language(self, language):
     alias_for_lang = self._registered_language_aliases()[language]
     target_types = self.target_types_for_alias(alias_for_lang)
     if len(target_types) > 1:
       raise TaskError('More than one target type registered for language `{0}`'.format(language))
-    return target_types.pop()
+    return next(iter(target_types))
 
   def execute_codegen(self, target, target_workdir):
     self._validate_compiler_configs([target])
