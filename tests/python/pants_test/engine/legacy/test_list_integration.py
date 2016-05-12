@@ -19,16 +19,13 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
   def run_engine_list(self, spec, success):
     args = ['-q', 'run', 'src/python/pants/engine/legacy:list', '--'] + spec
-    pants_run = self.run_pants(args)
-    if success:
-      self.assert_success(pants_run)
-      stdout_lines = pants_run.stdout_data.split('\n')
-      return set([l for l in stdout_lines if l])
-    else:
-      self.assert_failure(pants_run)
+    return self.get_target_set(args, success)
 
   def run_regular_list(self, spec, success):
     args = ['-q', 'list'] + spec
+    return self.get_target_set(args, success)
+
+  def get_target_set(self, args, success):
     pants_run = self.run_pants(args)
     if success:
       self.assert_success(pants_run)
@@ -36,6 +33,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       return set([l for l in stdout_lines if l])
     else:
       self.assert_failure(pants_run)
+      return None
 
   def test_list_single(self):
     self.assert_list_new_equals_old(True, ['3rdparty::'])
