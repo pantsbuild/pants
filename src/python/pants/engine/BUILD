@@ -47,7 +47,6 @@ python_library(
     ':storage',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:meta',
-    '3rdparty/python:futures',
   ]
 )
 
@@ -123,6 +122,9 @@ python_library(
 python_library(
   name='processing',
   sources=['processing.py'],
+  dependencies=[
+    '3rdparty/python:futures',
+  ]
 )
 
 python_library(
