@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 from abc import abstractproperty
 
+from six import string_types
+
 from pants.build_graph.address import Addresses
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import Files as FSFiles
@@ -137,22 +139,22 @@ class BaseGlobs(AbstractClass):
     """
     if sources is None:
       return Files()
-    elif isinstance(sources, collections.Sequence):
-      return Files(*sources)
     elif isinstance(sources, BaseGlobs):
       return sources
+    elif isinstance(sources, collections.Sequence) and not isinstance(sources, string_types):
+      return Files(*sources)
     else:
       raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
-  @classmethod
-  def _filespec_for_excludes(cls, raw_excludes):
+  @staticmethod
+  def _filespec_for_excludes(raw_excludes):
     excluded_patterns = []
-    for exclude in cls.legacy_globs_class.process_raw_excludes(raw_excludes):
-      exclude_filespecs = cls.from_sources_field(exclude).filespecs
+    for raw_exclude in raw_excludes:
+      exclude_filespecs = BaseGlobs.from_sources_field(raw_exclude).filespecs
       if exclude_filespecs.get('exclude', []):
         raise ValueError('Nested excludes are not supported: got {}'.format(raw_excludes))
       excluded_patterns.extend(exclude_filespecs.get('globs', []))
-    return cls.legacy_globs_class.to_filespec(excluded_patterns)
+    return {'globs': excluded_patterns}
 
   @abstractproperty
   def path_globs_kwarg(self):
