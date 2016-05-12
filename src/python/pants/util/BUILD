@@ -12,6 +12,7 @@ python_library(
    dependencies = [
      '3rdparty/python:six',
      ':dirutil',
+     ':util_config',
    ],
 )
 
@@ -104,6 +105,11 @@ python_library(
 python_library(
   name = 'timeout',
   sources = ['timeout.py'],
+)
+
+python_library(
+  name = 'util_config',
+  sources = ['util_config.py'],
 )
 
 python_library(

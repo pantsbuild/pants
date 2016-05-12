@@ -20,6 +20,7 @@ from pants.core_tasks.roots import ListRoots
 from pants.core_tasks.run_prep_command import (RunBinaryPrepCommand, RunCompilePrepCommand,
                                                RunTestPrepCommand)
 from pants.core_tasks.targets_help import TargetsHelp
+from pants.core_tasks.util_config_init import UtilConfigInit
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -90,3 +91,6 @@ def register_goals():
 
   # Handle sources that aren't loose files in the repo.
   task(name='deferred-sources', action=DeferredSourcesMapper).install()
+
+  # Configuration initialization.
+  task('util-config', action=UtilConfigInit).install('bootstrap')
