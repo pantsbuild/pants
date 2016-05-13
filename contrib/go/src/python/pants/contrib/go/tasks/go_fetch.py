@@ -110,6 +110,42 @@ class GoFetch(GoTask):
       return matched.groups()
     return None
 
+  def _fetch_pkg(self, gopath, pkg, rev):
+    """fetch the package and setup sym links"""
+    fetcher = self._get_fetcher(pkg)
+
+    meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(pkg)
+    if meta_root:
+      root = fetcher.root(meta_root)
+    else:
+      root = fetcher.root(pkg)
+
+    root_dir = os.path.join(self.workdir, 'fetches', root)
+
+    # Only fetch each remote root once.
+    if not os.path.exists(root_dir):
+      with temporary_dir() as tmp_fetch_root:
+        fetcher.fetch(pkg, dest=tmp_fetch_root,
+                      rev=rev, meta_repo_url=meta_repo_url)
+        safe_mkdir(root_dir)
+        for path in os.listdir(tmp_fetch_root):
+          shutil.move(os.path.join(tmp_fetch_root, path), os.path.join(root_dir, path))
+
+    # TODO(John Sirois): Circle back and get get rid of this symlink tree.
+    # GoWorkspaceTask will further symlink a single package from the tree below into a
+    # target's workspace when it could just be linking from the fetch_dir.  The only thing
+    # standing in the way is a determination of what we want to artifact cache.  If we don't
+    # want to cache fetched zips, linking straight from the fetch_dir works simply.  Otherwise
+    # thought needs to be applied to using the artifact cache directly or synthesizing a
+    # canonical owner target for the fetched files that 'child' targets (subpackages) can
+    # depend on and share the fetch from.
+    dest_dir = os.path.join(gopath, 'src', root)
+    # We may have been `invalidate`d and not `clean-all`ed so we need a new empty symlink
+    # chroot to avoid collision; thus `clean=True`.
+    safe_mkdir(dest_dir, clean=True)
+    for path in os.listdir(root_dir):
+      os.symlink(os.path.join(root_dir, path), os.path.join(dest_dir, path))
+
   def _transitive_download_remote_libs(self, go_remote_libs, all_known_addresses=None):
     """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.
 
@@ -141,41 +177,9 @@ class GoFetch(GoTask):
         go_remote_lib = vt.target
         gopath = vt.results_dir
         pkg = go_remote_lib.import_path
-        fetcher = self._get_fetcher(pkg)
 
         if not vt.valid:
-          meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(pkg)
-
-          if meta_root:
-            root = fetcher.root(meta_root)
-          else:
-            root = fetcher.root(pkg)
-
-          root_dir = os.path.join(self.workdir, 'fetches', root)
-
-          # Only fetch each remote root once.
-          if not os.path.exists(root_dir):
-            with temporary_dir() as tmp_fetch_root:
-              fetcher.fetch(pkg, dest=tmp_fetch_root,
-                            rev=go_remote_lib.rev, meta_repo_url=meta_repo_url)
-              safe_mkdir(root_dir)
-              for path in os.listdir(tmp_fetch_root):
-                shutil.move(os.path.join(tmp_fetch_root, path), os.path.join(root_dir, path))
-
-          # TODO(John Sirois): Circle back and get get rid of this symlink tree.
-          # GoWorkspaceTask will further symlink a single package from the tree below into a
-          # target's workspace when it could just be linking from the fetch_dir.  The only thing
-          # standing in the way is a determination of what we want to artifact cache.  If we don't
-          # want to cache fetched zips, linking straight from the fetch_dir works simply.  Otherwise
-          # thought needs to be applied to using the artifact cache directly or synthesizing a
-          # canonical owner target for the fetched files that 'child' targets (subpackages) can
-          # depend on and share the fetch from.
-          dest_dir = os.path.join(gopath, 'src', root)
-          # We may have been `invalidate`d and not `clean-all`ed so we need a new empty symlink
-          # chroot to avoid collision; thus `clean=True`.
-          safe_mkdir(dest_dir, clean=True)
-          for path in os.listdir(root_dir):
-            os.symlink(os.path.join(root_dir, path), os.path.join(dest_dir, path))
+          self._fetch_pkg(gopath, pkg, go_remote_lib.rev)
 
           # Map the fetched remote sources.
           for remote_import_path in self._get_remote_import_paths(pkg, gopath=gopath):
