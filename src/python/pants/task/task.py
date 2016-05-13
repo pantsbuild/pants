@@ -153,7 +153,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
 
-    :returns list: The new target roots to use or none to accept the CLI specified target roots.
+    :returns list: The new target roots to use or None to accept the CLI specified target roots.
     """
 
   @classmethod

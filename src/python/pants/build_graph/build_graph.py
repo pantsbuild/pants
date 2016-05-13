@@ -372,7 +372,7 @@ class BuildGraph(AbstractClass):
 
     Note that this uses `walk_transitive_dependencies_graph` and the predicate is passed through,
     hence it trims graphs rather than just filtering out Targets that do not match the predicate.
-    See `walk_transitive_dependencies_graph for more detail on `predicate`.
+    See `walk_transitive_dependency_graph for more detail on `predicate`.
 
     :API: public
 

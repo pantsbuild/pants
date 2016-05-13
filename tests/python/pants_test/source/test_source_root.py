@@ -5,17 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.source.source_root import SourceRoot, SourceRootConfig, SourceRootTrie
+from pants.source.source_root import SourceRoot, SourceRootConfig, SourceRootFactory, SourceRootTrie
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import create_subsystem
 
 
 class SourceRootTest(BaseTest):
   def test_source_root_trie(self):
-    trie = SourceRootTrie({
+    trie = SourceRootTrie(SourceRootFactory({
       'jvm': ('java', 'scala'),
       'py': ('python',)
-    })
+    }))
     self.assertIsNone(trie.find('src/java/org/pantsbuild/foo/Foo.java'))
 
     # Wildcard at the end.
@@ -81,7 +81,7 @@ class SourceRootTest(BaseTest):
 
   def test_all_roots(self):
     self.create_dir('contrib/go/examples/3rdparty/go')
-    self.create_dir('contrib/go/examples/src/go')
+    self.create_dir('contrib/go/examples/src/go/src')
     self.create_dir('src/java')
     self.create_dir('src/python')
     self.create_dir('src/example/java')
@@ -91,15 +91,22 @@ class SourceRootTest(BaseTest):
 
     options = {
       'source_root_patterns': ['src/*', 'src/example/*'],
-      # Test that our 'go_remote' hack works.
-      # TODO: This will be redundant once we have proper "3rdparty"/"remote" support.
-      'source_roots': { 'contrib/go/examples/3rdparty/go': ['go_remote'] }
+      'source_roots': {
+        # Fixed roots should trump patterns which would detect contrib/go/examples/src/go here.
+        'contrib/go/examples/src/go/src': ['go'],
+
+        # Test that our 'go_remote' hack works.
+        # TODO: This will be redundant once we have proper "3rdparty"/"remote" support.
+        'contrib/go/examples/3rdparty/go': ['go_remote'],
+
+        # Dir does not exist, should not be listed as a root.
+        'java': ['java']}
     }
     options.update(self.options[''])  # We need inherited values for pants_workdir etc.
 
     source_roots = create_subsystem(SourceRootConfig, **options).get_source_roots()
     self.assertEquals({SourceRoot('contrib/go/examples/3rdparty/go', ('go_remote',)),
-                       SourceRoot('contrib/go/examples/src/go', ('go',)),
+                       SourceRoot('contrib/go/examples/src/go/src', ('go',)),
                        SourceRoot('src/java', ('java',)),
                        SourceRoot('src/python', ('python',)),
                        SourceRoot('src/example/java', ('java',)),
