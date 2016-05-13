@@ -25,7 +25,7 @@ python_tests(
   name = 'wrapped_globs',
   sources = ['test_wrapped_globs.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:payload',
     'src/python/pants/build_graph',
     'src/python/pants/source',
     'tests/python/pants_test:base_test',

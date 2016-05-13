@@ -112,6 +112,10 @@ class Subsystem(SubsystemClientMixin, Optionable):
   def set_options(cls, options):
     cls._options = options
 
+  @classmethod
+  def is_initialized(cls):
+    return cls._options is not None
+
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
   _scoped_instances = {}
 
