@@ -65,6 +65,25 @@ class ScopesTest(BaseTest):
 class ScopedClosureTest(BaseTest):
 
   def assert_closure(self, expected_targets, roots, include_scopes=None, exclude_scopes=None,
+                     respect_intransitive=True):
+    self.assert_closure_dfs(expected_targets, roots, include_scopes, exclude_scopes,
+                            respect_intransitive)
+    self.assert_closure_bfs(expected_targets, roots, include_scopes, exclude_scopes,
+                            respect_intransitive)
+
+  def assert_closure_bfs(self, expected_targets, roots, include_scopes=None, exclude_scopes=None,
+                     respect_intransitive=True, ordered=False):
+    set_type = OrderedSet if ordered else set
+    bfs_result = set_type(Target.closure_for_targets(
+      target_roots=roots,
+      include_scopes=include_scopes,
+      exclude_scopes=exclude_scopes,
+      respect_intransitive=respect_intransitive,
+      bfs=True
+    ))
+    self.assertEquals(set_type(expected_targets), bfs_result)
+
+  def assert_closure_dfs(self, expected_targets, roots, include_scopes=None, exclude_scopes=None,
                      respect_intransitive=True, ordered=False):
     set_type = OrderedSet if ordered else set
     result = set_type(Target.closure_for_targets(
@@ -97,7 +116,8 @@ class ScopedClosureTest(BaseTest):
     self.assert_closure({c, b_intransitive, a}, {c})
     self.assert_closure({b_intransitive, a}, {b_intransitive})
     self.assert_closure({e, d, a, c}, {e, d})
-    self.assert_closure([d, c, b_intransitive, a], [d, c], ordered=True)
+    self.assert_closure_dfs([d, c, b_intransitive, a], [d, c], ordered=True)
+    self.assert_closure_bfs([d, c, b_intransitive, a], [d, c], ordered=True)
     self.assert_closure({a, b_intransitive, d, c}, {d}, respect_intransitive=False)
 
   def test_intransitive_diamond(self):
