@@ -36,8 +36,7 @@ class GoFetch(GoTask):
   @classmethod
   def register_options(cls, register):
     register('--skip-meta-tag-resolution', advanced=True, type=bool, default=False,
-             help='The meta tag in html may contain url to source code. '
-                  'By setting this option, meta tag will be ignored in Go remote lib resolution.')
+             help='Whether to ignore meta tag resolution when resolving remote libraries.')
 
   @property
   def cache_target_dirs(self):
@@ -149,8 +148,9 @@ class GoFetch(GoTask):
         fetcher = self._get_fetcher(go_remote_lib.import_path)
 
         if not vt.valid:
-          meta_root, meta_protocol, meta_repo_url = (None, None, None) if self.get_options().skip_meta_tag_resolution \
-                                                    else self._check_for_meta_tag(go_remote_lib.import_path)
+          meta_root, meta_protocol, meta_repo_url = ((None, None, None) if
+            self.get_options().skip_meta_tag_resolution
+            else self._check_for_meta_tag(go_remote_lib.import_path))
 
           if meta_root:
             root = fetcher.root(meta_root)
