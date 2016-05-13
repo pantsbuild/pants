@@ -28,6 +28,8 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
         go_dist.create_go_cmd('env', args=['GOARCH']).check_output().strip()
         expected_files = {
           'src/go/thrifttest/duck/constants.go',
+          'src/go/thrifttest/duck/echo_server-remote/echo_server-remote.go',
+          'src/go/thrifttest/duck/echoserver.go',
           'src/go/thrifttest/duck/ttypes.go',
         }
 
