@@ -67,6 +67,8 @@ class GoFetch(GoTask):
   def _get_fetcher(self, import_path):
     return Fetchers.global_instance().get_fetcher(import_path)
 
+  # TODO(Yujie Chen): Move meta-tag handling into Fetcher
+  # https://github.com/pantsbuild/pants/issues/3439
   @classmethod
   def _check_for_meta_tag(cls, import_path):
     """Looks for go-import meta tags for the provided import_path.
