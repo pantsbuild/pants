@@ -234,7 +234,7 @@ And at this point we are back on familiar ground.  We can edit
 `buildgen` until we have a fully pinned, explicit 3rparty dependency set and compiling codebase.
 At this point the generated BUILD files can be checked in.
 
-# Codebase maintenance
+## Codebase maintenance
 
 When new packages are added or existing packages' dependencies are modified a similar seeding (only
 needed if the packages are new roots), buildgen and compilation can be cycled through. To simplify
