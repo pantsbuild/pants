@@ -27,6 +27,14 @@ class OptionValueContainer(object):
   def __init__(self):
     self._value_map = {}  # key -> either raw value or RankedValue wrapping the raw value.
 
+  def get_explicit_keys(self):
+    """Returns the keys for any values that were set explicitly (via flag, config, or env var)."""
+    ret = []
+    for k, v in self._value_map.items():
+      if v.rank > RankedValue.HARDCODED:
+        ret.append(k)
+    return ret
+
   def get_rank(self, key):
     """Returns the rank of the value at the specified key.
 
@@ -60,11 +68,14 @@ class OptionValueContainer(object):
     :rtype: bool
     """
     return self.get_rank(key) in (RankedValue.NONE, RankedValue.HARDCODED)
-
-  def update(self, attrs):
-    """Set attr values on this object from the data in the attrs dict."""
-    for k, v in attrs.items():
-      self._set(k, v)
+  #
+  # def update(self, attrs):
+  #   """Set attr values on this object from the data in attrs.
+  #
+  #   :param dict|OptionValueContainer attrs: The key/value attrs to set on this object.
+  #   """
+  #   for k, v in attrs.items():
+  #     self._set(k, v)
 
   def get(self, key, default=None):
     # Support dict-like dynamic access.  See also __getitem__ below.
@@ -100,6 +111,16 @@ class OptionValueContainer(object):
       # We set values from outer scopes before values from inner scopes, so
       # in case of equal rank we overwrite. That way that the inner scope value wins.
       self._value_map[key] = value
+
+  def augment(self, other):
+    """Set other's values onto this object.
+
+    For each key, highest ranked value wins. In a tie, other's value wins.
+
+    :param OptionValueContainer other: Augment our values with this object's values.
+    """
+    for k, v in other._value_map.items():
+      self._set(k, v)
 
   # Support natural dynamic access, e.g., opts[foo] is more idiomatic than getattr(opts, 'foo').
   def __getitem__(self, key):
