@@ -8,11 +8,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.payload import Payload
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants.source.wrapped_globs import Globs, RGlobs
 from pants_test.base_test import BaseTest
+
+
+class DummyTarget(Target):
+  def __init__(self, address=None, payload=None, sources=None, **kwargs):
+    payload = payload or Payload()
+    payload.add_fields({
+      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
+    })
+    super(DummyTarget, self).__init__(address=address, payload=payload, **kwargs)
 
 
 class FilesetRelPathWrapperTest(BaseTest):
@@ -21,8 +31,7 @@ class FilesetRelPathWrapperTest(BaseTest):
   def alias_groups(self):
     return BuildFileAliases(
       targets={
-        # TODO: Use dummy target type instead of depending on jvm backend.
-        'java_library': JavaLibrary,
+        'dummy_target': DummyTarget,
       },
       context_aware_object_factories={
         'globs': Globs,
@@ -38,15 +47,15 @@ class FilesetRelPathWrapperTest(BaseTest):
     os.symlink('../../y', os.path.join(self.build_root, 'z/w/y'))
 
   def test_no_dir_glob(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("*"))')
     self.context().scan()
 
   def test_no_dir_glob_question(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("?"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("?"))')
     self.context().scan()
 
   def _spec_test(self, spec, expected):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources={})'.format(spec))
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources={})'.format(spec))
     graph = self.context().scan()
     globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
     self.assertEquals(expected, globs)
@@ -107,27 +116,27 @@ class FilesetRelPathWrapperTest(BaseTest):
 
   def test_glob_exclude(self):
     self.add_to_build_file('y/BUILD', dedent("""
-      java_library(name="y", sources=globs("*.java", exclude=[["fleem.java"]]))
+      dummy_target(name="y", sources=globs("*.java", exclude=[["fleem.java"]]))
       """))
     graph = self.context().scan()
     assert ['morx.java'] == list(graph.get_target_from_spec('y').sources_relative_to_source_root())
 
   def test_glob_exclude_not_string(self):
     self.add_to_build_file('y/BUILD', dedent("""
-      java_library(name="y", sources=globs("*.java", exclude="fleem.java"))
+      dummy_target(name="y", sources=globs("*.java", exclude="fleem.java"))
       """))
     with self.assertRaisesRegexp(AddressLookupError, 'Expected exclude parameter.*'):
       self.context().scan()
 
   def test_glob_exclude_string_in_list(self):
     self.add_to_build_file('y/BUILD', dedent("""
-      java_library(name="y", sources=globs("*.java", exclude=["fleem.java"]))
+      dummy_target(name="y", sources=globs("*.java", exclude=["fleem.java"]))
       """))
     self.context().scan()
 
   def test_glob_with_folder_with_only_folders(self):
     self.add_to_build_file('z/BUILD', dedent("""
-      java_library(name="z", sources=globs("*", exclude=["BUILD"]))
+      dummy_target(name="z", sources=globs("*", exclude=["BUILD"]))
       """))
     graph = self.context().scan()
     self.assertEqual([],
@@ -136,8 +145,8 @@ class FilesetRelPathWrapperTest(BaseTest):
   def test_glob_exclude_doesnt_modify_exclude_array(self):
     self.add_to_build_file('y/BUILD', dedent("""
       list_of_files = ["fleem.java"]
-      java_library(name="y", sources=globs("*.java", exclude=list_of_files))
-      java_library(name="z", sources=list_of_files)
+      dummy_target(name="y", sources=globs("*.java", exclude=list_of_files))
+      dummy_target(name="z", sources=list_of_files)
       """))
 
     graph = self.context().scan()
@@ -147,14 +156,14 @@ class FilesetRelPathWrapperTest(BaseTest):
 
   def test_glob_invalid_keyword(self):
     self.add_to_build_file('y/BUILD', dedent("""
-      java_library(name="y", sources=globs("*.java", invalid_keyword=["fleem.java"]))
+      dummy_target(name="y", sources=globs("*.java", invalid_keyword=["fleem.java"]))
       """))
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_glob_invalid_keyword_along_with_valid_ones(self):
     self.add_to_build_file('y/BUILD', dedent("""
-      java_library(
+      dummy_target(
         name="y",
         sources=globs("*.java", follow_links=True, invalid_keyword=["fleem.java"])
       )
@@ -163,66 +172,66 @@ class FilesetRelPathWrapperTest(BaseTest):
       self.context().scan()
 
   def test_subdir_glob(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/*.scala"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("dir/*.scala"))')
     self.context().scan()
 
   def test_subdir_glob_question(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/?.scala"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("dir/?.scala"))')
     self.context().scan()
 
   def test_subdir_bracket_glob(self):
     self.add_to_build_file('y/BUILD', dedent("""
-      java_library(name="y", sources=globs("dir/[dir1, dir2]/*.scala"))
+      dummy_target(name="y", sources=globs("dir/[dir1, dir2]/*.scala"))
       """))
     self.context().scan()
 
   def test_subdir_with_dir_glob(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/**/*.scala"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("dir/**/*.scala"))')
     self.context().scan()
 
   # This is no longer allowed.
   def test_parent_dir_glob(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../*.scala"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("../*.scala"))')
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_parent_dir_glob_question(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../?.scala"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("../?.scala"))')
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_parent_dir_bracket_glob_question(self):
     self.add_to_build_file('y/BUILD', dedent("""
-      java_library(name="y", sources=globs("../[dir1, dir2]/?.scala"))
+      dummy_target(name="y", sources=globs("../[dir1, dir2]/?.scala"))
       """))
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_parent_dir_bracket(self):
     self.add_to_build_file('y/BUILD', dedent("""
-      java_library(name="y", sources=globs("../[dir1, dir2]/File.scala"))
+      dummy_target(name="y", sources=globs("../[dir1, dir2]/File.scala"))
       """))
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_absolute_dir_glob(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("/root/*.scala"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("/root/*.scala"))')
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_absolute_dir_glob_question(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("/root/?.scala"))')
+    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("/root/?.scala"))')
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_rglob_follows_symlinked_dirs_by_default(self):
-    self.add_to_build_file('z/w/BUILD', 'java_library(name="w", sources=rglobs("*.java"))')
+    self.add_to_build_file('z/w/BUILD', 'dummy_target(name="w", sources=rglobs("*.java"))')
     graph = self.context().scan()
     relative_sources = list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
     assert ['y/fleem.java', 'y/morx.java', 'foo.java'] == relative_sources
 
   def test_rglob_respects_follow_links_override(self):
     self.add_to_build_file('z/w/BUILD',
-                           'java_library(name="w", sources=rglobs("*.java", follow_links=False))')
+                           'dummy_target(name="w", sources=rglobs("*.java", follow_links=False))')
     graph = self.context().scan()
     assert ['foo.java'] == list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
