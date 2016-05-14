@@ -50,9 +50,9 @@ facing changes to warrant a new `stable` release. Of those two weeks, five busin
 to bugfixing and testing by pants contributors on a release candidate announcement thread (described
 below).
 
-#### `major` and `minor` stable releases
-The decision to do a `major` or a `minor` release is based on the impact of the changes.
-Major releases signify large or breaking changes. `minor` releases however should be compatible
+#### `major` and `minor` stable branches
+The decision to create a `major` or a `minor` stable branch is based on the impact of the changes.
+`major` releases signify large or breaking changes. `minor` releases however should be compatible
 with the last two `minor` releases. In other words if a feature is deprecated in version `1.2.x`
 you should be able to continue using that feature at least through version `1.4.0`.
 
