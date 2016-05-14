@@ -151,7 +151,6 @@ page(
   name='dev',
   source='dev.md',
   links=[
-    ':branching_strategy',
     ':dev_tasks',
     ':dev_tasks_publish_extras',
     ':docs',
@@ -164,13 +163,19 @@ page(
     ':internals',
     ':release',
     ':release_jvm',
+    ':release_strategy',
     ':styleguide',
   ]
 )
 
 page(
-  name='branching_strategy',
-  source='branching_strategy.md',
+  name='release_strategy',
+  source='release_strategy.md',
+  links=[
+    ':deprecation_policy',
+    ':howto_contribute',
+    ':release',
+  ],
 )
 
 page(
