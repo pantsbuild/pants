@@ -33,6 +33,11 @@ class GoFetch(GoTask):
   def product_types(cls):
     return ['go_remote_lib_src']
 
+  @classmethod
+  def register_options(cls, register):
+    register('--skip-meta-tag-resolution', advanced=True, type=bool, default=False,
+             help='Whether to ignore meta tag resolution when resolving remote libraries.')
+
   @property
   def cache_target_dirs(self):
     # TODO(John Sirois): See TODO in _transitive_download_remote_libs, re-consider how artifact
@@ -62,6 +67,8 @@ class GoFetch(GoTask):
   def _get_fetcher(self, import_path):
     return Fetchers.global_instance().get_fetcher(import_path)
 
+  # TODO(Yujie Chen): Move meta-tag handling into Fetcher
+  # https://github.com/pantsbuild/pants/issues/3439
   @classmethod
   def _check_for_meta_tag(cls, import_path):
     """Looks for go-import meta tags for the provided import_path.
@@ -143,7 +150,9 @@ class GoFetch(GoTask):
         fetcher = self._get_fetcher(go_remote_lib.import_path)
 
         if not vt.valid:
-          meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(go_remote_lib.import_path)
+          meta_root, meta_protocol, meta_repo_url = ((None, None, None) if
+            self.get_options().skip_meta_tag_resolution
+            else self._check_for_meta_tag(go_remote_lib.import_path))
 
           if meta_root:
             root = fetcher.root(meta_root)
