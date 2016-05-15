@@ -18,7 +18,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask, JarTask
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
@@ -127,8 +127,9 @@ class JarTaskTest(BaseJarTaskTest):
         self.assert_listing(jar, 'README')
         self.assertEquals('42', jar.read('README'))
 
-  def test_custom_manifest(self):
-    contents = b'Manifest-Version: 1.0\r\nCreated-By: test\r\n\r\n'
+  @contextmanager
+  def _test_custom_manifest(self):
+    manifest_contents = b'Manifest-Version: 1.0\r\nCreated-By: test\r\n\r\n'
 
     with self.jarfile() as existing_jarfile:
       with self.jar_task.open_jar(existing_jarfile, overwrite=True) as jar:
@@ -137,15 +138,39 @@ class JarTaskTest(BaseJarTaskTest):
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'README')
         self.assertEquals('42', jar.read('README'))
-        self.assertNotEqual(contents, jar.read('META-INF/MANIFEST.MF'))
+        self.assertNotEqual(manifest_contents, jar.read('META-INF/MANIFEST.MF'))
 
       with self.jar_task.open_jar(existing_jarfile, overwrite=False) as jar:
-        jar.writestr('META-INF/MANIFEST.MF', contents)
+        yield jar, manifest_contents
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'README')
         self.assertEquals('42', jar.read('README'))
-        self.assertEquals(contents, jar.read('META-INF/MANIFEST.MF'))
+        self.assertEquals(manifest_contents, jar.read('META-INF/MANIFEST.MF'))
+
+  def test_custom_manifest_str(self):
+    with self._test_custom_manifest() as (jar, manifest_contents):
+      jar.writestr('META-INF/MANIFEST.MF', manifest_contents)
+
+  def test_custom_manifest_file(self):
+    with self._test_custom_manifest() as (jar, manifest_contents):
+      with safe_open(os.path.join(safe_mkdtemp(), 'any_source_file'), 'w') as fp:
+        fp.write(manifest_contents)
+      jar.write(fp.name, dest='META-INF/MANIFEST.MF')
+
+  def test_custom_manifest_dir(self):
+    with self._test_custom_manifest() as (jar, manifest_contents):
+      basedir = safe_mkdtemp()
+      with safe_open(os.path.join(basedir, 'META-INF/MANIFEST.MF'), 'w') as fp:
+        fp.write(manifest_contents)
+      jar.write(basedir)
+
+  def test_custom_manifest_dir_custom_dest(self):
+    with self._test_custom_manifest() as (jar, manifest_contents):
+      basedir = safe_mkdtemp()
+      with safe_open(os.path.join(basedir, 'MANIFEST.MF'), 'w') as fp:
+        fp.write(manifest_contents)
+      jar.write(basedir, dest='META-INF')
 
   def test_classpath(self):
     def manifest_content(classpath):
