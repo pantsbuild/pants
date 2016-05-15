@@ -76,7 +76,6 @@ class OptionValueContainer(object):
     else:
       return default
 
-
   def update(self, other):
     """Set other's values onto this object.
 
