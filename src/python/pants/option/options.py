@@ -299,7 +299,7 @@ class Options(object):
                       'Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
         # Note that a deprecated val will take precedence over a val of equal rank.
         # This makes the code a bit neater.
-        values.augment(deprecated_vals)
+        values.update(deprecated_vals)
 
     # Record the value derivation.
     for option in values:
