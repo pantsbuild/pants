@@ -107,15 +107,24 @@ class GoFetch(GoTask):
 
     return None, None, None
 
+  _META_IMPORT_REGEX = re.compile(r"""
+      <meta
+          \s+
+          name=['"]go-import['"]
+          \s+
+          content=['"](?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)['"]
+          \s*
+      >""",
+      flags=re.VERBOSE)
+
   @classmethod
   def _find_meta_tag(cls, page_html):
     """Returns the content of the meta tag if found inside of the provided HTML."""
 
-    meta_import_regex = re.compile(r'<meta\s+name="go-import"\s+content="(?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)"\s*>')
-    matched = meta_import_regex.search(page_html)
+    matched = cls._META_IMPORT_REGEX.search(page_html)
     if matched:
       return matched.groups()
-    return None
+    return None, None, None
 
   def _transitive_download_remote_libs(self, go_remote_libs, all_known_addresses=None):
     """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.
