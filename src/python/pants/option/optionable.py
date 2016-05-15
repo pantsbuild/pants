@@ -5,8 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
+
 from six import string_types
 
+from pants.base.deprecated import deprecated_conditional
 from pants.option.errors import OptionsError
 from pants.option.scope import ScopeInfo
 from pants.util.meta import AbstractClass
@@ -25,6 +28,20 @@ class Optionable(AbstractClass):
   # a valid semver).
   deprecated_options_scope = None
   deprecated_options_scope_removal_version = None
+
+  _scope_name_component_re = re.compile(r'^(?:[a-z]|[0-9])+(?:-(?:[a-z]|[0-9])+)*$')
+
+  @classmethod
+  def is_valid_scope_name_component(cls, s):
+    return cls._scope_name_component_re.match(s) is not None
+
+  @classmethod
+  def validate_scope_name_component(cls, s):
+    # TODO: turn this deprecation warning into a permanent error after 1.2.0.
+    deprecated_conditional(lambda: not cls.is_valid_scope_name_component(s), '1.2.0',
+                           'options scope {}'.format(s),
+                           'Replace in code with new scope name consisting of dash-separated-words, '
+                           'with words consisting only of lower-case letters and digits.')
 
   @classmethod
   def get_scope_info(cls):

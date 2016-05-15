@@ -82,7 +82,7 @@ class Options(object):
         ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
         original_scopes.add(si.deprecated_scope)
 
-    for si in scope_infos:
+    for si in copy.copy(ret):
       scope = si.scope
       while scope != '':
         if scope not in original_scopes:

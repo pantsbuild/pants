@@ -64,6 +64,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   @classmethod
   def get_scope_info(cls, subscope=None):
+    cls.validate_scope_name_component(cls.options_scope)
     if subscope is None:
       return super(Subsystem, cls).get_scope_info()
     else:
