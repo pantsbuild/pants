@@ -5,10 +5,7 @@ python_tests(
   name='fetchers',
   sources=['test_fetchers.py'],
   dependencies=[
-    '3rdparty/python:mock',
-    '3rdparty/python:requests',
     'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
-    'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:base_test',
   ]

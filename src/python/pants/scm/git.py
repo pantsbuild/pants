@@ -59,6 +59,18 @@ class Git(Scm):
     return cls._cleanse(out)
 
   @classmethod
+  def clone(cls, repo_url, dest, binary='git'):
+    """Clone the repo at repo_url into dest.
+
+    :returns: an instance of this class representing the cloned repo.
+    :rtype: Git
+    """
+    cmd = [binary, 'clone', repo_url, dest]
+    process, out = cls._invoke(cmd)
+    cls._check_result(cmd, process.returncode)
+    return cls(binary=binary, worktree=dest)
+
+  @classmethod
   def _invoke(cls, cmd):
     """Invoke the given command, and return a tuple of process and raw binary output.
 
@@ -237,6 +249,9 @@ class Git(Scm):
   def push(self, *refs):
     remote, merge = self._get_upstream()
     self._check_call(['push', remote, merge] + list(refs), raise_type=Scm.RemoteException)
+
+  def set_state(self, rev):
+    self._check_call(['checkout', rev])
 
   def _get_upstream(self):
     """Return the remote and remote merge branch for the current branch"""

@@ -3,13 +3,15 @@
 
 python_library(
   name='fetchers',
-  sources=['fetchers.py'],
+  sources=['archive_retriever.py', 'fetcher.py', 'fetcher_factory.py',
+           'go_import_meta_tag_reader.py', 'imported_repo.py'],
   dependencies=[
     '3rdparty/python:requests',
     '3rdparty/python:six',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'src/python/pants/fs',
     'src/python/pants/option',
+    'src/python/pants/scm:git',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
