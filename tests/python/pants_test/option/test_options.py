@@ -24,6 +24,7 @@ from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, Im
                                  Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
+from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
@@ -1009,3 +1010,43 @@ class OptionsTest(unittest.TestCase):
                              option_tracker=OptionTracker())
     options.register(GLOBAL_SCOPE, '--foo-bar')
     self.assertRaises(OptionAlreadyRegistered, lambda: options.register(GLOBAL_SCOPE, '--foo-bar'))
+
+  def test_scope_deprecation(self):
+    class DummyOptionable(Optionable):
+      options_scope = 'new-scope'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+      deprecated_options_scope = 'deprecated-scope'
+      deprecated_options_scope_removal_version = '9999.9.9'
+
+    options = Options.create(env={},
+                             config=self._create_config({
+                               DummyOptionable.options_scope: {
+                                 'foo': 'xx'
+                               },
+                               DummyOptionable.deprecated_options_scope: {
+                                 'foo': 'yy',
+                                 'bar': 'zz',
+                                 'baz': 'ww'
+                               }
+                             }),
+                             known_scope_infos=[DummyOptionable.get_scope_info()],
+                             args=shlex.split('./pants --new-scope-baz=vv'),
+                             option_tracker=OptionTracker())
+
+    options.register(DummyOptionable.options_scope, '--foo')
+    options.register(DummyOptionable.options_scope, '--bar')
+    options.register(DummyOptionable.options_scope, '--baz')
+
+    with self.warnings_catcher() as w:
+      vals = options.for_scope(DummyOptionable.options_scope)
+
+    # Check that we got a warning.
+    self.assertEquals(1, len(w))
+    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
+
+    # Check values.
+    # Deprecated scope takes precedence at equal rank.
+    self.assertEquals('yy', vals.foo)
+    self.assertEquals('zz', vals.bar)
+    # New scope takes precedence at higher rank.
+    self.assertEquals('vv', vals.baz)
