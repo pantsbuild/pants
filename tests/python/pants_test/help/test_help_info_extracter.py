@@ -91,8 +91,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': int}, 'None')
     do_test(['--foo'], {'type': int, 'default': 42}, '42')
     do_test(['--foo'], {'type': list}, '[]')
-    # TODO: Change this if we switch the implicit default to {}.
-    do_test(['--foo'], {'type': dict}, 'None')
+    do_test(['--foo'], {'type': dict}, '{}')
 
   def test_deprecated(self):
     kwargs = {'removal_version': '999.99.9', 'removal_hint': 'do not use this'}
