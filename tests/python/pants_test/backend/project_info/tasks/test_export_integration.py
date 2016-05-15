@@ -247,3 +247,12 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       python_target = json_data['targets']['src/python/pants/backend/python/targets:python']
       self.assertIsNotNone(python_target)
       self.assertEquals(default_interpreter, python_target['python_interpreter'])
+
+  def test_intransitive_and_scope(self):
+    with self.temporary_workdir() as workdir:
+      test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
+      test_target = '{}:common'.format(test_path)
+      json_data = self.run_export(test_target, workdir)
+      synthetic_target = '{}:shadow-unstable-intransitive-1'.format(test_path)
+      self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
+      self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])
