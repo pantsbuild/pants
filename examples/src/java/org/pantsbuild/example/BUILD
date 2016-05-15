@@ -1,6 +1,6 @@
 page(
   name='readme',
-  source='readme.md',
+  source='README.md',
   links=[
     ':3rdparty_jvm',
     ':from_maven',
