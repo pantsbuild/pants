@@ -13,7 +13,6 @@ from collections import defaultdict, namedtuple
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
-from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -113,7 +112,10 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   @memoized_method
   def _target_type_for_language(self, language):
     alias_for_lang = self._registered_language_aliases()[language]
-    target_types = self.target_types_for_alias(alias_for_lang)
+    registered_aliases = self.context.build_file_parser.registered_aliases()
+    target_types = registered_aliases.target_types_by_alias.get(alias_for_lang, None)
+    if not target_types:
+      raise TaskError('Registered target type `{0}` for language `{1}` does not exist!'.format(alias_for_lang, language))
     if len(target_types) > 1:
       raise TaskError('More than one target type registered for language `{0}`'.format(language))
     return next(iter(target_types))

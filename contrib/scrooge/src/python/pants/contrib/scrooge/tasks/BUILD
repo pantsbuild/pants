@@ -19,7 +19,6 @@ python_library(
     'src/python/pants/backend/codegen/subsystems:thrift_defaults',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/tasks:all',
-    'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
