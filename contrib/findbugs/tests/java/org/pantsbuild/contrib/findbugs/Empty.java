@@ -1,8 +1,6 @@
 // Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-namespace go thrifttest.duck
+package org.pantsbuild.contrib.findbugs;
 
-struct Duck {
-  1: optional string quack,
-}
+// We should not throw an error when the source file is empty

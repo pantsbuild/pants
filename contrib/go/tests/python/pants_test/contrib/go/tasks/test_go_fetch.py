@@ -139,7 +139,9 @@ class GoFetchTest(TaskTestBase):
         }
         self._init_dep_graph_files(src, zipdir, dep_graph)
 
+        self.set_options_for_scope('source', source_roots={'3rdparty/go': ['go_remote']})
         r1 = self.target('3rdparty/go/localzip/r1')
+
         context = self._create_fetch_context(zipdir)
         go_fetch = self.create_task(context)
         undeclared_deps = go_fetch._transitive_download_remote_libs({r1})
@@ -159,6 +161,7 @@ class GoFetchTest(TaskTestBase):
         }
         self._init_dep_graph_files(src, zipdir, dep_graph)
 
+        self.set_options_for_scope('source', source_roots={'3rdparty/go': ['go_remote']})
         r1 = self.target('3rdparty/go/localzip/r1')
         r2 = self.target('3rdparty/go/localzip/r2')
 
@@ -180,6 +183,7 @@ class GoFetchTest(TaskTestBase):
         }
         self._init_dep_graph_files(src, zipdir, dep_graph)
 
+        self.set_options_for_scope('source', source_roots={'3rdparty/go': ['go_remote']})
         r1 = self.target('3rdparty/go/localzip/r1')
         r2 = self.target('3rdparty/go/localzip/r2')
 
@@ -254,4 +258,4 @@ class GoFetchTest(TaskTestBase):
     go_fetch = self.create_task(self.context())
     meta_tag_content = go_fetch._find_meta_tag(test_html)
 
-    self.assertEqual(meta_tag_content, None)
+    self.assertEqual(meta_tag_content, (None, None, None))

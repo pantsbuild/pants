@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import shutil
 import tempfile
 from abc import abstractmethod
 from contextlib import contextmanager
@@ -24,6 +25,7 @@ from pants.binaries.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
 from pants.java.util import relativize_classpath
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
 
@@ -51,6 +53,20 @@ class Jar(object):
       """The destination path of the entry in the jar."""
       return self._dest
 
+    def split_manifest(self):
+      """Splits this entry into a jar non-manifest part and a manifest part.
+
+      Some entries represent a manifest, some do not, and others have both a manifest entry and
+      non-manifest entries; as such, callers must be prepared to handle ``None`` entries.
+
+      :returns: A tuple of (non-manifest Entry, manifest Entry).
+      :rtype: tuple of (:class:`Jar.Entry`, :class:`Jar.Entry`)
+      """
+      if self.dest == Manifest.PATH:
+        return None, self
+      else:
+        return self, None
+
     @abstractmethod
     def materialize(self, scratch_dir):
       """Materialize this entry's source data into a filesystem path.
@@ -67,6 +83,26 @@ class Jar(object):
     def __init__(self, src, dest=None):
       super(Jar.FileSystemEntry, self).__init__(dest)
       self._src = src
+
+    def split_manifest(self):
+      if not os.path.isdir(self._src):
+        return super(Jar.FileSystemEntry, self).split_manifest()
+
+      if self.dest and self.dest == os.path.commonprefix([self.dest, Manifest.PATH]):
+        manifest_relpath = os.path.relpath(Manifest.PATH, self.dest)
+      else:
+        manifest_relpath = Manifest.PATH
+
+      manifest_path = os.path.join(self._src, manifest_relpath)
+      if os.path.isfile(manifest_path):
+        manifest_entry = Jar.FileSystemEntry(manifest_path, dest=Manifest.PATH)
+
+        non_manifest_chroot = os.path.join(safe_mkdtemp(), 'chroot')
+        shutil.copytree(self._src, non_manifest_chroot)
+        os.unlink(os.path.join(non_manifest_chroot, manifest_relpath))
+        return Jar.FileSystemEntry(non_manifest_chroot), manifest_entry
+      else:
+        return self, None
 
     def materialize(self, _):
       return self._src
@@ -160,10 +196,11 @@ class Jar(object):
     self._add_entry(self.MemoryEntry(path, contents))
 
   def _add_entry(self, entry):
-    if Manifest.PATH == entry.dest:
-      self._manifest_entry = entry
-    else:
-      self._entries.append(entry)
+    non_manifest, manifest = entry.split_manifest()
+    if manifest:
+      self._manifest_entry = manifest
+    if non_manifest:
+      self._entries.append(non_manifest)
 
   def writejar(self, jar):
     """Schedules all entries from the given ``jar``'s to be added to this jar save for the manifest.
