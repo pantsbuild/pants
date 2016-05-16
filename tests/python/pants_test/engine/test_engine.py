@@ -80,11 +80,9 @@ class EngineTest(unittest.TestCase):
     with self.thread_engine() as engine:
       self.assert_engine(engine)
 
-
   def test_thread_engine_single(self):
     with self.thread_engine(pool_size=1) as engine:
       self.assert_engine(engine)
-
 
   def test_thread_unpickleable(self):
     build_request = self.request(['unpickleable'], self.java)
