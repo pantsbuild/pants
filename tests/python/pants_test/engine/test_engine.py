@@ -11,7 +11,7 @@ from contextlib import closing, contextmanager
 
 from pants.build_graph.address import Address
 from pants.engine.engine import (LocalMultiprocessEngine, LocalMultithreadingEngine,
-                                 LocalSerialEngine, SerializationError)
+                                 LocalSerialEngine, SerializationError, ThreadHybridEngine)
 from pants.engine.nodes import Return, SelectNode
 from pants.engine.storage import Cache, Storage
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
@@ -44,6 +44,13 @@ class EngineTest(unittest.TestCase):
       yield e
 
   @contextmanager
+  def hybrid_engine(self, pool_size=None):
+    with closing(ThreadHybridEngine(self.scheduler, self.storage, self.cache,
+                                         pool_size=pool_size, debug=True)) as e:
+      e.start()
+      yield e
+
+  @contextmanager
   def thread_engine(self, pool_size=None):
     with closing(LocalMultithreadingEngine(self.scheduler, self.storage, self.cache,
                                          pool_size=pool_size, debug=True)) as e:
@@ -62,14 +69,42 @@ class EngineTest(unittest.TestCase):
     with self.multiprocessing_engine(pool_size=1) as engine:
       self.assert_engine(engine)
 
-  def test_thread_engine_single(self):
-    with self.thread_engine(pool_size=1) as engine:
-      self.assert_engine(engine)
-
   def test_multiprocess_unpickleable(self):
     build_request = self.request(['unpickleable'], self.java)
 
     with self.multiprocessing_engine() as engine:
+      with self.assertRaises(SerializationError):
+        engine.execute(build_request)
+
+  def test_thread_engine_multi(self):
+    with self.thread_engine() as engine:
+      self.assert_engine(engine)
+
+
+  def test_thread_engine_single(self):
+    with self.thread_engine(pool_size=1) as engine:
+      self.assert_engine(engine)
+
+
+  def test_thread_unpickleable(self):
+    build_request = self.request(['unpickleable'], self.java)
+
+    with self.thread_engine() as engine:
+      with self.assertRaises(SerializationError):
+        engine.execute(build_request)
+
+  def test_hybrid_engine_multi(self):
+    with self.hybrid_engine() as engine:
+      self.assert_engine(engine)
+
+  def test_hybrid_engine_single(self):
+    with self.hybrid_engine(pool_size=1) as engine:
+      self.assert_engine(engine)
+
+  def test_hybrid_unpickleable(self):
+    build_request = self.request(['unpickleable'], self.java)
+
+    with self.hybrid_engine() as engine:
       with self.assertRaises(SerializationError):
         engine.execute(build_request)
 

@@ -14,9 +14,11 @@ from abc import abstractmethod, abstractproperty
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
+from pants.engine.nodes import FilesystemNode
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulProcessPool, StatefulThreadPool
 from pants.engine.storage import Cache, Storage
+from pants.source.wrapped_globs import Files
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -191,8 +193,8 @@ class AsyncEngine(Engine):
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
-    node_builder = scheduler.node_builder()
-    process_initializer = functools.partial(self._initializer, node_builder, self._storage)
+    self.node_builder = scheduler.node_builder()
+    process_initializer = functools.partial(self._initializer, self.node_builder, self._storage)
     self._pool = self._pool_factory(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
@@ -215,25 +217,37 @@ class AsyncEngine(Engine):
     super(AsyncEngine, self).close()
     self._pool.close()
 
+  def _process_node_async(self, node):
+    return True
+
   def submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
     to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
     submitted = 0
     for _ in range(to_submit):
-      step, promise = pending_submission.pop(last=False)
+      step_, promise = pending_submission.pop(last=False)
 
-      if step.step_id in in_flight:
-        raise Exception('{} is already in_flight!'.format(step))
+      if self._process_node_async(step_.node):
+        if step_.step_id in in_flight:
+          raise Exception('{} is already in_flight!'.format(step_))
 
-      step = self._storage.key_for_request(step)
-      result = self._maybe_cache_get(step)
-      if result is not None:
-        # Skip in_flight on cache hit.
-        promise.success(result)
+        step_ = self._storage.key_for_request(step_)
+        result = self._maybe_cache_get(step_)
+        if result is not None:
+          # Skip in_flight on cache hit.
+          promise.success(result)
+        else:
+          in_flight[step_.step_id] = promise
+          self._submit(step_)
+          submitted += 1
       else:
-        in_flight[step.step_id] = promise
-        self._submit(step)
-        submitted += 1
+        keyed_request = self._storage.key_for_request(step_)
+        result = self._maybe_cache_get(keyed_request)
+        if result is None:
+          result = step_(self.node_builder)
+          self._maybe_cache_put(keyed_request, result)
+        promise.success(result)
+
     return submitted
 
   def await_one(self, in_flight):
@@ -293,7 +307,9 @@ class LocalMultithreadingEngine(AsyncEngine):
     submit_until = functools.partial(self.submit_until, pending_submission, in_flight)
     await_one = functools.partial(self.await_one, in_flight)
 
+    batches = []
     for step_batch in self._scheduler.schedule(execution_request):
+      batches.append(step_batch)
       if not step_batch:
         # A batch should only be empty if all dependency work is currently blocked/running.
         if not in_flight and not pending_submission:
@@ -309,10 +325,23 @@ class LocalMultithreadingEngine(AsyncEngine):
         await_one()
 
     # Consume all steps.
+    # import pdb; pdb.set_trace()
     while pending_submission or in_flight:
       submit_until(self._pool_size)
       await_one()
 
+class ThreadHybridEngine(LocalMultithreadingEngine):
+  @property
+  def _pool_factory(self):
+    return StatefulThreadPool
+
+  @property
+  def _initializer(self):
+    return _thread_initializer
+
+  def _process_node_async(self, node):
+    """Override default behavior and handle specific nodes asynchronously."""
+    return isinstance(node, (FilesystemNode,))
 
 def _process_initializer(node_builder, storage):
   """Another pickle-able top-level function that provides multi-processes' initial states.

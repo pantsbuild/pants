@@ -74,7 +74,7 @@ class StatefulBasePool(object):
 
   def close(self):
     for _ in range(self._pool_size):
-      self._send.put(None)
+      self._send.put(None, block=False)
     self._executor.shutdown()
 
 
@@ -114,6 +114,8 @@ class StatefulProcessPool(StatefulBasePool):
     return ProcessPoolExecutor
 
   def __init__(self, pool_size, initializer, function):
+    # NOTE: It's unclear why but subclassing StatefulBasePool similar to StatefulThreadPool
+    # causes the process to lock up. For now I am leaving the existing implementation as is.
     super(StatefulProcessPool, self).__init__(pool_size, initializer, function)
 
     self._pool_size = pool_size
