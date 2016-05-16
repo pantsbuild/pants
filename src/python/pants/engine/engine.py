@@ -18,7 +18,6 @@ from pants.engine.nodes import FilesystemNode
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulProcessPool, StatefulThreadPool
 from pants.engine.storage import Cache, Storage
-from pants.source.wrapped_globs import Files
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -330,6 +329,7 @@ class LocalMultithreadingEngine(AsyncEngine):
       submit_until(self._pool_size)
       await_one()
 
+
 class ThreadHybridEngine(LocalMultithreadingEngine):
   @property
   def _pool_factory(self):
@@ -342,6 +342,7 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
   def _process_node_async(self, node):
     """Override default behavior and handle specific nodes asynchronously."""
     return isinstance(node, (FilesystemNode,))
+
 
 def _process_initializer(node_builder, storage):
   """Another pickle-able top-level function that provides multi-processes' initial states.
