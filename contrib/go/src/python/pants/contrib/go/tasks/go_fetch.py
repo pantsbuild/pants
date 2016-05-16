@@ -33,6 +33,11 @@ class GoFetch(GoTask):
   def product_types(cls):
     return ['go_remote_lib_src']
 
+  @classmethod
+  def register_options(cls, register):
+    register('--skip-meta-tag-resolution', advanced=True, type=bool, default=False,
+             help='Whether to ignore meta tag resolution when resolving remote libraries.')
+
   @property
   def cache_target_dirs(self):
     # TODO(John Sirois): See TODO in _transitive_download_remote_libs, re-consider how artifact
@@ -62,6 +67,8 @@ class GoFetch(GoTask):
   def _get_fetcher(self, import_path):
     return Fetchers.global_instance().get_fetcher(import_path)
 
+  # TODO(Yujie Chen): Move meta-tag handling into Fetcher
+  # https://github.com/pantsbuild/pants/issues/3439
   @classmethod
   def _check_for_meta_tag(cls, import_path):
     """Looks for go-import meta tags for the provided import_path.
@@ -100,21 +107,33 @@ class GoFetch(GoTask):
 
     return None, None, None
 
+  _META_IMPORT_REGEX = re.compile(r"""
+      <meta
+          \s+
+          name=['"]go-import['"]
+          \s+
+          content=['"](?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)['"]
+          \s*
+      >""",
+      flags=re.VERBOSE)
+
   @classmethod
   def _find_meta_tag(cls, page_html):
     """Returns the content of the meta tag if found inside of the provided HTML."""
 
-    meta_import_regex = re.compile(r'<meta\s+name="go-import"\s+content="(?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)"\s*>')
-    matched = meta_import_regex.search(page_html)
+    matched = cls._META_IMPORT_REGEX.search(page_html)
     if matched:
       return matched.groups()
-    return None
+    return None, None, None
 
   def _fetch_pkg(self, gopath, pkg, rev):
     """fetch the package and setup sym links"""
     fetcher = self._get_fetcher(pkg)
 
-    meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(pkg)
+    meta_root, meta_protocol, meta_repo_url = ((None, None, None) if
+      self.get_options().skip_meta_tag_resolution
+      else self._check_for_meta_tag(pkg))
+
     if meta_root:
       root = fetcher.root(meta_root)
     else:
