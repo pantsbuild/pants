@@ -4,7 +4,6 @@
 python_library(
   name='tasks',
   dependencies=[
-    ':lua_to_resources',
     ':scrooge_gen',
     ':thrift_linter',
   ],
@@ -17,7 +16,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':java_thrift_library_fingerprint_strategy',
     ':thrift_util',
-    'contrib/scrooge/src/python/pants/contrib/scrooge/targets:lua_library',
     'src/python/pants/backend/codegen/subsystems:thrift_defaults',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/tasks:all',
@@ -57,14 +55,5 @@ python_library(
   dependencies=[
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/base:fingerprint_strategy',
-  ],
-)
-
-python_library(
-  name='lua_to_resources',
-  sources=['lua_to_resources.py'],
-  dependencies=[
-    'contrib/scrooge/src/python/pants/contrib/scrooge/targets:lua_library',
-    'src/python/pants/backend/jvm/tasks:prepare_resources',
   ],
 )
