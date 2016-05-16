@@ -21,8 +21,8 @@ class BaseCompileIT(PantsRunIntegrationTest):
   """
 
   @contextmanager
-  def do_test_compile(self, target,
-      expected_files=None, iterations=2, expect_failure=False, extra_args=None, workdir_outside_of_buildroot=False):
+  def do_test_compile(self, target, expected_files=None, iterations=2, expect_failure=False,
+                      extra_args=None, workdir_outside_of_buildroot=False):
     """Runs a configurable number of iterations of compilation for the given target.
 
     :API: public

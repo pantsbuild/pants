@@ -33,3 +33,4 @@ jar_library(name = 'scrooge-linter',
             dependencies = [
               '3rdparty:thrift-0.6.1',
             ])
+

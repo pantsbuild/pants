@@ -19,6 +19,13 @@ class Optionable(AbstractClass):
   options_scope = None
   options_scope_category = None
 
+  # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
+  # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
+  # The deprecation warning becomes an error at the given Pants version (which must therefore be
+  # a valid semver).
+  deprecated_options_scope = None
+  deprecated_options_scope_removal_version = None
+
   @classmethod
   def get_scope_info(cls):
     """Returns a ScopeInfo instance representing this Optionable's options scope."""
