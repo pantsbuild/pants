@@ -12,7 +12,7 @@ from mock import MagicMock
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
@@ -79,32 +79,22 @@ class ScroogeGenTest(TaskTestBase):
       task._validate_compiler_configs([self.target('test_validate:three')])
 
   def test_scala(self):
-    build_string = '''
-      java_thrift_library(name='a',
-        sources=['a.thrift'],
-        dependencies=[],
-        compiler='scrooge',
-        language='scala',
-        rpc_style='finagle'
-      )
-    '''
     sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
-    self._test_help(build_string, ScalaLibrary, sources)
+    self._test_help('scala', 'finagle', ScalaLibrary, sources)
 
   def test_android(self):
-    build_string = '''
-      java_thrift_library(name='a',
-        sources=['a.thrift'],
-        dependencies=[],
-        compiler='scrooge',
-        language='android',
-        rpc_style='finagle'
-      )
-    '''
     sources = [os.path.join(self.task_outdir, 'org/pantsbuild/android_example/Example.java')]
-    self._test_help(build_string, JavaLibrary, sources)
+    self._test_help('android', 'finagle', JavaLibrary, sources)
 
-  def _test_help(self, build_string, library_type, sources):
+  def test_invalid_lang(self):
+    with self.assertRaises(TargetDefinitionException):
+      self._test_help('not-a-lang', 'finagle', JavaLibrary, [])
+
+  def test_invalid_style(self):
+    with self.assertRaises(TargetDefinitionException):
+      self._test_help('scala', 'not-a-style', JavaLibrary, [])
+
+  def _test_help(self, language, rpc_style, library_type, sources):
     contents = dedent('''#@namespace android org.pantsbuild.android_example
       namespace java org.pantsbuild.example
       struct Example {
@@ -112,8 +102,18 @@ class ScroogeGenTest(TaskTestBase):
       }
     ''')
 
+    build_string = dedent('''
+      java_thrift_library(name='a',
+        sources=['a.thrift'],
+        dependencies=[],
+        compiler='scrooge',
+        language='{language}',
+        rpc_style='{rpc_style}'
+      )
+    '''.format(language=language, rpc_style=rpc_style))
+
     self.create_file(relpath='test_smoke/a.thrift', contents=contents)
-    self.add_to_build_file('test_smoke', dedent(build_string))
+    self.add_to_build_file('test_smoke', build_string)
 
     target = self.target('test_smoke:a')
     context = self.context(target_roots=[target])
