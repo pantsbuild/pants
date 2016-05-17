@@ -29,7 +29,7 @@ def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
       state.close()
 
 
-class StatefulBasePool(object):
+class StatefulPoolBase(object):
   """A Thread.Pool-alike with stateful workers running the same function.
 
   Note: there is no exception handling wrapping the function, so it should handle its
@@ -50,7 +50,7 @@ class StatefulBasePool(object):
     """
 
   def __init__(self, pool_size, initializer, function):
-    super(StatefulBasePool, self).__init__()
+    super(StatefulPoolBase, self).__init__()
 
     self._pool_size = pool_size
 
@@ -78,7 +78,7 @@ class StatefulBasePool(object):
     self._executor.shutdown()
 
 
-class StatefulThreadPool(StatefulBasePool):
+class StatefulThreadPoolBase(StatefulPoolBase):
   """A Thread.Pool-alike with stateful workers running the same function.
 
   Note: there is no exception handling wrapping the function, so it should handle its
@@ -96,7 +96,7 @@ class StatefulThreadPool(StatefulBasePool):
     return ThreadPoolExecutor
 
 
-class StatefulProcessPool(StatefulBasePool):
+class StatefulProcessPoolBase(StatefulPoolBase):
   """A multiprocessing.Pool-alike with stateful workers running the same function.
 
   Note: there is no exception handling wrapping the function, so it should handle its
@@ -116,7 +116,7 @@ class StatefulProcessPool(StatefulBasePool):
   def __init__(self, pool_size, initializer, function):
     # NOTE: It's unclear why but subclassing StatefulBasePool similar to StatefulThreadPool
     # causes the process to lock up. For now I am leaving the existing implementation as is.
-    super(StatefulProcessPool, self).__init__(pool_size, initializer, function)
+    super(StatefulProcessPoolBase, self).__init__(pool_size, initializer, function)
 
     self._pool_size = pool_size
 

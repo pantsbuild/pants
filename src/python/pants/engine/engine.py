@@ -16,7 +16,7 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants.base.exceptions import TaskError
 from pants.engine.nodes import FilesystemNode
 from pants.engine.objects import SerializationError
-from pants.engine.processing import StatefulProcessPool, StatefulThreadPool
+from pants.engine.processing import StatefulProcessPoolBase, StatefulThreadPoolBase
 from pants.engine.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -174,7 +174,7 @@ def _execute_step(cache_save, debug, process_state, step):
     return step_id, e
 
 
-class AsyncEngine(Engine):
+class ConcurrentEngine(Engine):
   def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
     """
     :param scheduler: The local scheduler for creating execution graphs.
@@ -188,7 +188,7 @@ class AsyncEngine(Engine):
                           be used.
     :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
     """
-    super(AsyncEngine, self).__init__(scheduler, storage, cache)
+    super(ConcurrentEngine, self).__init__(scheduler, storage, cache)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
@@ -213,7 +213,7 @@ class AsyncEngine(Engine):
     self._pool.start()
 
   def close(self):
-    super(AsyncEngine, self).close()
+    super(ConcurrentEngine, self).close()
     self._pool.close()
 
   def _process_node_async(self, node):
@@ -282,12 +282,12 @@ def _thread_initializer(node_builder, storage):
   return node_builder, storage
 
 
-class LocalMultithreadingEngine(AsyncEngine):
+class LocalMultithreadingEngine(ConcurrentEngine):
   """An engine that runs tasks locally and in parallel when possible using a thread pool."""
 
   @property
   def _pool_factory(self):
-    return StatefulThreadPool
+    return StatefulThreadPoolBase
 
   @property
   def _initializer(self):
@@ -324,16 +324,21 @@ class LocalMultithreadingEngine(AsyncEngine):
         await_one()
 
     # Consume all steps.
-    # import pdb; pdb.set_trace()
     while pending_submission or in_flight:
       submit_until(self._pool_size)
       await_one()
 
 
 class ThreadHybridEngine(LocalMultithreadingEngine):
+  """An engine that runs locally but allows nodes to be optionally run concurrently.
+
+  The decision to run concurrently or in serial is determined by _process_nod_async.
+  For IO bound nodes we will run concurrently using threads.
+  """
+
   @property
   def _pool_factory(self):
-    return StatefulThreadPool
+    return StatefulThreadPoolBase
 
   @property
   def _initializer(self):
@@ -353,12 +358,12 @@ def _process_initializer(node_builder, storage):
   return node_builder, Storage.clone(storage)
 
 
-class LocalMultiprocessEngine(AsyncEngine):
+class LocalMultiprocessEngine(ConcurrentEngine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
   @property
   def _pool_factory(self):
-    return StatefulProcessPool
+    return StatefulProcessPoolBase
 
   @property
   def _initializer(self):
