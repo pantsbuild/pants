@@ -30,7 +30,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     if success:
       self.assert_success(pants_run)
       stdout_lines = pants_run.stdout_data.split('\n')
-      return set([l for l in stdout_lines if l])
+      return sorted([l for l in stdout_lines if l])
     else:
       self.assert_failure(pants_run)
       return None
