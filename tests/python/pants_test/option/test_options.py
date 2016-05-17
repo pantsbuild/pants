@@ -428,6 +428,25 @@ class OptionsTest(unittest.TestCase):
     check(['//:c', '//:d'],
           './pants', config={'GLOBAL': {'target_listy': '["//:c", "//:d"]'} })
 
+  def test_dict_option(self):
+    def check(expected, args_str, env=None, config=None):
+      options = self._parse(args_str=args_str, env=env, config=config)
+      self.assertEqual(expected, options.for_global_scope().dicty)
+
+    check({'a': 'b'}, './pants')
+    check({'c': 'd'}, './pants --dicty=\'{"c": "d"}\'')
+    check({'a': 'b', 'c': 'd'}, './pants --dicty=\'+{"c": "d"}\'')
+
+    check({'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '{"c": "d"}'}})
+    check({'a': 'b', 'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '+{"c": "d"}'}})
+    check({'a': 'b', 'c': 'd', 'e': 'f'}, './pants --dicty=\'+{"e": "f"}\'',
+          config={'GLOBAL': {'dicty': '+{"c": "d"}'}})
+
+    # Check that highest rank wins if we have multiple values for the same key.
+    check({'a': 'b+', 'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '+{"a": "b+", "c": "d"}'}})
+    check({'a': 'b++', 'c': 'd'}, './pants --dicty=\'+{"a": "b++"}\'',
+          config={'GLOBAL': {'dicty': '+{"a": "b+", "c": "d"}'}})
+
   def test_defaults(self):
     # Hard-coded defaults.
     options = self._parse('./pants compile.java -n33')
