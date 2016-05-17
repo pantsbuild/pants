@@ -33,7 +33,7 @@ class NodeRun(NodeTask):
       node_paths = self.context.products.get_data(NodePaths)
       node_path = node_paths.node_path(target)
 
-      args = ['run', self.get_options().script_name] + self.get_passthru_args()
+      args = ['run-script', self.get_options().script_name, '--'] + self.get_passthru_args()
 
       with pushd(node_path):
         result, npm_run = self.execute_npm(args=args,

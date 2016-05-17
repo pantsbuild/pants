@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
+from mock import patch
 from pants.base.exceptions import TestFailedTaskError
+from pants.util.timeout import TimeoutReached
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
@@ -39,7 +41,7 @@ class NodeTestTest(TaskTestBase):
           "name": "pantsbuild.pants.test.too_long",
           "version": "0.0.0",
           "scripts": {
-            "test": "sleep 10"
+            "test": "echo 0"
           }
       }
     """))
@@ -49,20 +51,24 @@ class NodeTestTest(TaskTestBase):
 
     too_long_target_test = self.make_target(spec='src/node/too_long:test',
                                             target_type=NodeTestTarget,
-                                            dependencies=[too_long_target])
-
-    # Passing timeout=5 to make_target above gives an UninitializedSubsystemError
-    # about Subsystem "UnknownArguments", just set it directly.
-    too_long_target_test.timeout = 5
+                                            dependencies=[too_long_target],
+                                            timeout = 5)
 
     context = self.context(target_roots=[too_long_target_test])
 
-    # Fake resolving so self.context.products.get_data(NodePaths) is populated for NodeTestTask
+    # Fake resolving so self.context.products.get_data(NodePaths) is populated for NodeTestTask.
     too_long_target_root = os.path.join(self.build_root, too_long_target.address.spec_path)
     node_paths = context.products.get_data(NodePaths, init_func=NodePaths)
     node_paths.resolved(too_long_target, too_long_target_root)
 
     task = self.create_task(context)
 
-    with self.assertRaises(TestFailedTaskError):
-      task.execute()
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
+      mock_timeout().__exit__.side_effect = TimeoutReached(5)
+
+      with self.assertRaises(TestFailedTaskError):
+        task.execute()
+
+      # Ensures that Timeout is instantiated with a 5 second timeout.
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (5,))
