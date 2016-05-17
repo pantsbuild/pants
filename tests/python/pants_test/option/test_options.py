@@ -1031,33 +1031,46 @@ class OptionsTest(unittest.TestCase):
     self.assertRaises(OptionAlreadyRegistered, lambda: options.register(GLOBAL_SCOPE, '--foo-bar'))
 
   def test_scope_deprecation(self):
-    class DummyOptionable(Optionable):
-      options_scope = 'new-scope'
+    # Note: This test demonstrates that two different new scopes can deprecate the same
+    # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
+    class DummyOptionable1(Optionable):
+      options_scope = 'new-scope1'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+      deprecated_options_scope = 'deprecated-scope'
+      deprecated_options_scope_removal_version = '9999.9.9'
+
+    class DummyOptionable2(Optionable):
+      options_scope = 'new-scope2'
       options_scope_category = ScopeInfo.SUBSYSTEM
       deprecated_options_scope = 'deprecated-scope'
       deprecated_options_scope_removal_version = '9999.9.9'
 
     options = Options.create(env={},
                              config=self._create_config({
-                               DummyOptionable.options_scope: {
+                               DummyOptionable1.options_scope: {
                                  'foo': 'xx'
                                },
-                               DummyOptionable.deprecated_options_scope: {
+                               DummyOptionable1.deprecated_options_scope: {
                                  'foo': 'yy',
                                  'bar': 'zz',
-                                 'baz': 'ww'
-                               }
+                                 'baz': 'ww',
+                                 'qux': 'uu'
+                               },
                              }),
-                             known_scope_infos=[DummyOptionable.get_scope_info()],
-                             args=shlex.split('./pants --new-scope-baz=vv'),
+                             known_scope_infos=[
+                               DummyOptionable1.get_scope_info(),
+                               DummyOptionable2.get_scope_info()
+                             ],
+                             args=shlex.split('./pants --new-scope1-baz=vv'),
                              option_tracker=OptionTracker())
 
-    options.register(DummyOptionable.options_scope, '--foo')
-    options.register(DummyOptionable.options_scope, '--bar')
-    options.register(DummyOptionable.options_scope, '--baz')
+    options.register(DummyOptionable1.options_scope, '--foo')
+    options.register(DummyOptionable1.options_scope, '--bar')
+    options.register(DummyOptionable1.options_scope, '--baz')
+    options.register(DummyOptionable2.options_scope, '--qux')
 
     with self.warnings_catcher() as w:
-      vals = options.for_scope(DummyOptionable.options_scope)
+      vals1 = options.for_scope(DummyOptionable1.options_scope)
 
     # Check that we got a warning.
     self.assertEquals(1, len(w))
@@ -1065,7 +1078,17 @@ class OptionsTest(unittest.TestCase):
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
-    self.assertEquals('yy', vals.foo)
-    self.assertEquals('zz', vals.bar)
+    self.assertEquals('yy', vals1.foo)
+    self.assertEquals('zz', vals1.bar)
     # New scope takes precedence at higher rank.
-    self.assertEquals('vv', vals.baz)
+    self.assertEquals('vv', vals1.baz)
+
+    with self.warnings_catcher() as w:
+      vals2 = options.for_scope(DummyOptionable2.options_scope)
+
+    # Check that we got a warning.
+    self.assertEquals(1, len(w))
+    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
+
+    # Check values.
+    self.assertEquals('uu', vals2.qux)
