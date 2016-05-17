@@ -177,15 +177,18 @@ class LegacyBuildGraph(BuildGraph):
     # Update the base class indexes for this request.
     self._index(legacy_target_roots)
 
-    addresses = set()
-    if expect_return_values:
-      for address_root in address_roots:
-        address_state = self._scheduler.root_entries(request)[address_root]
-        addresses.update(address_state.value)
-      logger.debug('addresses: %s', addresses)
-      return addresses
-    else:
-      return []
+    if not expect_return_values:
+      return
+
+    existing_addresses = set()
+    for address_root in address_roots:
+      address_state = self._scheduler.root_entries(request)[address_root]
+      for address in address_state.value:
+        if address not in existing_addresses:
+          existing_addresses.add(address)
+          yield address
+
+    logger.debug('addresses: %s', existing_addresses)
 
 
 class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies'])):
