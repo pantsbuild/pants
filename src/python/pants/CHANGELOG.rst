@@ -1,6 +1,98 @@
 Release History
 ===============
 
+1.1.0-pre1 (05/17/2016)
+-----------------------
+
+This is the second `1.1.0-pre` release on the way to the `1.1.0` stable branch.
+
+It adds support for JDK8 javac plugins to the core, adds a Java FindBugs module to contrib, and
+improves the convenience of `dict` typed options.
+
+API Changes
+~~~~~~~~~~~
+
+* Add 'transitive' and 'scope' attributes to export of target
+  `RB #3582 <https://rbcommons.com/s/twitter/r/3582>`_
+  `RB #3845 <https://rbcommons.com/s/twitter/r/3845>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow updating dict option values instead of replacing them.
+  `RB #3896 <https://rbcommons.com/s/twitter/r/3896>`_
+
+* Add FindBugs plugin to contrib
+  `RB #3847 <https://rbcommons.com/s/twitter/r/3847>`_
+
+* Implement options scope name deprecation.
+  `RB #3884 <https://rbcommons.com/s/twitter/r/3884>`_
+
+* Find custom jar manifests in added directories.
+  `RB #3886 <https://rbcommons.com/s/twitter/r/3886>`_
+
+* Support for javac plugins.
+  `RB #3839 <https://rbcommons.com/s/twitter/r/3839>`_
+
+* Making the permissions of the local artifact cache configurable.
+  `RB #3867 <https://rbcommons.com/s/twitter/r/3867>`_
+  `RB #3869 <https://rbcommons.com/s/twitter/r/3869>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix GoFetch and test.
+  `RB #3888 <https://rbcommons.com/s/twitter/r/3888>`_
+
+* Fix SourceRoots.all_roots to respect fixed roots.
+  `RB #3881 <https://rbcommons.com/s/twitter/r/3881>`_
+
+* Skip test_pantsd_run_with_watchman on OSX.
+  `RB #3874 <https://rbcommons.com/s/twitter/r/3874>`_
+
+* PrepCommandIntegration handles parallel runs.
+  `RB #3864 <https://rbcommons.com/s/twitter/r/3864>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Link the Go doc to the site toc.
+  `RB #3891 <https://rbcommons.com/s/twitter/r/3891>`_
+
+* Make pants a good example of Go contrib usage.
+  `RB #3889 <https://rbcommons.com/s/twitter/r/3889>`_
+
+* Add a command line option for meta tag resolution
+  `RB #3882 <https://rbcommons.com/s/twitter/r/3882>`_
+
+* Add a note about fixing PANTS_VERSION mismatch.
+  `RB #3887 <https://rbcommons.com/s/twitter/r/3887>`_
+
+* Add a Go Plugin README.
+  `RB #3866 <https://rbcommons.com/s/twitter/r/3866>`_
+
+* Add the start of a Jenkins runbook.
+  `RB #3871 <https://rbcommons.com/s/twitter/r/3871>`_
+
+* Update packer docs to include canary process.
+  `RB #3862 <https://rbcommons.com/s/twitter/r/3862>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Use the appropriate `BaseGlobs` subclass for excludes
+  `RB #3875 <https://rbcommons.com/s/twitter/r/3875>`_
+
+* [engine] Avoid indexing on LegacyBuildGraph.reset().
+  `RB #3868 <https://rbcommons.com/s/twitter/r/3868>`_
+
+* [engine] Add a pantsd.ini for development use of the daemon + watchman + buildgraph caching.
+  `RB #3859 <https://rbcommons.com/s/twitter/r/3859>`_
+
+* [engine] Fix bundle handling
+  `RB #3860 <https://rbcommons.com/s/twitter/r/3860>`_
+
+
 1.1.0-pre0 (05/09/2016)
 -----------------------
 
