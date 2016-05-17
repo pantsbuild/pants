@@ -155,6 +155,7 @@ class ApacheThriftGen(SimpleCodegenTask):
     os.rmdir(gen_dir)
 
   def execute_codegen(self, target, target_workdir):
+    self._validate(target)
     self._generate_thrift(target, target_workdir)
 
   @property
