@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 from hashlib import sha1
 
-from twitter.common.collections import maybe_list
-
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -150,14 +148,14 @@ class LegacyBuildGraph(BuildGraph):
   def inject_address_closure(self, address):
     if address in self._target_by_address:
       return
-    for _ in self._inject([address]):
+    for _ in self._inject([address], False):
       pass
 
   def inject_addresses_closure(self, addresses):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject(addresses):
+    for _ in self._inject(addresses, False):
       pass
 
   def inject_specs_closure(self, specs, fail_fast=None):
@@ -165,7 +163,7 @@ class LegacyBuildGraph(BuildGraph):
     for address in self._inject(specs):
       yield address
 
-  def _inject(self, subjects):
+  def _inject(self, subjects, expect_return_values=True):
     """Request LegacyTargets for each of the subjects, and yield resulting Addresses."""
     logger.debug('Injecting to {}: {}'.format(self, subjects))
     request = self._scheduler.execution_request([LegacyTarget, Address], subjects)
@@ -180,12 +178,14 @@ class LegacyBuildGraph(BuildGraph):
     self._index(legacy_target_roots)
 
     addresses = set()
-    for address_root in address_roots:
-      address_state = self._scheduler.root_entries(request)[address_root]
-      addresses.update(maybe_list(address_state.value, Address))
-
-    logger.debug('addresses: {}'.format(addresses))
-    return addresses
+    if expect_return_values:
+      for address_root in address_roots:
+        address_state = self._scheduler.root_entries(request)[address_root]
+        addresses.update(address_state.value)
+      logger.debug('addresses: %s', addresses)
+      return addresses
+    else:
+      return []
 
 
 class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies'])):
