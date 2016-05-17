@@ -339,9 +339,8 @@ class BuildGraphTest(BaseTest):
           seen_targets[target] += 1
           return True
 
-        self.assertEquals(set(expected), set(func([t.address for t in roots],
-                                                  predicate=predicate_sees,
-                                                  **kwargs)))
+        result = func([t.address for t in roots], predicate=predicate_sees, **kwargs)
+        self.assertEquals(set(expected), set(result))
         if any(ct > 1 for ct in seen_targets.values()):
           self.fail('func {} visited {} more than once.'.format(
             func,
