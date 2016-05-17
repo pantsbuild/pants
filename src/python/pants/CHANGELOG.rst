@@ -1,6 +1,37 @@
 Release History
 ===============
 
+1.0.1-rc0 (05/15/2016)
+----------------------
+
+This will be the first patch release in the 1.0.x stable branch. It contains exactly the following
+fixes, relative to the `1.0.0` release.
+
+New Features
+~~~~~~~~~~~~
+
+* Add 'transitive' and 'scope' attributes to export of target
+  `RB #3582 <https://rbcommons.com/s/twitter/r/3582>`_
+  `RB #3845 <https://rbcommons.com/s/twitter/r/3845>`_
+
+Bugfixes
+~~~~~~~~
+
+* Upgrade to pex 1.1.6.
+  `RB #3768 <https://rbcommons.com/s/twitter/r/3768>`_
+
+* Addresses should not equal things that are not addresses.
+  `RB #3791 <https://rbcommons.com/s/twitter/r/3791>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use a set for the contains check in topo order path for invalidation
+  `RB #3786 <https://rbcommons.com/s/twitter/r/3786>`_
+
+* Scrooge gen: Cache resolved scrooge deps
+  `RB #3790 <https://rbcommons.com/s/twitter/r/3790>`_
+
 1.1.0-pre0 (05/09/2016)
 -----------------------
 
