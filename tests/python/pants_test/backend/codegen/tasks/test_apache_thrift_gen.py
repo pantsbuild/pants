@@ -20,9 +20,6 @@ class ApacheThriftGenTest(TaskTestBase):
   def task_type(cls):
     return ApacheThriftGen
 
-  def setUp(self):
-    super(ApacheThriftGenTest, self).setUp()
-
   def generate_single_thrift_target(self, java_thrift_library):
     context = self.context(target_roots=[java_thrift_library])
     apache_thrift_gen = self.create_task(context)

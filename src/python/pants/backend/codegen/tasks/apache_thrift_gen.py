@@ -103,11 +103,11 @@ class ApacheThriftGen(SimpleCodegenTask):
             self._COMPILER == self._thrift_defaults.compiler(target))
 
   def _validate(self, target):
-    if self._thrift_defaults.language(target) is not self._LANG:
+    if self._thrift_defaults.language(target) != self._LANG:
       raise TargetDefinitionException(
           target,
           'Compiler {} supports only language={}.'.format(self._COMPILER, self._LANG))
-    if self._thrift_defaults.rpc_style(target) is not self._RPC_STYLE:
+    if self._thrift_defaults.rpc_style(target) != self._RPC_STYLE:
       raise TargetDefinitionException(
           target,
           'Compiler {} supports only rpc_style={}.'.format(self._COMPILER, self._RPC_STYLE))

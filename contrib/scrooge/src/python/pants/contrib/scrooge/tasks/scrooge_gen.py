@@ -179,13 +179,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    if self._thrift_defaults.compiler(target) != 'scrooge':
-      return False
-
-    language = self._thrift_defaults.language(target)
-    if language not in ('scala', 'java', 'android'):
-      raise TaskError('Scrooge can not generate {0}'.format(language))
-    return True
+    return self._thrift_defaults.compiler(target) == 'scrooge'
 
   def _validate_compiler_configs(self, targets):
     assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")
