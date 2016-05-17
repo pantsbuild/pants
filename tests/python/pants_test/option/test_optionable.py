@@ -37,3 +37,21 @@ class OptionableTest(unittest.TestCase):
     class Indirect(Intermediate):
       options_scope = 'good'
     self.assertEquals('good', Indirect.options_scope)
+
+  def test_is_valid_scope_name_component(self):
+    def check_true(s):
+      self.assertTrue(Optionable.is_valid_scope_name_component(s))
+
+    def check_false(s):
+      self.assertFalse(Optionable.is_valid_scope_name_component(s))
+
+    check_true('foo')
+    check_true('foo-bar0')
+    check_true('foo-bar0-1ba22z')
+
+    check_false('Foo')
+    check_false('fOo')
+    check_false('foo.bar')
+    check_false('foo_bar')
+    check_false('foo--bar')
+    check_false('foo-bar-')

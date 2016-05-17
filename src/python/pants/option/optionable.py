@@ -29,7 +29,7 @@ class Optionable(AbstractClass):
   deprecated_options_scope = None
   deprecated_options_scope_removal_version = None
 
-  _scope_name_component_re = re.compile(r'^(?:[a-z]|[0-9])+(?:-(?:[a-z]|[0-9])+)*$')
+  _scope_name_component_re = re.compile(r'^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$')
 
   @classmethod
   def is_valid_scope_name_component(cls, s):
