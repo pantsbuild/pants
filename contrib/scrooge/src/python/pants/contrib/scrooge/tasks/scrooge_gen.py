@@ -26,6 +26,7 @@ from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
 _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary, android=JavaLibrary)
+_RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 
 
 class ScroogeGen(SimpleCodegenTask, NailgunTask):
@@ -55,6 +56,10 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   def product_types(cls):
     return ['java', 'scala']
 
+  @classmethod
+  def implementation_version(cls):
+    return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 2)]
+
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
     self._thrift_defaults = ThriftDefaults.global_instance()
@@ -82,15 +87,29 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
           raise AddressLookupError('{}\n  referenced from {} scope'.format(e, self.options_scope))
     return deps
 
+  def _validate_language(self, target):
+    language = self._thrift_defaults.language(target)
+    if language not in _TARGET_TYPE_FOR_LANG:
+      raise TargetDefinitionException(
+          target,
+          'language {} not supported: expected one of {}.'.format(language, _TARGET_TYPE_FOR_LANG))
+    return language
+
+  def _validate_rpc_style(self, target):
+    rpc_style = self._thrift_defaults.rpc_style(target)
+    if rpc_style not in _RPC_STYLES:
+      raise TargetDefinitionException(
+          target,
+          'rpc_style {} not supported: expected one of {}.'.format(rpc_style, _RPC_STYLES))
+    return rpc_style
+
   def execute_codegen(self, target, target_workdir):
     self._validate_compiler_configs([target])
     self._must_have_sources(target)
 
-    language = self._thrift_defaults.language(target)
-    rpc_style = self._thrift_defaults.rpc_style(target)
     partial_cmd = self.PartialCmd(
-        language=language,
-        rpc_style=rpc_style,
+        language=self._validate_language(target),
+        rpc_style=self._validate_rpc_style(target),
         namespace_map=tuple(sorted(target.namespace_map.items()) if target.namespace_map else ()))
 
     self.gen(partial_cmd, target, target_workdir)
@@ -160,13 +179,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    if self._thrift_defaults.compiler(target) != 'scrooge':
-      return False
-
-    language = self._thrift_defaults.language(target)
-    if language not in ('scala', 'java', 'android'):
-      raise TaskError('Scrooge can not generate {0}'.format(language))
-    return True
+    return self._thrift_defaults.compiler(target) == 'scrooge'
 
   def _validate_compiler_configs(self, targets):
     assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")

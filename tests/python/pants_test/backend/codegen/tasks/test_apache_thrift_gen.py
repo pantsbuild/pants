@@ -10,6 +10,7 @@ from textwrap import dedent
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.apache_thrift_gen import ApacheThriftGen
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.exceptions import TargetDefinitionException
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -18,9 +19,6 @@ class ApacheThriftGenTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return ApacheThriftGen
-
-  def setUp(self):
-    super(ApacheThriftGenTest, self).setUp()
 
   def generate_single_thrift_target(self, java_thrift_library):
     context = self.context(target_roots=[java_thrift_library])
@@ -65,3 +63,26 @@ class ApacheThriftGenTest(TaskTestBase):
     synthetic_target = self.generate_single_thrift_target(one)
     self.assertEqual(sorted(['com/foo/One.java', 'com/foo/bar/Two.java']),
                      sorted(synthetic_target.sources_relative_to_source_root()))
+
+  def test_invalid_parameters(self):
+    self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
+    namespace java com.foo
+
+    struct One {}
+    """))
+
+    a = self.make_target(spec='src/thrift/com/foo:a',
+                         target_type=JavaThriftLibrary,
+                         sources=['one.thrift'],
+                         compiler='thrift',
+                         language='not-a-lang')
+    with self.assertRaises(TargetDefinitionException):
+      self.generate_single_thrift_target(a)
+
+    b = self.make_target(spec='src/thrift/com/foo:b',
+                         target_type=JavaThriftLibrary,
+                         sources=['one.thrift'],
+                         compiler='thrift',
+                         rpc_style='not-a-style')
+    with self.assertRaises(TargetDefinitionException):
+      self.generate_single_thrift_target(b)
