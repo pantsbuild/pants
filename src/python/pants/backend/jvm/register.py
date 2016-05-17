@@ -22,6 +22,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
@@ -73,6 +74,7 @@ def build_file_aliases():
       'jar_library': JarLibrary,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
+      'javac_plugin': JavacPlugin,
       'java_tests': JavaTests,
       'junit_tests': JavaTests,
       'jvm_app': JvmApp,

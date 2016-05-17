@@ -14,6 +14,7 @@ from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -240,7 +241,7 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings):
+              log_file, settings, fatal_warnings, javac_plugins_to_exclude):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -256,6 +257,9 @@ class JvmCompile(NailgunTaskBase):
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
     :param fatal_warnings: whether to convert compilation warnings to errors.
+    :param javac_plugins_to_exclude: A list of names of javac plugins that mustn't be used in
+                                     this compilation, even if requested (typically because
+                                     this compilation is building those same plugins).
     """
     raise NotImplementedError()
 
@@ -482,8 +486,11 @@ class JvmCompile(NailgunTaskBase):
         vts.force_invalidate()
         if self.get_options().capture_classpath:
           self._record_compile_classpath(classpath, vts.targets, outdir)
+
+        # If compiling a plugin, don't try to use it on itself.
+        javac_plugins_to_exclude = (t.plugin for t in vts.targets if isinstance(t, JavacPlugin))
         self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings, fatal_warnings)
+                     log_file, settings, fatal_warnings, javac_plugins_to_exclude)
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -567,6 +574,8 @@ class JvmCompile(NailgunTaskBase):
 
     Recursively resolves target aliases, and includes the transitive deps of compiler plugins,
     since compiletime is actually runtime for them.
+
+    TODO: Javac plugins/processors should use -processorpath instead of the classpath.
     """
     def resolve(t):
       for declared in t.dependencies:
@@ -598,8 +607,13 @@ class JvmCompile(NailgunTaskBase):
             target.address.spec, pruned))
     else:
       classpath_targets = target.closure(bfs=True, **self._target_closure_kwargs)
-    return ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
-                                           extra_compile_time_classpath, self._confs)
+    ret = ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
+                                          extra_compile_time_classpath, self._confs)
+    if isinstance(target, JavacPlugin):
+      # Javac plugins need to compile against our distribution's tools.jar. There's no way to
+      # express this via traversable_dependency_specs, so we inject it into the classpath here.
+      ret = self.dist.find_libs(['tools.jar']) + ret
+    return ret
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -808,8 +822,6 @@ class JvmCompile(NailgunTaskBase):
     """Compute any extra compile-time-only classpath elements.
 
     TODO(benjy): Model compile-time vs. runtime classpaths more explicitly.
-    TODO(benjy): Add a pre-execute goal for injecting deps into targets, so e.g.,
-    we can inject a dep on the scala runtime library and still have it ivy-resolve.
     """
     def extra_compile_classpath_iter():
       for conf in self._confs:
