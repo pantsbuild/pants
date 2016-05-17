@@ -13,8 +13,11 @@ API Changes
 ~~~~~~~~~~~
 
 * Add 'transitive' and 'scope' attributes to export of target
-  `RB #3582 <https://rbcommons.com/s/twitter/r/3582>`_
   `RB #3845 <https://rbcommons.com/s/twitter/r/3845>`_
+
+* Remove deprecated check_published_deps goal
+  `RB #3893 <https://rbcommons.com/s/twitter/r/3893>`_
+  `RB #3894 <https://rbcommons.com/s/twitter/r/3894>`_
 
 New Features
 ~~~~~~~~~~~~
@@ -35,7 +38,6 @@ New Features
   `RB #3839 <https://rbcommons.com/s/twitter/r/3839>`_
 
 * Making the permissions of the local artifact cache configurable.
-  `RB #3867 <https://rbcommons.com/s/twitter/r/3867>`_
   `RB #3869 <https://rbcommons.com/s/twitter/r/3869>`_
 
 Bugfixes
@@ -76,6 +78,10 @@ Refactoring, Improvements, and Tooling
 
 * Update packer docs to include canary process.
   `RB #3862 <https://rbcommons.com/s/twitter/r/3862>`_
+
+* Move thrift language/rpc validation to codegen implementations
+  `RB #3823 <https://rbcommons.com/s/twitter/r/3823>`_
+  `RB #3876 <https://rbcommons.com/s/twitter/r/3876>`_
 
 New Engine Work
 ~~~~~~~~~~~~~~~
