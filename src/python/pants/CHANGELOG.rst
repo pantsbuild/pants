@@ -83,6 +83,9 @@ Refactoring, Improvements, and Tooling
   `RB #3823 <https://rbcommons.com/s/twitter/r/3823>`_
   `RB #3876 <https://rbcommons.com/s/twitter/r/3876>`_
 
+* Enhance options scope deprecation test.
+  `RB #3901 <https://rbcommons.com/s/twitter/r/3901>`_
+
 New Engine Work
 ~~~~~~~~~~~~~~~
 
