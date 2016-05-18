@@ -148,14 +148,14 @@ class LegacyBuildGraph(BuildGraph):
   def inject_address_closure(self, address):
     if address in self._target_by_address:
       return
-    for _ in self._inject([address], False):
+    for _ in self._inject([address], expect_return_values=False):
       pass
 
   def inject_addresses_closure(self, addresses):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject(addresses, False):
+    for _ in self._inject(addresses, expect_return_values=False):
       pass
 
   def inject_specs_closure(self, specs, fail_fast=None):
@@ -164,7 +164,11 @@ class LegacyBuildGraph(BuildGraph):
       yield address
 
   def _inject(self, subjects, expect_return_values=True):
-    """Request LegacyTargets for each of the subjects, and yield resulting Addresses."""
+    """
+    Request LegacyTargets for each of the subjects.
+    If `expect_return_values` is True, yield resulting Addresses.
+    Otherwise no resulting Addresses will be computed.
+    """
     logger.debug('Injecting to {}: {}'.format(self, subjects))
     request = self._scheduler.execution_request([LegacyTarget, Address], subjects)
 
