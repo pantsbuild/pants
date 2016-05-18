@@ -13,19 +13,16 @@ from collections import defaultdict, namedtuple
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
-from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
-_TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary, android=JavaLibrary)
 _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 
 
@@ -46,6 +43,11 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     register('--structs-deps', default={}, advanced=True, type=dict,
              help='A map of language to targets to add as dependencies of '
                   'synthetic thrift libraries that contain structs.')
+    register('--target-types',
+             default={'scala': 'scala_library', 'java': 'java_library', 'android': 'java_library'},
+             advanced=True,
+             type=dict,
+             help='Registered target types.')
     cls.register_jvm_tool(register, 'scrooge-gen')
 
   @classmethod
@@ -89,10 +91,10 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   def _validate_language(self, target):
     language = self._thrift_defaults.language(target)
-    if language not in _TARGET_TYPE_FOR_LANG:
+    if language not in self._registered_language_aliases():
       raise TargetDefinitionException(
           target,
-          'language {} not supported: expected one of {}.'.format(language, _TARGET_TYPE_FOR_LANG))
+          'language {} not supported: expected one of {}.'.format(language, self._registered_language_aliases().keys()))
     return language
 
   def _validate_rpc_style(self, target):
@@ -102,6 +104,21 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
           target,
           'rpc_style {} not supported: expected one of {}.'.format(rpc_style, _RPC_STYLES))
     return rpc_style
+
+  @memoized_method
+  def _registered_language_aliases(self):
+    return self.get_options().target_types
+
+  @memoized_method
+  def _target_type_for_language(self, language):
+    alias_for_lang = self._registered_language_aliases()[language]
+    registered_aliases = self.context.build_file_parser.registered_aliases()
+    target_types = registered_aliases.target_types_by_alias.get(alias_for_lang, None)
+    if not target_types:
+      raise TaskError('Registered target type `{0}` for language `{1}` does not exist!'.format(alias_for_lang, language))
+    if len(target_types) > 1:
+      raise TaskError('More than one target type registered for language `{0}`'.format(language))
+    return next(iter(target_types))
 
   def execute_codegen(self, target, target_workdir):
     self._validate_compiler_configs([target])
@@ -219,7 +236,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   def synthetic_target_type(self, target):
     language = self._thrift_defaults.language(target)
-    return _TARGET_TYPE_FOR_LANG[language]
+    return self._target_type_for_language(language)
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     deps = OrderedSet(self._thrift_dependencies_for_target(target))
