@@ -50,4 +50,3 @@ class NodeTestIntegrationTest(PantsRunIntegrationTest):
 
     pants_run = self.run_pants(command=command + ['correct'])
     self.assert_success(pants_run)
-    self.assertEqual('.', pants_run.stderr_data.strip())

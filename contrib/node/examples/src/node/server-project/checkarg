@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-if [[ "$1" == "correct" ]]; then
-  echo "Got correct"
-  exit 0
-else
-  echo "Did not get correct"
+if [[ "$1" == "incorrect" ]]; then
+  echo "Got incorrect arg"
   exit 1
+else
+  echo "Did not get incorrect arg"
+  exit 0
 fi

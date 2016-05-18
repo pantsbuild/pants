@@ -53,7 +53,7 @@ class NodeTask(Task):
     :param list args: The command line args to pass to `node`.
     :param string workunit_name: A name for the execution's work unit; defaults to 'node'.
     :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :param **kwargs: Any extra args to pass to _run_node_distribution_command.
+    :param **kwargs: Any extra kwargs to pass to the subprocess.Popen executing node.
     :returns: A tuple of (returncode, command).
     :rtype: A tuple of (int,
             :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
@@ -70,7 +70,7 @@ class NodeTask(Task):
     :param list args: The command line args to pass to `npm`.
     :param string workunit_name: A name for the execution's work unit; defaults to 'npm'.
     :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :param **kwargs: Any extra args to pass to _run_node_distribution_command.
+    :param **kwargs: Any extra kwargs to pass to the subprocess.Popen executing npm.
     :returns: A tuple of (returncode, command).
     :rtype: A tuple of (int,
             :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
@@ -88,7 +88,7 @@ class NodeTask(Task):
     :param NodeDistribution.Command command: The command to run.
     :param string workunit_name: A name for the execution's work unit; default command.executable.
     :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :param **kwargs: Any extra args to pass to _run_node_distribution_command.
+    :param **kwargs: Any extra kwargs to pass to the subprocess.Popen executing node or npm.
     :returns: A tuple of (returncode, command).
     :rtype: A tuple of (int,
             :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
@@ -111,7 +111,7 @@ class NodeTask(Task):
 
     :param NodeDistribution.Command command: The command to run.
     :param WorkUnit workunit: The WorkUnit the command is running under.
-    :param **kwargs: Any extra args to pass to :class:`subprocess.Popen`.
+    :param **kwargs: Any extra kwargs to pass to the subprocess.Popen executing node or npm.
     :returns: returncode
     :rtype: int
     """
