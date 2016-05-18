@@ -71,70 +71,70 @@ class TestProcessMetadataManager(unittest.TestCase):
   BUILDROOT = '/mock_buildroot/'
 
   def test_maybe_cast(self):
-    self.assertIsNone(ProcessMetadataManager._maybe_cast(None, int))
-    self.assertEqual(ProcessMetadataManager._maybe_cast('3333', int), 3333)
-    self.assertEqual(ProcessMetadataManager._maybe_cast('ssss', int), 'ssss')
+    self.assertIsNone(ProcessMetadataManager()._maybe_cast(None, int))
+    self.assertEqual(ProcessMetadataManager()._maybe_cast('3333', int), 3333)
+    self.assertEqual(ProcessMetadataManager()._maybe_cast('ssss', int), 'ssss')
 
   def test_get_metadata_dir_by_name(self):
     with mock.patch('pants.pantsd.process_manager.get_buildroot') as mock_buildroot:
       mock_buildroot.return_value = self.BUILDROOT
-      self.assertEqual(ProcessMetadataManager._get_metadata_dir_by_name(self.NAME),
+      self.assertEqual(ProcessMetadataManager()._get_metadata_dir_by_name(self.NAME),
                        os.path.join(self.BUILDROOT, '.pids', self.NAME))
 
   def test_maybe_init_metadata_dir_by_name(self):
     with mock.patch('pants.pantsd.process_manager.safe_mkdir', **PATCH_OPTS) as mock_mkdir:
-      ProcessMetadataManager._maybe_init_metadata_dir_by_name(self.NAME)
+      ProcessMetadataManager()._maybe_init_metadata_dir_by_name(self.NAME)
       mock_mkdir.assert_called_once_with(
-        ProcessMetadataManager._get_metadata_dir_by_name(self.NAME))
+        ProcessMetadataManager()._get_metadata_dir_by_name(self.NAME))
 
   def test_readwrite_metadata_by_name(self):
     with temporary_dir() as tmpdir, \
          mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
-      ProcessMetadataManager.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
+      ProcessMetadataManager().write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
       self.assertEqual(
-        ProcessMetadataManager.read_metadata_by_name(self.NAME, self.TEST_KEY),
+        ProcessMetadataManager().read_metadata_by_name(self.NAME, self.TEST_KEY),
         self.TEST_VALUE
       )
       self.assertEqual(
-        ProcessMetadataManager.read_metadata_by_name(self.NAME, self.TEST_KEY, int),
+        ProcessMetadataManager().read_metadata_by_name(self.NAME, self.TEST_KEY, int),
         self.TEST_VALUE_INT
       )
 
   def test_deadline_until(self):
-    with self.assertRaises(ProcessMetadataManager.Timeout):
-      ProcessMetadataManager._deadline_until(lambda: False, timeout=.1)
+    with self.assertRaises(ProcessMetadataManager().Timeout):
+      ProcessMetadataManager()._deadline_until(lambda: False, timeout=.1)
 
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
       safe_file_dump(test_filename, 'test')
-      ProcessMetadataManager._wait_for_file(test_filename, timeout=.1)
+      ProcessMetadataManager()._wait_for_file(test_filename, timeout=.1)
 
   def test_wait_for_file_timeout(self):
     with temporary_dir() as td:
-      with self.assertRaises(ProcessMetadataManager.Timeout):
-        ProcessMetadataManager._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
+      with self.assertRaises(ProcessMetadataManager().Timeout):
+        ProcessMetadataManager()._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
 
   def test_await_metadata_by_name(self):
     with temporary_dir() as tmpdir, \
          mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
-      ProcessMetadataManager.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
+      ProcessMetadataManager().write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
 
       self.assertEquals(
-        ProcessMetadataManager.await_metadata_by_name(self.NAME, self.TEST_KEY, .1),
+        ProcessMetadataManager().await_metadata_by_name(self.NAME, self.TEST_KEY, .1),
         self.TEST_VALUE
       )
 
   def test_purge_metadata(self):
     with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
-      ProcessMetadataManager.purge_metadata_by_name(self.NAME)
+      ProcessMetadataManager().purge_metadata_by_name(self.NAME)
     self.assertGreater(mock_rm.call_count, 0)
 
   def test_purge_metadata_error(self):
     with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
       mock_rm.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
       with self.assertRaises(ProcessManager.MetadataError):
-        ProcessMetadataManager.purge_metadata_by_name(self.NAME)
+        ProcessMetadataManager().purge_metadata_by_name(self.NAME)
     self.assertGreater(mock_rm.call_count, 0)
 
 
