@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
+import os
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -52,11 +52,13 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
       self._print_pantsd_log(workdir)
 
-  @unittest.skipIf(True, 'https://github.com/pantsbuild/pants/issues/3377')
   def test_pantsd_run_with_watchman(self):
     pantsd_config = {'GLOBAL': {'enable_pantsd': True,
                                 'level': 'debug'},
-                     'pantsd': {'fs_event_detection': True}}
+                     'pantsd': {'fs_event_detection': True},
+                     # The absolute paths in CI can often exceed the UNIX socket path limitation
+                     # (104-108+ characters), so we override that here with a shorter path.
+                     'watchman': {'socket_path': '/tmp/watchman.{}.sock'.format(os.getpid())}}
 
     with self.temporary_workdir() as workdir:
       # Explicitly kill any running pantsd instances for the current buildroot.
