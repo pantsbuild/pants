@@ -24,13 +24,15 @@ class Watchman(ProcessManager):
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
-  def __init__(self, watchman_path, work_dir, log_level='1', timeout=SOCKET_TIMEOUT_SECONDS):
+  def __init__(self, watchman_path, work_dir, log_level='1', timeout=SOCKET_TIMEOUT_SECONDS,
+               socket_path_override=None):
     """
     :param str watchman_path: The path to the watchman binary.
     :param str work_dir: The path to the pants work dir.
     :param float timeout: The watchman socket timeout (in seconds).
     :param str log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging,
                           '1' for standard logging and '2' for verbose logging.
+    :param str socket_path_override: The overridden target path of the watchman socket, if any.
     """
     super(Watchman, self).__init__(name='watchman', process_name='watchman', socket_type=str)
     self._watchman_path = self._normalize_watchman_path(watchman_path)
@@ -40,7 +42,8 @@ class Watchman(ProcessManager):
 
     self._state_file = os.path.join(self._watchman_work_dir, '{}.state'.format(self.name))
     self._log_file = os.path.join(self._watchman_work_dir, '{}.log'.format(self.name))
-    self._sock_file = os.path.join(self._watchman_work_dir, '{}.sock'.format(self.name))
+    self._sock_file = socket_path_override or os.path.join(self._watchman_work_dir,
+                                                           '{}.sock'.format(self.name))
 
     self._logger = logging.getLogger(__name__)
     self._watchman_client = None
