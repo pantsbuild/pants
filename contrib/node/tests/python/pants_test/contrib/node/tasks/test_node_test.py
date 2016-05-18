@@ -49,8 +49,9 @@ class NodeTestTest(TaskTestBase):
                             target_type=NodeModule,
                             sources=['package.json'])
 
-  def _resolve_node_module_and_create_tests_task(self, node_module_target, test_targets):
-    context = self.context(target_roots=test_targets)
+  def _resolve_node_module_and_create_tests_task(self, node_module_target, test_targets,
+                                                 passthru_args=None):
+    context = self.context(target_roots=test_targets, passthru_args=passthru_args)
 
     # Fake resolving so self.context.products.get_data(NodePaths) is populated for NodeTestTask.
     node_module_target_root = os.path.join(self.build_root, node_module_target.address.spec_path)
