@@ -224,26 +224,26 @@ class ConcurrentEngine(Engine):
     to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
     submitted = 0
     for _ in range(to_submit):
-      step_, promise = pending_submission.pop(last=False)
+      step, promise = pending_submission.pop(last=False)
 
-      if self._process_node_async(step_.node):
-        if step_.step_id in in_flight:
-          raise Exception('{} is already in_flight!'.format(step_))
+      if self._process_node_async(step.node):
+        if step.step_id in in_flight:
+          raise Exception('{} is already in_flight!'.format(step))
 
-        step_ = self._storage.key_for_request(step_)
-        result = self._maybe_cache_get(step_)
+        step = self._storage.key_for_request(step)
+        result = self._maybe_cache_get(step)
         if result is not None:
           # Skip in_flight on cache hit.
           promise.success(result)
         else:
-          in_flight[step_.step_id] = promise
-          self._submit(step_)
+          in_flight[step.step_id] = promise
+          self._submit(step)
           submitted += 1
       else:
-        keyed_request = self._storage.key_for_request(step_)
+        keyed_request = self._storage.key_for_request(step)
         result = self._maybe_cache_get(keyed_request)
         if result is None:
-          result = step_(self.node_builder)
+          result = step(self.node_builder)
           self._maybe_cache_put(keyed_request, result)
         promise.success(result)
 
