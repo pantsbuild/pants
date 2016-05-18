@@ -87,3 +87,11 @@ python_binary(
     ':commands'
   ]
 )
+
+python_binary(
+  name='list',
+  entry_point='pants.engine.legacy.commands:list',
+  dependencies=[
+    ':commands'
+  ]
+)
