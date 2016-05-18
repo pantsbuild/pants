@@ -216,17 +216,17 @@ class ConcurrentEngine(Engine):
     super(ConcurrentEngine, self).close()
     self._pool.close()
 
-  def _process_node_async(self, node):
+  def _is_async_node(self, node):
     return True
 
-  def submit_until(self, pending_submission, in_flight, n):
+  def _submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
     to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
     submitted = 0
     for _ in range(to_submit):
       step, promise = pending_submission.pop(last=False)
 
-      if self._process_node_async(step.node):
+      if self._is_async_node(step.node):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
@@ -249,7 +249,7 @@ class ConcurrentEngine(Engine):
 
     return submitted
 
-  def await_one(self, in_flight):
+  def _await_one(self, in_flight):
     """Await one completed step, and remove it from in_flight."""
     if not in_flight:
       raise Exception('Awaited an empty pool!')
@@ -303,12 +303,10 @@ class LocalMultithreadingEngine(ConcurrentEngine):
     pending_submission = OrderedSet()
     # Dict from step id to a Promise for Steps that have been submitted.
     in_flight = dict()
-    submit_until = functools.partial(self.submit_until, pending_submission, in_flight)
-    await_one = functools.partial(self.await_one, in_flight)
+    submit_until = functools.partial(self._submit_until, pending_submission, in_flight)
+    await_one = functools.partial(self._await_one, in_flight)
 
-    batches = []
     for step_batch in self._scheduler.schedule(execution_request):
-      batches.append(step_batch)
       if not step_batch:
         # A batch should only be empty if all dependency work is currently blocked/running.
         if not in_flight and not pending_submission:
@@ -332,7 +330,7 @@ class LocalMultithreadingEngine(ConcurrentEngine):
 class ThreadHybridEngine(LocalMultithreadingEngine):
   """An engine that runs locally but allows nodes to be optionally run concurrently.
 
-  The decision to run concurrently or in serial is determined by _process_nod_async.
+  The decision to run concurrently or in serial is determined by _is_async_node.
   For IO bound nodes we will run concurrently using threads.
   """
 
@@ -344,7 +342,7 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
   def _initializer(self):
     return _thread_initializer
 
-  def _process_node_async(self, node):
+  def _is_async_node(self, node):
     """Override default behavior and handle specific nodes asynchronously."""
     return isinstance(node, (FilesystemNode,))
 
@@ -379,8 +377,8 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     pending_submission = OrderedSet()
     # Dict from step id to a Promise for Steps that have been submitted.
     in_flight = dict()
-    submit_until = functools.partial(self.submit_until, pending_submission, in_flight)
-    await_one = functools.partial(self.await_one, in_flight)
+    submit_until = functools.partial(self._submit_until, pending_submission, in_flight)
+    await_one = functools.partial(self._await_one, in_flight)
 
     for step_batch in self._scheduler.schedule(execution_request):
       if not step_batch:
