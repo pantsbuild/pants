@@ -17,6 +17,11 @@ class NodeTest(NodeTask):
   """Runs a test script from package.json in a NodeModule, currently via "npm run [script name]"."""
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    super(NodeTest, cls).prepare(options, round_manager)
+    round_manager.require_data('node_paths')
+
+  @classmethod
   def supports_passthru_args(cls):
     return True
 
