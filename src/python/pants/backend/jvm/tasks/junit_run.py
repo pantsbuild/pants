@@ -105,10 +105,12 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--allow-empty-sources', type=bool, advanced=True,
              help='Allows a junit_tests() target to be defined with no sources.  Otherwise,'
                   'such a target will raise an error during the test run.')
+    register('--use-experimental-runner', type=bool, advanced=True,
+             help='Use experimental junit-runner logic for more options for parallelism.')
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.5'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.7'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
@@ -190,13 +192,15 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
     if options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_BOTH:
       self.context.log.warn('--default-concurrency=PARALLEL_BOTH is experimental.')
-      self._args.append('-default-parallel')
-      self._args.append('-parallel-methods')
+      self._args.append('-default-concurrency')
+      self._args.append('PARALLEL_BOTH')
     elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
-      self._args.append('-default-parallel')
+      self._args.append('-default-concurrency')
+      self._args.append('PARALLEL_CLASSES')
     elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
-      self.context.log.warn('--default-concurrency=PARALLEL_METHODS is not implemented.')
-      raise NotImplementedError()
+      self.context.log.warn('--default-concurrency=PARALLEL_METHODS is experimental.')
+      self._args.append('-default-concurrency')
+      self._args.append('PARALLEL_METHODS')
     elif options.default_concurrency == junit_tests.CONCURRENCY_SERIAL:
       # TODO(zundel): we can't do anything here yet while the --default-parallel
       # option is in deprecation mode.
@@ -208,6 +212,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.test_shard:
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
+
+    if options.use_experimental_runner:
+      self._args.append('-use-experimental-runner')
 
   def classpath(self, targets, classpath_product=None):
     return super(JUnitRun, self).classpath(targets, classpath_product=classpath_product,

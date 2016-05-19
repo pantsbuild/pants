@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+if [[ "$1" == "incorrect" ]]; then
+  echo "Got incorrect arg"
+  exit 1
+else
+  echo "Did not get incorrect arg"
+  exit 0
+fi
