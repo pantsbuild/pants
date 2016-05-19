@@ -19,7 +19,7 @@ class NodeResolve(NodeTask):
 
   @classmethod
   def product_types(cls):
-    return ['node_paths']
+    return [NodePaths]
 
   @classmethod
   def prepare(cls, options, round_manager):

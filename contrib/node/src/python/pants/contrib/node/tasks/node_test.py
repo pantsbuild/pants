@@ -29,7 +29,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(NodeTest, cls).prepare(options, round_manager)
-    round_manager.require_data('node_paths')
+    round_manager.require_data(NodePaths)
 
   @classmethod
   def supports_passthru_args(cls):
