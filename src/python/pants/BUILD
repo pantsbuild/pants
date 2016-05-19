@@ -31,8 +31,3 @@ python_library(
     "src/python/pants/base:revision"
   ]
 )
-
-page(
-  name='changelog',
-  source='CHANGELOG.rst'
-)
