@@ -47,13 +47,12 @@ class NodeTask(Task):
     """Returns `True` if the given target is a `NodeTest`."""
     return isinstance(target, NodeTest)
 
-  def execute_node(self, args, workunit_name=None, workunit_labels=None, **kwargs):
+  def execute_node(self, args, workunit_name=None, workunit_labels=None):
     """Executes node passing the given args.
 
     :param list args: The command line args to pass to `node`.
     :param string workunit_name: A name for the execution's work unit; defaults to 'node'.
     :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :param **kwargs: Any extra args to pass to :class:`subprocess.Popen`.
     :returns: A tuple of (returncode, command).
     :rtype: A tuple of (int,
             :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
@@ -61,16 +60,14 @@ class NodeTask(Task):
     node_command = self.node_distribution.node_command(args=args)
     return self._execute_command(node_command,
                                  workunit_name=workunit_name,
-                                 workunit_labels=workunit_labels,
-                                 **kwargs)
+                                 workunit_labels=workunit_labels)
 
-  def execute_npm(self, args, workunit_name=None, workunit_labels=None, **kwargs):
+  def execute_npm(self, args, workunit_name=None, workunit_labels=None):
     """Executes npm passing the given args.
 
     :param list args: The command line args to pass to `npm`.
     :param string workunit_name: A name for the execution's work unit; defaults to 'npm'.
     :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :param **kwargs: Any extra args to pass to :class:`subprocess.Popen`.
     :returns: A tuple of (returncode, command).
     :rtype: A tuple of (int,
             :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
@@ -79,17 +76,39 @@ class NodeTask(Task):
     npm_command = self.node_distribution.npm_command(args=args)
     return self._execute_command(npm_command,
                                  workunit_name=workunit_name,
-                                 workunit_labels=workunit_labels,
-                                 **kwargs)
+                                 workunit_labels=workunit_labels)
 
-  def _execute_command(self, command, workunit_name=None, workunit_labels=None, **kwargs):
+  def _execute_command(self, command, workunit_name=None, workunit_labels=None):
+    """Executes a node or npm command via self._run_node_distribution_command.
+
+    :param NodeDistribution.Command command: The command to run.
+    :param string workunit_name: A name for the execution's work unit; default command.executable.
+    :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
+    :returns: A tuple of (returncode, command).
+    :rtype: A tuple of (int,
+            :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
+    """
     workunit_name = workunit_name or command.executable
     workunit_labels = {WorkUnitLabel.TOOL} | set(workunit_labels or ())
     with self.context.new_workunit(name=workunit_name,
                                    labels=workunit_labels,
                                    cmd=str(command)) as workunit:
-      process = command.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'),
-                            **kwargs)
-      returncode = process.wait()
+      returncode = self._run_node_distribution_command(command, workunit)
       workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
       return returncode, command
+
+  def _run_node_distribution_command(self, command, workunit):
+    """Runs a NodeDistribution.Command for _execute_command and returns its return code.
+
+    Passes any additional kwargs to command.run (which passes them, modified, to subprocess.Popen).
+    Override this in a Task subclass to do something more complicated than just calling
+    command.run() and returning the result of wait().
+
+    :param NodeDistribution.Command command: The command to run.
+    :param WorkUnit workunit: The WorkUnit the command is running under.
+    :returns: returncode
+    :rtype: int
+    """
+    process = command.run(stdout=workunit.output('stdout'),
+                          stderr=workunit.output('stderr'))
+    return process.wait()

@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from collections import defaultdict
+
 import six
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
@@ -332,7 +334,18 @@ class BuildGraphTest(BaseTest):
 
     def check_funcs(expected, roots, **kwargs):
       for func in subgraph_funcs:
-        self.assertEquals(set(expected), set(func([t.address for t in roots], **kwargs)))
+        seen_targets = defaultdict(lambda: 0)
+        def predicate_sees(target):
+          seen_targets[target] += 1
+          return True
+
+        result = func([t.address for t in roots], predicate=predicate_sees, **kwargs)
+        self.assertEquals(set(expected), set(result))
+        if any(ct > 1 for ct in seen_targets.values()):
+          self.fail('func {} visited {} more than once.'.format(
+            func,
+            ', '.join(t.address for t, ct in seen_targets.items() if ct > 1))
+          )
 
     def only_roots(_, __):
       # This is a silly constraint, because it effectively turns the transitive subgraph functions

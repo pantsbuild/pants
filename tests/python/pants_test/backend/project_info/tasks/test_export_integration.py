@@ -254,7 +254,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertIsNotNone(python_target)
       self.assertEquals(default_interpreter, python_target['python_interpreter'])
 
-  def test_intranstive_and_scope(self):
+  def test_intransitive_and_scope(self):
     with self.temporary_workdir() as workdir:
       test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
       test_target = '{}:common'.format(test_path)

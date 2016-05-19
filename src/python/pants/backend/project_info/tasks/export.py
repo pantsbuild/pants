@@ -207,12 +207,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
         if self.get_options().sources:
           info['sources'] = list(current_target.sources_relative_to_buildroot())
 
-      if not current_target.transitive:
-        info['transitive'] = False
-
-      scope_string = str(current_target.scope)
-      if scope_string:
-        info['scope'] = scope_string
+      info['transitive'] = current_target.transitive
+      info['scope'] = str(current_target.scope)
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
@@ -294,7 +290,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
     }
     jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
     if jvm_distributions:
-      deprecated_conditional(lambda: True, '0.0.89',
+      deprecated_conditional(lambda: True, '1.1.1',
                              'jvm_distributions is deprecated in favor of '
                              'preferred_jvm_distributions.')
       graph_info['jvm_distributions'] = jvm_distributions

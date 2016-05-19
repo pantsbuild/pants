@@ -116,7 +116,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
 
   @property
   def is_cacheable(self):
-    return True
+    return False
 
   def _variants_node(self):
     if type(self.subject) is Address and self.product is not Variants:
@@ -219,7 +219,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
 
   @property
   def is_cacheable(self):
-    return True
+    return False
 
   def _dep_product_node(self):
     return SelectNode(self.subject, self.dep_product, self.variants, None)
@@ -273,7 +273,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
 
   @property
   def is_cacheable(self):
-    return True
+    return False
 
   def _input_node(self):
     return SelectNode(self.subject, self.input_product, self.variants, None)

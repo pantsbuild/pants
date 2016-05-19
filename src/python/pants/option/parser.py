@@ -13,16 +13,16 @@ from collections import defaultdict
 
 import six
 
-from pants.base.deprecated import deprecated_conditional, validate_removal_semver, warn_or_error
+from pants.base.deprecated import validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.custom_types import (ListValueComponent, dict_option, file_option, list_option,
-                                       target_list_option, target_option)
+from pants.option.custom_types import (DictValueComponent, ListValueComponent, dict_option,
+                                       file_option, list_option, target_option)
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
                                  InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
                                  NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
                                  OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
                                  Shadowing)
-from pants.option.option_util import is_list_option
+from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
 
@@ -289,60 +289,6 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    def check_deprecated_types(kwarg_name):
-      t = kwargs.get(kwarg_name)
-      # First check for deprecated direct use of the internal types.
-      if t == list_option:
-        deprecated_conditional(lambda: True, '0.0.83', 'list_option',
-                               'Use type=list for option {} in scope {}.'.format(args[0],
-                                                                                 self.scope))
-      elif t == dict_option:
-        deprecated_conditional(lambda: True, '0.0.83', 'dict_option',
-                               'Use type=dict for option {} in scope {}.'.format(args[0],
-                                                                                 self.scope))
-
-    check_deprecated_types('type')
-    check_deprecated_types('member_type')
-
-    action = kwargs.get('action')
-    # Temporary munging to effectively turn type=list options into list options,
-    # for uniform handling.  From here on, type=list is an error.
-    # TODO: Remove after type=list deprecation.
-    if action == 'append':
-      if 'type' in kwargs:
-        kwargs['member_type'] = kwargs['type']
-      kwargs['type'] = list
-      del kwargs['action']
-      deprecated_conditional(lambda: True, '0.0.83', "action='append'",
-                             'Use type=list for option {} in scope {}.'.format(args[0], self.scope))
-
-    # Temporary munging to effectively turn type='target_list_option' options into list options,
-    # with member type 'target_option', for uniform handling.
-    # TODO: Remove after target_list_option deprecation.
-    if kwargs.get('type') == target_list_option:
-      kwargs['type'] = list
-      kwargs['member_type'] = target_option
-      deprecated_conditional(lambda: True, '0.0.83', 'target_list_option',
-                             'Use type=list, member_type=target_option '
-                             'for option {} in scope {}.'.format(args[0], self.scope))
-
-    # Temporary munging to effectively turn action='store_true' into bool-typed options.
-    # From here on, action='store_true' is an error.  Ditto for store_false.
-    # TODO: Remove after action='store_true'/'store_false' deprecation.
-    if action == 'store_true':
-      kwargs['type'] = bool
-      kwargs['implicit_value'] = True
-      del kwargs['action']
-      deprecated_conditional(lambda: True, '0.0.83', "action='store_true'",
-                             'Use type=bool for option {} in scope {}.'.format(args[0], self.scope))
-    elif action == 'store_false':
-      kwargs['type'] = bool
-      kwargs['implicit_value'] = False
-      del kwargs['action']
-      deprecated_conditional(lambda: True, '0.0.83', "action='store_false'",
-                             'Use type=bool, implicit_value=False '
-                             'for option {} in scope {}.'.format(args[0], self.scope))
-
     # Boolean options always have an implicit boolean-typed default.  They can never be None.
     # We make that default explicit here.
     if kwargs.get('type') == bool and kwargs.get('default') is None:
@@ -444,6 +390,13 @@ class Parser(object):
     else:
       return t
 
+  @staticmethod
+  def _convert_member_type(t, x):
+    if t == dict:
+      return dict_option(x).val
+    else:
+      return t(x)
+
   def _compute_value(self, dest, kwargs, flag_val_strs):
     """Compute the value to use for an option.
 
@@ -514,6 +467,10 @@ class Parser(object):
       # Note: It's important to set flag_val to None if no flags were specified, so we can
       # distinguish between no flags set vs. explicit setting of the value to [].
       flag_val = ListValueComponent.merge(flag_vals) if flag_vals else None
+    elif is_dict_option(kwargs):
+      # Note: It's important to set flag_val to None if no flags were specified, so we can
+      # distinguish between no flags set vs. explicit setting of the value to {}.
+      flag_val = DictValueComponent.merge(flag_vals) if flag_vals else None
     elif len(flag_vals) > 1:
       raise ParseError('Multiple cmd line flags specified for option {} in {}'.format(
           dest, self._scope_str()))
@@ -564,7 +521,14 @@ class Parser(object):
       merged_rank = ranked_vals[-1].rank
       merged_val = ListValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val
-      merged_val = [self._wrap_type(kwargs.get('member_type', str))(x) for x in merged_val]
+      merged_val = [self._convert_member_type(kwargs.get('member_type', str), x)
+                    for x in merged_val]
+      map(check, merged_val)
+      ret = RankedValue(merged_rank, merged_val)
+    elif is_dict_option(kwargs):
+      merged_rank = ranked_vals[-1].rank
+      merged_val = DictValueComponent.merge(
+          [rv.value for rv in ranked_vals if rv.value is not None]).val
       map(check, merged_val)
       ret = RankedValue(merged_rank, merged_val)
     else:

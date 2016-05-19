@@ -26,6 +26,21 @@ can run it like so:
       PANTS_BACKEND_PACKAGES="['pants.contrib.python.checks']" \
       /path/to/pants/repo/pants compile ::
 
+You may hit an error with version mismatch:
+
+    :::bash
+    ...
+    Exception message: Version mismatch: Requested version was 1.0.0, our version is 1.1.0-pre0.
+
+If so, you can add a `PANTS_VERSION` environment variable like so:
+
+    :::bash
+    (other repo) $ PANTS_PLUGINS="[]" \
+      PANTS_PYTHONPATH="['/path/to/pants/repo/contrib/python/src/python']" \
+      PANTS_BACKEND_PACKAGES="['pants.contrib.python.checks']" \
+      PANTS_VERSION=1.1.0-pre0 \
+      /path/to/pants/repo/pants compile ::
+
 Here the environment variables are used to make sure any pants plugins your other repo uses will
 also be run from pants sources. Explaining each environment variable:
 
@@ -35,6 +50,7 @@ also be run from pants sources. Explaining each environment variable:
 + `PANTS_BACKEND_PACKAGES`: This is a comma-separated list of plugin package names.  These values
   can also be taken from the pants repo pants.ini.  You'll need one package name per plugin your
   other repo uses.
++ `PANTS_VERSION`: The version of pants required by the repo.
 
 If your other repo uses plugins but you don't use this environment variable technique, or you do use
 it but miss one or more plugins, pants will still run, but the result can be confusing since the

@@ -43,31 +43,10 @@ python_library(
 )
 
 python_library(
-  name='exclude_nested',
-  sources=rglobs('*.py',
-                 exclude=[
-                   rglobs('*b.py',
-                          exclude=[
-                            ['aabb.py'], globs('*/a*.py')
-                          ]
-                         )
-                 ]
-                ),
-  dependencies=[
-  ]
-)
-
-
-python_library(
   name='exclude_composite',
   sources=rglobs('*.py',
                  exclude=[
                    ['aaa.py'],
-                   rglobs('*b.py',
-                          exclude=[
-                            ['aabb.py'], globs('*/aa*.py')
-                          ]
-                         ),
                    zglobs('**/a.py')
                  ]
                 ),

@@ -66,10 +66,10 @@ class PrefixesTest(unittest.TestCase):
 
   @contextmanager
   def fetcher(self, import_path):
-    with subsystem_instance(Fetchers, **{'fetchers' : {
+    with subsystem_instance(Fetchers, **{'go-fetchers' : {
           'mapping' : {'.*': 'ArchiveFetcher'},
           },
-        'archive-fetcher' : {
+        'go-archive-fetcher' : {
           'matchers' : {'.*': ('', None, 0)},
           'prefixes' :['foo', 'bar/baz'],
         }}) as fetchers:

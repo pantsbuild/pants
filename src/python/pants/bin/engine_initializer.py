@@ -17,7 +17,8 @@ from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
-from pants.engine.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
+from pants.engine.legacy.parser import LegacyPythonCallbacksParser
+from pants.engine.legacy.structs import JvmAppAdaptor, TargetAdaptor
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -43,7 +44,12 @@ class LegacySymbolTable(SymbolTable):
   @classmethod
   @memoized_method
   def table(cls):
-    return {alias: TargetAdaptor for alias in cls.aliases().target_types}
+    def target_type(alias):
+      if alias == 'jvm_app':
+        return JvmAppAdaptor
+      else:
+        return TargetAdaptor
+    return {alias: target_type(alias) for alias in cls.aliases().target_types}
 
 
 class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler',

@@ -92,6 +92,7 @@ python_tests(
   name='go_test_integration',
   sources=['test_go_test_integration.py'],
   dependencies=[
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},
@@ -102,7 +103,9 @@ python_tests(
   sources=['test_go_thrift_gen_integration.py'],
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
+    'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/testutils:file_test_util',
     'tests/python/pants_test:int-test',
