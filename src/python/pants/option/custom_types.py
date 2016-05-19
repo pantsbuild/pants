@@ -19,7 +19,7 @@ def dict_option(s):
 
   :API: public
   """
-  return _convert(s, (dict,))
+  return DictValueComponent.create(s)
 
 
 def list_option(s):
@@ -128,8 +128,8 @@ class ListValueComponent(object):
     Note that we accept tuple literals, but the internal value is always a list.
 
     :param value: The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
-           a string representation (possibly prefixed by +) of a list or tuple, or any allowed
-           member_type.
+                  a string representation (possibly prefixed by +) of a list or tuple, or any
+                  allowed member_type.
     :rtype: `ListValueComponent`
     """
     if isinstance(value, six.string_types):
@@ -153,6 +153,75 @@ class ListValueComponent(object):
       action = cls.EXTEND
       val = _convert('[{}]'.format(value), list)
     return cls(action, list(val))
+
+  def __repr__(self):
+    return b'{} {}'.format(self.action, self.val)
+
+
+class DictValueComponent(object):
+  """A component of the value of a dict-typed option.
+
+  One or more instances of this class can be merged to form a dict value.
+
+  Each component may either replace or extend the preceding component.  So that, e.g., a config
+  file can extend the default value of a dict, instead of having to repeat it.
+  """
+  REPLACE = 'REPLACE'
+  EXTEND = 'EXTEND'
+
+  @classmethod
+  def merge(cls, components):
+    """Merges components into a single component, applying their actions appropriately.
+
+    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
+
+    :param list components: an iterable of instances of DictValueComponent.
+    :return: An instance representing the result of merging the components.
+    :rtype: `DictValueComponent`
+    """
+    # Note that action of the merged component is EXTEND until the first REPLACE is encountered.
+    # This guarantees associativity.
+    action = cls.EXTEND
+    val = {}
+    for component in components:
+      if component.action is cls.REPLACE:
+        val = component.val
+        action = cls.REPLACE
+      elif component.action is cls.EXTEND:
+        val.update(component.val)
+      else:
+        raise ParseError('Unknown action for dict value: {}'.format(component.action))
+    return cls(action, val)
+
+  def __init__(self, action, val):
+    self.action = action
+    self.val = val
+
+  @classmethod
+  def create(cls, value):
+    """Interpret value as either a dict or something to extend another dict with.
+
+    :param value: The value to convert.  Can be an instance of DictValueComponent, a dict,
+                  or a string representation (possibly prefixed by +) of a dict.
+    :rtype: `DictValueComponent`
+    """
+    if isinstance(value, six.string_types):
+      value = ensure_text(value)
+    if isinstance(value, cls):  # Ensure idempotency.
+      action = value.action
+      val = value.val
+    elif isinstance(value, dict):  # Ensure we can handle dict-typed default values.
+      action = cls.REPLACE
+      val = value
+    elif value.startswith('{'):
+      action = cls.REPLACE
+      val = _convert(value, dict)
+    elif value.startswith('+{'):
+      action = cls.EXTEND
+      val = _convert(value[1:], dict)
+    else:
+      raise ParseError('Invalid dict value: {}'.format(value))
+    return cls(action, dict(val))
 
   def __repr__(self):
     return b'{} {}'.format(self.action, self.val)

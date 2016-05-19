@@ -175,3 +175,10 @@ class ContextutilTest(unittest.TestCase):
 
     self.assertEquals(sys.stdout, old_stdout)
     self.assertEquals(sys.stderr, old_stderr)
+
+  def test_permissions(self):
+    with temporary_file(permissions=0700) as f:
+      self.assertEquals(0700, os.stat(f.name)[0] & 0777)
+
+    with temporary_dir(permissions=0644) as path:
+      self.assertEquals(0644, os.stat(path)[0] & 0777)

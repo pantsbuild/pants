@@ -172,7 +172,9 @@ class Fetchers(Subsystem):
   def subsystem_dependencies(cls):
     return tuple(f for f in set(cls._FETCHERS.values()) if issubclass(f, Subsystem))
 
-  options_scope = 'fetchers'
+  options_scope = 'go-fetchers'
+  deprecated_options_scope = 'fetchers'
+  deprecated_options_scope_removal_version = '1.2.0'
 
   @classmethod
   def register_options(cls, register):
@@ -280,7 +282,9 @@ class ArchiveFetcher(Fetcher, Subsystem):
     def rev(self, rev):
       return rev or self.default_rev
 
-  options_scope = 'archive-fetcher'
+  options_scope = 'go-archive-fetcher'
+  deprecated_options_scope = 'archive-fetcher'
+  deprecated_options_scope_removal_version = '1.2.0'
 
   _DEFAULT_MATCHERS = {
     r'bitbucket\.org/(?P<user>[^/]+)/(?P<repo>[^/]+)':
@@ -437,7 +441,9 @@ class GopkgInFetcher(Fetcher, Subsystem):
   `go help importpath` so we are forced to implement their re-direction protocol instead of using
   the more general <meta/> tag protocol.
   """
-  options_scope = 'gopkg.in'
+  options_scope = 'gopkg-in'
+  deprecated_options_scope = 'gopkg.in'
+  deprecated_options_scope_removal_version = '1.2.0'
 
   @classmethod
   def subsystem_dependencies(cls):

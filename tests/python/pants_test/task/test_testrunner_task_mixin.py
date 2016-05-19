@@ -307,3 +307,61 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
       # Ensure that we only call terminate, and not kill.
       self.assertEqual(self.process_handler.call_list,
                        [[u'process_handler.terminate'], [u'process_handler.poll'], [u'process_handler.wait']])
+
+
+class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
+
+  @classmethod
+  def task_type(cls):
+    class TestRunnerTaskMixinMultipleTargetsTask(TestRunnerTaskMixin, TaskBase):
+      def _execute(self, all_targets):
+        self._spawn_and_wait()
+
+      def _spawn(self, *args, **kwargs):
+        class FakeProcessHandler(ProcessHandler):
+          def wait(self):
+            return 0
+
+          def kill(self):
+            pass
+
+          def terminate(self):
+            pass
+
+          def poll(self):
+            pass
+
+        return FakeProcessHandler()
+
+      def _test_target_filter(self):
+        return lambda target: True
+
+      def _validate_target(self, target):
+        pass
+
+      def _get_targets(self):
+        return [targetA, targetB]
+
+      def _get_test_targets_for_spawn(self):
+        return self.current_targets
+
+    return TestRunnerTaskMixinMultipleTargetsTask
+
+  def test_multiple_targets_single_target_timeout(self):
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
+      mock_timeout().__exit__.side_effect = TimeoutReached(1)
+
+      self.set_options(timeouts=True)
+      task = self.create_task(self.context())
+
+      task.current_targets = [targetA]
+      with self.assertRaises(TestFailedTaskError) as cm:
+        task.execute()
+      self.assertEqual(len(cm.exception.failed_targets), 1)
+      self.assertEqual(cm.exception.failed_targets[0].address.spec, 'TargetA')
+
+      task.current_targets = [targetB]
+      with self.assertRaises(TestFailedTaskError) as cm:
+        task.execute()
+      self.assertEqual(len(cm.exception.failed_targets), 1)
+      self.assertEqual(cm.exception.failed_targets[0].address.spec, 'TargetB')

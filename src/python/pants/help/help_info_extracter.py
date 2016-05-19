@@ -73,8 +73,11 @@ class HelpInfoExtracter(object):
     if typ == list:
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
     elif typ == dict:
-      default_str = '{{ {} }}'.format(
-        ','.join(["'{}':'{}'".format(k, v) for k, v in default.items()]))
+      if default:
+        default_str = '{{ {} }}'.format(
+          ','.join(["'{}':'{}'".format(k, v) for k, v in default.items()]))
+      else:
+        default_str = '{}'
     elif typ == str:
       default_str = "'{}'".format(default).replace('\n', ' ')
     else:

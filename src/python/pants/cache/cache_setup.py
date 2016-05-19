@@ -79,6 +79,8 @@ class CacheSetup(Subsystem):
              help='number of seconds before pinger times out')
     register('--pinger-tries', advanced=True, type=int, default=2,
              help='number of times pinger tries a cache')
+    register('--write-permissions', advanced=True, type=str, default=None,
+             help='Permissions to use when writing artifacts to a local cache, in octal.')
 
   @classmethod
   def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
@@ -148,7 +150,7 @@ class CacheFactory(object):
   def get_write_cache(self):
     """Returns the write cache for this setup, creating it if necessary.
 
-    Returns None if no read cache is configured.
+    Returns None if no write cache is configured.
     """
     if self._options.write_to and not self._write_cache:
       cache_spec = self._resolve(self._sanitize_cache_spec(self._options.write_to))
@@ -217,16 +219,19 @@ class CacheFactory(object):
     # both artifact cache and resolver use REST, add new protocols here once they are supported
     return string_spec.startswith('http://') or string_spec.startswith('https://')
 
+  def _baseurl(self, url):
+    parsed_url = urlparse.urlparse(url)
+    return '{scheme}://{netloc}'.format(scheme=parsed_url.scheme, netloc=parsed_url.netloc)
+
   def get_available_urls(self, urls):
     """Return reachable urls sorted by their ping times."""
-
-    netloc_to_url = {urlparse.urlparse(url).netloc: url for url in urls}
-    pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).
+    baseurl_to_urls = {self._baseurl(url): url for url in urls}
+    pingtimes = self._pinger.pings(baseurl_to_urls.keys())  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
 
     sorted_pingtimes = sorted(pingtimes, key=lambda x: x[1])
-    available_urls = [netloc_to_url[netloc] for netloc, pingtime in sorted_pingtimes
+    available_urls = [baseurl_to_urls[baseurl] for baseurl, pingtime in sorted_pingtimes
                       if pingtime < Pinger.UNREACHABLE]
     self._log.debug('Available cache servers: {0}'.format(available_urls))
 
@@ -251,7 +256,8 @@ class CacheFactory(object):
       self._log.debug('{0} {1} local artifact cache at {2}'
                       .format(self._stable_name, action, path))
       return LocalArtifactCache(artifact_root, path, compression,
-                                self._options.max_entries_per_target)
+                                self._options.max_entries_per_target,
+                                permissions=self._options.write_permissions)
 
     def create_remote_cache(remote_spec, local_cache):
       urls = self.get_available_urls(remote_spec.split('|'))

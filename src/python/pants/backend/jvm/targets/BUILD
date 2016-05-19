@@ -30,6 +30,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:six',
+    'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:build_environment',
@@ -53,6 +54,7 @@ python_library(
     'annotation_processor.py',
     'java_agent.py',
     'java_library.py',
+    'javac_plugin.py',
     'java_tests.py',
   ],
   dependencies = [
