@@ -138,7 +138,6 @@ Create a new branch off master and make changes.
 Does your change alter Pants' behavior in a way users will notice? If
 so, then along with changing code...
 
-+   Update `src/python/pants/CHANGELOG.rst`.
 +   Consider updating the
     [[user documentation|pants('src/docs:docs')]].
 

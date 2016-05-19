@@ -418,7 +418,7 @@ passed to the `setup` function.
         name='pantsbuild.pants.testinfra',
         version='0.0.24',
         description='Test support for writing pants plugins.',
-        long_description=read_contents('ABOUT.rst') + read_contents('CHANGELOG.rst'),
+        long_description='''A much longer description of this package. Pages and pages!''',
         url='https://github.com/pantsbuild/pants',
         license='Apache License, Version 2.0',
         zip_safe=True,

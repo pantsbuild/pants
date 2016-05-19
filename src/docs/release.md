@@ -74,21 +74,20 @@ Pants and the common libraries are published to the [Python Package
 Index](https://pypi.python.org/pypi) per the Python community
 convention.
 
-Although the build and publish are automated, the version bumping and
-CHANGELOG and CONTRIBUTORS management are not.
+Although the build and publish are automated, the version bumping, changelog edits,
+and CONTRIBUTORS management are not. Changelog edits and CONTRIBUTOR updates always
+occur in master, while version changes generally only occur in the relevant release branch.
 
-You'll need to edit the version number in
-[src/python/pants/version.py](https://github.com/pantsbuild/pants/tree/master/src/python/pants/version.py)
-and add an entry in the CHANGELOG at
-[src/python/pants/CHANGELOG.rst](https://github.com/pantsbuild/pants/tree/master/src/python/pants/CHANGELOG.rst).
-You can run `./build-support/bin/release-changelog-helper.sh` to get a
-head-start on the CHANGELOG entry.
-
-To bring the CONTRIBUTORS roster in
+1. In your release branch: Edit the version number in `src/python/pants/version.py`
+2. In master: Add an entry for the release to the changelog for the release branch under
+`src/python/pants/notes/*.rst`. You can run `./build-support/bin/release-changelog-helper.sh` to
+get a head-start creating the relevant changelog entries.
+3. In master: Bring the CONTRIBUTORS roster in
 [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
-up to date you just run `build-support/bin/contributors.sh`.
+up to date by running `build-support/bin/contributors.sh`.
 
-Finally, send these three changes out for review.
+Finally, send these three changes out for review. If you are releasing from master, this will
+be one review; if you are releasing from a stable branch, it will be two reviews.
 
 Dry Run (Optional)
 ------------------
