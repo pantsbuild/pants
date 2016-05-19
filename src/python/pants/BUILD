@@ -31,3 +31,11 @@ python_library(
     "src/python/pants/base:revision"
   ]
 )
+
+page(name='changelog',
+  source='CHANGELOG.rst',
+  description='''
+This file is no longer a changelog, but remains in this location in order to avoid breaking
+older changelog links unnecessarily. Could consider removing it by 2.0.x, perhaps.
+''',
+)

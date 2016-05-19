@@ -8,6 +8,7 @@
     "branching_strategy": "dist/markdown/html/src/docs/branching_strategy.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
+    "changelog": "dist/markdown/html/src/python/pants/CHANGELOG.html",
     "notes-master": "dist/markdown/html/src/python/pants/notes/master.html",
     "notes-1.0.x": "dist/markdown/html/src/python/pants/notes/1.0.x.html",
     "community": "dist/markdown/html/src/docs/community.html",
