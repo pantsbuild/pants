@@ -82,7 +82,10 @@ class Options(object):
         ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
         original_scopes.add(si.deprecated_scope)
 
-    for si in scope_infos:
+    # TODO: Once scope name validation is enforced (so there can be no dots in scope name
+    # components) we can replace this line with `for si in scope_infos:`, because it will
+    # not be possible for a deprecated_scope to introduce any new intermediate scopes.
+    for si in copy.copy(ret):
       scope = si.scope
       while scope != '':
         if scope not in original_scopes:

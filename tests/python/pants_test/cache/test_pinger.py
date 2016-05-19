@@ -16,6 +16,9 @@ from pants_test.cache.delay_server import setup_delayed_server
 
 
 class TestPinger(BaseTest):
+  # NB(gmalmquist): The tests in this file pass locally, but are decorated with expectedFailure
+  # because CI is usually too slow to run them before they timeout.
+
   resolution = 1
   fast_delay_seconds = 0
   fast_timeout_seconds = fast_delay_seconds + resolution
@@ -29,9 +32,10 @@ class TestPinger(BaseTest):
     slow = setup_delayed_server(self.slow_delay_seconds)
     fast = setup_delayed_server(self.fast_delay_seconds)
     self.servers = [unreachable, slow, fast]
-    self.fast_netloc = 'localhost:{}'.format(fast.socket.getsockname()[1])
-    self.slow_netloc = 'localhost:{}'.format(slow.socket.getsockname()[1])
-    self.unreachable_netloc = 'localhost:{}'.format(unreachable.socket.getsockname()[1])
+    self.fast_netloc = 'http://localhost:{}'.format(fast.socket.getsockname()[1])
+    self.slow_netloc = 'http://localhost:{}'.format(slow.socket.getsockname()[1])
+    self.unreachable_netloc = 'http://localhost:{}'.format(unreachable.socket.getsockname()[1])
+    self.https_external_netlock = 'https://github.com'
 
   @unittest.expectedFailure
   def test_pinger_times_correct(self):
@@ -59,6 +63,14 @@ class TestPinger(BaseTest):
       fast_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE, msg=self.message)
     self.assertNotEqual(
       slow_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE, msg=self.message)
+
+  @unittest.expectedFailure
+  def test_https_external_pinger(self):
+    # NB(gmalmquist): I spent quite some time trying to spin up an HTTPS server and get it to work
+    # with this test, but it appears to be more trouble than it's worth. If you're feeling
+    # ambitious, feel free to give it a try.
+    pinger = Pinger(timeout=self.slow_delay_seconds, tries=2)
+    self.assertLess(pinger.ping(self.https_external_netlock), Pinger.UNREACHABLE)
 
   def tearDown(self):
     for server in self.servers:

@@ -54,7 +54,7 @@ python_library(
   name = 'delay_server',
   sources = ['delay_server.py'],
   dependencies = [
-  '3rdparty/python:six',
+    '3rdparty/python:six',
   ]
 )
 
@@ -65,7 +65,7 @@ python_tests(
     'src/python/pants/cache',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/cache:delay_server',
-  ]
+  ],
 )
 
 python_tests(
