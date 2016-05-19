@@ -27,6 +27,11 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
     self._currently_executing_test_targets = []
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    super(NodeTest, cls).prepare(options, round_manager)
+    round_manager.require_data(NodePaths)
+
+  @classmethod
   def supports_passthru_args(cls):
     return True
 
