@@ -7,14 +7,12 @@ other related packages to PyPi.  If you need to release pants jvm tools
 [[JVM Artifact Release Process|pants('src/docs:release_jvm')]]
 page.
 
-At a high level, releasing pants involves:
+Deciding the "who", "what", and "when" of releasing is described on the
+[[Release Strategy|pants('src/docs:release_strategy')]] page. Note that for some
+lucky release managers, this may result in two or more releases in a particular week.
 
--   Deciding what/when to release. At present this is ad-hoc, typically
-    when a change has been made and the author wants to use a version
-    incorporating that change. Things are likely to remain this way pre
-    1.0.0.  Post 1.0 we will use the following
-    [[Branching Strategy|pants('src/docs:branching_strategy')]]
-    for releases.
+Once you know what to release, releasing pants involves:
+
 -   Preparing the release.
 -   (optional) Perform a release dry run.
 -   Publishing the release to PyPi.
