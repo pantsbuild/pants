@@ -21,15 +21,17 @@ logger = logging.getLogger(__name__)
 
 class BaseLocalArtifactCache(ArtifactCache):
 
-  def __init__(self, artifact_root, compression):
+  def __init__(self, artifact_root, compression, permissions=None):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param int compression: The gzip compression level for created artifacts.
                             Valid values are 0-9.
+    :param string permissions: File permissions to use when creating artifact files.
     """
     super(BaseLocalArtifactCache, self).__init__(artifact_root)
     self._compression = compression
     self._cache_root = None
+    self._permissions = permissions
 
   def _artifact(self, path):
     return TarballArtifact(self.artifact_root, path, self._compression)
@@ -37,7 +39,8 @@ class BaseLocalArtifactCache(ArtifactCache):
   @contextmanager
   def _tmpfile(self, cache_key, use):
     """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions"""
-    with temporary_file(suffix=cache_key.id + use, root_dir=self._cache_root) as tmpfile:
+    with temporary_file(suffix=cache_key.id + use, root_dir=self._cache_root,
+                        permissions=self._permissions) as tmpfile:
       yield tmpfile
 
   @contextmanager
@@ -70,14 +73,20 @@ class BaseLocalArtifactCache(ArtifactCache):
 class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
 
-  def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None):
+  def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None,
+               permissions=None):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
     :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
+    :param str permissions: File permissions to use when creating artifact files.
     """
-    super(LocalArtifactCache, self).__init__(artifact_root, compression)
+    super(LocalArtifactCache, self).__init__(
+      artifact_root,
+      compression,
+      permissions=int(permissions.strip(), base=8) if permissions else None,
+    )
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
     self._max_entries_per_target = max_entries_per_target
     safe_mkdir(self._cache_root)
@@ -129,6 +138,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     dest = self._cache_file_for_key(cache_key)
     safe_mkdir_for(dest)
     os.rename(src, dest)
+    if self._permissions:
+      os.chmod(dest, self._permissions)
     self.prune(os.path.dirname(dest))  # Remove old cache files.
     return dest
 
@@ -145,11 +156,12 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
   actually stores files between calls, but is useful for handling file IO for a remote cache.
   """
 
-  def __init__(self, artifact_root, compression):
+  def __init__(self, artifact_root, compression, permissions=None):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     """
-    super(TempLocalArtifactCache, self).__init__(artifact_root, compression=compression)
+    super(TempLocalArtifactCache, self).__init__(artifact_root, compression=compression,
+                                                 permissions=permissions)
 
   def _store_tarball(self, cache_key, src):
     return src

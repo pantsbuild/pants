@@ -16,7 +16,7 @@ class ScalacPlugin(ScalaLibrary):
 
     """
     :param classname: The fully qualified plugin class name - required.
-    :param plugin: The name of the plugin which defaults to name if not supplied.
+    :param plugin: The name of the plugin. Defaults to name if not supplied.
     """
 
     super(ScalacPlugin, self).__init__(*args, **kwargs)

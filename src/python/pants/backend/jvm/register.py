@@ -22,6 +22,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
@@ -58,7 +59,6 @@ from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepComman
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
-from pants.base.deprecated import deprecated
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -73,6 +73,7 @@ def build_file_aliases():
       'jar_library': JarLibrary,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
+      'javac_plugin': JavacPlugin,
       'java_tests': JavaTests,
       'junit_tests': JavaTests,
       'jvm_app': JvmApp,
@@ -171,15 +172,6 @@ def register_goals():
 
   # Publishing.
   task(name='check-published-deps', action=CheckPublishedDeps).install('check-published-deps')
-
-  class CheckPublishedDepsDeprecated(CheckPublishedDeps):
-    """DEPRECATED: Use the check-published-deps goal instead."""
-
-    @deprecated('1.0.1', 'DEPRECATED: Use the check-published-deps goal instead.')
-    def console_output(self, targets):
-      return super(CheckPublishedDepsDeprecated, self).console_output(targets)
-
-  task(name='check_published_deps', action=CheckPublishedDepsDeprecated).install('check_published_deps')
 
   task(name='jar', action=JarPublish).install('publish')
 

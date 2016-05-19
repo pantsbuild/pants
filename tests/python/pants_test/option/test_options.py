@@ -24,6 +24,7 @@ from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, Im
                                  Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
+from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
@@ -426,6 +427,25 @@ class OptionsTest(unittest.TestCase):
           './pants', config={'GLOBAL': {'target_listy': '+["//:c", "//:d"]'} })
     check(['//:c', '//:d'],
           './pants', config={'GLOBAL': {'target_listy': '["//:c", "//:d"]'} })
+
+  def test_dict_option(self):
+    def check(expected, args_str, env=None, config=None):
+      options = self._parse(args_str=args_str, env=env, config=config)
+      self.assertEqual(expected, options.for_global_scope().dicty)
+
+    check({'a': 'b'}, './pants')
+    check({'c': 'd'}, './pants --dicty=\'{"c": "d"}\'')
+    check({'a': 'b', 'c': 'd'}, './pants --dicty=\'+{"c": "d"}\'')
+
+    check({'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '{"c": "d"}'}})
+    check({'a': 'b', 'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '+{"c": "d"}'}})
+    check({'a': 'b', 'c': 'd', 'e': 'f'}, './pants --dicty=\'+{"e": "f"}\'',
+          config={'GLOBAL': {'dicty': '+{"c": "d"}'}})
+
+    # Check that highest rank wins if we have multiple values for the same key.
+    check({'a': 'b+', 'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '+{"a": "b+", "c": "d"}'}})
+    check({'a': 'b++', 'c': 'd'}, './pants --dicty=\'+{"a": "b++"}\'',
+          config={'GLOBAL': {'dicty': '+{"a": "b+", "c": "d"}'}})
 
   def test_defaults(self):
     # Hard-coded defaults.
@@ -1009,3 +1029,66 @@ class OptionsTest(unittest.TestCase):
                              option_tracker=OptionTracker())
     options.register(GLOBAL_SCOPE, '--foo-bar')
     self.assertRaises(OptionAlreadyRegistered, lambda: options.register(GLOBAL_SCOPE, '--foo-bar'))
+
+  def test_scope_deprecation(self):
+    # Note: This test demonstrates that two different new scopes can deprecate the same
+    # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
+    class DummyOptionable1(Optionable):
+      options_scope = 'new-scope1'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+      deprecated_options_scope = 'deprecated-scope'
+      deprecated_options_scope_removal_version = '9999.9.9'
+
+    class DummyOptionable2(Optionable):
+      options_scope = 'new-scope2'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+      deprecated_options_scope = 'deprecated-scope'
+      deprecated_options_scope_removal_version = '9999.9.9'
+
+    options = Options.create(env={},
+                             config=self._create_config({
+                               DummyOptionable1.options_scope: {
+                                 'foo': 'xx'
+                               },
+                               DummyOptionable1.deprecated_options_scope: {
+                                 'foo': 'yy',
+                                 'bar': 'zz',
+                                 'baz': 'ww',
+                                 'qux': 'uu'
+                               },
+                             }),
+                             known_scope_infos=[
+                               DummyOptionable1.get_scope_info(),
+                               DummyOptionable2.get_scope_info()
+                             ],
+                             args=shlex.split('./pants --new-scope1-baz=vv'),
+                             option_tracker=OptionTracker())
+
+    options.register(DummyOptionable1.options_scope, '--foo')
+    options.register(DummyOptionable1.options_scope, '--bar')
+    options.register(DummyOptionable1.options_scope, '--baz')
+    options.register(DummyOptionable2.options_scope, '--qux')
+
+    with self.warnings_catcher() as w:
+      vals1 = options.for_scope(DummyOptionable1.options_scope)
+
+    # Check that we got a warning.
+    self.assertEquals(1, len(w))
+    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
+
+    # Check values.
+    # Deprecated scope takes precedence at equal rank.
+    self.assertEquals('yy', vals1.foo)
+    self.assertEquals('zz', vals1.bar)
+    # New scope takes precedence at higher rank.
+    self.assertEquals('vv', vals1.baz)
+
+    with self.warnings_catcher() as w:
+      vals2 = options.for_scope(DummyOptionable2.options_scope)
+
+    # Check that we got a warning.
+    self.assertEquals(1, len(w))
+    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
+
+    # Check values.
+    self.assertEquals('uu', vals2.qux)

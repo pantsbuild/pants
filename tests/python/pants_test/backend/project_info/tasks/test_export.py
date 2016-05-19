@@ -280,6 +280,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       ],
       'scope' : 'default',
       'target_type': 'SOURCE',
+      'transitive' : True,
       'pants_target_type': 'scala_library',
       'platform': 'java6',
     }

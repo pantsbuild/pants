@@ -55,6 +55,10 @@ class BuildGraph(AbstractClass):
       self._worked = set()
       self._expanded = set()
 
+    def expanded_or_worked(self, vertex):
+      """Returns True if the vertex has been expanded or worked."""
+      return vertex in self._expanded or vertex in self._worked
+
     def do_work_once(self, vertex):
       """Returns True exactly once for the given vertex."""
       if vertex in self._worked:
@@ -309,19 +313,28 @@ class BuildGraph(AbstractClass):
     walker = self.DepthAwareWalk if leveled_predicate else self.DepthAgnosticWalk
     walk = walker()
     def _walk_rec(addr, level=0):
+      # If we've followed an edge to this address, stop recursing.
       if not walk.expand_once(addr, level):
         return
+
       target = self._target_by_address[addr]
+
       if predicate and not predicate(target):
         return
-      if not postorder and walk.do_work_once(target):
+
+      if not postorder and walk.do_work_once(addr):
         work(target)
+
       for dep_address in self._target_dependencies_by_address[addr]:
+        if walk.expanded_or_worked(dep_address):
+          continue
         if not leveled_predicate \
                 or leveled_predicate(self._target_by_address[dep_address], level):
           _walk_rec(dep_address, level + 1)
-      if postorder and walk.do_work_once(target):
+
+      if postorder and walk.do_work_once(addr):
         work(target)
+
     for address in addresses:
       _walk_rec(address)
 
@@ -372,7 +385,7 @@ class BuildGraph(AbstractClass):
 
     Note that this uses `walk_transitive_dependencies_graph` and the predicate is passed through,
     hence it trims graphs rather than just filtering out Targets that do not match the predicate.
-    See `walk_transitive_dependencies_graph for more detail on `predicate`.
+    See `walk_transitive_dependency_graph for more detail on `predicate`.
 
     :API: public
 
@@ -417,14 +430,18 @@ class BuildGraph(AbstractClass):
     to_walk = deque((0, addr) for addr in addresses)
     while len(to_walk) > 0:
       level, address = to_walk.popleft()
-      target = self._target_by_address[address]
-      if not walk.expand_once(target, level):
+
+      if not walk.expand_once(address, level):
         continue
+
+      target = self._target_by_address[address]
       if predicate and not predicate(target):
         continue
-      if walk.do_work_once(target):
+      if walk.do_work_once(address):
         ordered_closure.add(target)
       for addr in self._target_dependencies_by_address[address]:
+        if walk.expanded_or_worked(addr):
+          continue
         if not leveled_predicate or leveled_predicate(self._target_by_address[addr], level):
           to_walk.append((level + 1, addr))
     return ordered_closure

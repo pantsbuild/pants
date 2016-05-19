@@ -135,8 +135,91 @@ and then ssh into it and inspect it. Here is an example using
 
 Ideally you'll have launched an instance manually using the AMI you created in order to vet it.
 When you're confident in the image, navigate to [Jenkins > Manage Jenkins > Configure System]
-(http://jenkins.pantsbuild.org/configure). Towards the bottom of the page you'll find an `AMI ID`
-field in the `AMIs` section. Enter the AMI id here and click the `Check AMI` button to verify
-Jenkins can access it. A Successful id-edit and check is shown below:
+(http://jenkins.pantsbuild.org/configure). Towards the bottom of the page you'll find an `AMIs`
+section. There should be 2 AMIs, "`(Production)...`" and "`(Canary)...`".  Find the canary AMI
+and enter the AMI id. Click the `Check AMI` button to verify Jenkins can access it. A Successful
+id-edit and check is shown below:
 
 ![image](images/check-ami-success.png)
+
+You can now click `Save` and navigate to [Jenkins > Manage Jenkins > Manage Nodes]
+(http://jenkins.pantsbuild.org/computer/) to try and launching a canary instance to receive
+production traffic. You'll find a `Provision via...` drop-down in the lower-left corner of the
+node table that you can use to manually launch a canary node as shown below:
+
+![image](images/launch-canary.png).
+
+This will trigger spin-up of a node in EC2.  It will take some time for the node to come up,
+perhaps 30 seconds or more.  You'll see node landing page with a disconnected icon:
+
+![image](images/launched-canary.png).
+
+You can click through to `See log for more details` which will show the process of launching
+the AWS instance, polling for it to be up and finally making an ssh connection and launching
+the agent process.  An example of a successful launch and connect log looks like so (some
+repeated polling lines snipped):
+```
+May 10, 2016 10:04:42 PM null
+FINEST: Node (Canary) Pants Ephemeral EC2 Worker (sir-029qrhnf)(SpotRequest sir-029qrhnf) still requesting the instance, waiting 10s
+May 10, 2016 10:04:53 PM null
+FINEST: Node (Canary) Pants Ephemeral EC2 Worker (sir-029qrhnf)(SpotRequest sir-029qrhnf) still requesting the instance, waiting 10s
+May 10, 2016 10:05:04 PM null
+...
+FINEST: Node (Canary) Pants Ephemeral EC2 Worker (sir-029qrhnf)(i-3af3a4bd) is still pending/launching, waiting 5s
+May 10, 2016 10:05:50 PM null
+FINEST: Node (Canary) Pants Ephemeral EC2 Worker (sir-029qrhnf)(i-3af3a4bd) is still pending/launching, waiting 5s
+May 10, 2016 10:05:55 PM null
+FINER: Node (Canary) Pants Ephemeral EC2 Worker (sir-029qrhnf)(i-3af3a4bd) is ready
+May 10, 2016 10:05:55 PM null
+INFO: Launching instance: i-3af3a4bd
+May 10, 2016 10:05:55 PM null
+INFO: bootstrap()
+May 10, 2016 10:05:55 PM null
+INFO: Getting keypair...
+May 10, 2016 10:05:55 PM null
+INFO: Using key: pantsbuild-jenkins-bot
+a2:30:44:ef:ae:2a:ff:c2:c3:8c:68:4d:22:98:1b:e2:b6:89:4f:8a
+...
+INFO: Authenticating as jenkins
+May 10, 2016 10:05:55 PM null
+INFO: Connecting to ec2-52-207-232-166.compute-1.amazonaws.com on port 22, with timeout 10000.
+May 10, 2016 10:06:05 PM null
+INFO: Failed to connect via ssh: The kexTimeout (10000 ms) expired.
+May 10, 2016 10:06:05 PM null
+INFO: Waiting for SSH to come up. Sleeping 5.
+May 10, 2016 10:06:10 PM null
+...
+INFO: Connecting to ec2-52-207-232-166.compute-1.amazonaws.com on port 22, with timeout 10000.
+May 10, 2016 10:06:56 PM null
+INFO: Failed to connect via ssh: There was a problem while connecting to ec2-52-207-232-166.compute-1.amazonaws.com:22
+May 10, 2016 10:06:56 PM null
+INFO: Waiting for SSH to come up. Sleeping 5.
+May 10, 2016 10:07:01 PM null
+INFO: Connecting to ec2-52-207-232-166.compute-1.amazonaws.com on port 22, with timeout 10000.
+May 10, 2016 10:07:01 PM null
+INFO: Connected via SSH.
+May 10, 2016 10:07:01 PM null
+INFO: connect fresh as root
+May 10, 2016 10:07:04 PM null
+INFO: Connecting to ec2-52-207-232-166.compute-1.amazonaws.com on port 22, with timeout 10000.
+May 10, 2016 10:07:04 PM null
+INFO: Connected via SSH.
+May 10, 2016 10:07:04 PM null
+INFO: Creating tmp directory (/tmp) if it does not exist
+May 10, 2016 10:07:04 PM null
+INFO: Verifying that java exists
+openjdk full version "1.8.0_91-8u91-b14-0ubuntu4~16.04.1-b14"
+May 10, 2016 10:07:18 PM null
+INFO: Copying slave.jar
+May 10, 2016 10:07:18 PM null
+INFO: Launching slave agent (via Trilead SSH2 Connection): java  -jar /tmp/slave.jar
+<===[JENKINS REMOTING CAPACITY]===>Slave.jar version: 2.57
+This is a Unix agent
+Evacuated stdout
+Agent successfully connected and online
+```
+
+The node is now ready to receive production traffic.  You can trigger a build and verify the
+new node performs as expected. Once confirmed, promote the AMI to production much as you did
+to canary the AMI via [Jenkins > Manage Jenkins > Configure System]
+(http://jenkins.pantsbuild.org/configure). This time ensure you edit the production AMI id.

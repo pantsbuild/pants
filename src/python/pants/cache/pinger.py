@@ -5,19 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import httplib
 import urlparse
 from collections import Counter, deque
 from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
 
+import requests
 from six.moves import range
 
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.util.contextutil import Timer
-
-
-_global_pinger_memo = {}  # (netloc, timeout, tries) -> rt time in secs.
+from pants.util.memo import memoized_method
 
 
 class InvalidRESTfulCacheProtoError(ArtifactCacheError):
@@ -29,15 +27,33 @@ class Pinger(object):
   # Signifies that a netloc is unreachable.
   UNREACHABLE = 999999
 
+  @classmethod
+  def _try_ping(cls, url, timeout):
+    try:
+      with Timer() as timer:
+        # We just want to see if we can get the headers.
+        requests.head(url, timeout=timeout)
+      return timer.elapsed
+    except Exception:
+      return Pinger.UNREACHABLE
+
+  @classmethod
+  @memoized_method
+  def _get_ping_time(cls, url, timeout, tries):
+    rt_secs = Pinger.UNREACHABLE
+    for _ in range(tries):
+      rt_secs = min(rt_secs, cls._try_ping(url, timeout))
+    return rt_secs
+
   def __init__(self, timeout, tries):
     """Try pinging the given number of times, each with the given timeout."""
     self._timeout = timeout
     self._tries = tries
 
-  def ping(self, netloc):
-    """Time a single roundtrip to the netloc.
+  def ping(self, url):
+    """Time a single roundtrip to the url.
 
-    :param netloc: string of "host:port"
+    :param url to ping.
     :returns: the fastest ping time for a given netloc and number of tries.
     or Pinger.UNREACHABLE if ping times out.
     :rtype: float
@@ -46,32 +62,14 @@ class Pinger(object):
     inflexible and platform-dependent, so shelling out to it is annoying,
     and the ICMP python lib can only be called by the superuser.
     """
-    netloc_info = (netloc, self._timeout, self._tries)
-    if netloc_info in _global_pinger_memo:
-      return _global_pinger_memo[netloc_info]
+    return self._get_ping_time(url, self._timeout, self._tries)
 
-    host, colon, portstr = netloc.partition(':')
-    port = int(portstr) if portstr else None
-    rt_secs = Pinger.UNREACHABLE
-    for _ in range(self._tries):
-      try:
-        with Timer() as timer:
-          conn = httplib.HTTPConnection(host, port, timeout=self._timeout)
-          conn.request('HEAD', '/')   # Doesn't actually matter if this exists.
-          conn.getresponse()
-        new_rt_secs = timer.elapsed
-      except Exception:
-        new_rt_secs = Pinger.UNREACHABLE
-      rt_secs = min(rt_secs, new_rt_secs)
-    _global_pinger_memo[netloc_info] = rt_secs
-    return rt_secs
-
-  def pings(self, netlocs):
-    pool = ThreadPool(processes=len(netlocs))
-    rt_secs = pool.map(self.ping, netlocs, chunksize=1)
+  def pings(self, urls):
+    pool = ThreadPool(processes=len(urls))
+    rt_secs = pool.map(self.ping, urls, chunksize=1)
     pool.close()
     pool.join()
-    return zip(netlocs, rt_secs)
+    return zip(urls, rt_secs)
 
 
 class BestUrlSelector(object):

@@ -71,7 +71,7 @@ PKG_GO=(
 function pkg_go_install_test() {
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.go==$(local_version)']" \
-      test.go contrib/go/examples::
+      buildgen test contrib/go/examples::
 }
 
 PKG_NODE=(

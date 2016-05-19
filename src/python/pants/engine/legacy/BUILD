@@ -5,23 +5,23 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
-    ':globs',
+    ':structs',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:parser',
-    'src/python/pants/engine:struct',
   ],
 )
 
 python_library(
-  name='globs',
-  sources=['globs.py'],
+  name='structs',
+  sources=['structs.py'],
   dependencies=[
+    'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
+    'src/python/pants/engine:struct',
     'src/python/pants/source',
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],
@@ -31,13 +31,15 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
-    ':globs',
     ':parser',
+    ':structs',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine:graph',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:selectors',
+    'src/python/pants/source',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',
   ],
 )
@@ -81,6 +83,14 @@ python_binary(
 python_binary(
   name='fsnodes',
   entry_point='pants.engine.legacy.commands:fsnodes',
+  dependencies=[
+    ':commands'
+  ]
+)
+
+python_binary(
+  name='list',
+  entry_point='pants.engine.legacy.commands:list',
   dependencies=[
     ':commands'
   ]
