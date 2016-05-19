@@ -11,11 +11,11 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.version import VERSION, PANTS_SEMVER
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.subsystem.subsystem import Subsystem
+from pants.version import PANTS_SEMVER, VERSION
 
 
 def _read_contents(path):
