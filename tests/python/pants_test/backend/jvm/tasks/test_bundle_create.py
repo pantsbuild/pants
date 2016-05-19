@@ -63,14 +63,14 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                           dependencies=[self.java_lib_target, self.jar_lib],
                                           resources=[self.resources_target.address.spec])
 
-    self.app_target = self.make_target(spec='//foo:foo-app',
-                                       target_type=JvmApp,
-                                       basename='FooApp',
-                                       dependencies=[self.binary_target])
-
-    self.task_context = self.context(target_roots=[self.app_target])
-    self._setup_classpath(self.task_context)
     self.dist_root = os.path.join(self.build_root, 'dist')
+
+  def _create_target(self, **kwargs):
+    return self.make_target(spec='//foo:foo-app',
+                            target_type=JvmApp,
+                            basename='FooApp',
+                            dependencies=[self.binary_target],
+                            **kwargs)
 
   def _setup_classpath(self, task_context):
     """As a separate prep step because to test different option settings, this needs to rerun
@@ -89,13 +89,15 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
   def test_jvm_bundle_products(self):
     """Test default setting outputs bundle products using `target.id`."""
-
+    self.app_target = self._create_target()
+    self.task_context = self.context(target_roots=[self.app_target])
+    self._setup_classpath(self.task_context)
     self.execute(self.task_context)
     self._check_bundle_products('foo.foo-app')
 
   def test_jvm_bundle_use_basename_prefix(self):
     """Test override default setting outputs bundle products using basename."""
-
+    self.app_target = self._create_target()
     self.set_options(use_basename_prefix=True)
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
@@ -113,7 +115,8 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
   def test_jvm_bundle_missing_product(self):
     """Test exception is thrown in case of a missing jar."""
-
+    self.app_target = self._create_target()
+    self.task_context = self.context(target_roots=[self.app_target])
     missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
                                                 materialize=False)
     classpath_products = self.ensure_classpath_products(self.task_context)
@@ -126,7 +129,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
   def test_conflicting_basename(self):
     """Test exception is thrown when two targets share the same basename."""
-
+    self.app_target = self._create_target()
     conflict_app_target = self.make_target(spec='//foo:foo-app-conflict',
                                            target_type=JvmApp,
                                            basename='FooApp',
@@ -136,6 +139,21 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self._setup_classpath(self.task_context)
     with self.assertRaises(BundleCreate.BasenameConflictError):
       self.execute(self.task_context)
+
+  def test_target_options(self):
+    self.app_target = self._create_target(use_basename_prefix=True)
+    self.task_context = self.context(target_roots=[self.app_target])
+    self._setup_classpath(self.task_context)
+    self.execute(self.task_context)
+    self._check_bundle_products('FooApp')
+
+  def test_cli_suppress_target_options(self):
+    self.set_options(use_basename_prefix=False)
+    self.app_target = self._create_target(use_basename_prefix=True)
+    self.task_context = self.context(target_roots=[self.app_target])
+    self._setup_classpath(self.task_context)
+    self.execute(self.task_context)
+    self._check_bundle_products('foo.foo-app')
 
   def _check_bundle_products(self, bundle_basename):
     products = self.task_context.products.get('jvm_bundles')

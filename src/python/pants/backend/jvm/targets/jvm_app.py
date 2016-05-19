@@ -189,7 +189,17 @@ class JvmApp(Target):
   :API: public
   """
 
-  def __init__(self, name=None, payload=None, binary=None, bundles=None, basename=None, **kwargs):
+  def __init__(self,
+               name=None,
+               payload=None,
+               binary=None,
+               bundles=None,
+               basename=None,
+               deployjar=None,
+               archive=None,
+               archive_prefix=None,
+               use_basename_prefix=None,
+               **kwargs):
     """
     :param string binary: Target spec of the ``jvm_binary`` that contains the
       app main.
@@ -206,6 +216,10 @@ class JvmApp(Target):
       'basename': PrimitiveField(basename or name),
       'binary': PrimitiveField(binary),
       'bundles': BundleField(bundles or []),
+      'deployjar': PrimitiveField(deployjar),
+      'archive': PrimitiveField(archive),
+      'archive_prefix': PrimitiveField(archive_prefix),
+      'use_basename_prefix': PrimitiveField(use_basename_prefix),
       })
     super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 

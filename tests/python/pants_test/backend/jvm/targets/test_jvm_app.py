@@ -37,6 +37,20 @@ class JvmAppTest(BaseTest):
     self.assertEquals(binary_target, app_target.binary)
     self.assertEquals([':foo-binary'], list(app_target.traversable_dependency_specs))
 
+  def test_jvmapp_bundle_payload_fields(self):
+    app_target = self.make_target(':foo_payload',
+                                  JvmApp,
+                                  basename='foo-payload-app',
+                                  archive='zip',
+                                  archive_prefix=False,
+                                  use_basename_prefix=True)
+
+    self.assertEquals('foo-payload-app', app_target.payload.basename)
+    self.assertIsNone(app_target.payload.deployjar)
+    self.assertEquals('zip', app_target.payload.archive)
+    self.assertFalse(app_target.payload.archive_prefix)
+    self.assertTrue(app_target.payload.use_basename_prefix)
+
   def test_bad_basename(self):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmApp.* basename must not equal name.'):
