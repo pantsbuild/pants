@@ -5,6 +5,9 @@ package org.pantsbuild.tools.junit.impl;
 
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
+import org.pantsbuild.tools.junit.lib.AnnotationOverrideClass;
+import org.pantsbuild.tools.junit.lib.ParallelAnnotatedClass;
+import org.pantsbuild.tools.junit.lib.UnannotatedTestClass;
 
 import static org.junit.Assert.assertEquals;
 
@@ -13,7 +16,7 @@ public class SpecTest {
   @Test public void testAddMethod() throws Exception {
     Spec spec = new Spec(UnannotatedTestClass.class);
     assertEquals(UnannotatedTestClass.class, spec.getSpecClass());
-    assertEquals("org.pantsbuild.tools.junit.impl.UnannotatedTestClass",
+    assertEquals("org.pantsbuild.tools.junit.lib.UnannotatedTestClass",
         spec.getSpecName());
     assertEquals(ImmutableList.of(), spec.getMethods());
     spec.addMethod("testMethod");

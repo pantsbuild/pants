@@ -3,25 +3,78 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Comparator;
+import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
+import java.util.ArrayList;
 import java.util.List;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.pantsbuild.junit.annotations.TestSerial;
+import org.pantsbuild.tools.junit.impl.Concurrency;
+import org.pantsbuild.tools.junit.impl.ConsoleRunnerImpl;
 import org.pantsbuild.tools.junit.lib.TestRegistry;
 
-import static org.junit.Assert.fail;
-
 @TestSerial
+@RunWith(Parameterized.class)
 public abstract class ConsoleRunnerTestBase {
+  private static final String DEFAULT_CONCURRENCY_FLAG = "-default-concurrency";
+  private static final String USE_EXPERIMENTAL_RUNNER_FLAG = "-use-experimental-runner";
+  private static final String PARALLEL_THREADS_FLAG = "-parallel-threads";
+
+  private static final String DEFAULT_TEST_PACKGE = "org.pantsbuild.tools.junit.lib.";
+
+  private TestParameters parameters;
+
+  protected enum TestParameters {
+    LEGACY_SERIAL(false, null),
+    LEGACY_PARALLEL_CLASSES(false, Concurrency.PARALLEL_CLASSES),
+    EXPERIMENTAL_SERIAL(true, Concurrency.SERIAL),
+    EXPERIMENTAL_PARALLEL_CLASSES(true, Concurrency.PARALLEL_CLASSES),
+    EXPERIMENTAL_PARALLEL_METHODS(true, Concurrency.PARALLEL_METHODS),
+    EXPERIMENTAL_PARALLEL_BOTH(true, Concurrency.PARALLEL_BOTH);
+
+    public final boolean useExperimentalRunner;
+    public final Concurrency defaultConcurrency;
+
+    TestParameters(boolean useExperimentalRunner, Concurrency defaultConcurrency) {
+      this.useExperimentalRunner = useExperimentalRunner;
+      this.defaultConcurrency = defaultConcurrency;
+    }
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      if (useExperimentalRunner) {
+        sb.append(USE_EXPERIMENTAL_RUNNER_FLAG);
+        sb.append(" ");
+      }
+      if (defaultConcurrency != null) {
+        sb.append(DEFAULT_CONCURRENCY_FLAG);
+        sb.append(" ");
+        sb.append(defaultConcurrency.name());
+      }
+      return sb.toString();
+    }
+  }
+
+  @Parameters(name = "{0}")
+  public static TestParameters[] data() {
+    return TestParameters.values();
+  }
+
+  /**
+   * The Parameterized test runner will invoke this test with each value in the
+   * {@link TestParameters} enum.
+   *
+   * @param parameters A combination of extra parameters to test with.
+   */
+  public ConsoleRunnerTestBase(TestParameters parameters) {
+    this.parameters = parameters;
+  }
+
   @Rule
   public TemporaryFolder temporary = new TemporaryFolder();
 
@@ -38,54 +91,35 @@ public abstract class ConsoleRunnerTestBase {
     ConsoleRunnerImpl.setExitStatus(0);
   }
 
-  protected String[] asArgsArray(String cmdLine) {
-    String[] args = cmdLine.split(" ");
-    for (int i = 0; i < args.length; i++) {
-      if (args[i].contains("Test")) {
-        args[i] = "org.pantsbuild.tools.junit.lib." + args[i];
+  /**
+   * Invokes ConsoleRunner.main() and tacks on optional parameters specified by the parameterized
+   * test runner.
+   */
+  protected void invokeConsoleRunner(String argsString) {
+    List<String> testArgs = new ArrayList<String>();
+    for (String arg : Splitter.on(" ").split(argsString)) {
+      // Prepend the package name to tests to allow shorthand command line invocation
+      if (arg.contains("Test") && !arg.contains(DEFAULT_TEST_PACKGE)) {
+        arg = DEFAULT_TEST_PACKGE + arg;
       }
-    }
-    return args;
-  }
-
-  protected File runTestAndReturnXmlFile(String testClassName, boolean shouldFail)
-      throws IOException, JAXBException {
-    String outdirPath = temporary.newFolder("testOutputDir").getAbsolutePath();
-
-    String[] args = new String[] { testClassName, "-xmlreport", "-outdir", outdirPath};
-    if (shouldFail) {
-      try {
-        ConsoleRunnerImpl.main(args);
-        fail("The ConsoleRunner should throw an exception when running these tests");
-      } catch (RuntimeException ex) {
-        // Expected
-      }
-    } else {
-      ConsoleRunnerImpl.main(args);
+      testArgs.add(arg);
     }
 
-    return new File(outdirPath, "TEST-" + testClassName + ".xml");
-  }
-
-  protected AntJunitXmlReportListener.TestSuite runTestAndParseXml(
-      String testClassName, boolean shouldFail) throws IOException, JAXBException {
-    return parseTestXml(runTestAndReturnXmlFile(testClassName, shouldFail));
-  }
-
-  protected AntJunitXmlReportListener.TestSuite parseTestXml(File testXmlFile)
-      throws IOException, JAXBException {
-    JAXBContext jaxbContext = JAXBContext.newInstance(AntJunitXmlReportListener.TestSuite.class);
-
-    Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
-    return (AntJunitXmlReportListener.TestSuite) jaxbUnmarshaller.unmarshal(testXmlFile);
-  }
-
-  protected void sortTestCasesByName(List<AntJunitXmlReportListener.TestCase> testCases) {
-    Collections.sort(testCases, new Comparator<AntJunitXmlReportListener.TestCase>() {
-      public int compare(AntJunitXmlReportListener.TestCase tc1,
-          AntJunitXmlReportListener.TestCase tc2) {
-        return tc1.getName().compareTo(tc2.getName());
+    // Tack on extra parameters from the Parameterized runner
+    if (!testArgs.contains(DEFAULT_CONCURRENCY_FLAG) && parameters.defaultConcurrency != null) {
+      testArgs.add(DEFAULT_CONCURRENCY_FLAG);
+      testArgs.add(parameters.defaultConcurrency.name());
+      if (!testArgs.contains(PARALLEL_THREADS_FLAG)) {
+        testArgs.add(PARALLEL_THREADS_FLAG);
+        testArgs.add("8");
       }
-    });
+    }
+    if (!testArgs.contains(USE_EXPERIMENTAL_RUNNER_FLAG) && parameters.useExperimentalRunner) {
+      testArgs.add(USE_EXPERIMENTAL_RUNNER_FLAG);
+    }
+    System.out.println("Invoking ConsoleRunnerImpl.main(\""
+        + Joiner.on(' ').join(testArgs) + "\")");
+
+    ConsoleRunnerImpl.main(testArgs.toArray(new String[testArgs.size()]));
   }
 }

@@ -6,6 +6,7 @@ package org.pantsbuild.tools.junit.lib;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
@@ -17,10 +18,17 @@ public class FlakyTest {
   public static int numFlaky2Invocations = 0;
   public static int numFlaky3Invocations = 0;
   public static int numExpectedExceptionMethodInvocations = 0;
-
   public static int numFlakyTestInstantiations = 0;
 
   public int numTestMethodInvocationsPerTestInstance;
+
+  public static void reset() {
+    numFlaky1Invocations = 0;
+    numFlaky2Invocations = 0;
+    numFlaky3Invocations = 0;
+    numExpectedExceptionMethodInvocations = 0;
+    numFlakyTestInstantiations = 0;
+  }
 
   public FlakyTest() {
     numFlakyTestInstantiations++;

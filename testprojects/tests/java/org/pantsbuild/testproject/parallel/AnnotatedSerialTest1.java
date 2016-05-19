@@ -3,6 +3,8 @@
 package org.pantsbuild.testproject.parallel;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.pantsbuild.junit.annotations.TestSerial;
 
@@ -27,8 +29,13 @@ import static org.junit.Assert.assertTrue;
  */
 @TestSerial
 public class AnnotatedSerialTest1 {
-  private static final int WAIT_TIMEOUT_MS = 3000;
+  private static final int WAIT_TIMEOUT_MS = 1000;
   private static AtomicBoolean waiting = new AtomicBoolean(false);
+
+  @BeforeClass
+  public static void before() {
+    waiting.set(false);
+  }
 
   @Test
   public void astest1() throws Exception {

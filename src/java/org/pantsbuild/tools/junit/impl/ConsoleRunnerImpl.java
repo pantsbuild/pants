@@ -7,6 +7,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -21,7 +22,6 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -29,17 +29,16 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
 import org.junit.runner.JUnitCore;
 import org.junit.runner.Request;
 import org.junit.runner.Result;
-import org.junit.runner.RunWith;
 import org.junit.runner.Runner;
 import org.junit.runner.manipulation.Filter;
 import org.junit.runner.notification.Failure;
@@ -50,6 +49,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
+import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
 import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
 
 /**
@@ -464,10 +464,32 @@ public class ConsoleRunnerImpl {
 
   private int runExperimental(List<Spec> parsedTests, JUnitCore core)
       throws InitializationError {
-    Preconditions.checkArgument(!parsedTests.isEmpty());
     Preconditions.checkNotNull(core);
 
-    throw new InitializationError("Experimental Runner: Not Implemented");
+    int failures = 0;
+    SpecSet filter = new SpecSet(parsedTests, defaultConcurrency);
+
+    // TODO(zundel): Test sharding currently isn't compatible with the parallel computer runner
+    // since the Computer only accepts Class objects.
+    if (numTestShards == 0) {
+      // Run all of the parallel tests using the ConcurrentComputer
+      failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_BOTH);
+      failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_CLASSES);
+      failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_METHODS);
+    }
+
+    // Everything else has to run serially or with the legacy runner
+    // TODO(zundel): Attempt to refactor so we can dump runLegacy all together.
+    List<Spec> legacySpecs = ImmutableList.copyOf(filter.specs());
+    failures += runLegacy(legacySpecs, core);
+
+    return failures;
+  }
+
+  private int runConcurrentTests(JUnitCore core, SpecSet specSet, Concurrency concurrency) {
+    Computer junitComputer = new ConcurrentComputer(concurrency, parallelThreads);
+    Class<?>[] classes = specSet.extract(concurrency).classes();
+    return core.run(junitComputer, classes).getFailureCount();
   }
 
   private int runLegacy(List<Spec> parsedTests, JUnitCore core) throws InitializationError {
@@ -556,7 +578,6 @@ public class ConsoleRunnerImpl {
   }
 
   private boolean shouldRunParallelMethods(Class<?> clazz) {
-    // TODO(zundel): Add support for an annotation like TestParallelMethods.
     return this.defaultConcurrency.shouldRunMethodsParallel();
   }
 
@@ -578,7 +599,7 @@ public class ConsoleRunnerImpl {
     // order), and save it in testToRunStatus table.
     class TestFilter extends Filter {
       private int testIdx;
-      private HashMap<String, Boolean> testToRunStatus = new HashMap<String, Boolean>();
+      private HashMap<String, Boolean> testToRunStatus = new LinkedHashMap<String, Boolean>();
 
       @Override
       public boolean shouldRun(Description desc) {
@@ -658,19 +679,15 @@ public class ConsoleRunnerImpl {
           usage = "Show a description of each test and timer for each test class.")
       private boolean perTestTimer;
 
-      // TODO(zundel): Combine -default-parallel and -paralel-methods together into a
-      // single argument:  -default-concurrency {serial, parallel, parallel_methods}
-      // TODO(zundel): Also add a @TestParallelMethods annotation
+      // TODO(zundel): This argument is deprecated, remove in a future release
       @Option(name = "-default-parallel",
-          usage = "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
+          usage = "DEPRECATED: use -default-concurrency instead.\n"
+              + "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
       private boolean defaultParallel;
 
-      @Option(name = "-parallel-methods",
-          usage = "EXPERIMENTAL: Run methods within a class in parallel.")
-      private boolean parallelMethods;
-
       @Option(name = "-default-concurrency",
-          usage = "Specify how to parallelize running tests.")
+          usage = "Specify how to parallelize running tests.\n"
+          + "Use -use-experimental-runner for PARALLEL_METHODS and PARALLEL_BOTH")
       private Concurrency defaultConcurrency;
 
       private int parallelThreads = 0;
@@ -754,7 +771,7 @@ public class ConsoleRunnerImpl {
     }
 
     options.defaultConcurrency = computeConcurrencyOption(options.defaultConcurrency,
-        options.defaultParallel, options.parallelMethods);
+        options.defaultParallel);
 
     ConsoleRunnerImpl runner =
         new ConsoleRunnerImpl(options.failFast,
@@ -785,29 +802,25 @@ public class ConsoleRunnerImpl {
         tests.add(test);
       }
     }
-
     runner.run(tests);
   }
 
   /**
-   * Used to convert the legacy -default-parallel and -parallel-methods options to the new
+   * Used to convert the legacy -default-parallel option to the new
    * style -default-concurrency values
    */
   @VisibleForTesting
   static Concurrency computeConcurrencyOption(Concurrency defaultConcurrency,
-      boolean defaultParallel, boolean parallelMethods) {
+      boolean defaultParallel) {
 
     if (defaultConcurrency != null) {
       // -default-concurrency option present - use it.
       return defaultConcurrency;
     }
 
-    // Fall Back to using -default-parallel and -parallel-methods
+    // Fall Back to using -default-parallel
     if (!defaultParallel) {
       return Concurrency.SERIAL;
-    }
-    if (parallelMethods) {
-      return Concurrency.PARALLEL_BOTH;
     }
     return Concurrency.PARALLEL_CLASSES;
   }
