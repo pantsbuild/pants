@@ -3,7 +3,7 @@
 
 python_library(
   name='fetchers',
-  sources=['archive_retriever.py', 'fetcher.py', 'fetcher_factory.py',
+  sources=['archive_retriever.py', 'fetch_error.py', 'fetcher.py', 'fetcher_factory.py',
            'go_import_meta_tag_reader.py', 'imported_repo.py'],
   dependencies=[
     '3rdparty/python:requests',

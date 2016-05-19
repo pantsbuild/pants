@@ -12,6 +12,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
 from pants.contrib.go.subsystems.archive_retriever import ArchiveRetriever
+from pants.contrib.go.subsystems.fetch_error import FetchError
 from pants.contrib.go.subsystems.fetcher import ArchiveFetcher, CloningFetcher
 from pants.contrib.go.subsystems.go_import_meta_tag_reader import GoImportMetaTagReader
 
@@ -63,6 +64,10 @@ class FetcherFactory(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(FetcherFactory, cls).register_options(register)
+    register('--disallow-cloning-fetcher', type=bool, default=False, advanced=True,
+             help="If True, we only fetch archives explicitly matched by --matchers."
+                  "Otherwise we fall back to cloning the remote repos, using Go's standard "
+                  "remote dependency resolution protocol.")
     register('--matchers', metavar='<mapping>', type=dict,
              default=cls._DEFAULT_MATCHERS, advanced=True,
              help="A mapping from a remote import path matching regex to an UrlInfo struct "
@@ -97,6 +102,9 @@ class FetcherFactory(Subsystem):
                                                    unexpanded_url_info.strip_level)
         return ArchiveFetcher(import_path, match.group(0), expanded_url_info,
                               ArchiveRetriever.global_instance())
+    if self.get_options().disallow_cloning_fetcher:
+      raise FetchError('Cannot fetch {}. No archive match, and remote repo cloning '
+                       'disallowed.'.format(import_path))
     return CloningFetcher(import_path, GoImportMetaTagReader.global_instance())
 
   @memoized_property

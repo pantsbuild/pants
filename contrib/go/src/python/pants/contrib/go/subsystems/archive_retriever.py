@@ -16,6 +16,8 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir, temporary_file
 from six.moves.urllib.parse import urlparse
 
+from pants.contrib.go.subsystems.fetch_error import FetchError
+
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ class ArchiveRetriever(Subsystem):
     try:
       archiver = archiver_for_path(archive_url)
     except ValueError:
-      raise self.FetchError("Don't know how to unpack archive at url {}".format(archive_url))
+      raise FetchError("Don't know how to unpack archive at url {}".format(archive_url))
 
     with self._fetch(archive_url) as archive:
       if strip_level == 0:
@@ -75,7 +77,7 @@ class ArchiveRetriever(Subsystem):
     logger.info('Downloading {}...'.format(url))
     with closing(self._session().get(url, stream=True)) as res:
       if res.status_code != requests.codes.ok:
-        raise self.FetchError('Failed to download {} ({} error)'.format(url, res.status_code))
+        raise FetchError('Failed to download {} ({} error)'.format(url, res.status_code))
       with temporary_file() as archive_fp:
         # NB: Archives might be very large so we play it safe and buffer them to disk instead of
         # memory before unpacking.

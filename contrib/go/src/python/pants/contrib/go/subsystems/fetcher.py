@@ -12,7 +12,7 @@ from collections import namedtuple
 from pants.scm.git import Git
 from pants.util.meta import AbstractClass
 
-from pants.contrib.go.subsystems.go_import_meta_tag_reader import GoImportMetaTagReader
+from pants.contrib.go.subsystems.fetch_error import FetchError
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 
 
@@ -21,9 +21,6 @@ logger = logging.getLogger(__name__)
 
 class Fetcher(AbstractClass):
   """Knows how to interpret remote import paths and fetch code to satisfy them."""
-
-  class FetchError(Exception):
-    """Indicates an error fetching remote code."""
 
   def __init__(self, import_path):
     self._import_path = import_path
@@ -59,7 +56,7 @@ class Fetcher(AbstractClass):
                         remote library's contents to.
     :param string rev: The version to fetch - may be `None` or empty indicating the latest version
                        should be fetched.
-    :raises: :class:`Fetcher.FetchError` if there was a problem fetching the remote package.
+    :raises: :class:`FetchError` if there was a problem fetching the remote package.
     """
 
 
@@ -87,13 +84,13 @@ class CloningFetcher(Fetcher):
       return None
 
   def fetch(self, dest, rev=None):
-    imported_repo = GoImportMetaTagReader.global_instance().get_imported_repo(self.import_path)
+    imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
     if not imported_repo:
-      raise self.FetchError('No <meta name="go-import"> tag found, so cannot fetch repo '
-                            'at {}'.format(self.import_path))
+      raise FetchError('No <meta name="go-import"> tag found, so cannot fetch repo '
+                       'at {}'.format(self.import_path))
     if imported_repo.vcs != 'git':
       # TODO: Support other vcs systems as needed.
-      raise self.FetchError("Don't know how to fetch for vcs type {}.".format(imported_repo.vcs))
+      raise FetchError("Don't know how to fetch for vcs type {}.".format(imported_repo.vcs))
     # TODO: Do this in a workunit.
     logger.info('Cloning {} into {}'.format(imported_repo.url, dest))
     repo = Git.clone(imported_repo.url, dest)
@@ -127,7 +124,12 @@ class ArchiveFetcher(Fetcher):
     pkg = GoRemoteLibrary.remote_package_path(self.root(), self.import_path)
     archive_url = self._url_info.url_format.format(rev=rev or self._url_info.default_rev,
                                                    pkg=pkg, import_prefix=self.root())
-    self._fetch(archive_url, self._url_info.strip_level, dest)
+    try:
+      self._fetch(archive_url, self._url_info.strip_level, dest)
+    except FetchError as e:
+      # Modify the message to add more information, then reraise with the original traceback.
+      e.add_message_prefix('Error while fetching import {}: '.format(self.import_path))
+      raise
 
   def _fetch(self, archive_url, strip_level, dest):
     # Note: Broken out into a separate function so we can mock it out easily in tests.

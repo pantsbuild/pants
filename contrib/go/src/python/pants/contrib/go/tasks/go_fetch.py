@@ -31,6 +31,13 @@ class GoFetch(GoTask):
   def product_types(cls):
     return ['go_remote_lib_src']
 
+  @classmethod
+  def register_options(cls, register):
+    register('--skip-meta-tag-resolution', advanced=True, type=bool, default=False,
+             removal_version='1.2.0',
+             removal_hint='Use --disallow-cloning-fetcher on scope go-fetchers instead.',
+             help='Whether to ignore meta tag resolution when resolving remote libraries.')
+
   @property
   def cache_target_dirs(self):
     # TODO(John Sirois): See TODO in _transitive_download_remote_libs, re-consider how artifact
