@@ -1,7 +1,7 @@
 1.0.x Stable Releases
 =====================
 
-This document describes releases from the `1.0.x` `stable` branch.
+This document describes releases from the ``1.0.x`` ``stable`` branch.
 
 1.0.0-rc3 (04/26/2016)
 ----------------------

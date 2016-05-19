@@ -1,8 +1,8 @@
 Master Pre-Releases
 ===================
 
-This document describes `pre` releases which occur weekly from master, and which do
-not undergo the vetting associated with `stable` releases.
+This document describes ``pre`` releases which occur weekly from master, and which do
+not undergo the vetting associated with ``stable`` releases.
 
 1.1.0-pre1 (05/17/2016)
 -----------------------
