@@ -13,11 +13,11 @@ import org.junit.runners.model.Statement;
 /**
  * A Runner for running composite requests in a concurrent fashion.
  */
-public class ConcurrentCompositeRequest extends CompositeRequest {
+public class ConcurrentCompositeRequestRunner extends CompositeRequestRunner {
 
   private final ConcurrentRunnerScheduler runnerScheduler;
 
-  public ConcurrentCompositeRequest(List<Request> requests, Concurrency defaultConcurrency,
+  public ConcurrentCompositeRequestRunner(List<Request> requests, Concurrency defaultConcurrency,
       int numThreads)
       throws InitializationError {
     super(requests);
