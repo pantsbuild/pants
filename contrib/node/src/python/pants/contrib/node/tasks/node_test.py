@@ -30,7 +30,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
   def supports_passthru_args(cls):
     return True
 
-  def _run_node_distribution_command(self, command, workunit, **kwargs):
+  def _run_node_distribution_command(self, command, workunit):
     """Overrides NodeTask._run_node_distribution_command.
 
     This is what execute_npm ultimately uses to run the NodeDistribution.Command.
@@ -38,7 +38,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
     command.run immediately. We override here to invoke TestRunnerTaskMixin._spawn_and_wait,
     which ultimately invokes _spawn, which finally calls command.run.
     """
-    return self._spawn_and_wait(command, workunit, **kwargs)
+    return self._spawn_and_wait(command, workunit)
 
   def _get_test_targets_for_spawn(self):
     """Overrides TestRunnerTaskMixin._get_test_targets_for_spawn.
@@ -64,19 +64,17 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
 
       with pushd(node_path):
         self._currently_executing_test_targets = [target]
-        result, npm_test_command = self.execute_npm(args=args,
-                                                    workunit_labels=[WorkUnitLabel.TEST])
+        result, npm_test_command = self.execute_npm(args, workunit_labels=[WorkUnitLabel.TEST])
         if result != 0:
           raise TaskError('npm test script failed:\n'
                           '\t{} failed with exit code {}'.format(npm_test_command, result))
 
     self._currently_executing_test_targets = []
 
-  def _spawn(self, command, workunit, **kwargs):
+  def _spawn(self, command, workunit):
     """Implements abstract TestRunnerTaskMixin._spawn."""
     process = command.run(stdout=workunit.output('stdout'),
-                          stderr=workunit.output('stderr'),
-                          **kwargs)
+                          stderr=workunit.output('stderr'))
     return SubprocessProcessHandler(process)
 
   def _test_target_filter(self):
