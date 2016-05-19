@@ -20,14 +20,13 @@ The release manager for a particular week decides whether to cut `stable` or `pr
 both!) based on the following criteria:
 
 1. Decide whether to create a _new_ `stable` branch:
-    * If it is an "even" week, the release manager
-should inspect changes that have landed in master since the previous `stable` branch was created, and
-decide whether the changes justify a new `stable` branch (this is intentionally left open
-for discussion). If a new `stable` branch is justified, it will be either a `major` or `minor` branch
-(described below).
-    * If for any reason a new `stable` branch is _not_ created, perhaps because it is an "odd" week, or
-because the release manager decided there was insufficient change in master to justify the stable
-vetting process, the release manager must cut a `pre` release from master instead.
+    * If it has been approximately [[three months|pants('src/docs:deprecation_policy')]] since the
+previous `stable` branch, the release manager should inspect changes that have landed in master
+since the previous `stable` branch was created, and decide whether the changes justify a new
+`stable` branch (this is intentionally left open for discussion). If a new `stable` branch is
+justified, it will be either a `major` or `minor` branch (described below).
+    * If a new `stable` branch is _not_ created (because of insufficient time/change to justify the
+stable vetting process), the release manager must cut a `pre` release from master instead.
 2. In addition to any `pre` release or newly-created `stable` branches, the release manager should
 determine whether any existing `stable` branches need new release candidates by inspecting the
 [Pants Backport Proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
@@ -51,16 +50,17 @@ to bugfixing and testing by pants contributors on a release candidate announceme
 below).
 
 #### `major` and `minor` stable branches
-The decision to create a `major` or a `minor` stable branch is based on the impact of the changes.
+The decision to create a `major` or a `minor` stable branch is based on consensus on
+[[pants-devel@|pants('src/docs:howto_contribute')]] as to the impact of the changes.
 `major` releases signify large or breaking changes. `minor` releases however should be compatible
 with the last two `minor` releases. In other words if a feature is deprecated in version `1.2.x`
 you should be able to continue using that feature at least through version `1.4.0`.
 
 #### `patch` stable Releases
 In order to allow us to react quickly to bugs, `patch` fixes are released for `stable` branches as
-needed and should always consist of fixes backported from master. These releases update the patch
-version number, (ie, from `1.0.x` to `1.0.y`) and should only include commits from the Pants
-Backport Proposals that are deemed to be
+needed and should always consist of fixes or small backwards-compatible features backported from
+master. These releases update the patch version number, (ie, from `1.0.x` to `1.0.y`) and should
+only include commits from the Pants Backport Proposals that are deemed to be
 [[backwards compatible|pants('src/docs:deprecation_policy')]].
 
 ## Naming conventions
@@ -80,10 +80,10 @@ and N is the next sequential number starting from `0`. For instance: "the `1.1.0
 
 ## Examples
 
-* Leading up to the release of `1.0.0` the release manager would create a `stable` branch with
-the literal name "`1.0.x`". They would cut release candidates named `1.0.0-rc0` (and so on), and
-afterwards, they'd finalize the `1.0.0` release in that `1.0.x` branch by tagging the
-commit with the release version: `v1.0.0`.
+* Leading up to the release of `2.0.0` the release manager would create a `stable` branch with
+the literal name "`2.0.x`". They would cut release candidates named `2.0.0-rc0` (and so on), and
+afterwards, they'd finalize the `2.0.0` release in that `2.0.x` branch by tagging the
+commit with the release version: `v2.0.0`.
 
 * If a release manager had a bugfix from master that they needed to backport to the `1.1.x` `stable`
 branch, they would cherry-pick the commit to the `1.1.x` branch, run a series of release candidates
