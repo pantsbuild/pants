@@ -11,6 +11,7 @@ import mock
 import psutil
 
 from pants.java.nailgun_executor import NailgunExecutor
+from pants_test.base_test import METADATA_BASE_DIR
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -27,7 +28,8 @@ class NailgunExecutorTest(unittest.TestCase):
     self.executor = NailgunExecutor(identity='test',
                                     workdir='/__non_existent_dir',
                                     nailgun_classpath=[],
-                                    distribution=mock.Mock())
+                                    distribution=mock.Mock(),
+                                    metadata_base_dir=METADATA_BASE_DIR)
 
   def test_is_alive_override(self):
     with mock.patch.object(NailgunExecutor, '_as_process', **PATCH_OPTS) as mock_as_process:

@@ -46,7 +46,8 @@ class PantsDaemon(ProcessManager):
   class StartupFailure(Exception): pass
   class RuntimeFailure(Exception): pass
 
-  def __init__(self, build_root, work_dir, log_level, log_dir=None, services=None):
+  def __init__(self, build_root, work_dir, log_level, log_dir=None, services=None,
+               metadata_base_dir=None):
     """
     :param string build_root: The pants build root.
     :param string work_dir: The pants work directory.
@@ -54,7 +55,7 @@ class PantsDaemon(ProcessManager):
     :param string log_dir: The directory to use for file-based logging via the daemon. (Optional)
     :param tuple services: A tuple of PantsService instances to launch/manage. (Optional)
     """
-    super(PantsDaemon, self).__init__(name='pantsd')
+    super(PantsDaemon, self).__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
     self._logger = logging.getLogger(__name__)
     self._build_root = build_root
     self._work_dir = work_dir

@@ -25,7 +25,7 @@ class Watchman(ProcessManager):
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
   def __init__(self, watchman_path, work_dir, log_level='1', timeout=SOCKET_TIMEOUT_SECONDS,
-               socket_path_override=None):
+               socket_path_override=None, metadata_base_dir=None):
     """
     :param str watchman_path: The path to the watchman binary.
     :param str work_dir: The path to the pants work dir.
@@ -33,8 +33,12 @@ class Watchman(ProcessManager):
     :param str log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging,
                           '1' for standard logging and '2' for verbose logging.
     :param str socket_path_override: The overridden target path of the watchman socket, if any.
+    :param str metadata_base_dir: The overriden metadata base dir for `ProcessMetadataManager`.
     """
-    super(Watchman, self).__init__(name='watchman', process_name='watchman', socket_type=str)
+    super(Watchman, self).__init__(name='watchman',
+                                   process_name='watchman',
+                                   socket_type=str,
+                                   metadata_base_dir=metadata_base_dir)
     self._watchman_path = self._normalize_watchman_path(watchman_path)
     self._watchman_work_dir = os.path.join(work_dir, self.name)
     self._log_level = log_level

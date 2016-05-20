@@ -15,7 +15,7 @@ import pywatchman
 
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants_test.base_test import BaseTest
+from pants_test.base_test import METADATA_BASE_DIR, BaseTest
 
 
 class TestWatchman(BaseTest):
@@ -32,7 +32,9 @@ class TestWatchman(BaseTest):
     BaseTest.setUp(self)
     with mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_is_valid:
       mock_is_valid.return_value = True
-      self.watchman = Watchman('/fake/path/to/watchman', self.WORK_DIR)
+      self.watchman = Watchman('/fake/path/to/watchman',
+                               self.WORK_DIR,
+                               metadata_base_dir=METADATA_BASE_DIR)
 
   def test_client_property(self):
     self.assertIsInstance(self.watchman.client, pywatchman.client)
@@ -49,7 +51,9 @@ class TestWatchman(BaseTest):
 
   def test_resolve_watchman_path_provided_exception(self):
     with self.assertRaises(Watchman.ExecutionError):
-      self.watchman = Watchman('/fake/path/to/watchman', self.WORK_DIR)
+      self.watchman = Watchman('/fake/path/to/watchman',
+                               self.WORK_DIR,
+                               metadata_base_dir=METADATA_BASE_DIR)
 
   def test_maybe_init_metadata(self):
     with mock.patch('pants.pantsd.watchman.safe_mkdir', **self.PATCH_OPTS) as mock_mkdir, \

@@ -17,6 +17,7 @@ from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessM
                                           swallow_psutil_exceptions)
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
+from pants_test.base_test import METADATA_BASE_DIR
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -30,7 +31,7 @@ def fake_process(**kwargs):
 
 class TestProcessGroup(unittest.TestCase):
   def setUp(self):
-    self.pg = ProcessGroup('test')
+    self.pg = ProcessGroup('test', metadata_base_dir=METADATA_BASE_DIR)
 
   def test_swallow_psutil_exceptions(self):
     with swallow_psutil_exceptions():
@@ -70,77 +71,85 @@ class TestProcessMetadataManager(unittest.TestCase):
   TEST_VALUE_INT = 300
   BUILDROOT = '/mock_buildroot/'
 
+  def setUp(self):
+    self.pmm = ProcessMetadataManager(metadata_base_dir=METADATA_BASE_DIR)
+
   def test_maybe_cast(self):
-    self.assertIsNone(ProcessMetadataManager()._maybe_cast(None, int))
-    self.assertEqual(ProcessMetadataManager()._maybe_cast('3333', int), 3333)
-    self.assertEqual(ProcessMetadataManager()._maybe_cast('ssss', int), 'ssss')
+    self.assertIsNone(self.pmm._maybe_cast(None, int))
+    self.assertEqual(self.pmm._maybe_cast('3333', int), 3333)
+    self.assertEqual(self.pmm._maybe_cast('ssss', int), 'ssss')
 
   def test_get_metadata_dir_by_name(self):
-    with mock.patch('pants.pantsd.process_manager.get_buildroot') as mock_buildroot:
-      mock_buildroot.return_value = self.BUILDROOT
-      self.assertEqual(ProcessMetadataManager()._get_metadata_dir_by_name(self.NAME),
-                       os.path.join(self.BUILDROOT, '.pids', self.NAME))
+    self.pmm = ProcessMetadataManager(metadata_base_dir=self.BUILDROOT)
+    self.assertEqual(self.pmm._get_metadata_dir_by_name(self.NAME),
+                     os.path.join(self.BUILDROOT, self.NAME))
 
   def test_maybe_init_metadata_dir_by_name(self):
     with mock.patch('pants.pantsd.process_manager.safe_mkdir', **PATCH_OPTS) as mock_mkdir:
-      ProcessMetadataManager()._maybe_init_metadata_dir_by_name(self.NAME)
+      self.pmm._maybe_init_metadata_dir_by_name(self.NAME)
       mock_mkdir.assert_called_once_with(
-        ProcessMetadataManager()._get_metadata_dir_by_name(self.NAME))
+        self.pmm._get_metadata_dir_by_name(self.NAME))
 
   def test_readwrite_metadata_by_name(self):
     with temporary_dir() as tmpdir, \
          mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
-      ProcessMetadataManager().write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
+      self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
       self.assertEqual(
-        ProcessMetadataManager().read_metadata_by_name(self.NAME, self.TEST_KEY),
+        self.pmm.read_metadata_by_name(self.NAME, self.TEST_KEY),
         self.TEST_VALUE
       )
       self.assertEqual(
-        ProcessMetadataManager().read_metadata_by_name(self.NAME, self.TEST_KEY, int),
+        self.pmm.read_metadata_by_name(self.NAME, self.TEST_KEY, int),
         self.TEST_VALUE_INT
       )
 
   def test_deadline_until(self):
-    with self.assertRaises(ProcessMetadataManager().Timeout):
-      ProcessMetadataManager()._deadline_until(lambda: False, timeout=.1)
+    with self.assertRaises(self.pmm.Timeout):
+      self.pmm._deadline_until(lambda: False, timeout=.1)
 
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
       safe_file_dump(test_filename, 'test')
-      ProcessMetadataManager()._wait_for_file(test_filename, timeout=.1)
+      self.pmm._wait_for_file(test_filename, timeout=.1)
 
   def test_wait_for_file_timeout(self):
     with temporary_dir() as td:
-      with self.assertRaises(ProcessMetadataManager().Timeout):
-        ProcessMetadataManager()._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
+      with self.assertRaises(self.pmm.Timeout):
+        self.pmm._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
 
   def test_await_metadata_by_name(self):
     with temporary_dir() as tmpdir, \
          mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
-      ProcessMetadataManager().write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
+      self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
 
       self.assertEquals(
-        ProcessMetadataManager().await_metadata_by_name(self.NAME, self.TEST_KEY, .1),
+        self.pmm.await_metadata_by_name(self.NAME, self.TEST_KEY, .1),
         self.TEST_VALUE
       )
 
   def test_purge_metadata(self):
     with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
-      ProcessMetadataManager().purge_metadata_by_name(self.NAME)
+      self.pmm.purge_metadata_by_name(self.NAME)
     self.assertGreater(mock_rm.call_count, 0)
 
   def test_purge_metadata_error(self):
     with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
       mock_rm.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
       with self.assertRaises(ProcessManager.MetadataError):
-        ProcessMetadataManager().purge_metadata_by_name(self.NAME)
+        self.pmm.purge_metadata_by_name(self.NAME)
     self.assertGreater(mock_rm.call_count, 0)
 
 
 class TestProcessManager(unittest.TestCase):
   def setUp(self):
-    self.pm = ProcessManager('test')
+    # N.B. We pass in `metadata_base_dir` here because ProcessManager (itself a non-task/non-
+    # subsystem) depends on an initialized `GlobalOptions` subsystem for the value of
+    # `--pants-subprocessdir` in the default case. This is normally provided by GoalRunner's
+    # global subsystem dependencies in a typical pants run (and integration tests), but not in
+    # unit tests. Thus, passing this parameter here short-circuits the subsystem-reliant path for
+    # the purposes of testing without requiring adhoc subsystem initialization.
+    self.pm = ProcessManager('test', metadata_base_dir=METADATA_BASE_DIR)
 
   def test_process_properties(self):
     with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:

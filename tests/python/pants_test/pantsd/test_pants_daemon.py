@@ -12,7 +12,7 @@ import mock
 from pants.pantsd.pants_daemon import PantsDaemon, _StreamLogger
 from pants.pantsd.service.pants_service import PantsService
 from pants.util.contextutil import stdio_as
-from pants_test.base_test import BaseTest
+from pants_test.base_test import METADATA_BASE_DIR, BaseTest
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -47,7 +47,8 @@ class PantsDaemonTest(BaseTest):
     self.pantsd = PantsDaemon('test_buildroot',
                               'test_work_dir',
                               logging.INFO,
-                              log_dir='/non_existent')
+                              log_dir='/non_existent',
+                              metadata_base_dir=METADATA_BASE_DIR)
     self.pantsd.set_services([])
     self.pantsd.set_socket_map({})
 

@@ -76,7 +76,8 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-distdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'dist'),
              help='Write end-product artifacts to this dir.')
-    register('--pants-subprocessdir', advanced=True, type=str, default=None,
+    register('--pants-subprocessdir', advanced=True, type=str,
+             default=os.path.join(buildroot, '.pids'),
              help='The directory to use for tracking subprocess metadata, if any. This should '
                   'generally live outside of the dir used by `--pants-workdir`.')
     register('--pants-config-files', advanced=True, type=list,

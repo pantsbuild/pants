@@ -16,6 +16,7 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
+from pants.option.subsystem.global_options import GlobalOptions
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 
 
@@ -36,12 +37,16 @@ def swallow_psutil_exceptions():
 class ProcessGroup(object):
   """Wraps a logical group of processes and provides convenient access to ProcessManager objects."""
 
-  def __init__(self, name):
+  def __init__(self, name, metadata_base_dir=None):
     self._name = name
+    self._metadata_base_dir = metadata_base_dir
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
-    return ProcessManager(name=process.name(), pid=process.pid, process_name=process.name())
+    return ProcessManager(name=process.name(),
+                          pid=process.pid,
+                          process_name=process.name(),
+                          metadata_base_dir=self._metadata_base_dir)
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
@@ -68,7 +73,11 @@ class ProcessMetadataManager(object):
     :param str metadata_base_dir: The base directory for process metadata.
     """
     super(ProcessMetadataManager, self).__init__()
-    self._metadata_base_dir = metadata_base_dir or os.path.join(get_buildroot(), '.pids')
+
+    self._metadata_base_dir = (
+      metadata_base_dir or
+      GlobalOptions.Factory.global_instance().create().get_global_option('pants_subprocessdir')
+    )
 
   @staticmethod
   def _maybe_cast(item, caster):
@@ -207,8 +216,7 @@ class ProcessManager(ProcessMetadataManager):
     :param string socket: The socket metadata. Overrides fetching of the self.socket @property.
     :param string process_name: The process name for cmdline executable name matching.
     :param type socket_type: The type to be used for socket type casting (e.g. int).
-    :param str metadata_base_dir: The base directory for process metadata.
-                                  (Defaults to `<buildroot>/.pids`).
+    :param str metadata_base_dir: The overridden base directory for process metadata.
     """
     super(ProcessManager, self).__init__(metadata_base_dir)
     self._name = name

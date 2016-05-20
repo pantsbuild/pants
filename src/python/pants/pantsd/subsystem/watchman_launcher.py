@@ -36,7 +36,10 @@ class WatchmanLauncher(object):
                help='The watchman UNIX socket path. This can be overridden if the default absolute '
                     'path length exceeds the maximum allowed by the OS (~104-108 characters).')
 
-    def create(self):
+    def create(self, metadata_base_dir=None):
+      """
+      :param str metadata_base_dir: An optional override of ProcessManager's metadata_base_dir.
+      """
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
       return WatchmanLauncher(binary_util,
@@ -45,10 +48,11 @@ class WatchmanLauncher(object):
                               options.version,
                               options.supportdir,
                               options.socket_timeout,
-                              options.socket_path)
+                              options.socket_path,
+                              metadata_base_dir)
 
   def __init__(self, binary_util, workdir, log_level, watchman_version, watchman_supportdir,
-               socket_timeout, socket_path_override=None):
+               socket_timeout, socket_path_override=None, metadata_base_dir=None):
     """
     :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
     :param workdir: The current pants workdir.
@@ -64,6 +68,7 @@ class WatchmanLauncher(object):
     self._watchman_supportdir = watchman_supportdir
     self._socket_timeout = socket_timeout
     self._socket_path_override = socket_path_override
+    self._metadata_base_dir = metadata_base_dir
     self._log_level = log_level
     self._logger = logging.getLogger(__name__)
     self._watchman = None
@@ -86,7 +91,8 @@ class WatchmanLauncher(object):
                     self._workdir,
                     self._convert_log_level(self._log_level),
                     self._socket_timeout,
-                    self._socket_path_override)
+                    self._socket_path_override,
+                    self._metadata_base_dir)
 
   def maybe_launch(self):
     if not self.watchman.is_alive():

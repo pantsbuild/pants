@@ -12,6 +12,7 @@ from collections import defaultdict
 from tempfile import mkdtemp
 from textwrap import dedent
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -30,6 +31,9 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context
 from pants_test.option.util.fakes import create_options_for_optionables
+
+
+METADATA_BASE_DIR = os.path.join(get_buildroot(), '.pids')
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
