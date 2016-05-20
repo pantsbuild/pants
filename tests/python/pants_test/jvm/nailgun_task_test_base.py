@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunProcessGroup
+from pants_test.base_test import METADATA_BASE_DIR
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -27,4 +28,4 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
     :API: public
     """
     # Kill any nailguns launched in our ephemeral build root.
-    NailgunProcessGroup().killall()
+    NailgunProcessGroup(metadata_base_dir=METADATA_BASE_DIR).killall()
