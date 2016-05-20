@@ -27,7 +27,6 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
-from pants.option.subsystem.global_options import GlobalOptions
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
@@ -217,14 +216,7 @@ class GoalRunner(object):
   @classmethod
   def subsystems(cls):
     # Subsystems used outside of any task.
-    return {
-      GlobalOptions.Factory,
-      SourceRootConfig,
-      Reporting,
-      Reproducer,
-      RunTracker,
-      PantsDaemonLauncher.Factory
-    }
+    return {SourceRootConfig, Reporting, Reproducer, RunTracker, PantsDaemonLauncher.Factory}
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir

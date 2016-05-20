@@ -11,7 +11,7 @@ import mock
 
 from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 from pants.pantsd.watchman import Watchman
-from pants_test.base_test import METADATA_BASE_DIR, BaseTest
+from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
@@ -20,7 +20,7 @@ class TestWatchmanLauncher(BaseTest):
   def watchman_launcher(self, options=None):
     options = options or {}
     with subsystem_instance(WatchmanLauncher.Factory, **options) as factory:
-      yield factory.create(metadata_base_dir=METADATA_BASE_DIR)
+      yield factory.create()
 
   def create_mock_watchman(self, is_alive):
     mock_watchman = mock.create_autospec(Watchman, spec_set=False)

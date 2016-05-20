@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 
 from pants.binaries.binary_util import BinaryUtil
+from pants.option.subsystem.global_options import GlobalOptions
 from pants.pantsd.watchman import Watchman
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import testable_memoized_property
@@ -21,7 +22,7 @@ class WatchmanLauncher(object):
 
     @classmethod
     def subsystem_dependencies(cls):
-      return (BinaryUtil.Factory,)
+      return (BinaryUtil.Factory, GlobalOptions.Factory)
 
     @classmethod
     def register_options(cls, register):
@@ -33,13 +34,10 @@ class WatchmanLauncher(object):
       register('--socket-timeout', type=float, advanced=True, default=Watchman.SOCKET_TIMEOUT_SECONDS,
                help='The watchman client socket timeout (in seconds).')
       register('--socket-path', type=str, advanced=True, default=None,
-               help='The watchman UNIX socket path. This can be overridden if the default absolute '
-                    'path length exceeds the maximum allowed by the OS (~104-108 characters).')
+               help='The path to the watchman UNIX socket. This can be overridden if the default '
+                    'absolute path length exceeds the maximum allowed by the OS.')
 
-    def create(self, metadata_base_dir=None):
-      """
-      :param str metadata_base_dir: An optional override of ProcessManager's metadata_base_dir.
-      """
+    def create(self):
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
       return WatchmanLauncher(binary_util,
@@ -48,11 +46,10 @@ class WatchmanLauncher(object):
                               options.version,
                               options.supportdir,
                               options.socket_timeout,
-                              options.socket_path,
-                              metadata_base_dir)
+                              options.socket_path)
 
   def __init__(self, binary_util, workdir, log_level, watchman_version, watchman_supportdir,
-               socket_timeout, socket_path_override=None, metadata_base_dir=None):
+               socket_timeout, socket_path_override=None):
     """
     :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
     :param workdir: The current pants workdir.
@@ -68,7 +65,6 @@ class WatchmanLauncher(object):
     self._watchman_supportdir = watchman_supportdir
     self._socket_timeout = socket_timeout
     self._socket_path_override = socket_path_override
-    self._metadata_base_dir = metadata_base_dir
     self._log_level = log_level
     self._logger = logging.getLogger(__name__)
     self._watchman = None
@@ -91,8 +87,7 @@ class WatchmanLauncher(object):
                     self._workdir,
                     self._convert_log_level(self._log_level),
                     self._socket_timeout,
-                    self._socket_path_override,
-                    self._metadata_base_dir)
+                    self._socket_path_override)
 
   def maybe_launch(self):
     if not self.watchman.is_alive():

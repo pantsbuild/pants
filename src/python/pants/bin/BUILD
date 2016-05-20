@@ -38,7 +38,6 @@ python_library(
     'src/python/pants/help',
     'src/python/pants/logging',
     'src/python/pants/option',
-    'src/python/pants/option/subsystem:global_options',
     'src/python/pants/pantsd/subsystem:pants_daemon_launcher',
     'src/python/pants/reporting',
     'src/python/pants/subsystem',

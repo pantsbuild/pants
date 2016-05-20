@@ -9,6 +9,7 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.option.subsystem.global_options import GlobalOptions
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
@@ -42,7 +43,7 @@ class PantsDaemonLauncher(object):
     @classmethod
     def subsystem_dependencies(cls):
       return super(PantsDaemonLauncher.Factory,
-                   cls).subsystem_dependencies() + (WatchmanLauncher.Factory,)
+                   cls).subsystem_dependencies() + (WatchmanLauncher.Factory, GlobalOptions.Factory)
 
     def create(self, engine_initializer=None):
       """

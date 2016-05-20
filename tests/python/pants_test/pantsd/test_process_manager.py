@@ -145,10 +145,10 @@ class TestProcessManager(unittest.TestCase):
   def setUp(self):
     # N.B. We pass in `metadata_base_dir` here because ProcessManager (itself a non-task/non-
     # subsystem) depends on an initialized `GlobalOptions` subsystem for the value of
-    # `--pants-subprocessdir` in the default case. This is normally provided by GoalRunner's
-    # global subsystem dependencies in a typical pants run (and integration tests), but not in
-    # unit tests. Thus, passing this parameter here short-circuits the subsystem-reliant path for
-    # the purposes of testing without requiring adhoc subsystem initialization.
+    # `--pants-subprocessdir` in the default case. This is normally provided by subsystem
+    # dependencies in a typical pants run (and integration tests), but not in unit tests.
+    # Thus, passing this parameter here short-circuits the subsystem-reliant path for the
+    # purposes of unit testing without requiring adhoc subsystem initialization.
     self.pm = ProcessManager('test', metadata_base_dir=METADATA_BASE_DIR)
 
   def test_process_properties(self):
