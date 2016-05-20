@@ -1,5 +1,8 @@
-Release History
-===============
+Master Pre-Releases
+===================
+
+This document describes ``pre`` releases which occur weekly from master, and which do
+not undergo the vetting associated with ``stable`` releases.
 
 1.1.0-pre1 (05/17/2016)
 -----------------------
@@ -361,23 +364,6 @@ New Engine Work
 * [engine] Support for synthetic target injection
   `RB #3738 <https://rbcommons.com/s/twitter/r/3738>`_
 
-
-1.0.0-rc3 (04/26/2016)
-----------------------
-
-Cherry pick fixes for problems found in RC1
-
-API Changes
-~~~~~~~~~~~
-
-* Rename check_published_deps to check-published-deps to be consistent with dashes in goal names
-  `RB #3749 <https://rbcommons.com/twitter/r/3749>`_
-
-Bugfixes
-~~~~~~~~
-
-* startswith() is the correct method for strings, not starts_with()
-  `RB #3744 <https://rbcommons.com/twitter/r/3744>`_
 
 1.0.0-rc1 (04/22/2016)
 ----------------------
