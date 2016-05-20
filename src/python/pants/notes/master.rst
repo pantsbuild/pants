@@ -4,6 +4,66 @@ Master Pre-Releases
 This document describes ``pre`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.1.0-pre2 (05/21/2016)
+-----------------------
+
+This is the third `1.1.0-pre` release on the way to the `1.1.0` stable branch.
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate ambiguous options scope name components.
+  `RB #3893 <https://rbcommons.com/s/twitter/r/3893>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Make NodeTest task use the TestRunnerTaskMixin to support timeouts
+  `Issue #3453 <https://github.com/pantsbuild/pants/issues/3453>`_
+  `RB #3870 <https://rbcommons.com/s/twitter/r/3870>`_
+
+* Support Scrooge generation of additional languages.
+  `RB #3823 <https://rbcommons.com/s/twitter/r/3823>`_
+
+Bugfixes
+~~~~~~~~
+
+* Adding product dependency for NodeResolve/NodeTest
+  `RB #3870 <https://rbcommons.com/s/twitter/r/3870>`_
+  `RB #3906 <https://rbcommons.com/s/twitter/r/3906>`_
+
+* Make pinger.py work with both HTTP and HTTPS.
+  `RB #3904 <https://rbcommons.com/s/twitter/r/3904>`_
+
+* Fix the release script to include `pre` releases in the version match
+  `RB #3903 <https://rbcommons.com/s/twitter/r/3903>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Split release notes by release branch
+  `RB #3890 <https://rbcommons.com/s/twitter/r/3890>`_
+  `RB #3907 <https://rbcommons.com/s/twitter/r/3907>`_
+
+* Update the release strategy docs
+  `RB #3890 <https://rbcommons.com/s/twitter/r/3890>`_
+
+* Bump junit-runner to 1.0.7 to pick up previous changes
+  `RB #3846 <https://rbcommons.com/s/twitter/r/3846>`_
+  `RB #3753 <https://rbcommons.com/s/twitter/r/3753>`_
+  `RB #3707 <https://rbcommons.com/s/twitter/r/3707>`_
+  `RB #3908 <https://rbcommons.com/s/twitter/r/3908>`_
+
+* junit-runner: Separate out parsing specs from making list of requests
+  `RB #3846 <https://rbcommons.com/s/twitter/r/3846>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] yield only addresses associated with target specs, so `list` goal will work
+  `RB #3873 <https://rbcommons.com/s/twitter/r/3873>`_
+
+
 1.1.0-pre1 (05/17/2016)
 -----------------------
 
