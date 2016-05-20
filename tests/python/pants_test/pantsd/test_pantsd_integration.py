@@ -79,7 +79,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
                                   'pants_subprocessdir': pid_dir},
                        'pantsd': {'fs_event_detection': True},
                        # The absolute paths in CI can exceed the UNIX socket path limitation
-                       # (104-108+ characters), so we override that here with a shorter path.
+                       # (>104-108 characters), so we override that here with a shorter path.
                        'watchman': {'socket_path': '/tmp/watchman.{}.sock'.format(os.getpid())}}
       checker = PantsDaemonMonitor(pid_dir)
 
