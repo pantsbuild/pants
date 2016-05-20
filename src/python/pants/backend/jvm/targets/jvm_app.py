@@ -210,6 +210,15 @@ class JvmApp(Target):
       ``name``. Optionally pants uses this in the ``bundle`` goal to name the distribution
       artifact.  Note this is unsafe because of the possible conflict when multiple bundles
       are built.
+    :param boolean deployjar: If True, pack all 3rdparty and internal jar classfiles into
+      a single deployjar in the bundle's root dir. If unset, all jars will go into the
+      bundle's libs directory, the root will only contain a synthetic jar with its manifest's
+      Class-Path set to those jars."
+    :param archive: Create an archive of this type from the bundle.
+    :param boolean archive_prefix: If archive is specified, prefix archive with target basename
+      or a unique identifier as determined by use_basename_prefix.
+    :param boolean use_basename_prefix: Use target basename to prefix bundle folder or archive;
+      otherwise a unique identifier derived from target will be used.
     """
     payload = payload or Payload()
     payload.add_fields({

@@ -34,22 +34,21 @@ class BundleCreate(JvmBinaryTask):
     super(BundleCreate, cls).register_options(register)
     register('--deployjar', advanced=True, type=bool,
              fingerprint=True,
-             help="Pack all 3rdparty and internal jar classfiles into a single deployjar in "
-                  "the bundle's root dir. If unset, all jars will go into the bundle's libs "
-                  "directory, the root will only contain a synthetic jar with its manifest's "
-                  "Class-Path set to those jars.")
+             help='This option is also defined in jvm_app target.'
+                  'Please refer to the documentation for jvm_app.')
     register('--archive', advanced=True, choices=list(archive.TYPE_NAMES),
              fingerprint=True,
-             help='Create an archive of this type from the bundle.')
+             help='This option is also defined in jvm_app target.'
+                  'Please refer to the documentation for jvm_app.')
     register('--archive-prefix', advanced=True, type=bool,
              fingerprint=True,
-             help='If --archive is specified, prefix archive with target basename or a unique '
-                  'identifier as determined by --use-basename-prefix.')
+             help='This option is also defined in jvm_app target.'
+                  'Please refer to the documentation for jvm_app.')
     # `target.id` ensures global uniqueness, this flag is provided primarily for
     # backward compatibility.
     register('--use-basename-prefix', advanced=True, type=bool,
-             help='Use target basename to prefix bundle folder or archive; otherwise a unique '
-                  'identifier derived from target will be used.')
+             help='This option is also defined in jvm_app target.'
+                  'Please refer to the documentation for jvm_app.')
 
   @classmethod
   def product_types(cls):
@@ -76,6 +75,10 @@ class BundleCreate(JvmBinaryTask):
     return True
 
   def _resolved_option(self, target, key):
+    """
+    Get value for option "key".
+    Resolution precedence is CLI option > target option > pants.ini option.
+    """
     option_value = self.get_options().get(key)
     if not isinstance(target, JvmApp) or self.get_options().is_flagged(key):
       return option_value
@@ -84,8 +87,6 @@ class BundleCreate(JvmBinaryTask):
 
   def execute(self):
     jvmapp = self.context.target_roots[0]
-    archiver_type = self._resolved_option(jvmapp, 'archive')
-    archiver = archive.archiver(archiver_type) if archiver_type else None
 
     use_basename_prefix = self._resolved_option(jvmapp, 'use_basename_prefix')
     if use_basename_prefix:
@@ -115,7 +116,10 @@ class BundleCreate(JvmBinaryTask):
     self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
 
     for app in apps:
-      basedir = self.bundle(app, self._resolved_option(jvmapp, 'deployjar'))
+      archiver_type = self._resolved_option(app.target, 'archive')
+      archiver = archive.archiver(archiver_type) if archiver_type else None
+
+      basedir = self.bundle(app, self._resolved_option(app.target, 'deployjar'))
       # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
       # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
       # expect the product to be cached, a user running an 'rm' on the dist/ directory could
@@ -127,7 +131,7 @@ class BundleCreate(JvmBinaryTask):
           basedir,
           self.get_options().pants_distdir,
           app.basename,
-          prefix=app.basename if self._resolved_option(jvmapp, 'archive_prefix') else None
+          prefix=app.basename if self._resolved_option(app.target, 'archive_prefix') else None
         )
         self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
