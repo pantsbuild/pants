@@ -27,7 +27,7 @@ class PantsDaemonMonitor(ProcessManager):
 
 
 def print_pantsd_log(workdir):
-  # Surface the pantsd log for easy viewing via pytest's `-s` (don't redirect stdio) option.
+  # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
   print('pantsd.log:\n')
   with open('{}/pantsd/pantsd.log'.format(workdir)) as f:
     for line in f:
