@@ -326,19 +326,17 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     return True
 
   def _resolve(self, dep_node, dependency_states, step_context):
-    """Recursively steps non-Task/FS Nodes, and returns a State for the root.
+    """Given a Node and all input dependencies, return a State for the dep.
 
     TODO: This inlines execution of all non-Task/Filesystem nodes, which could maybe
     be cleaner/more-general? We actually use an explicit Dependencies node at the root
     though. And overall, inlining everywhere is not going to be particularly good for
     debuggability.
     """
-    if type(dep_node) not in (DependenciesNode, ProjectionNode, SelectNode):
+    if type(dep_node) in (DependenciesNode, ProjectionNode, SelectNode):
+      return dep_node.step(dependency_states, step_context)
+    else:
       return dependency_states.get(dep_node, Waiting([dep_node]))
-
-    dep_state = dep_node.step(dependency_states, step_context)
-    ..
-
 
   def step(self, dependency_states, step_context):
     # Compute dependencies for the Node, or determine whether it is a Noop.
