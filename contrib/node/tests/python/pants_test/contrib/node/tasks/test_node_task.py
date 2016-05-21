@@ -11,7 +11,7 @@ import string
 from textwrap import dedent
 
 from pants.build_graph.target import Target
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import pushd, temporary_dir
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_module import NodeModule
@@ -92,7 +92,7 @@ class NodeTaskTest(TaskTestBase):
           fs.writeFile("{proof}", "Hello World!", function(err) {{}});
           """).format(proof=proof))
       self.assertFalse(os.path.exists(proof))
-      returncode, command = task.execute_node(args=[script])
+      returncode, command = task.execute_node([script])
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
@@ -113,7 +113,8 @@ class NodeTaskTest(TaskTestBase):
       }
       with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
         json.dump(package, fp)
-      returncode, command = task.execute_npm(args=['run-script', 'proof'], cwd=chroot)
+      with pushd(chroot):
+        returncode, command = task.execute_npm(['run-script', 'proof'])
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))

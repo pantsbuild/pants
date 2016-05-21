@@ -56,7 +56,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.7'
+  DEFAULT_EXPORT_VERSION = '1.0.8'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -199,13 +199,16 @@ class ExportTask(IvyTaskMixin, PythonTask):
         # NB: is_code_gen should be removed when export format advances to 1.1.0 or higher
         'is_code_gen': current_target.is_codegen,
         'is_synthetic': current_target.is_synthetic,
-        'pants_target_type': self._get_pants_target_alias(type(current_target))
+        'pants_target_type': self._get_pants_target_alias(type(current_target)),
       }
 
       if not current_target.is_synthetic:
         info['globs'] = current_target.globs_relative_to_buildroot()
         if self.get_options().sources:
           info['sources'] = list(current_target.sources_relative_to_buildroot())
+
+      info['transitive'] = current_target.transitive
+      info['scope'] = str(current_target.scope)
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
@@ -287,7 +290,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
     }
     jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
     if jvm_distributions:
-      deprecated_conditional(lambda: True, '0.0.89',
+      deprecated_conditional(lambda: True, '1.1.1',
                              'jvm_distributions is deprecated in favor of '
                              'preferred_jvm_distributions.')
       graph_info['jvm_distributions'] = jvm_distributions

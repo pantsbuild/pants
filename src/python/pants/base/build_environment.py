@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def pants_version():
-  """Returns the pants semantic version number: http://semver.org/"""
+  """Returns the pants semantic version number as a string: http://semver.org/"""
   return _VERSION
 
 

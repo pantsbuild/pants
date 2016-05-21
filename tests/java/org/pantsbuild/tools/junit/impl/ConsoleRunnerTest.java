@@ -205,7 +205,60 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
         "SerialTest1 SerialTest2"
             + " -default-concurrency SERIAL -parallel-threads 4"));
     assertEquals("stest1 stest2", TestRegistry.getCalledTests());
+  }
 
+  @Test
+  public void testMockJUnit3Test() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray("MockJUnit3Test"));
+    assertEquals("mju3t1", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testMockRunWithTest() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray("MockRunWithTest"));
+    assertEquals("mrwt1-bar mrwt1-foo", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testNotATestNoPublicConstructor() throws Exception {
+    // This class contains no public constructor. The test runner should ignore
+    ConsoleRunnerImpl.main(asArgsArray("NotATestNoPublicConstructor"));
+    assertEquals("", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testNotATestPrivateClass() throws Exception {
+    // This class is private. The test runner should ignore
+    ConsoleRunnerImpl.main(asArgsArray("NotATestPrivateClass$PrivateClass"));
+    assertEquals("", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testNotATestNoRunnableMethods() throws Exception {
+    // This class has no runnable methods. The test runner should ignore
+    ConsoleRunnerImpl.main(asArgsArray("NotATestNoRunnableMethods"));
+    assertEquals("", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testNotATestNonzeroArgConstructor() throws Exception {
+    // This class doesn't have a zero args public constructor, test runner should ignore
+    ConsoleRunnerImpl.main(asArgsArray("NotATestNonzeroArgConstructor"));
+    assertEquals("", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testNotATestAbstractClass() throws Exception {
+    // This class is abstract, test runner should ignore
+    ConsoleRunnerImpl.main(asArgsArray("NotATestAbstractClass"));
+    assertEquals("", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testNotATestInterface() throws Exception {
+    // This class is abstract, test runner should ignore
+    ConsoleRunnerImpl.main(asArgsArray("NotATestInterface"));
+    assertEquals("", TestRegistry.getCalledTests());
   }
 
   @Test

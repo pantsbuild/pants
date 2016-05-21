@@ -60,10 +60,20 @@ class TestRunnerTaskMixin(object):
 
       self._execute(all_targets)
 
+  def _get_test_targets_for_spawn(self):
+    """Invoked by _spawn_and_wait to know targets being executed. Defaults to _get_test_targets().
+
+    _spawn_and_wait passes all its arguments through to _spawn, but it needs to know what targets
+    are being executed by _spawn. A caller to _spawn_and_wait can override this method to return
+    the targets being executed by the current _spawn_and_wait. By default it returns
+    _get_test_targets(), which is all test targets.
+    """
+    return self._get_test_targets()
+
   def _spawn_and_wait(self, *args, **kwargs):
     """Spawn the actual test runner process, and wait for it to complete."""
 
-    test_targets = self._get_test_targets()
+    test_targets = self._get_test_targets_for_spawn()
     timeout = self._timeout_for_targets(test_targets)
 
     process_handler = self._spawn(*args, **kwargs)

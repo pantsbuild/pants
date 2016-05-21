@@ -1,6 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+python_library(
+  name = 'missing_jvm_check',
+  sources = ['missing_jvm_check.py'],
+  dependencies = [
+    'src/python/pants/java/distribution',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
 python_tests(
   name = 'binary_create',
   sources = ['test_binary_create.py'],
@@ -75,10 +84,14 @@ python_tests(
   sources = ['test_bundle_create.py'],
   dependencies = [
     ':jvm_binary_task_test_base',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:bundle_create',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -346,9 +359,8 @@ python_tests(
   name = 'junit_run_integration',
   sources = ['test_junit_run_integration.py'],
   dependencies = [
-    'src/python/pants/java/distribution',
+    ':missing_jvm_check',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
   tags = {'integration'},
 )

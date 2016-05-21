@@ -17,7 +17,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.fs.archive import JAR
 from pants.util.dirutil import safe_mkdir
 
 
@@ -189,12 +188,14 @@ class BundleCreate(JvmBinaryTask):
         entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
         for index, (conf, entry) in enumerate(entries):
           if ClasspathUtil.is_dir(entry.path):
+            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
+
             # regenerate artifact for invalid vts
             if not vt.valid:
-              JAR.create(entry.path, vt.results_dir, 'output-{}'.format(index))
+              with self.open_jar(jarpath, overwrite=True, compressed=False) as jar:
+                jar.write(entry.path)
 
             # replace directory classpath entry with its jarpath
-            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
             classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
             classpath_products.add_for_target(vt.target, [(conf, jarpath)])
 

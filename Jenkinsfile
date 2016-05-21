@@ -21,7 +21,7 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
     node(os) {
       ansiColor {
         // Avoid failing on transient git issues.
-        retry(2) {
+        retry(3) {
           checkout scm
         }
 

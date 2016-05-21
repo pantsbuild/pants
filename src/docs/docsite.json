@@ -5,10 +5,11 @@
     "3rdparty_jvm": "dist/markdown/html/examples/src/java/org/pantsbuild/example/3rdparty_jvm.html",
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
-    "branching_strategy": "dist/markdown/html/src/docs/branching_strategy.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "changelog": "dist/markdown/html/src/python/pants/CHANGELOG.html",
+    "notes-master": "dist/markdown/html/src/python/pants/notes/master.html",
+    "notes-1.0.x": "dist/markdown/html/src/python/pants/notes/1.0.x.html",
     "community": "dist/markdown/html/src/docs/community.html",
     "dev": "dist/markdown/html/src/docs/dev.html",
     "dev_tasks": "dist/markdown/html/src/docs/dev_tasks.html",
@@ -19,6 +20,7 @@
     "first_concepts": "dist/markdown/html/src/docs/first_concepts.html",
     "first_tutorial": "dist/markdown/html/src/docs/first_tutorial.html",
     "from_maven": "dist/markdown/html/examples/src/java/org/pantsbuild/example/from_maven.html",
+    "go_readme": "dist/markdown/html/contrib/go/README.html",
     "howto_ask": "dist/markdown/html/src/docs/howto_ask.html",
     "howto_contribute": "dist/markdown/html/src/docs/howto_contribute.html",
     "howto_develop": "dist/markdown/html/src/docs/howto_develop.html",
@@ -29,22 +31,23 @@
     "intellij": "dist/markdown/html/src/docs/intellij.html",
     "internals": "dist/markdown/html/src/docs/internals.html",
     "invoking": "dist/markdown/html/src/docs/invoking.html",
-    "jvm_projects": "dist/markdown/html/examples/src/java/org/pantsbuild/example/readme.html",
+    "jvm_projects": "dist/markdown/html/examples/src/java/org/pantsbuild/example/README.html",
     "page": "dist/markdown/html/examples/src/java/org/pantsbuild/example/page.html",
     "powered_by": "dist/markdown/html/src/docs/powered_by.html",
     "publish": "dist/markdown/html/examples/src/java/org/pantsbuild/example/publish.html",
-    "python_readme": "dist/markdown/html/examples/src/python/example/readme.html",
+    "python_readme": "dist/markdown/html/examples/src/python/example/README.html",
     "options": "dist/markdown/html/src/docs/options.html",
     "options_reference": "dist/reference/pants_reference_body.html",
     "release": "dist/markdown/html/src/docs/release.html",
     "release_jvm": "dist/markdown/html/src/docs/release_jvm.html",
-    "scala": "dist/markdown/html/examples/src/scala/org/pantsbuild/example/readme.html",
+    "release_strategy": "dist/markdown/html/src/docs/release_strategy.html",
+    "scala": "dist/markdown/html/examples/src/scala/org/pantsbuild/example/README.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
     "styleguide": "dist/markdown/html/src/docs/styleguide.html",
     "reporting_server": "dist/markdown/html/src/docs/reporting_server.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
     "tshoot": "dist/markdown/html/src/docs/tshoot.html",
-    "thrift_deps": "dist/markdown/html/examples/src/thrift/org/pantsbuild/example/readme.html",
+    "thrift_deps": "dist/markdown/html/examples/src/thrift/org/pantsbuild/example/README.html",
     "why_use_pants": "dist/markdown/html/src/docs/why_use_pants.html"
   },
   "show_toc": {
@@ -101,6 +104,9 @@
         { "page": "python_readme" },
         { "page": "3rdparty_py" },
 
+        { "heading": "Go" },
+        { "page": "go_readme" },
+
         {"heading": "Codegen"},
         { "page": "thrift_deps" },
 
@@ -115,9 +121,12 @@
         { "page": "build_dictionary" },
         { "page": "options_reference" },
 
+        { "heading": "Release Notes"},
+        { "page": "notes-1.0.x" },
+        { "page": "notes-master" },
+
         { "heading": "Developer"},
         { "page": "dev" },
-        { "page": "changelog" },
         { "page": "export"}
       ]
     }

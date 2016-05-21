@@ -62,7 +62,7 @@ def stdio_as(stdout, stderr, stdin=None):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix=str()):
+def temporary_dir(root_dir=None, cleanup=True, suffix=str(), permissions=None):
   """
     A with-context that creates a temporary directory.
 
@@ -71,9 +71,12 @@ def temporary_dir(root_dir=None, cleanup=True, suffix=str()):
     You may specify the following keyword args:
     :param string root_dir: The parent directory to create the temporary directory.
     :param bool cleanup: Whether or not to clean up the temporary directory.
+    :param int permissions: If provided, sets the directory permissions to this mode.
   """
   path = tempfile.mkdtemp(dir=root_dir, suffix=suffix)
   try:
+    if permissions is not None:
+      os.chmod(path, permissions)
     yield path
   finally:
     if cleanup:
@@ -81,7 +84,7 @@ def temporary_dir(root_dir=None, cleanup=True, suffix=str()):
 
 
 @contextmanager
-def temporary_file_path(root_dir=None, cleanup=True, suffix=''):
+def temporary_file_path(root_dir=None, cleanup=True, suffix='', permissions=None):
   """
     A with-context that creates a temporary file and returns its path.
 
@@ -91,13 +94,13 @@ def temporary_file_path(root_dir=None, cleanup=True, suffix=''):
     :param str root_dir: The parent directory to create the temporary file.
     :param bool cleanup: Whether or not to clean up the temporary file.
   """
-  with temporary_file(root_dir, cleanup=cleanup, suffix=suffix) as fd:
+  with temporary_file(root_dir, cleanup=cleanup, suffix=suffix, permissions=permissions) as fd:
     fd.close()
     yield fd.name
 
 
 @contextmanager
-def temporary_file(root_dir=None, cleanup=True, suffix=''):
+def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
   """
     A with-context that creates a temporary file and returns a writeable file descriptor to it.
 
@@ -109,9 +112,12 @@ def temporary_file(root_dir=None, cleanup=True, suffix=''):
                        mkstemp() does not put a dot between the file name and the suffix;
                        if you need one, put it at the beginning of suffix.
                        See :py:class:`tempfile.NamedTemporaryFile`.
+    :param int permissions: If provided, sets the file to use these permissions.
   """
   with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False) as fd:
     try:
+      if permissions is not None:
+        os.chmod(fd.name, permissions)
       yield fd
     finally:
       if cleanup:

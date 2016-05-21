@@ -1,6 +1,6 @@
 page(
   name='readme',
-  source='readme.md',
+  source='README.md',
   links=[
     'examples/src/java/org/pantsbuild/example:publish',
   ])

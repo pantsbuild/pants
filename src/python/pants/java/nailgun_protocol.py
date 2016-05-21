@@ -79,13 +79,20 @@ class NailgunProtocol(object):
     """Raised if there is a socket error while reading the payload bytes."""
 
   @classmethod
+  def _decode_unicode_seq(cls, seq):
+    for item in seq:
+      yield item.decode('utf-8')
+
+  @classmethod
   def send_request(cls, sock, working_dir, command, *arguments, **environment):
     """Send the initial Nailgun request over the specified socket."""
     for argument in arguments:
       cls.write_chunk(sock, ChunkType.ARGUMENT, argument)
 
     for item_tuple in environment.items():
-      cls.write_chunk(sock, ChunkType.ENVIRONMENT, cls.ENVIRON_SEP.join(item_tuple))
+      cls.write_chunk(sock,
+                      ChunkType.ENVIRONMENT,
+                      cls.ENVIRON_SEP.join(cls._decode_unicode_seq(item_tuple)))
 
     cls.write_chunk(sock, ChunkType.WORKING_DIR, working_dir)
     cls.write_chunk(sock, ChunkType.COMMAND, command)
@@ -183,7 +190,7 @@ class NailgunProtocol(object):
     if chunk_type not in ChunkType.VALID_TYPES:
       raise cls.ProtocolError('invalid chunk type: {}'.format(chunk_type))
 
-    return chunk_type, payload
+    return chunk_type, payload.decode('utf-8')
 
   @classmethod
   def iter_chunks(cls, sock):
