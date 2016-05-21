@@ -21,7 +21,7 @@ java_library(
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit/withretry',
   ],
-  sources=globs('*.java', 'impl/*.java')
+  sources=globs('*.java', 'impl/*.java', 'impl/experimental/*.java')
 )
 
 jvm_binary(

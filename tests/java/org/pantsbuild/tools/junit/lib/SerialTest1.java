@@ -4,7 +4,6 @@ package org.pantsbuild.tools.junit.lib;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
-import org.pantsbuild.junit.annotations.TestSerial;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -26,8 +25,12 @@ import static org.junit.Assert.assertTrue;
  * </p>
  */
 public class SerialTest1 {
-  private static final int WAIT_TIMEOUT_MS = 3000;
-  private static AtomicBoolean waiting = new AtomicBoolean(false);
+  private static final int WAIT_TIMEOUT_MS = 1000;
+  private static final AtomicBoolean waiting = new AtomicBoolean(false);
+
+  public static void reset() {
+    waiting.set(false);
+  }
 
   @Test
   public void stest1() throws Exception {
