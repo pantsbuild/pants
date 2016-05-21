@@ -1,209 +1,112 @@
-Invoking Pants Build
-====================
+Invoking Pants
+==============
 
-This page discusses some advanced features of invoking the Pants build
-tool on the command line. We assume you already know the
-[[basic command-line structure|pants('src/docs:first_tutorial')]],
-something like:
+This page discusses advanced usage when invoking Pants on the command line.
+We assume you already know the [[basic command-line structure|pants('src/docs:first_tutorial')]].
 
-    :::bash
-    $ ./pants test.junit --fail-fast bundle path/to/target path/to/another/target
-
-For a full description of specifying target addresses, see
-[[Target Addresses|pants('src/docs:target_addresses')]].
-For a list of Pants' goals and their options, see the
-<a href="options_reference.html">Options Reference</a>.
++ For details on how to specify target addresses, see [[Target Addresses|pants('src/docs:target_addresses')]].
++ For details on how to specify options, see [[Options|pants('src/docs:options')]].
++ For a list of Pants' goals and their options, see the <a href="options_reference.html">Options Reference</a>.
 
 Order of Arguments
 ------------------
 
-A simple Pants command line looks like <tt>./pants <var>goal</var> <var>target</var></tt>.
-A less-simple Pants command looks like:
+A simple Pants command line looks like `./pants goal target`. E.g., `./pants compile src/java/::`.
+
+The full command line specification is:
 
     :::bash
-    ./pants <global options> <goal1> <options for goal1> <goal2> <options for goal2> \
-            <target1> <target2> [-- pass-through options for last goal]
+    ./pants <global and fully-qualified flags> \
+            <goal1.task1> <shorthand flags for task1> \
+            <goal2.task2> <shorthand flags for task2> \
+            ... \
+            <target1> <target2> ... [-- passthrough options for last goal]
 
-You can specify one or more goals. You can specify options for any goal right after that goal's
-name:
+Fully qualified flags can be passed anywhere on the command line
+before the `--` separator for passthrough args, but
+shorthand flags must immediately follow the goal they apply to.
 
-    :::bash
-    $ ./pants list --sep='|' examples/src/python/example:
-    examples/src/python/example:readme|examples/src/python/example:pex_design|examples/sr...
-
-Some goals are made up of tasks; to specify an option for that task, use the dotted
-_goal.task_ notation:
-
-    :::bash
-    # compile src, keeping Java compile's "scratch files"
-    ./pants compile.java --no-delete-scratch src::
-
-You can specify one or more targets to operate upon. Target specifications come after goals
-and goal options on the command line.
-
-<em>Global options</em> are the options that `./pants -h` lists, options that affect the whole
-Pants run, e.g., `-ldebug`. Specify global options after "goal".
-
-When setting a value for an option, beware spaces. For example, `-l debug` and `--level debug`
-don't do what you want. If you're tempted to put a space between an option and its value, use an
-equals sign instead: `--level=debug`, `-ldebug`, and even `-l=debug` all work.
-
-Some goals and tasks take "passthrough" args. That is, you can specify command-line args that are
-passed through to some tool that Pants invoke in turn. These are specified last on the command
-line after a double-hyphen like `-- foo bar` and are passed to the last goal specified. E.g., to
-pass `-k list` to `pytest` (to say "only run tests whose names contain `list`") you could invoke:
+Consider the following command:
 
     :::bash
-    $ ./pants test.pytest tests/python/pants_test/tasks -- -k list
+    ./pants --level=debug compile.zinc --no-delete-scratch --resolve-ivy-open src::
 
-You could use `test` instead of `test.pytest` above; Pants then applies the
-passthrough args to tools called by all of `test`, not just `test.pytest`.
-This gets tricky. We happen to know we can pass `-k list` here, that `pytest` accepts passthrough
-args, and that this `test` invocation upon `tests/python/...` won't invoke any other tools
-(assuming nobody hid a `junit` test in the `python` directory).
++ `--level` is a global flag.
++ The goal and task to run are `compile.zinc`.
++ The `--no-delete-scratch` is shorthand for the
+  `--compile-zinc-no-delete-scratch` flag.
++ The `--resolve-ivy-open` command is a fully qualified flag and
+  applies to the `resolve.ivy` task.  Although the task `resolve.ivy`
+  isn't specified on the command line it implicitly runs because
+  `compile.zinc` task depends on it.
 
-Append arguments that append to a list can be specified more than one time.  When specifying more
-than one test to run at a time, you could run:
+You can pass options to pants using the a config file, the
+environment, or command line flags. See the
+[[Options|pants('src/docs:options')]] page for more details.
 
-    :::bash
-    $ ./pants test.junit --test="com.twitter.MyMainTest" --test="com.twitter.MySideTest" ./beans::
-
-Setting Options Other Ways
+How to Use Shorthand Flags
 --------------------------
 
-Instead of passing an option on the command line, you can set an environment variable or change
-an option in an `.ini` file. Pants "looks" for an option value on the command line, environment
-variable, and `.ini` file; it uses the first it finds.
-For a complete, precedence-ordered list of places Pants looks for option values, see the
-`Options` docstring in [src/python/pants/option/options.py]
-(https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py).
+Either fully qualified or shorthand flags can be used to pass an
+option to a task. The fully qualified (or long form) options are
+listed in the `help` output and the <a href="options_reference.html">Options Reference</a>.
+The long form is more foolproof to use because it can go almost anywhere on
+the command line, but the shorthand version can save typing.
 
-### `PANTS_...` Environment Variables
-
-Each goal option also has a corresponding environment variable. For example, either of these
-commands opens a coverage report in your browser:
+For many goals, there is only a single task registered. For example,
+to specify the `--list-sep` option for the `list` goal you could use
+the long form:
 
     :::bash
-    $ ./pants test.junit --coverage-html-open examples/tests/java/org/pantsbuild/example::
+    ./pants list --list-sep='|' examples/src/python/example:
 
-    $ PANTS_TEST_JUNIT_COVERAGE_HTML_OPEN=1 ./pants test examples/tests/java/org/pantsbuild/example::
+or you could use the short form:
 
-Pants checks for an environment variable whose name is `PANTS` + the goal name (or goal+task name)
-+ the option name; all of these in all-caps, joined by underscores (instead of dots or hyphens).
+    :::bash
+    ./pants list --sep='|' examples/src/python/example:
 
-### `pants.ini` Settings File
+When a goal has multiple tasks registered, you must fully specify the
+task and goal name to use the short form flag.  Here's an example of
+using the long form to pass an option to the `zinc` task:
 
-Pants can also read command-line options (and other options) from a configuration file named
-`pants.ini` at the root of the repo. For example, if your `pants.ini` file contains
+    :::bash
+    ./pants --no-compile-zinc-delete-scratch compile src::
 
-    [test.junit]
-    coverage_html_open: True
+To use the shorthand form of the option, specify both goal and task
+name as `compile.zinc`:
 
-...then whenever Pants carries out the `test.junit` task, it will behave as if you passed
-`test.junit --coverage-html-open`. If an environment variable and an `.ini` configuration both
-specify a value for some option, the environment variable "wins".
+    :::bash
+    ./pants  compile.zinc --no-delete-scratch src::
 
-The format of the config file is similar to Microsoft Windows INI files. See the
-[ConfigParser](https://docs.python.org/2/library/configparser.html) Python documentation.
+This is especially handy if you have lots of options to type:
 
+    :::bash
+    ./pants publish.jar --named-snapshot=1.2.3-SNAPSHOT --no-dryrun --force src/java::
 
-Some options are intended to only be set in the `pants.ini` file and are thus normally hidden from
-the online help output.  To see these options, use `./pants <goal> --help-advanced` or
-view them all with the `./pants --help-all --help-advanced` command.
+You can use shorthand even when you want to pass options to multiple
+tasks by listing each task.  For example:
 
-There are a few differences in using options in the config file compared to invoking them from the
-command line:
+    :::bash
+    ./pants compile --compile-zinc-no-delete-scratch --resolve-ivy-open src::
 
-  - Omit the leading double dash ('--')
-  - Dash characters ('-') are transposed to underscores ('_').
-  - Flag values are enabled and disabled by setting the value of the option to `True` or `False`
-  - The prefix for long form options is not specified. Instead, you must organize the options
-    into their appropriate sections.
+can also be expressed using shorthand flags:
 
-Sections in the .ini file are described in the help output:
+    :::bash
+    ./pants --level=debug compile.zinc --no-delete-scratch resolve.ivy --open src::
 
-    ::bash
-    $ ./pants compile.zinc --help
+Passthrough Args
+----------------
 
-    compile.zinc options:
-    Compile Scala and Java code using Zinc.
+In some cases Pants allows you to pass arguments directly through to the underlying tool it invokes.
+These are specified last on the command line after a double-hyphen, and are passed through the
+last goal specified.
 
-    --[no-]compile-zinc-debug-symbols (default: False)
-        Compile with debug symbol enabled.
-    --[no-]compile-zinc-use-nailgun (default: True)
-        Use nailgun to make repeated invocations of this task quicker.
-    --[no-]compile-zinc-warnings (default: True)
-        Compile with all configured warnings enabled.
+E.g., to pass `-k foo` to `pytest` (to say "only run tests whose names contain `foo`"):
 
-The section name is also used to form the long form command-line option prefixes, but you cannot
-arbitrarily strip off the first part of the option name and use it in a section.   Section names
-can have multiple parts.  You must be careful to use the correct section name as specified
-in the help output:
+    :::bash
+    ./pants test.pytest tests/python/pants_test/tasks -- -k foo
 
-    :::ini
-    # Wrong
-    [compile]  # The correct section name is compile.zinc for this option
-    zinc_warnings: False
-
-    # Right
-    [compile.zinc]
-    warnings: False
-
-Settings that span multiple lines should be indented.  To minimize problems, follow these
-conventions:
-
-  - Followon lines should be indented four spaces.
-  - The ending bracket for lists and dicts should be indented two spaces.
-
-Here are some examples of correctly and incorrectly formatted values:
-
-    :::ini
-    # Right
-    jvm_options: [ "foo", "bar" ]
-
-    # Right
-    jvm_options: [
-        "foo", "bar"
-      ]
-
-    # Wrong
-    jvm_options: [ "foo",
-    "bar" ]  # Followon line must be indented
-
-    # Wrong
-    jvm_options: [
-        "foo", "bar"
-    ] # closing bracket must be indented
-
-The `pants.ini` file allows string interpolation for variables defined in the `[DEFAULT]` section by
-using the syntax `%(<variable name>)s` inside of a string.
-
-    :::ini
-    local_artifact_cache = %(pants_bootstrapdir)s/artifact_cache
-    read_from = ["%(local_artifact_cache)s"]
-
-### Overlay `.ini` Files with `--config-override`
-
-Sometimes it's convenient to keep `.ini` settings in more than one file. Perhaps you usually
-operate Pants in one "mode", but occasionally need to use a tweaked set of settings.
-
-Use the `--config-override` command-line option to specify a second `.ini` file. Each of
-this `.ini` file's values override the corresponding value in `pants.ini`, if any.
-For example, if your `pants.ini` contains the section
-
-    [test.junit]
-    coverage_html_open: True
-    debug: False
-
-...and you invoke `--config-override=quick.ini` and your `quick.ini` says
-
-    [test.junit]
-    coverage_html_open: False
-    skip: True
-
-...then Pants will act as if you specified
-
-    [test.junit]
-    coverage_html_open: False
-    skip: True
-    debug: False
+You can use `test` instead of `test.pytest` above; Pants then applies the passthrough args
+through all tasks in `test` that support them. In this case, it would pass them to JUnit as well.
+So it only makes sense to do this if you know that JUnit won't be invoked in practice (because
+you're not invoking Pants on any Java tests).

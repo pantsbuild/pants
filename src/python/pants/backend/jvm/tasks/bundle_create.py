@@ -17,7 +17,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.fs.archive import JAR
 from pants.util.dirutil import safe_mkdir
 
 
@@ -33,21 +32,22 @@ class BundleCreate(JvmBinaryTask):
   @classmethod
   def register_options(cls, register):
     super(BundleCreate, cls).register_options(register)
-    register('--deployjar', action='store_true', default=False,
+    register('--deployjar', type=bool,
              fingerprint=True,
-             help="Expand 3rdparty jars into loose classfiles in the bundle's root dir. "
-                  "If unset, the root will contain internal classfiles only, and 3rdparty jars "
-                  "will go into the bundle's libs dir.")
+             help="Pack all 3rdparty and internal jar classfiles into a single deployjar in "
+                  "the bundle's root dir. If unset, all jars will go into the bundle's libs "
+                  "directory, the root will only contain a synthetic jar with its manifest's "
+                  "Class-Path set to those jars.")
     register('--archive', choices=list(archive.TYPE_NAMES),
              fingerprint=True,
              help='Create an archive of this type from the bundle.')
-    register('--archive-prefix', action='store_true', default=False,
+    register('--archive-prefix', type=bool,
              fingerprint=True,
              help='If --archive is specified, prefix archive with target basename or a unique '
                   'identifier as determined by --use-basename-prefix.')
     # `target.id` ensures global uniqueness, this flag is provided primarily for
     # backward compatibility.
-    register('--use-basename-prefix', action='store_true', default=False,
+    register('--use-basename-prefix', type=bool,
              help='Use target basename to prefix bundle folder or archive; otherwise a unique '
                   'identifier derived from target will be used.')
 
@@ -188,12 +188,14 @@ class BundleCreate(JvmBinaryTask):
         entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
         for index, (conf, entry) in enumerate(entries):
           if ClasspathUtil.is_dir(entry.path):
+            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
+
             # regenerate artifact for invalid vts
             if not vt.valid:
-              JAR.create(entry.path, vt.results_dir, 'output-{}'.format(index))
+              with self.open_jar(jarpath, overwrite=True, compressed=False) as jar:
+                jar.write(entry.path)
 
             # replace directory classpath entry with its jarpath
-            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
             classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
             classpath_products.add_for_target(vt.target, [(conf, jarpath)])
 

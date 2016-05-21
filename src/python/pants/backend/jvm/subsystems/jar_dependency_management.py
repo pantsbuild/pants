@@ -57,7 +57,7 @@ class JarDependencyManagement(Subsystem):
     register('--conflict-strategy', choices=conflict_strategies, default='FAIL', fingerprint=True,
              help='Specifies how to behave when a jar_library has a jar with an explicit version '
                   'that differs from one in the managed_jar_dependencies target it depends on.')
-    register('--suppress-conflict-warnings', action='store_true', default=False,
+    register('--suppress-conflict-warnings', type=bool,
              help='Turns warning messages into debug messages when resolving jar conflicts.')
 
   def __init__(self, *args, **kwargs):

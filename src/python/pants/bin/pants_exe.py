@@ -43,7 +43,7 @@ def main():
   try:
     PantsRunner(exiter).run()
   except KeyboardInterrupt:
-    exiter.exit_and_fail('Interrupted by user.')
+    exiter.exit_and_fail(b'Interrupted by user.')
 
 
 if __name__ == '__main__':

@@ -11,9 +11,8 @@ from contextlib import contextmanager
 import pytest
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
-                                   MissingRemovalVersionError, PastRemovalVersionError,
-                                   check_deprecated_semver, deprecated, deprecated_conditional,
-                                   deprecated_module)
+                                   CodeRemovedError, MissingRemovalVersionError, deprecated,
+                                   deprecated_conditional, deprecated_module, warn_or_error)
 from pants.version import VERSION
 
 
@@ -94,7 +93,7 @@ def test_deprecated_module():
     # direct call of deprecated_module() here is fine.
     deprecated_module(FUTURE_VERSION, hint_message='Do not use me.')
     warning_message = str(extract_deprecation_warning())
-    assert 'Module is deprecated' in warning_message
+    assert 'module will be removed' in warning_message
     assert 'Do not use me' in warning_message
 
 
@@ -120,7 +119,7 @@ def test_removal_version_required():
 
 def test_removal_version_bad():
   with pytest.raises(BadRemovalVersionError):
-    check_deprecated_semver(1.0)
+    warn_or_error(1.0, 'dummy description')
 
   with pytest.raises(BadRemovalVersionError):
     @deprecated(1.0)
@@ -128,7 +127,7 @@ def test_removal_version_bad():
       pass
 
   with pytest.raises(BadRemovalVersionError):
-    check_deprecated_semver('1.a.0')
+    warn_or_error('1.a.0', 'dummy description')
 
   with pytest.raises(BadRemovalVersionError):
     @deprecated('1.a.0')
@@ -137,27 +136,25 @@ def test_removal_version_bad():
 
 
 def test_removal_version_same():
-  with pytest.raises(PastRemovalVersionError):
-    check_deprecated_semver(VERSION)
+  with pytest.raises(CodeRemovedError):
+    warn_or_error(VERSION, 'dummy description')
 
-  with pytest.raises(PastRemovalVersionError):
-    @deprecated(VERSION)
-    def test_func():
-      pass
-
-
-def test_removal_version_too_small():
-  with pytest.raises(PastRemovalVersionError):
-    check_deprecated_semver('0.0.27')
-
-  with pytest.raises(PastRemovalVersionError):
-    @deprecated('0.0.27')
-    def test_func():
-      pass
+  @deprecated(VERSION)
+  def test_func():
+    pass
+  with pytest.raises(CodeRemovedError):
+    test_func()
 
 
-def test_removal_version_too_small_expiration_unchecked():
-  check_deprecated_semver('0.0.27', check_expired=False)
+def test_removal_version_lower():
+  with pytest.raises(CodeRemovedError):
+    warn_or_error('0.0.27', 'dummy description')
+
+  @deprecated('0.0.27')
+  def test_func():
+    pass
+  with pytest.raises(CodeRemovedError):
+    test_func()
 
 
 def test_bad_decorator_nesting():

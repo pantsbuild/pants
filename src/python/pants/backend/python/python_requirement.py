@@ -7,13 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pkg_resources import Requirement
 
-from pants.base.deprecated import deprecated_conditional
-
-
-def _always_build(python, platform):
-  """Top level function is picklable."""
-  return True
-
 
 class PythonRequirement(object):
   """Pants wrapper around pkg_resources.Requirement
@@ -38,19 +31,13 @@ class PythonRequirement(object):
   :API: public
   """
 
-  def __init__(self, requirement, name=None, repository=None, version_filter=None, use_2to3=False,
-               compatibility=None):
-    deprecated_conditional(lambda: version_filter is not None, '0.0.80',
-                           'version_filter using lambda function is no longer supported.')
-
-    # TODO(wickman) Allow PythonRequirements to be specified using pip-style vcs or url identifiers,
-    # e.g. git+https or just http://...
+  def __init__(self, requirement, name=None, repository=None, use_2to3=False, compatibility=None):
+    # TODO(wickman) Allow PythonRequirements to be specified using pip-style vcs or url
+    # identifiers, e.g. git+https or just http://...
     self._requirement = Requirement.parse(requirement)
     self._repository = repository
     self._name = name or self._requirement.project_name
     self._use_2to3 = use_2to3
-    # Temporary workaround to allow pickling before we fully deprecate version_filter.
-    self._version_filter = version_filter or _always_build
     # TODO(wickman) Unify this with PythonTarget .compatibility
     self.compatibility = compatibility or ['']
 
@@ -58,7 +45,7 @@ class PythonRequirement(object):
     """
     :API: public
     """
-    return self._version_filter(python, platform)
+    return True
 
   @property
   def use_2to3(self):

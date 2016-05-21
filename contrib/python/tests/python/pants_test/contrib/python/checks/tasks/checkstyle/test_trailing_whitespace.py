@@ -61,4 +61,4 @@ class TrailingWhitespaceTest(CheckstylePluginTestBase):
                baz
     \"\"\"
     """
-    self.assertNit(statement, 'T201', expected_line_number=1)
+    self.assertNit(statement, 'T201', expected_line_number='001-002')

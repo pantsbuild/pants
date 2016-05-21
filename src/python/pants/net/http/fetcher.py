@@ -177,7 +177,7 @@ class Fetcher(object):
         self.chunks = chunk_count
         if self.size:
           sys.stdout.write('\r')
-          sys.stdout.write('{:3}% '.format(int(self.read * 1.0 / self.size) * 100))
+          sys.stdout.write('{:3}% '.format(int(self.read * 1.0 / self.size * 100)))
         sys.stdout.write('.' * self.chunks)
         if self.size:
           size_width = len(str(self.download_size))

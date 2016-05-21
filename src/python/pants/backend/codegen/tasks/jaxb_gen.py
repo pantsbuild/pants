@@ -13,7 +13,6 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.java.distribution.distribution import DistributionLocator
 
 
 class JaxbGen(SimpleCodegenTask, NailgunTask):
@@ -25,13 +24,14 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     :param workdir: inherited parameter from Task
     """
     super(JaxbGen, self).__init__(*args, **kwargs)
+    self.set_distribution(jdk=True)
     self.gen_langs = set()
     lang = 'java'
     if self.context.products.isrequired(lang):
       self.gen_langs.add(lang)
 
   def _compile_schema(self, args):
-    classpath = DistributionLocator.cached(jdk=True).find_libs(['tools.jar'])
+    classpath = self.dist.find_libs(['tools.jar'])
     java_main = 'com.sun.tools.internal.xjc.Driver'
     return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 

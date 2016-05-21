@@ -109,6 +109,10 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
       self.assertTrue('org.pantsbuild' in foo_target.get('excludes'))
 
+  # This test fails when the `PANTS_IVY_CACHE_DIR` is set to something that isn't
+  # the default location.  The set cache_dir likely needs to be plumbed down
+  # to the sub-invocation of pants.
+  # https://github.com/pantsbuild/pants/issues/3126
   def test_export_jar_path(self):
     with self.temporary_workdir() as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
@@ -149,6 +153,10 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertIsNotNone(scala_lang_lib['sources'])
       self.assertIsNotNone(scala_lang_lib['javadoc'])
 
+  # This test fails when the `PANTS_IVY_CACHE_DIR` is set to something that isn't
+  # the default location.  The set cache_dir likely needs to be plumbed down
+  # to the sub-invocation of pants.
+  # See https://github.com/pantsbuild/pants/issues/3126
   def test_ivy_classifiers(self):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
@@ -214,6 +222,13 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         },
         json_data['jvm_platforms'])
 
+  def test_test_platform(self):
+    with self.temporary_workdir() as workdir:
+      test_target = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform'
+      json_data = self.run_export(test_target, workdir)
+      self.assertEquals('java7', json_data['targets'][test_target]['platform'])
+      self.assertEquals('java8', json_data['targets'][test_target]['test_platform'])
+
   def test_intellij_integration(self):
     with self.temporary_workdir() as workdir:
       exported_file = os.path.join(workdir, "export_file.json")
@@ -238,3 +253,12 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       python_target = json_data['targets']['src/python/pants/backend/python/targets:python']
       self.assertIsNotNone(python_target)
       self.assertEquals(default_interpreter, python_target['python_interpreter'])
+
+  def test_intransitive_and_scope(self):
+    with self.temporary_workdir() as workdir:
+      test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
+      test_target = '{}:common'.format(test_path)
+      json_data = self.run_export(test_target, workdir)
+      synthetic_target = '{}:shadow-unstable-intransitive-1'.format(test_path)
+      self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
+      self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])

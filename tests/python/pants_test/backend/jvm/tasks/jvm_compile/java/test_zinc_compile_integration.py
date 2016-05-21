@@ -15,7 +15,9 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 class ZincCompileIntegrationTest(BaseCompileIT):
 
   def test_java_src_zinc_compile(self):
-    with self.do_test_compile('examples/src/java/::'):
+    # TODO: Remove the --exclude-target-regexp once we're on Java 8 everywhere.
+    with self.do_test_compile('examples/src/java/::',
+                              extra_args=['--exclude-target-regexp=examples/src/java/org/pantsbuild/example/plugin']):
       # run succeeded as expected
       pass
     with self.do_test_compile('examples/tests/java/::'):

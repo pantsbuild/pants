@@ -19,7 +19,7 @@ from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
-from pants.process.pidlock import OwnerPrintingPIDLockFile
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.reporting.report import Report
 from pants.source.source_root import SourceRootConfig
 
@@ -63,9 +63,6 @@ class Context(object):
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, invalidation_report=None):
-    """
-    :API: public
-    """
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -76,7 +73,7 @@ class Context(object):
     self._products = Products()
     self._buildroot = get_buildroot()
     self._source_roots = SourceRootConfig.global_instance().get_source_roots()
-    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._buildroot, '.pants.run'))
+    self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.workdir.file_lock'))
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
     self._console_outstream = console_outstream or sys.stdout
@@ -147,17 +144,11 @@ class Context(object):
 
   @property
   def workspace(self):
-    """Returns the current workspace, if any.
-
-    :API: public
-    """
+    """Returns the current workspace, if any."""
     return self._workspace
 
   @property
   def invalidation_report(self):
-    """
-    :API: public
-    """
     return self._invalidation_report
 
   def __str__(self):
@@ -230,7 +221,7 @@ class Context(object):
     :API: public
     """
     if self.options.for_global_scope().lock:
-      if not self._lock.i_am_locking():
+      if not self._lock.acquired:
         self._lock.acquire()
 
   def release_lock(self):
@@ -239,7 +230,7 @@ class Context(object):
 
     :API: public
     """
-    if not self._lock.i_am_locking():
+    if not self._lock.acquired:
       return False
     else:
       self._lock.release()
@@ -250,7 +241,7 @@ class Context(object):
 
     :API: public
     """
-    return not self._lock.i_am_locking()
+    return not self._lock.acquired
 
   def _replace_targets(self, target_roots):
     # Replaces all targets in the context with the given roots and their transitive dependencies.

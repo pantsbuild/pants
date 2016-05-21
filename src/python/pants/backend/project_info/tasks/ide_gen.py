@@ -64,31 +64,31 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                   'processes it launches.  Note that specifying this trumps --{0}-project-dir '
                   'and not all project related files will be stored there.'
                   .format(cls.options_scope))
-    register('--intransitive', action='store_true', default=False,
+    register('--intransitive', type=bool,
              help='Limits the sources included in the generated project to just '
                   'those owned by the targets specified on the command line.')
-    register('--python', action='store_true', default=False,
+    register('--python', type=bool,
              help='Adds python support to the generated project configuration.')
-    register('--java', action='store_true', default=True,
+    register('--java', type=bool, default=True,
              help='Includes java sources in the project; otherwise compiles them and adds them '
                   'to the project classpath.')
-    register('--java-language-level', type=int, default=7,
+    register('--java-language-level', type=int, default=8,
              help='Sets the java language and jdk used to compile the project\'s java sources.')
     register('--java-jdk-name', default=None,
              help='Sets the jdk used to compile the project\'s java sources. If unset the default '
                   'jdk name for the --java-language-level is used')
-    register('--scala', action='store_true', default=True,
+    register('--scala', type=bool, default=True,
              help='Includes scala sources in the project; otherwise compiles them and adds them '
                   'to the project classpath.')
-    register('--use-source-root', action='store_true', default=False,
+    register('--use-source-root', type=bool,
              help='Use source roots to collapse sourcepaths in project and determine '
                   'which paths are used for tests.  This is usually what you want if your repo '
                   ' uses a maven style directory layout.')
     register('--debug_port', type=int, default=5005,
              help='Port to use for launching tasks under the debugger.')
-    register('--source-jars', action='store_true', default=True,
+    register('--source-jars', type=bool, default=True,
              help='Pull source jars from external dependencies into the project.')
-    register('--javadoc-jars', action='store_true', default=True,
+    register('--javadoc-jars', type=bool, default=True,
              help='Pull javadoc jars from external dependencies into the project')
 
     # Options intended to be configured primarily in pants.ini

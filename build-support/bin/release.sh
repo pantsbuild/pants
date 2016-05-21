@@ -75,6 +75,7 @@ function execute_packaged_pants_with_internal_backends() {
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
+    --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[ \
         'internal_backend.optional', \
@@ -220,13 +221,14 @@ EOM
   die "$msg"
 }
 
-function check_clean_master() {
-  banner "Checking for a clean master branch"
+function check_clean_branch() {
+  banner "Checking for a clean branch"
 
-  [[
-    -z "$(git status --porcelain)" &&
-    "$(git branch | grep -E '^\* ' | cut -d' ' -f2-)" == "master"
-  ]] || die "You are not on a clean master branch."
+  pattern="^(master)|([0-9]+\.[0-9]+\.x)$"
+  branch=$(git branch | grep -E '^\* ' | cut -d' ' -f2-)
+  [[ -z "$(git status --porcelain)" &&
+     $branch =~ $pattern
+  ]] || die "You are not on a clean branch."
 }
 
 function check_pgp() {
@@ -325,7 +327,7 @@ function get_owners() {
 
   latest_package_path=$(
     curl -s https://pypi.python.org/pypi/${package_name} | \
-      grep -oE  "/pypi/${package_name}/[0-9]*\.[0-9]*\.[0-9]*" | head -n1
+        grep -oE  "/pypi/${package_name}/[0-9]+\.[0-9]+\.[0-9]+(-(rc|pre)[0-9]+)?" | head -n1
   )
   curl -s "https://pypi.python.org${latest_package_path}" | \
     grep -A1 "Owner" | tail -1 | \
@@ -462,7 +464,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPi." && \
   (
-    check_origin && check_clean_master && check_pgp && check_owners && \
+    check_origin && check_clean_branch && check_pgp && check_owners && \
       dry_run_install && publish_packages && tag_release && publish_docs && \
       banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."

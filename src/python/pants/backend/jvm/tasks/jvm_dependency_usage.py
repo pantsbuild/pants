@@ -43,20 +43,20 @@ class JvmDependencyUsage(Task):
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyUsage, cls).register_options(register)
-    register('--internal-only', default=True, action='store_true',
+    register('--internal-only', default=True, type=bool,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
-    register('--summary', default=True, action='store_true',
+    register('--summary', default=True, type=bool,
              help='When set, outputs a summary of the "worst" dependencies; otherwise, '
                   'outputs a JSON report.')
     register('--size-estimator',
              choices=list(cls.size_estimators.keys()), default='filesize',
              help='The method of target size estimation.')
-    register('--transitive', default=True, action='store_true',
+    register('--transitive', default=True, type=bool,
              help='Score all targets in the build graph transitively.')
     register('--output-file', type=str,
              help='Output destination. When unset, outputs to <stdout>.')
-    register('--use-cached', action='store_true',
+    register('--use-cached', type=bool,
              help='Use cached dependency data to compute analysis result. '
                   'When set, skips `resolve` and `compile` steps. '
                   'Useful for computing analysis for a lot of targets, but '

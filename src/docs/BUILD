@@ -13,11 +13,21 @@ page(
 )
 
 page(
+  name='1.0',
+  source='1.0.md',
+)
+
+page(
   name='build_files',
   source='build_files.md',
   links=[
     ':first_tutorial',
   ]
+)
+
+page(
+    name='community',
+    source='community.md',
 )
 
 page(
@@ -44,24 +54,25 @@ page(
   source='index.md',
   links=[
     ':3rdparty',
+    ':1.0',
     ':announce_201409',
     ':build_files',
     ':first_concepts',
     ':first_tutorial',
     ':install',
     ':invoking',
+    ':options',
     ':powered_by',
-    ':publish',
+    ':dev',
     ':setup_repo',
     ':target_addresses',
     ':tshoot',
-    ':with_emacs',
-    ':with_intellij',
+    ':ide_support',
+    ':why_use_pants',
     'examples/src/java/org/pantsbuild/example:page',
     'examples/src/java/org/pantsbuild/example:readme',
     'examples/src/python/example:readme',
     'examples/src/thrift/org/pantsbuild/example:readme',
-    'src/python/pants/docs:readme',
     ])
 
 page(
@@ -78,7 +89,13 @@ page(
   source='install.md',
   links=[
     ':setup_repo',
+    ':options',
   ]
+)
+
+page(
+    name='options',
+    source='options.md',
 )
 
 page(
@@ -87,11 +104,8 @@ page(
 )
 
 page(
-  name='publish',
-  source='publish.md',
-  links=[
-    ':3rdparty',
-  ]
+    name='reporting_server',
+    source='reporting_server.md',
 )
 
 page(
@@ -100,11 +114,11 @@ page(
   links=[
     ':build_files',
     ':first_concepts',
-    ':publish',
-    'src/python/pants/docs:dev_tasks',
-    'src/python/pants/docs:dev_tasks_publish_extras',
-    'src/python/pants/docs:howto_contribute',
-    'src/python/pants/docs:howto_plugin',
+    ':options',
+    ':dev_tasks',
+    ':dev_tasks_publish_extras',
+    ':howto_contribute',
+    ':howto_plugin',
   ]
 )
 
@@ -117,19 +131,154 @@ page(
   name='tshoot',
   source='tshoot.md',
   links=[
-    'src/python/pants/docs:howto_ask',
+    ':community',
+    ':reporting_server',
+    ':howto_ask',
   ]
 )
 
 page(
-  name='with_emacs',
-  source='with_emacs.md'
+  name='why_use_pants',
+  source='why_use_pants.md'
 )
 
 page(
-  name='with_intellij',
-  source='with_intellij.md',
+  name='ide_support',
+  source='ide_support.md',
+)
+
+page(
+  name='dev',
+  source='dev.md',
   links=[
-    'src/python/pants/docs:intellij',
+    ':dev_tasks',
+    ':dev_tasks_publish_extras',
+    ':docs',
+    ':export',
+    ':howto_ask',
+    ':howto_contribute',
+    ':howto_develop',
+    ':howto_plugin',
+    ':intellij',
+    ':internals',
+    ':release',
+    ':release_jvm',
+    ':release_strategy',
+    ':styleguide',
+  ]
+)
+
+page(
+  name='release_strategy',
+  source='release_strategy.md',
+  links=[
+    ':deprecation_policy',
+    ':howto_contribute',
+    ':release',
   ],
+)
+
+page(
+  name='dev_tasks',
+  source='dev_tasks.md',
+  links=[
+    ':howto_plugin',
+    'src/docs:invoking',
+  ],
+)
+
+page(
+  name='dev_tasks_publish_extras',
+  source='dev_tasks_publish_extras.md',
+)
+
+page(
+  name='deprecation_policy',
+  source='deprecation_policy.md',
+)
+
+page(
+  name='docs',
+  source='docs.md',
+)
+
+page(
+  name='export',
+  source='export.md',
+)
+
+page(
+  name='howto_ask',
+  source='howto_ask.md',
+)
+
+page(
+  name='howto_contribute',
+  source='howto_contribute.md',
+  links=[
+    ':docs',
+    ':howto_ask',
+    ':howto_develop',
+    ':internals',
+    ':styleguide',
+  ]
+)
+
+page(
+  name='howto_develop',
+  source='howto_develop.md',
+  links=[
+    ':howto_contribute',
+    'src/docs:first_tutorial',
+  ]
+)
+
+page(
+  name='howto_plugin',
+  source='howto_plugin.md',
+  links=[
+    ':docs',
+    ':howto_develop',
+  ]
+)
+
+page(
+  name='intellij',
+  source='intellij.md',
+  links=[
+    'src/docs:ide_support',
+  ])
+
+page(
+  name='internals',
+  source='internals.md',
+  links=[
+    ':dev_tasks',
+    'src/docs:first_concepts',
+    'src/docs:dev_tasks',
+  ]
+)
+
+page(
+  name='release',
+  source='release.md',
+  links=[
+    ':release_jvm',
+  ]
+)
+
+page(
+  name='release_jvm',
+  source='release_jvm.md',
+  links=[
+    'examples/src/java/org/pantsbuild/example:publish',
+  ]
+)
+
+page(
+  name='styleguide',
+  source='styleguide.md',
+  links=[
+    ':howto_contribute',
+  ]
 )

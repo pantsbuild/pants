@@ -167,8 +167,11 @@ class BundleField(tuple, PayloadField):
       buildroot_relative_path = os.path.relpath(abs_path, get_buildroot())
       hasher.update(buildroot_relative_path)
       hasher.update(bundle.filemap[abs_path])
-      with open(abs_path, 'rb') as f:
-        hasher.update(f.read())
+      if os.path.isfile(abs_path):
+        # Update with any additional string to differentiate empty file with non-existing file.
+        hasher.update('e')
+        with open(abs_path, 'rb') as f:
+          hasher.update(f.read())
     return hasher.hexdigest()
 
   def _compute_fingerprint(self):
@@ -182,6 +185,8 @@ class JvmApp(Target):
   self-contained artifact suitable for deployment on some other machine.
   The artifact contains the executable jar, its dependencies, and
   extra files like config files, startup scripts, etc.
+
+  :API: public
   """
 
   def __init__(self, name=None, payload=None, binary=None, bundles=None, basename=None, **kwargs):

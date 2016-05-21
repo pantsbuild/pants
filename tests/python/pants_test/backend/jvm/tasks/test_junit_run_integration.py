@@ -10,18 +10,8 @@ import os.path
 import time
 from unittest import expectedFailure, skipIf
 
-from pants.java.distribution.distribution import DistributionLocator
+from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
-
-
-def missing_jvm(version):
-  with subsystem_instance(DistributionLocator):
-    try:
-      DistributionLocator.locate(minimum_version=version, maximum_version='{}.9999'.format(version))
-      return False
-    except DistributionLocator.Error:
-      return True
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
@@ -30,19 +20,22 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)
     self.assert_success(self.run_pants(['clean-all', 'test.junit', '--strict-jvm-version', spec]))
 
-  @skipIf(missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
+  # See https://github.com/pantsbuild/pants/issues/2894 for details on why this is
+  # marked xfail.
+  @expectedFailure
+  @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_java_eight(self):
     self._testjvms('eight')
 
-  @skipIf(missing_jvm('1.7'), 'no java 1.7 installation on testing machine')
+  @skipIf(is_missing_jvm('1.7'), 'no java 1.7 installation on testing machine')
   def test_java_seven(self):
     self._testjvms('seven')
 
-  @skipIf(missing_jvm('1.6'), 'no java 1.6 installation on testing machine')
+  @skipIf(is_missing_jvm('1.6'), 'no java 1.6 installation on testing machine')
   def test_java_six(self):
     self._testjvms('six')
 
-  @skipIf(missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
+  @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_with_test_platform(self):
     self._testjvms('eight-test-platform')
 

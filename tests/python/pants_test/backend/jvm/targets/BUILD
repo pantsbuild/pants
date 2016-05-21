@@ -30,6 +30,16 @@ python_tests(
 )
 
 python_tests(
+  name='java_tests',
+  sources=['test_java_tests.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:base_test',
+  ],
+)
+
+python_tests(
   name='jvm_app',
   sources=['test_jvm_app.py'],
   dependencies=[

@@ -28,11 +28,11 @@ class ExplainOptionsTask(ConsoleTask):
     register('--name', help='Only show options with this name.')
     register('--rank', choices=RankedValue.get_names(),
              help='Only show options with at least this importance.')
-    register('--show-history', action='store_true', default=False,
+    register('--show-history', type=bool,
              help='Show the previous values options had before being overridden.')
-    register('--only-overridden', action='store_true', default=False,
+    register('--only-overridden', type=bool,
              help='Only show values that overrode defaults.')
-    register('--skip-inherited', action='store_true', default=True,
+    register('--skip-inherited', type=bool, default=True,
              help='Do not show inherited options, unless their values differ from their parents.')
 
   def _scope_filter(self, scope):

@@ -24,7 +24,6 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependenc
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.base.deprecated import deprecated
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.build_graph.target import Target
@@ -716,12 +715,6 @@ class IvyUtils(object):
     return TemplateData(org=jar.org, module=jar.name, version=jar.rev)
 
   @staticmethod
-  @deprecated('0.0.81',
-              hint_message='Use `construct_and_load_symlink_map` instead.')
-  def load_classpath_from_cachepath(path):
-    return IvyUtils._load_classpath_from_cachepath(path)
-
-  @staticmethod
   def _load_classpath_from_cachepath(path):
     if not os.path.exists(path):
       return []
@@ -788,16 +781,6 @@ class IvyUtils(object):
                            .format(ivy_cache_report_path, workdir_report_path, e))
 
   @classmethod
-  @deprecated('0.0.81', hint_message='Use `do_resolve` instead.')
-  def exec_ivy(cls, ivy, confs, ivyxml, args,
-               jvm_options,
-               executor,
-               workunit_name,
-               workunit_factory):
-    return cls._exec_ivy(ivy, confs, ivyxml, args, jvm_options, executor, workunit_name,
-                         workunit_factory)
-
-  @classmethod
   def _exec_ivy(cls, ivy, confs, ivyxml, args, jvm_options, executor,
                 workunit_name, workunit_factory):
     ivy = ivy or Bootstrapper.default_ivy()
@@ -821,11 +804,6 @@ class IvyUtils(object):
                                                                           cmd=runner.cmd))
     except runner.executor.Error as e:
       raise IvyUtils.IvyError(e)
-
-  @classmethod
-  @deprecated('0.0.81', hint_message='Use `construct_and_load_symlink_map` instead.')
-  def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
-    return cls._symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath)
 
   @classmethod
   def construct_and_load_symlink_map(cls, symlink_dir, ivy_cache_dir,
@@ -888,16 +866,6 @@ class IvyUtils(object):
       outfile.write(':'.join(OrderedSet(symlink_map.values())))
 
     return dict(symlink_map)
-
-  @staticmethod
-  @deprecated('0.0.81',
-              hint_message='Ivy resolves now use the hash name derived from the cache key.')
-  def identify(targets):
-    targets = list(targets)
-    if len(targets) == 1 and targets[0].is_jvm and getattr(targets[0], 'provides', None):
-      return targets[0].provides.org, targets[0].provides.name
-    else:
-      return IvyUtils.INTERNAL_ORG_NAME, Target.maybe_readable_identify(targets)
 
   @classmethod
   def xml_report_path(cls, cache_dir, resolve_hash_name, conf):
@@ -1120,8 +1088,10 @@ class IvyUtils(object):
     # longer global.
     if provide_excludes:
       additional_excludes = tuple(provide_excludes)
-      jars = {coordinate: jar.copy(excludes=jar.excludes + additional_excludes)
-              for coordinate, jar in jars.items()}
+      new_jars = OrderedDict()
+      for coordinate, jar in jars.items():
+        new_jars[coordinate] = jar.copy(excludes=jar.excludes + additional_excludes)
+      jars = new_jars
 
     return jars.values(), global_excludes
 

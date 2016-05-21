@@ -23,7 +23,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
-    register('--use-nailgun', action='store_true', default=True,
+    register('--use-nailgun', type=bool, default=True,
              help='Use nailgun to make repeated invocations of this task quicker.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
              help='Timeout (secs) for nailgun startup.')
@@ -61,6 +61,10 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                               maximum_version=maximum_version, jdk=jdk)
     except DistributionLocator.Error as e:
       raise TaskError(e)
+
+  @property
+  def dist(self):
+    return self._dist
 
   def create_java_executor(self):
     """Create java executor that uses this task's ng daemon, if allowed.
@@ -124,7 +128,7 @@ class NailgunKillall(Task):
   @classmethod
   def register_options(cls, register):
     super(NailgunKillall, cls).register_options(register)
-    register('--everywhere', default=False, action='store_true',
+    register('--everywhere', type=bool,
              help='Kill all nailguns servers launched by pants for all workspaces on the system.')
 
   def execute(self):

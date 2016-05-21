@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def pants_version():
-  """Returns the pants semantic version number: http://semver.org/"""
+  """Returns the pants semantic version number as a string: http://semver.org/"""
   return _VERSION
 
 
@@ -29,7 +29,10 @@ def pants_release():
 
 
 def get_buildroot():
-  """Returns the pants build root, calculating it if needed."""
+  """Returns the pants build root, calculating it if needed.
+
+  :API: public
+  """
   try:
     return BuildRoot().path
   except BuildRoot.NotFoundError as e:
@@ -64,7 +67,10 @@ _SCM = None
 
 
 def get_scm():
-  """Returns the pants Scm if any."""
+  """Returns the pants Scm if any.
+
+  :API: public
+  """
   # TODO(John Sirois): Extract a module/class to carry the bootstrap logic.
   global _SCM
   if not _SCM:
@@ -74,7 +80,7 @@ def get_scm():
     if worktree and os.path.isdir(worktree):
       git = Git(worktree=worktree)
       try:
-        logger.info('Detected git repository at {} on branch {}'.format(worktree, git.branch_name))
+        logger.debug('Detected git repository at {} on branch {}'.format(worktree, git.branch_name))
         set_scm(git)
       except git.LocalException as e:
         logger.info('Failed to load git repository at {}: {}'.format(worktree, e))

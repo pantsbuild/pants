@@ -4,7 +4,7 @@
 
 node_module(
   name='server-project',
-  sources=globs('package.json', 'src/*.js', 'test/*.js'),
+  sources=globs('package.json', 'checkarg', 'src/*.js', 'test/*.js'),
   dependencies=[
     'contrib/node/examples/3rdparty/node/babel',
     'contrib/node/examples/3rdparty/node/mocha',
@@ -13,6 +13,14 @@ node_module(
 
 node_test(
   name='unit',
+  dependencies=[
+    ':server-project'
+  ]
+)
+
+node_test(
+  name='checkarg',
+  script_name='checkarg',
   dependencies=[
     ':server-project'
   ]

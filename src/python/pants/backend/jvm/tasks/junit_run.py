@@ -13,6 +13,7 @@ from collections import defaultdict
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -24,13 +25,13 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
-from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
@@ -62,6 +63,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   """
   :API: public
   """
+
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
@@ -72,18 +74,19 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--test', type=list,
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
-    register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')
-    register('--default-parallel', advanced=True, action='store_true',
+    register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
+    register('--default-concurrency', advanced=True,
+             choices=junit_tests.VALID_CONCURRENCY_OPTS, default=junit_tests.CONCURRENCY_SERIAL,
+             help='Set the default concurrency mode for running tests not annotated with'
+                  ' @TestParallel or @TestSerial.')
+    register('--default-parallel', advanced=True, type=bool,
+             removal_hint='Use --concurrency instead.', removal_version='1.1.0',
              help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
     register('--parallel-threads', advanced=True, type=int, default=0,
              help='Number of threads to run tests in parallel. 0 for autoset.')
     register('--test-shard', advanced=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
-    register('--suppress-output', action='store_true', default=True,
-             deprecated_hint='Use --output-mode instead.',
-             deprecated_version='0.0.64', removal_version='0.0.81',
-             help='Redirect test output to files in .pants.d/test/junit.')
     register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
              help='Specify what part of output should be passed to stdout. '
                   'In case of FAILURE_ONLY and parallel tests execution '
@@ -92,20 +95,22 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--cwd', advanced=True,
              help='Set the working directory. If no argument is passed, use the build root. '
                   'If cwd is set on a target, it will supersede this argument.')
-    register('--strict-jvm-version', action='store_true', default=False, advanced=True,
+    register('--strict-jvm-version', type=bool, advanced=True,
              help='If true, will strictly require running junits with the same version of java as '
                   'the platform -target level. Otherwise, the platform -target level will be '
                   'treated as the minimum jvm to run.')
-    register('--failure-summary', action='store_true', default=True,
+    register('--failure-summary', type=bool, default=True,
              help='If true, includes a summary of which test-cases failed at the end of a failed '
                   'junit run.')
-    register('--allow-empty-sources', action='store_true', default=False, advanced=True,
+    register('--allow-empty-sources', type=bool, advanced=True,
              help='Allows a junit_tests() target to be defined with no sources.  Otherwise,'
                   'such a target will raise an error during the test run.')
+    register('--use-experimental-runner', type=bool, advanced=True,
+             help='Use experimental junit-runner logic for more options for parallelism.')
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.4'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.7'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
@@ -178,11 +183,29 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       self._args.append('-fail-fast')
     self._args.append('-outdir')
     self._args.append(self.workdir)
-
     if options.per_test_timer:
       self._args.append('-per-test-timer')
+
+    # TODO(zundel): Simply remove when --default_parallel finishes deprecation
     if options.default_parallel:
       self._args.append('-default-parallel')
+
+    if options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_BOTH:
+      self.context.log.warn('--default-concurrency=PARALLEL_BOTH is experimental.')
+      self._args.append('-default-concurrency')
+      self._args.append('PARALLEL_BOTH')
+    elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
+      self._args.append('-default-concurrency')
+      self._args.append('PARALLEL_CLASSES')
+    elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
+      self.context.log.warn('--default-concurrency=PARALLEL_METHODS is experimental.')
+      self._args.append('-default-concurrency')
+      self._args.append('PARALLEL_METHODS')
+    elif options.default_concurrency == junit_tests.CONCURRENCY_SERIAL:
+      # TODO(zundel): we can't do anything here yet while the --default-parallel
+      # option is in deprecation mode.
+      pass
+
     self._args.append('-parallel-threads')
     self._args.append(str(options.parallel_threads))
 
@@ -190,21 +213,17 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
 
+    if options.use_experimental_runner:
+      self._args.append('-use-experimental-runner')
+
   def classpath(self, targets, classpath_product=None):
     return super(JUnitRun, self).classpath(targets, classpath_product=classpath_product,
                                            include_scopes=Scopes.JVM_TEST_SCOPES)
 
   def preferred_jvm_distribution_for_targets(self, targets):
-    return self.preferred_jvm_distribution([target.platform for target in targets
-                                            if isinstance(target, JvmTarget)])
-
-  def preferred_jvm_distribution(self, platforms):
-    """Returns a jvm Distribution with a version that should work for all the platforms."""
-    if not platforms:
-      return DistributionLocator.cached()
-    min_version = max(platform.target_level for platform in platforms)
-    max_version = Revision(*(min_version.components + [9999])) if self._strict_jvm_version else None
-    return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
+    return JvmPlatform.preferred_jvm_distribution([target.platform for target in targets
+                                                  if isinstance(target, JvmTarget)],
+                                                  self._strict_jvm_version)
 
   def _spawn(self, distribution, executor=None, *args, **kwargs):
     """Returns a processhandler to a process executing java.
@@ -339,13 +358,16 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       lambda target: target.test_platform,
       lambda target: target.payload.extra_jvm_options,
       lambda target: target.payload.extra_env_vars,
+      lambda target: target.concurrency,
+      lambda target: target.threads
     )
 
     # the below will be None if not set, and we'll default back to runtime_classpath
     classpath_product = self.context.products.get_data('instrument_classpath')
 
     result = 0
-    for (workdir, platform, target_jvm_options, target_env_vars), tests in tests_by_properties.items():
+    for properties, tests in tests_by_properties.items():
+      (workdir, platform, target_jvm_options, target_env_vars, concurrency, threads) = properties
       for batch in self._partition(tests):
         # Batches of test classes will likely exist within the same targets: dedupe them.
         relevant_targets = set(map(tests_to_targets.get, batch))
@@ -355,7 +377,26 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         complete_classpath.update(self.classpath(relevant_targets,
                                                  classpath_product=classpath_product))
         complete_classpath.update(classpath_append)
-        distribution = self.preferred_jvm_distribution([platform])
+        distribution = JvmPlatform.preferred_jvm_distribution([platform], self._strict_jvm_version)
+
+        # Override cmdline args with values from junit_test() target that specify concurrency:
+        args = self._args + [u'-xmlreport']
+
+        # TODO(zundel): Combine these together into a single -concurrency choices style argument
+        if concurrency == junit_tests.CONCURRENCY_SERIAL:
+          args = remove_arg(args, '-default-parallel')
+        elif concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
+          args = ensure_arg(args, '-default-parallel')
+        elif concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
+          self.context.log.warn('Not implemented: parallel_methods')
+        elif concurrency == junit_tests.CONCURRENCY_PARALLEL_BOTH:
+          self.context.log.warn('specifying {} is experimental.'.format(concurrency))
+          args = ensure_arg(args, '-default-parallel')
+          args = ensure_arg(args, '-parallel-methods')
+        if threads is not None:
+          args = remove_arg(args, '-parallel-threads', has_param=True)
+          args += ['-parallel-threads', str(threads)]
+
         with binary_util.safe_args(batch, self.get_options()) as batch_tests:
           self.context.log.debug('CWD = {}'.format(workdir))
           self.context.log.debug('platform = {}'.format(platform))
@@ -366,7 +407,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               classpath=complete_classpath,
               main=JUnitRun._MAIN,
               jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
-              args=self._args + batch_tests + [u'-xmlreport'],
+              args=args + batch_tests,
               workunit_factory=self.context.new_workunit,
               workunit_name='run',
               workunit_labels=[WorkUnitLabel.TEST],

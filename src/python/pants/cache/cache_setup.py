@@ -49,11 +49,11 @@ class CacheSetup(Subsystem):
   def register_options(cls, register):
     super(CacheSetup, cls).register_options(register)
     default_cache = [os.path.join(get_buildroot(), '.cache')]
-    register('--read', action='store_true', default=True,
+    register('--read', type=bool, default=True,
              help='Read build artifacts from cache, if available.')
-    register('--write', action='store_true', default=True,
+    register('--write', type=bool, default=True,
              help='Write build artifacts to cache, if available.')
-    register('--overwrite', advanced=True, action='store_true',
+    register('--overwrite', advanced=True, type=bool,
              help='If writing build artifacts to cache, overwrite existing artifacts '
                   'instead of skipping them.')
     register('--resolver', advanced=True, choices=['none', 'rest'], default='none',
@@ -75,8 +75,12 @@ class CacheSetup(Subsystem):
              help='The gzip compression level (0-9) for created artifacts.')
     register('--max-entries-per-target', advanced=True, type=int, default=8,
              help='Maximum number of old cache files to keep per task target pair')
-    register('--pinger-timeout', advanced=True, type=float, default=0.5, help='number of seconds before pinger times out')
-    register('--pinger-tries', advanced=True, type=int, default=2, help='number of times pinger tries a cache')
+    register('--pinger-timeout', advanced=True, type=float, default=0.5,
+             help='number of seconds before pinger times out')
+    register('--pinger-tries', advanced=True, type=int, default=2,
+             help='number of times pinger tries a cache')
+    register('--write-permissions', advanced=True, type=str, default=None,
+             help='Permissions to use when writing artifacts to a local cache, in octal.')
 
   @classmethod
   def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
@@ -110,13 +114,17 @@ class CacheFactory(object):
     # Caches are supposed to be close, and we don't want to waste time pinging on no-op builds.
     # So we ping twice with a short timeout.
     # TODO: Make lazy.
-    self._pinger = pinger or Pinger(timeout=self._options.pinger_timeout, tries=self._options.pinger_tries)
+    self._pinger = pinger or Pinger(timeout=self._options.pinger_timeout,
+                                    tries=self._options.pinger_tries)
 
     # resolver is also close but failing to resolve might have broader impact than
     # single ping failure, therefore use a higher timeout with more retries.
-    self._resolver = resolver or \
-                     (RESTfulResolver(timeout=1.0, tries=3) if self._options.resolver == 'rest' else \
-                      NoopResolver())
+    if resolver:
+      self._resolver = resolver
+    elif self._options.resolver == 'rest':
+      self._resolver = RESTfulResolver(timeout=1.0, tries=3)
+    else:
+      self._resolver = NoopResolver()
 
   def read_cache_available(self):
     return self._options.read and bool(self._options.read_from) and self.get_read_cache()
@@ -142,7 +150,7 @@ class CacheFactory(object):
   def get_write_cache(self):
     """Returns the write cache for this setup, creating it if necessary.
 
-    Returns None if no read cache is configured.
+    Returns None if no write cache is configured.
     """
     if self._options.write_to and not self._write_cache:
       cache_spec = self._resolve(self._sanitize_cache_spec(self._options.write_to))
@@ -211,16 +219,19 @@ class CacheFactory(object):
     # both artifact cache and resolver use REST, add new protocols here once they are supported
     return string_spec.startswith('http://') or string_spec.startswith('https://')
 
+  def _baseurl(self, url):
+    parsed_url = urlparse.urlparse(url)
+    return '{scheme}://{netloc}'.format(scheme=parsed_url.scheme, netloc=parsed_url.netloc)
+
   def get_available_urls(self, urls):
     """Return reachable urls sorted by their ping times."""
-
-    netloc_to_url = {urlparse.urlparse(url).netloc: url for url in urls}
-    pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).
+    baseurl_to_urls = {self._baseurl(url): url for url in urls}
+    pingtimes = self._pinger.pings(baseurl_to_urls.keys())  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
 
     sorted_pingtimes = sorted(pingtimes, key=lambda x: x[1])
-    available_urls = [netloc_to_url[netloc] for netloc, pingtime in sorted_pingtimes
+    available_urls = [baseurl_to_urls[baseurl] for baseurl, pingtime in sorted_pingtimes
                       if pingtime < Pinger.UNREACHABLE]
     self._log.debug('Available cache servers: {0}'.format(available_urls))
 
@@ -244,7 +255,9 @@ class CacheFactory(object):
       path = os.path.join(parent_path, self._stable_name)
       self._log.debug('{0} {1} local artifact cache at {2}'
                       .format(self._stable_name, action, path))
-      return LocalArtifactCache(artifact_root, path, compression, self._options.max_entries_per_target)
+      return LocalArtifactCache(artifact_root, path, compression,
+                                self._options.max_entries_per_target,
+                                permissions=self._options.write_permissions)
 
     def create_remote_cache(remote_spec, local_cache):
       urls = self.get_available_urls(remote_spec.split('|'))

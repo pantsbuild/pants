@@ -9,25 +9,22 @@ import copy
 import os
 import re
 import traceback
-import warnings
 from collections import defaultdict
 
 import six
 
-from pants.base.deprecated import check_deprecated_semver, deprecated_conditional
-from pants.base.revision import Revision
+from pants.base.deprecated import validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.custom_types import (ListValueComponent, dict_option, file_option, list_option,
-                                       target_list_option, target_option)
-from pants.option.errors import (BooleanOptionNameWithNo, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidKwarg, InvalidMemberType,
-                                 MemberTypeNotAllowed, NoOptionNames, OptionNameDash,
+from pants.option.custom_types import (DictValueComponent, ListValueComponent, dict_option,
+                                       file_option, list_option, target_option)
+from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
+                                 InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
+                                 NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
                                  OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
                                  Shadowing)
-from pants.option.option_util import is_list_option
+from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
-from pants.version import PANTS_SEMVER
 
 
 class Parser(object):
@@ -178,7 +175,7 @@ class Parser(object):
 
       for arg in args:
         # If the user specified --no-foo on the cmd line, treat it as if the user specified
-        # --foo, but with the inverse implicit and explicit values.
+        # --foo, but with the inverse value.
         if kwargs.get('type') == bool:
           inverse_arg = self._inverse_arg(arg)
           if inverse_arg in flag_value_map:
@@ -292,56 +289,10 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    def check_deprecated_types(kwarg_name):
-      t = kwargs.get(kwarg_name)
-      # First check for deprecated direct use of the internal types.
-      if t == list_option:
-        deprecated_conditional(lambda: True, '0.0.81',
-                               'list_option is deprecated for option {} in scope {}. '
-                               'Use type=list.'.format(args[0], self.scope))
-      elif t == dict_option:
-        deprecated_conditional(lambda: True, '0.0.81',
-                               'dict_option is deprecated for option {} in scope {}. '
-                               'Use type=dict.'.format(args[0], self.scope))
-
-    check_deprecated_types('type')
-    check_deprecated_types('member_type')
-
-    action = kwargs.get('action')
-    # Temporary munging to effectively turn type=list options into list options,
-    # for uniform handling.  From here on, type=list is an error.
-    # TODO: Remove after type=list deprecation.
-    if action == 'append':
-      if 'type' in kwargs:
-        kwargs['member_type'] = kwargs['type']
-      kwargs['type'] = list
-      del kwargs['action']
-      deprecated_conditional(lambda: True, '0.0.81',
-                             "action='append' is deprecated for option {} in scope {}. "
-                             "Use type=list.".format(args[0], self.scope))
-
-    # Temporary munging to effectively turn type='target_list_option' options into list options,
-    # with member type 'target_option', for uniform handling.
-    # TODO: Remove after target_list_option deprecation.
-    if kwargs.get('type') == target_list_option:
-      kwargs['type'] = list
-      kwargs['member_type'] = target_option
-      deprecated_conditional(lambda: True, '0.0.81',
-                             'target_list_option is deprecated for option {} in scope {}. '
-                             'Use type=list, member_type=target_option.'.format(
-                               args[0], self.scope
-                             ))
-
-    # Temporary munging to effectively turn action='store_true' into bool-typed options.
-    # From here on, action='store_true' is an error.  Ditto for store_false.
-    if action == 'store_true':
-      kwargs['type'] = bool
-      kwargs['implicit_value'] = True
-      del kwargs['action']
-    elif action == 'store_false':
-      kwargs['type'] = bool
-      kwargs['implicit_value'] = False
-      del kwargs['action']
+    # Boolean options always have an implicit boolean-typed default.  They can never be None.
+    # We make that default explicit here.
+    if kwargs.get('type') == bool and kwargs.get('default') is None:
+      kwargs['default'] = not self._ensure_bool(kwargs.get('implicit_value', True))
 
     # Record the args. We'll do the underlying parsing on-demand.
     self._option_registrations.append((args, kwargs))
@@ -350,31 +301,24 @@ class Parser(object):
         existing_scope = self._parent_parser._existing_scope(arg)
         if existing_scope is not None:
           raise Shadowing(self.scope, arg, outer_scope=self._scope_str(existing_scope))
+    for arg in args:
+      if arg in self._known_args:
+        raise OptionAlreadyRegistered(self.scope, arg)
     self._known_args.update(args)
 
   def _check_deprecated(self, dest, kwargs):
     """Checks option for deprecation and issues a warning/error if necessary."""
-    deprecated_ver = kwargs.get('deprecated_version', None)
-    if deprecated_ver is not None:
-      msg = (
-        "Option '{dest}' in {scope} is deprecated and removed in version {removal_version}. {hint}"
-      ).format(dest=dest,
-               scope=self._scope_str(),
-               removal_version=deprecated_ver,
-               hint=kwargs.get('deprecated_hint', ''))
-
-      if PANTS_SEMVER >= Revision.semver(deprecated_ver):
-        # Once we've hit the deprecated_version, raise an error instead of warning. This allows for
-        # more actionable options hinting to continue beyond the deprecation period until removal.
-        raise DeprecatedOptionError(msg)
-      else:
-        # Out of range stacklevel to suppress printing src line.
-        warnings.warn('*** {}'.format(msg), DeprecationWarning, stacklevel=9999)
+    removal_version = kwargs.get('removal_version', None)
+    if removal_version is not None:
+      warn_or_error(removal_version,
+                    "option '{}' in {}".format(dest, self._scope_str()),
+                    kwargs.get('removal_hint', ''),
+                    stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
 
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'deprecated_version', 'deprecated_hint', 'removal_version', 'fromfile'
+    'fingerprint', 'removal_version', 'removal_hint', 'fromfile'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -415,9 +359,9 @@ class Parser(object):
       if kwarg not in self._allowed_registration_kwargs:
         error(InvalidKwarg, kwarg=kwarg)
 
-    deprecated_ver = kwargs.get('deprecated_version')
-    if deprecated_ver is not None:
-      check_deprecated_semver(deprecated_ver, check_expired=False)
+    removal_version = kwargs.get('removal_version')
+    if removal_version is not None:
+      validate_removal_semver(removal_version)
 
   def _existing_scope(self, arg):
     if arg in self._known_args:
@@ -445,6 +389,13 @@ class Parser(object):
       return dict_option
     else:
       return t
+
+  @staticmethod
+  def _convert_member_type(t, x):
+    if t == dict:
+      return dict_option(x).val
+    else:
+      return t(x)
 
   def _compute_value(self, dest, kwargs, flag_val_strs):
     """Compute the value to use for an option.
@@ -494,8 +445,7 @@ class Parser(object):
       # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
       # PANTS_PANTS_WORKDIR or PANTS_GLOBAL_PANTS_WORKDIR. We take the first specified value we
       # find, in this order: PANTS_GLOBAL_FOO, PANTS_FOO, FOO.
-      env_vars = ['PANTS_DEFAULT_{0}'.format(udest),  # Temporary, until deprecation is complete.
-                  'PANTS_GLOBAL_{0}'.format(udest), 'PANTS_{0}'.format(udest)]
+      env_vars = ['PANTS_GLOBAL_{0}'.format(udest), 'PANTS_{0}'.format(udest)]
       if udest.startswith('PANTS_'):
         env_vars.append(udest)
     else:
@@ -507,8 +457,6 @@ class Parser(object):
     if self._env:
       for env_var in env_vars:
         if env_var in self._env:
-          deprecated_conditional(lambda: env_var == 'PANTS_DEFAULT_{0}'.format(udest), '0.0.80',
-                                 'Use PANTS_GLOBAL_{0} instead of PANTS_DEFAULT_{0}'.format(udest))
           env_val_str = expand(self._env.get(env_var))
           env_details = 'from env var {}'.format(env_var)
           break
@@ -519,6 +467,10 @@ class Parser(object):
       # Note: It's important to set flag_val to None if no flags were specified, so we can
       # distinguish between no flags set vs. explicit setting of the value to [].
       flag_val = ListValueComponent.merge(flag_vals) if flag_vals else None
+    elif is_dict_option(kwargs):
+      # Note: It's important to set flag_val to None if no flags were specified, so we can
+      # distinguish between no flags set vs. explicit setting of the value to {}.
+      flag_val = DictValueComponent.merge(flag_vals) if flag_vals else None
     elif len(flag_vals) > 1:
       raise ParseError('Multiple cmd line flags specified for option {} in {}'.format(
           dest, self._scope_str()))
@@ -549,7 +501,7 @@ class Parser(object):
                                          option=dest,
                                          value=ranked_val.value,
                                          rank=ranked_val.rank,
-                                         deprecation_version=kwargs.get('deprecated_version'),
+                                         deprecation_version=kwargs.get('removal_version'),
                                          details=details)
 
     # Helper function to check various validity constraints on final option values.
@@ -569,19 +521,18 @@ class Parser(object):
       merged_rank = ranked_vals[-1].rank
       merged_val = ListValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val
-      merged_val = [self._wrap_type(kwargs.get('member_type', str))(x) for x in merged_val]
+      merged_val = [self._convert_member_type(kwargs.get('member_type', str), x)
+                    for x in merged_val]
+      map(check, merged_val)
+      ret = RankedValue(merged_rank, merged_val)
+    elif is_dict_option(kwargs):
+      merged_rank = ranked_vals[-1].rank
+      merged_val = DictValueComponent.merge(
+          [rv.value for rv in ranked_vals if rv.value is not None]).val
       map(check, merged_val)
       ret = RankedValue(merged_rank, merged_val)
     else:
       ret = ranked_vals[-1]
-      if kwargs.get('type') == bool and ret.value is None:
-        # We don't allow None as a value for bool options. If the value is None here it
-        # means that the value wasn't specified by the user anywhere, so we fall back to
-        # the inverse of the implicit_value (i.e., the inverse of what you'd get if the flag was
-        # specified with no argument).
-        # Note that we convert to str here because kwargs['implicit_value'] may be a string
-        # or a bool - we want it to work in both cases.
-        ret = RankedValue(ret.rank, not self._ensure_bool(kwargs.get('implicit_value', True)))
       check(ret.value)
 
     # All done!

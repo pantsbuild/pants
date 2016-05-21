@@ -39,6 +39,17 @@ python_tests(
 )
 
 python_tests(
+  name='javac_plugin_integration',
+  sources=['test_javac_plugin_integration.py'],
+  dependencies=[
+    'tests/python/pants_test/backend/jvm/tasks:missing_jvm_check',
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+  ],
+  timeout = 120,
+  tags = {'integration'},
+)
+
+python_tests(
   name='zinc_compile_jvm_platform_integration',
   sources=['test_zinc_compile_jvm_platform_integration.py'],
   dependencies=[

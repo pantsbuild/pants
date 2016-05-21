@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 import sys
 
+from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
@@ -26,9 +27,9 @@ class Options(object):
   The value in global scope of option '--foo-bar' (registered in global scope) will be selected
   in the following order:
     - The value of the --foo-bar flag in global scope.
-    - The value of the PANTS_DEFAULT_FOO_BAR environment variable.
+    - The value of the PANTS_GLOBAL_FOO_BAR environment variable.
     - The value of the PANTS_FOO_BAR environment variable.
-    - The value of the foo_bar key in the [DEFAULT] section of pants.ini.
+    - The value of the foo_bar key in the [GLOBAL] section of pants.ini.
     - The hard-coded value provided at registration time.
     - None.
 
@@ -39,11 +40,11 @@ class Options(object):
     - The value of the --foo-bar flag in global scope.
     - The value of the PANTS_COMPILE_JAVA_FOO_BAR environment variable.
     - The value of the PANTS_COMPILE_FOO_BAR environment variable.
-    - The value of the PANTS_DEFAULT_FOO_BAR environment variable.
+    - The value of the PANTS_GLOBAL_FOO_BAR environment variable.
     - The value of the PANTS_FOO_BAR environment variable.
     - The value of the foo_bar key in the [compile.java] section of pants.ini.
     - The value of the foo_bar key in the [compile] section of pants.ini.
-    - The value of the foo_bar key in the [DEFAULT] section of pants.ini.
+    - The value of the foo_bar key in the [GLOBAL] section of pants.ini.
     - The hard-coded value provided at registration time.
     - None.
 
@@ -55,7 +56,7 @@ class Options(object):
     - The value of the PANTS_COMPILE_FOO_BAR environment variable.
     - The value of the foo_bar key in the [compile.java] section of pants.ini.
     - The value of the foo_bar key in the [compile] section of pants.ini.
-    - The value of the foo_bar key in the [DEFAULT] section of pants.ini
+    - The value of the foo_bar key in the [GLOBAL] section of pants.ini
       (because of automatic config file fallback to that section).
     - The hard-coded value provided at registration time.
     - None.
@@ -69,14 +70,23 @@ class Options(object):
     """Expand a set of scopes to include all enclosing scopes.
 
     E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
+
+    Also adds any deprecated scopes.
     """
     ret = {GlobalOptionsRegistrar.get_scope_info()}
-    for scope_info in scope_infos:
-      ret.add(scope_info)
+    original_scopes = set()
+    for si in scope_infos:
+      ret.add(si)
+      original_scopes.add(si.scope)
+      if si.deprecated_scope:
+        ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
+        original_scopes.add(si.deprecated_scope)
 
-    original_scopes = {si.scope for si in scope_infos}
-    for scope_info in scope_infos:
-      scope = scope_info.scope
+    # TODO: Once scope name validation is enforced (so there can be no dots in scope name
+    # components) we can replace this line with `for si in scope_infos:`, because it will
+    # not be possible for a deprecated_scope to introduce any new intermediate scopes.
+    for si in copy.copy(ret):
+      scope = si.scope
       while scope != '':
         if scope not in original_scopes:
           ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
@@ -85,7 +95,7 @@ class Options(object):
 
   @classmethod
   def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None,
-             option_tracker=None,):
+             option_tracker=None):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
@@ -231,6 +241,9 @@ class Options(object):
   def register(self, scope, *args, **kwargs):
     """Register an option in the given scope."""
     self.get_parser(scope).register(*args, **kwargs)
+    deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
+    if deprecated_scope:
+      self.get_parser(deprecated_scope).register(*args, **kwargs)
 
   def registration_function_for_optionable(self, optionable_class):
     """Returns a function for registering options on the given scope."""
@@ -273,10 +286,32 @@ class Options(object):
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
-    self._values_by_scope[scope] = values
+
+    # If we're the new name of a deprecated scope, also get values from that scope (but we
+    # take precedence).
+    deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
+    # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
+    # Optionable has a deprecated_options_scope equal to deprecated_scope. Therefore we must
+    # check that scope != deprecated_scope to prevent infinite recursion.
+    if deprecated_scope is not None and scope != deprecated_scope:
+      deprecated_vals = self.for_scope(deprecated_scope)
+      explicit_keys = deprecated_vals.get_explicit_keys()
+      if explicit_keys:
+        warn_or_error(self.known_scope_to_info[scope].deprecated_scope_removal_version,
+                      'scope {}'.format(deprecated_scope),
+                      'Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
+        # Note that a deprecated val will take precedence over a val of equal rank.
+        # This makes the code a bit neater.
+        values.update(deprecated_vals)
+
+    # Record the value derivation.
     for option in values:
       self._option_tracker.record_option(scope=scope, option=option, value=values[option],
                                          rank=values.get_rank(option))
+
+    # Cache the values.
+    self._values_by_scope[scope] = values
+
     return values
 
   def get_fingerprintable_for_scope(self, scope):

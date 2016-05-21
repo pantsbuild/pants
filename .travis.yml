@@ -42,7 +42,7 @@ cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - $HOME/.npm
     - $HOME/.android
-    - $SDK_INSTALL_LOCATION
+    - $ANDROID_SDK_INSTALL_LOCATION
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
@@ -56,8 +56,8 @@ install:
 
 env:
   global:
-    - SDK_INSTALL_LOCATION="$HOME/opt/android-sdk-install"
-    - ANDROID_HOME="$SDK_INSTALL_LOCATION/android-sdk-linux"
+    - ANDROID_SDK_INSTALL_LOCATION="$HOME/opt/android-sdk-install"
+    - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
     - CXX=g++
     - PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']"
     # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN

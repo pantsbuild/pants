@@ -26,11 +26,11 @@ class CountLinesOfCode(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(CountLinesOfCode, cls).register_options(register)
-    register('--version', advanced=True, fingerprint=True, default='1.64', help='Version of cloc.')
-    register('--transitive', action='store_true', fingerprint=True, default=True,
+    register('--version', advanced=True, fingerprint=True, default='1.66', help='Version of cloc.')
+    register('--transitive', type=bool, fingerprint=True, default=True,
              help='Operate on the transitive dependencies of the specified targets.  '
                   'Unset to operate only on the specified targets.')
-    register('--ignored', action='store_true', fingerprint=True,
+    register('--ignored', type=bool, fingerprint=True,
              help='Show information about files ignored by cloc.')
 
   def _get_cloc_script(self):

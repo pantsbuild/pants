@@ -22,12 +22,12 @@ from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDepende
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
-from pants_test.base_test import BaseTest
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
-from pants_test.tasks.task_test_base import ensure_cached
+from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
 def strip_workdir(dir, classpath):
@@ -462,7 +462,29 @@ class IvyResolveTest(JvmToolTaskTestBase):
                     'Expected {} to exist as a file'.format(path))
 
 
-class IvyResolveFingerprintStrategyTest(BaseTest):
+class EmptyTask(Task):
+  @classmethod
+  def register_options(cls, register):
+    register('--a', type=bool, default=False, fingerprint=True)
+
+  @property
+  def fingerprint(self):
+    # NB: The fake options object doesn't contribute to fingerprinting, so this class redefines
+    #     fingerprint.
+    if self.get_options().a:
+      return "a"
+    else:
+      return "b"
+
+  def execute(self):
+    pass
+
+
+class IvyResolveFingerprintStrategyTest(TaskTestBase):
+
+  @classmethod
+  def task_type(cls):
+    return EmptyTask
 
   def setUp(self):
     super(IvyResolveFingerprintStrategyTest, self).setUp()
@@ -479,15 +501,35 @@ class IvyResolveFingerprintStrategyTest(BaseTest):
 
   def test_target_target_is_none(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(confs)
+    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
+                                             confs)
 
     target = self.make_target(':just-target')
 
     self.assertIsNone(strategy.compute_fingerprint(target))
 
+  def test_options_included_in_fingerprint(self):
+    confs = ()
+    jar_library = self.make_target(':jar-library', target_type=JarLibrary,
+                                   jars=[JarDependency('org.some', 'name')])
+
+    self.set_options(a=True)
+    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
+                                             confs)
+    with_true_a = strategy.compute_fingerprint(jar_library)
+
+    self.set_options(a=False)
+    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
+                                             confs)
+
+    with_false_a = strategy.compute_fingerprint(jar_library)
+
+    self.assertNotEqual(with_true_a, with_false_a)
+
   def test_jvm_target_without_excludes_is_none(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(confs)
+    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
+                                             confs)
 
     target_without_excludes = self.make_target(':jvm-target', target_type=JvmTarget)
 
@@ -495,7 +537,8 @@ class IvyResolveFingerprintStrategyTest(BaseTest):
 
   def test_jvm_target_with_excludes_is_hashed(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(confs)
+    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
+                                             confs)
 
     target_with_excludes = self.make_target(':jvm-target', target_type=JvmTarget,
                                                excludes=[Exclude('org.some')])
@@ -504,7 +547,8 @@ class IvyResolveFingerprintStrategyTest(BaseTest):
 
   def test_jar_library_with_one_jar_is_hashed(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(confs)
+    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
+                                             confs)
 
     jar_library = self.make_target(':jar-library', target_type=JarLibrary,
                                    jars=[JarDependency('org.some', 'name')])
@@ -513,7 +557,8 @@ class IvyResolveFingerprintStrategyTest(BaseTest):
 
   def test_identical_jar_libraries_with_same_jar_dep_management_artifacts_match(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(confs)
+    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
+                                             confs)
 
     managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
                                artifacts=[JarDependency('org.some', 'name')])
@@ -533,7 +578,8 @@ class IvyResolveFingerprintStrategyTest(BaseTest):
 
   def test_identical_jar_libraries_with_differing_managed_deps_differ(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(confs)
+    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
+                                             confs)
 
     managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
                                artifacts=[JarDependency('org.some', 'name')])

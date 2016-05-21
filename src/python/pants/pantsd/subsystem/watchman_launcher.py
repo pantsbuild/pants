@@ -15,7 +15,7 @@ from pants.util.memo import testable_memoized_property
 
 
 class WatchmanLauncher(object):
-  """Encapsulates access to Watchman."""
+  """A subsystem that encapsulates access to Watchman."""
 
   class Factory(Subsystem):
     options_scope = 'watchman'
@@ -31,6 +31,8 @@ class WatchmanLauncher(object):
       register('--supportdir', advanced=True, default='bin/watchman',
                help='Find watchman binaries under this dir. Used as part of the path to lookup '
                     'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
+      register('--socket-timeout', type=float, advanced=True, default=Watchman.SOCKET_TIMEOUT_SECONDS,
+               help='The watchman client socket timeout (in seconds).')
 
     def create(self):
       binary_util = BinaryUtil.Factory.create()
@@ -39,20 +41,24 @@ class WatchmanLauncher(object):
                               options.pants_workdir,
                               options.level,
                               options.version,
-                              options.supportdir)
+                              options.supportdir,
+                              options.socket_timeout)
 
-  def __init__(self, binary_util, workdir, log_level, watchman_version, watchman_supportdir):
+  def __init__(self, binary_util, workdir, log_level, watchman_version, watchman_supportdir,
+               socket_timeout):
     """
     :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
     :param workdir: The current pants workdir.
     :param log_level: The current log level of pants.
     :param watchman_version: The watchman binary version to retrieve using BinaryUtil.
     :param watchman_supportdir: The supportdir for BinaryUtil.
+    :param socket_timeout: The watchman client socket timeout (in seconds).
     """
     self._binary_util = binary_util
     self._workdir = workdir
     self._watchman_version = watchman_version
     self._watchman_supportdir = watchman_supportdir
+    self._socket_timeout = socket_timeout
     self._log_level = log_level
     self._logger = logging.getLogger(__name__)
     self._watchman = None
@@ -60,7 +66,11 @@ class WatchmanLauncher(object):
   @staticmethod
   def _convert_log_level(level):
     """Convert a given pants log level string into a watchman log level string."""
-    return {'warn': '0', 'info': '1', 'debug': '2'}.get(level, '1')
+    # N.B. Enabling true Watchman debug logging (log level 2) can generate an absurd amount of log
+    # data (10s of gigabytes over the course of an ~hour for an active fs) and is not particularly
+    # helpful except for debugging Watchman itself. Thus, here we intentionally avoid this level
+    # in the mapping of pants log level -> watchman.
+    return {'warn': '0', 'info': '1', 'debug': '1'}.get(level, '1')
 
   @testable_memoized_property
   def watchman(self):
@@ -69,19 +79,20 @@ class WatchmanLauncher(object):
                                                       'watchman')
     return Watchman(watchman_binary,
                     self._workdir,
-                    self._convert_log_level(self._log_level))
+                    self._convert_log_level(self._log_level),
+                    self._socket_timeout)
 
   def maybe_launch(self):
     if not self.watchman.is_alive():
-      self._logger.info('launching watchman')
+      self._logger.debug('launching watchman')
       try:
         self.watchman.launch()
       except (self.watchman.ExecutionError, self.watchman.InvalidCommandOutput) as e:
         self._logger.critical('failed to launch watchman: {exc!r})'.format(exc=e))
         return False
 
-    self._logger.info('watchman is running, pid={pid} socket={socket}'
-                      .format(pid=self.watchman.pid, socket=self.watchman.socket))
+    self._logger.debug('watchman is running, pid={pid} socket={socket}'
+                       .format(pid=self.watchman.pid, socket=self.watchman.socket))
     # TODO(kwlzn): This sleep is currently helpful based on empirical testing with older watchman
     # versions, but should go away quickly once we embed watchman fetching in pants and uprev both
     # the binary and client versions.

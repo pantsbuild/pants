@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import StringIO
 import subprocess
@@ -13,6 +14,7 @@ from contextlib import contextmanager
 
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
+from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_binary
 
 
@@ -25,6 +27,9 @@ NUL = ensure_binary('\0')
 SPACE = ensure_binary(' ')
 NEWLINE = ensure_binary('\n')
 EMPTY_STRING = ensure_binary("")
+
+
+logger = logging.getLogger(__name__)
 
 
 class Git(Scm):
@@ -81,7 +86,7 @@ class Git(Scm):
     if result != 0:
       raise raise_type(failure_msg or '{} failed with exit code {}'.format(' '.join(cmd), result))
 
-  def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None, log=None):
+  def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None):
     """Creates a git scm proxy that assumes the git repository is in the cwd by default.
 
     binary:    The path to the git binary to use, 'git' by default.
@@ -89,7 +94,6 @@ class Git(Scm):
     worktree:  The path to the git repository working tree directory (typically '.').
     remote:    The default remote to use.
     branch:    The default remote branch to use.
-    log:       A log object that supports debug, info, and warn methods.
     """
     super(Scm, self).__init__()
 
@@ -98,12 +102,6 @@ class Git(Scm):
     self._gitdir = os.path.realpath(gitdir) if gitdir else os.path.join(self._worktree, '.git')
     self._remote = remote
     self._branch = branch
-
-    if log:
-      self._log = log
-    else:
-      import logging
-      self._log = logging.getLogger(__name__)
 
   def current_rev_identifier(self):
     return 'HEAD'
@@ -209,12 +207,12 @@ class Git(Scm):
       self._check_call(['rebase', 'FETCH_HEAD'], raise_type=Scm.LocalException)
     except Scm.LocalException as e:
       if leave_clean:
-        self._log.debug('Cleaning up after failed rebase')
+        logger.debug('Cleaning up after failed rebase')
         try:
           self._check_call(['rebase', '--abort'], raise_type=Scm.LocalException)
         except Scm.LocalException as abort_exc:
-          self._log.debug('Failed to up after failed rebase')
-          self._log.debug(traceback.format_exc(abort_exc))
+          logger.debug('Failed to up after failed rebase')
+          logger.debug(traceback.format_exc(abort_exc))
           # But let the original exception propagate, since that's the more interesting one
       raise e
 
@@ -275,7 +273,7 @@ class Git(Scm):
     return [self._gitcmd, '--git-dir=' + self._gitdir, '--work-tree=' + self._worktree] + args
 
   def _log_call(self, cmd):
-    self._log.debug('Executing: ' + ' '.join(cmd))
+    logger.debug('Executing: ' + ' '.join(cmd))
 
   def repo_reader(self, rev):
     return GitRepositoryReader(self, rev)
@@ -338,6 +336,15 @@ class GitRepositoryReader(object):
     def __str__(self):
       return "SymlinkLoop({}, {})".format(self.relpath, self.rev)
 
+  class ExternalSymlinkException(Exception):
+
+    def __init__(self, rev, relpath):
+      self.relpath = relpath
+      self.rev = rev
+
+    def __str__(self):
+      return "ExternalSymlink({}, {})".format(self.relpath, self.rev)
+
   class GitDiedException(Exception):
     pass
 
@@ -352,6 +359,14 @@ class GitRepositoryReader(object):
       return None
     except self.NotADirException:
       return None
+
+  def _safe_read_object(self, relpath, max_symlinks):
+    try:
+      return self._read_object(relpath, max_symlinks)
+    except self.MissingFileException:
+      return None, relpath
+    except self.NotADirException:
+      return None, relpath
 
   def exists(self, relpath):
     path = self._safe_realpath(relpath)
@@ -368,6 +383,19 @@ class GitRepositoryReader(object):
     if path:
       return path.endswith('/')
     return False
+
+  def lstat(self, relpath):
+    obj, _ = self._safe_read_object(relpath, max_symlinks=0)
+    return obj
+
+  def readlink(self, relpath):
+    # TODO: Relatively inefficient, but easier than changing read_object, unfortunately.
+    if type(self.lstat(relpath)) != self.Symlink:
+      return None
+    obj, path_so_far = self._safe_read_object(relpath, max_symlinks=1)
+    if obj == None:
+      return None
+    return path_so_far
 
   class Symlink(object):
 
@@ -426,6 +454,7 @@ class GitRepositoryReader(object):
     assert object_type == 'blob'
     yield StringIO.StringIO(data)
 
+  @memoized_method
   def _realpath(self, relpath):
     """Follow symlinks to find the real path to a file or directory in the repo.
 
@@ -433,14 +462,12 @@ class GitRepositoryReader(object):
               to that file; if a directory, the relative path + '/'; if
               a symlink outside the repo, a path starting with / or ../.
     """
+    obj, path_so_far = self._read_object(relpath, MAX_SYMLINKS_IN_REALPATH)
+    if isinstance(obj, self.Symlink):
+      raise self.SymlinkLoopException(self.rev, relpath)
+    return path_so_far
 
-    realpath = self._realpath_cache.get(relpath)
-    if not realpath:
-      realpath = self._realpath_uncached(relpath)
-      self._realpath_cache[relpath] = realpath
-    return realpath
-
-  def _realpath_uncached(self, relpath):
+  def _read_object(self, relpath, max_symlinks):
     path_so_far = ''
     components = list(relpath.split(os.path.sep))
     symlinks = 0
@@ -468,28 +495,28 @@ class GitRepositoryReader(object):
           # We've encountered a file while searching for a directory
           raise self.NotADirException(self.rev, relpath)
         else:
-          return path_so_far
+          return obj, path_so_far
       elif isinstance(obj, self.Dir):
         if not components:
-          return path_so_far + '/'
+          return obj, path_so_far + '/'
         # A dir is OK; we just descend from here
       elif isinstance(obj, self.Symlink):
         symlinks += 1
-        if symlinks > MAX_SYMLINKS_IN_REALPATH:
-          raise self.SymlinkLoopException(self.rev, relpath)
+        if symlinks > max_symlinks:
+          return obj, path_so_far
         # A git symlink is stored as a blob containing the name of the target.
         # Read that blob.
         object_type, path_data = self._read_object_from_repo(sha=obj.sha)
         assert object_type == 'blob'
 
         if path_data[0] == '/':
-          # In the event of an absolute path, just return that path
-          return path_data
+          # Is absolute, thus likely points outside the repo.
+          raise self.ExternalSymlinkException(self.rev, relpath)
 
         link_to = os.path.normpath(os.path.join(parent_path, path_data))
         if link_to.startswith('../') or link_to[0] == '/':
-          # If the link points outside the repo, then just return that file
-          return link_to
+          # Points outside the repo.
+          raise self.ExternalSymlinkException(self.rev, relpath)
 
         # Restart our search at the top with the new path.
         # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
@@ -498,7 +525,7 @@ class GitRepositoryReader(object):
       else:
         # Programmer error
         raise self.UnexpectedGitObjectTypeException()
-    return './'
+    return self.Dir('./', None), './'
 
   def _fixup_dot_relative(self, path):
     """Git doesn't understand dot-relative paths."""
@@ -511,7 +538,7 @@ class GitRepositoryReader(object):
   def _read_tree(self, path):
     """Given a revision and path, parse the tree data out of git cat-file output.
 
-    :returns: a dict from filename -> [list of Symlink, Dir, and Fil objectse]
+    :returns: a dict from filename -> [list of Symlink, Dir, and File objects]
     """
 
     path = self._fixup_dot_relative(path)

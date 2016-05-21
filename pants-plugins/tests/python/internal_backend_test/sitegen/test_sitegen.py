@@ -18,7 +18,11 @@ CONFIG_JSON = """
   "sources": {
     "index": "fake0/README.html",
     "subdir/page1": "fake1/p1.html",
-    "subdir/page2": "fake1/p2.html"
+    "subdir/page2": "fake1/p2.html",
+    "subdir/page2_no_toc": "fake1/p2.html"
+  },
+  "show_toc": {
+    "subdir/page2_no_toc": false
   },
   "extras": {
   },
@@ -87,6 +91,7 @@ class AllTheThingsTestCase(unittest.TestCase):
       'index': bs4.BeautifulSoup(INDEX_HTML),
       'subdir/page1': bs4.BeautifulSoup(P1_HTML),
       'subdir/page2': bs4.BeautifulSoup(P2_HTML),
+      'subdir/page2_no_toc': bs4.BeautifulSoup(P2_HTML),
     }
     self.precomputed = sitegen.precompute(self.config, self.soups)
 
@@ -151,6 +156,20 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
     self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
 
+  def test_no_show_toc(self):
+    sitegen.generate_page_tocs(self.soups, self.precomputed)
+    rendered = sitegen.render_html('subdir/page2_no_toc',
+                                   self.config,
+                                   self.soups,
+                                   self.precomputed,
+                                   """
+                                   {{#page_toc}}
+                                   DEPTH={{depth}} LINK={{link}} TEXT={{text}}
+                                   {{/page_toc}}
+                                   """)
+    self.assertNotIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
+    self.assertNotIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
+
   def test_transforms_not_discard_page_tocs(self):
     # We had a bug where one step of transform lost the info
     # we need to build page-tocs. Make sure that doesn't happen again.
@@ -166,31 +185,6 @@ class AllTheThingsTestCase(unittest.TestCase):
                                    """)
     self.assertIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
     self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
-
-  def test_here_links(self):
-    sitegen.add_here_links(self.soups)
-    html = sitegen.render_html('index',
-                               self.config,
-                               self.soups,
-                               self.precomputed,
-                               TEMPLATE_MUSTACHE)
-    self.assertIn('href="#pants-build-system"', html,
-                  'Generated html lacks auto-created link to h1.')
-
-  def test_breadcrumbs(self):
-    # Our "site" has a simple outline.
-    # Do we get the correct info from that to generate
-    # "breadcrumbs" navigating from one page up to the top?
-    rendered = sitegen.render_html('subdir/page2',
-                                   self.config,
-                                   self.soups,
-                                   self.precomputed,
-                                   """
-                                   {{#breadcrumbs}}
-                                   LINK={{link}} TEXT={{text}}
-                                   {{/breadcrumbs}}
-                                   """)
-    self.assertIn('LINK=../index.html TEXT=Pants Build System', rendered)
 
   def test_site_toc(self):
     # Our "site" has a simple outline.

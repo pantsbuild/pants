@@ -26,6 +26,7 @@ python_library(
   sources = ['watchman.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:retry',
     ':process_manager',
     ':watchman_client'
   ]
@@ -44,6 +45,16 @@ python_library(
   sources = ['pants_daemon.py'],
   dependencies = [
     '3rdparty/python:setproctitle',
+    'src/python/pants/goal:run_tracker',
+    ':util'
+  ]
+)
+
+python_library(
+  name = 'util',
+  sources = ['util.py'],
+  dependencies = [
+    'src/python/pants/goal:goal',
     'src/python/pants/goal:run_tracker'
   ]
 )

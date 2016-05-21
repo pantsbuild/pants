@@ -1,0 +1,22 @@
+# BUILD file used for integ tests to verify custom scala 2.11 setup works.
+
+ jar_library(name = 'scalac',
+            jars = [
+              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.11.7'),
+            ])
+
+# jar_library(name = 'scala-library',
+#             jars = [
+#               jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.11.7'),
+#             ])
+
+jar_library(name = 'scala-repl',
+            jars = [
+              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.11.7'),
+              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.11.7'),
+            ])
+
+jar_library(name = 'scalastyle',
+            jars = [
+              scala_jar(org='org.scalastyle', name='scalastyle', rev='0.8.0')
+            ])

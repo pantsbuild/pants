@@ -27,7 +27,10 @@ def shared_artifacts(version, extra_jar=None):
 # TODO: Right now some options are set via config and some via cmd-line flags. Normalize this?
 def publish_extra_config(unique_config):
   return {
-    'DEFAULT': {
+    'GLOBAL': {
+      # Turn off --verify-config as some scopes in pants.ini will not be
+      # recognized due to the select few backend packages.
+      'verify_config': False,
       'pythonpath': [
         'examples/src/python',
         'pants-plugins/src/python',

@@ -95,7 +95,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Add these directories to PYTHONPATH to search for plugins.')
     register('--target-spec-file', type=list, dest='target_spec_files',
              help='Read additional specs from this file, one per line')
-    register('--verify-config', type=bool, default=False,
+    register('--verify-config', type=bool, default=True,
              help='Verify that all config file values correspond to known options.')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
@@ -140,18 +140,15 @@ class GlobalOptionsRegistrar(Optionable):
              metavar='<regexp>',
              help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
-    register('--spec-excludes', advanced=True, type=list,
-             default=[register.bootstrap.pants_workdir],
-             deprecated_hint='Use --ignore-patterns instead. Use .gitignore syntax for each item, '
-                             'to simulate old behavior prefix each item with "/".',
-             deprecated_version='0.0.75', removal_version='0.0.80',
-             help='Ignore these paths when evaluating the command-line target specs.  Useful with '
-                  '::, to avoid descending into unneeded directories.')
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
-             default=['.*'],
-             help='Patterns for ignoring files when reading BUILD files. '
+             default=['.*', '/dist', 'bower_components', 'node_modules', '*.egg-info'],
+             help='Glob patterns for ignoring files when reading BUILD files. '
                   'Use to ignore unneeded directories or BUILD files. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
+    register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*', 'dist/'],
+             help='Ignore files that match the specified patterns. '
+                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore). '
+                  'This option is currently experimental.')
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')

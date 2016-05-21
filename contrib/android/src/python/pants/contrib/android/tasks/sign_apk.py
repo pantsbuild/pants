@@ -23,6 +23,8 @@ from pants.contrib.android.targets.android_binary import AndroidBinary
 logger = logging.getLogger(__name__)
 
 
+# TODO: Should this be a NailgunTask? Then it can set its self.dist instead of
+# working directly with DistributionLocator.
 class SignApkTask(Task):
   """Sign Android packages with keystores using the jarsigner tool."""
 

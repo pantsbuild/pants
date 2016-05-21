@@ -14,15 +14,13 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.classpath_util import MissingClasspathEntryError
+from pants.build_graph.resources import Resources
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_file_dump
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
-from pants_test.testutils.file_test_util import check_zip_file_content
 
 
 class TestBundleCreate(JvmBinaryTaskTestBase):
-
-  FOO_JAR = {'Foo.class': '', 'foo.txt': ''}
 
   @classmethod
   def task_type(cls):
@@ -43,23 +41,32 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self.jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
                                     target_type=JarLibrary,
                                     jars=[JarDependency(org='org.example', name='foo', rev='1.0.0'),
-                                          JarDependency(org='org.pantsbuild', name='bar', rev='2.0.0',
+                                          JarDependency(org='org.pantsbuild',
+                                                        name='bar',
+                                                        rev='2.0.0',
                                                         ext='zip'),
                                           JarDependency(org='org.apache', name='baz', rev='3.0.0',
                                                         classifier='tests'),
                                           JarDependency(org='org.gnu', name='gary', rev='4.0.0',
                                                         ext='tar.gz')])
 
+    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content')
+    self.resources_target = self.make_target('//resources:foo-resources', Resources,
+                                             sources=['foo/file'])
+
     # This is so that payload fingerprint can be computed.
     safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
     self.java_lib_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
+
     self.binary_target = self.make_target(spec='//foo:foo-binary',
                                           target_type=JvmBinary,
-                                          dependencies=[self.java_lib_target, self.jar_lib])
+                                          dependencies=[self.java_lib_target, self.jar_lib],
+                                          resources=[self.resources_target.address.spec])
+
     self.app_target = self.make_target(spec='//foo:foo-app',
-                                        target_type=JvmApp,
-                                        basename='FooApp',
-                                        dependencies=[self.binary_target])
+                                       target_type=JvmApp,
+                                       basename='FooApp',
+                                       dependencies=[self.binary_target])
 
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
@@ -78,7 +85,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                                            self.tar_gz_artifact])
 
     self.add_to_runtime_classpath(task_context, self.binary_target,
-                                  {'Foo.class': '', 'foo.txt': ''})
+                                  {'Foo.class': '', 'foo.txt': '', 'foo/file': ''})
 
   def test_jvm_bundle_products(self):
     """Test default setting outputs bundle products using `target.id`."""
@@ -147,8 +154,15 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                              'libs/3rdparty.jvm.org.example.foo-2.jar',
                              'libs/3rdparty.jvm.org.example.foo-3.gz']),
                      sorted(self.iter_files(bundle_root)))
-    check_zip_file_content(os.path.join(bundle_root, 'libs/foo.foo-binary-0.jar'),
-                           self.FOO_JAR)
+
+    with open_zip(os.path.join(bundle_root, 'libs/foo.foo-binary-0.jar')) as zf:
+      self.assertEqual(sorted(['META-INF/',
+                               'META-INF/MANIFEST.MF',
+                               'Foo.class',
+                               'foo.txt',
+                               'foo/',
+                               'foo/file']),
+                       sorted(zf.namelist()))
 
     # TODO verify Manifest's Class-Path
     with open_zip(os.path.join(bundle_root, 'foo-binary.jar')) as jar:

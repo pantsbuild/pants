@@ -1,71 +1,32 @@
 JVM 3rdparty Pattern
 ====================
 
-In general, we use the
-[[3rdparty idiom|pants('src/docs:3rdparty')]] to organize
-dependencies on code from outside the source tree. This document
+In general, we recommend the [[3rdparty idiom|pants('src/docs:3rdparty')]]
+for organizing dependencies on code from outside the source tree. This document
 describes how to make this work for JVM (Java or Scala) code.
 
-Your JVM code can pull in code written elsewhere. Pants uses
-[Ivy](http://ant.apache.org/ivy/), a tool based on Maven's jar-sharing.
+Your JVM code can depend on external, third-party libraries. Pants uses
+[Ivy](http://ant.apache.org/ivy/) to resolve and retrieve these JAR files.
 You should know the ([Maven/Ivy groupId, artifactId, and
 version](http://maven.apache.org/guides/mini/guide-central-repository-upload.html))
 you want to use.
 
-The 3rdparty pattern described here eases avoiding diamond dependency
-problems and version conflicts. If your code depends on artifacts `foo`
-and `bar`; and if `foo` and `bar` depend on different versions of the
-`baz` artifact; then some code will be linked together with a version of
-`baz` it didn't "expect." Tracking versioned dependencies in one place
-makes it easier to reason about them.
-
 3rdparty/jvm
 ------------
 
-**The JVM part of 3rdparty is organized by org (Maven groupId).**
-For an example of a repo with 3rdparty arranged this way, see
-[twitter/commons](https://github.com/twitter/commons/tree/master/3rdparty/jvm).
-(Pants' own 3rdparty isn't organized this way; it doesn't have enough 3rdparty
-dependencies for this to make sense.)
-Under there, see if there's already a `3rdparty/jvm/path/to/org/BUILD` file.
-If there isn't, then you want to create one. E.g., to import
-`com.sun.jersey-apache-client`, look in `3rdparty/jvm/com/sun` for a
-likely-looking `BUILD` file--in this example,
-`3rdparty/jvm/com/google/sun/jersey/BUILD`.
+If you have a small to medium number of third-party dependencies, you can define
+them all in a single `3rdparty/jvm/BUILD` file.  If you have a large number, it
+may make sense to organize them in multiple subdirectories, say by category or by publisher.
 
-In the appropriate `BUILD` file, you want to find a
-<a pantsref="bdict_jar_library">`jar_library`</a>
-with the <a pantsref="bdict_jar">`jar`</a>s you want:
+In the appropriate `BUILD` file, you create a <a pantsref="bdict_jar_library">`jar_library`</a>
+referencing the <a pantsref="bdict_jar">`jar`</a>s you want:
 
 !inc[start-at=junit&end-before=scalatest](../../../../../../3rdparty/BUILD)
 
-Here, the
-<a pantsref="bdict_jar_library">`jar_library`</a>'s name
-defines a target address that
-other build targets can refer to. The
-<a pantsref="bdict_jar">`jar`</a>s refer to jars known to
-your Ivy resolver.
+Here, the <a pantsref="bdict_jar_library">`jar_library`</a>'s name
+defines a target address that other build targets can refer to. The
+<a pantsref="bdict_jar">`jar`</a>s refer to jars that Ivy can resolve and fetch.
 
-If there's already a `jar` importing the code you want but with a
-*different* version, then you probably want to talk to other folks in
-your organization to agree on one version. (If there's already a `jar`
-importing the code you want with the version you want, then great. Leave
-it there.)
-
-(You don't *need* a tree of `BUILD` files; you could instead have, e.g., one `3rdparty/jvm/BUILD`
-file. Pants' own repo has its JVM 3rdparty targets in just one `BUILD` file. That works fine because
-Pants doesn't have many 3rdparty JVM dependencies. But as the number of these dependencies grows,
-it makes more sense to set up a directory tree. In a large organization, a tree can ease some
-common tasks. For example, `git log` quickly answers questions like "Who set up this dependency?
-Who cares if I bump the version?")
-
-Additionally, some families of jars have different groupId's but are
-logically part of the same project, or need to have their rev's kept in
-sync. For example, (`com.fasterxml.jackson.core`,
-`com.fasterxml.jackson.dataformat`). Sometimes it makes sense to define
-these in a single build file, such as
-`3rdparty/jvm/com/fasterxml/jackson/BUILD` for the jackson family of
-jars.
 
 Your Code's BUILD File
 ----------------------
@@ -86,41 +47,29 @@ And your Java code might have:
 "Round Trip" Dependencies
 -------------------------
 
-Depending on your workspace's relation with the rest of the world, you
-might want to look out for "round trip" dependencies. You can publish an
-artifact *near* generated from your workspace's source code and consume
-a third-party artifact *far* that depends on *near*. If you're not
-careful, you might depend on two versions of the *near* code: the local
-source code and an artifact you published a while ago.
+It is possible for your code to exist as source in the repo but
+also be published as a binary to an external repository. If you happen to pull in any
+third party artifacts, they may express a dependency on the published
+version of the artifact.  This means that the classpath will contain
+both the version in the repo compiled from source and an older version
+that was previously published.  In this case, you want to be sure that
+when pants always prefers the version built from source.
 
-When consuming such third-party artifacts, ensure that your source dependencies
-have `provides` clauses (*near*), and then add the source dependencies
-explicitly when you depend on the binary copy of the *far* dependency:
+Fortunately, the remedy for this is simple.  If you add a `provides=`
+parameter that matches the one used to publish the artifact, pants
+will always prefer the local target definition to the
+published jar.
 
     :::python
-    jar_library(name='far',
-      jars=[
-        jar(org='org.archie', name='far', rev='0.0.18'),
-      ]
-      dependencies=[
-        # including the local version of source manually will cause the binary
-        # dependency to be automatically excluded:
-        'util/near',
-      ]
-    )
+    jar_library(name='api',
+      sources = globs('*.java'),
+      provides = artifact(org='org.archie',
+                          name='api',
+                          repo=myrepo,)
+	)
 
-Troubleshooting a JVM Dependencies Problem
-------------------------------------------
-
-If you're working in JVM (Java or Scala) and suspect you're pulling in different versions of some
-package, you can dump your dependency "tree" with versions with an Ivy resolve report.
-To generate a report for a target such as the `junit`-using `hello/greet` example tests:
-
-    :::bash
-    $ ./pants resolve.ivy --open examples/tests/java/org/pantsbuild/example/hello/greet
-
-Ivy's report shows which which package is pulling in the package-version you didn't expect.
-(It might not be clear which version you *want*; but at least you've narrowed down the problem.)
+Controlling JAR Dependency Versions
+-----------------------------------
 
 **If you notice a small number of wrong-version things,** then in a JVM
 target, you can depend on a `jar` that specifies a version and sets
@@ -170,6 +119,166 @@ transitive dependencies from JVM targets:
       excludes = [
         exclude('org.sonatype.sisu.inject', 'cglib')
       ]
+    )
+
+Managing Transitive Dependencies
+-------------------------------
+
+### The Problem
+
+If you have jars that pull in many transitive dependencies, you probably
+want to constrain which versions of those transitive dependencies you
+pull in. This is valuable for:
+
+  * Security concerns (you may want to avoid artifacts with known
+    vulnerabilities, or you may only want to use particular jars which you
+    trust).
+  * Predictable and consistent behavior across all projects in your
+    repository (described below).
+  * Caching concerns/build times (described below).
+
+Otherwise, you may have some targets that end up being built with
+version `1.2.3` of a transitive dependency, and others that get built with
+`4.5.6` of that dependency. Worse, the *same target* might be built with
+different versions of a transitive dependency depending on what other
+targets happen to be part of the same pants invocation. To illustrate
+this, consider the diagram below:
+
+<div>
+  <img alt="image" src="images/transitive-dependencies.png" style="display: block; max-height: 25ex; margin-left: auto; margin-right: auto;">
+</div>
+
+Assume `foo` and `bar` are binary targets. If you build a binary of `foo`
+with `./pants binary foo`, `foo` will be packaged with the `example` jar
+in addition to its transitive dependencies, which will be resolved as the
+`common` jar, version `1.2.3`.
+
+Likewise, if you run `./pants binary bar`, it will be packaged with `demo`,
+and the transitive dependencies of `demo`, which here is simply the `common`
+jar version `4.5.6`.
+
+However, if you run `./pants binary foo bar`, ivy will only resolve one
+version of `common-1.2.3`, which most likely means that both `foo` and `bar`
+will get `common` version `4.5.6` (because it is the more recent version).
+This is a problem, because it may be that `common-4.5.6` is not compatible
+with `3rdparty:example`, which will _break the `foo` binary at runtime_.
+
+More subtly, if you have many intermediate `java_library` targets between
+your `jvm_binaries` and your `jar_library` targets (which is normaly the
+case), simply changing which combination of `java_library` targets are in
+the same `./pants` invocation may invalidate the cache and force Pants to
+recompile them, even if their sources are unchanged. This is because they
+may resolve different versions of their transitive jar dependencies than
+the previous time they were compiled, which means their classpaths will be
+different. Getting a different classpath causes a cache-miss, forcing a
+recompile. In general recompiling when the classpath changes is the
+correct thing to do, however this means that unstable transitive
+dependencies will cause a lot of cache-thrashing. If you have a large
+repository with a large amount of code, recompiles get expensive.
+
+### Possible Solutions
+
+There are a few ways to avoid or work around these problems. A simple method
+is to use the [strict ivy conflict manager](http://ant.apache.org/ivy/history/2.4.0/settings/conflict-managers.html),
+which will cause the jar resolution to fail with an error if it detects two
+artifacts with conflicting versions. This has the advantage of forcing a dev
+to be aware of (and make a decision about) confliction versions.
+
+You could also disable transitive jar resolution altogether, and explicitly
+declare every dependency you need. This ensures that you have total control
+over your external dependencies, but can be difficult to maintain.
+
+The third option is using `managed_jar_dependencies`, to pin the versions of
+the subset of your transitive dependencies that you care about.
+
+### Managed Jar Dependencies
+
+Maven handles this problem with the `<dependencyManagement>`
+<a href="https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management">stanza</a>,
+and Pants has similar functionality via the `managed_jar_dependencies` target.
+
+You can set up your `3rdparty/BUILD` file like so:
+
+    :::python
+    managed_jar_dependencies(name='management',
+      artifacts=[
+        ':commons-io',
+        ':jersey-core',
+      ],
+    )
+
+    jar_library(name='commons-io',
+      jars=[
+        jar('commons-io', 'commons-io', '2.5'),
+      ],
+    )
+
+    jar_library(name='jersey-core',
+      jars=[
+        jar('com.sun.jersey', 'jersey-core', '1.19.1'),
+      ],
+    )
+
+And in `pants.ini`, add:
+
+    :::ini
+    [jar-dependency-management]
+    default_target: 3rdparty:management
+
+This will force all `jar_library` targets in your repository to use the
+versions of `commons-io` and `jersey-core` referenced by the `management`
+target. When resolving transitive dependencies, Pants will always choose
+the versions "pinned" by the managed dependencies target.
+
+If a `jar_library` omits the version for one of its `jar()`s, it will use
+the version defined in `managed_jar_dependencies`. If a `jar()` defines a
+version that _conflicts_ with the version set in `managed_jar_dependencies`,
+an error will be raised and the build will fail (though this behavior can
+be modified via the `conflict_strategy` option).
+
+This is a bit verbose, and entails a bit of duplicate code (you have to
+mention `jersey-core` 3 times in the above example). You can use the
+`managed_jar_libraries` target factory instead to make your `3rdparty/BUILD`
+definitions more concise.
+
+This example is equivalent to the one earlier, but using `managed_jar_libraries`
+instead:
+
+    :::python
+    managed_jar_libraries(name='management',
+      artifacts=[
+        jar('commons-io', 'commons-io', '2.5'),
+        jar('com.sun.jersey', 'jersey-core', '1.19.1'),
+      ],
+    )
+
+This automatically generates `jar_library` targets for you, and makes a
+`managed_jar_dependencies` target to reference them. (Note that you still
+need to make the same change to pants.ini).
+
+The generated library targets follow the naming convention
+`org.name.classifier.ext`, where `classifier` and `ext` are omitted if they
+are the default values.
+
+So in the above example will generate two `jar_library` targets, called
+`3rdparty:commons-io.commons-io` and `3rdparty:com.sun.jersey.jersey-core`.
+
+The artifacts list of `managed_jar_libraries` can also accept target
+addresses to already-existing `jar_libraries`, just like a normal
+`managed_jar_dependences` target. In this case, `managed_jar_libraries`
+will just use the referenced target, rather than generating a new one.
+
+With Pants you can create *multiple* `managed_jar_dependencies`.
+If you have more than one, for any particular `jar_library`, you can define
+which `managed_jar_dependencies` it uses explicitly (rather than using the
+default defined in `pants.ini`):
+
+    :::python
+    jar_library(name='org.apache.hadoop-alternate',
+      jars=[
+        jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
+      ],
+      managed_dependencies='3rdparty:management-alternate',
     )
 
 <a pantsmark="test_3rdparty_jvm_snapshot"> </a>

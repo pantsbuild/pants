@@ -10,12 +10,22 @@ from contextlib import contextmanager
 
 from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
+from pants.util.memo import memoized_property
 
 
 class DependencyContext(object):
-  def __init__(self, compiler_plugin_types, target_closure_kwargs):
-    self.compiler_plugin_types = compiler_plugin_types
+  def __init__(self, compiler_plugins, target_closure_kwargs):
+    """
+    :param compiler_plugins: A dict of compiler plugin target types and their
+      additional classpath entries.
+    :param target_closure_kwargs: kwargs for the `target.closure` method.
+    """
+    self.compiler_plugins = compiler_plugins
     self.target_closure_kwargs = target_closure_kwargs
+
+  @memoized_property
+  def compiler_plugin_types(self):
+    return tuple(self.compiler_plugins.keys())
 
 
 class CompileContext(object):
@@ -42,11 +52,16 @@ class CompileContext(object):
       yield jar
 
   def dependencies(self, dep_context):
-    """Computes the compile time dependencies of this target, in the given DependencyContext."""
+    """Yields the compile time dependencies of this target, in the given DependencyContext."""
     if self.strict_deps:
-      return list(self.strict_dependencies(dep_context))
+      return self.strict_dependencies(dep_context)
     else:
       return self.all_dependencies(dep_context)
+
+  def _plugin_dependencies(self, dep_context):
+    """If this target is a compiler plugin, yields additional compiler plugin dependencies."""
+    for plugin_dep in dep_context.compiler_plugins.get(type(self.target), []):
+      yield plugin_dep
 
   def declared_dependencies(self, dep_context, compiler_plugins=True, exported=True):
     """Compute the declared dependencies for this target, recursively resolving target aliases.
@@ -54,6 +69,7 @@ class CompileContext(object):
     TODO: Formalize the `exported` tag.
     TODO: Switch to using scopes rather than types to identify plugins.
     TODO: Consider moving this API to `Target`.
+    TODO: Javac plugins/processors should use -processorpath instead of the classpath.
     """
     def resolve(t):
       for declared in t.dependencies:
@@ -82,6 +98,8 @@ class CompileContext(object):
     Results in a list similar to the list for `declared_dependencies`, with the addition
     of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
     """
+    for dep in self._plugin_dependencies(dep_context):
+      yield dep
     yield self.target
     for declared in self.declared_dependencies(dep_context, compiler_plugins=True):
       if isinstance(declared, dep_context.compiler_plugin_types):
@@ -92,7 +110,10 @@ class CompileContext(object):
 
   def all_dependencies(self, dep_context):
     """All transitive dependencies of the context's target."""
-    return self.target.closure(bfs=True, **dep_context.target_closure_kwargs)
+    for dep in self._plugin_dependencies(dep_context):
+      yield dep
+    for dep in self.target.closure(bfs=True, **dep_context.target_closure_kwargs):
+      yield dep
 
   @property
   def _id(self):

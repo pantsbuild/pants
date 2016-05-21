@@ -30,7 +30,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
     self._copy_sources(target, results_dir)
     self._emit_package_descriptor(node_task, target, results_dir, node_paths)
     with pushd(results_dir):
-      result, npm_install = node_task.execute_npm(args=['install'],
+      result, npm_install = node_task.execute_npm(['install'],
                                                   workunit_name=target.address.reference(),
                                                   workunit_labels=[WorkUnitLabel.COMPILER])
       if result != 0:

@@ -95,7 +95,7 @@ class PEP8VariableNamesTest(CheckstylePluginTestBase):
       class dhis_not_right(object):
         pass
     """
-    self.assertNit(statement, 'T000', expected_line_number=1)
+    self.assertNit(statement, 'T000', expected_line_number='001')
 
   def test_class_globals(self):
     statement = """
@@ -103,7 +103,7 @@ class PEP8VariableNamesTest(CheckstylePluginTestBase):
         RIGHT = 123
         notRight = 321
     """
-    self.assertNit(statement, 'T001', expected_line_number=3)
+    self.assertNit(statement, 'T001', expected_line_number='003')
 
   def test_builtin_overrides(self):
     statement = """
@@ -114,7 +114,7 @@ class PEP8VariableNamesTest(CheckstylePluginTestBase):
         def any(self):
           print("In a class body")
     """
-    self.assertNit(statement, 'T801', expected_line_number=1)
+    self.assertNit(statement, 'T801', expected_line_number='001')
 
   def test_lower_snake_method_names(self):
     statement = """
@@ -125,14 +125,14 @@ class PEP8VariableNamesTest(CheckstylePluginTestBase):
         def clearlyNotThinking(self):
           print("In a class body")
     """
-    self.assertNit(statement, 'T002', expected_line_number=5)
+    self.assertNit(statement, 'T002', expected_line_number='005')
 
     statement = """
       class DhisRight:
         def clearlyNotThinking(self):
           print("In a class body")
     """
-    self.assertNit(statement, 'T002', expected_line_number=2)
+    self.assertNit(statement, 'T002', expected_line_number='002')
 
     # Allow derivations from other modules to be ok.
     statement = """
@@ -150,4 +150,4 @@ class PEP8VariableNamesTest(CheckstylePluginTestBase):
         def totally_fine(self):
           print("In a class body")
     """
-    self.assertNit(statement, 'T002', expected_line_number=1)
+    self.assertNit(statement, 'T002', expected_line_number='001')

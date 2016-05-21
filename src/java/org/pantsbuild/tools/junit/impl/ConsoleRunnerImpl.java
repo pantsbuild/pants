@@ -3,27 +3,7 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FilterOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.io.ByteArrayOutputStream;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -33,7 +13,26 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
-
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FilterOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
@@ -50,7 +49,6 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
-
 import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
 import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
 
@@ -327,18 +325,17 @@ public class ConsoleRunnerImpl {
     ALL, FAILURE_ONLY, NONE
   }
 
-  private static final Pattern METHOD_PARSER = Pattern.compile("^([^#]+)#([^#]+)$");
-
   private final boolean failFast;
   private final OutputMode outputMode;
   private final boolean xmlReport;
   private final File outdir;
   private final boolean perTestTimer;
-  private final boolean defaultParallel;
+  private final Concurrency defaultConcurrency;
   private final int parallelThreads;
   private final int testShard;
   private final int numTestShards;
   private final int numRetries;
+  private final boolean useExperimentalRunner;
   private final SwappableStream<PrintStream> swappableOut;
   private final SwappableStream<PrintStream> swappableErr;
 
@@ -348,38 +345,38 @@ public class ConsoleRunnerImpl {
       boolean xmlReport,
       boolean perTestTimer,
       File outdir,
-      boolean defaultParallel,
+      Concurrency defaultConcurrency,
       int parallelThreads,
       int testShard,
       int numTestShards,
       int numRetries,
+      boolean useExperimentalRunner,
       PrintStream out,
       PrintStream err) {
+
+    Preconditions.checkNotNull(outputMode);
+    Preconditions.checkNotNull(defaultConcurrency);
+    Preconditions.checkNotNull(out);
+    Preconditions.checkNotNull(err);
 
     this.failFast = failFast;
     this.outputMode = outputMode;
     this.xmlReport = xmlReport;
     this.perTestTimer = perTestTimer;
     this.outdir = outdir;
-    this.defaultParallel = defaultParallel;
+    this.defaultConcurrency = defaultConcurrency;
     this.parallelThreads = parallelThreads;
     this.testShard = testShard;
     this.numTestShards = numTestShards;
     this.numRetries = numRetries;
     this.swappableOut = new SwappableStream<PrintStream>(out);
     this.swappableErr = new SwappableStream<PrintStream>(err);
+    this.useExperimentalRunner = useExperimentalRunner;
   }
 
-  void run(Iterable<String> tests) {
+  void run(Collection<String> tests) {
     System.setOut(new PrintStream(swappableOut));
     System.setErr(new PrintStream(swappableErr));
-
-    List<Request> requests =
-        parseRequests(swappableOut.getOriginal(), swappableErr.getOriginal(), tests);
-
-    if (numTestShards > 0) {
-      requests = setFilterForTestShard(requests);
-    }
 
     JUnitCore core = new JUnitCore();
     final AbortableListener abortableListener = new AbortableListener(failFast) {
@@ -418,20 +415,22 @@ public class ConsoleRunnerImpl {
     final Thread abnormalExitHook =
         createAbnormalExitHook(abortableListener, swappableOut.getOriginal());
     Runtime.getRuntime().addShutdownHook(abnormalExitHook);
+
     int failures = 0;
     try {
-      if (this.parallelThreads > 1) {
-        ConcurrentCompositeRequest request = new ConcurrentCompositeRequest(
-            requests, this.defaultParallel, this.parallelThreads);
-        failures = core.run(request).getFailureCount();
+      List<Spec> parsedTests = new SpecParser(tests).parse();
+
+      if (useExperimentalRunner) {
+        failures = runExperimental(parsedTests, core);
       } else {
-        for (Request request : requests) {
-          Result result = core.run(request);
-          failures += result.getFailureCount();
-        }
+        failures = runLegacy(parsedTests, core);
       }
-    } catch (InitializationError initializationError) {
+    } catch (SpecException e) {
       failures = 1;
+      swappableErr.getOriginal().println("Error parsing specs: " + e.getMessage());
+    } catch (InitializationError e) {
+      failures = 1;
+      swappableErr.getOriginal().println("Error initializing JUnit: " + e.getMessage());
     } finally {
       // If we're exiting via a thrown exception, we'll get a better message by letting it
       // propagate than by halt()ing.
@@ -463,7 +462,38 @@ public class ConsoleRunnerImpl {
     return abnormalExitHook;
   }
 
-  private List<Request> parseRequests(PrintStream out, PrintStream err, Iterable<String> specs) {
+  private int runExperimental(List<Spec> parsedTests, JUnitCore core)
+      throws InitializationError {
+    Preconditions.checkArgument(!parsedTests.isEmpty());
+    Preconditions.checkNotNull(core);
+
+    throw new InitializationError("Experimental Runner: Not Implemented");
+  }
+
+  private int runLegacy(List<Spec> parsedTests, JUnitCore core) throws InitializationError {
+    List<Request> requests =
+        legacyParseRequests(swappableOut.getOriginal(), swappableErr.getOriginal(), parsedTests);
+
+    if (numTestShards > 0) {
+      requests = setFilterForTestShard(requests);
+    }
+
+    if (this.parallelThreads > 1) {
+      ConcurrentCompositeRequestRunner request = new ConcurrentCompositeRequestRunner(
+          requests, this.defaultConcurrency, this.parallelThreads);
+      return core.run(request).getFailureCount();
+    }
+
+    int failures = 0;
+    for (Request request : requests) {
+      Result result = core.run(request);
+      failures += result.getFailureCount();
+    }
+    return failures;
+  }
+
+  private List<Request> legacyParseRequests(PrintStream out, PrintStream err,
+      List<Spec> specs) {
     /**
      * Datatype representing an individual test method.
      */
@@ -478,34 +508,13 @@ public class ConsoleRunnerImpl {
     }
     Set<TestMethod> testMethods = Sets.newLinkedHashSet();
     Set<Class<?>> classes = Sets.newLinkedHashSet();
-    for (String spec : specs) {
-      Matcher matcher = METHOD_PARSER.matcher(spec);
-      try {
-        if (matcher.matches()) {
-          Class<?> testClass = loadClass(matcher.group(1));
-          if (isTest(testClass)) {
-            String method = matcher.group(2);
-            testMethods.add(new TestMethod(testClass, method));
-          }
-        } else {
-          Class<?> testClass = loadClass(spec);
-          if (isTest(testClass)) {
-            classes.add(testClass);
-          }
+    for (Spec spec: specs) {
+      if (spec.getMethods().isEmpty()) {
+        classes.add(spec.getSpecClass());
+      } else {
+        for (String method : spec.getMethods()) {
+          testMethods.add(new TestMethod(spec.getSpecClass(), method));
         }
-      } catch (NoClassDefFoundError e) {
-        notFoundError(spec, out, e);
-      } catch (ClassNotFoundException e) {
-        notFoundError(spec, out, e);
-      } catch (LinkageError e) {
-        // Any of a number of runtime linking errors can occur when trying to load a class,
-        // fail with the test spec so the class failing to link is known.
-        notFoundError(spec, out, e);
-      // See the comment below for justification.
-      } catch (RuntimeException e) {
-        // The class may fail with some variant of RTE in its static initializers, trap these
-        // and dump the bad spec in question to help narrow down issue.
-        notFoundError(spec, out, e);
       }
     }
     List<Request> requests = Lists.newArrayList();
@@ -513,12 +522,20 @@ public class ConsoleRunnerImpl {
     if (!classes.isEmpty()) {
       if (this.perTestTimer || this.parallelThreads > 1) {
         for (Class<?> clazz : classes) {
-          requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
+          if (this.shouldRunParallelMethods(clazz)) {
+            // Don't add these as class requests, make individual TestMethod requests.
+            for (Method method :
+                Iterables.filter(Arrays.asList(clazz.getMethods()),IS_ANNOTATED_TEST_METHOD)) {
+              testMethods.add(new TestMethod(clazz, method.getName()));
+            }
+          } else {
+            requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
+          }
         }
       } else {
         // The code below does what the original call
         // requests.add(Request.classes(classes.toArray(new Class<?>[classes.size()])));
-        // does, except that it instantiates our own builder, needed to support retries
+        // does, except that it instantiates our own builder, needed to support retries.
         try {
           AllDefaultPossibilitiesBuilderWithRetry builder =
               new AllDefaultPossibilitiesBuilderWithRetry(numRetries, err);
@@ -536,6 +553,11 @@ public class ConsoleRunnerImpl {
           .filterWith(Description.createTestDescription(testMethod.clazz, testMethod.name)));
     }
     return requests;
+  }
+
+  private boolean shouldRunParallelMethods(Class<?> clazz) {
+    // TODO(zundel): Add support for an annotation like TestParallelMethods.
+    return this.defaultConcurrency.shouldRunMethodsParallel();
   }
 
   // Loads classes without initializing them.  We just need the type, annotations and method
@@ -606,11 +628,6 @@ public class ConsoleRunnerImpl {
     return filteredRequests;
   }
 
-  private void notFoundError(String spec, PrintStream out, Throwable t) {
-    out.printf("FATAL: Error during test discovery for %s: %s\n", spec, t);
-    throw new RuntimeException("Classloading error during test discovery for " + spec, t);
-  }
-
   /**
    * Launcher for JUnitConsoleRunner.
    *
@@ -641,9 +658,20 @@ public class ConsoleRunnerImpl {
           usage = "Show a description of each test and timer for each test class.")
       private boolean perTestTimer;
 
+      // TODO(zundel): Combine -default-parallel and -paralel-methods together into a
+      // single argument:  -default-concurrency {serial, parallel, parallel_methods}
+      // TODO(zundel): Also add a @TestParallelMethods annotation
       @Option(name = "-default-parallel",
           usage = "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
       private boolean defaultParallel;
+
+      @Option(name = "-parallel-methods",
+          usage = "EXPERIMENTAL: Run methods within a class in parallel.")
+      private boolean parallelMethods;
+
+      @Option(name = "-default-concurrency",
+          usage = "Specify how to parallelize running tests.")
+      private Concurrency defaultConcurrency;
 
       private int parallelThreads = 0;
 
@@ -707,6 +735,10 @@ public class ConsoleRunnerImpl {
                 metaVar = "TESTS",
                 handler = StringArrayOptionHandler.class)
       private String[] tests = {};
+
+      @Option(name="-use-experimental-runner",
+          usage="Use the experimental runner that has support for parallel methods")
+      private boolean useExperimentalRunner = false;
     }
 
     Options options = new Options();
@@ -721,17 +753,21 @@ public class ConsoleRunnerImpl {
       exit(1);
     }
 
+    options.defaultConcurrency = computeConcurrencyOption(options.defaultConcurrency,
+        options.defaultParallel, options.parallelMethods);
+
     ConsoleRunnerImpl runner =
         new ConsoleRunnerImpl(options.failFast,
             options.outputMode,
             options.xmlReport,
             options.perTestTimer,
             options.outdir,
-            options.defaultParallel,
+            options.defaultConcurrency,
             options.parallelThreads,
             options.testShard,
             options.numTestShards,
             options.numRetries,
+            options.useExperimentalRunner,
             System.out,
             System.err);
 
@@ -753,12 +789,28 @@ public class ConsoleRunnerImpl {
     runner.run(tests);
   }
 
-  public static final Predicate<Constructor<?>> IS_PUBLIC_CONSTRUCTOR =
-      new Predicate<Constructor<?>>() {
-        @Override public boolean apply(Constructor<?> constructor) {
-          return Modifier.isPublic(constructor.getModifiers());
-        }
-      };
+  /**
+   * Used to convert the legacy -default-parallel and -parallel-methods options to the new
+   * style -default-concurrency values
+   */
+  @VisibleForTesting
+  static Concurrency computeConcurrencyOption(Concurrency defaultConcurrency,
+      boolean defaultParallel, boolean parallelMethods) {
+
+    if (defaultConcurrency != null) {
+      // -default-concurrency option present - use it.
+      return defaultConcurrency;
+    }
+
+    // Fall Back to using -default-parallel and -parallel-methods
+    if (!defaultParallel) {
+      return Concurrency.SERIAL;
+    }
+    if (parallelMethods) {
+      return Concurrency.PARALLEL_BOTH;
+    }
+    return Concurrency.PARALLEL_CLASSES;
+  }
 
   private static final Predicate<Method> IS_ANNOTATED_TEST_METHOD = new Predicate<Method>() {
     @Override public boolean apply(Method method) {
@@ -766,33 +818,6 @@ public class ConsoleRunnerImpl {
           && method.isAnnotationPresent(org.junit.Test.class);
     }
   };
-
-  private static boolean isTest(final Class<?> clazz) {
-    // Must be a public concrete class to be a runnable junit Test.
-    if (clazz.isInterface()
-        || Modifier.isAbstract(clazz.getModifiers())
-        || !Modifier.isPublic(clazz.getModifiers())) {
-      return false;
-    }
-
-    // The class must have some public constructor to be instantiated by the runner being used
-    if (!Iterables.any(Arrays.asList(clazz.getConstructors()), IS_PUBLIC_CONSTRUCTOR)) {
-      return false;
-    }
-
-    // Support junit 3.x Test hierarchy.
-    if (junit.framework.Test.class.isAssignableFrom(clazz)) {
-      return true;
-    }
-
-    // Support classes using junit 4.x custom runners.
-    if (clazz.isAnnotationPresent(RunWith.class)) {
-      return true;
-    }
-
-    // Support junit 4.x @Test annotated methods.
-    return Iterables.any(Arrays.asList(clazz.getMethods()), IS_ANNOTATED_TEST_METHOD);
-  }
 
   private static void exit(int code) {
     exitStatus = code;

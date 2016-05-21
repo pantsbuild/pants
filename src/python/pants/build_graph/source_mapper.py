@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
-from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.source.payload_fields import DeferredSourcesField
 
 
@@ -48,7 +48,7 @@ class SpecSourceMapper(SourceMapper):
       path = os.path.dirname(path)
       try:
         result.extend(self._find_targets_for_source(source, path))
-      except AddressLookupError:
+      except BuildFileAddressMapper.BuildFileScanError:
         pass
       if self._stop_after_match and len(result) > 0:
         break
@@ -128,7 +128,7 @@ class LazySourceMapper(SourceMapper):
       if path not in self._mapped_paths:
         try:
           self._map_sources_from_spec_path(path)
-        except AddressLookupError:
+        except BuildFileAddressMapper.BuildFileScanError:
           pass
         self._mapped_paths.add(path)
       elif not self._stop_after_match:

@@ -15,10 +15,10 @@ class ZincLanguageMixin(object):
     # NB: This option is fingerprinted because the default value is not included in a target's
     # fingerprint. This also has the effect of invalidating only the relevant tasks: ZincCompile
     # in this case.
-    register('--strict-deps', advanced=True, default=False, fingerprint=True, action='store_true',
+    register('--strict-deps', advanced=True, default=False, fingerprint=True, type=bool,
              help='The default for the "strict_deps" argument for targets of this language.')
 
-    register('--fatal-warnings', advanced=True, action='store_true', default=False,
+    register('--fatal-warnings', advanced=True, type=bool,
              fingerprint=True,
              help='The default for the "fatal_warnings" argument for targets of this language.')
 

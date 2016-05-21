@@ -16,6 +16,8 @@ Organizations
 - [Oscar](https://www.hioscar.com/)
 - [Whisk](https://whisk.com)
 - [Clover Health](http://www.cloverhealth.com/)
+- [QuizUp](https://www.quizup.com/)
+- [Grapeshot](https://www.grapeshot.com)
 
 Open Source Projects
 --------------------
@@ -46,6 +48,8 @@ Testimonials
 > and different projects within the repo freely  without worrying about taking a productivity
 > hit to reconfigure their IDE."  -- Eric Ayers, Square
 
+> "I'm super happy with pants, it's now powering almost all our java, scala and python builds,
+> along with a few go and node projects" -- Arni Hermann, QuizUp
 
 To be added to this list, post a message to the
 [pants-devel](https://groups.google.com/forum/#!forum/pants-devel) Google Group.

@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from colors import green
 
 from pants.base.build_environment import get_buildroot
-from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer
+from pants.bin.goal_runner import GoalRunner
+from pants.bin.options_initializer import OptionsInitializer
+from pants.bin.reporting_initializer import ReportingInitializer
 from pants.bin.repro import Reproducer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -16,16 +18,18 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 class LocalPantsRunner(object):
   """Handles a single pants invocation running in the process-local context."""
 
-  def __init__(self, exiter, args, env, options_bootstrapper=None):
+  def __init__(self, exiter, args, env, build_graph=None, options_bootstrapper=None):
     """
     :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
+    :param BuildGraph build_graph: A BuildGraph instance for graph reuse (optional).
     :param OptionsBootstrapper options_bootstrapper: An optional existing OptionsBootstrapper.
     """
     self._exiter = exiter
     self._args = args
     self._env = env
+    self._build_graph = build_graph
     self._options_bootstrapper = options_bootstrapper
     self._profile_path = self._env.get('PANTS_PROFILE')
 
@@ -53,12 +57,18 @@ class LocalPantsRunner(object):
     options_bootstrapper = self._options_bootstrapper or OptionsBootstrapper(env=self._env,
                                                                              args=self._args)
     options, build_config = OptionsInitializer(options_bootstrapper, exiter=self._exiter).setup()
+    global_options = options.for_global_scope()
 
     # Apply exiter options.
     self._exiter.apply_options(options)
 
+    # Option values are usually computed lazily on demand,
+    # but command line options are eagerly computed for validation.
+    for scope in options.scope_to_flags.keys():
+      options.for_scope(scope)
+
     # Verify the configs here.
-    if options.for_global_scope().verify_config:
+    if global_options.verify_config:
       options_bootstrapper.verify_configs_against_options(options)
 
     # Launch RunTracker as early as possible (just after Subsystem options are initialized).
@@ -79,7 +89,8 @@ class LocalPantsRunner(object):
                                        build_config,
                                        run_tracker,
                                        reporting,
-                                       exiter=self._exiter).setup()
+                                       self._build_graph,
+                                       self._exiter).setup()
 
       result = goal_runner.run()
 

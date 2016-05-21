@@ -2,6 +2,7 @@
 *.iml
 *.ipr
 *.iws
+*.lock_message
 *.pyc
 *.hprof
 *.swp
@@ -15,9 +16,12 @@
 .buildcache/
 .coverage*
 .idea
+.cache
 .pants.d
 .pants.run
+.pants.workdir.file_lock
 .pants.stats
+.pantsd.startup
 .pids
 .project
 .settings

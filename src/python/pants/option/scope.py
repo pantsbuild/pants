@@ -19,7 +19,18 @@ class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls']
 
   @property
   def description(self):
-    return self.optionable_cls.get_description() if self.optionable_cls else ''
+    return self._optionable_cls_attr('get_description', lambda: '')()
+
+  @property
+  def deprecated_scope(self):
+    return self._optionable_cls_attr('deprecated_options_scope')
+
+  @property
+  def deprecated_scope_removal_version(self):
+    return self._optionable_cls_attr('deprecated_options_scope_removal_version')
+
+  def _optionable_cls_attr(self, name, default=None):
+    return getattr(self.optionable_cls, name) if self.optionable_cls else default
 
 
 # Allow the optionable_cls to default to None.

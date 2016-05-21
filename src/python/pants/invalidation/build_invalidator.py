@@ -33,10 +33,7 @@ GLOBAL_CACHE_KEY_GEN_VERSION = '7'
 
 
 class CacheKeyGenerator(object):
-  """Generates cache keys for versions of target sets.
-
-  :API: public
-  """
+  """Generates cache keys for versions of target sets."""
 
   @staticmethod
   def combine_cache_keys(cache_keys):
@@ -48,8 +45,6 @@ class CacheKeyGenerator(object):
     Note that this operation is commutative but not associative.  We use the term 'combine' rather
     than 'merge' or 'union' to remind the user of this. Associativity is not a necessary property,
     in practice.
-
-    :API: public
     """
     if len(cache_keys) == 1:
       return cache_keys[0]
@@ -62,8 +57,6 @@ class CacheKeyGenerator(object):
     """
     cache_key_gen_version - If provided, added to all cache keys. Allows you to invalidate
       all cache keys in a single pants repo, by changing this value in config.
-
-    :API: public
     """
 
     self._cache_key_gen_version = '_'.join([cache_key_gen_version or '',
@@ -74,8 +67,6 @@ class CacheKeyGenerator(object):
 
     A key for a set of targets can be created by calling combine_cache_keys()
     on the target's individual cache keys.
-
-    :API: public
 
     :target: The target to create a CacheKey for.
     :transitive: Whether or not to include a fingerprint of all of :target:'s dependencies.
@@ -110,8 +101,6 @@ class BuildInvalidator(object):
   def previous_key(self, cache_key):
     """If there was a previous successful build for the given key, return the previous key.
 
-    :API: public
-
     :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
     :returns: The previous cache_key, or None if there was not a previous build.
     """
@@ -123,8 +112,6 @@ class BuildInvalidator(object):
   def needs_update(self, cache_key):
     """Check if the given cached item is invalid.
 
-    :API: public
-
     :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
     :returns: True if the cached version of the item is out of date.
     """
@@ -133,24 +120,16 @@ class BuildInvalidator(object):
   def update(self, cache_key):
     """Makes cache_key the valid version of the corresponding target set.
 
-    :API: public
-
     :param cache_key: A CacheKey object (typically returned by CacheKeyGenerator.key_for()).
     """
     self._write_sha(cache_key)
 
   def force_invalidate_all(self):
-    """Force-invalidates all cached items.
-
-    :API: public
-    """
+    """Force-invalidates all cached items."""
     safe_mkdir(self._root, clean=True)
 
   def force_invalidate(self, cache_key):
-    """Force-invalidate the cached item.
-
-    :API: public
-    """
+    """Force-invalidate the cached item."""
     try:
       os.unlink(self._sha_file(cache_key))
     except OSError as e:

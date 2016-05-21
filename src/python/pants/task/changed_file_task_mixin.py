@@ -116,7 +116,7 @@ class ChangedFileTaskMixin(object):
 
   @classmethod
   def register_change_file_options(cls, register):
-    register('--fast', action='store_true', default=False,
+    register('--fast', type=bool,
              help='Stop searching for owners once a source is mapped to at least owning target.')
     register('--changes-since', '--parent',
              help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')

@@ -69,8 +69,11 @@ public abstract class ConsoleRunnerTestBase {
 
   protected AntJunitXmlReportListener.TestSuite runTestAndParseXml(
       String testClassName, boolean shouldFail) throws IOException, JAXBException {
-    File testXmlFile = runTestAndReturnXmlFile(testClassName, shouldFail);
+    return parseTestXml(runTestAndReturnXmlFile(testClassName, shouldFail));
+  }
 
+  protected AntJunitXmlReportListener.TestSuite parseTestXml(File testXmlFile)
+      throws IOException, JAXBException {
     JAXBContext jaxbContext = JAXBContext.newInstance(AntJunitXmlReportListener.TestSuite.class);
 
     Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();

@@ -18,58 +18,30 @@ from pants.util.dirutil import safe_mkdir, touch
 
 
 class BuildFileTestBase(unittest.TestCase):
-  """
-    :API: public
-  """
-
   def fullpath(self, path):
-    """
-    :API: public
-    """
     return os.path.join(self.root_dir, path)
 
   def makedirs(self, path):
-    """
-    :API: public
-    """
     safe_mkdir(self.fullpath(path))
 
   def touch(self, path):
-    """
-    :API: public
-    """
     touch(self.fullpath(path))
 
   def _create_ignore_spec(self, build_ignore_patterns):
-    """
-    :API: public
-    """
     return PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
 
   def scan_buildfiles(self, base_relpath, build_ignore_patterns=None):
-    """
-    :API: public
-    """
     return BuildFile.scan_build_files(self._project_tree, base_relpath,
                                       build_ignore_patterns=self._create_ignore_spec(build_ignore_patterns))
 
   def create_buildfile(self, relpath):
-    """
-    :API: public
-    """
     return BuildFile(self._project_tree, relpath)
 
   def get_build_files_family(self, relpath, build_ignore_patterns=None):
-    """
-    :API: public
-    """
     return BuildFile.get_build_files_family(self._project_tree, relpath,
                                             build_ignore_patterns=self._create_ignore_spec(build_ignore_patterns))
 
   def setUp(self):
-    """
-    :API: public
-    """
     self.base_dir = tempfile.mkdtemp()
     self._project_tree = None
 
@@ -101,7 +73,4 @@ class BuildFileTestBase(unittest.TestCase):
     self.touch('issue_1742/BUILD.sibling')
 
   def tearDown(self):
-    """
-    :API: public
-    """
     shutil.rmtree(self.base_dir)

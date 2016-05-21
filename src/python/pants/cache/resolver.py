@@ -99,7 +99,7 @@ class RESTfulResolver(Resolver):
     """
     :API: public
 
-    :param int timeout: Timeout for GET in seconds.
+    :param float timeout: Timeout for GET in seconds.
     :param int tries: Max number of retries. See docstring on `requests.adapters.HTTPAdapter`
                       for details.
     :param response_parser: Parser to extract the resolved URLS from response.

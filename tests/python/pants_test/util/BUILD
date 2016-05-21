@@ -2,6 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name = 'argutil',
+  sources = ['test_argutil.py'],
+  coverage = ['pants.util.argutil'],
+  dependencies = [
+    'src/python/pants/util:argutil',
+  ],
+)
+
+python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],
   coverage = ['pants.util.contextutil'],
@@ -87,6 +96,15 @@ python_tests(
   sources = ['test_process_handler.py'],
   dependencies = [
     'src/python/pants/util:process_handler'
+  ]
+)
+
+python_tests(
+  name = 'retry',
+  sources = ['test_retry.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:retry',
   ]
 )
 

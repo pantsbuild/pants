@@ -16,6 +16,11 @@ from pants.task.repl_task_mixin import ReplTaskMixin
 
 
 class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
+  """Operations to create or launch Scala repls.
+
+  :API: public
+  """
+
   _RUNNER_MAIN = 'org.pantsbuild.tools.runner.PantsRunner'
 
   @classmethod
@@ -37,9 +42,9 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
 
   def setup_repl_session(self, targets):
     repl_name = ScalaPlatform.global_instance().repl
-    return self.tool_classpath('pants-runner') +\
-           self.tool_classpath(repl_name, scope=ScalaPlatform.options_scope) +\
-           self.classpath(targets)
+    return (self.tool_classpath('pants-runner') +
+            self.tool_classpath(repl_name, scope=ScalaPlatform.options_scope) +
+            self.classpath(targets))
 
   def launch_repl(self, classpath):
     # The scala repl requires -Dscala.usejavacp=true since Scala 2.8 when launching in the way

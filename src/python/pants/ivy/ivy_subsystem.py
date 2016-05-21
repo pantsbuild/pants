@@ -14,7 +14,10 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class IvySubsystem(Subsystem):
-  """Common configuration items for ivy tasks."""
+  """Common configuration items for ivy tasks.
+
+  :API: public
+  """
   options_scope = 'ivy'
 
   _DEFAULT_VERSION = '2.4.0'
@@ -39,6 +42,8 @@ class IvySubsystem(Subsystem):
              help='Directory to store artifacts retrieved by Ivy.')
     register('--ivy-settings', advanced=True,
              help='Location of XML configuration file for Ivy settings.')
+    register('--bootstrap-ivy-settings', advanced=True,
+             help='Bootstrap Ivy XML configuration file.')
 
   @classmethod
   def subsystem_dependencies(cls):

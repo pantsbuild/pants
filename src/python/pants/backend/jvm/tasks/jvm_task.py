@@ -13,6 +13,17 @@ from pants.task.task import Task
 
 
 class JvmTask(Task):
+  """Base class for tasks that whose explicit user-facing purpose is to run code in a JVM.
+
+  Examples are run.jvm, test.junit, repl.scala.  These tasks (and end users) can configure
+  the JVM options, args etc. via the JVM subsystem scoped to the task.
+
+  Note that this is distinct from tasks that happen to run code in a JVM as an implementation
+  detail, such as compile.java, checkstyle, etc.  Hypothetically at least, you could imagine
+  a Java compiler written in a non-JVM language, and then compile.java might not need to
+  run JVM code at all.  In practice that is highly unlikely, but the distinction is still
+  important.  Those JVM-tool-using tasks mix in `pants.backend.jvm.tasks.JvmToolTaskMixin`.
+  """
 
   @classmethod
   def subsystem_dependencies(cls):

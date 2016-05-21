@@ -94,7 +94,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
-    register('--fast', action='store_true', default=True,
+    register('--fast', type=bool, default=True,
              help='Run all tests in a single chroot. If turned off, each test target will '
                   'create a new chroot, which will be much slower, but more correct, as the'
                   'isolation verifies that all dependencies are correctly declared.')

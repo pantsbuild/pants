@@ -54,8 +54,7 @@ def _options_registration_function(defaults):
   def register(*args, **kwargs):
     default = kwargs.get('default')
     if default is None:
-      action = kwargs.get('action')
-      if action == 'store_true':
+      if kwargs.get('type') == bool:
         default = False
       if kwargs.get('type') == list:
         default = []

@@ -175,7 +175,7 @@ class ProcessMetadataManager(object):
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
     meta_dir = cls._get_metadata_dir_by_name(name)
-    logging.debug('purging metadata directory: {}'.format(meta_dir))
+    logger.debug('purging metadata directory: {}'.format(meta_dir))
     try:
       rm_rf(meta_dir)
     except OSError as e:
@@ -185,9 +185,16 @@ class ProcessMetadataManager(object):
 class ProcessManager(ProcessMetadataManager):
   """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
-  class ExecutionError(Exception): pass
   class InvalidCommandOutput(Exception): pass
   class NonResponsiveProcess(Exception): pass
+  class ExecutionError(Exception):
+    def __init__(self, message, output=None):
+      super(ProcessManager.ExecutionError, self).__init__(message)
+      self.message = message
+      self.output = output
+
+    def __repr__(self):
+      return '{}(message={!r}, output={!r})'.format(type(self).__name__, self.message, self.output)
 
   KILL_WAIT_SEC = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
@@ -258,9 +265,10 @@ class ProcessManager(ProcessMetadataManager):
     :returns: The output of the command.
     """
     try:
-      return subprocess.check_output(*args)
+      return subprocess.check_output(*args, stderr=subprocess.STDOUT)
     except (OSError, subprocess.CalledProcessError) as e:
-      raise cls.ExecutionError(str(e))
+      subprocess_output = getattr(e, 'output', '').strip()
+      raise cls.ExecutionError(str(e), subprocess_output)
 
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to write pid metadata."""
@@ -391,6 +399,7 @@ class ProcessManager(ProcessMetadataManager):
     """
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
+    logger.debug('forking %s', self)
     pid = os.fork()
     if pid == 0:
       os.setsid()
@@ -400,7 +409,7 @@ class ProcessManager(ProcessMetadataManager):
           os.chdir(self._buildroot)
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
-          logging.critical(traceback.format_exc())
+          logger.critical(traceback.format_exc())
 
         os._exit(0)
       else:
@@ -408,7 +417,7 @@ class ProcessManager(ProcessMetadataManager):
           if write_pid: self.write_pid(second_pid)
           self.post_fork_parent(**post_fork_parent_opts or {})
         except Exception:
-          logging.critical(traceback.format_exc())
+          logger.critical(traceback.format_exc())
 
         os._exit(0)
     else:
@@ -432,14 +441,14 @@ class ProcessManager(ProcessMetadataManager):
         os.chdir(self._buildroot)
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
-        logging.critical(traceback.format_exc())
+        logger.critical(traceback.format_exc())
 
       os._exit(0)
     else:
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})
       except Exception:
-        logging.critical(traceback.format_exc())
+        logger.critical(traceback.format_exc())
 
   def pre_fork(self):
     """Pre-fork callback for subclasses."""

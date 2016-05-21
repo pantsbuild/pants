@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import re
 from collections import namedtuple
 
@@ -15,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import file_option
 
-from pants.contrib.python.checks.tasks.checkstyle.common import Nit, PythonFile
+from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError, Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 from pants.contrib.python.checks.tasks.checkstyle.register_plugins import register_plugins
 
@@ -32,8 +31,8 @@ class LintPlugin(namedtuple('_LintPlugin', ['name', 'subsystem'])):
     return self.subsystem.global_instance().get_plugin(python_file)
 
 
-def noqa_line_filter(python_file, line_number):
-  return _NOQA_LINE_SEARCH(python_file.lines[line_number]) is not None
+def line_contains_noqa(line):
+  return _NOQA_LINE_SEARCH(line) is not None
 
 
 def noqa_file_filter(python_file):
@@ -60,14 +59,14 @@ class PythonCheckStyleTask(PythonTask):
     super(PythonCheckStyleTask, cls).register_options(register)
     register('--severity', fingerprint=True, default='COMMENT', type=str,
              help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
-    register('--strict', fingerprint=True, default=False, action='store_true',
+    register('--strict', fingerprint=True, type=bool,
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
     # Skip short circuits before fingerprinting
-    register('--skip', default=False, action='store_true',
+    register('--skip', type=bool,
              help='If enabled, skip this style checker.')
     register('--suppress', fingerprint=True, type=file_option, default=None,
              help='Takes a XML file where specific rules on specific files will be skipped.')
-    register('--fail', fingerprint=True, default=True, action='store_true',
+    register('--fail', fingerprint=True, default=True, type=bool,
              help='Prevent test failure but still produce output for problems.')
 
   @classmethod
@@ -93,33 +92,40 @@ class PythonCheckStyleTask(PythonTask):
     cls._plugins.append(plugin)
     cls._subsystems += (plugin.subsystem, )
 
-  def get_nits(self, python_file):
+  def get_nits(self, filename):
     """Iterate over the instances style checker and yield Nits.
 
-    :param python_file: PythonFile Object
+    :param filename: str pointing to a file within the buildroot.
     """
+    try:
+      python_file = PythonFile.parse(filename, root=get_buildroot())
+    except CheckSyntaxError as e:
+      yield e.as_nit()
+      return
+
     if noqa_file_filter(python_file):
       return
 
     if self.options.suppress:
       # Filter out any suppressed plugins
       check_plugins = [plugin for plugin in self._plugins
-                       if self.excluder.should_include(python_file.filename, plugin.name)]
+                       if self.excluder.should_include(filename, plugin.name)]
     else:
       check_plugins = self._plugins
 
     for plugin in check_plugins:
-      for nit in plugin.checker(python_file):
-        if nit._line_number is None:
+
+      for i, nit in enumerate(plugin.checker(python_file)):
+        if i == 0:
+          # NB: Add debug log header for nits from each plugin, but only if there are nits from it.
+          self.context.log.debug('Nits from plugin {} for {}'.format(plugin.name, filename))
+
+        if not nit.has_lines_to_display:
           yield nit
           continue
 
-        nit_slice = python_file.line_range(nit._line_number)
-        for line_number in range(nit_slice.start, nit_slice.stop):
-          if noqa_line_filter(python_file, line_number):
-            break
-          else:
-            yield nit
+        if all(not line_contains_noqa(line) for line in nit.lines):
+          yield nit
 
   def check_file(self, filename):
     """Process python file looking for indications of problems.
@@ -127,22 +133,16 @@ class PythonCheckStyleTask(PythonTask):
     :param filename: (str) Python source filename
     :return: (int) number of failures
     """
-    try:
-      python_file = PythonFile.parse(os.path.join(get_buildroot(), filename))
-    except SyntaxError as e:
-      print('{filename}:SyntaxError: {error}'.format(filename=filename, error=e))
-      return 1
-
     # If the user specifies an invalid severity use comment.
-    severity = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
+    log_threshold = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
 
     failure_count = 0
     fail_threshold = Nit.WARNING if self.options.strict else Nit.ERROR
 
-    for i, nit in enumerate(self.get_nits(python_file)):
+    for i, nit in enumerate(self.get_nits(filename)):
       if i == 0:
         print()  # Add an extra newline to clean up the output only if we have nits.
-      if nit.severity >= severity:
+      if nit.severity >= log_threshold:
         print('{nit}\n'.format(nit=nit))
       if nit.severity >= fail_threshold:
         failure_count += 1

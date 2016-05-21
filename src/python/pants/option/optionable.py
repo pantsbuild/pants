@@ -5,8 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
+
 from six import string_types
 
+from pants.base.deprecated import deprecated_conditional
 from pants.option.errors import OptionsError
 from pants.option.scope import ScopeInfo
 from pants.util.meta import AbstractClass
@@ -18,6 +21,27 @@ class Optionable(AbstractClass):
   # Subclasses must override.
   options_scope = None
   options_scope_category = None
+
+  # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
+  # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
+  # The deprecation warning becomes an error at the given Pants version (which must therefore be
+  # a valid semver).
+  deprecated_options_scope = None
+  deprecated_options_scope_removal_version = None
+
+  _scope_name_component_re = re.compile(r'^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$')
+
+  @classmethod
+  def is_valid_scope_name_component(cls, s):
+    return cls._scope_name_component_re.match(s) is not None
+
+  @classmethod
+  def validate_scope_name_component(cls, s):
+    # TODO: turn this deprecation warning into a permanent error after 1.2.0.
+    deprecated_conditional(lambda: not cls.is_valid_scope_name_component(s), '1.2.0',
+                           'options scope {}'.format(s),
+                           'Replace in code with new scope name consisting of dash-separated-words, '
+                           'with words consisting only of lower-case letters and digits.')
 
   @classmethod
   def get_scope_info(cls):
