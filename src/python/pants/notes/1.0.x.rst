@@ -12,7 +12,6 @@ API Changes
 ~~~~~~~~~~~
 
 * Add 'transitive' and 'scope' attributes to export of target
-  `RB #3582 <https://rbcommons.com/s/twitter/r/3582>`_
   `RB #3845 <https://rbcommons.com/s/twitter/r/3845>`_
 
 * Upgrade to pex 1.1.6.
@@ -39,6 +38,13 @@ Refactoring, Improvements, and Tooling
 
 * Scrooge gen: Cache resolved scrooge deps
   `RB #3790 <https://rbcommons.com/s/twitter/r/3790>`_
+
+
+1.0.0 (05/01/2016)
+------------------
+
+The 1.0.0 release! The 1.0.0-rc3 release candidate was accepted without any additional changes.
+
 
 1.0.0-rc3 (04/26/2016)
 ----------------------
