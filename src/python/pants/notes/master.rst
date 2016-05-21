@@ -49,9 +49,6 @@ Refactoring, Improvements, and Tooling
   `RB #3890 <https://rbcommons.com/s/twitter/r/3890>`_
 
 * Bump junit-runner to 1.0.7 to pick up previous changes
-  `RB #3846 <https://rbcommons.com/s/twitter/r/3846>`_
-  `RB #3753 <https://rbcommons.com/s/twitter/r/3753>`_
-  `RB #3707 <https://rbcommons.com/s/twitter/r/3707>`_
   `RB #3908 <https://rbcommons.com/s/twitter/r/3908>`_
 
 * junit-runner: Separate out parsing specs from making list of requests
