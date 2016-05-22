@@ -391,7 +391,7 @@ class NodeBuilder(Closable):
 class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_tree'])):
   """Additional inputs needed to run Node.step for the given Node.
 
-  TODO: See docs on StepResult.
+  TODO: Unclear why this has a ProjectTree reference; should be passed in by the Engine.
 
   :param step_id: A unique id for the step, to ease comparison.
   :param node: The Node instance that will run.
@@ -400,7 +400,6 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   """
 
   def __call__(self, node_builder):
-
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, self.project_tree)
     state = self.node.step(self.dependencies, step_context)

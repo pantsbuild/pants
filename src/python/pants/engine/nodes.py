@@ -88,7 +88,15 @@ class Node(AbstractClass):
 
   @abstractproperty
   def is_cacheable(self):
-    """Whether node should be cached or not."""
+    """Whether this Node type can be cached."""
+
+  @abstractproperty
+  def is_inlineable(self):
+    """Whether this Node type can have its execution inlined.
+
+    In cases where a Node is inlined, it is executed directly in the step method of a dependent
+    Node, and is not memoized or cached in any way.
+    """
 
   @abstractmethod
   def step(self, dependency_states, step_context):
@@ -113,10 +121,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
   selector, which introduces the 'variant' value to restrict the names of values selected by a
   SelectNode.
   """
-
-  @property
-  def is_cacheable(self):
-    return False
+  is_cacheable = False
+  is_inlineable = True
 
   def _variants_node(self):
     if type(self.subject) is Address and self.product is not Variants:
@@ -216,10 +222,8 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
   The value produced by this Node guarantees that the order of the provided values matches the
   order of declaration in the list `field` of the `dep_product`.
   """
-
-  @property
-  def is_cacheable(self):
-    return False
+  is_cacheable = False
+  is_inlineable = True
 
   def _dep_product_node(self):
     return SelectNode(self.subject, self.dep_product, self.variants, None)
@@ -270,10 +274,8 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
   TODO: This is semantically very similar to DependenciesNode (which might be considered to be a
   multi-field projection for the contents of a list). Should be looking for ways to merge them.
   """
-
-  @property
-  def is_cacheable(self):
-    return False
+  is_cacheable = False
+  is_inlineable = True
 
   def _input_node(self):
     return SelectNode(self.subject, self.input_product, self.variants, None)
@@ -321,19 +323,20 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
 
 class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', 'clause']), Node):
 
-  @property
-  def is_cacheable(self):
-    return True
+  is_cacheable = True
+  is_inlineable = False
 
   def _resolve(self, dep_node, dependency_states, step_context):
     """Given a Node and all input dependencies, return a State for the dep.
+
+    TODO: Should inline recursively.
 
     TODO: This inlines execution of all non-Task/Filesystem nodes, which could maybe
     be cleaner/more-general? We actually use an explicit Dependencies node at the root
     though. And overall, inlining everywhere is not going to be particularly good for
     debuggability.
     """
-    if type(dep_node) in (DependenciesNode, ProjectionNode, SelectNode):
+    if dep_node.is_inlineable:
       return dep_node.step(dependency_states, step_context)
     else:
       return dependency_states.get(dep_node, Waiting([dep_node]))
@@ -388,6 +391,9 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
 
   _FS_PRODUCT_TYPES = {product for product, subject in _FS_PAIRS}
 
+  is_cacheable = False
+  is_inlineable = False
+
   @classmethod
   def is_filesystem_pair(cls, subject_type, product):
     """True if the given subject type and product type should be computed using a FileystemNode."""
@@ -403,11 +409,6 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       yield Link(f)
       # DirectoryListings for parent dirs.
       yield Dir(dirname(f))
-
-  @property
-  def is_cacheable(self):
-    """Native node should not be cached."""
-    return False
 
   def step(self, dependency_states, step_context):
     try:
