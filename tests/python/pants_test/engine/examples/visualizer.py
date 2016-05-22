@@ -46,7 +46,7 @@ def pop_build_root_and_goals(description, args):
   def usage(error_message):
     print(error_message, file=sys.stderr)
     print(dedent("""
-    {} {}
+    {}
     """.format(sys.argv[0])), file=sys.stderr)
     sys.exit(1)
 
