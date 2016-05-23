@@ -613,11 +613,14 @@ class LocalScheduler(object):
           self._complete_step(step.node, promise.get())
           if self._product_graph.is_complete(step.node):
             # The Node is completed: mark any of its dependents as candidates for Steps.
+            print('>>> completed {}'.format(step.node))
             candidates.update(d for d in self._product_graph.dependents_of(step.node))
           else:
             # Waiting on dependencies.
+            # TODO: add a helper method to get completed without lookups in the Nodes dict.
             incomplete_deps = [d for d in self._product_graph.dependencies_of(step.node)
                                if not self._product_graph.is_complete(d)]
+            print('>>> waiting {} for {}'.format(step.node, incomplete_deps))
             if incomplete_deps:
               # Mark incomplete deps as candidates for Steps.
               candidates.update(incomplete_deps)

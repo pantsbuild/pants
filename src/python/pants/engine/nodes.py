@@ -67,6 +67,11 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   but all returned dependencies are recorded for the lifetime of a ProductGraph.
   """
 
+  def __new__(cls, dependencies):
+    if not dependencies:
+      raise ValueError('The `Waiting` Node type requires a non-empty list of dependencies.')
+    return super(Waiting, cls).__new__(cls, dependencies)
+
 
 class Node(AbstractClass):
   @classmethod
@@ -158,9 +163,9 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     variants = self.variants
     variants_node = self._variants_node()
     if variants_node:
-      dep_state = dependency_states.get(variants_node, None)
-      if dep_state is None or type(dep_state) == Waiting:
-        return Waiting([variants_node])
+      dep_state = step_context.get(variants_node, dependency_states)
+      if type(dep_state) == Waiting:
+        return dep_state
       elif type(dep_state) == Return:
         # A subject's variants are overridden by any dependent's requested variants, so
         # we merge them left to right here.
@@ -183,41 +188,44 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       return Return(literal_value)
 
     # Else, attempt to use a configured task to compute the value.
-    has_waiting_dep = False
-    dependencies = list(step_context.gen_nodes(self.subject, self.product, variants))
-    matches = {}
-    for dep in dependencies:
-      dep_state = dependency_states.get(dep, None)
-      if dep_state is None or type(dep_state) == Waiting:
-        has_waiting_dep = True
-        continue
+    dependencies = []
+    matched_node, matched_value = None, None
+    for dep in step_context.gen_nodes(self.subject, self.product, variants):
+      dep_state = step_context.get(dep, dependency_states)
+      if type(dep_state) == Waiting:
+        dependencies.extend(dep_state.dependencies)
+      elif type(dep_state) == Return:
+        if matched_node is not None:
+          # TODO: Multiple successful tasks are not currently supported. We should allow for this
+          # by adding support for "mergeable" products. see:
+          #   https://github.com/pantsbuild/pants/issues/2526
+          matches = {dep: dep_state, matched_node: matched_value}
+          return Throw(ConflictingProducersError.create(self.subject, self.product, matches))
+        # We computed a value: see whether we can use it.
+        literal_value = self._select_literal(dep_state.value, variant_value)
+        if literal_value is not None:
+          matched_node, matched_value = dep, literal_value
       elif type(dep_state) == Throw:
         return dep_state
       elif type(dep_state) == Noop:
         continue
-      elif type(dep_state) != Return:
+      else:
         State.raise_unrecognized(dep_state)
-      # We computed a value: see whether we can use it.
-      literal_value = self._select_literal(dep_state.value, variant_value)
-      if literal_value is not None:
-        matches[dep] = literal_value
-    if has_waiting_dep:
+
+    # If any dependencies were unavailable, wait for them.
+    if dependencies:
       return Waiting(dependencies)
-    elif len(matches) > 1:
-      # TODO: Multiple successful tasks are not currently supported. We should allow for this
-      # by adding support for "mergeable" products. see:
-      #   https://github.com/pantsbuild/pants/issues/2526
-      return Throw(ConflictingProducersError.create(self.subject, self.product, matches))
-    elif len(matches) == 1:
-      return Return(matches.values()[0])
-    return Noop('No source of {}.'.format(self))
+    elif matched_node is None:
+      return Noop('No source of {}.'.format(self))
+    else:
+      return Return(matched_value)
 
 
 class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product', 'field']), Node):
-  """A Node that selects the given Product for each of the items in a field `field` on this subject.
+  """A Node that selects the given Product for each of the items in `field` on `dep_product`.
 
   Begins by selecting the `dep_product` for the subject, and then selects a product for each
-  member a collection named `field` on the dep_product.
+  member of a collection named `field` on the dep_product.
 
   The value produced by this Node guarantees that the order of the provided values matches the
   order of declaration in the list `field` of the `dep_product`.
@@ -240,9 +248,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
   def step(self, dependency_states, step_context):
     # Request the product we need in order to request dependencies.
     dep_product_node = self._dep_product_node()
-    dep_product_state = dependency_states.get(dep_product_node, None)
-    if dep_product_state is None or type(dep_product_state) == Waiting:
-      return Waiting([dep_product_node])
+    dep_product_state = step_context.get(dep_product_node, dependency_states)
+    if type(dep_product_state) == Waiting:
+      return dep_product_state
     elif type(dep_product_state) == Throw:
       return dep_product_state
     elif type(dep_product_state) == Noop:
@@ -251,21 +259,24 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
       State.raise_unrecognized(dep_product_state)
 
     # The product and its dependency list are available.
-    dependencies = list(self._dependency_nodes(step_context, dep_product_state.value))
-    for dependency in dependencies:
-      dep_state = dependency_states.get(dependency, None)
-      if dep_state is None or type(dep_state) == Waiting:
-        # One of the dependencies is not yet available. Indicate that we are waiting for all
-        # of them.
-        return Waiting([dep_product_node] + dependencies)
-      elif type(dep_state) == Throw:
-        return dep_state
+    dep_values = []
+    dependencies = []
+    for dependency in self._dependency_nodes(step_context, dep_product_state.value):
+      dep_state = step_context.get(dependency, dependency_states)
+      if type(dep_state) == Waiting:
+        dependencies.extend(dep_state.dependencies)
+      elif type(dep_state) == Return:
+        dep_values.append(dep_state.value)
       elif type(dep_state) == Noop:
         return Throw(ValueError('No source of explicit dependency {}'.format(dependency)))
-      elif type(dep_state) != Return:
+      elif type(dep_state) == Throw:
+        return dep_state
+      else:
         raise State.raise_unrecognized(dep_state)
-    # All dependencies are present! Set our value to a list of the resulting values.
-    return Return([dependency_states[d].value for d in dependencies])
+    if dependencies:
+      return Waiting(dependencies)
+    # All dependencies are present!
+    return Return(dep_values)
 
 
 class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants', 'projected_subject', 'fields', 'input_product']), Node):
@@ -286,9 +297,9 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
   def step(self, dependency_states, step_context):
     # Request the product we need to compute the subject.
     input_node = self._input_node()
-    input_state = dependency_states.get(input_node, None)
-    if input_state is None or type(input_state) == Waiting:
-      return Waiting([input_node])
+    input_state = step_context.get(input_node, dependency_states)
+    if type(input_state) == Waiting:
+      return input_state
     elif type(input_state) == Throw:
       return input_state
     elif type(input_state) == Noop:
@@ -310,7 +321,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     output_node = self._output_node(step_context, projected_subject)
 
     # When the output node is available, return its result.
-    output_state = dependency_states.get(output_node, None)
+    output_state = step_context.get(output_node, dependency_states)
     if output_state is None or type(output_state) == Waiting:
       return Waiting([input_node, output_node])
     elif type(output_state) == Noop:
@@ -326,31 +337,14 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
   is_cacheable = True
   is_inlineable = False
 
-  def _resolve(self, dep_node, dependency_states, step_context):
-    """Given a Node and all input dependencies, return a State for the dep.
-
-    TODO: Should inline recursively.
-
-    TODO: This inlines execution of all non-Task/Filesystem nodes, which could maybe
-    be cleaner/more-general? We actually use an explicit Dependencies node at the root
-    though. And overall, inlining everywhere is not going to be particularly good for
-    debuggability.
-    """
-    if dep_node.is_inlineable:
-      return dep_node.step(dependency_states, step_context)
-    else:
-      return dependency_states.get(dep_node, Waiting([dep_node]))
-
   def step(self, dependency_states, step_context):
     # Compute dependencies for the Node, or determine whether it is a Noop.
-    waiting = False
     dependencies = []
     dep_values = []
     for selector in self.clause:
       dep_node = step_context.select_node(selector, self.subject, self.variants)
-      dep_state = self._resolve(dep_node, dependency_states, step_context)
+      dep_state = step_context.get(dep_node, dependency_states)
       if type(dep_state) == Waiting:
-        waiting = True
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) == Return:
         dep_values.append(dep_state.value)
@@ -364,7 +358,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
       else:
         State.raise_unrecognized(dep_state)
     # If any clause was still waiting on dependencies, indicate it; else execute.
-    if waiting:
+    if dependencies:
       return Waiting(dependencies)
     try:
       return Return(self.func(*dep_values))
@@ -436,6 +430,20 @@ class StepContext(object):
   def __init__(self, node_builder, project_tree):
     self._node_builder = node_builder
     self.project_tree = project_tree
+
+  def get(self, node, node_states):
+    """Given a Node and computed node_states, gets the current state for the Node.
+
+    TODO: Make inlining optional.
+    TODO: Make node_states a member of StepContext so that it is private here.
+    """
+    if False and node.is_inlineable:
+      return node.step(node_states, self)
+    else:
+      state = node_states.get(node, None)
+      if state is not None:
+        return state
+      return Waiting([node])
 
   def gen_nodes(self, subject, product, variants):
     """Yields Node instances which might be able to provide a value for the given inputs."""
