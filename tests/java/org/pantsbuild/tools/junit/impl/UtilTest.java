@@ -4,10 +4,57 @@
 package org.pantsbuild.tools.junit.impl;
 
 import org.junit.Test;
+import org.junit.runner.Description;
+import org.pantsbuild.tools.junit.lib.MockJUnit3Test;
+import org.pantsbuild.tools.junit.lib.MockRunWithTest;
+import org.pantsbuild.tools.junit.lib.MockTest1;
+import org.pantsbuild.tools.junit.lib.NotATestAbstractClass;
+import org.pantsbuild.tools.junit.lib.NotATestInterface;
+import org.pantsbuild.tools.junit.lib.NotATestNoPublicConstructor;
+import org.pantsbuild.tools.junit.lib.NotATestNoRunnableMethods;
+import org.pantsbuild.tools.junit.lib.NotATestNonzeroArgConstructor;
+import org.pantsbuild.tools.junit.lib.NotATestPrivateClass;
+import org.pantsbuild.tools.junit.lib.UnannotatedTestClass;
+import org.pantsbuild.tools.junit.lib.XmlReportFirstTestIngoredTest;
+import org.pantsbuild.tools.junit.lib.XmlReportIgnoredTestSuiteTest;
+
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class UtilTest {
+
+  @Test
+  public void testIsIgnoredClass() {
+    assertTrue(Util.isIgnored(XmlReportIgnoredTestSuiteTest.class));
+    assertFalse(Util.isIgnored(MockTest1.class));
+  }
+
+  @Test
+  public void testIsIgnoredDescription() throws Exception {
+    assertTrue(Util.isIgnored(getDescription(XmlReportFirstTestIngoredTest.class,
+        "testXmlIgnored")));
+    assertFalse(Util.isIgnored(getDescription(XmlReportFirstTestIngoredTest.class,
+        "testXmlPassing")));
+  }
+
+  @Test
+  public void testIsRunnableDescription() throws Exception {
+    assertFalse(Util.isRunnable(getDescription(XmlReportFirstTestIngoredTest.class,
+        "testXmlIgnored")));
+    assertTrue(Util.isRunnable(getDescription(XmlReportFirstTestIngoredTest.class,
+        "testXmlPassing")));
+  }
+
+  @Test
+  public void testGetPantsFriendlyDisplayName() throws Exception {
+    assertEquals("org.pantsbuild.tools.junit.lib.MockTest1#testMethod11",
+        Util.getPantsFriendlyDisplayName(getDescription(MockTest1.class,
+        "testMethod11")));
+    assertEquals("Vanilla Name",
+        Util.getPantsFriendlyDisplayName(Description.createSuiteDescription("Vanilla Name")));
+  }
+
   @Test
   public void testSanitizeSuiteName() {
     assertEquals("com.foo.bar.ClassName", Util.sanitizeSuiteName("com.foo.bar.ClassName"));
@@ -29,5 +76,44 @@ public class UtilTest {
     String sanitizedPunctuations = Util.sanitizeSuiteName("`~!@#$%^&*()+-=[]{}\\/<>|");
     assertTrue("Sanitized punctions were't converted to all hyphens: " + sanitizedPunctuations,
         sanitizedPunctuations.matches("^[-]+$"));
+  }
+
+  @Test
+  public void testIsUsingCustomRunner() {
+    assertTrue(Util.isUsingCustomRunner(MockRunWithTest.class));
+    assertFalse(Util.isUsingCustomRunner(MockTest1.class));
+  }
+
+  @Test
+  public void testIsJunit3() {
+    assertTrue(Util.isJunit3Test(MockJUnit3Test.class));
+    assertFalse(Util.isJunit3Test(MockTest1.class));
+  }
+
+  @Test
+  public void testIsRunnableClass() {
+    assertTrue(Util.isRunnable(MockJUnit3Test.class));
+    assertFalse(Util.isRunnable(XmlReportIgnoredTestSuiteTest.class));
+  }
+
+  @Test
+  public void testIsATestClass() {
+    assertTrue(Util.isTestClass(MockJUnit3Test.class));
+    assertTrue(Util.isTestClass(MockRunWithTest.class));
+    assertTrue(Util.isTestClass(UnannotatedTestClass.class));
+    assertFalse(Util.isTestClass(NotATestAbstractClass.class));
+    assertFalse(Util.isTestClass(NotATestNonzeroArgConstructor.class));
+    assertFalse(Util.isTestClass(NotATestNoPublicConstructor.class));
+    assertFalse(Util.isTestClass(NotATestInterface.class));
+    assertFalse(Util.isTestClass(NotATestNoRunnableMethods.class));
+    assertFalse(Util.isTestClass(NotATestPrivateClass.class));
+
+    // Even though this is ignored it should still be considered a Test
+    assertTrue(Util.isTestClass(XmlReportIgnoredTestSuiteTest.class));
+  }
+
+  private Description getDescription(Class<?> clazz, String methodName) throws Exception {
+    return Description.createTestDescription(
+        clazz, methodName, clazz.getMethod(methodName).getAnnotations());
   }
 }
