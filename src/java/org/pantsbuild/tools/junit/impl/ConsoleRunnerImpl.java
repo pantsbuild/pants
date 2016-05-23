@@ -26,8 +26,8 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -491,18 +491,7 @@ public class ConsoleRunnerImpl {
 
   private List<Request> legacyParseRequests(PrintStream out, PrintStream err,
       List<Spec> specs) {
-    /**
-     * Datatype representing an individual test method.
-     */
-    class TestMethod {
-      private final Class<?> clazz;
-      private final String name;
 
-      TestMethod(Class<?> clazz, String name) {
-        this.clazz = clazz;
-        this.name = name;
-      }
-    }
     Set<TestMethod> testMethods = Sets.newLinkedHashSet();
     Set<Class<?>> classes = Sets.newLinkedHashSet();
     for (Spec spec: specs) {
@@ -514,17 +503,13 @@ public class ConsoleRunnerImpl {
         }
       }
     }
-    List<Request> requests = Lists.newArrayList();
 
+    List<Request> requests = Lists.newArrayList();
     if (!classes.isEmpty()) {
       if (this.perTestTimer || this.parallelThreads > 1) {
         for (Class<?> clazz : classes) {
-          if (this.shouldRunParallelMethods(clazz)) {
-            // Don't add these as class requests, make individual TestMethod requests.
-            for (Method method :
-                Iterables.filter(Arrays.asList(clazz.getMethods()),IS_ANNOTATED_TEST_METHOD)) {
-              testMethods.add(new TestMethod(clazz, method.getName()));
-            }
+          if (legacyShouldRunParallelMethods(clazz)) {
+            testMethods.addAll(TestMethod.fromClass(clazz));
           } else {
             requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
           }
@@ -552,7 +537,16 @@ public class ConsoleRunnerImpl {
     return requests;
   }
 
-  private boolean shouldRunParallelMethods(Class<?> clazz) {
+  private boolean legacyShouldRunParallelMethods(Class<?> clazz) {
+    if (!Util.isRunnable(clazz)) {
+      return false;
+    }
+    // The legacy runner makes Requests out of each individual method in a class. This isn't
+    // designed to work for JUnit3 and isn't appropriate for custom runners.
+    if (Util.isJunit3Test(clazz) || Util.isUsingCustomRunner(clazz)) {
+      return false;
+    }
+
     // TODO(zundel): Add support for an annotation like TestParallelMethods.
     return this.defaultConcurrency.shouldRunMethodsParallel();
   }
@@ -801,13 +795,6 @@ public class ConsoleRunnerImpl {
     }
     return Concurrency.PARALLEL_CLASSES;
   }
-
-  private static final Predicate<Method> IS_ANNOTATED_TEST_METHOD = new Predicate<Method>() {
-    @Override public boolean apply(Method method) {
-      return Modifier.isPublic(method.getModifiers())
-          && method.isAnnotationPresent(org.junit.Test.class);
-    }
-  };
 
   private static void exit(int code) {
     exitStatus = code;

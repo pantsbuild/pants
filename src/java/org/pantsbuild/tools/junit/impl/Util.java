@@ -3,14 +3,36 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import org.junit.Ignore;
 import org.junit.runner.Description;
+import org.junit.runner.RunWith;
 import org.junit.runner.notification.Failure;
 
 /**
  * Utilities for working with junit test runs.
  */
 final class Util {
+
+  static final Predicate<Method> IS_ANNOTATED_TEST_METHOD =
+      new Predicate<Method>() {
+        @Override public boolean apply(Method method) {
+          return Modifier.isPublic(method.getModifiers())
+              && method.isAnnotationPresent(org.junit.Test.class);
+        }
+      };
+
+  static final Predicate<Constructor<?>> IS_PUBLIC_CONSTRUCTOR =
+      new Predicate<Constructor<?>>() {
+        @Override public boolean apply(Constructor<?> constructor) {
+          return Modifier.isPublic(constructor.getModifiers());
+        }
+      };
 
   private Util() {
     // utility
@@ -27,6 +49,16 @@ final class Util {
   }
 
   /**
+   * Returns {@code true} if the given class is {@literal @Ignore}d
+   *
+   * @param clazz class instance to evaluate.
+   * @return {@code true} if the class is marked as ignored.
+   */
+  static boolean isIgnored(Class<?> clazz) {
+    return clazz.isAnnotationPresent(Ignore.class);
+  }
+
+  /**
    * Returns {@code true} if the given {@code test} is eligible for running.  Runnable tests are
    * those that are not {@literal @Ignore}d and have direct executable content (i.e.: not a test
    * suite or other executable test aggregator).
@@ -36,6 +68,16 @@ final class Util {
    */
   static boolean isRunnable(Description test) {
     return test.isTest() && !isIgnored(test);
+  }
+
+  /**
+   * Returns {@code false} if the given class is {@literal @Ignore}d
+   *
+   * @param clazz class instance to evaluate.
+   * @return {@code true} if the class is marked as ignored.
+   */
+  static boolean isRunnable(Class<?> clazz) {
+    return isTestClass(clazz) && !isIgnored(clazz);
   }
 
   /**
@@ -92,4 +134,43 @@ final class Util {
     return name.replaceAll("[[\\p{Punct}][\\p{Space}]&&[^_.-]]", "-").replaceAll("[.]+$", "");
   }
 
+  /**
+   * Support junit 3.x Test hierarchy.
+   */
+  public static boolean isJunit3Test(Class<?> clazz) {
+    return junit.framework.Test.class.isAssignableFrom(clazz);
+  }
+
+  /**
+   * Support classes using junit 4.x custom runners.
+   */
+  public static boolean isUsingCustomRunner(Class<?> clazz) {
+    return clazz.isAnnotationPresent(RunWith.class);
+  }
+
+  public static boolean isTestClass(final Class<?> clazz) {
+    // Must be a public concrete class to be a runnable junit Test.
+    if (clazz.isInterface()
+        || Modifier.isAbstract(clazz.getModifiers())
+        || !Modifier.isPublic(clazz.getModifiers())) {
+      return false;
+    }
+
+    // The class must have some public constructor to be instantiated by the runner being used
+    if (!Iterables.any(Arrays.asList(clazz.getConstructors()), IS_PUBLIC_CONSTRUCTOR)) {
+      return false;
+    }
+
+    if (isJunit3Test(clazz)) {
+      return true;
+    }
+
+    // Support classes using junit 4.x custom runners.
+    if (isUsingCustomRunner(clazz)) {
+      return true;
+    }
+
+    // Support junit 4.x @Test annotated methods.
+    return Iterables.any(Arrays.asList(clazz.getMethods()), IS_ANNOTATED_TEST_METHOD);
+  }
 }
