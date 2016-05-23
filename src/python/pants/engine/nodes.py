@@ -317,8 +317,8 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
 
     # When the output node is available, return its result.
     output_state = step_context.get(output_node)
-    if output_state is None or type(output_state) == Waiting:
-      return Waiting([input_node, output_node])
+    if type(output_state) == Waiting:
+      return output_state
     elif type(output_state) == Noop:
       return Noop('Successfully projected, but no source of output product for {}.'.format(output_node))
     elif type(output_state) in [Throw, Return]:
@@ -353,8 +353,8 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
       else:
         State.raise_unrecognized(dep_state)
     # If any clause was still waiting on dependencies, indicate it; else execute.
+    print('>>> node {} for\n>>  {}\n>>   {}'.format(self.func, dependencies, dep_values))
     if dependencies:
-      print('>>> waiting {} for\n>>  {}'.format(self.func, dependencies))
       return Waiting(dependencies)
     try:
       return Return(self.func(*dep_values))
@@ -433,12 +433,12 @@ class StepContext(object):
 
     TODO: Inline recursively.
     TODO: Make inlining optional.
-    TODO: Make node_states a member of StepContext so that it is private here.
     """
     if node.is_inlineable:
       print('Inlining execution of {}'.format(node))
       return node.step(self)
     else:
+      print('Cannot inline execution of {}'.format(node))
       state = self._node_states.get(node, None)
       if state is not None:
         return state
