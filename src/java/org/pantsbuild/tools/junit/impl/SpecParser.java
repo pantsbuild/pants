@@ -86,7 +86,7 @@ class SpecParser {
   private Spec getOrCreateSpec(String className, String specString) throws SpecException {
     try {
       Class<?> clazz = getClass().getClassLoader().loadClass(className);
-      if (!isTest(clazz)) {
+      if (!Util.isTestClass(clazz)) {
         return null;
       }
       if (!specs.containsKey(clazz)) {
@@ -112,48 +112,6 @@ class SpecParser {
       throw new SpecException(specString,
           String.format("Error initializing %s.",className), e);
     }
-  }
-
-  public static final Predicate<Constructor<?>> IS_PUBLIC_CONSTRUCTOR =
-      new Predicate<Constructor<?>>() {
-        @Override public boolean apply(Constructor<?> constructor) {
-          return Modifier.isPublic(constructor.getModifiers());
-        }
-      };
-
-  private static final Predicate<Method> IS_ANNOTATED_TEST_METHOD =
-      new Predicate<Method>() {
-        @Override public boolean apply(Method method) {
-          return Modifier.isPublic(method.getModifiers())
-              && method.isAnnotationPresent(org.junit.Test.class);
-        }
-      };
-
-  private static boolean isTest(final Class<?> clazz) {
-    // Must be a public concrete class to be a runnable junit Test.
-    if (clazz.isInterface()
-        || Modifier.isAbstract(clazz.getModifiers())
-        || !Modifier.isPublic(clazz.getModifiers())) {
-      return false;
-    }
-
-    // The class must have some public constructor to be instantiated by the runner being used
-    if (!Iterables.any(Arrays.asList(clazz.getConstructors()), IS_PUBLIC_CONSTRUCTOR)) {
-      return false;
-    }
-
-    // Support junit 3.x Test hierarchy.
-    if (junit.framework.Test.class.isAssignableFrom(clazz)) {
-      return true;
-    }
-
-    // Support classes using junit 4.x custom runners.
-    if (clazz.isAnnotationPresent(RunWith.class)) {
-      return true;
-    }
-
-    // Support junit 4.x @Test annotated methods.
-    return Iterables.any(Arrays.asList(clazz.getMethods()), IS_ANNOTATED_TEST_METHOD);
   }
 
   /**
