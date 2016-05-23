@@ -104,16 +104,11 @@ class Node(AbstractClass):
     """
 
   @abstractmethod
-  def step(self, dependency_states, step_context):
-    """Given a dict of the dependency States for this Node, returns the current State of the Node.
+  def step(self, step_context):
+    """Given a StepContext returns the current State of the Node.
 
-    The StepContext parameter provides a way to construct Nodes that require information about
-    installed tasks, or to access the filesystem.
-
-    After this method returns a non-Waiting state, it will never be visited again for this Node.
-
-    TODO: Not all Node types actually need the `subject` as a parameter... can that be pushed out
-    as an explicit dependency type? Perhaps the "is-a/has-a" checks should be native outside of Node?
+    The StepContext holds any computed dependencies, provides a way to construct Nodes
+    that require information about installed tasks, and allows access to the filesystem.
     """
 
 
@@ -157,13 +152,13 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       return item
     return None
 
-  def step(self, dependency_states, step_context):
+  def step(self, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
     variants = self.variants
     variants_node = self._variants_node()
     if variants_node:
-      dep_state = step_context.get(variants_node, dependency_states)
+      dep_state = step_context.get(variants_node)
       if type(dep_state) == Waiting:
         return dep_state
       elif type(dep_state) == Return:
@@ -191,7 +186,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     dependencies = []
     matched_node, matched_value = None, None
     for dep in step_context.gen_nodes(self.subject, self.product, variants):
-      dep_state = step_context.get(dep, dependency_states)
+      dep_state = step_context.get(dep)
       if type(dep_state) == Waiting:
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) == Return:
@@ -245,10 +240,10 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
         variants = Variants.merge(variants, literal_variants)
       yield SelectNode(dependency, self.product, variants, None)
 
-  def step(self, dependency_states, step_context):
+  def step(self, step_context):
     # Request the product we need in order to request dependencies.
     dep_product_node = self._dep_product_node()
-    dep_product_state = step_context.get(dep_product_node, dependency_states)
+    dep_product_state = step_context.get(dep_product_node)
     if type(dep_product_state) == Waiting:
       return dep_product_state
     elif type(dep_product_state) == Throw:
@@ -262,7 +257,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     dep_values = []
     dependencies = []
     for dependency in self._dependency_nodes(step_context, dep_product_state.value):
-      dep_state = step_context.get(dependency, dependency_states)
+      dep_state = step_context.get(dependency)
       if type(dep_state) == Waiting:
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) == Return:
@@ -294,10 +289,10 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
   def _output_node(self, step_context, projected_subject):
     return SelectNode(projected_subject, self.product, self.variants, None)
 
-  def step(self, dependency_states, step_context):
+  def step(self, step_context):
     # Request the product we need to compute the subject.
     input_node = self._input_node()
-    input_state = step_context.get(input_node, dependency_states)
+    input_state = step_context.get(input_node)
     if type(input_state) == Waiting:
       return input_state
     elif type(input_state) == Throw:
@@ -321,7 +316,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     output_node = self._output_node(step_context, projected_subject)
 
     # When the output node is available, return its result.
-    output_state = step_context.get(output_node, dependency_states)
+    output_state = step_context.get(output_node)
     if output_state is None or type(output_state) == Waiting:
       return Waiting([input_node, output_node])
     elif type(output_state) == Noop:
@@ -337,13 +332,13 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
   is_cacheable = True
   is_inlineable = False
 
-  def step(self, dependency_states, step_context):
+  def step(self, step_context):
     # Compute dependencies for the Node, or determine whether it is a Noop.
     dependencies = []
     dep_values = []
     for selector in self.clause:
       dep_node = step_context.select_node(selector, self.subject, self.variants)
-      dep_state = step_context.get(dep_node, dependency_states)
+      dep_state = step_context.get(dep_node)
       if type(dep_state) == Waiting:
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) == Return:
@@ -359,6 +354,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
         State.raise_unrecognized(dep_state)
     # If any clause was still waiting on dependencies, indicate it; else execute.
     if dependencies:
+      print('>>> waiting {} for\n>>  {}'.format(self.func, dependencies))
       return Waiting(dependencies)
     try:
       return Return(self.func(*dep_values))
@@ -404,7 +400,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       # DirectoryListings for parent dirs.
       yield Dir(dirname(f))
 
-  def step(self, dependency_states, step_context):
+  def step(self, step_context):
     try:
       if self.product is Stats:
         return Return(path_stat(step_context.project_tree, self.subject))
@@ -427,21 +423,23 @@ class StepContext(object):
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, node_builder, project_tree):
+  def __init__(self, node_builder, project_tree, node_states):
     self._node_builder = node_builder
     self.project_tree = project_tree
+    self._node_states = node_states
 
-  def get(self, node, node_states):
+  def get(self, node):
     """Given a Node and computed node_states, gets the current state for the Node.
 
+    TODO: Inline recursively.
     TODO: Make inlining optional.
     TODO: Make node_states a member of StepContext so that it is private here.
     """
     if node.is_inlineable:
       print('Inlining execution of {}'.format(node))
-      return node.step(node_states, self)
+      return node.step(self)
     else:
-      state = node_states.get(node, None)
+      state = self._node_states.get(node, None)
       if state is not None:
         return state
       return Waiting([node])
