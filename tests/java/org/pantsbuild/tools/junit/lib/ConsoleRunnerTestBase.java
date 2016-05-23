@@ -33,11 +33,11 @@ public abstract class ConsoleRunnerTestBase {
   protected enum TestParameters {
     LEGACY_SERIAL(false, null),
     LEGACY_PARALLEL_CLASSES(false, Concurrency.PARALLEL_CLASSES),
-    LEGACY_PARALLEL_METHODS(false, Concurrency.PARALLEL_METHODS);
-    // EXPERIMENTAL_SERIAL(true, Concurrency.SERIAL)
-    // EXPERIMENTAL_PARALLEL_CLASSES(true, Concurrency.PARALLEL_CLASSES),
-    // EXPERIMENTAL_PARALLEL_METHODS(true, Concurrency.PARALLEL_METHODS),
-    // EXPERIMENTAL_PARALLEL_BOTH(true, Concurrency.PARALLEL_BOTH);
+    LEGACY_PARALLEL_METHODS(false, Concurrency.PARALLEL_METHODS),
+    EXPERIMENTAL_SERIAL(true, Concurrency.SERIAL),
+    EXPERIMENTAL_PARALLEL_CLASSES(true, Concurrency.PARALLEL_CLASSES),
+    EXPERIMENTAL_PARALLEL_METHODS(true, Concurrency.PARALLEL_METHODS),
+    EXPERIMENTAL_PARALLEL_BOTH(true, Concurrency.PARALLEL_BOTH);
 
     public final boolean useExperimentalRunner;
     public final Concurrency defaultConcurrency;
