@@ -27,7 +27,7 @@ import static org.junit.Assert.assertTrue;
  */
 @TestSerial
 public class AnnotatedSerialTest1 {
-  private static final int WAIT_TIMEOUT_MS = 3000;
+  private static final int WAIT_TIMEOUT_MS = 1000;
   private static AtomicBoolean waiting = new AtomicBoolean(false);
 
   @Test

@@ -56,6 +56,9 @@ class NodeResolveTest(TaskTestBase):
     self.assertEqual(NpmResolver,
                      NodeResolve._resolver_for_target(node_module_target))
 
+  def test_product_types(self):
+    self.assertEqual([NodePaths], NodeResolve.product_types())
+
   def test_noop(self):
     task = self.create_task(self.context())
     task.execute()

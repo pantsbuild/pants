@@ -21,25 +21,22 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
 import org.junit.runner.JUnitCore;
 import org.junit.runner.Request;
 import org.junit.runner.Result;
-import org.junit.runner.RunWith;
 import org.junit.runner.Runner;
 import org.junit.runner.manipulation.Filter;
 import org.junit.runner.notification.Failure;
@@ -578,7 +575,7 @@ public class ConsoleRunnerImpl {
     // order), and save it in testToRunStatus table.
     class TestFilter extends Filter {
       private int testIdx;
-      private HashMap<String, Boolean> testToRunStatus = new HashMap<String, Boolean>();
+      private Map<String, Boolean> testToRunStatus = Maps.newHashMap();
 
       @Override
       public boolean shouldRun(Description desc) {
@@ -658,19 +655,16 @@ public class ConsoleRunnerImpl {
           usage = "Show a description of each test and timer for each test class.")
       private boolean perTestTimer;
 
-      // TODO(zundel): Combine -default-parallel and -paralel-methods together into a
-      // single argument:  -default-concurrency {serial, parallel, parallel_methods}
       // TODO(zundel): Also add a @TestParallelMethods annotation
+      // TODO(zundel): This argument is deprecated, remove in a future release
       @Option(name = "-default-parallel",
-          usage = "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
+          usage = "DEPRECATED: use -default-concurrency instead.\n"
+              + "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
       private boolean defaultParallel;
 
-      @Option(name = "-parallel-methods",
-          usage = "EXPERIMENTAL: Run methods within a class in parallel.")
-      private boolean parallelMethods;
-
       @Option(name = "-default-concurrency",
-          usage = "Specify how to parallelize running tests.")
+          usage = "Specify how to parallelize running tests.\n"
+          + "Use -use-experimental-runner for PARALLEL_METHODS and PARALLEL_BOTH")
       private Concurrency defaultConcurrency;
 
       private int parallelThreads = 0;
@@ -754,7 +748,7 @@ public class ConsoleRunnerImpl {
     }
 
     options.defaultConcurrency = computeConcurrencyOption(options.defaultConcurrency,
-        options.defaultParallel, options.parallelMethods);
+        options.defaultParallel);
 
     ConsoleRunnerImpl runner =
         new ConsoleRunnerImpl(options.failFast,
@@ -785,29 +779,25 @@ public class ConsoleRunnerImpl {
         tests.add(test);
       }
     }
-
     runner.run(tests);
   }
 
   /**
-   * Used to convert the legacy -default-parallel and -parallel-methods options to the new
+   * Used to convert the legacy -default-parallel option to the new
    * style -default-concurrency values
    */
   @VisibleForTesting
   static Concurrency computeConcurrencyOption(Concurrency defaultConcurrency,
-      boolean defaultParallel, boolean parallelMethods) {
+      boolean defaultParallel) {
 
     if (defaultConcurrency != null) {
       // -default-concurrency option present - use it.
       return defaultConcurrency;
     }
 
-    // Fall Back to using -default-parallel and -parallel-methods
+    // Fall Back to using -default-parallel
     if (!defaultParallel) {
       return Concurrency.SERIAL;
-    }
-    if (parallelMethods) {
-      return Concurrency.PARALLEL_BOTH;
     }
     return Concurrency.PARALLEL_CLASSES;
   }
@@ -834,7 +824,7 @@ public class ConsoleRunnerImpl {
 
   // ---------------------------- For testing only ---------------------------------
 
-  static void setCallSystemExitOnFinish(boolean v) {
+  public static void setCallSystemExitOnFinish(boolean v) {
     callSystemExitOnFinish = v;
   }
 
@@ -842,7 +832,7 @@ public class ConsoleRunnerImpl {
     return exitStatus;
   }
 
-  static void setExitStatus(int v) {
+  public static void setExitStatus(int v) {
     exitStatus = v;
   }
 }

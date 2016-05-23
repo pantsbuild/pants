@@ -5,10 +5,11 @@
     "3rdparty_jvm": "dist/markdown/html/examples/src/java/org/pantsbuild/example/3rdparty_jvm.html",
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
-    "branching_strategy": "dist/markdown/html/src/docs/branching_strategy.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "changelog": "dist/markdown/html/src/python/pants/CHANGELOG.html",
+    "notes-master": "dist/markdown/html/src/python/pants/notes/master.html",
+    "notes-1.0.x": "dist/markdown/html/src/python/pants/notes/1.0.x.html",
     "community": "dist/markdown/html/src/docs/community.html",
     "dev": "dist/markdown/html/src/docs/dev.html",
     "dev_tasks": "dist/markdown/html/src/docs/dev_tasks.html",
@@ -39,6 +40,7 @@
     "options_reference": "dist/reference/pants_reference_body.html",
     "release": "dist/markdown/html/src/docs/release.html",
     "release_jvm": "dist/markdown/html/src/docs/release_jvm.html",
+    "release_strategy": "dist/markdown/html/src/docs/release_strategy.html",
     "scala": "dist/markdown/html/examples/src/scala/org/pantsbuild/example/README.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
     "styleguide": "dist/markdown/html/src/docs/styleguide.html",
@@ -119,9 +121,12 @@
         { "page": "build_dictionary" },
         { "page": "options_reference" },
 
+        { "heading": "Release Notes"},
+        { "page": "notes-1.0.x" },
+        { "page": "notes-master" },
+
         { "heading": "Developer"},
         { "page": "dev" },
-        { "page": "changelog" },
         { "page": "export"}
       ]
     }
