@@ -7,7 +7,7 @@ python_library(
   dependencies = [
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
-    'src/python/pants/option/subsystem:global_options',
+    'src/python/pants/pantsd/subsystem:subprocess',
     'src/python/pants/util:dirutil'
   ]
 )

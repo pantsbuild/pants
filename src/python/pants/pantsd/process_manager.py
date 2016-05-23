@@ -16,7 +16,7 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.option.subsystem.global_options import GlobalOptions
+from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 
 
@@ -76,7 +76,7 @@ class ProcessMetadataManager(object):
 
     self._metadata_base_dir = (
       metadata_base_dir or
-      GlobalOptions.Factory.global_instance().create().get_global_option('pants_subprocessdir')
+      Subprocess.Factory.global_instance().create().get_subprocess_dir()
     )
 
   @staticmethod

@@ -14,7 +14,7 @@ from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
-from pants.option.subsystem.global_options import GlobalOptions
+from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
 
 
@@ -41,7 +41,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @classmethod
   def global_subsystems(cls):
     return super(NailgunTaskBase, cls).global_subsystems() + (DistributionLocator,
-                                                              GlobalOptions.Factory)
+                                                              Subprocess.Factory)
 
   def __init__(self, *args, **kwargs):
     """

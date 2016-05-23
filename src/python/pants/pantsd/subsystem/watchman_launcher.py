@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 
 from pants.binaries.binary_util import BinaryUtil
-from pants.option.subsystem.global_options import GlobalOptions
+from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.pantsd.watchman import Watchman
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import testable_memoized_property
@@ -22,7 +22,7 @@ class WatchmanLauncher(object):
 
     @classmethod
     def subsystem_dependencies(cls):
-      return (BinaryUtil.Factory, GlobalOptions.Factory)
+      return (BinaryUtil.Factory, Subprocess.Factory)
 
     @classmethod
     def register_options(cls, register):

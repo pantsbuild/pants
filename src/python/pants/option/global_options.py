@@ -76,10 +76,10 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-distdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'dist'),
              help='Write end-product artifacts to this dir.')
-    register('--pants-subprocessdir', advanced=True, type=str,
-             default=os.path.join(buildroot, '.pids'),
+    register('--pants-subprocessdir', advanced=True, default=os.path.join(buildroot, '.pids'),
              help='The directory to use for tracking subprocess metadata, if any. This should '
-                  'generally live outside of the dir used by `--pants-workdir`.')
+                  'live outside of the dir used by `--pants-workdir` to allow for tracking '
+                  'subprocesses that outlive the workdir data (e.g. `./pants server`).')
     register('--pants-config-files', advanced=True, type=list,
              default=[get_default_pants_config_file()], help='Paths to Pants config files.')
     # TODO: Deprecate --config-override in favor of --pants-config-files.
