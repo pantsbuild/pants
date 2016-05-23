@@ -11,6 +11,7 @@ import multiprocessing
 import traceback
 from abc import abstractmethod, abstractproperty
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
@@ -219,7 +220,7 @@ class ConcurrentEngine(Engine):
   def _is_async_node(self, node):
     return True
 
-  def _submit_until(self, pending_submission, in_flight, n):
+  def submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
     to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
     submitted = 0
@@ -345,6 +346,61 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
   def _is_async_node(self, node):
     """Override default behavior and handle specific nodes asynchronously."""
     return isinstance(node, (FilesystemNode,))
+
+  def _submit_maybe_cache(self, step):
+    def maybe_cache_with_step():
+      return step.step_id, self._maybe_cache_get(step)
+
+    self._pool.submit(maybe_cache_with_step)
+
+  def _submit_until(self, pending_submission, in_flight, n):
+    """Submit pending while there's capacity, and more than `n` items pending_submission."""
+    to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
+    submitted = 0
+    for _ in range(to_submit):
+      step, promise = pending_submission.pop(last=False)
+      if self._is_async_node(step.node):
+        if step.step_id in in_flight:
+          raise Exception('{} is already in_flight!'.format(step))
+
+        step = self._storage.key_for_request(step)
+        in_flight[step.step_id] = promise
+        self._submit_maybe_cache(step)
+        self._submit(step)
+
+      else:
+        keyed_request = self._storage.key_for_request(step)
+        # We always use a thread pool for cache race.
+        with ThreadPoolExecutor(max_workers=self._pool_size) as executor:
+          _futures = [
+            executor.submit(self._maybe_cache_get, keyed_request),
+            executor.submit(step, self.node_builder)
+          ]
+
+          for f in as_completed(_futures):
+            if f.result() is not None:
+              break
+          promise.success(f.result())
+
+    return submitted
+
+  def _await_one(self, in_flight):
+    """Await one completed step, and remove it from in_flight."""
+    if not in_flight:
+      raise Exception('Awaited an empty pool!')
+
+    # Drop silently None results (these are cache misses)
+    result = None
+    while not result:
+      step_id, result = self._pool.await_one_result()
+      print(step_id, result)
+    if isinstance(result, Exception):
+      raise result
+    result = self._storage.resolve_result(result)
+    if step_id not in in_flight:
+      raise Exception(
+        'Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
+    in_flight.pop(step_id).success(result)
 
 
 def _process_initializer(node_builder, storage):
