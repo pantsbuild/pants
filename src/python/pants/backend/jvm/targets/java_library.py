@@ -20,6 +20,10 @@ class JavaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
+  @classmethod
+  def subsystems(cls):
+    return super(JavaLibrary, cls).subsystems()
+
   def __init__(self, *args, **kwargs):
     """
     :param provides: The ``artifact``

@@ -148,14 +148,14 @@ class LegacyBuildGraph(BuildGraph):
   def inject_address_closure(self, address):
     if address in self._target_by_address:
       return
-    for _ in self._inject([address]):
+    for _ in self._inject([address], expect_return_values=False):
       pass
 
   def inject_addresses_closure(self, addresses):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject(addresses):
+    for _ in self._inject(addresses, expect_return_values=False):
       pass
 
   def inject_specs_closure(self, specs, fail_fast=None):
@@ -163,16 +163,36 @@ class LegacyBuildGraph(BuildGraph):
     for address in self._inject(specs):
       yield address
 
-  def _inject(self, subjects):
-    """Request LegacyTargets for each of the subjects, and yield resulting Addresses."""
+  def _inject(self, subjects, expect_return_values=True):
+    """
+    Request LegacyTargets for each of the subjects.
+    If `expect_return_values` is True, yield resulting Addresses.
+    Otherwise no resulting Addresses will be computed.
+    """
     logger.debug('Injecting to {}: {}'.format(self, subjects))
-    request = self._scheduler.execution_request([LegacyTarget], subjects)
+    request = self._scheduler.execution_request([LegacyTarget, Address], subjects)
+
+    legacy_target_roots = filter(lambda root: root.product is LegacyTarget, request.roots)
+    address_roots = filter(lambda root: root.product is Address, request.roots)
+
     result = self._engine.execute(request)
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
-    for address in self._index(request.roots):
-      yield address
+    self._index(legacy_target_roots)
+
+    if not expect_return_values:
+      return
+
+    existing_addresses = set()
+    for address_root in address_roots:
+      address_state = self._scheduler.root_entries(request)[address_root]
+      for address in address_state.value:
+        if address not in existing_addresses:
+          existing_addresses.add(address)
+          yield address
+
+    logger.debug('addresses: %s', existing_addresses)
 
 
 class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies'])):

@@ -20,8 +20,6 @@ class JavaThriftLibrary(JvmTarget):
   # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
   # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.
   _COMPILERS = frozenset(['thrift', 'scrooge'])
-  _LANGUAGES = frozenset(['java', 'scala', 'android'])
-  _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 
   def __init__(self,
                compiler=None,
@@ -57,8 +55,8 @@ class JavaThriftLibrary(JvmTarget):
     # The following fields are only added to the fingerprint via FingerprintStrategy when their
     # values impact the outcome of the task.  See JavaThriftLibraryFingerprintStrategy.
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
-    self._language = check_value_for_arg('language', language, self._LANGUAGES)
-    self._rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)
+    self._language = language
+    self._rpc_style = rpc_style
 
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict

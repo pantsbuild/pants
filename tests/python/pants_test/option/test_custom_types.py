@@ -17,7 +17,7 @@ class CustomTypesTest(unittest.TestCase):
 
   def _do_test(self, expected_val, s):
     if isinstance(expected_val, dict):
-      val = dict_option(s)
+      val = dict_option(s).val
     elif isinstance(expected_val, (list, tuple)):
       val = list_option(s).val
     else:

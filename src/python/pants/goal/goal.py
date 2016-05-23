@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.goal.error import GoalError
+from pants.option.optionable import Optionable
 
 
 class Goal(object):
@@ -91,6 +92,7 @@ class _Goal(object):
 
     Create goals only through the Goal.by_name() factory.
     """
+    Optionable.validate_scope_name_component(name)
     self.name = name
     self._description = ''
     self.serialize = False
@@ -132,6 +134,7 @@ class _Goal(object):
       raise GoalError('Can only specify one of first, replace, before or after')
 
     task_name = task_registrar.name
+    Optionable.validate_scope_name_component(task_name)
     options_scope = Goal.scope(self.name, task_name)
 
     # Currently we need to support registering the same task type multiple times in different
