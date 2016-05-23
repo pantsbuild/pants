@@ -437,7 +437,8 @@ class StepContext(object):
     TODO: Make inlining optional.
     TODO: Make node_states a member of StepContext so that it is private here.
     """
-    if False and node.is_inlineable:
+    if node.is_inlineable:
+      print('Inlining execution of {}'.format(node))
       return node.step(node_states, self)
     else:
       state = node_states.get(node, None)
