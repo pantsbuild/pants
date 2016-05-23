@@ -198,7 +198,6 @@ class JvmApp(Target):
                deployjar=None,
                archive=None,
                archive_prefix=None,
-               use_basename_prefix=None,
                **kwargs):
     """
     :param string binary: Target spec of the ``jvm_binary`` that contains the
@@ -217,8 +216,6 @@ class JvmApp(Target):
     :param archive: Create an archive of this type from the bundle.
     :param boolean archive_prefix: If archive is specified, prefix archive with target basename
       or a unique identifier as determined by use_basename_prefix.
-    :param boolean use_basename_prefix: Use target basename to prefix bundle folder or archive;
-      otherwise a unique identifier derived from target will be used.
     """
     payload = payload or Payload()
     payload.add_fields({
@@ -228,7 +225,6 @@ class JvmApp(Target):
       'deployjar': PrimitiveField(deployjar),
       'archive': PrimitiveField(archive),
       'archive_prefix': PrimitiveField(archive_prefix),
-      'use_basename_prefix': PrimitiveField(use_basename_prefix),
       })
     super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 

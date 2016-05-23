@@ -141,19 +141,24 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
       self.execute(self.task_context)
 
   def test_target_options(self):
-    self.app_target = self._create_target(use_basename_prefix=True)
+    self.app_target = self._create_target(archive='zip')
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
-    self._check_bundle_products('FooApp')
+    self._check_archive_products('foo.foo-app', 'zip')
 
   def test_cli_suppress_target_options(self):
-    self.set_options(use_basename_prefix=False)
-    self.app_target = self._create_target(use_basename_prefix=True)
+    self.set_options(archive='tar')
+    self.app_target = self._create_target(archive='zip')
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
-    self._check_bundle_products('foo.foo-app')
+    self._check_archive_products('foo.foo-app', 'tar')
+
+  # TODO (Yujie Chen) Currently it is directly checking archives.
+  # Should use archive product after resolving https://github.com/pantsbuild/pants/issues/3477
+  def _check_archive_products(self, archive_basename, archive_type):
+    self.assertTrue(os.path.isfile('{}.{}'.format(os.path.join(self.dist_root, archive_basename), archive_type)))
 
   def _check_bundle_products(self, bundle_basename):
     products = self.task_context.products.get('jvm_bundles')

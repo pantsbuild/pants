@@ -42,14 +42,12 @@ class JvmAppTest(BaseTest):
                                   JvmApp,
                                   basename='foo-payload-app',
                                   archive='zip',
-                                  archive_prefix=False,
-                                  use_basename_prefix=True)
+                                  archive_prefix=False)
 
     self.assertEquals('foo-payload-app', app_target.payload.basename)
     self.assertIsNone(app_target.payload.deployjar)
     self.assertEquals('zip', app_target.payload.archive)
     self.assertFalse(app_target.payload.archive_prefix)
-    self.assertTrue(app_target.payload.use_basename_prefix)
 
   def test_bad_basename(self):
     with self.assertRaisesRegexp(TargetDefinitionException,

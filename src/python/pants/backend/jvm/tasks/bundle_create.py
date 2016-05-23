@@ -41,14 +41,14 @@ class BundleCreate(JvmBinaryTask):
              help='This option is also defined in jvm_app target.'
                   'Please refer to the documentation for jvm_app.')
     register('--archive-prefix', advanced=True, type=bool,
-             fingerprint=True,
+             fingerprint=True, removal_hint='redundant option', removal_version='1.1.0',
              help='This option is also defined in jvm_app target.'
                   'Please refer to the documentation for jvm_app.')
     # `target.id` ensures global uniqueness, this flag is provided primarily for
     # backward compatibility.
     register('--use-basename-prefix', advanced=True, type=bool,
-             help='This option is also defined in jvm_app target.'
-                  'Please refer to the documentation for jvm_app.')
+             help='Use target basename to prefix bundle folder or archive; otherwise a unique '
+                  'identifier derived from target will be used.')
 
   @classmethod
   def product_types(cls):
@@ -86,9 +86,7 @@ class BundleCreate(JvmBinaryTask):
     return option_value if v is None else v
 
   def execute(self):
-    jvmapp = self.context.target_roots[0]
-
-    use_basename_prefix = self._resolved_option(jvmapp, 'use_basename_prefix')
+    use_basename_prefix = self.get_options().use_basename_prefix
     if use_basename_prefix:
       # NB(peiyu) This special casing is confusing especially given we already fail
       # when duplicate basenames are detected. It's added because of the existing
