@@ -402,7 +402,9 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   def __call__(self, node_builder):
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, self.project_tree, self.dependencies)
+    print('>>> running step {} for {}'.format(self.step_id, self.node))
     state = self.node.step(step_context)
+    print('>>> got result for step {}: {}'.format(self.step_id, state))
     return StepResult(state)
 
   def __eq__(self, other):

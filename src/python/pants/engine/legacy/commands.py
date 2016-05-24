@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.bin.goal_runner import EngineInitializer
+from pants.bin.engine_initializer import EngineInitializer
 from pants.engine.nodes import FilesystemNode
 
 
@@ -21,6 +21,7 @@ def filemap():
   with EngineInitializer.open_legacy_graph() as (graph, addresses, _):
     for address in addresses:
       target = graph.get_target(address)
+      print('>>> for {}, got {}'.format(address, target))
       for source in target.sources_relative_to_buildroot():
         print('{} {}'.format(source, target.address.spec))
 
