@@ -130,8 +130,8 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     self._project_tree = self.mk_project_tree(self.root_dir, ['/fruit'])
     files_list = self._walk_tree()
 
-    # root level `/fruit` is excluded,
-    # `/grocery/fruit` is included.
+    # root level `/fruit` and its subdirs are excluded.
+    # non root level `/grocery/fruit` is included.
     self.assertEquals(
       self._all_files - {'fruit/apple',
                          'fruit/banana',
