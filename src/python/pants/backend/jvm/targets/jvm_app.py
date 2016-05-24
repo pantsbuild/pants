@@ -197,7 +197,6 @@ class JvmApp(Target):
                basename=None,
                deployjar=None,
                archive=None,
-               archive_prefix=None,
                **kwargs):
     """
     :param string binary: Target spec of the ``jvm_binary`` that contains the
@@ -214,8 +213,6 @@ class JvmApp(Target):
       bundle's libs directory, the root will only contain a synthetic jar with its manifest's
       Class-Path set to those jars."
     :param archive: Create an archive of this type from the bundle.
-    :param boolean archive_prefix: If archive is specified, prefix archive with target basename
-      or a unique identifier as determined by use_basename_prefix.
     """
     payload = payload or Payload()
     payload.add_fields({
@@ -224,7 +221,6 @@ class JvmApp(Target):
       'bundles': BundleField(bundles or []),
       'deployjar': PrimitiveField(deployjar),
       'archive': PrimitiveField(archive),
-      'archive_prefix': PrimitiveField(archive_prefix),
       })
     super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 
