@@ -307,6 +307,7 @@ def cache_lock(lock):
   finally:
     lock.release()
 
+
 class Cache(Closable):
   """Cache StepResult for a given StepRequest.
 

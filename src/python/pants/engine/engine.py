@@ -347,7 +347,6 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
     """Override default behavior and handle specific nodes asynchronously."""
     return isinstance(node, (FilesystemNode,))
 
-
   def _maybe_cache_get(self, step_request):
     return self._cache.get(step_request) if self._should_cache(step_request) else None
 
