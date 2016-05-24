@@ -7,6 +7,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -26,8 +27,8 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,6 +48,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
+import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
 import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
 
 /**
@@ -461,10 +463,34 @@ public class ConsoleRunnerImpl {
 
   private int runExperimental(List<Spec> parsedTests, JUnitCore core)
       throws InitializationError {
-    Preconditions.checkArgument(!parsedTests.isEmpty());
     Preconditions.checkNotNull(core);
 
-    throw new InitializationError("Experimental Runner: Not Implemented");
+    int failures = 0;
+    SpecSet filter = new SpecSet(parsedTests, defaultConcurrency);
+
+    // TODO(zundel): Test sharding currently isn't compatible with the parallel computer runner
+    // since the Computer only accepts Class objects.
+    if (numTestShards == 0) {
+      // Run all of the parallel tests using the ConcurrentComputer
+      // NB(zundel): This runs these test of each concurrency setting together and waits for them
+      // to finish.  This introduces a bottleneck after each class of test.
+      failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_BOTH);
+      failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_CLASSES);
+      failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_METHODS);
+    }
+
+    // Everything else has to run serially or with the legacy runner
+    // TODO(zundel): Attempt to refactor so we can dump runLegacy all together.
+    List<Spec> legacySpecs = ImmutableList.copyOf(filter.specs());
+    failures += runLegacy(legacySpecs, core);
+
+    return failures;
+  }
+
+  private int runConcurrentTests(JUnitCore core, SpecSet specSet, Concurrency concurrency) {
+    Computer junitComputer = new ConcurrentComputer(concurrency, parallelThreads);
+    Class<?>[] classes = specSet.extract(concurrency).classes();
+    return core.run(junitComputer, classes).getFailureCount();
   }
 
   private int runLegacy(List<Spec> parsedTests, JUnitCore core) throws InitializationError {
@@ -491,18 +517,7 @@ public class ConsoleRunnerImpl {
 
   private List<Request> legacyParseRequests(PrintStream out, PrintStream err,
       List<Spec> specs) {
-    /**
-     * Datatype representing an individual test method.
-     */
-    class TestMethod {
-      private final Class<?> clazz;
-      private final String name;
 
-      TestMethod(Class<?> clazz, String name) {
-        this.clazz = clazz;
-        this.name = name;
-      }
-    }
     Set<TestMethod> testMethods = Sets.newLinkedHashSet();
     Set<Class<?>> classes = Sets.newLinkedHashSet();
     for (Spec spec: specs) {
@@ -514,17 +529,13 @@ public class ConsoleRunnerImpl {
         }
       }
     }
-    List<Request> requests = Lists.newArrayList();
 
+    List<Request> requests = Lists.newArrayList();
     if (!classes.isEmpty()) {
       if (this.perTestTimer || this.parallelThreads > 1) {
         for (Class<?> clazz : classes) {
-          if (this.shouldRunParallelMethods(clazz)) {
-            // Don't add these as class requests, make individual TestMethod requests.
-            for (Method method :
-                Iterables.filter(Arrays.asList(clazz.getMethods()),IS_ANNOTATED_TEST_METHOD)) {
-              testMethods.add(new TestMethod(clazz, method.getName()));
-            }
+          if (legacyShouldRunParallelMethods(clazz)) {
+            testMethods.addAll(TestMethod.fromClass(clazz));
           } else {
             requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
           }
@@ -552,8 +563,16 @@ public class ConsoleRunnerImpl {
     return requests;
   }
 
-  private boolean shouldRunParallelMethods(Class<?> clazz) {
-    // TODO(zundel): Add support for an annotation like TestParallelMethods.
+  private boolean legacyShouldRunParallelMethods(Class<?> clazz) {
+    if (!Util.isRunnable(clazz)) {
+      return false;
+    }
+    // The legacy runner makes Requests out of each individual method in a class. This isn't
+    // designed to work for JUnit3 and isn't appropriate for custom runners.
+    if (Util.isJunit3Test(clazz) || Util.isUsingCustomRunner(clazz)) {
+      return false;
+    }
+
     return this.defaultConcurrency.shouldRunMethodsParallel();
   }
 
@@ -655,7 +674,6 @@ public class ConsoleRunnerImpl {
           usage = "Show a description of each test and timer for each test class.")
       private boolean perTestTimer;
 
-      // TODO(zundel): Also add a @TestParallelMethods annotation
       // TODO(zundel): This argument is deprecated, remove in a future release
       @Option(name = "-default-parallel",
           usage = "DEPRECATED: use -default-concurrency instead.\n"
@@ -801,13 +819,6 @@ public class ConsoleRunnerImpl {
     }
     return Concurrency.PARALLEL_CLASSES;
   }
-
-  private static final Predicate<Method> IS_ANNOTATED_TEST_METHOD = new Predicate<Method>() {
-    @Override public boolean apply(Method method) {
-      return Modifier.isPublic(method.getModifiers())
-          && method.isAnnotationPresent(org.junit.Test.class);
-    }
-  };
 
   private static void exit(int code) {
     exitStatus = code;
