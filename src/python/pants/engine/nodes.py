@@ -430,7 +430,9 @@ class StepContext(object):
   def get(self, node):
     """Given a Node and computed node_states, gets the current state for the Node.
 
-    TODO: Make inlining optional.
+    TODO: If all consumers of the graph ignored the graph structure, we could make inlining
+    optional, which could help with debuggability. As it stands, lots of consumers are walking
+    the graph and expecting particular structure to exist in it.
     """
     if node.is_inlineable:
       return node.step(self)
