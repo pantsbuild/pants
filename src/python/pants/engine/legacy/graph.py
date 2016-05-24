@@ -14,7 +14,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.fs import Files, FilesContent, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.nodes import Return, SelectNode, State, Throw
+from pants.engine.nodes import Return, State, TaskNode, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.util.dirutil import fast_relpath
@@ -62,7 +62,7 @@ class LegacyBuildGraph(BuildGraph):
         State.raise_unrecognized(state)
       if node.product is not LegacyTarget:
         continue
-      if type(node) is not SelectNode:
+      if type(node) is not TaskNode:
         continue
 
       # We have a successfully parsed LegacyTarget, which includes its declared dependencies.
