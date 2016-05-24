@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 from multiprocessing import Process, Queue
+from Queue import Queue as ThreadQueue
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
@@ -94,6 +95,15 @@ class StatefulThreadPoolBase(StatefulPoolBase):
   @property
   def _pool_constructor(self):
     return ThreadPoolExecutor
+
+  def __init__(self, pool_size, initializer, function):
+    self._pool_size = pool_size
+
+    self._send = ThreadQueue()
+    self._recv = ThreadQueue()
+
+    self._executor = self._pool_constructor(max_workers=self._pool_size)
+    self._fn_args = (self._recv, self._send, initializer, function)
 
 
 class StatefulProcessPoolBase(StatefulPoolBase):

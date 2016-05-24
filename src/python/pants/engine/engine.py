@@ -145,7 +145,7 @@ def _try_pickle(obj):
     # Unfortunately, pickle can raise things other than PickleError instances.  For example it
     # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
     # `Exception` type here.
-    raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
+    raise SerializationError('~~Failed to pickle {}: {}'.format(obj, e))
 
 
 def _execute_step(cache_save, debug, process_state, step):
@@ -327,6 +327,11 @@ class LocalMultithreadingEngine(ConcurrentEngine):
       submit_until(self._pool_size)
       await_one()
 
+def _threadable_maybe_cache_get(step_request, cache):
+  if step_request.node.is_cacheable:
+    return step_request.step_id, cache.get(step_request)
+  else:
+    return step_request.step_id, None
 
 class ThreadHybridEngine(LocalMultithreadingEngine):
   """An engine that runs locally but allows nodes to be optionally run concurrently.
@@ -351,7 +356,9 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
     return self._cache.get(step_request) if self._should_cache(step_request) else None
 
   def _submit_maybe_cache(self, step):
-    self._pool.submit(functools.partial(self._maybe_cache_get, step))
+    self._pool.submit(
+      functools.partial(_threadable_maybe_cache_get, step, self._cache)
+    )
 
   def _submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
@@ -359,34 +366,35 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
     submitted = 0
     for _ in range(to_submit):
       step, promise = pending_submission.pop(last=False)
+
+      ## Working
+      # if self._is_async_node(step.node):
+      #   if step.step_id in in_flight:
+      #     raise Exception('{} is already in_flight!'.format(step))
+      #
+      #   step = self._storage.key_for_request(step)
+      #   result = self._maybe_cache_get(step)
+      #   if result is not None:
+      #     # Skip in_flight on cache hit.
+      #     promise.success(result)
+      #   else:
+      #     in_flight[step.step_id] = promise
+      #     self._submit(step)
+      #     submitted += 1
+
       if self._is_async_node(step.node):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
         step = self._storage.key_for_request(step)
-        result = self._maybe_cache_get(step)
-        if result is not None:
-          # Skip in_flight on cache hit.
-          promise.success(result)
-        else:
-          in_flight[step.step_id] = promise
-          self._submit(step)
-          submitted += 1
-
-      # if self._is_async_node(step.node):
-      #   import pdb; pdb.set_trace()
-      #   if step.step_id in in_flight:
-      #     raise Exception('{} is already in_flight!'.format(step))
-      #
-      #   step = self._storage.key_for_request(step)
-      #   in_flight[step.step_id] = promise
-      #   self._submit_maybe_cache(step)             # <--- this is our problem child.
-      #   self._submit(step)
-      #   submitted += 1
+        in_flight[step.step_id] = promise
+        # self._submit_maybe_cache(step)         # <-- Problem child
+        self._submit(step)
+        submitted += 1
 
       else:
         keyed_request = self._storage.key_for_request(step)
-        # We always use a thread pool for cache race.
+        # We always use a thread pool for the cache race.
         with ThreadPoolExecutor(max_workers=self._pool_size) as executor:
           _futures = [
             executor.submit(self._maybe_cache_get, keyed_request),
@@ -409,7 +417,6 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
     result = None
     while not result:
       step_id, result = self._pool.await_one_result()
-      print(step_id, result)
     if isinstance(result, Exception):
       raise result
     result = self._storage.resolve_result(result)

@@ -137,6 +137,8 @@ class Storage(Closable):
   into keys, and vice versa are also provided.
   """
 
+  _lock = threading.Lock()
+
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
@@ -196,7 +198,7 @@ class Storage(Closable):
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
       # `Exception` type here.
-      raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
+      raise SerializationError('-->Failed to pickle {}: {}'.format(obj, e), e)
 
     return key
 
@@ -299,15 +301,6 @@ class Storage(Closable):
     return obj
 
 
-@contextmanager
-def cache_lock(lock):
-  lock.acquire()
-  try:
-    yield
-  finally:
-    lock.release()
-
-
 class Cache(Closable):
   """Cache StepResult for a given StepRequest.
 
@@ -320,7 +313,7 @@ class Cache(Closable):
   def create(cls, storage=None, cache_stats=None):
     """Create a Cache from a given storage instance."""
 
-    with cache_lock(cls._lock):
+    with cls._lock:
       storage = storage or Storage.create()
       cache_stats = cache_stats or CacheStats()
       return Cache(storage, cache_stats)
@@ -336,7 +329,7 @@ class Cache(Closable):
 
   def get(self, step_request):
     """Get the cached StepResult for a given StepRequest."""
-    with cache_lock(self._lock):
+    with self._lock:
       result_key = self._storage.get_mapping(self._storage.put(self._keyable_fields(step_request)))
       if result_key is None:
         self._cache_stats.add_miss()
@@ -347,7 +340,7 @@ class Cache(Closable):
 
   def put(self, step_request, step_result):
     """Save the StepResult for a given StepResult."""
-    with cache_lock(self._lock):
+    with self._lock:
       request_key = self._storage.put(self._keyable_fields(step_request))
       result_key = self._storage.put(step_result)
       return self._storage.add_mapping(from_key=request_key, to_key=result_key)
@@ -357,7 +350,7 @@ class Cache(Closable):
 
   def items(self):
     """Iterate over all cached request, result for testing purpose."""
-    with cache_lock(self._lock):
+    with self._lock:
       for digest, _ in self._storage._key_mappings.items():
         # Construct request key from digest directly because we do not have the
         # request blob.  Type check is intentionally skipped because we do not
@@ -379,7 +372,7 @@ class Cache(Closable):
     return (step_request.node, sorted_deps, step_request.project_tree)
 
   def close(self):
-    with cache_lock(self._lock):
+    with self._lock:
       self._storage.close()
 
 
@@ -483,6 +476,8 @@ class Lmdb(KeyValueStore):
   # such as OSX, to immediately preallocate map_size = bytes of underlying storage.
   # See https://lmdb.readthedocs.org/en/release/#writemap-mode
   USE_SPARSE_FILES = sys.platform != 'darwin'
+
+  _lock = threading.Lock()
 
   @classmethod
   def create(self, path=None, child_databases=None):
