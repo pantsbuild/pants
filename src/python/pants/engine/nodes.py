@@ -67,11 +67,6 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   but all returned dependencies are recorded for the lifetime of a ProductGraph.
   """
 
-  def __new__(cls, dependencies):
-    if not dependencies:
-      raise ValueError('The `Waiting` Node type requires a non-empty list of dependencies.')
-    return super(Waiting, cls).__new__(cls, dependencies)
-
 
 class Node(AbstractClass):
   @classmethod
