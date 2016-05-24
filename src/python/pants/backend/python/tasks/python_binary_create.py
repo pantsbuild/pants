@@ -11,10 +11,15 @@ from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 
 
 class PythonBinaryCreate(PythonTask):
+  @classmethod
+  def product_types(cls):
+    return ['python_pex']
+
   @staticmethod
   def is_binary(target):
     return isinstance(target, PythonBinary)
@@ -36,7 +41,11 @@ class PythonBinaryCreate(PythonTask):
       names[name] = binary
 
     for binary in binaries:
-      self.create_binary(binary)
+      pex_path = self.create_binary(binary)
+
+      python_pex_product = self.context.products.get('python_pex')
+      python_pex_product.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
+      self.context.log.info('created {}'.format(os.path.relpath(pex_path, get_buildroot())))
 
   def create_binary(self, binary):
     interpreter = self.select_interpreter_for_targets(binary.closure())
@@ -52,3 +61,4 @@ class PythonBinaryCreate(PythonTask):
                                platforms=binary.platforms) as chroot:
       pex_path = os.path.join(self._distdir, '{}.pex'.format(binary.name))
       chroot.package_pex(pex_path)
+      return pex_path

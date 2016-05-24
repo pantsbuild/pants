@@ -53,7 +53,7 @@ class BundleCreate(JvmBinaryTask):
 
   @classmethod
   def product_types(cls):
-    return ['jvm_bundles']
+    return ['jvm_bundles', 'bundle_archive']
 
   class App(object):
     """A uniform interface to an app."""
@@ -120,6 +120,9 @@ class BundleCreate(JvmBinaryTask):
           app.basename,
           prefix=app.basename if self.get_options().archive_prefix else None
         )
+        bundle_archive_product = self.context.products.get('bundle_archive')
+        bundle_archive_product.add(app.target, os.path.dirname(archivepath)).append(os.path.basename(archivepath))
+
         self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
   class BasenameConflictError(TaskError):
