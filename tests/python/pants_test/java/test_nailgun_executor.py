@@ -5,13 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
-
 import mock
 import psutil
 
 from pants.java.nailgun_executor import NailgunExecutor
-from pants_test.base_test import METADATA_BASE_DIR
+from pants_test.base_test import BaseTest
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -23,13 +21,14 @@ def fake_process(**kwargs):
   return proc
 
 
-class NailgunExecutorTest(unittest.TestCase):
+class NailgunExecutorTest(BaseTest):
   def setUp(self):
+    super(NailgunExecutorTest, self).setUp()
     self.executor = NailgunExecutor(identity='test',
                                     workdir='/__non_existent_dir',
                                     nailgun_classpath=[],
                                     distribution=mock.Mock(),
-                                    metadata_base_dir=METADATA_BASE_DIR)
+                                    metadata_base_dir=self.subprocess_dir)
 
   def test_is_alive_override(self):
     with mock.patch.object(NailgunExecutor, '_as_process', **PATCH_OPTS) as mock_as_process:

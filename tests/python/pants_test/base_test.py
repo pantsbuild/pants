@@ -12,7 +12,6 @@ from collections import defaultdict
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -31,9 +30,6 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context
 from pants_test.option.util.fakes import create_options_for_optionables
-
-
-METADATA_BASE_DIR = os.path.join(get_buildroot(), '.pids')
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
@@ -187,6 +183,7 @@ class BaseTest(unittest.TestCase):
     self.real_build_root = BuildRoot().path
 
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+    self.subprocess_dir = os.path.join(self.build_root, '.pids')
     self.addCleanup(safe_rmtree, self.build_root)
 
     self.pants_workdir = os.path.join(self.build_root, '.pants.d')
@@ -198,6 +195,7 @@ class BaseTest(unittest.TestCase):
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist'),
       'pants_configdir': os.path.join(self.build_root, 'config'),
+      'pants_subprocessdir': self.subprocess_dir,
       'cache_key_gen_version': '0-test',
     }
     self.options['cache'] = {
