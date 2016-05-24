@@ -220,7 +220,7 @@ class ConcurrentEngine(Engine):
   def _is_async_node(self, node):
     return True
 
-  def submit_until(self, pending_submission, in_flight, n):
+  def _submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
     to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
     submitted = 0
@@ -347,11 +347,12 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
     """Override default behavior and handle specific nodes asynchronously."""
     return isinstance(node, (FilesystemNode,))
 
-  def _submit_maybe_cache(self, step):
-    def maybe_cache_with_step():
-      return step.step_id, self._maybe_cache_get(step)
 
-    self._pool.submit(maybe_cache_with_step)
+  def _maybe_cache_get(self, step_request):
+    return self._cache.get(step_request) if self._should_cache(step_request) else None
+
+  def _submit_maybe_cache(self, step):
+    self._pool.submit(functools.partial(self._maybe_cache_get, step))
 
   def _submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
@@ -364,9 +365,25 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
           raise Exception('{} is already in_flight!'.format(step))
 
         step = self._storage.key_for_request(step)
-        in_flight[step.step_id] = promise
-        self._submit_maybe_cache(step)
-        self._submit(step)
+        result = self._maybe_cache_get(step)
+        if result is not None:
+          # Skip in_flight on cache hit.
+          promise.success(result)
+        else:
+          in_flight[step.step_id] = promise
+          self._submit(step)
+          submitted += 1
+
+      # if self._is_async_node(step.node):
+      #   import pdb; pdb.set_trace()
+      #   if step.step_id in in_flight:
+      #     raise Exception('{} is already in_flight!'.format(step))
+      #
+      #   step = self._storage.key_for_request(step)
+      #   in_flight[step.step_id] = promise
+      #   self._submit_maybe_cache(step)             # <--- this is our problem child.
+      #   self._submit(step)
+      #   submitted += 1
 
       else:
         keyed_request = self._storage.key_for_request(step)
