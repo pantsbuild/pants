@@ -126,6 +126,13 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
 
     self.assertEquals(self._all_files - {'apple'}, set(files_list))
 
+  def test_ignore_pattern_leading_and_trailing_slashes(self):
+    self._project_tree = self.mk_project_tree(self.root_dir, ['/apple/'])
+    files_list = self._walk_tree()
+    # Pattern '/apple/' should only exclude directory `/apple`.
+    # File `/apple` is not excluded.
+    self.assertEquals(self._all_files, set(files_list))
+
   def test_ignore_pattern_leading_slash_should_exclude_subdirs(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ['/fruit'])
     files_list = self._walk_tree()
