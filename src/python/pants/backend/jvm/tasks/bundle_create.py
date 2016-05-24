@@ -117,7 +117,7 @@ class BundleCreate(JvmBinaryTask):
       archiver_type = self._resolved_option(app.target, 'archive')
       archiver = archive.archiver(archiver_type) if archiver_type else None
 
-      basedir = self.bundle(app, self._resolved_option(app.target, 'deployjar'))
+      basedir = self.bundle(app)
       # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
       # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
       # expect the product to be cached, a user running an 'rm' on the dist/ directory could
@@ -136,7 +136,7 @@ class BundleCreate(JvmBinaryTask):
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""
 
-  def bundle(self, app, deployjar):
+  def bundle(self, app):
     """Create a self-contained application bundle.
 
     The bundle will contain the target classes, dependencies and resources.
@@ -154,7 +154,7 @@ class BundleCreate(JvmBinaryTask):
     # Create symlinks for both internal and external dependencies under `lib_dir`. This is
     # only needed when not creating a deployjar
     lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
-    if not deployjar:
+    if not self._resolved_option(app.target, 'deployjar'):
       os.mkdir(lib_dir)
       runtime_classpath = self.context.products.get_data('runtime_classpath')
       classpath.update(ClasspathUtil.create_canonical_classpath(
