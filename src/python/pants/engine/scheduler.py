@@ -402,9 +402,7 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   def __call__(self, node_builder):
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, self.project_tree, self.dependencies)
-    print('>>> running step {} for {}'.format(self.step_id, self.node))
     state = self.node.step(step_context)
-    print('>>> got result for step {}: {}'.format(self.step_id, state))
     return StepResult(state)
 
   def __eq__(self, other):
@@ -601,7 +599,6 @@ class LocalScheduler(object):
         if not ready and not outstanding:
           # Finished.
           break
-        print('>>> requesting execution of:\n>>   {}'.format(ready.keys()))
         yield ready.values()
         scheduling_iterations += 1
         outstanding.update(ready)
@@ -619,13 +616,9 @@ class LocalScheduler(object):
             candidates.update(d for d in self._product_graph.dependents_of(step.node))
           else:
             # Waiting on dependencies.
-            all_deps = list(self._product_graph.dependencies_of(step.node))
-            #if not all_deps:
-            #  raise AssertionError('A Node without dependencies should never be in a Waiting state:\n  {}'.format(step.node))
             # TODO: add a helper method to get completed without lookups in the Nodes dict.
-            incomplete_deps = [d for d in all_deps
+            incomplete_deps = [d for d in self._product_graph.dependencies_of(step.node)
                                if not self._product_graph.is_complete(d)]
-            print('>>> node {}\n>>   {}\n>>   {}'.format(step.node, incomplete_deps, len(all_deps)))
             if incomplete_deps:
               # Mark incomplete deps as candidates for Steps.
               candidates.update(incomplete_deps)

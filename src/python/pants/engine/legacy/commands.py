@@ -21,7 +21,6 @@ def filemap():
   with EngineInitializer.open_legacy_graph() as (graph, addresses, _):
     for address in addresses:
       target = graph.get_target(address)
-      print('>>> for {}, got {}'.format(address, target))
       for source in target.sources_relative_to_buildroot():
         print('{} {}'.format(source, target.address.spec))
 

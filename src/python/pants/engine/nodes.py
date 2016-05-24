@@ -340,7 +340,6 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
       dep_node = step_context.select_node(selector, self.subject, self.variants)
       dep_state = step_context.get(dep_node)
       if type(dep_state) == Waiting:
-        print('>>> for {}, dep {} is waiting.'.format(self.func, dep_node))
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) == Return:
         dep_values.append(dep_state.value)
@@ -434,14 +433,11 @@ class StepContext(object):
     TODO: Make inlining optional.
     """
     if node.is_inlineable:
-      print('Inlining execution of {}'.format(node))
       return node.step(self)
     else:
       state = self._node_states.get(node, None)
       if state is not None:
-        print('Cannot inline; but dep has already completed: {}'.format(node))
         return state
-      print('Cannot inline; waiting for execution of {}'.format(node))
       return Waiting([node])
 
   def gen_nodes(self, subject, product, variants):
