@@ -107,7 +107,7 @@ class GlobalOptionsRegistrar(Optionable):
     # determine whether or not to use the Pailgun client to invoke a given pants run
     # without resorting to heavier options parsing.
     register('--enable-pantsd', advanced=True, type=bool, default=False,
-             help='Enables use of the pants daemon. (Beta)')
+             help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
     # This facilitates use of the v2 engine for BuildGraph construction, sans daemon.
     register('--enable-engine', advanced=True, type=bool, default=False,
