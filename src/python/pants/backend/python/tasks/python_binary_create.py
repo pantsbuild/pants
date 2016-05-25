@@ -18,7 +18,7 @@ from pants.base.exceptions import TaskError
 class PythonBinaryCreate(PythonTask):
   @classmethod
   def product_types(cls):
-    return ['python_pex']
+    return ['deployable_archive']
 
   @staticmethod
   def is_binary(target):
@@ -43,7 +43,7 @@ class PythonBinaryCreate(PythonTask):
     for binary in binaries:
       pex_path = self.create_binary(binary)
 
-      python_pex_product = self.context.products.get('python_pex')
+      python_pex_product = self.context.products.get('deployable_archive')
       python_pex_product.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
       self.context.log.info('created {}'.format(os.path.relpath(pex_path, get_buildroot())))
 
