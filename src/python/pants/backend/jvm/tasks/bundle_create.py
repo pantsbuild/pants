@@ -81,8 +81,8 @@ class BundleCreate(JvmBinaryTask):
     return True
 
   def _resolved_option(self, target, key):
-    """
-    Get value for option "key".
+    """Get value for option "key".
+
     Resolution precedence is CLI option > target option > pants.ini option.
     """
     option_value = self.get_options().get(key)

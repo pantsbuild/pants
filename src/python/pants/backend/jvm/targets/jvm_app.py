@@ -19,6 +19,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
 from pants.base.validation import assert_list
 from pants.build_graph.target import Target
+from pants.fs import archive as Archive
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
@@ -188,6 +189,8 @@ class JvmApp(Target):
 
   :API: public
   """
+  class InvalidArchiveType(Exception):
+    """Raised when archive type defined in Target is invalid"""
 
   def __init__(self,
                name=None,
@@ -212,8 +215,12 @@ class JvmApp(Target):
       a single deployjar in the bundle's root dir. If unset, all jars will go into the
       bundle's libs directory, the root will only contain a synthetic jar with its manifest's
       Class-Path set to those jars."
-    :param archive: Create an archive of this type from the bundle.
+    :param string archive: Create an archive of this type from the bundle.
     """
+    if archive and archive not in Archive.TYPE_NAMES:
+      raise self.InvalidArchiveType(
+        'Given archive type "{}" is invalid, choose from {}.'.format(archive, list(Archive.TYPE_NAMES)))
+
     payload = payload or Payload()
     payload.add_fields({
       'basename': PrimitiveField(basename or name),
