@@ -10,7 +10,7 @@ import unittest
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
+class DependenciesIntegrationTest(PantsRunIntegrationTest):
   def assert_deps(self, success, spec, *expected_deps):
     args = ['-q', 'run', 'src/python/pants/engine/legacy:dependencies', '--'] + [spec]
     pants_run = self.run_pants(args)

@@ -10,7 +10,7 @@ import unittest
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
+class DependenciesIntegrationTest(PantsRunIntegrationTest):
   def assert_list_new_equals_old(self, success, spec):
     self.assertEqual(
       self.run_regular_list(spec, success),
