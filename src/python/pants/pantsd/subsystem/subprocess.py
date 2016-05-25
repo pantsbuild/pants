@@ -12,8 +12,11 @@ class Subprocess(object):
   """A subsystem for managing subprocess state."""
 
   class Factory(Subsystem):
-    # N.B. This scope is completely unused as of now, as this subsystem's current
-    # primary function is to surface the `--pants-subprocessdir` global option.
+    # N.B. This scope is completely unused as of now, as this subsystem's current primary function
+    # is to surface the `--pants-subprocessdir` global/bootstrap option at runtime. This option
+    # needs to be set on the bootstrap scope vs a Subsystem scope such that we have early access
+    # to the option (e.g. via `OptionsBootstrapper` vs `OptionsInitializer`) in order to bootstrap
+    # process-metadata dependent runs such as the pantsd thin client runner (`RemotePantsRunner`).
     options_scope = 'subprocess'
 
     def create(self):
