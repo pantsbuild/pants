@@ -234,3 +234,34 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     # These should be omitted because they have the same value as their super-scope.
     self.assertNotIn('jvm-platform-validate.colors = False', lines)
     self.assertNotIn('resolve.ivy.colors = False', lines)
+
+  def test_pants_ignore_option(self):
+    with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
+      config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
+      with open(config_path, 'w+') as f:
+        f.write(dedent("""
+          [GLOBAL]
+          pants_ignore: +['some/random/dir']
+        """))
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+                                  '--no-colors',
+                                  'options'])
+      self.assert_success(pants_run)
+      self.assertIn("pants_ignore = ['.*', '/dist/', 'some/random/dir'] (from CONFIG)",
+                    pants_run.stdout_data)
+
+  def test_pants_ignore_option_non_default_dist_dir(self):
+    with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
+      config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
+      with open(config_path, 'w+') as f:
+        f.write(dedent("""
+          [GLOBAL]
+          pants_ignore: +['some/random/dir']
+          pants_distdir: some/other/dist/dir
+        """))
+      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+                                  '--no-colors',
+                                  'options'])
+      self.assert_success(pants_run)
+      self.assertIn("pants_ignore = ['.*', '/some/other/dist/dir/', 'some/random/dir'] (from CONFIG)",
+                    pants_run.stdout_data)
