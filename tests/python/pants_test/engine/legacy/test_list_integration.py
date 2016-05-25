@@ -16,7 +16,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
     )
 
   def run_engine_list(self, spec, success):
-    args = ['-q', '--enable-engine', 'list'] + spec
+    args = ['-q', '--enable-v2-engine', 'list'] + spec
     return self.get_target_set(args, success)
 
   def run_regular_list(self, spec, success):
@@ -43,4 +43,4 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
     )
 
   def test_list_all(self):
-    self.assert_success(self.run_pants(['--enable-engine', 'list', '::']))
+    self.assert_success(self.run_pants(['--enable-v2-engine', 'list', '::']))

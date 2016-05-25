@@ -79,7 +79,7 @@ class GoalRunnerFactory(object):
       build_ignore_patterns,
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
-    self._build_graph = self._select_buildgraph(self._global_options.enable_engine,
+    self._build_graph = self._select_buildgraph(self._global_options.enable_v2_engine,
                                                 self._global_options.pants_ignore,
                                                 build_graph)
 
