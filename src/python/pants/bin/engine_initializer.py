@@ -137,5 +137,5 @@ class EngineInitializer(object):
       addresses = tuple(graph.inject_specs_closure(spec_roots))
       yield graph, addresses, scheduler
     finally:
-      logger.debug('engine cache stats: {}'.format(engine._cache.get_stats()))
+      logger.debug('engine cache stats: {}'.format(engine.cache_stats()))
       engine.close()
