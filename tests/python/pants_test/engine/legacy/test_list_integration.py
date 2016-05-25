@@ -41,3 +41,6 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
       True,
       ['3rdparty::', 'examples/src/::', 'testprojects/tests/::']
     )
+
+  def test_list_all(self):
+    self.assert_success(self.run_pants(['--enable-engine', 'list', '::']))

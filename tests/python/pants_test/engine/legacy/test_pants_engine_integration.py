@@ -16,4 +16,4 @@ class PantsEngineIntegrationTest(PantsRunIntegrationTest):
     self.assertRegexpMatches(pants_run.stderr_data, 'ran \d+ scheduling iterations in')
 
   def test_list_all(self):
-    self.assert_success(self.run_pants(['-ldebug', '--enable-engine', 'list', '::']))
+    self.assert_success(self.run_pants(['--enable-engine', 'list', '::']))

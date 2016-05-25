@@ -13,7 +13,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class FilemapIntegrationTest(PantsRunIntegrationTest):
   def do_filemap(self, success, *args):
-    args = ['run', 'src/python/pants/engine/legacy:filemap', '--'] + list(args)
+    args = ['--enable-engine', 'filemap'] + list(args)
     pants_run = self.run_pants(args)
     if success:
       self.assert_success(pants_run)
