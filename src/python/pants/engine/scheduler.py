@@ -388,7 +388,7 @@ class NodeBuilder(Closable):
         yield TaskNode(subject, product, variants, task, anded_clause)
 
 
-class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_tree'])):
+class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'inline_nodes', 'project_tree'])):
   """Additional inputs needed to run Node.step for the given Node.
 
   TODO: Unclear why this has a ProjectTree reference; should be passed in by the Engine.
@@ -396,12 +396,13 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'project_
   :param step_id: A unique id for the step, to ease comparison.
   :param node: The Node instance that will run.
   :param dependencies: The declared dependencies of the Node from previous Waiting steps.
+  :param inline_nodes: See `LocalScheduler._inline_nodes`.
   :param project_tree: A FileSystemProjectTree instance.
   """
 
   def __call__(self, node_builder):
     """Called by the Engine in order to execute this Step."""
-    step_context = StepContext(node_builder, self.project_tree, self.dependencies)
+    step_context = StepContext(node_builder, self.project_tree, self.dependencies, self.inline_nodes)
     state = self.node.step(step_context)
     return StepResult(state)
 
@@ -425,7 +426,14 @@ class StepResult(datatype('Step', ['state'])):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, storage, project_tree, graph_lock=None, graph_validator=None):
+  def __init__(self,
+               goals,
+               tasks,
+               storage,
+               project_tree,
+               graph_lock=None,
+               inline_nodes=True,
+               graph_validator=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
@@ -434,6 +442,11 @@ class LocalScheduler(object):
     :param project_tree: An instance of ProjectTree for the current build root.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
                        instance. Defaults to creating a new threading.RLock().
+    :param inline: Whether to inline execution of `inlineable` Nodes. This improves performance,
+                   but can make debugging more difficult, because the entire execution history
+                   is not recorded in the ProductGraph.
+    :param graph_validator: A validator that runs over the entire graph after every scheduling
+                            attempt. Very expensive, very experimental.
     """
     self._products_by_goal = goals
     self._tasks = tasks
@@ -443,6 +456,7 @@ class LocalScheduler(object):
     self._graph_validator = graph_validator
     self._product_graph = ProductGraph()
     self._product_graph_lock = graph_lock or threading.RLock()
+    self._inline_nodes = inline_nodes
     self._step_id = 0
 
   def visualize_graph_to_file(self, roots, filename):
@@ -480,7 +494,7 @@ class LocalScheduler(object):
 
     # Ready.
     self._step_id += 1
-    return (StepRequest(self._step_id, node, deps, self._project_tree), Promise())
+    return (StepRequest(self._step_id, node, deps, self._inline_nodes, self._project_tree), Promise())
 
   def node_builder(self):
     """Return the NodeBuilder instance for this Scheduler.

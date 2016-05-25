@@ -417,10 +417,11 @@ class StepContext(object):
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, node_builder, project_tree, node_states):
+  def __init__(self, node_builder, project_tree, node_states, inline_nodes):
     self._node_builder = node_builder
     self.project_tree = project_tree
     self._node_states = node_states
+    self._inline_nodes = inline_nodes
 
   def get(self, node):
     """Given a Node and computed node_states, gets the current state for the Node.
@@ -429,7 +430,7 @@ class StepContext(object):
     optional, which could help with debuggability. As it stands, lots of consumers are walking
     the graph and expecting particular structure to exist in it.
     """
-    if node.is_inlineable:
+    if self._inline_nodes and node.is_inlineable:
       return node.step(self)
     else:
       state = self._node_states.get(node, None)

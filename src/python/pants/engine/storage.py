@@ -263,12 +263,15 @@ class Storage(Closable):
 
     step_request.node isn't keyed is only for convenience because it is used
     in a subsequent is_cacheable check.
+
+    TODO: It's supremely odd that this creates a StepRequest.
     """
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       dependencies[self._to_key(dep)] = self._to_key(state)
     return StepRequest(step_request.step_id, step_request.node,
-                       dependencies, step_request.project_tree)
+                       dependencies, step_request.inline_nodes,
+                       step_request.project_tree)
 
   def key_for_result(self, step_result):
     """Make key for result state."""
