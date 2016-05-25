@@ -20,3 +20,11 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
+
+python_tests(
+    name='go_import_meta_tag_reader',
+    sources=['test_go_import_meta_tag_reader.py'],
+    dependencies=[
+      'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
+    ]
+)

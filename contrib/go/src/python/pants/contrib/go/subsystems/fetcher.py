@@ -44,6 +44,7 @@ class Fetcher(AbstractClass):
 
     :returns: The root portion of the import path.
     :rtype: string
+    :raises: :class:`FetchError` if there was a problem detecting the root.
     """
 
   @abstractmethod
@@ -81,7 +82,7 @@ class CloningFetcher(Fetcher):
     if imported_repo:
       return imported_repo.import_prefix
     else:
-      return None
+      raise FetchError('No <meta name="go-import"> tag found at {}'.format(self.import_path))
 
   def fetch(self, dest, rev=None):
     imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
@@ -91,7 +92,7 @@ class CloningFetcher(Fetcher):
     if imported_repo.vcs != 'git':
       # TODO: Support other vcs systems as needed.
       raise FetchError("Don't know how to fetch for vcs type {}.".format(imported_repo.vcs))
-    # TODO: Do this in a workunit.
+    # TODO: Do this in a workunit (see https://github.com/pantsbuild/pants/issues/3502).
     logger.info('Cloning {} into {}'.format(imported_repo.url, dest))
     repo = Git.clone(imported_repo.url, dest)
     if rev:
