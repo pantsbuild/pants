@@ -109,6 +109,10 @@ class GlobalOptionsRegistrar(Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon. (Beta)')
 
+    # This facilitates use of the v2 engine for BuildGraph construction, sans daemon.
+    register('--enable-engine', advanced=True, type=bool, default=False,
+             help='Enables use of the v2 engine. (Beta)')
+
   @classmethod
   def register_options(cls, register):
     """Register options not tied to any particular task or subsystem."""
