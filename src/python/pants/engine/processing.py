@@ -30,6 +30,20 @@ def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
       state.close()
 
 
+def _stateful_thread_pool_loop(send_queue, recv_queue, initializer, function):
+  """A top-level function implementing the loop for a StatefulPool."""
+  states = initializer()
+
+  while True:
+    item = recv_queue.get(block=True)
+    if item is None:
+      # Shutdown requested.
+      return
+    # Execute the function, and return the result.
+    result = function(states, item)
+    send_queue.put(result, block=True)
+
+
 class StatefulPoolBase(object):
   """A Thread.Pool-alike with stateful workers running the same function.
 
@@ -75,7 +89,7 @@ class StatefulPoolBase(object):
 
   def close(self):
     for _ in range(self._pool_size):
-      self._send.put(None, block=False)
+      self._send.put(None, block=True)
     self._executor.shutdown()
 
 
@@ -104,6 +118,10 @@ class StatefulThreadPoolBase(StatefulPoolBase):
 
     self._executor = self._pool_constructor(max_workers=self._pool_size)
     self._fn_args = (self._recv, self._send, initializer, function)
+
+  def start(self):
+    for _ in range(self._pool_size):
+      self._executor.submit(_stateful_thread_pool_loop, *self._fn_args)
 
 
 class StatefulProcessPoolBase(StatefulPoolBase):

@@ -327,6 +327,11 @@ class LocalMultithreadingEngine(ConcurrentEngine):
       submit_until(self._pool_size)
       await_one()
 
+    def close(self):
+      self._pool.close()  # Wait for pool to cleanup before we cleanup storage.
+      super(LocalMultithreadingEngine, self).close()
+
+
 def _threadable_maybe_cache_get(step_request, cache):
   if step_request.node.is_cacheable:
     return step_request.step_id, cache.get(step_request)
@@ -356,9 +361,7 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
     return self._cache.get(step_request) if self._should_cache(step_request) else None
 
   def _submit_maybe_cache(self, step):
-    self._pool.submit(
-      functools.partial(_threadable_maybe_cache_get, step, self._cache)
-    )
+    functools.partial(_threadable_maybe_cache_get, step, self._cache)
 
   def _submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
@@ -388,7 +391,7 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
 
         step = self._storage.key_for_request(step)
         in_flight[step.step_id] = promise
-        # self._submit_maybe_cache(step)         # <-- Problem child
+        self._submit_maybe_cache(step)         # <-- Problem child
         self._submit(step)
         submitted += 1
 
