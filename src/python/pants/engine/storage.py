@@ -278,13 +278,17 @@ class Storage(Closable):
     return StepResult(state=self._to_key(step_result.state))
 
   def resolve_request(self, step_request):
-    """Resolve keys in step_request."""
+    """Resolve keys in step_request.
+
+    TODO: It's supremely odd that this creates a StepRequest.
+    """
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       dependencies[self._from_key(dep)] = self._from_key(state)
 
     return StepRequest(step_request.step_id, step_request.node,
-                       dependencies, step_request.project_tree)
+                       dependencies, step_request.inline_nodes,
+                       step_request.project_tree)
 
   def resolve_result(self, step_result):
     """Resolve state key in step_result."""

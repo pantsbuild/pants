@@ -28,6 +28,7 @@ class StorageTest(unittest.TestCase):
     self.request = StepRequest(step_id=123, node='some node',
                                dependencies={'some dep': 'some state',
                                              'another dep': 'another state'},
+                               inline_nodes=False,
                                project_tree='some project tree')
 
   def test_lmdb_key_value_store(self):
