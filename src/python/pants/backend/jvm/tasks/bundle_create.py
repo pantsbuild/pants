@@ -35,14 +35,16 @@ class BundleCreate(JvmBinaryTask):
     super(BundleCreate, cls).register_options(register)
     register('--deployjar', advanced=True, type=bool,
              fingerprint=True,
-             help='This option is also defined in jvm_app target.'
-                  'Please refer to the documentation for jvm_app.'
-                  'Precedence is CLI option > target option > pants.ini option')
+             help="Pack all 3rdparty and internal jar classfiles into a single deployjar in "
+                  "the bundle's root dir. If unset, all jars will go into the bundle's libs "
+                  "directory, the root will only contain a synthetic jar with its manifest's "
+                  "Class-Path set to those jars. This option is also defined in jvm_app target. "
+                  "Precedence is CLI option > target option > pants.ini option.")
     register('--archive', advanced=True, choices=list(archive.TYPE_NAMES),
              fingerprint=True,
-             help='This option is also defined in jvm_app target.'
-                  'Please refer to the documentation for jvm_app.'
-                  'Precedence is CLI option > target option > pants.ini option')
+             help='Create an archive of this type from the bundle. '
+                  'This option is also defined in jvm_app target. '
+                  'Precedence is CLI option > target option > pants.ini option.')
     register('--archive-prefix', advanced=True, type=bool,
              fingerprint=True, removal_hint='redundant option', removal_version='1.1.0',
              help='If --archive is specified, prefix archive with target basename or a unique '
@@ -64,31 +66,30 @@ class BundleCreate(JvmBinaryTask):
     def is_app(target):
       return isinstance(target, (JvmApp, JvmBinary))
 
-    @staticmethod
-    def _resolved_option(target, options, key):
-      """
-      Get value for option "key".
-      Resolution precedence is CLI option > target option > pants.ini option.
-      """
-      option_value = options.get(key)
-      if not isinstance(target, JvmApp) or options.is_flagged(key):
-        return option_value
-      v = target.payload.get_field_value(key, None)
-      return option_value if v is None else v
-
     @classmethod
-    def create_app(cls, target, options, use_basename_prefix=False):
+    def create_app(cls, target, deployjar, archive, use_basename_prefix=False):
       return cls(target.address,
                  target if isinstance(target, JvmBinary) else target.binary,
                  [] if isinstance(target, JvmBinary) else target.payload.bundles,
                  target.basename if use_basename_prefix else target.id,
-                 cls._resolved_option(target, options, 'deployjar'),
-                 cls._resolved_option(target, options, 'archive'),
+                 deployjar,
+                 archive,
                  target)
 
   @property
   def cache_target_dirs(self):
     return True
+
+  def _resolved_option(self, target, key):
+    """
+    Get value for option "key".
+    Resolution precedence is CLI option > target option > pants.ini option.
+    """
+    option_value = self.get_options().get(key)
+    if not isinstance(target, JvmApp) or self.get_options().is_flagged(key):
+      return option_value
+    v = target.payload.get_field_value(key, None)
+    return option_value if v is None else v
 
   def execute(self):
     use_basename_prefix = self.get_options().use_basename_prefix
@@ -103,8 +104,14 @@ class BundleCreate(JvmBinaryTask):
       targets_to_bundle = self.context.target_roots
     else:
       targets_to_bundle = self.context.targets()
-    apps = [self.App.create_app(target, self.get_options(), use_basename_prefix=use_basename_prefix)
-            for target in targets_to_bundle if self.App.is_app(target)]
+
+    apps = []
+    for target in targets_to_bundle:
+      if self.App.is_app(target):
+        apps.append(self.App.create_app(target,
+                                        self._resolved_option(target, 'deployjar'),
+                                        self._resolved_option(target, 'archive'),
+                                        use_basename_prefix=use_basename_prefix))
 
     if use_basename_prefix:
       self.check_basename_conflicts(apps)
@@ -132,8 +139,7 @@ class BundleCreate(JvmBinaryTask):
         archivepath = archiver.create(
           basedir,
           self.get_options().pants_distdir,
-          app.basename,
-          prefix=None
+          app.basename
         )
         self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
