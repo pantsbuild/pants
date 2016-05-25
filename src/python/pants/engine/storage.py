@@ -12,7 +12,7 @@ import threading
 from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
-from contextlib import closing, contextmanager
+from contextlib import closing
 from functools import total_ordering
 from hashlib import sha1
 from struct import Struct as StdlibStruct

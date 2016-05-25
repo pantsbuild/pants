@@ -338,6 +338,7 @@ def _threadable_maybe_cache_get(step_request, cache):
   else:
     return step_request.step_id, None
 
+
 class ThreadHybridEngine(LocalMultithreadingEngine):
   """An engine that runs locally but allows nodes to be optionally run concurrently.
 
@@ -370,28 +371,13 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
     for _ in range(to_submit):
       step, promise = pending_submission.pop(last=False)
 
-      ## Working
-      # if self._is_async_node(step.node):
-      #   if step.step_id in in_flight:
-      #     raise Exception('{} is already in_flight!'.format(step))
-      #
-      #   step = self._storage.key_for_request(step)
-      #   result = self._maybe_cache_get(step)
-      #   if result is not None:
-      #     # Skip in_flight on cache hit.
-      #     promise.success(result)
-      #   else:
-      #     in_flight[step.step_id] = promise
-      #     self._submit(step)
-      #     submitted += 1
-
       if self._is_async_node(step.node):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
         step = self._storage.key_for_request(step)
         in_flight[step.step_id] = promise
-        self._submit_maybe_cache(step)         # <-- Problem child
+        self._submit_maybe_cache(step)
         self._submit(step)
         submitted += 1
 
