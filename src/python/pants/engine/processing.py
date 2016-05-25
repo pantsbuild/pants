@@ -11,6 +11,8 @@ from Queue import Queue as ThreadQueue
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
+from pants.engine.scheduler import StepRequest
+
 
 def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
   """A top-level function implementing the loop for a StatefulPool."""
@@ -39,8 +41,12 @@ def _stateful_thread_pool_loop(send_queue, recv_queue, initializer, function):
     if item is None:
       # Shutdown requested.
       return
+
     # Execute the function, and return the result.
-    result = function(states, item)
+    if isinstance(item, StepRequest):
+      result = function(states, item)
+    else:
+      result = item() # Handle async cache fetching
     send_queue.put(result, block=True)
 
 

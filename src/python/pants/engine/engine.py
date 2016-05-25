@@ -18,6 +18,7 @@ from pants.base.exceptions import TaskError
 from pants.engine.nodes import FilesystemNode
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulProcessPoolBase, StatefulThreadPoolBase
+from pants.engine.scheduler import StepRequest, StepResult
 from pants.engine.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -145,7 +146,7 @@ def _try_pickle(obj):
     # Unfortunately, pickle can raise things other than PickleError instances.  For example it
     # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
     # `Exception` type here.
-    raise SerializationError('~~Failed to pickle {}: {}'.format(obj, e))
+    raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
 def _execute_step(cache_save, debug, process_state, step):
@@ -332,13 +333,6 @@ class LocalMultithreadingEngine(ConcurrentEngine):
       super(LocalMultithreadingEngine, self).close()
 
 
-def _threadable_maybe_cache_get(step_request, cache):
-  if step_request.node.is_cacheable:
-    return step_request.step_id, cache.get(step_request)
-  else:
-    return step_request.step_id, None
-
-
 class ThreadHybridEngine(LocalMultithreadingEngine):
   """An engine that runs locally but allows nodes to be optionally run concurrently.
 
@@ -361,8 +355,15 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
   def _maybe_cache_get(self, step_request):
     return self._cache.get(step_request) if self._should_cache(step_request) else None
 
-  def _submit_maybe_cache(self, step):
-    functools.partial(_threadable_maybe_cache_get, step, self._cache)
+  def _maybe_cache_step(self, step_request):
+    if self._should_cache(step_request):
+      return step_request.step_id, self._cache.get(step_request)
+    else:
+      return step_request.step_id, None
+
+  def _submit(self, step):
+    # Pickle check is unneeded for threading.
+    self._pool.submit(step)
 
   def _submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
@@ -375,9 +376,10 @@ class ThreadHybridEngine(LocalMultithreadingEngine):
         if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
 
+        cache_step = functools.partial(self._maybe_cache_step, step)
         step = self._storage.key_for_request(step)
         in_flight[step.step_id] = promise
-        self._submit_maybe_cache(step)
+        self._submit(cache_step)
         self._submit(step)
         submitted += 1
 
