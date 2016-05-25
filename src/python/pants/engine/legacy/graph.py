@@ -32,7 +32,6 @@ class LegacyBuildGraph(BuildGraph):
 
   class InvalidCommandLineSpecError(AddressLookupError):
     """Raised when command line spec is not a valid directory"""
-    pass
 
   def __init__(self, scheduler, engine, symbol_table_cls):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
@@ -193,7 +192,7 @@ class LegacyBuildGraph(BuildGraph):
       address_state = self._scheduler.root_entries(request)[address_root]
       if not address_state.value:
         raise self.InvalidCommandLineSpecError(
-          'Can only scan directories and {} is not a valid dir'.format(address_root.subject.directory))
+          'Spec {} does not match any targets.'.format(address_root.subject))
 
       for address in address_state.value:
         if address not in existing_addresses:
