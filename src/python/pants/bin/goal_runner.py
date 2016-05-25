@@ -87,8 +87,8 @@ class GoalRunnerFactory(object):
     """Selects a BuildGraph to use then constructs and returns it.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
-    :param AddressMapper address_mapper: The `AddressMapper` instance to use for graph construction.
-    :param LegacyBuildGraph cached_buildgraph: A cached graph to reuse.
+    :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
+    :param LegacyBuildGraph cached_buildgraph: A cached graph to reuse, if available.
     """
     if cached_buildgraph is not None:
       return cached_buildgraph

@@ -31,10 +31,3 @@ def fsnodes():
     for node, _ in scheduler.product_graph.completed_nodes():
       if type(node) is FilesystemNode:
         print(node)
-
-
-def list():
-  """Lists the transitive dependencies of targets under the current build root."""
-  with EngineInitializer.open_legacy_graph() as (graph, addresses, _):
-    for address in addresses:
-      print(address)

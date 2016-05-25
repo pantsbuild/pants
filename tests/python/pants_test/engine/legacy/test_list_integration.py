@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -18,7 +16,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
     )
 
   def run_engine_list(self, spec, success):
-    args = ['-q', 'run', 'src/python/pants/engine/legacy:list', '--'] + spec
+    args = ['-q', '--enable-engine', 'list'] + spec
     return self.get_target_set(args, success)
 
   def run_regular_list(self, spec, success):
