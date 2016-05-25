@@ -124,6 +124,7 @@ python_library(
   sources=['processing.py'],
   dependencies=[
     '3rdparty/python:futures',
+    ':scheduler',
   ]
 )
 

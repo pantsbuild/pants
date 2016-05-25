@@ -18,7 +18,6 @@ from pants.base.exceptions import TaskError
 from pants.engine.nodes import FilesystemNode
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulProcessPoolBase, StatefulThreadPoolBase
-from pants.engine.scheduler import StepRequest, StepResult
 from pants.engine.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
