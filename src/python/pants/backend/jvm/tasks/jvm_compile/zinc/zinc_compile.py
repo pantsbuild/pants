@@ -5,12 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import re
 import textwrap
 from contextlib import closing
 from xml.etree import ElementTree
 
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -26,7 +28,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import Distribution, DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_method, memoized_property
@@ -40,6 +42,9 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 
 # Well known metadata file to register annotation processors with a java 1.6+ compiler.
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
+
+
+logger = logging.getLogger(__name__)
 
 
 class BaseZincCompile(JvmCompile):
@@ -82,6 +87,33 @@ class BaseZincCompile(JvmCompile):
     arg_index = 0
     while arg_index < len(args):
       arg_index += validate(arg_index)
+
+  @staticmethod
+  def _get_zinc_arguments(settings):
+    """Extracts and formats the zinc arguments given in the jvm platform settings.
+
+    This is responsible for the symbol substitution which replaces $JAVA_HOME with the path to an
+    appropriate jvm distribution.
+
+    :param settings: The jvm platform settings from which to extract the arguments.
+    :type settings: :class:`JvmPlatformSettings`
+    """
+    zinc_args = [
+      '-C-source', '-C{}'.format(settings.source_level),
+      '-C-target', '-C{}'.format(settings.target_level),
+    ]
+    if settings.args:
+      settings_args = settings.args
+      if any('$JAVA_HOME' in a for a in settings.args):
+        try:
+          distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
+        except DistributionLocator.Error:
+          distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=False)
+        logger.debug('Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'
+                     .format(distribution.home))
+        settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
+      zinc_args.extend(settings_args)
+    return zinc_args
 
   @classmethod
   def compiler_plugin_types(cls):
@@ -299,19 +331,14 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
     zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
 
-    zinc_args += self.javac_plugin_args(javac_plugins_to_exclude)
-    zinc_args += self.scalac_plugin_args
+    zinc_args.extend(self.javac_plugin_args(javac_plugins_to_exclude))
+    zinc_args.extend(self.scalac_plugin_args)
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
 
-    zinc_args += args
-
-    zinc_args.extend([
-      '-C-source', '-C{}'.format(settings.source_level),
-      '-C-target', '-C{}'.format(settings.target_level),
-    ])
-    zinc_args.extend(settings.args)
+    zinc_args.extend(args)
+    zinc_args.extend(self._get_zinc_arguments(settings))
 
     if fatal_warnings:
       zinc_args.extend(self.get_options().fatal_warnings_enabled_args)

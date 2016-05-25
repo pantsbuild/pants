@@ -516,7 +516,9 @@ class _Locator(object):
         logger.debug('Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}'
                      .format(dist, minimum_version, maximum_version, jdk))
         return dist
-      except (ValueError, Distribution.Error):
+      except (ValueError, Distribution.Error) as e:
+        logger.debug('{} is not a valid distribution because: {}'
+                     .format(location.home_path, str(e)))
         pass
 
     if (minimum_version is not None
