@@ -33,6 +33,7 @@ python_tests(
   dependencies=[
     ':python_task_test_base',
     'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/base:run_info',
   ]
 )
 
