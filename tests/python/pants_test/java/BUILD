@@ -29,7 +29,8 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:psutil',
-    'src/python/pants/java:nailgun_executor'
+    'src/python/pants/java:nailgun_executor',
+    'tests/python/pants_test:base_test'
   ]
 )
 

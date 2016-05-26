@@ -11,9 +11,16 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_environment import get_buildroot, pants_version
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.subsystem.subsystem import Subsystem
+from pants.version import PANTS_SEMVER, VERSION
+
+
+def _read_contents(path):
+  with open(os.path.join(get_buildroot(), path), 'rb') as fp:
+    return fp.read()
 
 
 def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
@@ -43,16 +50,13 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
       'Topic :: Software Development :: Build Tools']
   classifiers = OrderedSet(standard_classifiers + (additional_classifiers or []))
 
-  def _read_contents(path):
-    with open(os.path.join(get_buildroot(), path), 'rb') as fp:
-      return fp.read()
+  notes = PantsReleases.global_instance().notes_for_version(PANTS_SEMVER)
 
   return PythonArtifact(
       name=name,
-      version=pants_version(),
+      version=VERSION,
       description=description,
-      long_description=(_read_contents('src/python/pants/ABOUT.rst') +
-                        _read_contents('src/python/pants/CHANGELOG.rst')),
+      long_description=(_read_contents('src/python/pants/ABOUT.rst') + notes),
       url='https://github.com/pantsbuild/pants',
       license='Apache License, Version 2.0',
       zip_safe=True,
@@ -80,6 +84,54 @@ def contrib_setup_py(name, description, additional_classifiers=None, **kwargs):
                         additional_classifiers=additional_classifiers,
                         namespace_packages=['pants', 'pants.contrib'],
                         **kwargs)
+
+
+class PantsReleases(Subsystem):
+  """A subsystem to hold per-pants-release configuration."""
+
+  options_scope = 'pants-releases'
+
+  @classmethod
+  def register_options(cls, register):
+    super(PantsReleases, cls).register_options(register)
+    register('--branch-notes', type=dict,
+             help='A dict from branch name to release notes rst-file location.')
+
+  @property
+  def _branch_notes(self):
+    return self.get_options().branch_notes
+
+  @classmethod
+  def _branch_name(cls, version):
+    """Defines a mapping between versions and branches.
+
+    In particular, `-pre` suffixed releases always live on master. Any other (modern) release
+    lives in a branch.
+    """
+    components = version.components
+    suffix = components[3]
+    if suffix is None or suffix.startswith('rc'):
+      # An un-suffixed, or suffixed-with-rc version is a release from a stable branch.
+      return '{}.{}.x'.format(*components[:2])
+    elif suffix.startswith('pre'):
+      # Suffixed `pre` release version in master.
+      return 'master'
+    else:
+      raise ValueError('Unparseable pants version number: {}'.format(version))
+
+  def notes_for_version(self, version):
+    """Given the parsed Revision of pants, return its release notes.
+
+    TODO: This method should parse out the specific version from the resulting file:
+      see https://github.com/pantsbuild/pants/issues/1708
+    """
+    branch_name = self._branch_name(version)
+    branch_notes_file = self._branch_notes.get(branch_name, None)
+    if branch_notes_file is None:
+      raise ValueError(
+          'Version {} lives in branch {}, which is not configured in {}.'.format(
+            version, branch_name, self._branch_notes))
+    return _read_contents(branch_notes_file)
 
 
 class PantsPlugin(PythonLibrary):
@@ -156,6 +208,10 @@ class ContribPlugin(PantsPlugin):
   @classmethod
   def create_setup_py(cls, name, description, additional_classifiers=None):
     return contrib_setup_py(name, description, additional_classifiers=additional_classifiers)
+
+
+def global_subsystems():
+  return {PantsReleases}
 
 
 def build_file_aliases():

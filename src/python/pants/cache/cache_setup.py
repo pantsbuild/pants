@@ -219,16 +219,19 @@ class CacheFactory(object):
     # both artifact cache and resolver use REST, add new protocols here once they are supported
     return string_spec.startswith('http://') or string_spec.startswith('https://')
 
+  def _baseurl(self, url):
+    parsed_url = urlparse.urlparse(url)
+    return '{scheme}://{netloc}'.format(scheme=parsed_url.scheme, netloc=parsed_url.netloc)
+
   def get_available_urls(self, urls):
     """Return reachable urls sorted by their ping times."""
-
-    netloc_to_url = {urlparse.urlparse(url).netloc: url for url in urls}
-    pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).
+    baseurl_to_urls = {self._baseurl(url): url for url in urls}
+    pingtimes = self._pinger.pings(baseurl_to_urls.keys())  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
 
     sorted_pingtimes = sorted(pingtimes, key=lambda x: x[1])
-    available_urls = [netloc_to_url[netloc] for netloc, pingtime in sorted_pingtimes
+    available_urls = [baseurl_to_urls[baseurl] for baseurl, pingtime in sorted_pingtimes
                       if pingtime < Pinger.UNREACHABLE]
     self._log.debug('Available cache servers: {0}'.format(available_urls))
 

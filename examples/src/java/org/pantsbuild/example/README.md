@@ -261,6 +261,25 @@ You can also override these on the cli:
     :::bash
     ./pants compile --jvm-platform-default-platform=java8 examples/src/java/org/pantsbuild/example/hello/main
 
+If you want to set the `-bootclasspath` (or `-Xbootclasspath`) to use the
+appropriate java distribution, you can use the `$JAVA_HOME` symbol in the
+`args` list. For example:
+
+    :::ini
+    [jvm-platform]
+    default_platform: java6
+    platforms: {
+        'java7': {'source': '7', 'target': '7', 'args': ["-C-bootclasspath:$JAVA_HOME/jre/lib/resources.jar:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/jre/lib/sunrsasign.jar:$JAVA_HOME/jre/lib/jsse.jar:$JAVA_HOME/jre/lib/jce.jar:$JAVA_HOME/jre/lib/charsets.jar:$JAVA_HOME/jre/lib/jfr.jar:$JAVA_HOME/jre/classes"] },
+      }
+
+Your `-bootclasspath` should be designed to work with any compatible version of
+the JVM that might be used. If you make use of `[jvm-distributions]` and have
+strict control over what jvm installations are used by developers, this means you
+probably only have to make it work for one version of the JDK. Otherwise, you
+should design your bootclasspath to reference the union of all possible jars
+you might need to pull in from different JVMs (any paths that aren't available
+will simply be ignored by java).
+
 **Note:** Currently, pants is known to work with OpenJDK version 7 or greater,
 and Oracle JDK version 6 or greater.
 

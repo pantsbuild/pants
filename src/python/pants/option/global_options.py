@@ -76,6 +76,10 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-distdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'dist'),
              help='Write end-product artifacts to this dir.')
+    register('--pants-subprocessdir', advanced=True, default=os.path.join(buildroot, '.pids'),
+             help='The directory to use for tracking subprocess metadata, if any. This should '
+                  'live outside of the dir used by `--pants-workdir` to allow for tracking '
+                  'subprocesses that outlive the workdir data (e.g. `./pants server`).')
     register('--pants-config-files', advanced=True, type=list,
              default=[get_default_pants_config_file()], help='Paths to Pants config files.')
     # TODO: Deprecate --config-override in favor of --pants-config-files.
@@ -107,7 +111,11 @@ class GlobalOptionsRegistrar(Optionable):
     # determine whether or not to use the Pailgun client to invoke a given pants run
     # without resorting to heavier options parsing.
     register('--enable-pantsd', advanced=True, type=bool, default=False,
-             help='Enables use of the pants daemon. (Beta)')
+             help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
+
+    # This facilitates use of the v2 engine for BuildGraph construction, sans daemon.
+    register('--enable-v2-engine', advanced=True, type=bool, default=False,
+             help='Enables use of the v2 engine. (Beta)')
 
   @classmethod
   def register_options(cls, register):
@@ -140,12 +148,15 @@ class GlobalOptionsRegistrar(Optionable):
              metavar='<regexp>',
              help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
+    # Relative pants_distdir to buildroot. Requires --pants-distdir to be bootstrapped above first.
+    # e.g. '/dist/'
+    rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
-             default=['.*', '/dist', 'bower_components', 'node_modules', '*.egg-info'],
+             default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
              help='Glob patterns for ignoring files when reading BUILD files. '
                   'Use to ignore unneeded directories or BUILD files. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
-    register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*'],
+    register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*', rel_distdir],
              help='Ignore files that match the specified patterns. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore). '
                   'This option is currently experimental.')

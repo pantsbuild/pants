@@ -13,19 +13,17 @@ from collections import defaultdict, namedtuple
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
-from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
-_TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary, android=JavaLibrary)
+_RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 
 
 class ScroogeGen(SimpleCodegenTask, NailgunTask):
@@ -45,6 +43,11 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     register('--structs-deps', default={}, advanced=True, type=dict,
              help='A map of language to targets to add as dependencies of '
                   'synthetic thrift libraries that contain structs.')
+    register('--target-types',
+             default={'scala': 'scala_library', 'java': 'java_library', 'android': 'java_library'},
+             advanced=True,
+             type=dict,
+             help='Registered target types.')
     cls.register_jvm_tool(register, 'scrooge-gen')
 
   @classmethod
@@ -54,6 +57,10 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   @classmethod
   def product_types(cls):
     return ['java', 'scala']
+
+  @classmethod
+  def implementation_version(cls):
+    return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 2)]
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
@@ -82,15 +89,44 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
           raise AddressLookupError('{}\n  referenced from {} scope'.format(e, self.options_scope))
     return deps
 
+  def _validate_language(self, target):
+    language = self._thrift_defaults.language(target)
+    if language not in self._registered_language_aliases():
+      raise TargetDefinitionException(
+          target,
+          'language {} not supported: expected one of {}.'.format(language, self._registered_language_aliases().keys()))
+    return language
+
+  def _validate_rpc_style(self, target):
+    rpc_style = self._thrift_defaults.rpc_style(target)
+    if rpc_style not in _RPC_STYLES:
+      raise TargetDefinitionException(
+          target,
+          'rpc_style {} not supported: expected one of {}.'.format(rpc_style, _RPC_STYLES))
+    return rpc_style
+
+  @memoized_method
+  def _registered_language_aliases(self):
+    return self.get_options().target_types
+
+  @memoized_method
+  def _target_type_for_language(self, language):
+    alias_for_lang = self._registered_language_aliases()[language]
+    registered_aliases = self.context.build_file_parser.registered_aliases()
+    target_types = registered_aliases.target_types_by_alias.get(alias_for_lang, None)
+    if not target_types:
+      raise TaskError('Registered target type `{0}` for language `{1}` does not exist!'.format(alias_for_lang, language))
+    if len(target_types) > 1:
+      raise TaskError('More than one target type registered for language `{0}`'.format(language))
+    return next(iter(target_types))
+
   def execute_codegen(self, target, target_workdir):
     self._validate_compiler_configs([target])
     self._must_have_sources(target)
 
-    language = self._thrift_defaults.language(target)
-    rpc_style = self._thrift_defaults.rpc_style(target)
     partial_cmd = self.PartialCmd(
-        language=language,
-        rpc_style=rpc_style,
+        language=self._validate_language(target),
+        rpc_style=self._validate_rpc_style(target),
         namespace_map=tuple(sorted(target.namespace_map.items()) if target.namespace_map else ()))
 
     self.gen(partial_cmd, target, target_workdir)
@@ -160,13 +196,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    if self._thrift_defaults.compiler(target) != 'scrooge':
-      return False
-
-    language = self._thrift_defaults.language(target)
-    if language not in ('scala', 'java', 'android'):
-      raise TaskError('Scrooge can not generate {0}'.format(language))
-    return True
+    return self._thrift_defaults.compiler(target) == 'scrooge'
 
   def _validate_compiler_configs(self, targets):
     assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")
@@ -206,7 +236,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   def synthetic_target_type(self, target):
     language = self._thrift_defaults.language(target)
-    return _TARGET_TYPE_FOR_LANG[language]
+    return self._target_type_for_language(language)
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     deps = OrderedSet(self._thrift_dependencies_for_target(target))

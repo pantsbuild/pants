@@ -6,7 +6,7 @@ function help() {
   echo "  -h  display this help"
   echo "  With no arguments, prompts for the last release sha"
   echo
-  echo "Attempts to generate a mostly complete CHANGELOG.rst section"
+  echo "Attempts to generate a mostly complete changelog .rst section"
   echo "given the last release sha.  Each commit since that sha will"
   echo "have an RST compatible bullet generated with commit summary"
   echo "and ISSUE/RB links if present in the commit message.  A"
