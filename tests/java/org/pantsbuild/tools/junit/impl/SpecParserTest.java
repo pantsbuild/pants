@@ -9,6 +9,7 @@ import java.util.List;
 import org.junit.Test;
 import org.pantsbuild.tools.junit.lib.MockJUnit3Test;
 import org.pantsbuild.tools.junit.lib.MockRunWithTest;
+import org.pantsbuild.tools.junit.lib.UnannotatedTestClass;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
@@ -18,7 +19,7 @@ import static org.junit.Assert.fail;
 
 public class SpecParserTest {
   private static final String DUMMY_CLASS_NAME =
-      "org.pantsbuild.tools.junit.impl.UnannotatedTestClass";
+      "org.pantsbuild.tools.junit.lib.UnannotatedTestClass";
   private static final String DUMMY_METHOD_NAME = "testMethod";
 
   @Test public void testEmptySpecsThrows() {

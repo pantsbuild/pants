@@ -119,5 +119,6 @@ Created by running `build-support/bin/contributors.sh`.
 + Travis Crawford
 + Ugo Di Girolamo
 + Wei An
++ Wolfram Arnold
 + Yi Cheng
 + Yujie Chen
