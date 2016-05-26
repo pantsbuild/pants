@@ -62,6 +62,7 @@ class Git(Scm):
   def clone(cls, repo_url, dest, binary='git'):
     """Clone the repo at repo_url into dest.
 
+    :param string binary: The path to the git binary to use, 'git' by default.
     :returns: an instance of this class representing the cloned repo.
     :rtype: Git
     """
