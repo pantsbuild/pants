@@ -420,7 +420,7 @@ class StepContext(object):
   def __init__(self, node_builder, project_tree, node_states, inline_nodes):
     self._node_builder = node_builder
     self.project_tree = project_tree
-    self._node_states = node_states
+    self._node_states = dict(node_states)
     self._inline_nodes = inline_nodes
 
   def get(self, node):
@@ -428,12 +428,14 @@ class StepContext(object):
 
     Optionally inlines execution of inlineable dependencies if `inline_nodes=True`.
     """
+    state = self._node_states.get(node, None)
+    if state is not None:
+      return state
     if self._inline_nodes and node.is_inlineable:
-      return node.step(self)
+      state = node.step(self)
+      self._node_states[node] = state
+      return state
     else:
-      state = self._node_states.get(node, None)
-      if state is not None:
-        return state
       return Waiting([node])
 
   def gen_nodes(self, subject, product, variants):
