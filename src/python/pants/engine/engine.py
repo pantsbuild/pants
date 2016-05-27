@@ -124,6 +124,7 @@ class Engine(AbstractClass):
 
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
+
   def __init__(self, scheduler, storage=None, cache=None):
     storage = storage or Storage.create(in_memory=True)
     super(LocalSerialEngine, self).__init__(scheduler, storage, cache)
