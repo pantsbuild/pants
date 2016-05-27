@@ -19,7 +19,7 @@ from pants.util.contextutil import temporary_file_path
 from pants_test.engine.examples.planners import setup_json_scheduler
 
 
-def visualize_execution_graph(scheduler, storage, request):
+def visualize_execution_graph(scheduler, request):
   with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
     scheduler.visualize_graph_to_file(request.roots, dot_file)
     print('dot file saved to: {}'.format(dot_file))
@@ -32,15 +32,14 @@ def visualize_execution_graph(scheduler, storage, request):
 
 def visualize_build_request(build_root, goals, subjects):
   scheduler = setup_json_scheduler(build_root)
-  storage = Storage.create(debug=True)
 
   execution_request = scheduler.build_request(goals, subjects)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
-  engine = LocalSerialEngine(scheduler, storage)
+  engine = LocalSerialEngine(scheduler, Storage.create(debug=True))
   engine.start()
   try:
     engine.reduce(execution_request)
-    visualize_execution_graph(scheduler, storage, execution_request)
+    visualize_execution_graph(scheduler, execution_request)
   finally:
     engine.close()
 
