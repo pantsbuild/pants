@@ -80,16 +80,17 @@ class EngineInitializer(object):
     return spec_roots
 
   @staticmethod
-  def setup_legacy_graph(path_ignore_patterns):
+  def setup_legacy_graph(path_ignore_patterns, storage=None):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                       usually taken from the `--pants-ignore` global option.
+    :param Storage storage: storage instance to construct the engine.
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 
     build_root = get_buildroot()
-    storage = Storage.create(debug=False)
+    storage = storage or Storage.create(debug=False)
     project_tree = FileSystemProjectTree(build_root, path_ignore_patterns)
     symbol_table_cls = LegacySymbolTable
 
@@ -106,7 +107,7 @@ class EngineInitializer(object):
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
 
-    scheduler = LocalScheduler(dict(), tasks, storage, project_tree)
+    scheduler = LocalScheduler(dict(), tasks, project_tree)
     engine = LocalSerialEngine(scheduler, storage)
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
