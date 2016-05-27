@@ -287,3 +287,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
       yield
     finally:
       os.rename(real_path, test_path)
+
+  def do_command(self, success, enable_v2_engine, *args):
+    cmd = ['--enable-v2-engine'] if enable_v2_engine else []
+    cmd.extend(list(args))
+    pants_run = self.run_pants(cmd)
+    if success:
+      self.assert_success(pants_run)
+    else:
+      self.assert_failure(pants_run)
+    return pants_run

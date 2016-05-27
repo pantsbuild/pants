@@ -12,17 +12,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class FilemapIntegrationTest(PantsRunIntegrationTest):
-  def do_filemap(self, success, *args):
-    args = ['--enable-v2-engine', 'filemap'] + list(args)
-    pants_run = self.run_pants(args)
-    if success:
-      self.assert_success(pants_run)
-    else:
-      self.assert_failure(pants_run)
-    return pants_run
-
   def test_testprojects(self):
-    self.do_filemap(True, 'testprojects::')
+    self.do_command(True, True, 'filemap', 'testprojects::')
 
   TEST_EXCLUDE_FILES = {'a.py', 'aa.py', 'aaa.py', 'ab.py', 'aabb.py',
                         'dir1/a.py', 'dir1/aa.py', 'dir1/aaa.py', 'dir1/ab.py', 'dir1/aabb.py',
@@ -39,7 +30,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals(scan_set, self.TEST_EXCLUDE_FILES)
 
   def _extract_exclude_output(self, test_name):
-    stdout_data = self.do_filemap(True, '{}:{}'.format(self.path_prefix, test_name)).stdout_data
+    stdout_data = self.do_command(True, True, 'filemap', '{}:{}'.format(self.path_prefix, test_name)).stdout_data
     return {s.split(' ')[0].replace(self.path_prefix, '')
             for s in stdout_data.split('\n') if s.startswith(self.path_prefix)}
 

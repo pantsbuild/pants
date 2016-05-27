@@ -9,29 +9,22 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class DependenciesIntegrationTest(PantsRunIntegrationTest):
+
+  def get_target_set(self, std_out):
+    return sorted([l for l in std_out.split('\n') if l])
+
+  def run_engine_list(self, success, *args):
+    return self.get_target_set(self.do_command(success, True, *args).stdout_data)
+
+  def run_regular_list(self, success, *args):
+    return self.get_target_set(self.do_command(success, False, *args).stdout_data)
+
   def assert_list_new_equals_old(self, success, spec):
-    self.assertEqual(
-      self.run_regular_list(spec, success),
-      self.run_engine_list(spec, success),
-    )
-
-  def run_engine_list(self, spec, success):
-    args = ['-q', '--enable-v2-engine', 'list'] + spec
-    return self.get_target_set(args, success)
-
-  def run_regular_list(self, spec, success):
     args = ['-q', 'list'] + spec
-    return self.get_target_set(args, success)
-
-  def get_target_set(self, args, success):
-    pants_run = self.run_pants(args)
-    if success:
-      self.assert_success(pants_run)
-      stdout_lines = pants_run.stdout_data.split('\n')
-      return sorted([l for l in stdout_lines if l])
-    else:
-      self.assert_failure(pants_run)
-      return None
+    self.assertEqual(
+      self.run_regular_list(success, *args),
+      self.run_engine_list(success, *args),
+    )
 
   def test_list_single(self):
     self.assert_list_new_equals_old(True, ['3rdparty::'])
@@ -43,4 +36,8 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
     )
 
   def test_list_all(self):
-    self.assert_success(self.run_pants(['--enable-v2-engine', 'list', '::']))
+    self.do_command(True, True, 'list', '::')
+
+  def test_list_invalid_dir(self):
+    pants_run = self.do_command(False, True, 'list', 'abcde::')
+    self.assertIn('InvalidCommandLineSpecError', pants_run.stderr_data)
