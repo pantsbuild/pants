@@ -288,7 +288,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     finally:
       os.rename(real_path, test_path)
 
-  def do_command(self, success, enable_v2_engine, *args):
+  def do_command(self, *args, **kwargs):
+    """Wrapper around run_pants method.
+
+    :param args: command line arguments used to run pants
+    :param kwargs: handles 2 keys
+      success - indicate whether to expect pants run to succeed or fail.
+      enable_v2_engine - indicate whether to use v2 engine or not.
+    :return: a PantsResult object
+    """
+    success = kwargs.get('success', True)
+    enable_v2_engine = kwargs.get('enable_v2_engine', False)
     cmd = ['--enable-v2-engine'] if enable_v2_engine else []
     cmd.extend(list(args))
     pants_run = self.run_pants(cmd)

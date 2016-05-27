@@ -14,10 +14,10 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
     return sorted([l for l in std_out.split('\n') if l])
 
   def run_engine_list(self, success, *args):
-    return self.get_target_set(self.do_command(success, True, *args).stdout_data)
+    return self.get_target_set(self.do_command(*args, success=success, enable_v2_engine=True).stdout_data)
 
   def run_regular_list(self, success, *args):
-    return self.get_target_set(self.do_command(success, False, *args).stdout_data)
+    return self.get_target_set(self.do_command(*args, success=success, enable_v2_engine=False).stdout_data)
 
   def assert_list_new_equals_old(self, success, spec):
     args = ['-q', 'list'] + spec
@@ -36,8 +36,8 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
     )
 
   def test_list_all(self):
-    self.do_command(True, True, 'list', '::')
+    self.do_command('list', '::', success=True, enable_v2_engine=True)
 
   def test_list_invalid_dir(self):
-    pants_run = self.do_command(False, True, 'list', 'abcde::')
+    pants_run = self.do_command('list', 'abcde::', success=False, enable_v2_engine=True)
     self.assertIn('InvalidCommandLineSpecError', pants_run.stderr_data)
