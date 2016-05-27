@@ -1,4 +1,4 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
 + Alan Paulin
@@ -11,6 +11,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Bill Farner
 + Brian Larson
 + Brian Wickman
++ Bruno Bieth
 + Chris Aniszczyk
 + Chris Burroughs
 + Chris Chen
