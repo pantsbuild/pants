@@ -79,7 +79,26 @@ class GoalRunnerFactory(object):
       build_ignore_patterns,
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
-    self._build_graph = build_graph or MutableBuildGraph(self._address_mapper)
+    self._build_graph = self._select_buildgraph(self._global_options.enable_v2_engine,
+                                                self._global_options.pants_ignore,
+                                                build_graph)
+
+  def _select_buildgraph(self, use_engine, path_ignore_patterns, cached_buildgraph=None):
+    """Selects a BuildGraph to use then constructs and returns it.
+
+    :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
+    :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
+    :param LegacyBuildGraph cached_buildgraph: A cached graph to reuse, if available.
+    """
+    if cached_buildgraph is not None:
+      return cached_buildgraph
+    elif use_engine:
+      root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
+                                                                     build_root=self._root_dir)
+      graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns)
+      return graph_helper.create_graph(root_specs)
+    else:
+      return MutableBuildGraph(self._address_mapper)
 
   def _get_project_tree(self, build_file_rev, pants_ignore):
     """Creates the project tree for build files for use in a given pants run."""

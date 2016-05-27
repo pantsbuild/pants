@@ -65,7 +65,7 @@ class EngineTest(unittest.TestCase):
     with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
 
-      cache_stats = engine._cache.get_stats()
+      cache_stats = engine.cache_stats()
       # First run all misses.
       self.assertTrue(cache_stats.hits == 0)
 

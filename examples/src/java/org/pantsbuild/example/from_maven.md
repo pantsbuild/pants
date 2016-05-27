@@ -46,6 +46,8 @@ for advice.
 Pants Equivalents
 -----------------
 
+### Commands
+
 **Run a binary**<br>
 Maven: `exec:java`<br>
 Pants: `run`
@@ -66,3 +68,43 @@ Pants: `binary`<br>
 Maven: `dependency:analyze`<br>
 Pants: `depmap`<br>
 Pants: `resolve.ivy --open`<br>
+
+### Configuration
+
+**Shade with an AppendingTransformer**<br>
+
+Maven
+```xml
+<plugins>
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-shade-plugin</artifactId>
+    <executions>
+        <execution>
+            <goals>
+                <goal>shade</goal>
+            </goals>
+            <configuration>
+                <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                        <resource>reference.conf</resource>
+                    </transformer>
+                </transformers>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+</plugins>
+```
+
+Pants
+```python
+jvm_binary(name='your-bin',
+           main = 'pkg.to.my.Main',
+           deploy_jar_rules=jar_rules(rules=[
+              Duplicate('^reference\.conf', Duplicate.CONCAT_TEXT),
+
+              # We need to add this as it is overridden by adding the reference.conf one above.
+              Duplicate('^META-INF/services/', Duplicate.CONCAT_TEXT)
+          ]))
+```
