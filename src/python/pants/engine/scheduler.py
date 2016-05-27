@@ -310,16 +310,19 @@ class ProductGraph(object):
     yield '  concentrate=true;'
     yield '  rankdir=LR;'
 
-    for (node, node_state) in self.walk(roots):
+    predicate = lambda n, s: type(s) is not Noop
+
+    for (node, node_state) in self.walk(roots, predicate=predicate):
       node_str = format_node(node, node_state)
 
       yield ' "{}" [style=filled, fillcolor={}];'.format(node_str, format_color(node, node_state))
 
-      for dep in self.dependencies_of(node):
-        dep_state = self.state(dep)
-        if type(dep_state) is Noop:
-          continue
-        yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
+      for deps in (self.dependencies_of(node), self.cyclic_dependencies_of(node)):
+        for dep in deps:
+          dep_state = self.state(dep)
+          if not predicate(dep, dep_state):
+            continue
+          yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
 
     yield '}'
 

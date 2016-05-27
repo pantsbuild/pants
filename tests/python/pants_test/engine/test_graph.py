@@ -118,6 +118,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
     request = scheduler.execution_request([self._product], [address])
     LocalSerialEngine(scheduler, self.storage).reduce(request)
+    scheduler.visualize_graph_to_file(request.roots, '{}.dot'.format(address.path_safe_spec))
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     return root_entries[0]
@@ -200,9 +201,6 @@ class InlinedGraphTest(GraphTestBase):
     self.assertEquals(nonstrict, java1.configurations[1])
 
     self.assertEquals(java1, self.resolve(scheduler, java1_address))
-
-  def extract_path_tail(self, cycle_exception, line_count):
-    return [l.lstrip() for l in str(cycle_exception).splitlines()[-line_count:]]
 
   def do_test_cycle(self, scheduler, address_str):
     walk = self.walk(scheduler, Address.parse(address_str))
