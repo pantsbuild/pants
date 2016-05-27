@@ -28,10 +28,9 @@ class SchedulerService(PantsService):
     """
     super(SchedulerService, self).__init__()
     self._fs_event_service = fs_event_service
+    self._graph_helper = legacy_graph_helper
     self._scheduler = legacy_graph_helper.scheduler
     self._engine = legacy_graph_helper.engine
-    self._symbol_table_cls = legacy_graph_helper.symbol_table_cls
-    self._build_graph_facade_cls = legacy_graph_helper.legacy_graph_cls
 
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=64)
@@ -81,14 +80,8 @@ class SchedulerService(PantsService):
     self._event_queue.task_done()
 
   def get_build_graph(self, spec_roots):
-    """Returns a factory that provides a legacy BuildGraph given a set of input specs."""
-    graph = self._build_graph_facade_cls(self._scheduler, self._engine, self._symbol_table_cls)
-    with self._scheduler.locked():
-      for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
-        pass
-    self._logger.debug('engine cache stats: %s', self._engine._cache.get_stats())
-    self._logger.debug('build_graph is: %s', graph)
-    return graph
+    """Returns a legacy BuildGraph given a set of input specs."""
+    return self._graph_helper.create_graph(spec_roots)
 
   def run(self):
     """Main service entrypoint."""
