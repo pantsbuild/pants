@@ -159,7 +159,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     # Set up a scheduler that supports address mapping.
     symbol_table_cls = TargetTable
-    self.storage = Storage.create(in_memory=True)
+    self.storage = Storage.create()
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=JsonParser,
                                    build_pattern=r'.+\.BUILD.json$')
@@ -167,10 +167,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
 
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
     self.build_root = project_tree.build_root
-    self.scheduler, _ = self.mk_scheduler(tasks=tasks,
-                                          project_tree=project_tree,
-                                          storage=self.storage,
-                                          symbol_table_cls=symbol_table_cls)
+    self.scheduler = self.mk_scheduler(tasks=tasks, project_tree=project_tree)
 
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',

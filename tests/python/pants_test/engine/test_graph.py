@@ -91,7 +91,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def setUp(self):
     super(GraphTestBase, self).setUp()
-    self.storage = Storage.create(in_memory=True)
+    self.storage = Storage.create()
 
   def tearDown(self):
     self.storage.close()
@@ -105,10 +105,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
     tasks = create_graph_tasks(address_mapper, symbol_table_cls)
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
-    scheduler, _ = self.mk_scheduler(tasks=tasks,
-                                     storage=self.storage,
-                                     project_tree=project_tree,
-                                     symbol_table_cls=symbol_table_cls)
+    scheduler = self.mk_scheduler(tasks=tasks, project_tree=project_tree)
     return scheduler
 
   def create_json(self):
