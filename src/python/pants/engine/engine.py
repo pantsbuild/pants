@@ -288,21 +288,12 @@ class ThreadHybridEngine(Engine):
         submitted += 1
 
       else:
-        with ThreadPoolExecutor(max_workers=self._pool_size) as executor:
-          futures = [
-            executor.submit(self._deferred_cache_fetch(step)),
-            executor.submit(self._deferred_results(step))
-          ]
-
-          for f in as_completed(futures):
-            if f.result() is not None:
-              break
-          promise.success(f.result())
-
-          #cleanup
-          for f in futures:
-            f.cancel()
-          executor.shutdown(wait=False)
+        keyed_request = self._storage.key_for_request(step)
+        result = self._maybe_cache_get(keyed_request)
+        if result is None:
+          result = step(self._node_builder)
+          self._maybe_cache_put(keyed_request, result)
+        promise.success(result)
 
     return submitted
 
