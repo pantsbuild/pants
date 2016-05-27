@@ -442,9 +442,9 @@ class LocalScheduler(object):
     :param project_tree: An instance of ProjectTree for the current build root.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
                        instance. Defaults to creating a new threading.RLock().
-    :param inline: Whether to inline execution of `inlineable` Nodes. This improves performance,
-                   but can make debugging more difficult, because the entire execution history
-                   is not recorded in the ProductGraph.
+    :param inline_nodes: Whether to inline execution of `inlineable` Nodes. This improves
+                         performance, but can make debugging more difficult because the entire
+                         execution history is not recorded in the ProductGraph.
     :param graph_validator: A validator that runs over the entire graph after every scheduling
                             attempt. Very expensive, very experimental.
     """

@@ -64,7 +64,7 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   """Indicates that a Node is waiting for some/all of the dependencies to become available.
 
   Some Nodes will return different dependency Nodes based on where they are in their lifecycle,
-  but all returned dependencies are recorded for the lifetime of a ProductGraph.
+  but all returned dependencies are recorded for the lifetime of a Node.
   """
 
 
@@ -154,9 +154,9 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     variants_node = self._variants_node()
     if variants_node:
       dep_state = step_context.get(variants_node)
-      if type(dep_state) == Waiting:
+      if type(dep_state) is Waiting:
         return dep_state
-      elif type(dep_state) == Return:
+      elif type(dep_state) is Return:
         # A subject's variants are overridden by any dependent's requested variants, so
         # we merge them left to right here.
         variants = Variants.merge(dep_state.value.default.items(), variants)
@@ -182,9 +182,9 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     matched_node, matched_value = None, None
     for dep in step_context.gen_nodes(self.subject, self.product, variants):
       dep_state = step_context.get(dep)
-      if type(dep_state) == Waiting:
+      if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
-      elif type(dep_state) == Return:
+      elif type(dep_state) is Return:
         if matched_node is not None:
           # TODO: Multiple successful tasks are not currently supported. We should allow for this
           # by adding support for "mergeable" products. see:
@@ -195,9 +195,9 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
         literal_value = self._select_literal(dep_state.value, variant_value)
         if literal_value is not None:
           matched_node, matched_value = dep, literal_value
-      elif type(dep_state) == Throw:
+      elif type(dep_state) is Throw:
         return dep_state
-      elif type(dep_state) == Noop:
+      elif type(dep_state) is Noop:
         continue
       else:
         State.raise_unrecognized(dep_state)
@@ -239,13 +239,11 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     # Request the product we need in order to request dependencies.
     dep_product_node = self._dep_product_node()
     dep_product_state = step_context.get(dep_product_node)
-    if type(dep_product_state) == Waiting:
+    if type(dep_product_state) in (Throw, Waiting):
       return dep_product_state
-    elif type(dep_product_state) == Throw:
-      return dep_product_state
-    elif type(dep_product_state) == Noop:
+    elif type(dep_product_state) is Noop:
       return Noop('Could not compute {} to determine dependencies.'.format(dep_product_node))
-    elif type(dep_product_state) != Return:
+    elif type(dep_product_state) is not Return:
       State.raise_unrecognized(dep_product_state)
 
     # The product and its dependency list are available.
@@ -253,13 +251,13 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     dependencies = []
     for dependency in self._dependency_nodes(step_context, dep_product_state.value):
       dep_state = step_context.get(dependency)
-      if type(dep_state) == Waiting:
+      if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
-      elif type(dep_state) == Return:
+      elif type(dep_state) is Return:
         dep_values.append(dep_state.value)
-      elif type(dep_state) == Noop:
+      elif type(dep_state) is Noop:
         return Throw(ValueError('No source of explicit dependency {}'.format(dependency)))
-      elif type(dep_state) == Throw:
+      elif type(dep_state) is Throw:
         return dep_state
       else:
         raise State.raise_unrecognized(dep_state)
@@ -288,13 +286,11 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     # Request the product we need to compute the subject.
     input_node = self._input_node()
     input_state = step_context.get(input_node)
-    if type(input_state) == Waiting:
+    if type(input_state) in (Throw, Waiting):
       return input_state
-    elif type(input_state) == Throw:
-      return input_state
-    elif type(input_state) == Noop:
+    elif type(input_state) is Noop:
       return Noop('Could not compute {} in order to project its fields.'.format(input_node))
-    elif type(input_state) != Return:
+    elif type(input_state) is not Return:
       State.raise_unrecognized(input_state)
 
     # The input product is available: use it to construct the new Subject.
@@ -312,17 +308,21 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
 
     # When the output node is available, return its result.
     output_state = step_context.get(output_node)
-    if type(output_state) == Waiting:
+    if type(output_state) in (Return, Throw, Waiting):
       return output_state
-    elif type(output_state) == Noop:
+    elif type(output_state) is Noop:
       return Noop('Successfully projected, but no source of output product for {}.'.format(output_node))
-    elif type(output_state) in [Throw, Return]:
-      return output_state
     else:
       raise State.raise_unrecognized(output_state)
 
 
 class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', 'clause']), Node):
+  """A Node representing execution of a non-blocking python function.
+
+  All dependencies of the function are declared ahead of time in the dependency `clause` of the
+  function, so the TaskNode will determine whether the dependencies are available before
+  executing the function, and provides a satisfied argument per clause entry to the function.
+  """
 
   is_cacheable = True
   is_inlineable = False
@@ -334,16 +334,16 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     for selector in self.clause:
       dep_node = step_context.select_node(selector, self.subject, self.variants)
       dep_state = step_context.get(dep_node)
-      if type(dep_state) == Waiting:
+      if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
-      elif type(dep_state) == Return:
+      elif type(dep_state) is Return:
         dep_values.append(dep_state.value)
-      elif type(dep_state) == Noop:
+      elif type(dep_state) is Noop:
         if selector.optional:
           dep_values.append(None)
         else:
           return Noop('Was missing (at least) input {}.'.format(dep_node))
-      elif type(dep_state) == Throw:
+      elif type(dep_state) is Throw:
         return dep_state
       else:
         State.raise_unrecognized(dep_state)
