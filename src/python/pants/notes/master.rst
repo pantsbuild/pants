@@ -7,7 +7,7 @@ not undergo the vetting associated with ``stable`` releases.
 1.1.0-pre3 (05/27/2016)
 -----------------------
 
-This is the forth `1.1.0-pre` release on the way to the `1.1.0` stable branch
+This is the fourth `1.1.0-pre` release on the way to the `1.1.0` stable branch
 
 Bugfixes
 ~~~~~~~~
