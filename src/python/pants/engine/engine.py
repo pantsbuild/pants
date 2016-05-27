@@ -17,7 +17,7 @@ from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.engine.objects import SerializationError
-from pants.engine.processing import StatefulProcessPoolBase, StatefulThreadPoolBase
+from pants.engine.processing import StatefulProcessPoolBase
 from pants.engine.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -30,7 +30,10 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 class InFlightException(Exception):pass
+
+
 class StepBatchException(Exception):pass
 
 class Engine(AbstractClass):
