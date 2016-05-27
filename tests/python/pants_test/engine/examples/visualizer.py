@@ -30,7 +30,7 @@ def visualize_execution_graph(scheduler, storage, request):
 
 
 def visualize_build_request(build_root, goals, subjects):
-  scheduler, storage = setup_json_scheduler(build_root)
+  scheduler, storage = setup_json_scheduler(build_root, debug=False)
   execution_request = scheduler.build_request(goals, subjects)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   engine = LocalSerialEngine(scheduler, storage)
