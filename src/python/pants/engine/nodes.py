@@ -34,7 +34,7 @@ class ConflictingProducersError(Exception):
     This is provided as a workaround to http://bugs.python.org/issue17296 to make this exception
     picklable.
     """
-    msgs = '\n  '.join('{}: {}'.format(k, v) for k, v in matches.items())
+    msgs = '\n  '.join('{}: {}'.format(k, v) for k, v in matches)
     return ConflictingProducersError('More than one source of {} for {}:\n  {}'
                                      .format(product.__name__, subject, msgs))
 
@@ -179,22 +179,16 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
 
     # Else, attempt to use a configured task to compute the value.
     dependencies = []
-    matched_node, matched_value = None, None
+    matches = []
     for dep in step_context.gen_nodes(self.subject, self.product, variants):
       dep_state = step_context.get(dep)
       if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) is Return:
-        if matched_node is not None:
-          # TODO: Multiple successful tasks are not currently supported. We should allow for this
-          # by adding support for "mergeable" products. see:
-          #   https://github.com/pantsbuild/pants/issues/2526
-          matches = {dep: dep_state, matched_node: matched_value}
-          return Throw(ConflictingProducersError.create(self.subject, self.product, matches))
         # We computed a value: see whether we can use it.
         literal_value = self._select_literal(dep_state.value, variant_value)
         if literal_value is not None:
-          matched_node, matched_value = dep, literal_value
+          matches.append((dep, literal_value))
       elif type(dep_state) is Throw:
         return dep_state
       elif type(dep_state) is Noop:
@@ -202,13 +196,19 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       else:
         State.raise_unrecognized(dep_state)
 
-    # If any dependencies were unavailable, wait for them.
+    # If any dependencies were unavailable, wait for them; otherwise, determine whether
+    # a value was succesfully selected.
     if dependencies:
       return Waiting(dependencies)
-    elif matched_node is None:
+    elif len(matches) == 0:
       return Noop('No source of {}.'.format(self))
+    elif len(matches) > 1:
+      # TODO: Multiple successful tasks are not currently supported. We should allow for this
+      # by adding support for "mergeable" products. see:
+      #   https://github.com/pantsbuild/pants/issues/2526
+      return Throw(ConflictingProducersError.create(self.subject, self.product, matches))
     else:
-      return Return(matched_value)
+      return Return(matches[0][1])
 
 
 class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product', 'field']), Node):
