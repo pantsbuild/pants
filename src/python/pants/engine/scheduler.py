@@ -310,7 +310,7 @@ class ProductGraph(object):
     yield '  concentrate=true;'
     yield '  rankdir=LR;'
 
-    predicate = lambda n, s: type(s) is not Noop
+    predicate = lambda n, s: True #type(s) is not Noop
 
     for (node, node_state) in self.walk(roots, predicate=predicate):
       node_str = format_node(node, node_state)
@@ -406,7 +406,9 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'inline_n
   def __call__(self, node_builder):
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, self.project_tree, self.dependencies, self.inline_nodes)
+    print('>>> stepping {}'.format(self.node))
     state = self.node.step(step_context)
+    print('>>> ...got {}'.format(state))
     return StepResult(state)
 
   def __eq__(self, other):
@@ -492,8 +494,7 @@ class LocalScheduler(object):
       deps[dep] = state
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in self._product_graph.cyclic_dependencies_of(node):
-      noop_state = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
-      deps[dep] = noop_state
+      deps[dep] = Throw.cycle(node, dep)
 
     # Ready.
     self._step_id += 1

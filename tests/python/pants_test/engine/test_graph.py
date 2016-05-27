@@ -14,7 +14,7 @@ from pants.engine.addressable import (Exactly, SubclassesOf, addressable, addres
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.mapper import AddressMapper, ResolveError
-from pants.engine.nodes import Noop, Return, Throw
+from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
 from pants.engine.storage import Storage
 from pants.engine.struct import HasStructs, Struct, StructWithDeps
@@ -206,7 +206,7 @@ class InlinedGraphTest(GraphTestBase):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     self.assertEqual(type(walk[0][1]), Throw)
-    self.assertTrue(any('cycle' in state.msg for _, state in walk if type(state) is Noop))
+    self.assertTrue(any('cycle' in str(state.exc) for _, state in walk if type(state) is Throw))
 
   def test_cycle_self(self):
     self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')

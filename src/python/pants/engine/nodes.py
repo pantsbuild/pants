@@ -59,6 +59,10 @@ class Return(datatype('Return', ['value']), State):
 class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
 
+  @staticmethod
+  def cycle(src, dst):
+    return Throw('Edge:\n  {} ->\n  {}\nwould cause a cycle.'.format(src, dst))
+
 
 class Waiting(datatype('Waiting', ['dependencies']), State):
   """Indicates that a Node is waiting for some/all of the dependencies to become available.
@@ -422,21 +426,33 @@ class StepContext(object):
     self.project_tree = project_tree
     self._node_states = dict(node_states)
     self._inline_nodes = inline_nodes
+    self._level = 1
 
   def get(self, node):
     """Given a Node and computed node_states, gets the current state for the Node.
 
     Optionally inlines execution of inlineable dependencies if `inline_nodes=True`.
     """
-    state = self._node_states.get(node, None)
-    if state is not None:
-      return state
-    if self._inline_nodes and node.is_inlineable:
-      state = node.step(self)
-      self._node_states[node] = state
-      return state
-    else:
-      return Waiting([node])
+    def inline():
+      state = self._node_states.get(node, None)
+      if type(state) is Node:
+        return Throw.cycle(state, node)
+      if state is not None:
+        return state
+      if self._inline_nodes and node.is_inlineable:
+        self._node_states[node] = node
+        self._level += 1
+        state = node.step(self)
+        self._level -= 1
+        self._node_states[node] = state
+        return state
+      else:
+        return Waiting([node])
+
+    print('>>> {}getting {}'.format("  " * self._level, node))
+    s = inline()
+    print('>>> {}...got {}'.format("  " * self._level, s))
+    return s
 
   def gen_nodes(self, subject, product, variants):
     """Yields Node instances which might be able to provide a value for the given inputs."""
