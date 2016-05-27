@@ -118,6 +118,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
     request = scheduler.execution_request([self._product], [address])
     LocalSerialEngine(scheduler, self.storage).reduce(request)
+    scheduler.visualize_graph_to_file(request.roots, '{}.dot'.format(address.path_safe_spec))
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     return root_entries[0]
