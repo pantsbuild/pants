@@ -4,6 +4,48 @@ Master Pre-Releases
 This document describes ``pre`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.1.0-pre3 (05/27/2016)
+-----------------------
+
+This is the fourth `1.1.0-pre` release on the way to the `1.1.0` stable branch
+
+Bugfixes
+~~~~~~~~
+
+* Fix hardcoded pants ignore from 'dist/' to '/rel_distdir/'. Use pants_ignore: +[...] in pants.ini
+  `RB #3927 <https://rbcommons.com/s/twitter/r/3927>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Robustify pantsd + watchman integration tests.
+  `RB #3912 <https://rbcommons.com/s/twitter/r/3912>`_
+
+* Add an `--enable-engine` flag to leverage the v2 engine-backed LegacyBuildGraph without pantsd.
+  `RB #3932 <https://rbcommons.com/s/twitter/r/3932>`_
+
+* Adds in the experimental test runner
+  `RB #3921 <https://rbcommons.com/s/twitter/r/3921>`_
+
+* Flush out some bugs with the 'parallel methods' running in the legacy runner.
+  `RB #3922 <https://rbcommons.com/s/twitter/r/3922>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Adding a special '$JAVA_HOME' symbol for use in jvm platforms args.
+  `RB #3924 <https://rbcommons.com/s/twitter/r/3924>`_
+
+* Defaulting to Node 6.2.0
+  `Issue #3478 <https://github.com/pantsbuild/pants/issues/3478>`_
+  `RB #3918 <https://rbcommons.com/s/twitter/r/3918>`_
+
+* Add documentation on deploy_jar_rules for Maven experts
+  `RB #3937 <https://rbcommons.com/s/twitter/r/3937>`_
+
+* Bump pex requirement to pex==1.1.9.
+  `RB #3935 <https://rbcommons.com/s/twitter/r/3935>`_
+
 1.1.0-pre2 (05/21/2016)
 -----------------------
 
