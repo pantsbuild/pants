@@ -28,12 +28,10 @@ try:
 except ImportError:
   import pickle
 
-
 logger = logging.getLogger(__name__)
 
 class InFlightException(Exception):pass
 class StepBatchException(Exception):pass
-
 
 class Engine(AbstractClass):
   """An engine for running a pants command line."""
@@ -354,6 +352,7 @@ class ThreadHybridEngine(Engine):
       f.cancel()
     self._pool.shutdown()  # Wait for pool to cleanup before we cleanup storage.
 
+
 def _process_initializer(node_builder, storage):
   """Another pickle-able top-level function that provides multi-processes' initial states.
 
@@ -365,6 +364,7 @@ def _process_initializer(node_builder, storage):
 
 class LocalMultiprocessEngine(Engine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
+
   def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
     """
     :param scheduler: The local scheduler for creating execution graphs.
@@ -444,7 +444,7 @@ class LocalMultiprocessEngine(Engine):
   def _await_one(self, in_flight):
     """Await one completed step, and remove it from in_flight."""
     if not in_flight:
-      raise InFLightException('Awaited an empty pool!')
+      raise InFlightException('Awaited an empty pool!')
     step_id, result = self._pool.await_one_result()
     if isinstance(result, Exception):
       raise result
