@@ -5,12 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
+class DependenciesIntegrationTest(PantsRunIntegrationTest):
   def assert_list_new_equals_old(self, success, spec):
     self.assertEqual(
       self.run_regular_list(spec, success),
@@ -18,7 +16,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     )
 
   def run_engine_list(self, spec, success):
-    args = ['-q', 'run', 'src/python/pants/engine/legacy:list', '--'] + spec
+    args = ['-q', '--enable-v2-engine', 'list'] + spec
     return self.get_target_set(args, success)
 
   def run_regular_list(self, spec, success):
@@ -43,3 +41,6 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       True,
       ['3rdparty::', 'examples/src/::', 'testprojects/tests/::']
     )
+
+  def test_list_all(self):
+    self.assert_success(self.run_pants(['--enable-v2-engine', 'list', '::']))

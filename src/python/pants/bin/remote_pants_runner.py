@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
-from pants.pantsd.process_manager import ProcessManager
+from pants.pantsd.process_manager import ProcessMetadataManager
 
 
 class RemotePantsRunner(object):
@@ -22,11 +22,13 @@ class RemotePantsRunner(object):
   PANTS_COMMAND = 'pants'
   RECOVERABLE_EXCEPTIONS = (PortNotFound, NailgunClient.NailgunConnectionError)
 
-  def __init__(self, exiter, args, env, stdin=None, stdout=None, stderr=None):
+  def __init__(self, exiter, args, env, process_metadata_dir=None,
+               stdin=None, stdout=None, stderr=None):
     """
     :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
+    :param str process_metadata_dir: The directory in which process metadata is kept.
     :param file stdin: The stream representing stdin.
     :param file stdout: The stream representing stdout.
     :param file stderr: The stream representing stderr.
@@ -34,6 +36,7 @@ class RemotePantsRunner(object):
     self._exiter = exiter
     self._args = args
     self._env = env
+    self._process_metadata_dir = process_metadata_dir
     self._stdin = stdin or sys.stdin
     self._stdout = stdout or sys.stdout
     self._stderr = stderr or sys.stderr
@@ -60,7 +63,8 @@ class RemotePantsRunner(object):
       signal.signal(signal.SIGINT, existing_sigint_handler)
 
   def _retrieve_pailgun_port(self):
-    return ProcessManager.read_metadata_by_name('pantsd', 'socket_pailgun', int)
+    return ProcessMetadataManager(
+      self._process_metadata_dir).read_metadata_by_name('pantsd', 'socket_pailgun', int)
 
   def run(self, args=None):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
