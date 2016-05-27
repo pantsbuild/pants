@@ -19,8 +19,9 @@ from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
 class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
-    self.scheduler, self.storage = setup_json_scheduler(build_root, debug=True)
-    self.cache = Cache.create(Storage.create())
+    self.scheduler = setup_json_scheduler(build_root)
+    storage = Storage.create(debug=True, in_memory=False)
+    self.cache = Cache.create(storage=storage)
 
     self.java = Address.parse('src/java/codegen/simple')
 

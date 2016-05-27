@@ -14,6 +14,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.binaries import binary_util
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
+from pants.engine.storage import Storage
 from pants.util.contextutil import temporary_file_path
 from pants_test.engine.examples.planners import setup_json_scheduler
 
@@ -30,7 +31,9 @@ def visualize_execution_graph(scheduler, storage, request):
 
 
 def visualize_build_request(build_root, goals, subjects):
-  scheduler, storage = setup_json_scheduler(build_root)
+  scheduler = setup_json_scheduler(build_root)
+  storage = Storage.create(debug=True, in_memory=False)
+
   execution_request = scheduler.build_request(goals, subjects)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   engine = LocalSerialEngine(scheduler, storage)
