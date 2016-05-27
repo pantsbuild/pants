@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 from multiprocessing import Process, Queue
-from Queue import Queue as ThreadQueue
 
 from concurrent.futures import ProcessPoolExecutor
 

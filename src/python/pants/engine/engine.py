@@ -31,10 +31,13 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class InFlightException(Exception):pass
+class InFlightException(Exception):
+  pass
 
 
-class StepBatchException(Exception):pass
+class StepBatchException(Exception):
+  pass
+
 
 class Engine(AbstractClass):
   """An engine for running a pants command line."""
