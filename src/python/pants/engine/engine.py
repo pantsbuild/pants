@@ -12,7 +12,7 @@ import traceback
 from abc import abstractmethod
 from Queue import Queue
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
