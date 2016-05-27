@@ -183,6 +183,7 @@ class BaseTest(unittest.TestCase):
     self.real_build_root = BuildRoot().path
 
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+    self.subprocess_dir = os.path.join(self.build_root, '.pids')
     self.addCleanup(safe_rmtree, self.build_root)
 
     self.pants_workdir = os.path.join(self.build_root, '.pants.d')
@@ -194,6 +195,7 @@ class BaseTest(unittest.TestCase):
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist'),
       'pants_configdir': os.path.join(self.build_root, 'config'),
+      'pants_subprocessdir': self.subprocess_dir,
       'cache_key_gen_version': '0-test',
     }
     self.options['cache'] = {
