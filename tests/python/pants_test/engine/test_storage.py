@@ -25,7 +25,8 @@ class StorageTest(unittest.TestCase):
   def setUp(self):
     self.storage = Storage.create(in_memory=True)
     self.result = StepResult(state='something')
-    self.request = StepRequest(step_id=123, node='some node',
+    self.request = StepRequest(step_id=123,
+                               node='some node',
                                dependencies={'some dep': 'some state',
                                              'another dep': 'another state'},
                                inline_nodes=False,
@@ -116,10 +117,12 @@ class CacheTest(unittest.TestCase):
     """Setup cache as well as request and result."""
     self.storage = Storage.create(in_memory=True)
     self.cache = Cache.create(storage=self.storage)
-    request = StepRequest(step_id=123, node='some node',
-                               dependencies={'some dep': 'some state',
-                                             'another dep': 'another state'},
-                               project_tree='some project tree')
+    request = StepRequest(step_id=123,
+                          node='some node',
+                          dependencies={'some dep': 'some state',
+                                        'another dep': 'another state'},
+                          inline_nodes=False,
+                          project_tree='some project tree')
     self.result = StepResult(state='something')
     self.keyed_request = self.storage.key_for_request(request)
 
