@@ -29,7 +29,7 @@ class SchedulerTest(unittest.TestCase):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
     self.scheduler = setup_json_scheduler(build_root)
-    self.storage = Storage.create(debug=True, in_memory=False)
+    self.storage = Storage.create(debug=True)
     self.pg = self.scheduler.product_graph
     self.engine = LocalSerialEngine(self.scheduler, self.storage)
 
