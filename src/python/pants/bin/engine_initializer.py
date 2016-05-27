@@ -85,13 +85,10 @@ class EngineInitializer(object):
 
     :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                       usually taken from the `--pants-ignore` global option.
-    :param Storage storage: storage instance to construct the engine.
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 
     build_root = get_buildroot()
-    # Creates an in-memory storage for `LocalSerialEngine`
-    storage = Storage.create(debug=False)
     project_tree = FileSystemProjectTree(build_root, path_ignore_patterns)
     symbol_table_cls = LegacySymbolTable
 
@@ -109,7 +106,7 @@ class EngineInitializer(object):
     )
 
     scheduler = LocalScheduler(dict(), tasks, project_tree)
-    engine = LocalSerialEngine(scheduler, storage)
+    engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
 

@@ -32,7 +32,7 @@ def visualize_execution_graph(scheduler, storage, request):
 
 def visualize_build_request(build_root, goals, subjects):
   scheduler = setup_json_scheduler(build_root)
-  storage = Storage.create(debug=True, in_memory=False)
+  storage = Storage.create(debug=True)
 
   execution_request = scheduler.build_request(goals, subjects)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.

@@ -125,10 +125,6 @@ class Engine(AbstractClass):
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
-  def __init__(self, scheduler, storage=None, cache=None):
-    storage = storage or Storage.create(in_memory=True)
-    super(LocalSerialEngine, self).__init__(scheduler, storage, cache)
-
   def reduce(self, execution_request):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
@@ -206,7 +202,7 @@ class LocalMultiprocessEngine(Engine):
                           be used.
     :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
     """
-    # Explicitly create a lmdb storage that's only needed by LocalMultiprocessEngine.
+    # This is the only place where non in-memory storage is needed, create one if not specified.
     storage = storage or Storage.create(in_memory=False)
     super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()

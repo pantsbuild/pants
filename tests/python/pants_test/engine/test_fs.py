@@ -14,7 +14,6 @@ from pants.base.scm_project_tree import ScmProjectTree
 from pants.engine.fs import (Dir, DirectoryListing, Dirs, FileContent, Files, Link, Path, PathGlobs,
                              ReadLink, Stat, Stats)
 from pants.engine.nodes import FilesystemNode
-from pants.engine.storage import Storage
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version, initialize_repo
@@ -36,13 +35,13 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def assert_walk(self, ftype, filespecs, files):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, Storage.create(), Stat, self.specs(ftype, '', *filespecs))[0]
+      result = self.execute(scheduler, Stat, self.specs(ftype, '', *filespecs))[0]
       self.assertEquals(set(files), set([p.path for p in result]))
 
   def assert_content(self, filespecs, expected_content):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, Storage.create(), FileContent, self.specs(Files, '', *filespecs))[0]
+      result = self.execute(scheduler, FileContent, self.specs(Files, '', *filespecs))[0]
       def validate(e):
         self.assertEquals(type(e), FileContent)
         return True
@@ -52,7 +51,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      request = self.execute_request(scheduler, Storage.create(), Stat, self.specs(ftype, '', *filespecs))
+      request = self.execute_request(scheduler, Stat, self.specs(ftype, '', *filespecs))
 
       # Validate that FilesystemNodes for exactly the given subjects are reachable under this
       # request.

@@ -21,7 +21,6 @@ from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, Diffe
                                  DuplicateNameError, ResolveError, UnaddressableObjectError)
 from pants.engine.nodes import Throw
 from pants.engine.parser import SymbolTable
-from pants.engine.storage import Storage
 from pants.engine.struct import HasStructs, Struct
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser
@@ -159,7 +158,6 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     # Set up a scheduler that supports address mapping.
     symbol_table_cls = TargetTable
-    self.storage = Storage.create()
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=JsonParser,
                                    build_pattern=r'.+\.BUILD.json$')
@@ -175,12 +173,9 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              configurations=['//a', Struct(embedded='yes')],
                              type_alias='target')
 
-  def tearDown(self):
-    self.storage.close()
-
   def resolve(self, spec):
     request = self.scheduler.execution_request([UnhydratedStruct], [spec])
-    result = LocalSerialEngine(self.scheduler, self.storage).execute(request)
+    result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error
 

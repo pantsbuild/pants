@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+from contextlib import closing
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.engine import LocalSerialEngine
@@ -58,17 +59,18 @@ class SchedulerTestBase(object):
     scheduler = LocalScheduler(goals, tasks, project_tree)
     return scheduler
 
-  def execute_request(self, scheduler, storage, product, *subjects):
+  def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
     request = scheduler.execution_request([product], subjects)
-    res = LocalSerialEngine(scheduler, storage).execute(request)
-    if res.error:
-      raise res.error
-    return request
+    with closing(LocalSerialEngine(scheduler)) as engine:
+      res = engine.execute(request)
+      if res.error:
+        raise res.error
+      return request
 
-  def execute(self, scheduler, storage, product, *subjects):
+  def execute(self, scheduler, product, *subjects):
     """Runs an ExecutionRequest for the given product and subjects, and returns the result value."""
-    request = self.execute_request(scheduler, storage, product, *subjects)
+    request = self.execute_request(scheduler, product, *subjects)
     states = scheduler.root_entries(request).values()
     if any(type(state) is not Return for state in states):
       with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
