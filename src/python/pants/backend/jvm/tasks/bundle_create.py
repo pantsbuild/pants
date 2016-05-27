@@ -87,7 +87,10 @@ class BundleCreate(JvmBinaryTask):
       # `target_roots` instead of all transitive targets will reduce the chance users
       # see their bundle command fail due to basename conflicts. We should eventually
       # get rid of this special case.
-      targets_to_bundle = self.context.target_roots
+      targets_to_bundle = []
+      for target in self.context.targets():
+        if target in self.context.target_roots or isinstance(target, JvmApp):
+          targets_to_bundle.append(target)
     else:
       targets_to_bundle = self.context.targets()
     apps = [self.App(target, use_basename_prefix=self.get_options().use_basename_prefix)
