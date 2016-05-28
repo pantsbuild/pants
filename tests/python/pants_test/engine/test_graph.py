@@ -16,7 +16,6 @@ from pants.engine.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.mapper import AddressMapper, ResolveError
 from pants.engine.nodes import Noop, Return, Throw
 from pants.engine.parser import SymbolTable
-from pants.engine.storage import Storage
 from pants.engine.struct import HasStructs, Struct, StructWithDeps
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
                                                 PythonCallbacksParser)
@@ -91,10 +90,6 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def setUp(self):
     super(GraphTestBase, self).setUp()
-    self.storage = Storage.create(in_memory=True)
-
-  def tearDown(self):
-    self.storage.close()
 
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     symbol_table_cls = TestTable
@@ -105,10 +100,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
     tasks = create_graph_tasks(address_mapper, symbol_table_cls)
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
-    scheduler, _ = self.mk_scheduler(tasks=tasks,
-                                     storage=self.storage,
-                                     project_tree=project_tree,
-                                     symbol_table_cls=symbol_table_cls)
+    scheduler = self.mk_scheduler(tasks=tasks, project_tree=project_tree)
     return scheduler
 
   def create_json(self):
@@ -117,7 +109,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
     request = scheduler.execution_request([self._product], [address])
-    LocalSerialEngine(scheduler, self.storage).reduce(request)
+    LocalSerialEngine(scheduler).reduce(request)
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     return root_entries[0]

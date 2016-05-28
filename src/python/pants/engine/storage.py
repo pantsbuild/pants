@@ -139,7 +139,7 @@ class Storage(Closable):
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
-  def create(cls, path=None, in_memory=False, debug=True, protocol=None):
+  def create(cls, path=None, in_memory=True, debug=True, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
     :param path: If in_memory=False, the path to store the database in.

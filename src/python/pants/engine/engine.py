@@ -202,6 +202,8 @@ class LocalMultiprocessEngine(Engine):
                           be used.
     :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
     """
+    # This is the only place where non in-memory storage is needed, create one if not specified.
+    storage = storage or Storage.create(in_memory=False)
     super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 

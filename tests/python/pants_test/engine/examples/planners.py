@@ -22,7 +22,6 @@ from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
-from pants.engine.storage import Storage
 from pants.engine.struct import HasStructs, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -403,14 +402,11 @@ class ExampleTable(SymbolTable):
             'inferred_scala': ScalaInferredDepsSources}
 
 
-def setup_json_scheduler(build_root, debug=True):
+def setup_json_scheduler(build_root):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype A tuple of :class:`pants.engine.scheduler.LocalScheduler`,
-    :class:`pants.engine.storage.Storage`.
+  :rtype :class:`pants.engine.scheduler.LocalScheduler`
   """
-
-  storage = Storage.create(debug=debug)
 
   symbol_table_cls = ExampleTable
 
@@ -510,4 +506,4 @@ def setup_json_scheduler(build_root, debug=True):
     )
 
   project_tree = FileSystemProjectTree(build_root)
-  return LocalScheduler(goals, tasks, storage, project_tree, None, GraphValidator(symbol_table_cls)), storage
+  return LocalScheduler(goals, tasks, project_tree, None, GraphValidator(symbol_table_cls))

@@ -449,7 +449,7 @@ class StepResult(datatype('Step', ['state'])):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, storage, project_tree, graph_lock=None, graph_validator=None):
+  def __init__(self, goals, tasks, project_tree, graph_lock=None, graph_validator=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.

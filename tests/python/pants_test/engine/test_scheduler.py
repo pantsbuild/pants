@@ -27,9 +27,9 @@ class SchedulerTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
-    self.scheduler, self.storage = setup_json_scheduler(build_root)
+    self.scheduler = setup_json_scheduler(build_root)
     self.pg = self.scheduler.product_graph
-    self.engine = LocalSerialEngine(self.scheduler, self.storage)
+    self.engine = LocalSerialEngine(self.scheduler)
 
     self.guava = Address.parse('3rdparty/jvm:guava')
     self.thrift = Address.parse('src/thrift/codegen/simple')
