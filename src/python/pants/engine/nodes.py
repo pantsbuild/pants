@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from abc import abstractmethod, abstractproperty
 from os.path import dirname
 
+from twitter.common.collections import OrderedSet
+
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
 from pants.engine.fs import (Dir, DirectoryListing, File, FileContent, Link, Path, ReadLink, Stats,
@@ -425,6 +427,7 @@ class StepContext(object):
     self._node_builder = node_builder
     self.project_tree = project_tree
     self._node_states = dict(node_states)
+    self._parents = OrderedSet()
     self._inline_nodes = inline_nodes
     self._level = 1
 
@@ -435,16 +438,16 @@ class StepContext(object):
     """
     def inline():
       state = self._node_states.get(node, None)
-      if type(state) is Node:
-        return Noop.cycle(state, node)
       if state is not None:
         return state
       if self._inline_nodes and node.is_inlineable:
-        self._node_states[node] = node
+        if node in self._parents:
+          return Noop.cycle(list(self._parents)[-1], node)
+        self._parents.add(node)
         self._level += 1
         state = node.step(self)
         self._level -= 1
-        self._node_states[node] = state
+        self._parents.remove(node)
         return state
       else:
         return Waiting([node])
