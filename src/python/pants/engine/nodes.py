@@ -34,7 +34,7 @@ class ConflictingProducersError(Exception):
     This is provided as a workaround to http://bugs.python.org/issue17296 to make this exception
     picklable.
     """
-    msgs = '\n  '.join('{}: {}'.format(k, v) for k, v in matches)
+    msgs = '\n  '.join('{}:\n    {}'.format(k, v) for k, v in matches)
     return ConflictingProducersError('More than one source of {} for {}:\n  {}'
                                      .format(product.__name__, subject, msgs))
 
@@ -260,8 +260,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
       elif type(dep_state) is Return:
         dep_values.append(dep_state.value)
       elif type(dep_state) is Noop:
-        msg = 'No source of explicit dependency {}: {}'.format(dependency, dep_state.msg)
-        return Throw(ValueError(msg))
+        return Throw(ValueError('No source of explicit dependency {}'.format(dependency)))
       elif type(dep_state) is Throw:
         return dep_state
       else:

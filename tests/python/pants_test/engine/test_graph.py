@@ -91,7 +91,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     super(GraphTestBase, self).setUp()
 
-  def create(self, build_pattern=None, parser_cls=None, inline=False):
+  def create(self, build_pattern=None, parser_cls=None):
     symbol_table_cls = TestTable
 
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
@@ -132,8 +132,6 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
 
 class InlinedGraphTest(GraphTestBase):
-  def create(self, build_pattern=None, parser_cls=None, inline=True):
-    return super(InlinedGraphTest, self).create(build_pattern, parser_cls, inline=inline)
 
   def do_test_codegen_simple(self, scheduler):
     def address(name):
