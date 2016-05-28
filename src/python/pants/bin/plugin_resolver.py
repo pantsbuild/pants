@@ -34,7 +34,9 @@ class PluginResolver(object):
     self._options_bootstrapper = options_bootstrapper
 
     bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
-    self._plugin_requirements = bootstrap_options.plugins
+    plugins_pre  = bootstrap_options.plugins or []
+    plugins_post = bootstrap_options.plugins_post or []
+    self._plugin_requirements = plugins_pre + plugins_post
     self._plugin_cache_dir = bootstrap_options.plugin_cache_dir
 
   def resolve(self, working_set=None):

@@ -84,9 +84,12 @@ class OptionsInitializer(object):
       pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
-    plugins = global_bootstrap_options.plugins
+    plugins_pre = global_bootstrap_options.plugins or []
+    plugins_post = global_bootstrap_options.plugins_post or []
+
     backend_packages = global_bootstrap_options.backend_packages
-    build_configuration = load_plugins_and_backends(plugins, working_set, backend_packages)
+    build_configuration = load_plugins_and_backends(plugins_pre,
+                                                    plugins_post, working_set, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     known_scope_infos = [GlobalOptionsRegistrar.get_scope_info()]

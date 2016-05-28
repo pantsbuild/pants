@@ -22,7 +22,7 @@ PKG_ANDROID=(
 )
 function pkg_android_install_test() {
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
+    --plugins-post="['pantsbuild.pants.contrib.android==$(local_version)']" \
     --explain apk | grep "apk" &> /dev/null
 }
 
@@ -34,10 +34,10 @@ PKG_SCROOGE=(
 )
 function pkg_scrooge_install_test() {
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
+    --plugins-post="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
     --explain gen | grep "scrooge" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
+    --plugins-post="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
     goals | grep "thrift-linter" &> /dev/null
 }
 
@@ -59,7 +59,7 @@ PKG_SPINDLE=(
 )
 function pkg_spindle_install_test() {
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.spindle==$(local_version)']" \
+    --plugins-post="['pantsbuild.pants.contrib.spindle==$(local_version)']" \
     --explain gen | grep "spindle" &> /dev/null
 }
 
@@ -70,7 +70,7 @@ PKG_GO=(
 )
 function pkg_go_install_test() {
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.go==$(local_version)']" \
+      --plugins-post="['pantsbuild.pants.contrib.go==$(local_version)']" \
       buildgen test contrib/go/examples::
 }
 
@@ -81,7 +81,7 @@ PKG_NODE=(
 )
 function pkg_node_install_test() {
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.node==$(local_version)']" \
+      --plugins-post="['pantsbuild.pants.contrib.node==$(local_version)']" \
       test.node contrib/node/examples::
 }
 
@@ -92,7 +92,7 @@ PKG_SCALAJS=(
 )
 function pkg_scalajs_install_test() {
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.scalajs==$(local_version)']" \
+      --plugins-post="['pantsbuild.pants.contrib.scalajs==$(local_version)']" \
       test contrib/scalajs::
 }
 
@@ -103,10 +103,10 @@ PKG_PYTHON_CHECKS=(
 )
 function pkg_python_checks_install_test() {
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
+    --plugins-post="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
     --explain compile | grep "python-eval" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
+    --plugins-post="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
     --explain compile | grep "pythonstyle" &> /dev/null
 }
 
