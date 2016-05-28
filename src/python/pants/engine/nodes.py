@@ -450,9 +450,9 @@ class StepContext(object):
       else:
         return Waiting([node])
 
-    #print('>>> {}getting {}'.format("  " * self._level, node))
+    print('>>> {}getting {}'.format("  " * self._level, node))
     s = inline()
-    #print('>>> {}...got {}'.format("  " * self._level, s))
+    print('>>> {}...got {}'.format("  " * self._level, s))
     return s
 
   def gen_nodes(self, subject, product, variants):

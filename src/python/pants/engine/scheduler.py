@@ -115,6 +115,7 @@ class ProductGraph(object):
     is_not_completed = lambda e: e.state is None
     for entry in self._walk_entries([dest], entry_predicate=is_not_completed):
       if entry is src:
+        print('>>> found a cycle between {} and {}!'.format(src.node, dest.node))
         return True
     return False
 
