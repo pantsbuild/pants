@@ -32,6 +32,9 @@ class LegacyBuildGraph(BuildGraph):
   This implementation is backed by a Scheduler that is able to resolve LegacyTargets.
   """
 
+  class InvalidCommandLineSpecError(AddressLookupError):
+    """Raised when command line spec is not a valid directory"""
+
   def __init__(self, scheduler, engine, symbol_table_cls):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
@@ -177,8 +180,12 @@ class LegacyBuildGraph(BuildGraph):
     self._index(request.roots)
 
     existing_addresses = set()
-    for state in self._scheduler.root_entries(request).values():
-      for legacy_target in maybe_list(state.value, expected_type=LegacyTarget):
+    for root, state in self._scheduler.root_entries(request).items():
+      entries = maybe_list(state.value, expected_type=LegacyTarget)
+      if not entries:
+        raise self.InvalidCommandLineSpecError(
+          'Spec {} does not match any targets.'.format(root.subject))
+      for legacy_target in entries:
         address = legacy_target.adaptor.address
         if address not in existing_addresses:
           existing_addresses.add(address)

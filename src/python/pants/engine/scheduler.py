@@ -435,7 +435,6 @@ class LocalScheduler(object):
   def __init__(self,
                goals,
                tasks,
-               storage,
                project_tree,
                graph_lock=None,
                inline_nodes=True,

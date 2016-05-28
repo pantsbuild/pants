@@ -15,7 +15,7 @@ python_tests(
   name='go_buildgen',
   sources=['test_go_buildgen.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
+    'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets:go_binary',
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
@@ -55,7 +55,7 @@ python_tests(
   name='go_fetch',
   sources=['test_go_fetch.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
+    'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_fetch',
     'src/python/pants/build_graph',
@@ -79,7 +79,7 @@ python_tests(
   name='go_compile_integration',
   sources=['test_go_compile_integration.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
+    'contrib/go/src/python/pants/contrib/go/subsystems',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/testutils:file_test_util',
@@ -102,7 +102,7 @@ python_tests(
   name='go_thrift_gen_integration',
   sources=['test_go_thrift_gen_integration.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
+    'contrib/go/src/python/pants/contrib/go/subsystems',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

@@ -23,7 +23,7 @@ class StorageTest(unittest.TestCase):
   class SomeException(Exception): pass
 
   def setUp(self):
-    self.storage = Storage.create(in_memory=True)
+    self.storage = Storage.create()
     self.result = StepResult(state='something')
     self.request = StepRequest(step_id=123,
                                node='some node',
@@ -115,7 +115,7 @@ class CacheTest(unittest.TestCase):
 
   def setUp(self):
     """Setup cache as well as request and result."""
-    self.storage = Storage.create(in_memory=True)
+    self.storage = Storage.create()
     self.cache = Cache.create(storage=self.storage)
     request = StepRequest(step_id=123,
                           node='some node',
