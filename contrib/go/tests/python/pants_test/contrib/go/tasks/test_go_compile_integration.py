@@ -37,3 +37,8 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
     args = ['compile', 'contrib/go/examples/src/go/cgo']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
+
+  def test_go_compile_with_remote_deps(self):
+    args = ['compile', 'contrib/go/examples/src/go/server']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
