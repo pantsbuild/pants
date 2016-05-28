@@ -51,6 +51,10 @@ class State(object):
 class Noop(datatype('Noop', ['msg']), State):
   """Indicates that a Node did not have the inputs which would be needed for it to execute."""
 
+  @staticmethod
+  def cycle(src, dst):
+    return Noop('Edge:\n  {} ->\n  {}\nwould cause a cycle.'.format(src, dst))
+
 
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
@@ -58,10 +62,6 @@ class Return(datatype('Return', ['value']), State):
 
 class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
-
-  @staticmethod
-  def cycle(src, dst):
-    return Throw('Edge:\n  {} ->\n  {}\nwould cause a cycle.'.format(src, dst))
 
 
 class Waiting(datatype('Waiting', ['dependencies']), State):
@@ -260,7 +260,8 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
       elif type(dep_state) is Return:
         dep_values.append(dep_state.value)
       elif type(dep_state) is Noop:
-        return Throw(ValueError('No source of explicit dependency {}'.format(dependency)))
+        msg = 'No source of explicit dependency {}: {}'.format(dependency, dep_state.msg)
+        return Throw(ValueError(msg))
       elif type(dep_state) is Throw:
         return dep_state
       else:
@@ -436,7 +437,7 @@ class StepContext(object):
     def inline():
       state = self._node_states.get(node, None)
       if type(state) is Node:
-        return Throw.cycle(state, node)
+        return Noop.cycle(state, node)
       if state is not None:
         return state
       if self._inline_nodes and node.is_inlineable:
@@ -449,9 +450,9 @@ class StepContext(object):
       else:
         return Waiting([node])
 
-    print('>>> {}getting {}'.format("  " * self._level, node))
+    #print('>>> {}getting {}'.format("  " * self._level, node))
     s = inline()
-    print('>>> {}...got {}'.format("  " * self._level, s))
+    #print('>>> {}...got {}'.format("  " * self._level, s))
     return s
 
   def gen_nodes(self, subject, product, variants):

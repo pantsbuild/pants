@@ -494,7 +494,7 @@ class LocalScheduler(object):
       deps[dep] = state
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in self._product_graph.cyclic_dependencies_of(node):
-      deps[dep] = Throw.cycle(node, dep)
+      deps[dep] = Noop.cycle(node, dep)
 
     # Ready.
     self._step_id += 1
