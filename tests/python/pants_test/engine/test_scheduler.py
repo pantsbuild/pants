@@ -27,7 +27,7 @@ class SchedulerTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
-    self.scheduler = setup_json_scheduler(build_root)
+    self.scheduler = setup_json_scheduler(build_root, inline_nodes=False)
     self.pg = self.scheduler.product_graph
     self.engine = LocalSerialEngine(self.scheduler)
 
