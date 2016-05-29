@@ -111,5 +111,6 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       for line in read_pantsd_log(workdir):
         print(line)
 
+      # Assert there were no warnings or errors thrown in the pantsd log.
       for line in read_pantsd_log(workdir):
-        self.assertNotIn('raised by invalid watchman event: ', line)
+        self.assertNotRegexpMatches(line, r'^[WE].*')
