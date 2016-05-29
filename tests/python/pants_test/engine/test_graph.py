@@ -14,20 +14,23 @@ from pants.engine.addressable import (Exactly, SubclassesOf, addressable, addres
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.mapper import AddressMapper, ResolveError
-from pants.engine.nodes import Noop, Return, Throw
+from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
-from pants.engine.struct import HasStructs, Struct, StructWithDeps
+from pants.engine.struct import HasProducts, Struct, StructWithDeps
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
                                                 PythonCallbacksParser)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Target(Struct, HasStructs):
-  collection_field = 'configurations'
+class Target(Struct, HasProducts):
 
   def __init__(self, name=None, configurations=None, **kwargs):
     super(Target, self).__init__(name=name, **kwargs)
     self.configurations = configurations
+
+  @property
+  def products(self):
+    return self.configurations
 
   @addressable_list(SubclassesOf(Struct))
   def configurations(self):
@@ -91,7 +94,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     super(GraphTestBase, self).setUp()
 
-  def create(self, build_pattern=None, parser_cls=None, inline=False):
+  def create(self, build_pattern=None, parser_cls=None):
     symbol_table_cls = TestTable
 
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
@@ -131,8 +134,6 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
 
 class InlinedGraphTest(GraphTestBase):
-  def create(self, build_pattern=None, parser_cls=None, inline=True):
-    return super(InlinedGraphTest, self).create(build_pattern, parser_cls, inline=inline)
 
   def do_test_codegen_simple(self, scheduler):
     def address(name):
@@ -193,14 +194,12 @@ class InlinedGraphTest(GraphTestBase):
 
     self.assertEquals(java1, self.resolve(scheduler, java1_address))
 
-  def extract_path_tail(self, cycle_exception, line_count):
-    return [l.lstrip() for l in str(cycle_exception).splitlines()[-line_count:]]
-
   def do_test_cycle(self, scheduler, address_str):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    self.assertEqual(type(walk[0][1]), Throw)
-    self.assertTrue(any('cycle' in state.msg for _, state in walk if type(state) is Noop))
+    root, state = walk[0]
+    self.assertEqual(type(state), Throw)
+    self.assertTrue(any('cycle' in line for line in scheduler.product_graph.trace(root)))
 
   def test_cycle_self(self):
     self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')

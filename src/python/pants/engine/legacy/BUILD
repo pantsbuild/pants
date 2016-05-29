@@ -31,6 +31,7 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':parser',
     ':structs',
     'src/python/pants/base:exceptions',
