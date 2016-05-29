@@ -67,9 +67,9 @@ class SchedulerService(PantsService):
     try:
       subscription, is_initial_event, files = (event['subscription'],
                                                event['is_fresh_instance'],
-                                               event['files'])
-    except KeyError:
-      self._logger.warn('invalid watchman event: %s', event)
+                                               [f.decode('utf-8') for f in event['files']])
+    except (KeyError, UnicodeDecodeError) as e:
+      self._logger.warn('%r raised by invalid watchman event: %s', e, event)
       return
 
     self._logger.debug('processing {} files for subscription {} (first_event={})'
