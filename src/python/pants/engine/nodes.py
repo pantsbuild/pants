@@ -50,12 +50,28 @@ class State(object):
     raise ValueError('Unrecognized Node State: {}'.format(state))
 
 
-class Noop(datatype('Noop', ['msg']), State):
-  """Indicates that a Node did not have the inputs which would be needed for it to execute."""
+class Noop(datatype('Noop', ['format_string', 'args']), State):
+  """Indicates that a Node did not have the inputs which would be needed for it to execute.
+
+  Because Noops are very common but rarely displayed, they are formatted lazily.
+  """
 
   @staticmethod
   def cycle(src, dst):
-    return Noop('Edge:\n  {} ->\n  {}\nwould cause a cycle.'.format(src, dst))
+    return Noop('Edge would cause a cycle: {} -> {}.', src, dst)
+
+  def __new__(cls, format_string, *args):
+    return super(Noop, cls).__new__(cls, format_string, args)
+
+  @property
+  def msg(self):
+    if self.args:
+      return self.format_string.format(*self.args)
+    else:
+      return self.format_string
+
+  def __str__(self):
+    return 'Noop(msg={!r})'.format(self.msg)
 
 
 class Return(datatype('Return', ['value']), State):
@@ -174,8 +190,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
                         if key == self.variant_key] if variants else None
       if not variant_values:
         # Select cannot be satisfied: no variant configured for this key.
-        return Noop('Variant key {} was not configured in variants {}'.format(
-          self.variant_key, variants))
+        return Noop('Variant key {} was not configured in variants {}', self.variant_key, variants)
       variant_value = variant_values[0]
 
     # If the Subject "is a" or "has a" Product, then we're done.
@@ -207,7 +222,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     if dependencies:
       return Waiting(dependencies)
     elif len(matches) == 0:
-      return Noop('No source of {}.'.format(self))
+      return Noop('No source of {}.', self)
     elif len(matches) > 1:
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
       # by adding support for "mergeable" products. see:
@@ -248,7 +263,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     if type(dep_product_state) in (Throw, Waiting):
       return dep_product_state
     elif type(dep_product_state) is Noop:
-      return Noop('Could not compute {} to determine dependencies.'.format(dep_product_node))
+      return Noop('Could not compute {} to determine dependencies.', dep_product_node)
     elif type(dep_product_state) is not Return:
       State.raise_unrecognized(dep_product_state)
 
@@ -295,7 +310,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     if type(input_state) in (Throw, Waiting):
       return input_state
     elif type(input_state) is Noop:
-      return Noop('Could not compute {} in order to project its fields.'.format(input_node))
+      return Noop('Could not compute {} in order to project its fields.', input_node)
     elif type(input_state) is not Return:
       State.raise_unrecognized(input_state)
 
@@ -317,7 +332,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     if type(output_state) in (Return, Throw, Waiting):
       return output_state
     elif type(output_state) is Noop:
-      return Noop('Successfully projected, but no source of output product for {}.'.format(output_node))
+      return Noop('Successfully projected, but no source of output product for {}.', output_node)
     else:
       raise State.raise_unrecognized(output_state)
 
@@ -348,7 +363,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
         if selector.optional:
           dep_values.append(None)
         else:
-          return Noop('Was missing (at least) input {}.'.format(dep_node))
+          return Noop('Was missing (at least) input {}.', dep_node)
       elif type(dep_state) is Throw:
         return dep_state
       else:
@@ -436,26 +451,20 @@ class StepContext(object):
 
     Optionally inlines execution of inlineable dependencies if `inline_nodes=True`.
     """
-    def inline():
-      state = self._node_states.get(node, None)
-      if state is not None:
-        return state
-      if self._inline_nodes and node.is_inlineable:
-        if node in self._parents:
-          return Noop.cycle(list(self._parents)[-1], node)
-        self._parents.add(node)
-        self._level += 1
-        state = node.step(self)
-        self._level -= 1
-        self._parents.remove(node)
-        return state
-      else:
-        return Waiting([node])
-
-    print('>>> {}getting {}'.format("  " * self._level, node))
-    s = inline()
-    print('>>> {}...got {}'.format("  " * self._level, s))
-    return s
+    state = self._node_states.get(node, None)
+    if state is not None:
+      return state
+    if self._inline_nodes and node.is_inlineable:
+      if node in self._parents:
+        return Noop.cycle(list(self._parents)[-1], node)
+      self._parents.add(node)
+      self._level += 1
+      state = node.step(self)
+      self._level -= 1
+      self._parents.remove(node)
+      return state
+    else:
+      return Waiting([node])
 
   def gen_nodes(self, subject, product, variants):
     """Yields Node instances which might be able to provide a value for the given inputs."""

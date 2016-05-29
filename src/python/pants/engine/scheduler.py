@@ -115,7 +115,6 @@ class ProductGraph(object):
     is_not_completed = lambda e: e.state is None
     for entry in self._walk_entries([dest], entry_predicate=is_not_completed):
       if entry is src:
-        print('>>> found a cycle between {} and {}!'.format(src.node, dest.node))
         return True
     return False
 
@@ -269,6 +268,25 @@ class ProductGraph(object):
 
       yield entry
 
+  def trace(self, root):
+    """Yields a stringified 'stacktrace' starting from the given failed root.
+
+    TODO: This could use polish. In particular, the `__str__` representations of Nodes and
+    States are probably not sufficient for user output.
+    """
+    def _trace(entry, level):
+      yield '{}{}'.format('  ' * level, entry.state)
+      if type(entry.state) is Return:
+        return
+      for dep in entry.cyclic_dependencies:
+        yield '{}{}'.format('  ' * level, Noop.cycle(entry.node, dep))
+      for dep_entry in entry.dependencies:
+        for l in _trace(dep_entry, level+1):
+          yield l
+
+    for line in _trace(self._nodes[root], 1):
+      yield line
+
   def visualize(self, roots):
     """Visualize a graph walk by generating graphviz `dot` output.
 
@@ -306,24 +324,28 @@ class ProductGraph(object):
                                      format_type(node),
                                      str(state).replace('"', '\\"'))
 
+    def format_edge(src_str, dest_str, cyclic):
+      style = " [style=dashed]" if cyclic else ""
+      return '    "{}" -> "{}"{}'.format(node_str, format_node(dep, dep_state), style)
+
     yield 'digraph plans {'
     yield '  node[colorscheme={}];'.format(viz_color_scheme)
     yield '  concentrate=true;'
     yield '  rankdir=LR;'
 
-    predicate = lambda n, s: True #type(s) is not Noop
+    predicate = lambda n, s: type(s) is not Noop
 
     for (node, node_state) in self.walk(roots, predicate=predicate):
       node_str = format_node(node, node_state)
 
-      yield ' "{}" [style=filled, fillcolor={}];'.format(node_str, format_color(node, node_state))
+      yield '  "{}" [style=filled, fillcolor={}];'.format(node_str, format_color(node, node_state))
 
-      for deps in (self.dependencies_of(node), self.cyclic_dependencies_of(node)):
-        for dep in deps:
+      for cyclic, adjacencies in ((False, self.dependencies_of), (True, self.cyclic_dependencies_of)):
+        for dep in adjacencies(node):
           dep_state = self.state(dep)
           if not predicate(dep, dep_state):
             continue
-          yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
+          yield format_edge(node_str, format_node(dep, dep_state), cyclic)
 
     yield '}'
 
@@ -407,9 +429,7 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'inline_n
   def __call__(self, node_builder):
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, self.project_tree, self.dependencies, self.inline_nodes)
-    print('>>> stepping {}'.format(self.node))
     state = self.node.step(step_context)
-    print('>>> ...got {}'.format(state))
     return StepResult(state)
 
   def __eq__(self, other):

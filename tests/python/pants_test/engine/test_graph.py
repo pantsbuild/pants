@@ -110,7 +110,6 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
     request = scheduler.execution_request([self._product], [address])
     LocalSerialEngine(scheduler).reduce(request)
-    scheduler.visualize_graph_to_file(request.roots, '{}.dot'.format(address.path_safe_spec))
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     return root_entries[0]
@@ -195,8 +194,9 @@ class InlinedGraphTest(GraphTestBase):
   def do_test_cycle(self, scheduler, address_str):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    self.assertEqual(type(walk[0][1]), Throw)
-    self.assertTrue(any('cycle' in str(state.exc) for _, state in walk if type(state) is Throw))
+    root, state = walk[0]
+    self.assertEqual(type(state), Throw)
+    self.assertTrue(any('cycle' in line for line in scheduler.product_graph.trace(root)))
 
   def test_cycle_self(self):
     self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')
