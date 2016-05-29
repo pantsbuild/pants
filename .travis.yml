@@ -96,4 +96,6 @@ script: |
 
 after_success:
   coveralls
-
+  /bin/ls -1 |xargs du -sh
+  /bin/ls -1 /tmp |xargs du -sh
+  find . | xargs du -s | sort -nrk1
