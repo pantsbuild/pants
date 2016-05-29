@@ -61,8 +61,9 @@ class LegacyBuildGraph(BuildGraph):
     for node, state in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyTarget values.
       if type(state) is Throw:
+        trace = '\n'.join(self._graph.trace(node))
         raise AddressLookupError(
-            'Build graph construction failed for {}:\n  {}'.format(node.subject, state.exc))
+            'Build graph construction failed for {}:\n{}'.format(node.subject, trace))
       elif type(state) is not Return:
         State.raise_unrecognized(state)
       if node.product is not LegacyTarget:

@@ -275,9 +275,9 @@ class ProductGraph(object):
     States are probably not sufficient for user output.
     """
     def _trace(entry, level):
-      yield '{}{}'.format('  ' * level, entry.state)
-      if type(entry.state) is Return:
+      if type(entry.state) in (Noop, Return):
         return
+      yield '{}{}'.format('  ' * level, entry.state)
       for dep in entry.cyclic_dependencies:
         yield '{}{}'.format('  ' * level, Noop.cycle(entry.node, dep))
       for dep_entry in entry.dependencies:
