@@ -16,18 +16,21 @@ from pants.engine.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.mapper import AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
-from pants.engine.struct import HasStructs, Struct, StructWithDeps
+from pants.engine.struct import HasProducts, Struct, StructWithDeps
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
                                                 PythonCallbacksParser)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Target(Struct, HasStructs):
-  collection_field = 'configurations'
+class Target(Struct, HasProducts):
 
   def __init__(self, name=None, configurations=None, **kwargs):
     super(Target, self).__init__(name=name, **kwargs)
     self.configurations = configurations
+
+  @property
+  def products(self):
+    return self.configurations
 
   @addressable_list(SubclassesOf(Struct))
   def configurations(self):

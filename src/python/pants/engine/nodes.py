@@ -16,7 +16,7 @@ from pants.engine.fs import (Dir, DirectoryListing, File, FileContent, Link, Pat
                              file_content, list_directory, path_stat, read_link)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
-from pants.engine.struct import HasStructs, Variants
+from pants.engine.struct import HasProducts, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -155,8 +155,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       # Check whether the subject is-a instance of the product.
       yield candidate
       # Else, check whether it has-a instance of the product.
-      if isinstance(candidate, HasStructs):
-        for subject in getattr(candidate, candidate.collection_field):
+      if isinstance(candidate, HasProducts):
+        for subject in candidate.products:
           yield subject
 
     # TODO: returning only the first literal configuration of a given type/variant. Need to
