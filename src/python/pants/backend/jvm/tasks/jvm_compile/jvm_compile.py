@@ -157,6 +157,11 @@ class JvmCompile(NailgunTaskBase):
              help='Capture classpath to per-target newline-delimited text files. These files will '
                   'be packaged into any jar artifacts that are created from the jvm targets.')
 
+    register('--use-compile-classpath-jars', advanced=True, type=bool, default=False,
+             fingerprint=True,
+             help='Use jar files on the compile_classpath if they exist from a previous compile.'
+             'Note: Using this option disables incremental compile between targets.')
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmCompile, cls).prepare(options, round_manager)
@@ -321,6 +326,9 @@ class JvmCompile(NailgunTaskBase):
     self._size_estimator = self.size_estimator_by_name(self.get_options().size_estimator)
 
     self._analysis_tools = self.create_analysis_tools()
+
+    # Cache for set of jars already found on the filesystem
+    self._found_zjars = set()
 
   @property
   def _analysis_parser(self):
@@ -595,7 +603,8 @@ class JvmCompile(NailgunTaskBase):
   def _compute_classpath_entries(self,
                                  classpath_products,
                                  compile_context,
-                                 extra_compile_time_classpath):
+                                 extra_compile_time_classpath,
+                                 zjar_mapping):
     # Generate a classpath specific to this compile and target.
     target = compile_context.target
     if compile_context.strict_deps:
@@ -607,13 +616,37 @@ class JvmCompile(NailgunTaskBase):
             target.address.spec, pruned))
     else:
       classpath_targets = target.closure(bfs=True, **self._target_closure_kwargs)
-    ret = ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
-                                          extra_compile_time_classpath, self._confs)
+    cp_entries = ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
+                                                 extra_compile_time_classpath, self._confs)
     if isinstance(target, JavacPlugin):
       # Javac plugins need to compile against our distribution's tools.jar. There's no way to
       # express this via traversable_dependency_specs, so we inject it into the classpath here.
-      ret = self.dist.find_libs(['tools.jar']) + ret
-    return ret
+      cp_entries = self.dist.find_libs(['tools.jar']) + cp_entries
+
+    def _map_zjars(path, zjar_mapping):
+      """Substitutes a .jar file for a directory with loose files on the classpath.
+
+      After each compile finishes, a jar that contains all the loose files should be created.
+      This jar is named 'z.jar' and can be substituted for the loose file directory on the
+      classpath to recognize significant performance gains for targets that have lots of
+      compiled dependencies within the repo.
+
+      See https://rbcommons.com/s/twitter/r/3955/
+
+      :param string path: classpath directory to substitute
+      :param dict zjar_mapping: mapping of classpath directory to jar name
+      """
+      if path in zjar_mapping:
+        zjar = zjar_mapping[path];
+        if zjar in self._found_zjars:
+          return zjar
+        if os.path.exists(zjar):
+          self._found_zjars.add(zjar)
+          return zjar
+      return path
+
+    # Map the classpath entry to the jar file from a previous compile.
+    return [_map_zjars(e, zjar_mapping) for e in cp_entries]
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -691,7 +724,8 @@ class JvmCompile(NailgunTaskBase):
         # Compute the compile classpath for this target.
         cp_entries = self._compute_classpath_entries(classpath_products,
                                                      ctx,
-                                                     extra_compile_time_classpath)
+                                                     extra_compile_time_classpath,
+                                                     zjar_mapping)
         # TODO: always provide transitive analysis, but not always all classpath entries?
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
@@ -730,6 +764,11 @@ class JvmCompile(NailgunTaskBase):
 
       # Update the products with the latest classes.
       self._register_vts([ctx])
+
+    zjar_mapping = {}
+    if self.get_options().use_compile_classpath_jars:
+      for cc in compile_contexts.values():
+        zjar_mapping[cc.classes_dir] = cc.jar_file
 
     jobs = []
     invalid_target_set = set(invalid_targets)

@@ -174,3 +174,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                             'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
       self.assertNotIn('isolation-zinc-pool-bootstrap', second_run.stdout_data)
+
+
+class ZincCompileIntegrationWithZjars(ZincCompileIntegrationTest):
+  _EXTRA_TASK_ARGS = ['--compile-zinc-use-compile-classpath-jars']
