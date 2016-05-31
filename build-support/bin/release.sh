@@ -221,11 +221,15 @@ EOM
   die "$msg"
 }
 
+function get_branch() {
+  git branch | grep -E '^\* ' | cut -d' ' -f2-
+}
+
 function check_clean_branch() {
   banner "Checking for a clean branch"
 
   pattern="^(master)|([0-9]+\.[0-9]+\.x)$"
-  branch=$(git branch | grep -E '^\* ' | cut -d' ' -f2-)
+  branch=$(get_branch)
   [[ -z "$(git status --porcelain)" &&
      $branch =~ $pattern
   ]] || die "You are not on a clean branch."
@@ -303,8 +307,13 @@ function tag_release() {
   git push git@github.com:pantsbuild/pants.git ${tag_name}
 }
 
-function publish_docs() {
-  ${ROOT}/build-support/bin/publish_docs.sh -p -y
+function publish_docs_if_master() {
+  branch=$(get_branch)
+  if [[ $branch =~ "^master$" ]]; then
+    ${ROOT}/build-support/bin/publish_docs.sh -p -y
+  else
+    echo "Skipping docsite publishing on non-master branch (${branch})."
+  fi
 }
 
 function list_packages() {
@@ -465,7 +474,7 @@ else
   banner "Releasing packages to PyPi." && \
   (
     check_origin && check_clean_branch && check_pgp && check_owners && \
-      dry_run_install && publish_packages && tag_release && publish_docs && \
+      dry_run_install && publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
 fi
