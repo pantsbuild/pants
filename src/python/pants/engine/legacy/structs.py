@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
 from abc import abstractproperty
 
 from six import string_types
@@ -135,13 +134,15 @@ class BaseGlobs(AbstractClass):
   def from_sources_field(sources):
     """Return a BaseGlobs for the given sources field.
 
-    Sources may be None, a sequence, or a BaseGlobs instance.
+    `sources` may be None, a list/tuple/set, a string or a BaseGlobs instance.
     """
     if sources is None:
       return Files()
     elif isinstance(sources, BaseGlobs):
       return sources
-    elif isinstance(sources, collections.Sequence) and not isinstance(sources, string_types):
+    elif isinstance(sources, string_types):
+      return Files(sources)
+    elif isinstance(sources, (set, list, tuple)):
       return Files(*sources)
     else:
       raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
