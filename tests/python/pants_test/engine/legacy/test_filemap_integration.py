@@ -36,14 +36,24 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     return {s.split(' ')[0].replace(self.path_prefix, '')
             for s in stdout_data.split('\n') if s.startswith(self.path_prefix)}
 
-  def test_exclude_string(self):
-    test_out = self._extract_exclude_output('exclude_string')
+  def test_exclude_list_of_strings(self):
+    test_out = self._extract_exclude_output('exclude_list_of_strings')
     self.assertEquals(self.TEST_EXCLUDE_FILES - {'aaa.py', 'dir1/aaa.py'},
                       test_out)
 
   def test_exclude_globs(self):
     test_out = self._extract_exclude_output('exclude_globs')
     self.assertEquals(self.TEST_EXCLUDE_FILES - {'aabb.py', 'dir1/dirdir1/aa.py'},
+                      test_out)
+
+  def test_exclude_strings(self):
+    test_out = self._extract_exclude_output('exclude_strings')
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aa.py', 'ab.py'},
+                      test_out)
+
+  def test_exclude_set(self):
+    test_out = self._extract_exclude_output('exclude_set')
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aaa.py', 'a.py'},
                       test_out)
 
   def test_exclude_rglobs(self):
