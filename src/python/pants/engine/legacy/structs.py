@@ -149,6 +149,10 @@ class BaseGlobs(AbstractClass):
 
   @staticmethod
   def _filespec_for_excludes(raw_excludes):
+    if isinstance(raw_excludes, string_types):
+      raise ValueError('Excludes of type `{}` are not supported: got "{}"'
+                       .format(type(raw_excludes).__name__, raw_excludes))
+
     excluded_patterns = []
     for raw_exclude in raw_excludes:
       exclude_filespecs = BaseGlobs.from_sources_field(raw_exclude).filespecs
