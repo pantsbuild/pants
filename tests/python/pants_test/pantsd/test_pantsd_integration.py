@@ -26,12 +26,11 @@ class PantsDaemonMonitor(ProcessManager):
     assert self._pid is not None and self.is_dead(), 'pantsd should be stopped!'
 
 
-def print_pantsd_log(workdir):
+def read_pantsd_log(workdir):
   # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-  print('pantsd.log:\n')
   with open('{}/pantsd/pantsd.log'.format(workdir)) as f:
     for line in f:
-      print(line, end='')
+      yield line.strip()
 
 
 class TestPantsDaemonIntegration(PantsRunIntegrationTest):
@@ -68,7 +67,9 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
 
       checker.assert_stopped()
-      print_pantsd_log(workdir)
+
+      for line in read_pantsd_log(workdir):
+        print(line)
 
   def test_pantsd_run_with_watchman(self):
     with self.temporary_workdir() as workdir_base:
@@ -106,4 +107,10 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
 
       checker.assert_stopped()
-      print_pantsd_log(workdir)
+
+      for line in read_pantsd_log(workdir):
+        print(line)
+
+      # Assert there were no warnings or errors thrown in the pantsd log.
+      for line in read_pantsd_log(workdir):
+        self.assertNotRegexpMatches(line, r'^[WE].*')

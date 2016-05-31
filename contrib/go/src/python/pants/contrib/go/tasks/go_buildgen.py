@@ -18,7 +18,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 
-from pants.contrib.go.subsystems.fetchers import Fetchers
+from pants.contrib.go.subsystems.fetcher_factory import FetcherFactory
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_local_source import GoLocalSource
@@ -41,12 +41,12 @@ class GoTargetGenerator(object):
   class NewRemoteEncounteredButRemotesNotAllowedError(GenerationError):
     """Indicates a new remote library dependency was found but --remote was not enabled."""
 
-  def __init__(self, import_oracle, build_graph, local_root, fetchers,
+  def __init__(self, import_oracle, build_graph, local_root, fetcher_factory,
                generate_remotes=False, remote_root=None):
     self._import_oracle = import_oracle
     self._build_graph = build_graph
     self._local_source_root = local_root
-    self._fetchers = fetchers
+    self._fetcher_factory = fetcher_factory
     self._generate_remotes = generate_remotes
     self._remote_source_root = remote_root
 
@@ -75,9 +75,8 @@ class GoTargetGenerator(object):
     for import_path in import_listing.all_imports:
       if not self._import_oracle.is_go_internal_import(import_path):
         if import_path not in visited:
-          fetcher = self._fetchers.maybe_get_fetcher(import_path)
-          if fetcher:
-            remote_root = fetcher.root(import_path)
+          if self._import_oracle.is_remote_import(import_path):
+            remote_root = self._fetcher_factory.get_fetcher(import_path).root()
             remote_pkg_path = GoRemoteLibrary.remote_package_path(remote_root, import_path)
             name = remote_pkg_path or os.path.basename(import_path)
             address = Address(os.path.join(self._remote_source_root, remote_root), name)
@@ -120,8 +119,8 @@ class GoBuildgen(GoTask):
   """Automatically generates Go BUILD files."""
 
   @classmethod
-  def global_subsystems(cls):
-    return super(GoBuildgen, cls).global_subsystems() + (Fetchers,)
+  def subsystem_dependencies(cls):
+    return super(GoBuildgen, cls).subsystem_dependencies() + (FetcherFactory,)
 
   @classmethod
   def _default_template(cls):
@@ -368,7 +367,7 @@ class GoBuildgen(GoTask):
     generator = GoTargetGenerator(self.import_oracle,
                                   self.context.build_graph,
                                   local_root,
-                                  Fetchers.global_instance(),
+                                  self.get_fetcher_factory(),
                                   generate_remotes=self.get_options().remote,
                                   remote_root=remote_root)
     with self.context.new_workunit('go.buildgen', labels=[WorkUnitLabel.MULTITOOL]):
@@ -379,6 +378,9 @@ class GoBuildgen(GoTask):
                                      remote_root=remote_root)
       except generator.GenerationError as e:
         raise self.GenerationError(e)
+
+  def get_fetcher_factory(self):
+    return FetcherFactory.global_instance()
 
   def generate_build_files(self, targets):
     goal_name = self.options_scope

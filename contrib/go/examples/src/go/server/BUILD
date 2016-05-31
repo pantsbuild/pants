@@ -4,5 +4,8 @@
 go_binary(
   dependencies=[
     'contrib/go/examples/3rdparty/go/github.com/gorilla/mux',
+    'contrib/go/examples/3rdparty/go/golang.org/x/net:http2',
+    'contrib/go/examples/3rdparty/go/google.golang.org/grpc',
+    'contrib/go/examples/3rdparty/go/gopkg.in/yaml.v2',
   ]
 )

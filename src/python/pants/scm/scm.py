@@ -160,3 +160,10 @@ class Scm(AbstractClass):
 
     :API: public
     """
+
+  @abstractmethod
+  def set_state(self, rev):
+    """Set the repo state to the specified rev.
+
+    :API: public
+    """

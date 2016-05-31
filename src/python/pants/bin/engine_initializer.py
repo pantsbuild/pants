@@ -89,7 +89,6 @@ class EngineInitializer(object):
     """
 
     build_root = get_buildroot()
-    storage = Storage.create(debug=False)
     project_tree = FileSystemProjectTree(build_root, path_ignore_patterns)
     symbol_table_cls = LegacySymbolTable
 
@@ -106,8 +105,8 @@ class EngineInitializer(object):
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
 
-    scheduler = LocalScheduler(dict(), tasks, storage, project_tree)
-    engine = LocalSerialEngine(scheduler, storage)
+    scheduler = LocalScheduler(dict(), tasks, project_tree)
+    engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
 
