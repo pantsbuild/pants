@@ -184,7 +184,6 @@ class TestNailgunProtocol(unittest.TestCase):
       (ChunkType.STDOUT, self.TEST_UNICODE_PAYLOAD)
     )
 
-
   def test_isatty_from_empty_env(self):
     self.assertEquals(NailgunProtocol.isatty_from_env({}), (False, False, False))
 
