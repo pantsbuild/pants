@@ -3,6 +3,12 @@
 
 This document describes releases from the ``1.0.x`` ``stable`` branch.
 
+1.0.1 (05/31/2016)
+------------------
+
+The 1.0.1 release: there were no additional changes since the 1.0.1-rc0 release candidate.
+
+
 1.0.1-rc0 (05/21/2016)
 ----------------------
 
