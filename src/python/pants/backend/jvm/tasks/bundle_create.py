@@ -82,6 +82,7 @@ class BundleCreate(JvmBinaryTask):
 
   # TODO (Benjy): The following CLI > target > config logic
   # should be implemented in the options system.
+  # https://github.com/pantsbuild/pants/issues/3538
   def _resolved_option(self, target, key):
     """Get value for option "key".
 
