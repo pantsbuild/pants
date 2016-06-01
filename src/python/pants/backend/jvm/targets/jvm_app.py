@@ -214,7 +214,7 @@ class JvmApp(Target):
     :param boolean deployjar: If True, pack all 3rdparty and internal jar classfiles into
       a single deployjar in the bundle's root dir. If unset, all jars will go into the
       bundle's libs directory, the root will only contain a synthetic jar with its manifest's
-      Class-Path set to those jars."
+      Class-Path set to those jars.
     :param string archive: Create an archive of this type from the bundle.
     """
     if archive and archive not in Archive.TYPE_NAMES:

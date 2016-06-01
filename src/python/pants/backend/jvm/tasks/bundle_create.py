@@ -80,6 +80,8 @@ class BundleCreate(JvmBinaryTask):
   def cache_target_dirs(self):
     return True
 
+  # TODO (Benjy): The following CLI > target > config logic
+  # should be implemented in the options system.
   def _resolved_option(self, target, key):
     """Get value for option "key".
 
