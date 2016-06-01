@@ -4,7 +4,11 @@ set -e
 VIRTUALENV_VERSION=13.1.0
 VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.python.org/packages/source/v/virtualenv}
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+if [[ $GIT_HOOK == 1 ]] ; then
+  REPO_ROOT=.
+else
+  REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && git rev-parse --show-toplevel)
+fi
 source ${REPO_ROOT}/build-support/common.sh
 
 

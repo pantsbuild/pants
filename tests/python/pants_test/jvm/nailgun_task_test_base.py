@@ -21,10 +21,10 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
     super(NailgunTaskTestBase, self).setUp()
     self.set_options(use_nailgun=True)
 
-  @classmethod
-  def tearDownClass(cls):
+  def tearDown(self):
     """
     :API: public
     """
+    super(NailgunTaskTestBase, self).tearDown()
     # Kill any nailguns launched in our ephemeral build root.
-    NailgunProcessGroup().killall()
+    NailgunProcessGroup(metadata_base_dir=self.subprocess_dir).killall()
