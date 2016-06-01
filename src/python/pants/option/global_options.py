@@ -55,7 +55,11 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-version', advanced=True, default=pants_version(),
              help='Use this pants version.')
 
-    register('--plugins', advanced=True, type=list, help='Load these plugins.')
+    register('--plugins', advanced=True, type=list,
+             help='Load these plugins (before backends).')
+    register('--plugins-post', advanced=True, type=list,
+             help='Load these plugins (after backends).')
+
     register('--plugin-cache-dir', advanced=True,
              default=os.path.join(get_pants_cachedir(), 'plugins'),
              help='Cache resolved plugin requirements here.')

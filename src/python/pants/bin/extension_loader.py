@@ -24,16 +24,18 @@ class PluginNotFound(PluginLoadingError): pass
 class PluginLoadOrderError(PluginLoadingError): pass
 
 
-def load_plugins_and_backends(plugins, working_set, backends):
+def load_plugins_and_backends(plugins_pre, plugins_post, working_set, backends):
   """Load named plugins and source backends
 
-  :param list<str> plugins: Plugins to load (see `load_plugins`).
+  :param list<str> plugins_pre: Plugins to load before backends (see `load_plugins`).
+  :param list<str> plugins_post: Plugins to load after backends (see `load_plugins`).
   :param WorkingSet working_set: A pkg_resources.WorkingSet to load plugins from.
   :param list<str> backends: Source backends to load (see `load_build_configuration_from_source`).
   """
   build_configuration = BuildConfiguration()
-  load_plugins(build_configuration, plugins or [], working_set)
+  load_plugins(build_configuration, plugins_pre or [], working_set)
   load_build_configuration_from_source(build_configuration, additional_backends=backends or [])
+  load_plugins(build_configuration, plugins_post or [], working_set)
   return build_configuration
 
 
