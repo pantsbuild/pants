@@ -1,12 +1,11 @@
 python_library(
-  name='exclude_string',
+  name='exclude_list_of_strings',
   sources=rglobs('*.py',
                  exclude=[
                    ['aaa.py', 'dir1/aaa.py']
                  ]
                 ),
-  dependencies=[
-  ]
+  dependencies=[]
 )
 
 python_library(
@@ -16,8 +15,27 @@ python_library(
                    globs('*bb.py', 'dir1/dirdir1/*aa.py')
                  ]
                 ),
-  dependencies=[
-  ]
+  dependencies=[]
+)
+
+python_library(
+  name='exclude_strings',
+  sources=rglobs('*.py',
+                 exclude=[
+                  'aa.py', 'ab.py'
+                 ]
+                ),
+  dependencies=[]
+)
+
+python_library(
+  name='exclude_set',
+  sources=rglobs('*.py',
+                 exclude=[
+                   set(['aaa.py', 'a.py'])
+                 ]
+                ),
+  dependencies=[]
 )
 
 python_library(
@@ -27,8 +45,7 @@ python_library(
                    rglobs('*b.py')
                  ]
                 ),
-  dependencies=[
-  ]
+  dependencies=[]
 )
 
 python_library(
@@ -38,8 +55,7 @@ python_library(
                    zglobs('**/*b.py')
                  ]
                 ),
-  dependencies=[
-  ]
+  dependencies=[]
 )
 
 python_library(
@@ -50,6 +66,5 @@ python_library(
                    zglobs('**/a.py')
                  ]
                 ),
-  dependencies=[
-  ]
+  dependencies=[]
 )
