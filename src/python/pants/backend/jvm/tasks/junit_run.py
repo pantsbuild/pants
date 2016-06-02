@@ -23,6 +23,7 @@ from pants.backend.jvm.tasks.coverage.base import Coverage
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura, CoberturaTaskSettings
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnitLabel
@@ -107,6 +108,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                   'such a target will raise an error during the test run.')
     register('--use-experimental-runner', type=bool, advanced=True,
              help='Use experimental junit-runner logic for more options for parallelism.')
+    register('--html-report', type=bool,
+             help='If true, generate an html summary report of tests that were run.')
+    register('--open', type=bool,
+             help='Attempt to open the html summary report in a browser (implies --html-report)')
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
@@ -171,6 +176,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     self._strict_jvm_version = options.strict_jvm_version
     self._args = copy.copy(self.args)
     self._failure_summary = options.failure_summary
+    self._open = options.open
+    self._html_report = self._open or options.html_report
 
     if options.output_mode == 'ALL':
       self._args.append('-output-mode=ALL')
@@ -551,6 +558,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       if self._coverage:
         self._coverage.report(
           targets, tests_and_targets.keys(), self.execute_java_for_coverage, tests_failed_exception=exception)
+      if self._html_report:
+        html_file_path = JUnitHtmlReport().report(self.workdir, os.path.join(self.workdir, 'reports'))
+        if self._open:
+          binary_util.ui_open(html_file_path)
 
     try:
       self._run_tests(tests_and_targets)

@@ -104,3 +104,15 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
        '--no-jvm-synthetic-classpath',
        'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:test']).stdout_data
     self.assertIn('Synthetic jar run is not detected', output)
+
+  def test_junit_run_with_html_report(self):
+    with self.pants_results(['clean-all', 'test.junit', 'testprojects/tests/java/org/pantsbuild/testproject/htmlreport::', '--test-junit-html-report']) as results:
+      self.assert_failure(results)
+      report_html = os.path.join(results.workdir, 'test/junit/reports/junit-report.html')
+      self.assertTrue(os.path.isfile(report_html))
+      with codecs.open(report_html, 'r', encoding='utf8') as src:
+        html = src.read()
+        self.assertIn('testPasses', html)
+        self.assertIn('testFails', html)
+        self.assertIn('testErrors', html)
+        self.assertIn('testSkipped', html)

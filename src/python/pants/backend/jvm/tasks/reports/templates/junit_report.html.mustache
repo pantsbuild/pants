@@ -1,0 +1,223 @@
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <title>JUnit test report</title>
+  <script type="text/javascript" src="https://code.jquery.com/jquery-1.12.0.min.js"></script>
+  <link rel="stylesheet"
+        href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  {{! Inline the style elements to make this a standalone html page }}
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-size: 12px;
+    }
+
+    .test-passed::before {
+      content: "\00A0";
+      background-color: hsl(90, 90%, 70%);
+    }
+
+    .test-failure::before {
+      content: "!";
+      background-color: hsl(0, 90%, 70%);
+    }
+
+    .test-error::before {
+      content: "!";
+      background-color: hsl(48, 90%, 70%);
+    }
+
+    .test-skipped::before {
+      content: "\00A0";
+      background-color: hsl(0, 0%, 70%);
+    }
+
+    .failure-message {
+      white-space: pre-wrap;
+    }
+
+    .fa-caret-right {
+      font-size: 16px;
+      width: 8px;
+    }
+
+    .caret-down::before {
+      content: "\f0d7";
+    }
+
+    h2 {
+      color: hsl(207, 5%, 48%);
+      font-size: 175%;
+      font-weight: 300;
+      padding: 0 0 10px;
+      margin: 0;
+    }
+
+    .icon::before {
+      border: 1px solid hsla(0, 0%, 0%, 0.4);
+      border-radius: 3px;
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      line-height: 10px;
+      text-align: center;
+      margin-right: 2px;
+      box-shadow: 0 1px 1px hsla(0, 0%, 0%, 0.1);
+      font-size: 10px;
+      font-family: verdana, sans-serif;
+      font-weight: bold;
+      color: hsla(0, 0%, 0%, 0.4);
+    }
+
+    .summary {
+      margin: 10px;
+      width: 50%;
+    }
+
+    table {
+      border-collapse: collapse;
+      border-spacing: 0;
+      font-size: 100%;
+      width: 100%;
+    }
+
+    table tr:nth-child(even) {
+      background-color: hsla(0, 0%, 0%, 0.05);
+    }
+
+    table th {
+      font-weight: bold;
+      border-bottom: 1px solid hsla(0, 0%, 0%, 0.1);
+      padding: 0 5px 5px;
+      white-space: nowrap;
+    }
+
+    table td {
+      padding: 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    th, td {
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .testsuites tr {
+      display: none;
+      cursor: pointer;
+    }
+
+    .testsuites tr.header {
+      display: table-row;
+    }
+
+    .testsuites {
+      margin: 10px;
+    }
+
+    td.testrow {
+      padding: 0;
+    }
+
+    td.indent {
+      width: 15px;
+    }
+
+    td.time {
+      text-align: right;
+      padding-right: 10px;
+    }
+
+    .tests tr {
+      display: table-row;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+<div class="summary">
+  <h2>Summary</h2>
+  <table>
+    <tr>
+      <th></th>
+      <th>Tests</th>
+      <th>Errors</th>
+      <th>Failures</th>
+      <th>Skipped</th>
+      <th>Success Rate</th>
+      <th>Time</th>
+    </tr>
+    <tr>
+      <td><span class="icon {{summary_icon_class}}"></span></td>
+      <td>{{total_tests}}</td>
+      <td>{{total_errors}}</td>
+      <td>{{total_failures}}</td>
+      <td>{{total_skipped}}</td>
+      <td>{{total_success}}</td>
+      <td>{{total_time}}</td>
+    </tr>
+  </table>
+</div>
+<div class="testsuites">
+  <h2>Packages</h2>
+  <table>
+    <thead>
+    <tr class="header">
+      <th>Package</th>
+      <th>Tests</th>
+      <th>Errors</th>
+      <th>Failures</th>
+      <th>Skipped</th>
+      <th>Success Rate</th>
+      <th>Time</th>
+    </tr>
+    </thead>
+    <tbody>
+    {{#testsuites}}
+    <tr class="header">
+      <td>
+        <i class="fa fa-caret-right"></i>&nbsp;&nbsp;<span class="icon {{icon_class}}"></span>&nbsp;{{name}}
+      </td>
+      <td>{{tests}}</td>
+      <td>{{errors}}</td>
+      <td>{{failures}}</td>
+      <td>{{skipped}}</td>
+      <td>{{success}}</td>
+      <td class="time">{{time}}</td>
+    </tr>
+    {{#testcases}}
+    <tr>
+      <td colspan="7" class="testrow">
+        <div class="tests">
+          <table>
+            <tbody>
+            <tr>
+              <td class="indent"></td>
+              <td><span class="icon {{icon_class}}"></span>&nbsp;{{name}}</td>
+              <td class="failure-message" colspan="4">{{message}}</td>
+              <td class="time">{{time}}</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </td>
+    </tr>
+    {{/testcases}}
+    {{/testsuites}}
+    </tbody>
+  </table>
+</div>
+</body>
+<script>
+  $('tr.header').click(function () {
+    $(this).find('.fa-caret-right').toggleClass('caret-down');
+    $(this).nextUntil('tr.header').css('display', function (i, v) {
+      return this.style.display === 'table-row' ? 'none' : 'table-row';
+    });
+  });
+</script>
+</html>
