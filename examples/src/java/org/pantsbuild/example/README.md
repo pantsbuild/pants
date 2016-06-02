@@ -215,11 +215,12 @@ compilation for Java and Scala.
 Java7 vs Java6, Which Java
 --------------------------
 
-Pants first looks through any jdks specified by the jdk_paths map in pants.ini, eg:
+Pants first looks through any JDKs specified by the `paths` map in pants.ini's jvm-distributions
+section, eg:
 
     :::ini
-    [jvm]
-    jdk_paths = {
+    [jvm-distributions]
+    paths = {
         'macos': [
           '/Library/Java/JavaVirtualMachines/jdk1.7.0_79.jdk',
           '/Library/Java/JavaVirtualMachines/jdk1.8.0_45.jdk',
@@ -229,9 +230,9 @@ Pants first looks through any jdks specified by the jdk_paths map in pants.ini, 
         ]
       }
 
-If no jvms are found there, Pants uses the first java it finds in `JDK_HOME`, `JAVA_HOME`,
-or `PATH`. If no jdk_paths are set, you can specify a specific java version for just one
-pants invocation:
+If no JVMs are found there, Pants uses the first Java it finds in `JDK_HOME`, `JAVA_HOME`,
+or `PATH`. If no `paths` are specified in pants.ini, you can use JDK_HOME to set the Java version
+for just one pants invocation:
 
     :::bash
     $ JDK_HOME=/usr/lib/jvm/java-1.7.0-openjdk-amd64 ./pants ...
