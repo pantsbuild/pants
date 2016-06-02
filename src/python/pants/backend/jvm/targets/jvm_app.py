@@ -14,6 +14,7 @@ from twitter.common.dirutil import Fileset
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
@@ -128,6 +129,11 @@ class Bundle(object):
       filenames, or a Fileset object (e.g. globs()).
       E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
     """
+    deprecated_conditional(lambda: fileset is None,
+                           '1.2.0',
+                           'bare bundle() without `fileset=` param',
+                           "Pass the `fileset=` parameter: `bundle(fileset=globs('*.config')`")
+
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 

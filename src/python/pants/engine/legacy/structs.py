@@ -10,6 +10,7 @@ from abc import abstractproperty
 
 from six import string_types
 
+from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address import Addresses
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import Files as FSFiles
@@ -121,9 +122,13 @@ class JvmAppAdaptor(TargetAdaptor):
       path_globs_list = []
       excluded_path_globs_list = []
       for bundle in self.bundles:
-        # TODO: Consider deprecating `bundle()` form?
         # Short circuit in the case of `bundles=[..., bundle(), ...]`.
         if not hasattr(bundle, 'fileset'):
+          # N.B. This notice is duplicated in jvm_app.py::Bundle.__call__() for the old engine.
+          deprecated_conditional(lambda: True,
+                                 '1.2.0',
+                                 'bare bundle() without `fileset=` param',
+                                 "Pass a `fileset=` parameter: `bundle(fileset=globs('*.config')`")
           logger.warn('Ignoring `bundle()` without `fileset` parameter.')
           continue
         base_globs = BaseGlobs.from_sources_field(bundle.fileset)
