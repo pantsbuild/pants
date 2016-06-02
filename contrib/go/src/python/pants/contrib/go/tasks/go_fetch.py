@@ -152,8 +152,8 @@ class GoFetch(GoTask):
 
         if not vt.valid:
           self._fetch_pkg(gopath, go_remote_lib.import_path, go_remote_lib.rev)
-          self._map_fetched_remote_source(go_remote_lib, gopath, all_known_addresses,
-                                          resolved_remote_libs, undeclared_deps)
+        self._map_fetched_remote_source(go_remote_lib, gopath, all_known_addresses,
+                                        resolved_remote_libs, undeclared_deps)
 
         go_remote_lib_src[go_remote_lib] = os.path.join(gopath, 'src', go_remote_lib.import_path)
 

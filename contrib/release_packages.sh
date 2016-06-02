@@ -110,6 +110,17 @@ function pkg_python_checks_install_test() {
     --explain compile | grep "pythonstyle" &> /dev/null
 }
 
+PKG_FINDBUGS=(
+  "pantsbuild.pants.contrib.findbugs"
+  "//contrib/findbugs/src/python/pants/contrib/findbugs:plugin"
+  "pkg_findbugs_install_test"
+)
+function pkg_findbugs_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.findbugs==$(local_version)']" \
+      --explain compile | grep "findbugs" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -120,4 +131,5 @@ CONTRIB_PACKAGES=(
   PKG_NODE
   PKG_PYTHON_CHECKS
   PKG_SCALAJS
+  PKG_FINDBUGS
 )

@@ -288,6 +288,20 @@ class PantsRunIntegrationTest(unittest.TestCase):
     finally:
       os.rename(real_path, test_path)
 
+  @contextmanager
+  def temporary_file_content(self, path, content):
+    """Temporarily write content to a file for the purpose of an integration test."""
+    path = os.path.realpath(path)
+    assert path.startswith(
+      os.path.realpath(get_buildroot())), 'cannot write paths outside of the buildroot!'
+    assert not os.path.exists(path), 'refusing to overwrite an existing path!'
+    with open(path, 'wb') as fh:
+      fh.write(content)
+    try:
+      yield
+    finally:
+      os.unlink(path)
+
   def do_command(self, *args, **kwargs):
     """Wrapper around run_pants method.
 
