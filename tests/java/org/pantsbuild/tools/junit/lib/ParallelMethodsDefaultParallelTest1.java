@@ -4,6 +4,7 @@ package org.pantsbuild.tools.junit.lib;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -12,12 +13,13 @@ import static org.junit.Assert.assertTrue;
  * This test is intentionally under a java_library() BUILD target so it will not be run
  * on its own. It is run by the ConsoleRunnerTest suite to test ConsoleRunnerImpl.
  *<p>
- * Exercises the junit runner -parallel-methods argument.
+ * Exercises the junit runner PARALLEL_METHODS concurrency strategy.
  * <p>
  * For all methods in ParallelMethodsDefaultParallelTest1 and ParallelMethodsDefaultParallelTest2
- * to succeed all of the test methods must be running at the same time. Intended to test the flags
+ * to succeed all of the test methods must be running at the same time.  But the classes should
+ * not run in parallel. Intended to test the flags
  * <p>
- * -parallel-methods -default-parallel -parallel-threads 4
+ * -default-concurrency PARALLEL_METHODS -parallel-threads 4
  * <p>
  * when running with just these two classes as specs.
  * <p>
@@ -27,8 +29,9 @@ import static org.junit.Assert.assertTrue;
  */
 public class ParallelMethodsDefaultParallelTest1 {
   private static final int NUM_CONCURRENT_TESTS = 4;
-  private static final int RETRY_TIMEOUT_MS = 3000;
+  private static final int WAIT_TIMEOUT_MS = 3000;
   private static CountDownLatch latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
+  private static final AtomicInteger numRunning = new AtomicInteger(0);
 
   @Test
   public void pmdptest11() throws Exception {
@@ -41,8 +44,20 @@ public class ParallelMethodsDefaultParallelTest1 {
   }
 
   static void awaitLatch(String methodName) throws Exception {
+    // NB(zundel): this test currently doesn't ensure that both classes run all methods in
+    // parallel, it only ensures that at least two methods get started and that no more than
+    // 2 methods run at a time. A better test would show that methods are run in parallel
+    // in each class.
+
     TestRegistry.registerTestCall(methodName);
     latch.countDown();
-    assertTrue(latch.await(RETRY_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+    // Make sure that we wait for at least 2 methods to get started to ensure there is some
+    // parallelism going on.
+    assertTrue(latch.await(WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+    numRunning.incrementAndGet();
+    Thread.sleep(WAIT_TIMEOUT_MS);
+    // Make sure no more than 2 tests have been started concurrently
+    assertTrue(numRunning.get() <= NUM_CONCURRENT_TESTS);
+    numRunning.decrementAndGet();
   }
 }
