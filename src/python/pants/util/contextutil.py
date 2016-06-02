@@ -221,3 +221,17 @@ class Timer(object):
 
   def __exit__(self, typ, val, traceback):
     self.finish = self._clock.time()
+
+
+@contextmanager
+def exception_logging(logger, msg):
+  """Provides exception logging via `logger.exception` for a given block of code.
+
+  :param logging.Logger logger: The `Logger` instance to use for logging.
+  :param string msg: The message to emit before `logger.exception` emits the traceback.
+  """
+  try:
+    yield
+  except Exception:
+    logger.exception(msg)
+    raise

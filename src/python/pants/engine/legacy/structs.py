@@ -16,6 +16,7 @@ from pants.engine.fs import Files as FSFiles
 from pants.engine.fs import PathGlobs
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
+from pants.util.contextutil import exception_logging
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -43,11 +44,12 @@ class TargetAdaptor(StructWithDeps):
   @property
   def field_adaptors(self):
     """Returns a tuple of Fields for captured fields which need additional treatment."""
-    if not self.has_concrete_sources:
-      return tuple()
-    base_globs = BaseGlobs.from_sources_field(self.sources)
-    path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-    return (SourcesField(self.address, base_globs.filespecs, path_globs, excluded_path_globs),)
+    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+      if not self.has_concrete_sources:
+        return tuple()
+      base_globs = BaseGlobs.from_sources_field(self.sources)
+      path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
+      return (SourcesField(self.address, base_globs.filespecs, path_globs, excluded_path_globs),)
 
 
 class Field(object):
@@ -110,25 +112,31 @@ class JvmAppAdaptor(TargetAdaptor):
 
   @property
   def field_adaptors(self):
-    field_adaptors = super(JvmAppAdaptor, self).field_adaptors
-    if getattr(self, 'bundles', None) is None:
-      return field_adaptors
-    # Construct a field for the `bundles` argument.
-    filespecs_list = []
-    path_globs_list = []
-    excluded_path_globs_list = []
-    for bundle in self.bundles:
-      base_globs = BaseGlobs.from_sources_field(bundle.fileset)
-      filespecs_list.append(base_globs.filespecs)
-      path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-      path_globs_list.append(path_globs)
-      excluded_path_globs_list.append(excluded_path_globs)
-    bundles_field = BundlesField(self.address,
-                                 self.bundles,
-                                 filespecs_list,
-                                 path_globs_list,
-                                 excluded_path_globs_list)
-    return field_adaptors + (bundles_field,)
+    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+      field_adaptors = super(JvmAppAdaptor, self).field_adaptors
+      if getattr(self, 'bundles', None) is None:
+        return field_adaptors
+      # Construct a field for the `bundles` argument.
+      filespecs_list = []
+      path_globs_list = []
+      excluded_path_globs_list = []
+      for bundle in self.bundles:
+        # TODO: Consider deprecating `bundle()` form?
+        # Short circuit in the case of `bundles=[..., bundle(), ...]`.
+        if not hasattr(bundle, 'fileset'):
+          logger.warn('Ignoring `bundle()` without `fileset` parameter.')
+          continue
+        base_globs = BaseGlobs.from_sources_field(bundle.fileset)
+        filespecs_list.append(base_globs.filespecs)
+        path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
+        path_globs_list.append(path_globs)
+        excluded_path_globs_list.append(excluded_path_globs)
+      bundles_field = BundlesField(self.address,
+                                   self.bundles,
+                                   filespecs_list,
+                                   path_globs_list,
+                                   excluded_path_globs_list)
+      return field_adaptors + (bundles_field,)
 
 
 class BaseGlobs(AbstractClass):
