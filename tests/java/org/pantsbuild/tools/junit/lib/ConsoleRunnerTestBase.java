@@ -17,7 +17,6 @@ import org.junit.runners.Parameterized.Parameters;
 import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.Concurrency;
 import org.pantsbuild.tools.junit.impl.ConsoleRunnerImpl;
-import org.pantsbuild.tools.junit.lib.TestRegistry;
 
 @TestSerial
 @RunWith(Parameterized.class)
@@ -37,7 +36,7 @@ public abstract class ConsoleRunnerTestBase {
     EXPERIMENTAL_SERIAL(true, Concurrency.SERIAL),
     EXPERIMENTAL_PARALLEL_CLASSES(true, Concurrency.PARALLEL_CLASSES),
     EXPERIMENTAL_PARALLEL_METHODS(true, Concurrency.PARALLEL_METHODS),
-    EXPERIMENTAL_PARALLEL_BOTH(true, Concurrency.PARALLEL_BOTH);
+    EXPERIMENTAL_PARALLEL_CLASSES_AND_METHODS(true, Concurrency.PARALLEL_CLASSES_AND_METHODS);
 
     public final boolean useExperimentalRunner;
     public final Concurrency defaultConcurrency;

@@ -12,7 +12,7 @@ import pkg_resources
 
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import BuildConfigurationError
-from pants.bin.extension_loader import load_plugins_and_backends
+from pants.bin.extension_loader import load_backends_and_plugins
 from pants.bin.plugin_resolver import PluginResolver
 from pants.goal.goal import Goal
 from pants.logging.setup import setup_logging
@@ -86,7 +86,7 @@ class OptionsInitializer(object):
     # Load plugins and backends.
     plugins = global_bootstrap_options.plugins
     backend_packages = global_bootstrap_options.backend_packages
-    build_configuration = load_plugins_and_backends(plugins, working_set, backend_packages)
+    build_configuration = load_backends_and_plugins(plugins, working_set, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     known_scope_infos = [GlobalOptionsRegistrar.get_scope_info()]

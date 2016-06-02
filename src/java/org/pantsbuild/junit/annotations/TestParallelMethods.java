@@ -11,8 +11,9 @@ import java.lang.annotation.Target;
 
 /**
  * Annotate that methods in this test class can be run in parallel. Note that this will not run in
- * parallel with other classes. If you want that behavior too, specify {@link TestParallelBoth}.
- * See usage note in {@code org.pantsbuild.tools.junit.impl.ConsoleRunnerImpl}. The
+ * parallel with other classes. If you want that behavior too, specify
+ * {@link TestParallelClassesAndMethods}.  See usage note in
+ * {@code org.pantsbuild.tools.junit.impl.ConsoleRunnerImpl}. The
  * {@link TestSerial} and {@link TestParallel} annotation takes precedence over this annotation
  * if a class has multiple annotations (including via inheritance).
  * <p>

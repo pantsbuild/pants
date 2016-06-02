@@ -80,7 +80,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Set the default concurrency mode for running tests not annotated with'
                   ' @TestParallel or @TestSerial.')
     register('--default-parallel', advanced=True, type=bool,
-             removal_hint='Use --concurrency instead.', removal_version='1.1.0',
+             removal_hint='Use --default-concurrency instead.', removal_version='1.3.0',
              help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
     register('--parallel-threads', advanced=True, type=int, default=0,
              help='Number of threads to run tests in parallel. 0 for autoset.')
@@ -110,7 +110,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.7'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.9'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
@@ -186,25 +186,36 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.per_test_timer:
       self._args.append('-per-test-timer')
 
-    # TODO(zundel): Simply remove when --default_parallel finishes deprecation
     if options.default_parallel:
-      self._args.append('-default-parallel')
-
-    if options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_BOTH:
-      self.context.log.warn('--default-concurrency=PARALLEL_BOTH is experimental.')
-      self._args.append('-default-concurrency')
-      self._args.append('PARALLEL_BOTH')
-    elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
+      # TODO(zundel): Remove when --default_parallel finishes deprecation
+      if options.default_concurrency != junit_tests.CONCURRENCY_SERIAL:
+        self.context.log.warn('--default-parallel overrides --default-concurrency')
       self._args.append('-default-concurrency')
       self._args.append('PARALLEL_CLASSES')
-    elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
-      self.context.log.warn('--default-concurrency=PARALLEL_METHODS is experimental.')
-      self._args.append('-default-concurrency')
-      self._args.append('PARALLEL_METHODS')
-    elif options.default_concurrency == junit_tests.CONCURRENCY_SERIAL:
-      # TODO(zundel): we can't do anything here yet while the --default-parallel
-      # option is in deprecation mode.
-      pass
+    else:
+      if options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
+        if not options.use_experimental_runner:
+          self.context.log.warn(
+            '--default-concurrency=PARALLEL_CLASSES_AND_METHODS is experimental, use --use-experimental-runner.')
+        self._args.append('-default-concurrency')
+        self._args.append('PARALLEL_CLASSES_AND_METHODS')
+      elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
+        if not options.use_experimental_runner:
+          self.context.log.warn(
+            '--default-concurrency=PARALLEL_METHODS is experimental, use --use-experimental-runner.')
+        if options.test_shard:
+          # NB(zundel): The experimental junit runner doesn't support test sharding natively.  The
+          # legacy junit runner allows both methods and classes to run in parallel with this option.
+          self.context.log.warn(
+            '--default-concurrency=PARALLEL_METHODS with test sharding will run classes in parallel too.')
+        self._args.append('-default-concurrency')
+        self._args.append('PARALLEL_METHODS')
+      elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
+        self._args.append('-default-concurrency')
+        self._args.append('PARALLEL_CLASSES')
+      elif options.default_concurrency == junit_tests.CONCURRENCY_SERIAL:
+        self._args.append('-default-concurrency')
+        self._args.append('SERIAL')
 
     self._args.append('-parallel-threads')
     self._args.append(str(options.parallel_threads))
@@ -214,6 +225,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       self._args.append(options.test_shard)
 
     if options.use_experimental_runner:
+      self.context.log.info('Using experimental junit-runner logic.')
       self._args.append('-use-experimental-runner')
 
   def classpath(self, targets, classpath_product=None):
@@ -382,17 +394,17 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         # Override cmdline args with values from junit_test() target that specify concurrency:
         args = self._args + [u'-xmlreport']
 
-        # TODO(zundel): Combine these together into a single -concurrency choices style argument
-        if concurrency == junit_tests.CONCURRENCY_SERIAL:
+        if concurrency is not None:
           args = remove_arg(args, '-default-parallel')
-        elif concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
-          args = ensure_arg(args, '-default-parallel')
-        elif concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
-          self.context.log.warn('Not implemented: parallel_methods')
-        elif concurrency == junit_tests.CONCURRENCY_PARALLEL_BOTH:
-          self.context.log.warn('specifying {} is experimental.'.format(concurrency))
-          args = ensure_arg(args, '-default-parallel')
-          args = ensure_arg(args, '-parallel-methods')
+          if concurrency == junit_tests.CONCURRENCY_SERIAL:
+            args = ensure_arg(args, '-default-concurrency', param='SERIAL')
+          elif concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
+            args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES')
+          elif concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
+            args = ensure_arg(args, '-default-concurrency', param='PARALLEL_METHODS')
+          elif concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
+            args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES_AND_METHODS')
+
         if threads is not None:
           args = remove_arg(args, '-parallel-threads', has_param=True)
           args += ['-parallel-threads', str(threads)]

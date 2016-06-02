@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
+import logging
 from abc import abstractproperty
 
 from six import string_types
@@ -18,6 +18,9 @@ from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class TargetAdaptor(StructWithDeps):
@@ -135,19 +138,25 @@ class BaseGlobs(AbstractClass):
   def from_sources_field(sources):
     """Return a BaseGlobs for the given sources field.
 
-    Sources may be None, a sequence, or a BaseGlobs instance.
+    `sources` may be None, a list/tuple/set, a string or a BaseGlobs instance.
     """
     if sources is None:
       return Files()
     elif isinstance(sources, BaseGlobs):
       return sources
-    elif isinstance(sources, collections.Sequence) and not isinstance(sources, string_types):
+    elif isinstance(sources, string_types):
+      return Files(sources)
+    elif isinstance(sources, (set, list, tuple)):
       return Files(*sources)
     else:
       raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
   @staticmethod
   def _filespec_for_excludes(raw_excludes):
+    if isinstance(raw_excludes, string_types):
+      raise ValueError('Excludes of type `{}` are not supported: got "{}"'
+                       .format(type(raw_excludes).__name__, raw_excludes))
+
     excluded_patterns = []
     for raw_exclude in raw_excludes:
       exclude_filespecs = BaseGlobs.from_sources_field(raw_exclude).filespecs
@@ -169,8 +178,16 @@ class BaseGlobs(AbstractClass):
     raw_excludes = kwargs.pop('exclude', [])
     self._excluded_filespecs = self._filespec_for_excludes(raw_excludes).get('globs', [])
 
+    # `follow_links=True` is the default behavior for wrapped globs, so we pop the old kwarg
+    # and warn here to bridge the gap from v1->v2 BUILD files.
+    follow_links = kwargs.pop('follow_links', None)
+    if follow_links is not None:
+      logger.warn(
+        'Ignoring `follow_links={}` kwarg on glob. Default behavior is to follow all links.'
+        .format(follow_links)
+      )
+
     if kwargs:
-      # TODO
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))
 
   @property

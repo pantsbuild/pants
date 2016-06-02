@@ -457,7 +457,7 @@ class StepContext(object):
       if node in self._parents:
         return Noop.cycle(list(self._parents)[-1], node)
       self._parents.add(node)
-      state = node.step(self)
+      state = self._node_states[node] = node.step(self)
       self._parents.remove(node)
       return state
     else:
