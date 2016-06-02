@@ -65,7 +65,7 @@ Among Pants’s current strengths are:
 -   Support for local and distributed caching.
 -   Especially fast for Scala builds, compared to alternatives.
 -   Builds standalone python executables ([PEX
-    files](http://pex.readthedocs.org/))
+    files](https://pex.readthedocs.io/))
 -   Has a plugin system to add custom features and override stock
     behavior.
 -   Runs on Linux and Mac OS X.

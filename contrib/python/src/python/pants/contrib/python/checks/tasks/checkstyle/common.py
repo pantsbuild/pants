@@ -312,7 +312,7 @@ class CheckSyntaxError(Exception):
     line_range = slice(self._syntax_error.lineno, self._syntax_error.lineno + 1)
     lines = OffByOneList(self._blob.split('\n'))
     # NB: E901 is the SyntaxError PEP8 code.
-    # See:http://pep8.readthedocs.org/en/latest/intro.html#error-codes
+    # See:https://pep8.readthedocs.io/en/latest/intro.html#error-codes
     return Nit('E901', Nit.ERROR, self.filename,
                'SyntaxError: {error}'.format(error=self._syntax_error.msg),
                line_range=line_range, lines=lines)

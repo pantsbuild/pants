@@ -14,7 +14,7 @@ class FlakeError(Nit):
   # TODO(wickman) There is overlap between this and Flake8 -- consider integrating
   # checkstyle plug-ins into the PEP8 tool directly so that this can be inherited
   # by flake8.
-  # Code reference is here: http://flake8.readthedocs.org/en/latest/warnings.html
+  # Code reference is here: https://flake8.readthedocs.io/en/latest/warnings.html
   CLASS_ERRORS = {
     'DuplicateArgument': 'F831',
     'ImportShadowedByLoopVar': 'F402',
