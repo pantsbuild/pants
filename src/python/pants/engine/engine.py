@@ -105,11 +105,21 @@ class Engine(AbstractClass):
     return step_request.node.is_cacheable
 
   def _maybe_cache_get(self, step_request):
-    return self._cache.get(step_request) if self._should_cache(step_request) else None
+    """If caching is enabled for the given StepRequest, create a keyed request and perform a lookup.
 
-  def _maybe_cache_put(self, step_request, step_result):
-    if self._should_cache(step_request):
-      self._cache.put(step_request, step_result)
+    The sole purpose of a keyed request is to get a stable cache key, so we can sort
+    keyed_request.dependencies by keys as opposed to requiring dep nodes to support compare.
+
+    :returns: A tuple of a keyed StepRequest and result, either of which may be None.
+    """
+    if not self._should_cache(step_request):
+      return None, None
+    keyed_request = self._storage.key_for_request(step_request)
+    return keyed_request, self._cache.get(keyed_request)
+
+  def _maybe_cache_put(self, keyed_request, step_result):
+    if keyed_request is not None:
+      self._cache.put(keyed_request, step_result)
 
   @abstractmethod
   def reduce(self, execution_request):
@@ -129,14 +139,10 @@ class LocalSerialEngine(Engine):
     node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
-        # The sole purpose of a keyed request is to get a stable cache key,
-        # so we can sort keyed_request.dependencies by keys as opposed to requiring
-        # dep nodes to support compare.
-        keyed_request = self._storage.key_for_request(step)
-        result = self._maybe_cache_get(keyed_request)
+        keyed_request, result = self._maybe_cache_get(step)
         if result is None:
           result = step(node_builder)
-          self._maybe_cache_put(keyed_request, result)
+        self._maybe_cache_put(keyed_request, result)
         promise.success(result)
 
 
