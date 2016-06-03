@@ -731,15 +731,23 @@ class Target(AbstractTarget):
     if isinstance(sources, Addresses):
       # Currently, this is only created by the result of from_target() which takes a single argument
       if len(sources.addresses) != 1:
+        key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
+        spec_section = " to '{}'".format(address.spec) if address else ""
         raise self.WrongNumberOfAddresses(
-          "Expected a single address to from_target() as argument to {spec}"
-          .format(spec=address.spec))
+          "Expected {key_arg_section}a single address to from_target() as argument{spec_section}"
+          .format(key_arg_section=key_arg_section, spec_section=spec_section))
       referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
     elif sources is None:
       sources = FilesetWithSpec.empty(sources_rel_path)
-    elif not isinstance(sources, FilesetWithSpec):
+    elif isinstance(sources, FilesetWithSpec):
+      pass
+    elif isinstance(sources, (set, list, tuple)):
       # Received a literal sources list: convert to a FilesetWithSpec via Files.
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
+    else:
+      key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
+      raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
+                                            .format(key_arg_section, type(sources)))
 
     return SourcesField(sources=sources)
