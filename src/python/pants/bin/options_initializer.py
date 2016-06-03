@@ -11,6 +11,7 @@ import sys
 import pkg_resources
 
 from pants.base.build_environment import pants_version
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import BuildConfigurationError
 from pants.bin.extension_loader import load_backends_and_plugins
 from pants.bin.plugin_resolver import PluginResolver
@@ -85,8 +86,16 @@ class OptionsInitializer(object):
 
     # Load plugins and backends.
     plugins = global_bootstrap_options.plugins
-    backend_packages = global_bootstrap_options.backend_packages
-    build_configuration = load_backends_and_plugins(plugins, working_set, backend_packages)
+    deprecated_conditional(
+        lambda: not set(global_bootstrap_options.default_backend_packages).issubset(
+            global_bootstrap_options.backend_packages),
+        '1.3.0',
+        '--default-backend-packages',
+        'Add the backends you need to --backend-packages instead. If in doubt, add all of them. '
+        'In the future there will be no default backends.')
+    backends = (global_bootstrap_options.default_backend_packages +
+                global_bootstrap_options.backend_packages)
+    build_configuration = load_backends_and_plugins(plugins, working_set, backends)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     known_scope_infos = [GlobalOptionsRegistrar.get_scope_info()]
