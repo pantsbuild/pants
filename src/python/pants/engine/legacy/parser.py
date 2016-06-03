@@ -100,5 +100,5 @@ class LegacyPythonCallbacksParser(Parser):
 
     with cls._lock:
       del cls._objects[:]
-      six.exec_(python, symbols, {})
+      six.exec_(python, symbols)
       return list(cls._objects)
