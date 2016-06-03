@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import atexit
 import errno
+import filecmp
 import os
 import tempfile
 import time
@@ -20,7 +21,8 @@ from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir, read_file,
                                 relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
-                                safe_file_dump, safe_mkdir, safe_rm_oldest_items_in_dir, touch)
+                                safe_file_copy, safe_file_dump, safe_mkdir,
+                                safe_rm_oldest_items_in_dir, safe_symlink, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -234,6 +236,16 @@ class DirutilTest(unittest.TestCase):
       self.assertFalse(os.path.exists(safe_path))
       self.assertTrue(os.path.exists(expected_file))
 
+  def test_safe_file_copy(self):
+    with temporary_dir() as td:
+      source = os.path.join(td, 'source')
+      touch(source)
+      dest = os.path.join(td, 'a/b/c/d/e/dst')
+
+      safe_file_copy(source, dest)
+      self.assertTrue(os.path.exists(dest))
+      self.assertTrue(filecmp.cmp(source, dest))
+
   def test_safe_rm_oldest_items_in_dir(self):
     with temporary_dir() as td:
       touch(os.path.join(td, 'file1'))
@@ -277,3 +289,22 @@ class DirutilTest(unittest.TestCase):
       safe_rm_oldest_items_in_dir(td, 1)
       touch(os.path.join(td, 'file1'))
       self.assertEqual(len(os.listdir(td)), 1)
+
+  def test_safe_symlink(self):
+    def _create_and_check_link(source, link):
+      safe_symlink(source, link)
+      self.assertTrue(os.path.islink(link))
+      self.assertEquals(source, os.readlink(link))
+
+    with temporary_dir() as td:
+      link = os.path.join(td, 'link')
+
+      # Do it twice, to make sure we can overwrite existing link
+      source = os.path.join(td, 'source1')
+      _create_and_check_link(source, link)
+      source = os.path.join(td, 'source2')
+      _create_and_check_link(source, link)
+
+      # Check if parent dirs will be created for the link
+      link = os.path.join(td, 'a/b/c/link')
+      _create_and_check_link(source, link)

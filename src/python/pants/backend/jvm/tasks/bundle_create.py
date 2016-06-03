@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.util.dirutil import safe_copy, safe_mkdir, safe_symlink
+from pants.util.dirutil import safe_file_copy, safe_mkdir, safe_symlink
 from pants.util.objects import datatype
 
 
@@ -145,7 +145,7 @@ class BundleCreate(JvmBinaryTask):
 
           if archive and archivepath:
             archive_copy = os.path.join(self.get_options().pants_distdir, '{}.{}'.format(name, app.archive))
-            safe_copy(archivepath, archive_copy, overwrite=True)
+            safe_file_copy(archivepath, archive_copy)
             self.context.log.info('created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
 
   class BasenameConflictError(TaskError):
