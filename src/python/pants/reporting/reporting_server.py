@@ -86,9 +86,9 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   def _handle_runs(self, relpath, params):
     """Show a listing of all pants runs since the last clean-all."""
     runs_by_day = self._partition_runs_by_day()
-    args = self._default_template_args('run_list')
+    args = self._default_template_args('run_list.html')
     args['runs_by_day'] = runs_by_day
-    self._send_content(self._renderer.render_name('base', args), 'text/html')
+    self._send_content(self._renderer.render_name('base.html', args), 'text/html')
 
   _collapsible_fmt_string = dedent("""
     <div class="{class_prefix}" id="{id}">
@@ -106,7 +106,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   def _handle_run(self, relpath, params):
     """Show the report for a single pants run."""
-    args = self._default_template_args('run')
+    args = self._default_template_args('run.html')
     run_id = relpath
     run_info = self._get_run_info_dict(run_id)
     if run_info is None:
@@ -141,12 +141,12 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       if run_id == 'latest':
         args['is_latest'] = run_info['id']
 
-    self._send_content(self._renderer.render_name('base', args), 'text/html')
+    self._send_content(self._renderer.render_name('base.html', args), 'text/html')
 
   def _handle_stats(self, relpath, params):
     """Show stats for pants runs in the statsdb."""
-    args = self._default_template_args('stats')
-    self._send_content(self._renderer.render_name('base', args), 'text/html')
+    args = self._default_template_args('stats.html')
+    self._send_content(self._renderer.render_name('base.html', args), 'text/html')
 
   def _handle_statsdata(self, relpath, params):
     """Show stats for pants runs in the statsdb."""
@@ -191,7 +191,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     linenums = True
     args = {'prettify_extra_langs': prettify_extra_langs, 'content': content,
             'prettify': prettify, 'linenums': linenums}
-    self._send_content(self._renderer.render_name('file_content', args), 'text/html')
+    self._send_content(self._renderer.render_name('file_content.html', args), 'text/html')
 
   def _handle_assets(self, relpath, params):
     """Statically serve assets: js, css etc."""
@@ -293,12 +293,12 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     relpath = os.path.relpath(abspath, self._root)
     breadcrumbs = self._create_breadcrumbs(relpath)
     entries = [{'link_path': os.path.join(relpath, e), 'name': e} for e in os.listdir(abspath)]
-    args = self._default_template_args('dir')
+    args = self._default_template_args('dir.html')
     args.update({'root_parent': os.path.dirname(self._root),
                  'breadcrumbs': breadcrumbs,
                  'entries': entries,
                  'params': params})
-    self._send_content(self._renderer.render_name('base', args), 'text/html')
+    self._send_content(self._renderer.render_name('base.html', args), 'text/html')
 
   def _serve_file(self, abspath, params):
     """Show a file.
@@ -308,11 +308,11 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     relpath = os.path.relpath(abspath, self._root)
     breadcrumbs = self._create_breadcrumbs(relpath)
     link_path = urlparse.urlunparse([None, None, relpath, None, urllib.urlencode(params), None])
-    args = self._default_template_args('file')
+    args = self._default_template_args('file.html')
     args.update({'root_parent': os.path.dirname(self._root),
                  'breadcrumbs': breadcrumbs,
                  'link_path': link_path})
-    self._send_content(self._renderer.render_name('base', args), 'text/html')
+    self._send_content(self._renderer.render_name('base.html', args), 'text/html')
 
   def _send_content(self, content, content_type, code=200):
     """Send content to client."""

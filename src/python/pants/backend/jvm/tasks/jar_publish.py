@@ -165,7 +165,7 @@ class PomWriter(object):
     if target_jar:
       target_jar = target_jar.extend(dependencies=dependencies.values())
 
-    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.xml.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
     generator = Generator(template_text, project=target_jar)
     with safe_open(path, 'w') as output:
@@ -906,7 +906,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       return ivy.ivy_settings
 
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
-    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.xml.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
 
     published = [TemplateData(org=jar.org, name=jar.name) for jar in publishedjars]
@@ -923,7 +923,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       return wrapper.name
 
   def generate_ivy(self, jar, version, publications):
-    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.xml.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
 
     pubs = [TemplateData(name=None if p.name == jar.name else p.name,
