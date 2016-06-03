@@ -1,0 +1,8 @@
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+# This is here as part of an integration test for the `alias()` syntax.
+
+alias(target=':arbitrary-empty-target')
+
+target(name='arbitrary-empty-target')

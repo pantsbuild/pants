@@ -250,7 +250,7 @@ class Context(object):
     # initialized somewhere, making it now unsafe to replace targets. Thus callers of this method
     # must know what they're doing!
     #
-    # TODO(John Sirois): This currently has 0 uses (outside ContextTest) in pantsbuild/pants and
+    # TODO(John Sirois): This currently has only 1 use (outside ContextTest) in pantsbuild/pants and
     # only 1 remaining known use case in the Foursquare codebase that will be able to go away with
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
