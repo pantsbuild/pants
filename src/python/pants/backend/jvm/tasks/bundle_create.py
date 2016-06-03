@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.util.dirutil import safe_mkdir, safe_symlink
+from pants.util.dirutil import safe_copy, safe_mkdir, safe_symlink
 from pants.util.objects import datatype
 
 
@@ -141,12 +141,12 @@ class BundleCreate(JvmBinaryTask):
           name = vt.target.basename if self.get_options().use_basename_prefix else app.id
           bundle_symlink = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(name))
           safe_symlink(bundle_dir, bundle_symlink)
-
           self.context.log.info('created bundle symlink {}'.format(os.path.relpath(bundle_symlink, get_buildroot())))
+
           if archive and archivepath:
-            archive_symlink = os.path.join(self.get_options().pants_distdir, '{}.{}'.format(name, app.archive))
-            safe_symlink(archivepath, archive_symlink)
-            self.context.log.info('created archive symlink {}'.format(os.path.relpath(archive_symlink, get_buildroot())))
+            archive_copy = os.path.join(self.get_options().pants_distdir, '{}.{}'.format(name, app.archive))
+            safe_copy(archivepath, archive_copy, overwrite=True)
+            self.context.log.info('created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
 
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""

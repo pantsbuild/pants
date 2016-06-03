@@ -13,7 +13,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_symlink
+from pants.util.dirutil import safe_copy
 
 
 class PythonBinaryCreate(PythonTask):
@@ -53,9 +53,9 @@ class PythonBinaryCreate(PythonTask):
         self.context.log.debug('created {}'.format(os.path.relpath(pex_path, get_buildroot())))
 
         # Create symlink for pex.
-        pex_symlink = os.path.join(self._distdir, os.path.basename(pex_path))
-        safe_symlink(pex_path, pex_symlink)
-        self.context.log.info('created pex symlink {}'.format(os.path.relpath(pex_symlink, get_buildroot())))
+        pex_copy = os.path.join(self._distdir, os.path.basename(pex_path))
+        safe_copy(pex_path, pex_copy, overwrite=True)
+        self.context.log.info('created pex copy {}'.format(os.path.relpath(pex_copy, get_buildroot())))
 
   def create_binary(self, binary, results_dir):
     interpreter = self.select_interpreter_for_targets(binary.closure())

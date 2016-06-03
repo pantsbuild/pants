@@ -102,6 +102,26 @@ def read_file(filename):
     return f.read()
 
 
+def safe_copy(src, dst, overwrite=False):
+  """Copy a file or a dir at src to dst
+
+  :param string src: path to source file/dir
+  :param string dst: path to destination
+  :param bool overwrite: If True, overwrite dst when dst exists
+  :return: None
+  """
+  if overwrite:
+    rm_rf(dst)
+
+  try:
+    shutil.copytree(src, dst)
+  except OSError as e:
+    if e.errno == errno.ENOTDIR:
+      shutil.copy(src, dst)
+    else:
+      raise
+
+
 def safe_walk(path, **kwargs):
   """Just like os.walk, but ensures that the returned values are unicode objects.
 

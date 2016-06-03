@@ -47,10 +47,9 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     product_basedir = product_data.keys()[0]
     self.assertEquals(product_data[product_basedir], [pex_name])
 
-    # Check symlink.
-    pex_symlink = os.path.join(self.dist_root, pex_name)
-    self.assertTrue(os.path.islink(pex_symlink))
-    self.assertEqual(os.readlink(pex_symlink), os.path.join(product_basedir, pex_name))
+    # Check pex copy.
+    pex_copy = os.path.join(self.dist_root, pex_name)
+    self.assertTrue(os.path.isfile(pex_copy))
 
   def test_deployable_archive_products(self):
     self.test_task.execute()

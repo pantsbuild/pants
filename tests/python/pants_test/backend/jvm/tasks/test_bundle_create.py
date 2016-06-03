@@ -145,7 +145,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
-    self._check_archive_products('foo.foo-app', 'zip', check_symlink=True)
+    self._check_archive_products('foo.foo-app', 'zip', check_copy=True)
 
   def test_cli_suppress_target_options(self):
     self.set_options(archive='tar')
@@ -153,37 +153,32 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
-    self._check_archive_products('foo.foo-app', 'tar', check_symlink=True)
+    self._check_archive_products('foo.foo-app', 'tar', check_copy=True)
 
-  def _check_product_symlink(self, source_path, symlink_name):
-    symlink_path = os.path.join(self.dist_root, symlink_name)
-    self.assertTrue(os.path.islink(symlink_path))
-    self.assertEqual(os.readlink(symlink_path), source_path)
-
-  def _check_products(self, products, product_fullname, check_symlink=False, symlink_fullname=''):
+  def _check_products(self, products, product_fullname):
     self.assertIsNotNone(products)
     product_data = products.get(self.app_target)
     product_basedir = product_data.keys()[0]
     self.assertIn(self.pants_workdir, product_basedir)
     self.assertEquals(product_data[product_basedir], [product_fullname])
     product_path = os.path.join(product_basedir, product_fullname)
-    if check_symlink:
-      symlink_name = symlink_fullname if symlink_fullname else product_fullname
-      self._check_product_symlink(product_path, symlink_name)
     return product_path
 
-  def _check_archive_products(self, archive_name_prefix, archive_type, check_symlink=False, symlink_name_prefix=''):
+  def _check_archive_products(self, archive_name_prefix, archive_type, check_copy=False, copy_name_prefix=''):
     products = self.task_context.products.get('deployable_archives')
-    product_fullname = '{}.{}'.format(archive_name_prefix, archive_type)
-    symlink_fullname = '{}.{}'.format(symlink_name_prefix, archive_type) if symlink_name_prefix else ''
-    archive_path = self._check_products(products, product_fullname, check_symlink, symlink_fullname)
+    archive_fullname = '{}.{}'.format(archive_name_prefix, archive_type)
+    archive_path = self._check_products(products, archive_fullname)
     self.assertTrue(os.path.isfile(archive_path))
+
+    if check_copy:
+      copy_fullname = '{}.{}'.format(copy_name_prefix, archive_type) if copy_name_prefix else archive_fullname
+      copy_path = os.path.join(self.dist_root, copy_fullname)
+      self.assertTrue(os.path.isfile(copy_path))
 
   def _check_bundle_products(self, bundle_name_prefix, check_symlink=False, symlink_name_prefix=''):
     products = self.task_context.products.get('jvm_bundles')
     bundle_fullname = '{}-bundle'.format(bundle_name_prefix)
-    symlink_fullname = '{}-bundle'.format(symlink_name_prefix) if symlink_name_prefix else ''
-    bundle_root = self._check_products(products, bundle_fullname, check_symlink, symlink_fullname)
+    bundle_root = self._check_products(products, bundle_fullname)
     self.assertTrue(os.path.isdir(bundle_root))
 
     self.assertEqual(sorted(['foo-binary.jar',
@@ -207,3 +202,10 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     with open_zip(os.path.join(bundle_root, 'foo-binary.jar')) as jar:
       self.assertEqual(sorted(['META-INF/', 'META-INF/MANIFEST.MF']),
                        sorted(jar.namelist()))
+
+    # Check symlink.
+    if check_symlink:
+      symlink_fullname = '{}-bundle'.format(symlink_name_prefix) if symlink_name_prefix else bundle_fullname
+      symlink_path = os.path.join(self.dist_root, symlink_fullname)
+      self.assertTrue(os.path.islink(symlink_path))
+      self.assertEqual(os.readlink(symlink_path), bundle_root)
