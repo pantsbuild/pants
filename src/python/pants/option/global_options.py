@@ -70,8 +70,12 @@ class GlobalOptionsRegistrar(Optionable):
                       'pants.backend.codegen',
                       'pants.backend.project_info'],
              removal_version='1.3.0',
-             removal_hint='Add the backends you need to --backend-packages instead. If in doubt,'
-                          'add all of them.  In the future there will be no default backends.',
+             removal_hint='Add the backends you need to --backend-packages instead.  To see '
+                          'available backends run: '
+                          './pants help-advanced | grep default-backend-packages | egrep -o -m1 '
+                          '"default: [^)]+" . '
+                          'In the future there will be no default backends and all backends will'
+                          'have to be opted into via --backend packages.',
              help='Temporary helper option to ease the transition to requiring repos to '
                   'opt-in to any needed backend.')
 

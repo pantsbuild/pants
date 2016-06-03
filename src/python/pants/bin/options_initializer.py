@@ -91,8 +91,10 @@ class OptionsInitializer(object):
             global_bootstrap_options.backend_packages),
         '1.3.0',
         '--default-backend-packages',
-        'Add the backends you need to --backend-packages instead. If in doubt, add all of them. '
-        'In the future there will be no default backends.')
+        'Add the backends you need to --backend-packages instead. To see available backends run: '
+        './pants help-advanced | grep default-backend-packages | egrep -o -m1 "default: [^)]+" . '
+        'In the future there will be no default backends, and all backends will have to be opted '
+        'into via --backend packages.')
     backends = (global_bootstrap_options.default_backend_packages +
                 global_bootstrap_options.backend_packages)
     build_configuration = load_backends_and_plugins(plugins, working_set, backends)
