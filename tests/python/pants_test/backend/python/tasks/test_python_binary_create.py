@@ -41,13 +41,16 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
 
   def _check_products(self, bin_name):
     pex_name = '{}.pex'.format(bin_name)
-    products = self.task_context.products.get('deployable_archive')
+    products = self.task_context.products.get('deployable_archives')
     self.assertIsNotNone(products)
     product_data = products.get(self.binary)
-    self.assertEquals({self.dist_root: [pex_name]},
-                      product_data)
+    product_basedir = product_data.keys()[0]
+    self.assertEquals(product_data[product_basedir], [pex_name])
 
-    self.assertTrue(os.path.exists(os.path.join(self.dist_root, pex_name)))
+    # Check symlink.
+    pex_symlink = os.path.join(self.dist_root, pex_name)
+    self.assertTrue(os.path.islink(pex_symlink))
+    self.assertEqual(os.readlink(pex_symlink), os.path.join(product_basedir, pex_name))
 
   def test_deployable_archive_products(self):
     self.test_task.execute()

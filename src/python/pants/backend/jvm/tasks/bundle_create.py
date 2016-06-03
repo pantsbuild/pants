@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_symlink
 from pants.util.objects import datatype
 
 
@@ -57,9 +57,9 @@ class BundleCreate(JvmBinaryTask):
 
   @classmethod
   def product_types(cls):
-    return ['jvm_bundles', 'deployable_archive']
+    return ['jvm_bundles', 'deployable_archives']
 
-  class App(datatype('App', ['address', 'binary', 'bundles', 'basename', 'deployjar', 'archive', 'target'])):
+  class App(datatype('App', ['address', 'binary', 'bundles', 'id', 'deployjar', 'archive', 'target'])):
     """A uniform interface to an app."""
 
     @staticmethod
@@ -67,11 +67,11 @@ class BundleCreate(JvmBinaryTask):
       return isinstance(target, (JvmApp, JvmBinary))
 
     @classmethod
-    def create_app(cls, target, deployjar, archive, use_basename_prefix=False):
+    def create_app(cls, target, deployjar, archive):
       return cls(target.address,
                  target if isinstance(target, JvmBinary) else target.binary,
                  [] if isinstance(target, JvmBinary) else target.payload.bundles,
-                 target.basename if use_basename_prefix else target.id,
+                 target.id,
                  deployjar,
                  archive,
                  target)
@@ -95,33 +95,6 @@ class BundleCreate(JvmBinaryTask):
     return option_value if v is None else v
 
   def execute(self):
-    use_basename_prefix = self.get_options().use_basename_prefix
-    if use_basename_prefix:
-      # NB(peiyu) This special casing is confusing especially given we already fail
-      # when duplicate basenames are detected. It's added because of the existing
-      # user experience. Turns out a `jvm_app` that depends on another `jvm_binary`
-      # of the same basename is fairly common. In this case, using just
-      # `target_roots` instead of all transitive targets will reduce the chance users
-      # see their bundle command fail due to basename conflicts. We should eventually
-      # get rid of this special case.
-      targets_to_bundle = []
-      for target in self.context.targets():
-        if target in self.context.target_roots or isinstance(target, JvmApp):
-          targets_to_bundle.append(target)
-    else:
-      targets_to_bundle = self.context.targets()
-
-    apps = []
-    for target in targets_to_bundle:
-      if self.App.is_app(target):
-        apps.append(self.App.create_app(target,
-                                        self._resolved_option(target, 'deployjar'),
-                                        self._resolved_option(target, 'archive'),
-                                        use_basename_prefix=use_basename_prefix))
-
-    if use_basename_prefix:
-      self.check_basename_conflicts(apps)
-
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
@@ -131,31 +104,54 @@ class BundleCreate(JvmBinaryTask):
     )
     self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
 
-    for app in apps:
-      archiver = archive.archiver(app.archive) if app.archive else None
+    targets_to_bundle = self.context.targets(self.App.is_app)
 
-      basedir = self.bundle(app)
-      # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
-      # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
-      # expect the product to be cached, a user running an 'rm' on the dist/ directory could
-      # cause inconsistencies.
+    if self.get_options().use_basename_prefix:
+      self.check_basename_conflicts([t for t in self.context.target_roots if t in targets_to_bundle])
+
+    with self.invalidated(targets_to_bundle, invalidate_dependents=True) as invalidation_check:
       jvm_bundles_product = self.context.products.get('jvm_bundles')
-      jvm_bundles_product.add(app.target, os.path.dirname(basedir)).append(os.path.basename(basedir))
-      if archiver:
-        archivepath = archiver.create(
-          basedir,
-          self.get_options().pants_distdir,
-          app.basename
-        )
-        bundle_archive_product = self.context.products.get('deployable_archive')
-        bundle_archive_product.add(app.target, os.path.dirname(archivepath)).append(os.path.basename(archivepath))
+      bundle_archive_product = self.context.products.get('deployable_archives')
+      for vt in invalidation_check.all_vts:
+        app = self.App.create_app(vt.target,
+                                  self._resolved_option(vt.target, 'deployjar'),
+                                  self._resolved_option(vt.target, 'archive'))
 
-        self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
+        archiver = archive.archiver(app.archive) if app.archive else None
+
+        bundle_dir = self.bundle(app, vt.results_dir)
+        # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
+        # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
+        # expect the product to be cached, a user running an 'rm' on the dist/ directory could
+        # cause inconsistencies.
+        jvm_bundles_product.add(app.target, os.path.dirname(bundle_dir)).append(os.path.basename(bundle_dir))
+
+        archivepath = ''
+        if archiver:
+          archivepath = archiver.create(
+            bundle_dir,
+            vt.results_dir,
+            app.id
+          )
+          bundle_archive_product.add(app.target, os.path.dirname(archivepath)).append(os.path.basename(archivepath))
+          self.context.log.debug('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
+
+        # For root targets, create symlink.
+        if vt.target in self.context.target_roots:
+          name = vt.target.basename if self.get_options().use_basename_prefix else app.id
+          bundle_symlink = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(name))
+          safe_symlink(bundle_dir, bundle_symlink)
+
+          self.context.log.info('created bundle symlink {}'.format(os.path.relpath(bundle_symlink, get_buildroot())))
+          if archive and archivepath:
+            archive_symlink = os.path.join(self.get_options().pants_distdir, '{}.{}'.format(name, app.archive))
+            safe_symlink(archivepath, archive_symlink)
+            self.context.log.info('created archive symlink {}'.format(os.path.relpath(archive_symlink, get_buildroot())))
 
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""
 
-  def bundle(self, app):
+  def bundle(self, app, results_dir):
     """Create a self-contained application bundle.
 
     The bundle will contain the target classes, dependencies and resources.
@@ -163,8 +159,9 @@ class BundleCreate(JvmBinaryTask):
 
     assert(isinstance(app, BundleCreate.App))
 
-    bundle_dir = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(app.basename))
-    self.context.log.info('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
+    #bundle_dir = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(app.basename))
+    bundle_dir = os.path.join(results_dir, '{}-bundle'.format(app.id))
+    self.context.log.debug('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
     safe_mkdir(bundle_dir, clean=True)
 
@@ -240,15 +237,15 @@ class BundleCreate(JvmBinaryTask):
 
     return targets_with_directory_in_classpath
 
-  def check_basename_conflicts(self, apps):
+  def check_basename_conflicts(self, targets):
     """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
 
     basename_seen = {}
-    for app in apps:
-      if app.basename in basename_seen:
+    for target in targets:
+      if target.basename in basename_seen:
         raise self.BasenameConflictError('Basename must be unique, found two targets use '
                                          "the same basename: {}'\n\t{} and \n\t{}"
-                                         .format(app.basename,
-                                                 basename_seen[app.basename].address.spec,
-                                                 app.target.address.spec))
-      basename_seen[app.basename] = app.target
+                                         .format(target.basename,
+                                                 basename_seen[target.basename].address.spec,
+                                                 target.address.spec))
+      basename_seen[target.basename] = target

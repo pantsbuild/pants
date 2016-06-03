@@ -64,6 +64,23 @@ def safe_mkdir_for(path):
   safe_mkdir(os.path.dirname(path), clean=False)
 
 
+def safe_symlink(source, target):
+  """Create a symlink
+
+  If target exists, remove it first. Create a symlink to source at target.
+  """
+  try:
+    safe_delete(target)
+  except OSError as e:
+    if e.errno == errno.EPERM:
+      # It is a dir.
+      safe_rmtree(target)
+    else:
+      raise
+  safe_mkdir_for(target)
+  os.symlink(source, target)
+
+
 def safe_file_dump(filename, payload):
   """Write a string to a file.
 
