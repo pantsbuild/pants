@@ -35,6 +35,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
+  timeout = 90,
   tags = {'integration'},
 )
 
