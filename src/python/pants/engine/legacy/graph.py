@@ -45,7 +45,10 @@ class LegacyBuildGraph(BuildGraph):
     """
     self._scheduler = scheduler
     self._graph = scheduler.product_graph
-    self._target_types = symbol_table_cls.aliases().target_types
+    self._target_types = dict(symbol_table_cls.aliases().target_types)
+    for alias, factory in symbol_table_cls.aliases().target_macro_factories.items():
+      target_type, = factory.target_types
+      self._target_types[alias] = target_type
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
 

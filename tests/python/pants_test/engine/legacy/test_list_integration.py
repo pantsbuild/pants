@@ -32,7 +32,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
   def test_list_multiple(self):
     self.assert_list_new_equals_old(
       True,
-      ['3rdparty::', 'examples/src/::', 'testprojects/tests/::']
+      ['3rdparty::', 'examples/src/::', 'testprojects/tests/::', 'contrib/go/examples/3rdparty::']
     )
 
   def test_list_all(self):
