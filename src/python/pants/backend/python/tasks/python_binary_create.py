@@ -55,7 +55,7 @@ class PythonBinaryCreate(PythonTask):
         # Create symlink for pex.
         pex_symlink = os.path.join(self._distdir, os.path.basename(pex_path))
         safe_symlink(pex_path, pex_symlink)
-        self.context.log.debug('created pex symlink {}'.format(os.path.relpath(pex_symlink, get_buildroot())))
+        self.context.log.info('created pex symlink {}'.format(os.path.relpath(pex_symlink, get_buildroot())))
 
   def create_binary(self, binary, results_dir):
     interpreter = self.select_interpreter_for_targets(binary.closure())
