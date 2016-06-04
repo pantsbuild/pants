@@ -282,12 +282,16 @@ class ProductGraph(object):
     TODO: This could use polish. In particular, the `__str__` representations of Nodes and
     States are probably not sufficient for user output.
     """
+    traced = set()
+    def _format(level, node, state):
+      return '{}Computing {} for {}: {}'.format('  ' * level, node.product.__name__, node.subject, state)
     def _trace(entry, level):
-      if type(entry.state) in (Noop, Return):
+      if type(entry.state) in (Noop, Return) or entry in traced:
         return
-      yield '{}{}'.format('  ' * level, entry.state)
+      traced.add(entry)
+      yield _format(level, entry.node, entry.state)
       for dep in entry.cyclic_dependencies:
-        yield '{}{}'.format('  ' * level, Noop.cycle(entry.node, dep))
+        yield _format(level, entry.node, Noop.cycle(entry.node, dep))
       for dep_entry in entry.dependencies:
         for l in _trace(dep_entry, level+1):
           yield l

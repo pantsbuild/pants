@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from hashlib import sha1
 
 from twitter.common.collections import maybe_list
 
@@ -14,7 +13,7 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
-from pants.engine.fs import Files, FilesContent, PathGlobs
+from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, TaskNode, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
@@ -215,36 +214,36 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
   return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
 
 
-def _eager_fileset_with_spec(spec_path, filespecs, source_files_content, excluded_source_files):
+def _eager_fileset_with_spec(spec_path, filespecs, source_files_digest, excluded_source_files):
   excluded = {f.path for f in excluded_source_files.dependencies}
-  file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
-                 for fc in source_files_content.dependencies
-                 if fc.path not in excluded}
+  file_hashes = {fast_relpath(fd.path, spec_path): fd.digest
+                 for fd in source_files_digest.dependencies
+                 if fd.path not in excluded}
   return EagerFilesetWithSpec(spec_path, filespecs, file_hashes)
 
 
-def hydrate_sources(sources_field, source_files_content, excluded_source_files):
-  """Given a SourcesField and FilesContent for its path_globs, create an EagerFilesetWithSpec."""
+def hydrate_sources(sources_field, source_files_digest, excluded_source_files):
+  """Given a SourcesField and FilesDigest for its path_globs, create an EagerFilesetWithSpec."""
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
-                                               source_files_content,
+                                               source_files_digest,
                                                excluded_source_files)
   return HydratedField('sources', fileset_with_spec)
 
 
-def hydrate_bundles(bundles_field, files_content_list, excluded_files_list):
-  """Given a BundlesField and FilesContent for each of its filesets create a list of BundleAdaptors."""
+def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
+  """Given a BundlesField and FilesDigest for each of its filesets create a list of BundleAdaptors."""
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
-               files_content_list,
+               files_digest_list,
                excluded_files_list)
-  for bundle, filespecs, files_content, excluded_files in zipped:
+  for bundle, filespecs, files_digest, excluded_files in zipped:
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
     kwargs['fileset'] = _eager_fileset_with_spec(spec_path,
                                                  filespecs,
-                                                 files_content,
+                                                 files_digest,
                                                  excluded_files)
     bundles.append(BundleAdaptor(**kwargs))
   return HydratedField('bundles', bundles)
@@ -262,12 +261,12 @@ def create_legacy_graph_tasks():
      reify_legacy_graph),
     (HydratedField,
      [Select(SourcesField),
-      SelectProjection(FilesContent, PathGlobs, ('path_globs',), SourcesField),
+      SelectProjection(FilesDigest, PathGlobs, ('path_globs',), SourcesField),
       SelectProjection(Files, PathGlobs, ('excluded_path_globs',), SourcesField)],
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),
-      SelectDependencies(FilesContent, BundlesField, 'path_globs_list'),
+      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list'),
       SelectDependencies(Files, BundlesField, 'excluded_path_globs_list')],
      hydrate_bundles),
   ]

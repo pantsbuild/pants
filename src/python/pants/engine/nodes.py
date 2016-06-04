@@ -12,8 +12,9 @@ from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
-from pants.engine.fs import (Dir, DirectoryListing, File, FileContent, Link, Path, ReadLink, Stats,
-                             file_content, list_directory, path_stat, read_link)
+from pants.engine.fs import (Dir, DirectoryListing, File, FileContent, FileDigest, Link, Path,
+                             ReadLink, Stats, file_content, file_digest, list_directory, path_stat,
+                             read_link)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
@@ -390,6 +391,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   _FS_PAIRS = {
       (DirectoryListing, Dir),
       (FileContent, File),
+      (FileDigest, File),
       (Stats, Path),
       (ReadLink, Link),
     }
@@ -421,6 +423,8 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
         return Return(path_stat(step_context.project_tree, self.subject))
       elif self.product is FileContent:
         return Return(file_content(step_context.project_tree, self.subject))
+      elif self.product is FileDigest:
+        return Return(file_digest(step_context.project_tree, self.subject))
       elif self.product is DirectoryListing:
         return Return(list_directory(step_context.project_tree, self.subject))
       elif self.product is ReadLink:
