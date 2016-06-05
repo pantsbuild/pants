@@ -115,7 +115,6 @@ class PathGlob(AbstractClass):
   """
 
   _DOUBLE = '**'
-  _SINGLE = '*'
 
   @abstractproperty
   def canonical_stat(self):
@@ -142,11 +141,18 @@ class PathGlob(AbstractClass):
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
       # A request for the root path.
       return PathRoot()
+    elif cls._DOUBLE in parts[0] and len(parts) == 1:
+      # Per https://git-scm.com/docs/gitignore:
+      #
+      #  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
+      #   directory "abc", relative to the location of the .gitignore file, with infinite depth."
+      #
+      return PathDirWildcard(canonical_stat, symbolic_path, '*', ('*', '**/*'))
     elif cls._DOUBLE in parts[0]:
       if parts[0] != cls._DOUBLE:
-        raise ValueError(
-            'Illegal component "{}" in filespec under {}: {}'.format(
-              parts[0], symbolic_path, filespec))
+        raise ValueError('Illegal component "{}" in filespec under {}: {}'
+                         .format(parts[0], symbolic_path, filespec))
+
       # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
