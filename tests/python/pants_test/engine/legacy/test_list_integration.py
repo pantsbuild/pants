@@ -32,7 +32,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
   def test_list_multiple(self):
     self.assert_list_new_equals_old(
       True,
-      ['3rdparty::', 'examples/src/::', 'testprojects/tests/::']
+      ['3rdparty::', 'examples/src/::', 'testprojects/tests/::', 'contrib/go/examples/3rdparty::']
     )
 
   def test_list_all(self):
@@ -41,3 +41,13 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
   def test_list_invalid_dir(self):
     pants_run = self.do_command('list', 'abcde::', success=False, enable_v2_engine=True)
     self.assertIn('InvalidCommandLineSpecError', pants_run.stderr_data)
+
+  def test_list_nested_function_scopes(self):
+    pants_run = self.do_command('list',
+                                'testprojects/tests/python/pants/build_parsing::',
+                                success=True,
+                                enable_v2_engine=True)
+    self.assertEquals(
+      pants_run.stdout_data.strip(),
+      'testprojects/tests/python/pants/build_parsing:test-nested-variable-access-in-function-call'
+    )

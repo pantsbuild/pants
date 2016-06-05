@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot, pants_version
+from pants.build_graph.aliased_target import AliasTargetFactory
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.from_target import FromTarget
 from pants.build_graph.intransitive_dependency import (IntransitiveDependencyFactory,
@@ -37,6 +38,7 @@ class BuildFilePath(object):
 def build_file_aliases():
   return BuildFileAliases(
     targets={
+      'alias': AliasTargetFactory(),
       'prep_command': PrepCommand,
       'resources': Resources,
       'target': Target,

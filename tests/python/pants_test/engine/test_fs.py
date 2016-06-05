@@ -11,8 +11,8 @@ from abc import abstractmethod
 from contextlib import contextmanager
 
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import (Dir, DirectoryListing, Dirs, FileContent, Files, Link, Path, PathGlobs,
-                             ReadLink, Stat, Stats)
+from pants.engine.fs import (Dir, DirectoryListing, Dirs, FileContent, FileDigest, Files, Link,
+                             Path, PathGlobs, ReadLink, Stat, Stats)
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -47,6 +47,15 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         return True
       actual_content = {f.path: f.content for f in result if validate(f)}
       self.assertEquals(expected_content, actual_content)
+
+  def assert_digest(self, filespecs, expected_files):
+    with self.mk_project_tree(self._original_src) as project_tree:
+      scheduler = self.mk_scheduler(project_tree=project_tree)
+      result = self.execute(scheduler, FileDigest, self.specs(Files, '', *filespecs))[0]
+      # Confirm all expected files were digested.
+      self.assertEquals(set(expected_files), set(f.path for f in result))
+      # And that each distinct path had a distinct digest.
+      self.assertEquals(len(set(expected_files)), len(set(f.digest for f in result)))
 
   def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
     with self.mk_project_tree(self._original_src) as project_tree:
@@ -104,6 +113,9 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
       self.assert_content(['a/b/'], {'a/b/': 'nope\n'})
     with self.assertRaises(Exception):
       self.assert_content(['a/b'], {'a/b': 'nope\n'})
+
+  def test_files_digest_literal(self):
+    self.assert_digest(['a/3.txt', '4.txt'], ['a/3.txt', '4.txt'])
 
   def test_nodes_file(self):
     self.assert_fsnodes(Files, ['4.txt'], [
