@@ -159,7 +159,6 @@ class BundleCreate(JvmBinaryTask):
 
     assert(isinstance(app, BundleCreate.App))
 
-    #bundle_dir = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(app.basename))
     bundle_dir = os.path.join(results_dir, '{}-bundle'.format(app.id))
     self.context.log.debug('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
