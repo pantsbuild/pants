@@ -4,6 +4,111 @@ Master Pre-Releases
 This document describes ``pre`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.1.0-pre4 (06/03/2016)
+-----------------------
+
+This is the fifth `1.1.0-pre` release on the way to the `1.1.0` stable branch
+
+API Changes
+~~~~~~~~~~~
+
+New Features
+~~~~~~~~~~~~
+* Introducing target aliases in BUILD files.
+  `RB #3939 <https://rbcommons.com/s/twitter/r/3939>`_
+
+* Add JUnit HTML report to the JUnit runner
+  `RB #3958 <https://rbcommons.com/s/twitter/r/3958>`_
+
+* Add FindBugs plugin to released plugins
+  `RB #3909 <https://rbcommons.com/s/twitter/r/3909>`_
+
+Bugfixes
+~~~~~~~~
+* Fix an issue introduced in go resolve refactoring
+  `RB #3963 <https://rbcommons.com/s/twitter/r/3963>`_
+
+* Fix unicode string on stdout causing taskerror
+  `RB #3944 <https://rbcommons.com/s/twitter/r/3944>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+* [engine] Don't compute a cache key for things we aren't going to cache
+  `RB #3971 <https://rbcommons.com/s/twitter/r/3971>`_
+
+* [engine] Repair scope binding issue in BUILD parsing.
+  `RB #3969 <https://rbcommons.com/s/twitter/r/3969>`_
+
+* [engine] Fix support for TargetMacros in the new parser, and support default names
+  `RB #3966 <https://rbcommons.com/s/twitter/r/3966>`_
+
+* [engine] Make `follow_links` kwarg to globs non-fatal.
+  `RB #3964 <https://rbcommons.com/s/twitter/r/3964>`_
+
+* [engine] Directly use entries while scheduling
+  `RB #3953 <https://rbcommons.com/s/twitter/r/3953>`_
+
+* [engine] Optionally inline inlineable Nodes
+  `RB #3931 <https://rbcommons.com/s/twitter/r/3931>`_
+
+* [engine] skip hanging multiprocess engine tests
+  `RB #3940 <https://rbcommons.com/s/twitter/r/3940>`_
+  `RB #3941 <https://rbcommons.com/s/twitter/r/3941>`_
+
+* [engine] clean up non in-memory storage usage, only needed for LocalMultiprocessEngine
+  `RB #3940 <https://rbcommons.com/s/twitter/r/3940>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update jdk paths reference in jvm_projects documentation
+  `RB #3942 <https://rbcommons.com/s/twitter/r/3942>`_
+
+* Make `JvmAppAdaptor` compatible with bare `bundle()` form.
+  `RB #3965 <https://rbcommons.com/s/twitter/r/3965>`_
+
+* Update junit-runner to version 1.0.9 and test new experimental runner logic
+  `RB #3925 <https://rbcommons.com/s/twitter/r/3925>`_
+
+* Make BaseGlobs.from_sources_field() work for sets and strings.
+  `RB #3961 <https://rbcommons.com/s/twitter/r/3961>`_
+
+* Advance JVM bundle options, and enable them in jvm_app target as well
+  `RB #3910 <https://rbcommons.com/s/twitter/r/3910>`_
+
+* Rename PARALLEL_BOTH to PARALLEL_CLASSES_AND_METHODS inside JUnit Runner
+  `RB #3925 <https://rbcommons.com/s/twitter/r/3925>`_
+  `RB #3962 <https://rbcommons.com/s/twitter/r/3962>`_
+
+* Resolve backends before plugins
+  `RB #3909 <https://rbcommons.com/s/twitter/r/3909>`_
+  `RB #3950 <https://rbcommons.com/s/twitter/r/3950>`_
+
+* Update contributors.sh script not to count publish commits
+  `RB #3946 <https://rbcommons.com/s/twitter/r/3946>`_
+
+* Don't fail running virtualenv inside of a git hook
+  `RB #3945 <https://rbcommons.com/s/twitter/r/3945>`_
+
+* Prepare 1.0.1
+  `RB #3960 <https://rbcommons.com/s/twitter/r/3960>`_
+
+* During releases, only publish the docsite from master
+  `RB #3956 <https://rbcommons.com/s/twitter/r/3956>`_
+
+* Decode Watchman file event filenames to UTF-8.
+  `RB #3951 <https://rbcommons.com/s/twitter/r/3951>`_
+
+* Bump pex requirement to 1.1.10.
+  `Issue #265 <https://github.com/pantsbuild/pex/issues/265>`_
+  `RB #3949 <https://rbcommons.com/s/twitter/r/3949>`_
+
+* Refactor and simplify go fetcher code.
+  `Issue #3439 <https://github.com/pantsbuild/pants/issues/3439>`_
+  `Issue #3427 <https://github.com/pantsbuild/pants/issues/3427>`_
+  `Issue #2018 <https://github.com/pantsbuild/pants/issues/2018>`_
+  `RB #3902 <https://rbcommons.com/s/twitter/r/3902>`_
+
 1.1.0-pre3 (05/27/2016)
 -----------------------
 
