@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import errno
 import fnmatch
 from abc import abstractproperty
+from hashlib import sha1
 from os import sep as os_sep
 from os.path import basename, join, normpath
 
@@ -77,6 +78,10 @@ class FileContent(datatype('FileContent', ['path', 'content'])):
 
   def __str__(self):
     return repr(self)
+
+
+class FileDigest(datatype('FileDigest', ['path', 'digest'])):
+  """A unique fingerprint for the content of a File."""
 
 
 def _norm_with_dir(path):
@@ -330,28 +335,31 @@ def stat_to_path(stat):
   return Path(stat.path)
 
 
-def files_content(file_contents):
-  """Given a list of FileContent objects, return a FilesContent object."""
-  return FilesContent(file_contents)
+def file_content(project_tree, f):
+  """Return a FileContent for a known-existing File.
+
+  NB: This method fails eagerly, because it expects to be executed only after a caller has
+  stat'd a path to determine that it is, in fact, an existing File.
+  """
+  return FileContent(f.path, project_tree.content(f.path))
 
 
-def file_content(project_tree, path):
-  try:
-    return FileContent(path.path, project_tree.content(path.path))
-  except (IOError, OSError) as e:
-    if e.errno == errno.ENOENT:
-      return FileContent(path.path, None)
-    else:
-      raise e
+def file_digest(project_tree, f):
+  """Return a FileDigest for a known-existing File.
+
+  See NB on file_content.
+  """
+  return FileDigest(f.path, sha1(project_tree.content(f.path)).digest())
 
 
 def identity(v):
   return v
 
 
-Files = Collection.of(File)
 Dirs = Collection.of(Dir)
+Files = Collection.of(File)
 FilesContent = Collection.of(FileContent)
+FilesDigest = Collection.of(FileDigest)
 Links = Collection.of(Link)
 
 
@@ -404,5 +412,8 @@ def create_fs_tasks():
      merge_dirs),
     (FilesContent,
      [SelectDependencies(FileContent, Files)],
-     files_content),
+     FilesContent),
+    (FilesDigest,
+     [SelectDependencies(FileDigest, Files)],
+     FilesDigest),
   ]
