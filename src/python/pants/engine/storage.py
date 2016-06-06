@@ -198,7 +198,7 @@ class Storage(Closable):
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
       # `Exception` type here.
-      raise SerializationError('-->Failed to pickle {}: {}'.format(obj, e), e)
+      raise SerializationError('Failed to pickle {}: {}'.format(obj, e), e)
 
     return key
 
