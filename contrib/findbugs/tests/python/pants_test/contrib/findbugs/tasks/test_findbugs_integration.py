@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
+from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_file
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -75,7 +76,7 @@ class FindBugsTest(PantsRunIntegrationTest):
 
   def test_exclude(self):
     cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:all']
-    with temporary_file() as exclude_file:
+    with temporary_file(root_dir=get_buildroot()) as exclude_file:
       exclude_file.write(dedent("""\
         <?xml version="1.0" encoding="UTF-8"?>
         <FindBugsFilter>
@@ -98,7 +99,7 @@ class FindBugsTest(PantsRunIntegrationTest):
 
   def test_error(self):
     cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:all']
-    with temporary_file() as exclude_file:
+    with temporary_file(root_dir=get_buildroot()) as exclude_file:
       exclude_file.write(dedent("""\
         <?xml version="1.0" encoding="UTF-8"?>
         <FindBugsFilter>
