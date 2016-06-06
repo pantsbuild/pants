@@ -91,9 +91,9 @@ python_library(
   name='nodes',
   sources=['nodes.py'],
   dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':addressable',
     ':fs',
-    ':objects',
     ':struct',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',

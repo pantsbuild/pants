@@ -370,7 +370,7 @@ public class JarBuilder implements Closeable {
   }
 
   /**
-   * Input stream that always insures that a non-empty stream ends with a newline.
+   * Input stream that always ensures that a non-empty stream ends with a newline.
    */
   private static class NewlineAppendingInputStream extends InputStream {
     private InputStream underlyingStream;

@@ -142,7 +142,7 @@ class Storage(Closable):
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
-  def create(cls, path=None, in_memory=False, debug=True, protocol=None):
+  def create(cls, path=None, in_memory=True, debug=True, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
     :param path: If in_memory=False, the path to store the database in.
@@ -266,25 +266,36 @@ class Storage(Closable):
 
     step_request.node isn't keyed is only for convenience because it is used
     in a subsequent is_cacheable check.
+
+    TODO: It is supremely odd that this creates a StepRequest.
     """
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       dependencies[self._to_key(dep)] = self._to_key(state)
-    return StepRequest(step_request.step_id, step_request.node,
-                       dependencies, step_request.project_tree)
+    return StepRequest(step_request.step_id,
+                       step_request.node,
+                       dependencies,
+                       step_request.inline_nodes,
+                       step_request.project_tree)
 
   def key_for_result(self, step_result):
     """Make key for result state."""
     return StepResult(state=self._to_key(step_result.state))
 
   def resolve_request(self, step_request):
-    """Resolve keys in step_request."""
+    """Resolve keys in step_request.
+
+    TODO: It is supremely odd that this creates a StepRequest.
+    """
     dependencies = {}
     for dep, state in step_request.dependencies.items():
       dependencies[self._from_key(dep)] = self._from_key(state)
 
-    return StepRequest(step_request.step_id, step_request.node,
-                       dependencies, step_request.project_tree)
+    return StepRequest(step_request.step_id,
+                       step_request.node,
+                       dependencies,
+                       step_request.inline_nodes,
+                       step_request.project_tree)
 
   def resolve_result(self, step_result):
     """Resolve state key in step_result."""

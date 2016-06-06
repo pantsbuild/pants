@@ -20,8 +20,7 @@ from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
 class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
-    self.scheduler, self.storage = setup_json_scheduler(build_root, debug=True)
-    self.cache = Cache.create(Storage.create())
+    self.scheduler = setup_json_scheduler(build_root)
 
     self.java = Address.parse('src/java/codegen/simple')
 
@@ -38,7 +37,9 @@ class EngineTest(unittest.TestCase):
 
   @contextmanager
   def multiprocessing_engine(self, pool_size=None):
-    with closing(LocalMultiprocessEngine(self.scheduler, self.storage, self.cache,
+    storage = Storage.create(debug=True, in_memory=False)
+    cache = Cache.create(storage=storage)
+    with closing(LocalMultiprocessEngine(self.scheduler, storage, cache,
                                          pool_size=pool_size, debug=True)) as e:
       e.start()
       yield e
@@ -46,24 +47,29 @@ class EngineTest(unittest.TestCase):
   @contextmanager
   def hybrid_engine(self, pool_size=None):
     async_nodes = (FilesystemNode,)
-    with closing(ThreadHybridEngine(self.scheduler, self.storage,
-                                    threaded_node_types=async_nodes, cache=self.cache,
+    storage = Storage.create(debug=True, in_memory=False)
+    cache = Cache.create(storage=storage)
+    with closing(ThreadHybridEngine(self.scheduler, storage,
+                                    threaded_node_types=async_nodes, cache=cache,
                                     pool_size=pool_size, debug=True)) as e:
       e.start()
       yield e
 
   def test_serial_engine_simple(self):
-    engine = LocalSerialEngine(self.scheduler, self.storage, self.cache)
-    self.assert_engine(engine)
+    with closing(LocalSerialEngine(self.scheduler)) as engine:
+      self.assert_engine(engine)
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_multiprocess_engine_multi(self):
     with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_multiprocess_engine_single(self):
     with self.multiprocessing_engine(pool_size=1) as engine:
       self.assert_engine(engine)
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_multiprocess_unpickleable(self):
     build_request = self.request(['unpickleable'], self.java)
 
@@ -86,11 +92,12 @@ class EngineTest(unittest.TestCase):
       with self.assertRaises(SerializationError):
         engine.execute(build_request)
 
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_rerun_with_cache(self):
     with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
 
-      cache_stats = engine._cache.get_stats()
+      cache_stats = engine.cache_stats()
       # First run all misses.
       self.assertTrue(cache_stats.hits == 0)
 

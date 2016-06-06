@@ -38,8 +38,8 @@ class JavaTestsTest(BaseTest):
                            concurrency='PARALLEL_METHODS')
     self.assertEquals(JavaTests.CONCURRENCY_PARALLEL_METHODS, tc3.concurrency)
     tc4 = self.make_target('//:testconcurrency4', JavaTests, sources=["Test.java"],
-                           concurrency='PARALLEL_BOTH')
-    self.assertEquals(JavaTests.CONCURRENCY_PARALLEL_BOTH, tc4.concurrency)
+                           concurrency='PARALLEL_CLASSES_AND_METHODS')
+    self.assertEquals(JavaTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS, tc4.concurrency)
     with self.assertRaisesRegexp(TargetDefinitionException, r'concurrency'):
       self.make_target('//:testconcurrency5', JavaTests, sources=["Test.java"],
                        concurrency='nonsense')

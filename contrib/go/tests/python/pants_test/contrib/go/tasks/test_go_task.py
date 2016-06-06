@@ -56,3 +56,22 @@ class ImportOracleTest(TaskTestBase):
     self.assertTrue(set(import_listing.test_imports).issubset(self.import_oracle.go_stdlib),
                     'All imports for any stdlib package (including its tests) should also be '
                     'internal to the stdlib')
+
+  def test_is_remote_import(self):
+    def is_remote(import_path):
+      return self.import_oracle.is_remote_import(import_path)
+
+    self.assertTrue(is_remote('bitbucket.com/user/project'))
+    self.assertTrue(is_remote('github.com/user/project'))
+    self.assertTrue(is_remote('something.com/'))
+    self.assertTrue(is_remote('gopkg.in/yaml.v1'))
+
+    self.assertFalse(is_remote('fmt'))
+    self.assertFalse(is_remote('foo/bar'))
+    self.assertFalse(is_remote('foo/bar.baz'))
+    self.assertFalse(is_remote('.foo'))
+    self.assertFalse(is_remote('.foo/bar'))
+    self.assertFalse(is_remote('./foo'))
+    self.assertFalse(is_remote('./foo.com'))
+    self.assertFalse(is_remote('../foo.com'))
+    self.assertFalse(is_remote('foo/...'))

@@ -20,7 +20,7 @@ import static org.junit.Assert.assertTrue;
  * To properly exercise this function, both test classes must be running at the same time with
  * the flags:
  * <pre>
- *  -default-parallel -parallel-threads 2
+ *  -default-concurrency PARALLEL_CLASSES -parallel-threads 2
  * </pre>
  * when running with just these two classes as specs.
  * <p>

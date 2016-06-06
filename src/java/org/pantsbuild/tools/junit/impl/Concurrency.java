@@ -10,7 +10,7 @@ public enum Concurrency {
   SERIAL(false, false),
   PARALLEL_CLASSES(true, false),
   PARALLEL_METHODS(false, true),
-  PARALLEL_BOTH(true, true);
+  PARALLEL_CLASSES_AND_METHODS(true, true);
 
   private final boolean parallelClasses;
   private final boolean parallelMethods;

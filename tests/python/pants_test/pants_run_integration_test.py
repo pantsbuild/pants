@@ -287,3 +287,37 @@ class PantsRunIntegrationTest(unittest.TestCase):
       yield
     finally:
       os.rename(real_path, test_path)
+
+  @contextmanager
+  def temporary_file_content(self, path, content):
+    """Temporarily write content to a file for the purpose of an integration test."""
+    path = os.path.realpath(path)
+    assert path.startswith(
+      os.path.realpath(get_buildroot())), 'cannot write paths outside of the buildroot!'
+    assert not os.path.exists(path), 'refusing to overwrite an existing path!'
+    with open(path, 'wb') as fh:
+      fh.write(content)
+    try:
+      yield
+    finally:
+      os.unlink(path)
+
+  def do_command(self, *args, **kwargs):
+    """Wrapper around run_pants method.
+
+    :param args: command line arguments used to run pants
+    :param kwargs: handles 2 keys
+      success - indicate whether to expect pants run to succeed or fail.
+      enable_v2_engine - indicate whether to use v2 engine or not.
+    :return: a PantsResult object
+    """
+    success = kwargs.get('success', True)
+    enable_v2_engine = kwargs.get('enable_v2_engine', False)
+    cmd = ['--enable-v2-engine'] if enable_v2_engine else []
+    cmd.extend(list(args))
+    pants_run = self.run_pants(cmd)
+    if success:
+      self.assert_success(pants_run)
+    else:
+      self.assert_failure(pants_run)
+    return pants_run

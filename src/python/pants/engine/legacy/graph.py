@@ -6,15 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from hashlib import sha1
+
+from twitter.common.collections import maybe_list
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
-from pants.engine.fs import Files, FilesContent, PathGlobs
+from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.nodes import Return, SelectNode, State, Throw
+from pants.engine.nodes import Return, State, TaskNode, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.util.dirutil import fast_relpath
@@ -30,6 +31,9 @@ class LegacyBuildGraph(BuildGraph):
   This implementation is backed by a Scheduler that is able to resolve LegacyTargets.
   """
 
+  class InvalidCommandLineSpecError(AddressLookupError):
+    """Raised when command line spec is not a valid directory"""
+
   def __init__(self, scheduler, engine, symbol_table_cls):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
@@ -40,7 +44,10 @@ class LegacyBuildGraph(BuildGraph):
     """
     self._scheduler = scheduler
     self._graph = scheduler.product_graph
-    self._target_types = symbol_table_cls.aliases().target_types
+    self._target_types = dict(symbol_table_cls.aliases().target_types)
+    for alias, factory in symbol_table_cls.aliases().target_macro_factories.items():
+      target_type, = factory.target_types
+      self._target_types[alias] = target_type
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
 
@@ -56,13 +63,14 @@ class LegacyBuildGraph(BuildGraph):
     for node, state in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyTarget values.
       if type(state) is Throw:
+        trace = '\n'.join(self._graph.trace(node))
         raise AddressLookupError(
-            'Build graph construction failed for {}:\n  {}'.format(node.subject, state.exc))
+            'Build graph construction failed for {}:\n{}'.format(node.subject, trace))
       elif type(state) is not Return:
         State.raise_unrecognized(state)
       if node.product is not LegacyTarget:
         continue
-      if type(node) is not SelectNode:
+      if type(node) is not TaskNode:
         continue
 
       # We have a successfully parsed LegacyTarget, which includes its declared dependencies.
@@ -148,14 +156,14 @@ class LegacyBuildGraph(BuildGraph):
   def inject_address_closure(self, address):
     if address in self._target_by_address:
       return
-    for _ in self._inject([address], expect_return_values=False):
+    for _ in self._inject([address]):
       pass
 
   def inject_addresses_closure(self, addresses):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject(addresses, expect_return_values=False):
+    for _ in self._inject(addresses):
       pass
 
   def inject_specs_closure(self, specs, fail_fast=None):
@@ -163,36 +171,28 @@ class LegacyBuildGraph(BuildGraph):
     for address in self._inject(specs):
       yield address
 
-  def _inject(self, subjects, expect_return_values=True):
-    """
-    Request LegacyTargets for each of the subjects.
-    If `expect_return_values` is True, yield resulting Addresses.
-    Otherwise no resulting Addresses will be computed.
-    """
+  def _inject(self, subjects):
+    """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
     logger.debug('Injecting to {}: {}'.format(self, subjects))
-    request = self._scheduler.execution_request([LegacyTarget, Address], subjects)
-
-    legacy_target_roots = filter(lambda root: root.product is LegacyTarget, request.roots)
-    address_roots = filter(lambda root: root.product is Address, request.roots)
+    request = self._scheduler.execution_request([LegacyTarget], subjects)
 
     result = self._engine.execute(request)
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
-    self._index(legacy_target_roots)
-
-    if not expect_return_values:
-      return
+    self._index(request.roots)
 
     existing_addresses = set()
-    for address_root in address_roots:
-      address_state = self._scheduler.root_entries(request)[address_root]
-      for address in address_state.value:
+    for root, state in self._scheduler.root_entries(request).items():
+      entries = maybe_list(state.value, expected_type=LegacyTarget)
+      if not entries:
+        raise self.InvalidCommandLineSpecError(
+          'Spec {} does not match any targets.'.format(root.subject))
+      for legacy_target in entries:
+        address = legacy_target.adaptor.address
         if address not in existing_addresses:
           existing_addresses.add(address)
           yield address
-
-    logger.debug('addresses: %s', existing_addresses)
 
 
 class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies'])):
@@ -214,36 +214,36 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
   return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
 
 
-def _eager_fileset_with_spec(spec_path, filespecs, source_files_content, excluded_source_files):
+def _eager_fileset_with_spec(spec_path, filespecs, source_files_digest, excluded_source_files):
   excluded = {f.path for f in excluded_source_files.dependencies}
-  file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
-                 for fc in source_files_content.dependencies
-                 if fc.path not in excluded}
+  file_hashes = {fast_relpath(fd.path, spec_path): fd.digest
+                 for fd in source_files_digest.dependencies
+                 if fd.path not in excluded}
   return EagerFilesetWithSpec(spec_path, filespecs, file_hashes)
 
 
-def hydrate_sources(sources_field, source_files_content, excluded_source_files):
-  """Given a SourcesField and FilesContent for its path_globs, create an EagerFilesetWithSpec."""
+def hydrate_sources(sources_field, source_files_digest, excluded_source_files):
+  """Given a SourcesField and FilesDigest for its path_globs, create an EagerFilesetWithSpec."""
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
-                                               source_files_content,
+                                               source_files_digest,
                                                excluded_source_files)
   return HydratedField('sources', fileset_with_spec)
 
 
-def hydrate_bundles(bundles_field, files_content_list, excluded_files_list):
-  """Given a BundlesField and FilesContent for each of its filesets create a list of BundleAdaptors."""
+def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
+  """Given a BundlesField and FilesDigest for each of its filesets create a list of BundleAdaptors."""
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
-               files_content_list,
+               files_digest_list,
                excluded_files_list)
-  for bundle, filespecs, files_content, excluded_files in zipped:
+  for bundle, filespecs, files_digest, excluded_files in zipped:
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
     kwargs['fileset'] = _eager_fileset_with_spec(spec_path,
                                                  filespecs,
-                                                 files_content,
+                                                 files_digest,
                                                  excluded_files)
     bundles.append(BundleAdaptor(**kwargs))
   return HydratedField('bundles', bundles)
@@ -261,12 +261,12 @@ def create_legacy_graph_tasks():
      reify_legacy_graph),
     (HydratedField,
      [Select(SourcesField),
-      SelectProjection(FilesContent, PathGlobs, ('path_globs',), SourcesField),
+      SelectProjection(FilesDigest, PathGlobs, ('path_globs',), SourcesField),
       SelectProjection(Files, PathGlobs, ('excluded_path_globs',), SourcesField)],
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),
-      SelectDependencies(FilesContent, BundlesField, 'path_globs_list'),
+      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list'),
       SelectDependencies(Files, BundlesField, 'excluded_path_globs_list')],
      hydrate_bundles),
   ]

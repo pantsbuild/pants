@@ -22,8 +22,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
-from pants.engine.storage import Storage
-from pants.engine.struct import HasStructs, Struct, StructWithDeps, Variants
+from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants_test.engine.examples.graph_validator import GraphValidator
@@ -41,12 +40,11 @@ def printing_func(func):
   return wrapper
 
 
-class Target(Struct, HasStructs):
+class Target(Struct, HasProducts):
   """A placeholder for the most-numerous Struct subclass.
 
   This particular implementation holds a collection of other Structs in a `configurations` field.
   """
-  collection_field = 'configurations'
 
   def __init__(self, name=None, configurations=None, **kwargs):
     """
@@ -56,6 +54,10 @@ class Target(Struct, HasStructs):
     super(Target, self).__init__(name=name, **kwargs)
 
     self.configurations = configurations
+
+  @property
+  def products(self):
+    return self.configurations
 
   @addressable_list(SubclassesOf(Struct))
   def configurations(self):
@@ -403,14 +405,11 @@ class ExampleTable(SymbolTable):
             'inferred_scala': ScalaInferredDepsSources}
 
 
-def setup_json_scheduler(build_root, debug=True):
+def setup_json_scheduler(build_root, inline_nodes=True):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype A tuple of :class:`pants.engine.scheduler.LocalScheduler`,
-    :class:`pants.engine.storage.Storage`.
+  :rtype :class:`pants.engine.scheduler.LocalScheduler`
   """
-
-  storage = Storage.create(debug=debug)
 
   symbol_table_cls = ExampleTable
 
@@ -510,4 +509,9 @@ def setup_json_scheduler(build_root, debug=True):
     )
 
   project_tree = FileSystemProjectTree(build_root)
-  return LocalScheduler(goals, tasks, storage, project_tree, None, GraphValidator(symbol_table_cls)), storage
+  return LocalScheduler(goals,
+                        tasks,
+                        project_tree,
+                        graph_lock=None,
+                        inline_nodes=inline_nodes,
+                        graph_validator=GraphValidator(symbol_table_cls))

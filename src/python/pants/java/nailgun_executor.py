@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 class NailgunProcessGroup(ProcessGroup):
   _NAILGUN_KILL_LOCK = threading.Lock()
 
-  def __init__(self):
-    super(NailgunProcessGroup, self).__init__(name='nailgun')
+  def __init__(self, metadata_base_dir=None):
+    super(NailgunProcessGroup, self).__init__(name='nailgun', metadata_base_dir=metadata_base_dir)
     # TODO: this should enumerate the .pids dir first, then fallback to ps enumeration (& warn).
 
   def _iter_nailgun_instances(self, everywhere=False):
@@ -80,9 +80,12 @@ class NailgunExecutor(Executor, ProcessManager):
   _PROCESS_NAME = b'java'
 
   def __init__(self, identity, workdir, nailgun_classpath, distribution, ins=None,
-               connect_timeout=10, connect_attempts=5):
+               connect_timeout=10, connect_attempts=5, metadata_base_dir=None):
     Executor.__init__(self, distribution=distribution)
-    ProcessManager.__init__(self, name=identity, process_name=self._PROCESS_NAME)
+    ProcessManager.__init__(self,
+                            name=identity,
+                            process_name=self._PROCESS_NAME,
+                            metadata_base_dir=metadata_base_dir)
 
     if not isinstance(workdir, string_types):
       raise ValueError('Workdir must be a path string, not: {workdir}'.format(workdir=workdir))

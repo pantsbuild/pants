@@ -3,12 +3,12 @@
 
 package org.pantsbuild.tools.junit.lib;
 
-import org.pantsbuild.junit.annotations.TestParallelBoth;
+import org.pantsbuild.junit.annotations.TestParallelClassesAndMethods;
 
 /**
  * This test is intentionally under a java_library() BUILD target so it will not be run
  * on its own. It is run by the ConsoleRunnerTest suite to test ConsoleRunnerImpl.
  */
-@TestParallelBoth
-public class ParallelBothAnnotatedClass {
+@TestParallelClassesAndMethods
+public class ParallelClassesAndMethodsAnnotatedClass {
 }

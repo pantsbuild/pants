@@ -29,10 +29,10 @@ class PantsRunner(object):
     self._args = args or sys.argv
     self._env = env or os.environ
 
-  def _run(self, is_remote, exiter, args, env, options_bootstrapper=None):
+  def _run(self, is_remote, exiter, args, env, process_metadata_dir=None, options_bootstrapper=None):
     if is_remote:
       try:
-        return RemotePantsRunner(exiter, args, env).run()
+        return RemotePantsRunner(exiter, args, env, process_metadata_dir).run()
       except RemotePantsRunner.RECOVERABLE_EXCEPTIONS as e:
         # N.B. RemotePantsRunner will raise one of RECOVERABLE_EXCEPTIONS in the event we
         # encounter a failure while discovering or initially connecting to the pailgun. In
@@ -49,8 +49,9 @@ class PantsRunner(object):
     options_bootstrapper = OptionsBootstrapper(env=self._env, args=self._args)
     global_bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
 
-    return self._run(global_bootstrap_options.enable_pantsd,
+    return self._run(is_remote=global_bootstrap_options.enable_pantsd,
                      exiter=self._exiter,
                      args=self._args,
                      env=self._env,
+                     process_metadata_dir=global_bootstrap_options.pants_subprocessdir,
                      options_bootstrapper=options_bootstrapper)

@@ -25,6 +25,7 @@ python_tests(
   sources = ['test_extension_loader.py'],
   dependencies = [
     'src/python/pants/base:exceptions',
+    'src/python/pants/bin:bin',
     'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',

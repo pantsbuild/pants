@@ -51,7 +51,8 @@ class LegacyPythonCallbacksParser(Parser):
       def __call__(self, *args, **kwargs):
         name = kwargs.get('name')
         if name and self._serializable:
-          obj = self._object_type(type_alias=self._type_alias, **kwargs)
+          kwargs['type_alias'] = self._type_alias
+          obj = self._object_type(**kwargs)
           cls._objects.append(obj)
           return obj
         else:
@@ -59,9 +60,6 @@ class LegacyPythonCallbacksParser(Parser):
 
     # Compute a single ParseContext for a default path, which we will mutate for each parsed path.
     symbols = {}
-    for alias, target_macro_factory in aliases.target_macro_factories.items():
-      for target_type in target_macro_factory.target_types:
-        symbols[target_type] = TargetAdaptor
     parse_context = ParseContext(rel_path='', type_aliases=symbols)
 
     for alias, symbol in symbol_table.items():
@@ -80,7 +78,7 @@ class LegacyPythonCallbacksParser(Parser):
     for alias, target_macro_factory in aliases.target_macro_factories.items():
       symbols[alias] = target_macro_factory.target_macro(parse_context)
       for target_type in target_macro_factory.target_types:
-        symbols[target_type] = TargetAdaptor
+        symbols[target_type] = Registrar(alias, TargetAdaptor)
 
     # TODO: Replace builtins for paths with objects that will create wrapped PathGlobs objects.
     symbols['globs'] = Globs
@@ -100,5 +98,5 @@ class LegacyPythonCallbacksParser(Parser):
 
     with cls._lock:
       del cls._objects[:]
-      six.exec_(python, symbols, {})
+      six.exec_(python, symbols)
       return list(cls._objects)

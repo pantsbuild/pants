@@ -5,19 +5,24 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
+import logging
 from abc import abstractproperty
 
 from six import string_types
 
+from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address import Addresses
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import Files as FSFiles
 from pants.engine.fs import PathGlobs
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
+from pants.util.contextutil import exception_logging
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class TargetAdaptor(StructWithDeps):
@@ -40,11 +45,12 @@ class TargetAdaptor(StructWithDeps):
   @property
   def field_adaptors(self):
     """Returns a tuple of Fields for captured fields which need additional treatment."""
-    if not self.has_concrete_sources:
-      return tuple()
-    base_globs = BaseGlobs.from_sources_field(self.sources)
-    path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-    return (SourcesField(self.address, base_globs.filespecs, path_globs, excluded_path_globs),)
+    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+      if not self.has_concrete_sources:
+        return tuple()
+      base_globs = BaseGlobs.from_sources_field(self.sources)
+      path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
+      return (SourcesField(self.address, base_globs.filespecs, path_globs, excluded_path_globs),)
 
 
 class Field(object):
@@ -107,25 +113,35 @@ class JvmAppAdaptor(TargetAdaptor):
 
   @property
   def field_adaptors(self):
-    field_adaptors = super(JvmAppAdaptor, self).field_adaptors
-    if getattr(self, 'bundles', None) is None:
-      return field_adaptors
-    # Construct a field for the `bundles` argument.
-    filespecs_list = []
-    path_globs_list = []
-    excluded_path_globs_list = []
-    for bundle in self.bundles:
-      base_globs = BaseGlobs.from_sources_field(bundle.fileset)
-      filespecs_list.append(base_globs.filespecs)
-      path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-      path_globs_list.append(path_globs)
-      excluded_path_globs_list.append(excluded_path_globs)
-    bundles_field = BundlesField(self.address,
-                                 self.bundles,
-                                 filespecs_list,
-                                 path_globs_list,
-                                 excluded_path_globs_list)
-    return field_adaptors + (bundles_field,)
+    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+      field_adaptors = super(JvmAppAdaptor, self).field_adaptors
+      if getattr(self, 'bundles', None) is None:
+        return field_adaptors
+      # Construct a field for the `bundles` argument.
+      filespecs_list = []
+      path_globs_list = []
+      excluded_path_globs_list = []
+      for bundle in self.bundles:
+        # Short circuit in the case of `bundles=[..., bundle(), ...]`.
+        if not hasattr(bundle, 'fileset'):
+          # N.B. This notice is duplicated in jvm_app.py::Bundle.__call__() for the old engine.
+          deprecated_conditional(lambda: True,
+                                 '1.2.0',
+                                 'bare bundle() without `fileset=` param',
+                                 "Pass a `fileset=` parameter: `bundle(fileset=globs('*.config')`")
+          logger.warn('Ignoring `bundle()` without `fileset` parameter.')
+          continue
+        base_globs = BaseGlobs.from_sources_field(bundle.fileset)
+        filespecs_list.append(base_globs.filespecs)
+        path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
+        path_globs_list.append(path_globs)
+        excluded_path_globs_list.append(excluded_path_globs)
+      bundles_field = BundlesField(self.address,
+                                   self.bundles,
+                                   filespecs_list,
+                                   path_globs_list,
+                                   excluded_path_globs_list)
+      return field_adaptors + (bundles_field,)
 
 
 class BaseGlobs(AbstractClass):
@@ -135,19 +151,25 @@ class BaseGlobs(AbstractClass):
   def from_sources_field(sources):
     """Return a BaseGlobs for the given sources field.
 
-    Sources may be None, a sequence, or a BaseGlobs instance.
+    `sources` may be None, a list/tuple/set, a string or a BaseGlobs instance.
     """
     if sources is None:
       return Files()
     elif isinstance(sources, BaseGlobs):
       return sources
-    elif isinstance(sources, collections.Sequence) and not isinstance(sources, string_types):
+    elif isinstance(sources, string_types):
+      return Files(sources)
+    elif isinstance(sources, (set, list, tuple)):
       return Files(*sources)
     else:
       raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
   @staticmethod
   def _filespec_for_excludes(raw_excludes):
+    if isinstance(raw_excludes, string_types):
+      raise ValueError('Excludes of type `{}` are not supported: got "{}"'
+                       .format(type(raw_excludes).__name__, raw_excludes))
+
     excluded_patterns = []
     for raw_exclude in raw_excludes:
       exclude_filespecs = BaseGlobs.from_sources_field(raw_exclude).filespecs
@@ -169,8 +191,16 @@ class BaseGlobs(AbstractClass):
     raw_excludes = kwargs.pop('exclude', [])
     self._excluded_filespecs = self._filespec_for_excludes(raw_excludes).get('globs', [])
 
+    # `follow_links=True` is the default behavior for wrapped globs, so we pop the old kwarg
+    # and warn here to bridge the gap from v1->v2 BUILD files.
+    follow_links = kwargs.pop('follow_links', None)
+    if follow_links is not None:
+      logger.warn(
+        'Ignoring `follow_links={}` kwarg on glob. Default behavior is to follow all links.'
+        .format(follow_links)
+      )
+
     if kwargs:
-      # TODO
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))
 
   @property

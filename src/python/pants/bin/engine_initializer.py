@@ -58,6 +58,15 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler',
                                                          'legacy_graph_cls'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
+  def create_graph(self, spec_roots):
+    """Construct and return a BuildGraph given a set of input specs."""
+    graph = self.legacy_graph_cls(self.scheduler, self.engine, self.symbol_table_cls)
+    for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
+      pass
+    logger.debug('engine cache stats: %s', self.engine.cache_stats())
+    logger.debug('build_graph is: %s', graph)
+    return graph
+
 
 class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
@@ -80,7 +89,6 @@ class EngineInitializer(object):
     """
 
     build_root = get_buildroot()
-    storage = Storage.create(debug=False)
     project_tree = FileSystemProjectTree(build_root, path_ignore_patterns)
     symbol_table_cls = LegacySymbolTable
 
@@ -97,8 +105,8 @@ class EngineInitializer(object):
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
 
-    scheduler = LocalScheduler(dict(), tasks, storage, project_tree)
-    engine = LocalSerialEngine(scheduler, storage)
+    scheduler = LocalScheduler(dict(), tasks, project_tree)
+    engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
 
@@ -128,5 +136,5 @@ class EngineInitializer(object):
       addresses = tuple(graph.inject_specs_closure(spec_roots))
       yield graph, addresses, scheduler
     finally:
-      logger.debug('engine cache stats: {}'.format(engine._cache.get_stats()))
+      logger.debug('engine cache stats: {}'.format(engine.cache_stats()))
       engine.close()

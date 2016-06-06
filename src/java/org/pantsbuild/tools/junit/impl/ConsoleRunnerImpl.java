@@ -6,9 +6,7 @@ package org.pantsbuild.tools.junit.impl;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -22,12 +20,9 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -474,7 +469,7 @@ public class ConsoleRunnerImpl {
       // Run all of the parallel tests using the ConcurrentComputer
       // NB(zundel): This runs these test of each concurrency setting together and waits for them
       // to finish.  This introduces a bottleneck after each class of test.
-      failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_BOTH);
+      failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_CLASSES_AND_METHODS);
       failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_CLASSES);
       failures += runConcurrentTests(core, filter, Concurrency.PARALLEL_METHODS);
     }
@@ -682,7 +677,7 @@ public class ConsoleRunnerImpl {
 
       @Option(name = "-default-concurrency",
           usage = "Specify how to parallelize running tests.\n"
-          + "Use -use-experimental-runner for PARALLEL_METHODS and PARALLEL_BOTH")
+          + "Use -use-experimental-runner for PARALLEL_METHODS and PARALLEL_CLASSES_AND_METHODS")
       private Concurrency defaultConcurrency;
 
       private int parallelThreads = 0;
