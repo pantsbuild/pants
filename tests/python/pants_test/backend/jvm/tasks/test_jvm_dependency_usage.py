@@ -121,14 +121,14 @@ class TestJvmDependencyUsage(TaskTestBase):
     graph = self.create_graph(dep_usage, [a, b, c, alias_a_b, alias_b])
     # both `:a` and `:b` are resolved from target aliases, one is used the other is not.
     self.assertTrue(graph._nodes[c].dep_edges[a].is_declared)
-    self.assertEquals(graph._nodes[c].dep_edges[a].products_used, set(['a.class']))
+    self.assertEquals({'a.class'}, graph._nodes[c].dep_edges[a].products_used)
     self.assertTrue(graph._nodes[c].dep_edges[b].is_declared)
-    self.assertEquals(graph._nodes[c].dep_edges[b].products_used, set([]))
+    self.assertEquals(set(), graph._nodes[c].dep_edges[b].products_used)
 
     # With alias to its resolved targets mapping we can determine which aliases are unused.
     # In this example `alias_b` has none of its resolved dependencies being used.
-    self.assertEqual(set([a, b]), graph._nodes[c].dep_aliases[alias_a_b])
-    self.assertEqual(set([b]), graph._nodes[c].dep_aliases[alias_b])
+    self.assertEqual({a, b}, graph._nodes[c].dep_aliases[alias_a_b])
+    self.assertEqual({b}, graph._nodes[c].dep_aliases[alias_b])
 
   def test_overlapping_globs(self):
     t1 = self.make_java_target(spec=':t1', sources=['a.java'])
@@ -149,9 +149,9 @@ class TestJvmDependencyUsage(TaskTestBase):
     # Not creating edge for t2 even it provides a.class that t4 depends on.
     self.assertFalse(t2 in graph._nodes[t4].dep_edges)
     # t4 depends on a.class from t1 transitively through t3.
-    self.assertEqual(graph._nodes[t4].dep_edges[t1].products_used, set(['a.class']))
+    self.assertEqual({'a.class'}, graph._nodes[t4].dep_edges[t1].products_used)
     self.assertFalse(graph._nodes[t4].dep_edges[t1].is_declared)
-    self.assertEqual(graph._nodes[t4].dep_edges[t3].products_used, set([]))
+    self.assertEqual(set(), graph._nodes[t4].dep_edges[t3].products_used)
     self.assertTrue(graph._nodes[t4].dep_edges[t3].is_declared)
 
   def create_graph(self, task, targets):
