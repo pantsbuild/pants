@@ -394,8 +394,12 @@ class DependencyUsageGraph(object):
         'products_used_ratio': self._used_ratio(dep_tgt, edge),
       }
 
-    def gen_dep_aliases(node):
-      return {alias.address.spec: [dep.address.spec for dep in deps] for alias, deps in node.dep_aliases.items()}
+    def gen_dep_aliases(node, alias, deps):
+      return {
+        'target': alias.address.spec,
+        'dependencies': [dep.address.spec for dep in deps],
+        'has_products_used': 1 if any(len(node.dep_edges[dep].products_used) > 0 for dep in deps) else 0
+      }
 
     for node in self._nodes.values():
       res_dict[node.concrete_target.address.spec] = {
@@ -403,6 +407,6 @@ class DependencyUsageGraph(object):
         'cost_transitive': self._trans_cost(node.concrete_target),
         'products_total': node.products_total,
         'dependencies': [gen_dep_edge(node, edge, dep_tgt) for dep_tgt, edge in node.dep_edges.items()],
-        'aliases': gen_dep_aliases(node)
+        'aliases': [gen_dep_aliases(node, alias, deps) for alias, deps in node.dep_aliases.items()],
       }
     yield json.dumps(res_dict, indent=2, sort_keys=True)
