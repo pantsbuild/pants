@@ -10,7 +10,7 @@ import logging
 import os
 from types import NoneType
 
-from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
+from pants.base.project_tree import Dir, File, Link, ProjectTree
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized
 
@@ -62,11 +62,11 @@ class ScmProjectTree(ProjectTree):
     if mode == NoneType:
       return None
     elif mode == self._reader.Symlink:
-      return PTSTAT_LINK
+      return Link(relpath)
     elif mode == self._reader.Dir:
-      return PTSTAT_DIR
+      return Dir(relpath)
     elif mode == self._reader.File:
-      return PTSTAT_FILE
+      return File(relpath)
     else:
       raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 

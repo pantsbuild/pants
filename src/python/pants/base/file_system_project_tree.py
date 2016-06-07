@@ -10,8 +10,16 @@ import os
 import stat
 from glob import glob1
 
-from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
+from pants.base.project_tree import Dir, File, Link, ProjectTree
 from pants.util.dirutil import fast_relpath, safe_walk
+
+
+# Use the built-in version of scandir/walk if possible, otherwise
+# use the scandir module version
+try:
+  from os import scandir
+except ImportError:
+  from scandir import scandir
 
 
 class FileSystemProjectTree(ProjectTree):
@@ -23,10 +31,10 @@ class FileSystemProjectTree(ProjectTree):
   def _glob1_raw(self, dir_relpath, glob):
     return glob1(self._join(dir_relpath), glob)
 
-  def _listdir_raw(self, relpath):
-    # TODO: use scandir which is backported from 3.x
-    # https://github.com/pantsbuild/pants/issues/3250
-    return os.listdir(self._join(relpath))
+  def _scandir_raw(self, relpath):
+    for dir_ent in scandir(self._join(relpath)):
+      st_mode = dir_ent.stat(follow_symlinks=False).st_mode
+      yield self._construct_stat(dir_ent.path, st_mode)
 
   def _isdir_raw(self, relpath):
     return os.path.isdir(self._join(relpath))
@@ -46,15 +54,8 @@ class FileSystemProjectTree(ProjectTree):
 
   def _lstat_raw(self, relpath):
     try:
-      mode = os.lstat(self._join(relpath)).st_mode
-      if stat.S_ISLNK(mode):
-        return PTSTAT_LINK
-      elif stat.S_ISDIR(mode):
-        return PTSTAT_DIR
-      elif stat.S_ISREG(mode):
-        return PTSTAT_FILE
-      else:
-        raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
+      st_mode = os.lstat(self._join(relpath)).st_mode
+      return self._construct_stat(relpath, st_mode)
     except (IOError, OSError) as e:
       if e.errno == errno.ENOENT:
         return None
@@ -69,6 +70,17 @@ class FileSystemProjectTree(ProjectTree):
                                        topdown=topdown,
                                        onerror=onerror):
       yield fast_relpath(root, self.build_root), dirs, files
+
+  def _construct_stat(self, relpath, st_mode):
+    """Given a relpath and its st_mode (from stat_result), return a `project_tree.Stat`."""
+    if stat.S_ISLNK(st_mode):
+      return Link(relpath)
+    elif stat.S_ISDIR(st_mode):
+      return Dir(relpath)
+    elif stat.S_ISREG(st_mode):
+      return File(relpath)
+    else:
+      raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 
   def __eq__(self, other):
     return other and (type(other) == type(self)) and (self.build_root == other.build_root)

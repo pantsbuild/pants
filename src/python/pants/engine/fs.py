@@ -5,9 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import fnmatch
-from abc import abstractproperty
 from hashlib import sha1
 from os import sep as os_sep
 from os.path import basename, join, normpath
@@ -15,44 +13,11 @@ from os.path import basename, join, normpath
 import six
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK
+from pants.base.project_tree import Dir, File, Link
 from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-
-
-class Stat(AbstractClass):
-  """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
-
-  Note that in order to preserve these invariants, end-user functions should never directly
-  instantiate Stat instances.
-  """
-
-  @abstractproperty
-  def path(self):
-    """:returns: The string path for this Stat."""
-
-
-class File(datatype('File', ['path']), Stat):
-  """A file."""
-
-  def __new__(cls, path):
-    return super(File, cls).__new__(cls, six.text_type(path))
-
-
-class Dir(datatype('Dir', ['path']), Stat):
-  """A directory."""
-
-  def __new__(cls, path):
-    return super(Dir, cls).__new__(cls, six.text_type(path))
-
-
-class Link(datatype('Link', ['path']), Stat):
-  """A symbolic link."""
-
-  def __new__(cls, path):
-    return super(Link, cls).__new__(cls, six.text_type(path))
 
 
 class ReadLink(datatype('ReadLink', ['path'])):
@@ -226,31 +191,30 @@ class PathGlobs(datatype('PathGlobs', ['ftype', 'dependencies'])):
                             for filespec in filespecs))
 
 
-class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'paths'])):
-  """A list of entry names representing a directory listing.
-
-  If exists=False, then the entries list will be empty.
-  """
-
-
-def list_directory(project_tree, directory):
+def scan_directory(project_tree, directory):
   """List Paths directly below the given path, relative to the ProjectTree.
 
-  Raises an exception if the path is not a directory.
+  Fails eagerly if the path does not exist or is not a directory: since the input is
+  a `Dir` instance, the path it represents should already have been confirmed to be an
+  existing directory.
 
-  :returns: A DirectoryListing.
+  :returns: A Stats object containing the members of the directory.
   """
-  try:
-    path = normpath(directory.path)
-    entries = [join(path, e) for e in project_tree.listdir(path)]
-    return DirectoryListing(directory,
-                            True,
-                            tuple(Path(e) for e in entries))
-  except (IOError, OSError) as e:
-    if e.errno == errno.ENOENT:
-      return DirectoryListing(directory, False, tuple())
+  dirs = list()
+  files = list()
+  links = list()
+  for stat in project_tree.scandir(directory.path):
+    if type(stat) is Dir:
+      dirs.append(stat)
+    elif type(stat) is File:
+      files.append(stat)
+    elif type(stat) is Link:
+      links.append(stat)
     else:
-      raise e
+      _unrecognized_stat(project_tree, stat)
+  return Stats(files=tuple(files),
+               dirs=tuple(dirs),
+               links=tuple(links))
 
 
 def merge_stats(stats_list):
@@ -317,18 +281,22 @@ def read_link(project_tree, link):
 
 def path_stat(project_tree, path_literal):
   path = normpath(path_literal.path)
-  ptstat = project_tree.lstat(path)
-  if ptstat == None:
-    return Stats()
+  stat = project_tree.lstat(path)
 
-  if ptstat == PTSTAT_FILE:
-    return Stats(files=(File(path),))
-  elif ptstat == PTSTAT_DIR:
-    return Stats(dirs=(Dir(path),))
-  elif ptstat == PTSTAT_LINK:
-    return Stats(links=(Link(path),))
+  if stat is None:
+    return Stats()
+  elif type(stat) is File:
+    return Stats(files=(stat,))
+  elif type(stat) is Dir:
+    return Stats(dirs=(stat,))
+  elif type(stat) is Link:
+    return Stats(links=(stat,))
   else:
-    raise ValueError('Unrecognized stat type for {}, {}: {}'.format(project_tree, path, ptstat))
+    _unrecognized_stat(project_tree, stat)
+
+
+def _unrecognized_stat(project_tree, stat):
+  raise ValueError('Unrecognized stat type for {}: {}'.format(project_tree, stat))
 
 
 def stat_to_path(stat):
