@@ -160,14 +160,6 @@ class JvmAppAdaptor(TargetAdaptor):
 
 
 class PythonTargetAdaptor(TargetAdaptor):
-  def __init__(self, resources=None, **kwargs):
-    """
-    :param resources: Identical to the default `sources` argument on Target, but used by
-      PythonTarget to generate a synthetic Resources target.
-    """
-    super(PythonTargetAdaptor, self).__init__(**kwargs)
-    self.resources = resources
-
   @property
   def field_adaptors(self):
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
@@ -176,7 +168,12 @@ class PythonTargetAdaptor(TargetAdaptor):
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources)
       path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-      return (SourcesField(self.address, 'resources', base_globs.filespecs, path_globs, excluded_path_globs),)
+      sources_field = SourcesField(self.address,
+                                   'resources',
+                                   base_globs.filespecs,
+                                   path_globs,
+                                   excluded_path_globs)
+      return field_adaptors + (sources_field,)
 
 
 class BaseGlobs(AbstractClass):
