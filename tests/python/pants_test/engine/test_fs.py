@@ -10,9 +10,10 @@ import unittest
 from abc import abstractmethod
 from contextlib import contextmanager
 
+from pants.base.project_tree import Dir, Link, Stat
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import (Dir, DirectoryListing, Dirs, FileContent, FileDigest, Files, Link,
-                             Path, PathGlobs, ReadLink, Stat, Stats)
+from pants.engine.fs import (Dirs, FileContent, FileDigest, Files,
+                             Path, PathGlobs, ReadLink, Stats)
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -139,13 +140,12 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 
   def test_nodes_symlink_globbed_dir(self):
     self.assert_fsnodes(Files, ['*/2'], [
-        # Glob the root.
-        (Dir(''), DirectoryListing),
-        # Stat each entry.
+        # Scandir for the root.
+        (Dir(''), Stats),
+        # TODO: To resolve a symlink we stat it individually, rather than using the
+        # Stats from Scandir. We should consider replacing individual `lstat`
+        # calls with a projection of Scandir for the dirname of the path.
         (Path('a'), Stats),
-        (Path('c.ln'), Stats),
-        (Path('d.ln'), Stats),
-        (Path('4.txt'), Stats),
         # Read links to determine whether they're actually directories.
         (Link('c.ln'), ReadLink),
         (Link('d.ln'), ReadLink),
@@ -164,7 +164,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         (Link('d.ln'), ReadLink),
         (Path('a'), Stats),
         (Path('a/b'), Stats),
-        (Dir('a/b'), DirectoryListing),
+        (Dir('a/b'), Stats),
         (Path('a/b/2'), Stats),
         (Path('a/b/1.txt'), Stats),
       ])
