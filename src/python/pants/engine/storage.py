@@ -318,16 +318,14 @@ class Cache(Closable):
   NB: since Subjects in Nodes can be anything, comparison among them are usually N/A,
   both cache get and put are for a keyed `StepRequest`.
   """
-  _lock = threading.Lock()
 
   @classmethod
   def create(cls, storage=None, cache_stats=None):
     """Create a Cache from a given storage instance."""
 
-    with cls._lock:
-      storage = storage or Storage.create()
-      cache_stats = cache_stats or CacheStats()
-      return Cache(storage, cache_stats)
+    storage = storage or Storage.create()
+    cache_stats = cache_stats or CacheStats()
+    return Cache(storage, cache_stats)
 
   def __init__(self, storage, cache_stats):
     """Initialize the cache. Not for direct use, use factory methods `create`.
@@ -340,36 +338,33 @@ class Cache(Closable):
 
   def get(self, step_request):
     """Get the cached StepResult for a given StepRequest."""
-    with self._lock:
-      result_key = self._storage.get_mapping(self._storage.put(self._keyable_fields(step_request)))
-      if result_key is None:
-        self._cache_stats.add_miss()
-        return None
+    result_key = self._storage.get_mapping(self._storage.put(self._keyable_fields(step_request)))
+    if result_key is None:
+      self._cache_stats.add_miss()
+      return None
 
-      self._cache_stats.add_hit()
-      return self._storage.get(result_key)
+    self._cache_stats.add_hit()
+    return self._storage.get(result_key)
 
   def put(self, step_request, step_result):
     """Save the StepResult for a given StepResult."""
-    with self._lock:
-      request_key = self._storage.put(self._keyable_fields(step_request))
-      result_key = self._storage.put(step_result)
-      return self._storage.add_mapping(from_key=request_key, to_key=result_key)
+    request_key = self._storage.put(self._keyable_fields(step_request))
+    result_key = self._storage.put(step_result)
+    return self._storage.add_mapping(from_key=request_key, to_key=result_key)
 
   def get_stats(self):
     return self._cache_stats
 
   def items(self):
     """Iterate over all cached request, result for testing purpose."""
-    with self._lock:
-      for digest, _ in self._storage._key_mappings.items():
-        # Construct request key from digest directly because we do not have the
-        # request blob.  Type check is intentionally skipped because we do not
-        # want to introduce a dependency from `storage` to `scheduler`
-        request_key = Key(digest=digest, hash_=Key.compute_hash_from_digest(digest),
-                          type_=None, string=None)
-        request = self._storage.get(request_key)
-        yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
+    for digest, _ in self._storage._key_mappings.items():
+      # Construct request key from digest directly because we do not have the
+      # request blob.  Type check is intentionally skipped because we do not
+      # want to introduce a dependency from `storage` to `scheduler`
+      request_key = Key(digest=digest, hash_=Key.compute_hash_from_digest(digest),
+                        type_=None, string=None)
+      request = self._storage.get(request_key)
+      yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
 
   def _keyable_fields(self, step_request):
     """Return fields for the purpose of computing the cache key of this step request.
@@ -383,8 +378,7 @@ class Cache(Closable):
     return (step_request.node, sorted_deps, step_request.project_tree)
 
   def close(self):
-    with self._lock:
-      self._storage.close()
+    self._storage.close()
 
 
 class CacheStats(Counter):
@@ -487,8 +481,6 @@ class Lmdb(KeyValueStore):
   # such as OSX, to immediately preallocate map_size = bytes of underlying storage.
   # See https://lmdb.readthedocs.org/en/release/#writemap-mode
   USE_SPARSE_FILES = sys.platform != 'darwin'
-
-  _lock = threading.Lock()
 
   @classmethod
   def create(self, path=None, child_databases=None):
