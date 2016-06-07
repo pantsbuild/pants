@@ -389,7 +389,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   """A native node type for filesystem operations."""
 
   _FS_PAIRS = {
-      (DirectoryListing, Dir),
+      (Stats, Dir),
       (FileContent, File),
       (FileDigest, File),
       (Stats, Path),
@@ -419,14 +419,14 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
 
   def step(self, step_context):
     try:
-      if self.product is Stats:
+      if self.product is Stats and type(subject) is Path:
         return Return(path_stat(step_context.project_tree, self.subject))
+      elif self.product is Stats and type(subject) is Dir:
+        return Return(list_directory(step_context.project_tree, self.subject))
       elif self.product is FileContent:
         return Return(file_content(step_context.project_tree, self.subject))
       elif self.product is FileDigest:
         return Return(file_digest(step_context.project_tree, self.subject))
-      elif self.product is DirectoryListing:
-        return Return(list_directory(step_context.project_tree, self.subject))
       elif self.product is ReadLink:
         return Return(read_link(step_context.project_tree, self.subject))
       else:
