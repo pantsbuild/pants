@@ -5,10 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from abc import abstractproperty
 from multiprocessing import Process, Queue
-
-from concurrent.futures import ProcessPoolExecutor
 
 
 def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
@@ -29,56 +26,7 @@ def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
       state.close()
 
 
-class StatefulPoolBase(object):
-  """A Thread.Pool-alike with stateful workers running the same function.
-
-  Note: there is no exception handling wrapping the function, so it should handle its
-  own exceptions and return a failure result if need be.
-
-  :param pool_size: The number of workers.
-  :param initializer: To provide the initial states for each worker.
-  :param function: The function which will be executed for each input object, and receive
-    the worker's state and the current input. Should return the value that will be returned
-    to the calling thread.
-  """
-
-  @abstractproperty
-  def _pool_constructor(self):
-    """Allow the child class to define the type of pool.
-
-    The pool must be concurrent.futures like
-    """
-
-  def __init__(self, pool_size, initializer, function):
-    super(StatefulPoolBase, self).__init__()
-
-    self._pool_size = pool_size
-
-    self._send = Queue()
-    self._recv = Queue()
-
-    self._executor = self._pool_constructor(max_workers=self._pool_size)
-    self._fn_args = (self._recv, self._send, initializer, function)
-
-  def start(self):
-    for _ in range(self._pool_size):
-      self._executor.submit(_stateful_pool_loop, *self._fn_args)
-
-  def submit(self, item):
-    if item is None:
-      raise ValueError('Only non-None inputs are supported.')
-    self._send.put(item, block=True)
-
-  def await_one_result(self):
-    return self._recv.get(block=True)
-
-  def close(self):
-    for _ in range(self._pool_size):
-      self._send.put(None, block=True)
-    self._executor.shutdown()
-
-
-class StatefulProcessPoolBase(StatefulPoolBase):
+class StatefulPool(object):
   """A multiprocessing.Pool-alike with stateful workers running the same function.
 
   Note: there is no exception handling wrapping the function, so it should handle its
@@ -91,14 +39,8 @@ class StatefulProcessPoolBase(StatefulPoolBase):
     to the calling thread.
   """
 
-  @property
-  def _pool_constructor(self):
-    return ProcessPoolExecutor
-
   def __init__(self, pool_size, initializer, function):
-    # NOTE: It's unclear why but subclassing StatefulBasePool similar to StatefulThreadPool
-    # causes the process to lock up. For now I am leaving the existing implementation as is.
-    super(StatefulProcessPoolBase, self).__init__(pool_size, initializer, function)
+    super(StatefulPool, self).__init__()
 
     self._pool_size = pool_size
 
@@ -112,6 +54,14 @@ class StatefulProcessPoolBase(StatefulPoolBase):
   def start(self):
     for process in self._processes:
       process.start()
+
+  def submit(self, item):
+    if item is None:
+      raise ValueError('Only non-None inputs are supported.')
+    self._send.put(item, block=True)
+
+  def await_one_result(self):
+    return self._recv.get(block=True)
 
   def close(self):
     for _ in self._processes:

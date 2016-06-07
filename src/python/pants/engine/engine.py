@@ -17,7 +17,7 @@ from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.engine.objects import SerializationError
-from pants.engine.processing import StatefulProcessPoolBase
+from pants.engine.processing import StatefulPool
 from pants.engine.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -246,8 +246,7 @@ class ThreadHybridEngine(Engine):
 
     Deferred method returns (step_id, result) so that it can be processed later.
     """
-    execute_step = functools.partial(_execute_step, self._maybe_cache_put, self._debug, self._state)
-    return functools.partial(execute_step, step)
+    return functools.partial(_execute_step, self._maybe_cache_put, self._debug, self._state, step)
 
   def _deferred_results(self, step):
     """Create a callable to process a step that is able to be passed to the thred pool
@@ -262,9 +261,9 @@ class ThreadHybridEngine(Engine):
     return get_results
 
   def _deferred_cache_fetch(self, step):
-    """Create a callable to fetch cache that is able to be passed to the thred pool
+    """Create a callable to fetch cache that is able to be passed to the thread pool
 
-    Deferred method only returns result
+    Deferred method returns result without corresponding step id
     """
     keyed_request = self._storage.key_for_request(step)
     return functools.partial(self._maybe_cache_get, keyed_request)
@@ -394,14 +393,9 @@ class LocalMultiprocessEngine(Engine):
 
     self._processed_queue = Queue()
     self.node_builder = scheduler.node_builder()
-    self._state = (self.node_builder, storage)
     process_initializer = functools.partial(self._initializer, self.node_builder, self._storage)
-    self._pool = self._pool_factory(self._pool_size, process_initializer, execute_step)
+    self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
-
-  @property
-  def _pool_factory(self):
-    return StatefulProcessPoolBase
 
   @property
   def _initializer(self):
