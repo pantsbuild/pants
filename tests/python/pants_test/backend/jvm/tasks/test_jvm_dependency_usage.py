@@ -104,6 +104,32 @@ class TestJvmDependencyUsage(TaskTestBase):
 
     self._cover_output(graph)
 
+  def test_target_alias(self):
+    a = self.make_java_target(spec=':a', sources=['a.java'])
+    b = self.make_java_target(spec=':b', sources=['b.java'])
+    alias_a_b = self.make_target(spec=':alias_a_b', dependencies=[a, b])
+    alias_b = self.make_target(spec=':alias_b', dependencies=[b])
+    c = self.make_java_target(spec=':c', sources=['c.java'], dependencies=[alias_a_b, alias_b])
+    self.set_options(strict_deps=False)
+    dep_usage, product_deps_by_src = self._setup({
+      a: ['a.class'],
+      b: ['b.class'],
+      c: ['c.class'],
+    })
+
+    product_deps_by_src[c] = {'c.java': ['a.class']}
+    graph = self.create_graph(dep_usage, [a, b, c, alias_a_b, alias_b])
+    # both `:a` and `:b` are resolved from target aliases, one is used the other is not.
+    self.assertTrue(graph._nodes[c].dep_edges[a].is_declared)
+    self.assertEquals(graph._nodes[c].dep_edges[a].products_used, set(['a.class']))
+    self.assertTrue(graph._nodes[c].dep_edges[b].is_declared)
+    self.assertEquals(graph._nodes[c].dep_edges[b].products_used, set([]))
+
+    # With alias to its resolved targets mapping we can determine which aliases are unused.
+    # In this example `alias_b` has none of its resolved dependencies being used.
+    self.assertEqual(set([a, b]), graph._nodes[c].dep_aliases[alias_a_b])
+    self.assertEqual(set([b]), graph._nodes[c].dep_aliases[alias_b])
+
   def create_graph(self, task, targets):
     classes_by_source = task.context.products.get_data('classes_by_source')
     runtime_classpath = task.context.products.get_data('runtime_classpath')
