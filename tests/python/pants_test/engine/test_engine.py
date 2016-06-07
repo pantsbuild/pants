@@ -85,13 +85,6 @@ class EngineTest(unittest.TestCase):
     with self.hybrid_engine(pool_size=1) as engine:
       self.assert_engine(engine)
 
-  def test_hybrid_unpickleable(self):
-    build_request = self.request(['unpickleable'], self.java)
-
-    with self.hybrid_engine() as engine:
-      with self.assertRaises(SerializationError):
-        engine.execute(build_request)
-
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_rerun_with_cache(self):
     with self.multiprocessing_engine() as engine:

@@ -181,7 +181,7 @@ def _execute_step(cache_save, debug, process_state, step):
     if debug:
       _try_pickle(result)
     cache_save(step, result)
-    return storage.key_for_result(result)
+    return result
 
   try:
     return step_id, execute()
@@ -192,120 +192,7 @@ def _execute_step(cache_save, debug, process_state, step):
     return step_id, e
 
 
-class ThreadHybridEngine(Engine):
-  """An engine that runs locally but allows nodes to be optionally run concurrently.
-
-  The decision to run concurrently or in serial is determined by _is_async_node.
-  For IO bound nodes we will run concurrently using threads.
-  """
-
-  def __init__(self, scheduler, storage, cache=None, threaded_node_types=tuple(),
-               pool_size=None, debug=True):
-    """
-    :param scheduler: The local scheduler for creating execution graphs.
-    :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
-    :param storage: The storage instance for serializables keyed by their hashes.
-    :type storage: :class:`pants.engine.storage.Storage`
-    :param cache: The cache instance for storing execution results, by default it uses the same
-      Storage instance if not specified.
-    :type cache: :class:`pants.engine.storage.Cache`
-    :param int pool_size: The number of worker processes to use; by default 2 processes per core will
-                          be used.
-    :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
-    """
-    super(ThreadHybridEngine, self).__init__(scheduler, storage, cache)
-    self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
-
-    self._futures = []
-    self._processed_queue = Queue()
-    self._async_nodes = threaded_node_types
-    self._node_builder = scheduler.node_builder()
-    self._state = (self._node_builder, storage)
-    self._pool = self._pool_factory(max_workers=self._pool_size)
-    self._debug = debug
-
-  @property
-  def _pool_factory(self):
-    return ThreadPoolExecutor
-
-  def _is_async_node(self, node):
-    """Override default behavior and handle specific nodes asynchronously."""
-    return isinstance(node, self._async_nodes)
-
-  def _maybe_cache_get(self, step_request):
-    return self._cache.get(step_request) if self._should_cache(step_request) else None
-
-  def _maybe_cache_step(self, step_request):
-    if self._should_cache(step_request):
-      return step_request.step_id, self._cache.get(step_request)
-    else:
-      return step_request.step_id, None
-
-  def _deferred_step(self, step):
-    """Create a callable to process a step that is able to be passed to the thred pool
-
-    Deferred method returns (step_id, result) so that it can be processed later.
-    """
-    return functools.partial(_execute_step, self._maybe_cache_put, self._debug, self._state, step)
-
-  def _deferred_results(self, step):
-    """Create a callable to process a step that is able to be passed to the thred pool
-
-    Deferred method only returns the result
-    """
-    keyed_request = self._storage.key_for_request(step)
-    def get_results():
-      result = step(self._node_builder)
-      self._maybe_cache_put(keyed_request, result)
-      return result
-    return get_results
-
-  def _deferred_cache_fetch(self, step):
-    """Create a callable to fetch cache that is able to be passed to the thread pool
-
-    Deferred method returns result without corresponding step id
-    """
-    keyed_request = self._storage.key_for_request(step)
-    return functools.partial(self._maybe_cache_get, keyed_request)
-
-  def _deferred_cache_step(self, step):
-    """Create a callable to fetch cache that is able to be passed to the thred pool
-
-      Deferred method returns (step_id, result) so that it can be processed later.
-      """
-    keyed_request = self._storage.key_for_request(step)
-    return functools.partial(self._maybe_cache_step, keyed_request)
-
-  def _submit_until(self, pending_submission, in_flight, n):
-    """Submit pending while there's capacity, and more than `n` items pending_submission."""
-    to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
-    submitted = 0
-    for _ in range(to_submit):
-      step, promise = pending_submission.pop(last=False)
-      if self._is_async_node(step.node):
-        if step.step_id in in_flight:
-          raise InFlightException('{} is already in_flight!'.format(step))
-
-        in_flight[step.step_id] = promise
-        futures = [
-          self._pool.submit(self._deferred_cache_step(step)),
-          self._pool.submit(self._deferred_step(step))
-        ]
-        for f in futures:
-          f.add_done_callback(self._processed_queue.put)
-          self._futures.append(f)
-        submitted += 1
-
-      else:
-        keyed_request = self._storage.key_for_request(step)
-        result = self._maybe_cache_get(keyed_request)
-        if result is None:
-          result = step(self._node_builder)
-          self._maybe_cache_put(keyed_request, result)
-        promise.success(result)
-
-    return submitted
-
+class ConcurrentEngine(Engine):
   def reduce(self, execution_request):
     """The main reduction loop."""
     # 1. Whenever we don't have enough work to saturate the pool, request more.
@@ -322,7 +209,8 @@ class ThreadHybridEngine(Engine):
       if not step_batch:
         # A batch should only be empty if all dependency work is currently blocked/running.
         if not in_flight and not pending_submission:
-          raise StepBatchException('Scheduler provided an empty batch while no work is in progress!')
+          raise StepBatchException(
+            'Scheduler provided an empty batch while no work is in progress!')
       else:
         # Submit and wait for work for as long as we're able to keep the pool saturated.
         pending_submission.update(step_batch)
@@ -338,6 +226,98 @@ class ThreadHybridEngine(Engine):
       submit_until(self._pool_size)
       await_one()
 
+class ThreadHybridEngine(ConcurrentEngine):
+  """An engine that runs locally but allows nodes to be optionally run concurrently.
+
+  The decision to run concurrently or in serial is determined by _is_async_node.
+  For IO bound nodes we will run concurrently using threads.
+  """
+
+  def __init__(self, scheduler, storage, cache=None, threaded_node_types=tuple(),
+               pool_size=None, debug=True):
+    """
+    :param scheduler: The local scheduler for creating execution graphs.
+    :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
+    :param storage: The storage instance for serializables keyed by their hashes.
+    :type storage: :class:`pants.engine.storage.Storage`
+    :param cache: The cache instance for storing execution results, by default it uses the same
+      Storage instance if not specified.
+    :type cache: :class:`pants.engine.storage.Cache`
+    :param tuple threaded_node_types: Node types that will be processed using the thread pool.
+    :param int pool_size: The number of worker processes to use; by default 2 processes per core will
+                          be used.
+    :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
+    """
+    super(ThreadHybridEngine, self).__init__(scheduler, storage, cache)
+    self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
+
+    self._async_tasks = []  # Keep track of futures so we can cleanup at the end.
+    self._processed_queue = Queue()
+    self._async_nodes = threaded_node_types
+    self._node_builder = scheduler.node_builder()
+    self._state = (self._node_builder, storage)
+    self._pool = ThreadPoolExecutor(max_workers=self._pool_size)
+    self._debug = debug
+
+  def _is_async_node(self, node):
+    """Override default behavior and handle specific nodes asynchronously."""
+    return isinstance(node, self._async_nodes)
+
+  def _maybe_cache_step(self, step_request):
+    if self._should_cache(step_request):
+      return step_request.step_id, self._cache.get(step_request)
+    else:
+      return step_request.step_id, None
+
+  def _deferred_step(self, step):
+    """Create a callable to process a step that is able to be passed to the thread pool
+
+    Deferred method returns (step_id, result) so that it can be processed later.
+    """
+    return functools.partial(_execute_step, self._maybe_cache_put, self._debug, self._state, step)
+
+  def _deferred_cache(self, step):
+    """Create a callable to fetch cache that is able to be passed to the thread pool
+
+    Deferred method returns result without corresponding step id
+    """
+    def strip_step_id():
+      # Discard keyed_result
+      _, result = self._maybe_cache_get(step)
+      resolved_result = None if result is None else self._storage.resolve_result(result)
+      return step.step_id, resolved_result
+
+    return strip_step_id
+
+  def _submit_until(self, pending_submission, in_flight, n):
+    """Submit pending while there's capacity, and more than `n` items pending_submission."""
+    to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
+    submitted = 0
+    for _ in range(to_submit):
+      step, promise = pending_submission.pop(last=False)
+      if self._is_async_node(step.node):
+        if step.step_id in in_flight:
+          raise InFlightException('{} is already in_flight!'.format(step))
+
+        in_flight[step.step_id] = promise
+        futures = [
+          self._pool.submit(self._deferred_cache(step)),
+          self._pool.submit(self._deferred_step(step))
+        ]
+        for f in futures:
+          f.add_done_callback(self._processed_queue.put)
+          self._async_tasks.append(f)
+        submitted += 1
+
+      else:
+        keyed_request, result = self._maybe_cache_get(step)
+        if result is None:
+          result = step(self._node_builder)
+          self._maybe_cache_put(keyed_request, result)
+        promise.success(result)
+
+    return submitted
+
   def _await_one(self, in_flight):
     """Await one completed step, and remove it from in_flight."""
     if not in_flight:
@@ -349,12 +329,11 @@ class ThreadHybridEngine(Engine):
       step_id, result = self._processed_queue.get().result()
     if isinstance(result, Exception):
       raise result
-    result = self._storage.resolve_result(result)
     in_flight.pop(step_id).success(result)
 
   def close(self):
     """Cleanup thread pool."""
-    for f in self._futures:
+    for f in self._async_tasks:
       f.cancel()
     self._pool.shutdown()  # Wait for pool to cleanup before we cleanup storage.
 
@@ -368,7 +347,7 @@ def _process_initializer(node_builder, storage):
   return node_builder, Storage.clone(storage)
 
 
-class LocalMultiprocessEngine(Engine):
+class LocalMultiprocessEngine(ConcurrentEngine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
   def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
@@ -456,36 +435,3 @@ class LocalMultiprocessEngine(Engine):
       raise InFlightException(
         'Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
     in_flight.pop(step_id).success(result)
-
-  def reduce(self, execution_request):
-    # The main reduction loop:
-    # 1. Whenever we don't have enough work to saturate the pool, request more.
-    # 2. Whenever the pool is not saturated, submit currently pending work.
-
-    # Step instances which have not been submitted yet.
-    # TODO: Scheduler now only sends work once, so a deque should be fine here.
-    pending_submission = OrderedSet()
-    # Dict from step id to a Promise for Steps that have been submitted.
-    in_flight = dict()
-    submit_until = functools.partial(self._submit_until, pending_submission, in_flight)
-    await_one = functools.partial(self._await_one, in_flight)
-
-    for step_batch in self._scheduler.schedule(execution_request):
-      if not step_batch:
-        # A batch should only be empty if all dependency work is currently blocked/running.
-        if not in_flight and not pending_submission:
-          raise StepBatchException('Scheduler provided an empty batch while no work is in progress!')
-      else:
-        # Submit and wait for work for as long as we're able to keep the pool saturated.
-        pending_submission.update(step_batch)
-        while submit_until(self._pool_size) > 0:
-          await_one()
-      # Await at least one entry per scheduling loop.
-      submit_until(0)
-      if in_flight:
-        await_one()
-
-    # Consume all steps.
-    while pending_submission or in_flight:
-      submit_until(self._pool_size)
-      await_one()
