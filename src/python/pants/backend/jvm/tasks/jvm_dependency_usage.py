@@ -299,11 +299,16 @@ class Node(object):
         'products_used': list(self.dep_edges[dest].products_used),
         'is_declared': self.dep_edges[dest].is_declared,
       }
+    aliases = {}
+    for alias, deps in self.dep_aliases.items():
+      aliases[alias.address.spec] = [dep.address.spec for dep in deps]
+
     return {
       'target': self.concrete_target.address.spec,
       'products_total': self.products_total,
       'derivations': [derivation.address.spec for derivation in self.derivations],
-      'dep_edges': edges
+      'dep_edges': edges,
+      'aliases': aliases,
     }
 
   @staticmethod
@@ -315,6 +320,9 @@ class Node(object):
       res.dep_edges[target_resolve_func(edge)] = Edge(
         is_declared=cached_dict['dep_edges'][edge]['is_declared'],
         products_used=set(cached_dict['dep_edges'][edge]['products_used']))
+    for alias in cached_dict['aliases']:
+      for dep in cached_dict['aliases'][alias]:
+        res.dep_aliases[target_resolve_func(alias)].add(target_resolve_func(dep))
     return res
 
 
