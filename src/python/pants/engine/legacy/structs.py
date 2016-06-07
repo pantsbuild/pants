@@ -163,7 +163,7 @@ class PythonTargetAdaptor(TargetAdaptor):
   def __init__(self, resources=None, **kwargs):
     """
     :param resources: Identical to the default `sources` argument on Target, but used by
-      PythonTarget to generate a synthetic target Resources target.
+      PythonTarget to generate a synthetic Resources target.
     """
     super(PythonTargetAdaptor, self).__init__(**kwargs)
     self.resources = resources
