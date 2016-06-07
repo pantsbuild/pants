@@ -120,7 +120,7 @@ class TestJvmDependencyUsage(TaskTestBase):
     product_deps_by_src[t4] = {'d.java': ['a.class']}
     graph = self.create_graph(dep_usage, [t1, t2, t3, t4])
 
-    # Not creating edge for t2 even it provides a.class that t4 depends on
+    # Not creating edge for t2 even it provides a.class that t4 depends on.
     self.assertFalse(t2 in graph._nodes[t4].dep_edges)
     # t4 depends on a.class from t1 transitively through t3.
     self.assertEqual(graph._nodes[t4].dep_edges[t1].products_used, set(['a.class']))

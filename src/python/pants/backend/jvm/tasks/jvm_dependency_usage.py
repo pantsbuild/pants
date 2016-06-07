@@ -254,7 +254,9 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
           derived_from = dep_tgt.concrete_derived_from
           if not self._select(derived_from):
             continue
-          # Create edge only for those direct or transitive dependencies.
+          # Create edge only for those direct or transitive dependencies in order to
+          # disqualify irrelevant targets that happen to share some file in sources,
+          # not uncommon when globs especially rglobs is used.
           if not derived_from in transitive_deps_by_target.get(concrete_target):
             continue
           is_declared = self._is_declared_dep(target, dep_tgt)
