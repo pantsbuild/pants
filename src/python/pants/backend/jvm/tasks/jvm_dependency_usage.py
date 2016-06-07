@@ -107,14 +107,14 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     """Recursively resolve `target` aliases."""
     for declared in target.dependencies:
       if type(declared) == Target:
-        for r in self._resolve_aliases(declared):
-          yield r
+        for r, _ in self._resolve_aliases(declared):
+          yield r, declared
       else:
-        yield declared
+        yield declared, None
 
   def _is_declared_dep(self, target, dep):
     """Returns true if the given dep target should be considered a declared dep of target."""
-    return dep in self._resolve_aliases(target)
+    return dep in [resolved for resolved, _ in self._resolve_aliases(target)]
 
   def _select(self, target):
     if self.get_options().internal_only and isinstance(target, JarLibrary):
@@ -238,10 +238,10 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     node.add_derivation(target, products_total)
 
     # Record declared Edges.
-    for dep_tgt in self._resolve_aliases(target):
+    for dep_tgt, aliased_from in self._resolve_aliases(target):
       derived_from = dep_tgt.concrete_derived_from
       if self._select(derived_from):
-        node.add_edge(Edge(is_declared=True, products_used=set()), derived_from)
+        node.add_edge(Edge(is_declared=True, products_used=set()), derived_from, aliased_from)
 
     # Record the used products and undeclared Edges for this target. Note that some of
     # these may be self edges, which are considered later.
@@ -266,19 +266,24 @@ class Node(object):
     self.derivations = set()
     # Dict mapping concrete dependency targets to an Edge object.
     self.dep_edges = defaultdict(Edge)
+    # Dict mapping concrete dependency targets to where they are aliased from.
+    self.dep_aliases = defaultdict(set)
 
   def add_derivation(self, derived_target, derived_products):
     self.derivations.add(derived_target)
     self.products_total += derived_products
 
-  def add_edge(self, edge, dest):
+  def add_edge(self, edge, dest, dest_aliased_from=None):
     self.dep_edges[dest] += edge
+    if dest_aliased_from:
+      self.dep_aliases[dest_aliased_from].add(dest)
 
   def combine(self, other_node):
     assert other_node.concrete_target == self.concrete_target
     self.products_total += other_node.products_total
     self.derivations.update(other_node.derivations)
     self.dep_edges.update(other_node.dep_edges)
+    self.dep_aliases.update(other_node.dep_aliases)
 
   def to_cacheable_dict(self):
     edges = {}
@@ -389,11 +394,15 @@ class DependencyUsageGraph(object):
         'products_used_ratio': self._used_ratio(dep_tgt, edge),
       }
 
+    def gen_dep_aliases(node):
+      return {alias.address.spec: [dep.address.spec for dep in deps] for alias, deps in node.dep_aliases.items()}
+
     for node in self._nodes.values():
       res_dict[node.concrete_target.address.spec] = {
         'cost': self._cost(node.concrete_target),
         'cost_transitive': self._trans_cost(node.concrete_target),
         'products_total': node.products_total,
-        'dependencies': [gen_dep_edge(node, edge, dep_tgt) for dep_tgt, edge in node.dep_edges.items()]
+        'dependencies': [gen_dep_edge(node, edge, dep_tgt) for dep_tgt, edge in node.dep_edges.items()],
+        'aliases': gen_dep_aliases(node)
       }
     yield json.dumps(res_dict, indent=2, sort_keys=True)
