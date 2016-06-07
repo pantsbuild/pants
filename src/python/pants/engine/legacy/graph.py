@@ -228,7 +228,7 @@ def hydrate_sources(sources_field, source_files_digest, excluded_source_files):
                                                sources_field.filespecs,
                                                source_files_digest,
                                                excluded_source_files)
-  return HydratedField('sources', fileset_with_spec)
+  return HydratedField(sources_field.arg, fileset_with_spec)
 
 
 def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
