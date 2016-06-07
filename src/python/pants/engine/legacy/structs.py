@@ -50,29 +50,44 @@ class TargetAdaptor(StructWithDeps):
         return tuple()
       base_globs = BaseGlobs.from_sources_field(self.sources)
       path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-      return (SourcesField(self.address, base_globs.filespecs, path_globs, excluded_path_globs),)
+      return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs, excluded_path_globs),)
 
 
 class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype('SourcesField', ['address', 'filespecs', 'path_globs', 'excluded_path_globs']), Field):
+class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'path_globs', 'excluded_path_globs']), Field):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
   API efficiently; once tasks are explicitly requesting particular Products for Targets,
   lazy construction will be more natural.
+    see https://github.com/pantsbuild/pants/issues/3560
+
+  :param address: The Address of the TargetAdaptor for which this field is an argument.
+  :param arg: The name of this argument: usually 'sources', but occasionally also 'resources' in the
+    case of python resource globs.
+  :param filespecs: The merged filespecs dict the describes the paths captured by this field.
+  :param path_globs: A PathGlobs describing included files.
+  :param excluded_path_globs: A PathGlobs describing files excluded (ie, subtracted) from the
+    include set.
   """
 
   def __eq__(self, other):
-    return type(self) == type(other) and self.address == other.address
+    return type(self) == type(other) and self.address == other.address and self.arg == other.arg
 
   def __ne__(self, other):
     return not (self == other)
 
   def __hash__(self):
     return hash(self.address)
+
+  def __repr__(self):
+    return str(self)
+
+  def __str__(self):
+    return 'SourcesField(address={}, arg={}, filespecs={!r})'.format(self.address, self.arg, self.filespecs)
 
 
 class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list', 'excluded_path_globs_list']), Field):
@@ -142,6 +157,23 @@ class JvmAppAdaptor(TargetAdaptor):
                                    path_globs_list,
                                    excluded_path_globs_list)
       return field_adaptors + (bundles_field,)
+
+
+class PythonTargetAdaptor(TargetAdaptor):
+  @property
+  def field_adaptors(self):
+    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+      field_adaptors = super(PythonTargetAdaptor, self).field_adaptors
+      if getattr(self, 'resources', None) is None:
+        return field_adaptors
+      base_globs = BaseGlobs.from_sources_field(self.resources)
+      path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
+      sources_field = SourcesField(self.address,
+                                   'resources',
+                                   base_globs.filespecs,
+                                   path_globs,
+                                   excluded_path_globs)
+      return field_adaptors + (sources_field,)
 
 
 class BaseGlobs(AbstractClass):

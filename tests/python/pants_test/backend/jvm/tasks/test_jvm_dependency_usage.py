@@ -104,14 +104,40 @@ class TestJvmDependencyUsage(TaskTestBase):
 
     self._cover_output(graph)
 
+  def test_overlapping_globs(self):
+    t1 = self.make_java_target(spec=':t1', sources=['a.java'])
+    t2 = self.make_java_target(spec=':t2', sources=['a.java', 'b.java'])
+    t3 = self.make_java_target(spec=':t3', sources=['c.java'], dependencies=[t1])
+    t4 = self.make_java_target(spec=':t4', sources=['d.java'], dependencies=[t3])
+    self.set_options(strict_deps=False)
+    dep_usage, product_deps_by_src = self._setup({
+        t1: ['a.class'],
+        t2: ['a.class', 'b.class'],
+        t3: ['c.class'],
+        t4: ['d.class'],
+    })
+    product_deps_by_src[t3] = {'c.java': ['a.class']}
+    product_deps_by_src[t4] = {'d.java': ['a.class']}
+    graph = self.create_graph(dep_usage, [t1, t2, t3, t4])
+
+    # Not creating edge for t2 even it provides a.class that t4 depends on.
+    self.assertFalse(t2 in graph._nodes[t4].dep_edges)
+    # t4 depends on a.class from t1 transitively through t3.
+    self.assertEqual(graph._nodes[t4].dep_edges[t1].products_used, set(['a.class']))
+    self.assertFalse(graph._nodes[t4].dep_edges[t1].is_declared)
+    self.assertEqual(graph._nodes[t4].dep_edges[t3].products_used, set([]))
+    self.assertTrue(graph._nodes[t4].dep_edges[t3].is_declared)
+
   def create_graph(self, task, targets):
     classes_by_source = task.context.products.get_data('classes_by_source')
     runtime_classpath = task.context.products.get_data('runtime_classpath')
     product_deps_by_src = task.context.products.get_data('product_deps_by_src')
+    transitive_deps_by_target = task._compute_transitive_deps_by_target()
 
     def node_creator(target):
       return task.create_dep_usage_node(target, '',
-                                        classes_by_source, runtime_classpath, product_deps_by_src)
+                                        classes_by_source, runtime_classpath, product_deps_by_src,
+                                        transitive_deps_by_target)
 
     return DependencyUsageGraph(task.create_dep_usage_nodes(targets, node_creator),
                                 task.size_estimators[task.get_options().size_estimator])
