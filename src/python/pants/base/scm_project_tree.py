@@ -38,8 +38,10 @@ class ScmProjectTree(ProjectTree):
     files = self._reader.listdir(self._scm_relpath(dir_relpath))
     return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
 
-  def _listdir_raw(self, relpath):
-    return self._reader.listdir(self._scm_relpath(relpath))
+  def _scandir_raw(self, relpath):
+    # TODO: Further optimization possible.
+    for name in self._reader.listdir(self._scm_relpath(relpath)):
+      yield self._lstat_raw(os.path.join(relpath, name))
 
   def _isdir_raw(self, relpath):
     return self._reader.isdir(self._scm_relpath(relpath))
