@@ -10,7 +10,6 @@ python_library(
     ':plugins',
     '3rdparty/python:ansicolors',
     '3rdparty/python:setproctitle',
-    '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
@@ -52,6 +51,7 @@ python_library(
   name='extension_loader',
   sources=['extension_loader.py'],
   dependencies=[
+    '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph:build_graph'
@@ -63,6 +63,7 @@ python_library(
   sources=['plugin_resolver.py'],
   dependencies=[
     '3rdparty/python:pex',
+    '3rdparty/python:setuptools',
     'src/python/pants/backend/python:python_setup',
     'src/python/pants/option:option',
     'src/python/pants/subsystem:subsystem',
@@ -75,6 +76,7 @@ python_library(
   name='options_initializer',
   sources=['options_initializer.py'],
   dependencies=[
+    '3rdparty/python:setuptools',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
