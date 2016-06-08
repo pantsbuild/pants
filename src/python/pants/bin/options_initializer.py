@@ -11,7 +11,6 @@ import sys
 import pkg_resources
 
 from pants.base.build_environment import pants_version
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import BuildConfigurationError
 from pants.bin.extension_loader import load_backends_and_plugins
 from pants.bin.plugin_resolver import PluginResolver
@@ -150,16 +149,6 @@ class OptionsInitializer(object):
 
     # Conditionally load backends/plugins and materialize a `BuildConfiguration` object.
     if not self._has_build_configuration():
-      deprecated_conditional(
-        lambda: not set(global_bootstrap_options.default_backend_packages).issubset(
-          global_bootstrap_options.backend_packages),
-        '1.3.0',
-        '--default-backend-packages',
-        'Add the backends you need to --backend-packages instead. To see available backends run: '
-        './pants help-advanced | grep default-backend-packages | egrep -o -m1 "default: [^)]+" . '
-        'In the future there will be no default backends, and all backends will have to be opted '
-        'into via --backend packages.'
-      )
       backends = (global_bootstrap_options.default_backend_packages +
                   global_bootstrap_options.backend_packages)
       build_configuration = self._load_plugins(self._working_set,
