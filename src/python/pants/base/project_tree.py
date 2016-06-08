@@ -68,10 +68,6 @@ class ProjectTree(AbstractClass):
     """Execute `readlink` for the given path, which may result in a relative path."""
 
   @abstractmethod
-  def _lstat_raw(self, relpath):
-    """Without following symlinks, returns a Stat object for the path, or None."""
-
-  @abstractmethod
   def _walk_raw(self, relpath, topdown=True):
     """Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path."""
 
@@ -130,16 +126,6 @@ class ProjectTree(AbstractClass):
     if self.isignored(self._append_slash_if_dir_path(relpath)):
       self._raise_access_ignored(relpath)
     return self._relative_readlink_raw(relpath)
-
-  def lstat(self, relpath):
-    """Without following symlinks, returns a Stat object for the path, or None.
-
-    Raises exception if path is ignored.
-    """
-    if self.isignored(self._append_slash_if_dir_path(relpath)):
-      self._raise_access_ignored(relpath)
-
-    return self._lstat_raw(relpath)
 
   def walk(self, relpath, topdown=True):
     """

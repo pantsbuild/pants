@@ -5,9 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
-import stat
 from glob import glob1
 
 from pants.base.project_tree import Dir, File, Link, ProjectTree
@@ -60,23 +58,6 @@ class FileSystemProjectTree(ProjectTree):
 
   def _relative_readlink_raw(self, relpath):
     return os.readlink(self._join(relpath))
-
-  def _lstat_raw(self, relpath):
-    try:
-      st_mode = os.lstat(self._join(relpath)).st_mode
-      if stat.S_ISLNK(st_mode):
-        return Link(relpath)
-      elif stat.S_ISDIR(st_mode):
-        return Dir(relpath)
-      elif stat.S_ISREG(st_mode):
-        return File(relpath)
-      else:
-        raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
-    except (IOError, OSError) as e:
-      if e.errno == errno.ENOENT:
-        return None
-      else:
-        raise e
 
   def _walk_raw(self, relpath, topdown=True):
     def onerror(error):

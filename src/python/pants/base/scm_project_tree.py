@@ -41,7 +41,7 @@ class ScmProjectTree(ProjectTree):
   def _scandir_raw(self, relpath):
     # TODO: Further optimization possible.
     for name in self._reader.listdir(self._scm_relpath(relpath)):
-      yield self._lstat_raw(os.path.join(relpath, name))
+      yield self._lstat(os.path.join(relpath, name))
 
   def _isdir_raw(self, relpath):
     return self._reader.isdir(self._scm_relpath(relpath))
@@ -59,7 +59,7 @@ class ScmProjectTree(ProjectTree):
   def _relative_readlink_raw(self, relpath):
     return self._reader.readlink(self._scm_relpath(relpath))
 
-  def _lstat_raw(self, relpath):
+  def _lstat(self, relpath):
     mode = type(self._reader.lstat(self._scm_relpath(relpath)))
     if mode == NoneType:
       return None
