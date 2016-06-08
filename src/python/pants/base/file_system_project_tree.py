@@ -34,7 +34,8 @@ class FileSystemProjectTree(ProjectTree):
   def _scandir_raw(self, relpath):
     for dir_ent in scandir(self._join(relpath)):
       st_mode = dir_ent.stat(follow_symlinks=False).st_mode
-      yield self._construct_stat(os.path.join(relpath, dir_ent.name), st_mode)
+      entpath = os.path.normpath(os.path.join(relpath, dir_ent.name))
+      yield self._construct_stat(entpath, st_mode)
 
   def _isdir_raw(self, relpath):
     return os.path.isdir(self._join(relpath))

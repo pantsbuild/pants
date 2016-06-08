@@ -89,7 +89,7 @@ class ProjectTree(AbstractClass):
     if self.isignored(relpath, directory=True):
       self._raise_access_ignored(relpath)
 
-    stats = self._scandir_raw(relpath)
+    stats = list(self._scandir_raw(relpath))
     return self._filter_ignored(stats, selector=lambda e: e.path)
 
   def isdir(self, relpath):
@@ -191,7 +191,7 @@ class ProjectTree(AbstractClass):
       return entry_list
 
     # There were some ignored paths: filter the entries.
-    return [entry for path, eentry in prefixed_entry_list if path not in ignored_paths]
+    return [entry for path, entry in prefixed_entry_list if path not in ignored_paths]
 
   def _relpath_no_dot(self, relpath):
     return relpath.lstrip('./') if relpath != '.' else ''

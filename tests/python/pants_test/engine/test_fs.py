@@ -142,9 +142,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_fsnodes(Files, ['*/2'], [
         # Scandir for the root.
         (Dir(''), Stats),
-        # TODO: To resolve a symlink we stat it individually, rather than using the
-        # Stats from Scandir. We should consider replacing individual `lstat`
-        # calls with a projection of Scandir for the dirname of the path.
+        # TODO: Redundant Stat in order to resolve a symlink: see TODO in FilesystemNode.
         (Path('a'), Stats),
         # Read links to determine whether they're actually directories.
         (Link('c.ln'), ReadLink),
@@ -164,9 +162,8 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         (Link('d.ln'), ReadLink),
         (Path('a'), Stats),
         (Path('a/b'), Stats),
+        # Scandir to execute the glob.
         (Dir('a/b'), Stats),
-        (Path('a/b/2'), Stats),
-        (Path('a/b/1.txt'), Stats),
       ])
 
 

@@ -391,6 +391,9 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       (Stats, Dir),
       (FileContent, File),
       (FileDigest, File),
+      # TODO: Rather that supporting stat'ing individual paths, we should consider
+      # projecting the dirname of the path and using scandir. Would help to avoid
+      # redundant stat calls while resolving symlinks. See `test_fs.py`.
       (Stats, Path),
       (ReadLink, Link),
     }
