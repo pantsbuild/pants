@@ -78,11 +78,11 @@ class EngineTest(unittest.TestCase):
         engine.execute(build_request)
 
   def test_hybrid_engine_multi(self):
-    with self.hybrid_engine() as engine:
+    with self.hybrid_engine(pool_size=2) as engine:
       self.assert_engine(engine)
 
   def test_hybrid_engine_single(self):
-    with self.hybrid_engine(pool_size=1) as engine:
+    with self.hybrid_engine(pool_size=2) as engine:
       self.assert_engine(engine)
 
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')

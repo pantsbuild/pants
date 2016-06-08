@@ -165,7 +165,7 @@ def _try_pickle(obj):
     raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
-def _execute_step(cache_save, debug, process_state, step):
+def _execute_step(cache_save, debug, process_state, step, resolve_results=False):
   """A picklable top-level function to help support local multiprocessing uses.
 
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
@@ -177,7 +177,10 @@ def _execute_step(cache_save, debug, process_state, step):
 
   def execute():
     resolved_request = storage.resolve_request(step)
-    result = resolved_request(node_builder)
+    if resolve_results:
+      result = resolved_request(node_builder)
+    else:
+      result = storage.key_for_result(result)
     if debug:
       _try_pickle(result)
     cache_save(step, result)
@@ -252,7 +255,7 @@ class ThreadHybridEngine(ConcurrentEngine):
     super(ThreadHybridEngine, self).__init__(scheduler, storage, cache)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 
-    self._async_tasks = []  # Keep track of futures so we can cleanup at the end.
+    self._pending = set()  # Keep track of futures so we can cleanup at the end.
     self._processed_queue = Queue()
     self._async_nodes = threaded_node_types
     self._node_builder = scheduler.node_builder()
@@ -275,7 +278,13 @@ class ThreadHybridEngine(ConcurrentEngine):
 
     Deferred method returns (step_id, result) so that it can be processed later.
     """
-    return functools.partial(_execute_step, self._maybe_cache_put, self._debug, self._state, step)
+    return functools.partial(
+      _execute_step,
+      self._maybe_cache_put,
+      self._debug,
+      self._state,
+      step,
+      resolve_results=True)
 
   def _deferred_cache(self, step):
     """Create a callable to fetch cache that is able to be passed to the thread pool
@@ -289,6 +298,10 @@ class ThreadHybridEngine(ConcurrentEngine):
       return step.step_id, resolved_result
 
     return strip_step_id
+
+  def _processed_node_callback(self, finished_future):
+    self._processed_queue(finished_future)
+    self._pending.remove(finished_future)
 
   def _submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
@@ -307,7 +320,7 @@ class ThreadHybridEngine(ConcurrentEngine):
         ]
         for f in futures:
           f.add_done_callback(self._processed_queue.put)
-          self._async_tasks.append(f)
+          self._pending.add(f)
         submitted += 1
 
       else:
@@ -334,7 +347,7 @@ class ThreadHybridEngine(ConcurrentEngine):
 
   def close(self):
     """Cleanup thread pool."""
-    for f in self._async_tasks:
+    for f in self._pending:
       f.cancel()
     self._pool.shutdown()  # Wait for pool to cleanup before we cleanup storage.
 

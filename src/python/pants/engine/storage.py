@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import cPickle as pickle
 import cStringIO as StringIO
 import sys
-import threading
 from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
@@ -136,8 +135,6 @@ class Storage(Closable):
   `pants.engine.scheduler.StepRequest` and `pants.engine.scheduler.StepResult`
   into keys, and vice versa are also provided.
   """
-
-  _lock = threading.Lock()
 
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
