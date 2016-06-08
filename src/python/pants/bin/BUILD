@@ -9,7 +9,6 @@ python_library(
   dependencies=[
     ':plugins',
     '3rdparty/python:ansicolors',
-    '3rdparty/python:pex',
     '3rdparty/python:setproctitle',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
