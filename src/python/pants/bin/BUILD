@@ -7,7 +7,6 @@ python_library(
                                  'extension_loader.py',
                                  'plugin_resolver.py']),
   dependencies=[
-    ':plugins',
     '3rdparty/python:ansicolors',
     '3rdparty/python:setproctitle',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -54,7 +53,8 @@ python_library(
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph:build_graph'
+    'src/python/pants/build_graph:build_graph',
+    ':plugins',
   ]
 )
 
