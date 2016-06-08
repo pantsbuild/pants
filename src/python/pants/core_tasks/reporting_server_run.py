@@ -53,5 +53,6 @@ class ReportingServerRun(QuietTaskMixin, Task):
 
       logger.info('Launched server with pid {pid} at http://localhost:{port}'
                   .format(pid=manager.pid, port=manager.socket))
+      logger.info('To kill, run ./pants killserver')
 
     self._maybe_open(manager.socket)
