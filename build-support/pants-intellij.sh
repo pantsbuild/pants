@@ -8,6 +8,4 @@
     --exclude-target-regexp='.*android.*' \
     --exclude-target-regexp='.*go/examples.*' \
     --exclude-target-regexp='.*scrooge/tests/thrift.*' \
-    --exclude-target-regexp='.*spindle/tests/thrift.*' \
-    --exclude-target-regexp='.*spindle/tests/jvm.*' \
     "$@"
