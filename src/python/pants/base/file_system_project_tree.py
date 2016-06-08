@@ -32,10 +32,18 @@ class FileSystemProjectTree(ProjectTree):
     return glob1(self._join(dir_relpath), glob)
 
   def _scandir_raw(self, relpath):
-    for dir_ent in scandir(self._join(relpath)):
-      st_mode = dir_ent.stat(follow_symlinks=False).st_mode
-      entpath = os.path.normpath(os.path.join(relpath, dir_ent.name))
-      yield self._construct_stat(entpath, st_mode)
+    for entry in scandir(self._join(relpath)):
+      # NB: We don't use `DirEntry.stat`, as the scandir docs indicate that that always requires
+      # an additional syscall on Unixes.
+      entry_path = os.path.normpath(os.path.join(relpath, entry.name))
+      if entry.is_file(follow_symlinks=False):
+        yield File(entry_path)
+      elif entry.is_dir(follow_symlinks=False):
+        yield Dir(entry_path)
+      elif entry.is_symlink():
+        yield Link(entry_path)
+      else:
+        raise IOError('Unsupported file type in {}: {}'.format(self, entry_path))
 
   def _isdir_raw(self, relpath):
     return os.path.isdir(self._join(relpath))
@@ -56,7 +64,14 @@ class FileSystemProjectTree(ProjectTree):
   def _lstat_raw(self, relpath):
     try:
       st_mode = os.lstat(self._join(relpath)).st_mode
-      return self._construct_stat(relpath, st_mode)
+      if stat.S_ISLNK(st_mode):
+        return Link(relpath)
+      elif stat.S_ISDIR(st_mode):
+        return Dir(relpath)
+      elif stat.S_ISREG(st_mode):
+        return File(relpath)
+      else:
+        raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
     except (IOError, OSError) as e:
       if e.errno == errno.ENOENT:
         return None
@@ -71,17 +86,6 @@ class FileSystemProjectTree(ProjectTree):
                                        topdown=topdown,
                                        onerror=onerror):
       yield fast_relpath(root, self.build_root), dirs, files
-
-  def _construct_stat(self, relpath, st_mode):
-    """Given a relpath and its st_mode (from stat_result), return a `project_tree.Stat`."""
-    if stat.S_ISLNK(st_mode):
-      return Link(relpath)
-    elif stat.S_ISDIR(st_mode):
-      return Dir(relpath)
-    elif stat.S_ISREG(st_mode):
-      return File(relpath)
-    else:
-      raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
 
   def __eq__(self, other):
     return other and (type(other) == type(self)) and (self.build_root == other.build_root)
