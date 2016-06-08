@@ -409,10 +409,10 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def generate_subjects(self, filenames):
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
-      # Stats, ReadLink, or FileContent for the literal path.
+      # ReadLink, or FileContent for the literal path.
       yield File(f)
       yield Link(f)
-      # DirectoryListings for parent dirs.
+      # Stats for parent dirs.
       yield Dir(dirname(f))
 
   def step(self, step_context):
