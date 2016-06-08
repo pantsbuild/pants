@@ -97,14 +97,12 @@ class PathGlob(AbstractClass):
       # other without.
       remainders = (join(*parts[1:]), join(*parts[0:]))
       return PathDirWildcard(ftype, canonical_at, parts[0], remainders)
+    elif len(parts) == 1:
+      # We've reached the path basename, and it may or may not contain a wildcard.
+      return PathBasename(canonical_at, parts[0])
     elif cls._SINGLE not in parts[0]:
       # A literal path component. Look up the first non-canonical component.
-      if len(parts) == 1:
-        return Path(join(canonical_at, parts[0]))
-      return PathLiteral(ftype, join(canonical_at, parts[0]), join(*parts[1:]))
-    elif len(parts) == 1:
-      # This is the path basename, and it contains a wildcard.
-      return PathWildcard(canonical_at, parts[0])
+      return PathDirLiteral(ftype, join(canonical_at, parts[0]), join(*parts[1:]))
     else:
       # This is a path dirname, and it contains a wildcard.
       remainders = (join(*parts[1:]),)
@@ -125,14 +123,14 @@ class Path(datatype('Path', ['path']), PathGlob):
     return dirname(self.path)
 
 
-class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob):
-  """A PathGlob with a wildcard in the basename component."""
+class PathBasename(datatype('PathBasename', ['directory', 'wildcard']), PathGlob):
+  """A PathGlob with a wildcard  in the basename component."""
 
 
-class PathLiteral(datatype('PathLiteral', ['ftype', 'directory', 'remainder']), PathGlob):
+class PathDirLiteral(datatype('PathDirLiteral', ['ftype', 'directory', 'remainder']), PathGlob):
   """A PathGlob representing a partially-expanded literal Path.
 
-  While it still requires recursion, a PathLiteral is simpler to execute than either `wildcard`
+  While it still requires recursion, a PathDirLiteral is simpler to execute than either `wildcard`
   type: it only needs to stat each directory on the way down, rather than listing them.
   """
 
@@ -233,7 +231,7 @@ def merge_stats(stats_list):
 
 
 def apply_path_wildcard(stats, path_wildcard):
-  """Filter the given Stats object using the given PathWildcard."""
+  """Filter the given Stats object using the given PathBasename."""
   def filtered(entries):
     return tuple(stat for stat in entries
                  if fnmatch.fnmatch(basename(stat.path), path_wildcard.wildcard))
@@ -241,7 +239,7 @@ def apply_path_wildcard(stats, path_wildcard):
 
 
 def apply_path_literal(dirs, path_literal):
-  """Given a PathLiteral, generate a PathGlobs object with a longer canonical_at prefix."""
+  """Given a PathDirLiteral, generate a PathGlobs object with a longer canonical_at prefix."""
   ftype = path_literal.ftype
   if len(dirs.dependencies) > 1:
     raise AssertionError('{} matched more than one directory!: {}'.format(path_literal, dirs))
@@ -326,12 +324,12 @@ def create_fs_tasks():
   return [
     # Glob execution.
     (Stats,
-     [SelectProjection(Stats, Dir, ('directory',), PathWildcard),
-      Select(PathWildcard)],
+     [SelectProjection(Stats, Dir, ('directory',), PathBasename),
+      Select(PathBasename)],
      apply_path_wildcard),
     (PathGlobs,
-     [SelectProjection(Dirs, Path, ('directory',), PathLiteral),
-      Select(PathLiteral)],
+     [SelectProjection(Dirs, Path, ('directory',), PathDirLiteral),
+      Select(PathDirLiteral)],
      apply_path_literal),
     (PathGlobs,
      [SelectProjection(Dirs, Dir, ('directory',), PathDirWildcard),
