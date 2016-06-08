@@ -284,7 +284,7 @@ def read_link(project_tree, link):
 def filter_path_stats(stats, path):
   """Filter the given Stats object to contain only entries matching the given Path.
 
-  This is used to allow the Stat for a path to be satisfied by the result of a scandir call.
+  This is used to allow the Stat for a Path to be satisfied by a scandir for its dirname.
   """
   def f(field):
     return tuple(s for s in getattr(stats, field) if s.path == path.path)
@@ -316,10 +316,9 @@ def alias_link(link, underlying_stats):
 
   TODO: We don't actually need the underlying path in this context: just its type.
   """
-  print('>>> read {} and matched {}'.format(link, underlying_stats))
   if not underlying_stats.dependencies:
     return underlying_stats
-  # Alias the underlying values with the Link's name.
+  # Alias the underlying value(s) with the Link's name.
   stats_cls = type(underlying_stats)
   return stats_cls(tuple(type(s)(link.path) for s in underlying_stats.dependencies))
 
