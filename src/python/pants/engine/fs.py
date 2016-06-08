@@ -27,6 +27,17 @@ class ReadLink(datatype('ReadLink', ['path'])):
     return super(ReadLink, cls).__new__(cls, six.text_type(path))
 
 
+class Path(datatype('Path', ['path'])):
+  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
+
+  def __new__(cls, path):
+    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
+
+  @property
+  def dirname(self):
+    return dirname(self.path)
+
+
 class Stats(datatype('Stats', ['files', 'dirs', 'links'])):
   """Sets of File, Dir, and Link objects."""
 
@@ -110,17 +121,6 @@ class PathGlob(AbstractClass):
                              canonical_at,
                              parts[0],
                              remainders)
-
-
-class Path(datatype('Path', ['path']), PathGlob):
-  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
-
-  def __new__(cls, path):
-    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
-
-  @property
-  def dirname(self):
-    return dirname(self.path)
 
 
 class PathBasename(datatype('PathBasename', ['directory', 'wildcard']), PathGlob):
@@ -308,8 +308,20 @@ def file_digest(project_tree, f):
   return FileDigest(f.path, sha1(project_tree.content(f.path)).digest())
 
 
-def identity(v):
-  return v
+def alias_link(link, underlying_stats):
+  """Given a Link and its matched Stats, alias the underlying values with the Link's path.
+
+  The result of this aliasing is that for the purposes of callers, a Link which was walked
+  all the way to its terminus retains it's original name, which taking the underlying type.
+
+  TODO: We don't actually need the underlying path in this context: just its type.
+  """
+  print('>>> read {} and matched {}'.format(link, underlying_stats))
+  if not underlying_stats.dependencies:
+    return underlying_stats
+  # Alias the underlying values with the Link's name.
+  stats_cls = type(underlying_stats)
+  return stats_cls(tuple(type(s)(link.path) for s in underlying_stats.dependencies))
 
 
 Dirs = Collection.of(Dir)
@@ -345,15 +357,17 @@ def create_fs_tasks():
       SelectProjection(Dirs, Links, ('links',), Stats)],
      resolve_dir_links),
     (Dirs,
-     [SelectProjection(Dirs, Path, ('path',), ReadLink)],
-     identity),
+     [Select(Link),
+      SelectProjection(Dirs, Path, ('path',), ReadLink)],
+     alias_link),
     (Files,
      [Select(Stats),
       SelectProjection(Files, Links, ('links',), Stats)],
      resolve_file_links),
     (Files,
-     [SelectProjection(Files, Path, ('path',), ReadLink)],
-     identity),
+     [Select(Link),
+      SelectProjection(Files, Path, ('path',), ReadLink)],
+     alias_link),
     (Stats,
      [SelectProjection(Stats, Dir, ('dirname',), Path),
       Select(Path)],
