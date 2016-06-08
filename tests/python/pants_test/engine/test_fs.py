@@ -12,8 +12,7 @@ from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link, Stat
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import (Dirs, FileContent, FileDigest, Files,
-                             Path, PathGlobs, ReadLink, Stats)
+from pants.engine.fs import Dirs, FileContent, FileDigest, Files, Path, PathGlobs, ReadLink, Stats
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
