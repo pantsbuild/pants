@@ -13,8 +13,8 @@ from twitter.common.collections import OrderedSet
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
-from pants.engine.fs import (FileContent, FileDigest, Path, ReadLink, Stats, file_content,
-                             file_digest, path_stat, read_link, scan_directory)
+from pants.engine.fs import (FileContent, FileDigest, ReadLink, Stats, file_content, file_digest,
+                             read_link, scan_directory)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
@@ -392,10 +392,6 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       (Stats, Dir),
       (FileContent, File),
       (FileDigest, File),
-      # TODO: Rather that supporting stat'ing individual paths, we should consider
-      # projecting the dirname of the path and using scandir. Would help to avoid
-      # redundant stat calls while resolving symlinks. See `test_fs.py`.
-      (Stats, Path),
       (ReadLink, Link),
     }
 
@@ -414,7 +410,6 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
       # Stats, ReadLink, or FileContent for the literal path.
-      yield Path(f)
       yield File(f)
       yield Link(f)
       # DirectoryListings for parent dirs.
@@ -422,9 +417,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
 
   def step(self, step_context):
     try:
-      if self.product is Stats and type(self.subject) is Path:
-        return Return(path_stat(step_context.project_tree, self.subject))
-      elif self.product is Stats and type(self.subject) is Dir:
+      if self.product is Stats:
         return Return(scan_directory(step_context.project_tree, self.subject))
       elif self.product is FileContent:
         return Return(file_content(step_context.project_tree, self.subject))

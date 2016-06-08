@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link, Stat
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import Dirs, FileContent, FileDigest, Files, Path, PathGlobs, ReadLink, Stats
+from pants.engine.fs import Dirs, FileContent, FileDigest, Files, PathGlobs, ReadLink, Stats
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -119,49 +119,43 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 
   def test_nodes_file(self):
     self.assert_fsnodes(Files, ['4.txt'], [
-        (Path('4.txt'), Stats),
+        (Dir(''), Stats),
       ])
 
   def test_nodes_symlink_file(self):
     self.assert_fsnodes(Files, ['c.ln/2'], [
+        (Dir(''), Stats),
         (Link('c.ln'), ReadLink),
-        (Path('c.ln'), Stats),
-        (Path('a/b'), Stats),
-        (Path('a/b/2'), Stats),
+        (Dir('a'), Stats),
+        (Dir('a/b'), Stats),
       ])
     self.assert_fsnodes(Files, ['d.ln/b/1.txt'], [
-        (Path('d.ln'), Stats),
+        (Dir(''), Stats),
         (Link('d.ln'), ReadLink),
-        (Path('a'), Stats),
-        (Path('a/b'), Stats),
-        (Path('a/b/1.txt'), Stats),
+        (Dir('a'), Stats),
+        (Dir('a/b'), Stats),
       ])
 
   def test_nodes_symlink_globbed_dir(self):
     self.assert_fsnodes(Files, ['*/2'], [
         # Scandir for the root.
         (Dir(''), Stats),
-        # TODO: Redundant Stat in order to resolve a symlink: see TODO in FilesystemNode.
-        (Path('a'), Stats),
         # Read links to determine whether they're actually directories.
         (Link('c.ln'), ReadLink),
         (Link('d.ln'), ReadLink),
-        # Stat the detination of one link (the other was already stat'd during the initial list).
-        (Path('a/b'), Stats),
-        # Look up the literal in each path.
-        (Path('a/b/2'), Stats),
-        (Path('a/2'), Stats),
+        # Scan link destinations.
+        (Dir('a'), Stats),
+        (Dir('a/b'), Stats),
       ])
 
   def test_nodes_symlink_globbed_file(self):
     self.assert_fsnodes(Files, ['d.ln/b/*.txt'], [
-        # NB: Needs to stat every path on the way down to track whether
+        # NB: Needs to scandir every Dir on the way down to track whether
         # it is traversing a symlink.
-        (Path('d.ln'), Stats),
+        (Dir(''), Stats),
+        # Traverse one symlink.
         (Link('d.ln'), ReadLink),
-        (Path('a'), Stats),
-        (Path('a/b'), Stats),
-        # Scandir to execute the glob.
+        (Dir('a'), Stats),
         (Dir('a/b'), Stats),
       ])
 

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import fnmatch
 from hashlib import sha1
 from os import sep as os_sep
-from os.path import basename, join, normpath
+from os.path import basename, dirname, join, normpath
 
 import six
 from twitter.common.collections.orderedset import OrderedSet
@@ -120,6 +120,10 @@ class Path(datatype('Path', ['path']), PathGlob):
   def __new__(cls, path):
     return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
 
+  @property
+  def dirname(self):
+    return dirname(self.path)
+
 
 class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob):
   """A PathGlob with a wildcard in the basename component."""
@@ -211,7 +215,7 @@ def scan_directory(project_tree, directory):
     elif type(stat) is Link:
       links.append(stat)
     else:
-      _unrecognized_stat(project_tree, stat)
+      raise ValueError('Unrecognized stat type for {}: {}'.format(project_tree, stat))
   return Stats(files=tuple(files),
                dirs=tuple(dirs),
                links=tuple(links))
@@ -279,28 +283,14 @@ def read_link(project_tree, link):
   return ReadLink(project_tree.readlink(link.path))
 
 
-def path_stat(project_tree, path_literal):
-  path = normpath(path_literal.path)
-  stat = project_tree.lstat(path)
+def filter_path_stats(stats, path):
+  """Filter the given Stats object to contain only entries matching the given Path.
 
-  if stat is None:
-    return Stats()
-  elif type(stat) is File:
-    return Stats(files=(stat,))
-  elif type(stat) is Dir:
-    return Stats(dirs=(stat,))
-  elif type(stat) is Link:
-    return Stats(links=(stat,))
-  else:
-    _unrecognized_stat(project_tree, stat)
-
-
-def _unrecognized_stat(project_tree, stat):
-  raise ValueError('Unrecognized stat type for {}: {}'.format(project_tree, stat))
-
-
-def stat_to_path(stat):
-  return Path(stat.path)
+  This is used to allow the Stat for a path to be satisfied by the result of a scandir call.
+  """
+  def f(field):
+    return tuple(s for s in getattr(stats, field) if s.path == path.path)
+  return Stats(files=f('files'), dirs=f('dirs'), links=f('links'))
 
 
 def file_content(project_tree, f):
@@ -347,6 +337,9 @@ def create_fs_tasks():
      [SelectProjection(Dirs, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
+    (Stats,
+     [SelectDependencies(Stats, PathGlobs)],
+     merge_stats),
   ] + [
     # Link resolution.
     (Dirs,
@@ -363,12 +356,13 @@ def create_fs_tasks():
     (Files,
      [SelectProjection(Files, Path, ('path',), ReadLink)],
      identity),
+    (Stats,
+     [SelectProjection(Stats, Dir, ('dirname',), Path),
+      Select(Path)],
+     filter_path_stats),
   ] + [
     # TODO: These are boilerplatey: aggregation should become native:
     #   see https://github.com/pantsbuild/pants/issues/3169
-    (Stats,
-     [SelectDependencies(Stats, PathGlobs)],
-     merge_stats),
     (Files,
      [SelectDependencies(Files, Links)],
      merge_files),
