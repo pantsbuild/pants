@@ -283,20 +283,37 @@ class ProductGraph(object):
     States are probably not sufficient for user output.
     """
     traced = set()
+
     def _format(level, node, state):
-      return '{}Computing {} for {}: {}'.format('  ' * level, node.product.__name__, node.subject, state)
+      return '{}Could not compute {} for {}: {}'.format('  ', node.product.__name__, node.subject, state.exc)
+
     def _trace(entry, level):
+      """
+      yield tuple (level, formatted trace)
+      """
       if type(entry.state) in (Noop, Return) or entry in traced:
         return
       traced.add(entry)
-      yield _format(level, entry.node, entry.state)
+      yield (level, _format(level, entry.node, entry.state))
       for dep in entry.cyclic_dependencies:
-        yield _format(level, entry.node, Noop.cycle(entry.node, dep))
+        yield (level, _format(level, entry.node, Noop.cycle(entry.node, dep)))
+
       for dep_entry in entry.dependencies:
-        for l in _trace(dep_entry, level+1):
+        for l in _trace(dep_entry, level + 1):
           yield l
 
-    for line in _trace(self._nodes[root], 1):
+    # Obtain all traces with their level number
+    traces_with_level = list(_trace(self._nodes[root], 1))
+    if not traces_with_level:
+      return
+
+    # Sort the (level, formatted trace) in place by level in desc order.
+    traces_with_level.sort(key=lambda tup: tup[0], reverse=True)
+    max_level = traces_with_level[0][0]
+    # Only yield the max level/leaf trace.
+    for level, line in traces_with_level:
+      if level < max_level:
+        break
       yield line
 
   def visualize(self, roots):
