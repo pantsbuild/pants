@@ -285,7 +285,7 @@ class ProductGraph(object):
     traced = set()
 
     def _format(level, node, state):
-      return '{}Could not compute {} for {}: {}'.format('  ', node.product.__name__, node.subject, state.exc.message)
+      return '{}Could not compute {} for {}: {}'.format('  ', node.product.__name__, node.subject, state.exc)
 
     def _trace(entry, level):
       """
