@@ -97,7 +97,7 @@ You'll need to setup some files one-time in your own repo:
       dependencies=[
         ':pantsbuild.pants',
         # List any other pants backend local or remote deps here, ie:
-        # ':pantsbuild.pants.contrib.spindle' or 'src/python/your/pants/plugin'
+        # ':pantsbuild.pants.contrib.go' or 'src/python/your/pants/plugin'
       ]
     )
 
