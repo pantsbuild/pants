@@ -105,8 +105,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Dirs, ['*/*/*'], [])
 
   def test_files_content_literal(self):
-    self.assert_content(['4.txt'], {'4.txt': 'four\n'})
-    self.assert_content(['a/4.txt.ln'], {'4.txt': 'four\n'})
+    self.assert_content(['4.txt', 'a/4.txt.ln'], {'4.txt': 'four\n', 'a/4.txt.ln': 'four\n'})
 
   def test_files_content_directory(self):
     with self.assertRaises(Exception):
