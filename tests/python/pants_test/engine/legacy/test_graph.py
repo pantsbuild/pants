@@ -37,17 +37,20 @@ class GraphInvalidationTest(unittest.TestCase):
       initial_node_count = len(product_graph)
       self.assertGreater(initial_node_count, 0)
 
-      product_graph.invalidate_files(['3rdparty/python/BUILD'])
+      invalidated_count = product_graph.invalidate_files(['3rdparty/python/BUILD'])
+      self.assertGreater(invalidated_count, 0)
       self.assertLess(len(product_graph), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
-    with self.open_pg('3rdparty/python::') as product_graph:
+    with self.open_pg('3rdparty::') as product_graph:
       node_count = len(product_graph)
       self.assertGreater(node_count, 0)
 
-      # Invalidate the '3rdparty/python' Dir's Stats first by touching a random file.
-      for filename in ('3rdparty/python/CHANGED_RANDOM_FILE', '3rdparty/python/BUILD'):
-        product_graph.invalidate_files([filename])
+      # Invalidate the '3rdparty/python' Dir's Stats, and then its parent's Stats
+      # by "touching" random files.
+      for filename in ('3rdparty/python/BUILD', '3rdparty/CHANGED_RANDOM_FILE'):
+        invalidated_count = product_graph.invalidate_files([filename])
+        self.assertGreater(invalidated_count, 0)
         node_count, last_node_count = len(product_graph), node_count
         self.assertLess(node_count, last_node_count)
 
