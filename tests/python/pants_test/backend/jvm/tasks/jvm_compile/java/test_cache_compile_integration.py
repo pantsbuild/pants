@@ -148,3 +148,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         # Compile, and confirm that we have the right count of artifacts.
         self.run_compile(spec, complete_config(c.config), workdir)
         self.assertEquals(c.artifact_count, len(os.listdir(artifact_dir)))
+
+
+class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):
+  _EXTRA_TASK_ARGS = ['--compile-zinc-use-compile-classpath-jars']

@@ -180,3 +180,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
       # One artifact for guava 15 and one for guava 16
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
+
+
+class JavaCompileIntegrationTestWithZjar(JavaCompileIntegrationTest):
+  _EXTRA_TASK_ARGS = ['--compile-zinc-use-compile-classpath-jars']
