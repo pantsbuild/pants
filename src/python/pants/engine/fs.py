@@ -230,7 +230,7 @@ def merge_stats(stats_list):
                links=tuple(generate('links')))
 
 
-def apply_path_wildcard(stats, path_wildcard):
+def apply_path_basename(stats, path_wildcard):
   """Filter the given Stats object using the given PathBasename."""
   def filtered(entries):
     return tuple(stat for stat in entries
@@ -238,7 +238,7 @@ def apply_path_wildcard(stats, path_wildcard):
   return Stats(files=filtered(stats.files), dirs=filtered(stats.dirs), links=filtered(stats.links))
 
 
-def apply_path_literal(dirs, path_literal):
+def apply_path_dir_literal(dirs, path_literal):
   """Given a PathDirLiteral, generate a PathGlobs object with a longer canonical_at prefix."""
   ftype = path_literal.ftype
   if len(dirs.dependencies) > 1:
@@ -337,11 +337,11 @@ def create_fs_tasks():
     (Stats,
      [SelectProjection(Stats, Dir, ('directory',), PathBasename),
       Select(PathBasename)],
-     apply_path_wildcard),
+     apply_path_basename),
     (PathGlobs,
      [SelectProjection(Dirs, Path, ('directory',), PathDirLiteral),
       Select(PathDirLiteral)],
-     apply_path_literal),
+     apply_path_dir_literal),
     (PathGlobs,
      [SelectProjection(Dirs, Dir, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
