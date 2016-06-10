@@ -283,21 +283,45 @@ class ProductGraph(object):
     States are probably not sufficient for user output.
     """
     traced = set()
-    def _format(level, node, state):
-      return '{}Computing {} for {}: {}'.format('  ' * level, node.product.__name__, node.subject, state)
+
+    def _format_other(level, node):
+      return '{}Computing {} for {}'.format('  ' * level, node.product.__name__, node.subject)
+
+    def _format_leaf(level, node, state):
+      return '{}Computing {} for {}:\n{}{}' \
+        .format('  ' * level, node.product.__name__, node.subject, '  ' * (level + 1), state)
+
     def _trace(entry, level):
       if type(entry.state) in (Noop, Return) or entry in traced:
         return
       traced.add(entry)
-      yield _format(level, entry.node, entry.state)
+      yield (level, entry.node, entry.state)
       for dep in entry.cyclic_dependencies:
-        yield _format(level, entry.node, Noop.cycle(entry.node, dep))
+        yield (level, entry.node, Noop.cycle(entry.node, dep))
       for dep_entry in entry.dependencies:
         for l in _trace(dep_entry, level+1):
           yield l
+    traces_with_level = list(_trace(self._nodes[root], 1))
+    if not traces_with_level:
+      return
 
-    for line in _trace(self._nodes[root], 1):
-      yield line
+    # Compute which tuples in the list are leaf nodes.
+    leaf_indices = set()
+    for idx, (level, node, state) in enumerate(traces_with_level):
+      is_leaf = True
+      if idx < len(traces_with_level) - 1:
+        next_level, _, _ = traces_with_level[idx + 1]
+        # if next level is deeper, this level is not the leaf node.
+        if next_level > level:
+          is_leaf = False
+      if is_leaf:
+        leaf_indices.add(idx)
+
+    for idx, (level, node, state) in enumerate(traces_with_level):
+      if idx in leaf_indices:
+        yield _format_leaf(level, node, state)
+      else:
+        yield _format_other(level, node)
 
   def visualize(self, roots):
     """Visualize a graph walk by generating graphviz `dot` output.
