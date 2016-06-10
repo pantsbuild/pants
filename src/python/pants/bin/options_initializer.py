@@ -69,9 +69,6 @@ class OptionsInitializer(object):
   def reset(cls):
     cls.set_build_configuration(None)
 
-  def _get_bootstrap_options(self, options_bootstrapper):
-    return options_bootstrapper.get_bootstrap_options().for_global_scope()
-
   def _setup_logging(self, quiet, level, log_dir):
     """Initializes logging."""
     # N.B. quiet help says 'Squelches all console output apart from errors'.
@@ -143,7 +140,7 @@ class OptionsInitializer(object):
 
     :returns: A tuple of (options, build_configuration).
     """
-    global_bootstrap_options = self._get_bootstrap_options(self._options_bootstrapper)
+    global_bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
 
     if global_bootstrap_options.pants_version != pants_version():
       raise BuildConfigurationError(
