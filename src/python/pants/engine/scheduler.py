@@ -285,9 +285,12 @@ class ProductGraph(object):
 
     traced = set()
 
+    def is_bottom(entry):
+      return type(entry.state) in (Noop, Return) or entry in traced
+    
     def _format(level, entry, state):
       def is_one_level_above_bottom(parent):
-        return all(type(entry.state) in (Noop, Return) or entry in traced for entry in parent.dependencies)
+        return all(is_bottom(entry) for entry in parent.dependencies)
       if is_one_level_above_bottom(entry):
         return '{}Computing {} for {}\n{}{}'\
           .format('  ' * level, entry.node.product.__name__, entry.node.subject, '  ' * (level+1), state)
@@ -295,7 +298,7 @@ class ProductGraph(object):
         return '{}Computing {} for {}'.format('  ' * level, entry.node.product.__name__, entry.node.subject)
 
     def _trace(entry, level):
-      if type(entry.state) in (Noop, Return) or entry in traced:
+      if is_bottom(entry):
         return
       traced.add(entry)
       yield _format(level, entry, entry.state)
