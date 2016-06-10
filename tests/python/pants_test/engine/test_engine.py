@@ -59,17 +59,17 @@ class EngineTest(unittest.TestCase):
     with closing(LocalSerialEngine(self.scheduler)) as engine:
       self.assert_engine(engine)
 
-  # @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_multiprocess_engine_multi(self):
     with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
 
-  # @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_multiprocess_engine_single(self):
     with self.multiprocessing_engine(pool_size=1) as engine:
       self.assert_engine(engine)
 
-  # @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_multiprocess_unpickleable(self):
     build_request = self.request(['unpickleable'], self.java)
 
@@ -85,7 +85,7 @@ class EngineTest(unittest.TestCase):
     with self.hybrid_engine(pool_size=2) as engine:
       self.assert_engine(engine)
 
-  # @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3510')
   def test_rerun_with_cache(self):
     with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
