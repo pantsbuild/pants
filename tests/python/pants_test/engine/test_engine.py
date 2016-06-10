@@ -16,7 +16,7 @@ from pants.build_graph.address import Address
 from pants.engine.engine import (LocalMultiprocessEngine, LocalSerialEngine, SerializationError,
                                  ThreadHybridEngine)
 from pants.engine.nodes import FilesystemNode, Return, SelectNode
-from pants.engine.scheduler import Promise, StepResult
+from pants.engine.scheduler import Promise
 from pants.engine.storage import Cache, Storage
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
 
