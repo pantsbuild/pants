@@ -306,7 +306,7 @@ class ThreadHybridEngine(ConcurrentEngine):
     return strip_step_id
 
   def _processed_node_callback(self, finished_future):
-    self._processed_queue(finished_future)
+    self._processed_queue.put(finished_future)
     self._pending.remove(finished_future)
 
   def _submit_until(self, pending_submission, in_flight, n):
@@ -325,8 +325,8 @@ class ThreadHybridEngine(ConcurrentEngine):
           self._pool.submit(self._deferred_step(step))
         ]
         for f in futures:
-          f.add_done_callback(self._processed_queue.put)
           self._pending.add(f)
+          f.add_done_callback(self._processed_node_callback)
         submitted += 1
 
       else:
@@ -344,8 +344,10 @@ class ThreadHybridEngine(ConcurrentEngine):
       raise InFlightException('Awaited an empty pool!')
 
     # Drop silently None results (these are cache misses).
+    # Also drop steps that have already been handled.
+    step_id = None
     result = None
-    while not result:
+    while not result or (step_id not in in_flight):
       step_id, result = self._processed_queue.get().result()
     if isinstance(result, Exception):
       raise result

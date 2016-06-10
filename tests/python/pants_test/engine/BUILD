@@ -80,6 +80,7 @@ python_tests(
     'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:nodes',
+    '3rdparty/python:mock',
   ]
 )
 
