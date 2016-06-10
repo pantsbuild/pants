@@ -199,7 +199,20 @@ class InlinedGraphTest(GraphTestBase):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     root, state = walk[0]
     self.assertEqual(type(state), Throw)
-    self.assertTrue(any('cycle' in line for line in scheduler.product_graph.trace(root)))
+    error_msg = '\n'.join(scheduler.product_graph.trace(root))
+    self.assertTrue('cycle' in error_msg)
+    self.assertThrowsAreLeaves(error_msg, Throw.__name__)
+
+  def assertThrowsAreLeaves(self, error_msg, throw_name):
+    def indent(s):
+      return len(s) - len(s.lstrip())
+
+    lines = error_msg.splitlines()
+    line_indices_of_throws = [i for i, v in enumerate(lines) if throw_name in v]
+    for idx in line_indices_of_throws:
+      # Make sure lines with Throw have more or equal indentation than its neighbors.
+      self.assertTrue(indent(lines[idx]) >= indent(lines[max(0, idx - 1)]))
+      self.assertTrue(indent(lines[idx]) >= indent(lines[max(len(lines) - 1, idx + 1)]))
 
   def test_cycle_self(self):
     self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')
