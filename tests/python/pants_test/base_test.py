@@ -17,7 +17,6 @@ from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.bin.options_initializer import OptionsInitializer
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -25,7 +24,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
-from pants.goal.goal import Goal
+from pants.pantsd.util import clean_global_runtime_state
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
@@ -178,9 +177,7 @@ class BaseTest(unittest.TestCase):
     :API: public
     """
     super(BaseTest, self).setUp()
-    Goal.clear()
-    Subsystem.reset()
-    OptionsInitializer.reset()
+    clean_global_runtime_state(reset_runtracker=False, reset_subsystem=True)
 
     self.real_build_root = BuildRoot().path
 
