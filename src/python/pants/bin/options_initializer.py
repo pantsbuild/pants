@@ -35,23 +35,16 @@ class OptionsInitializer(object):
   # Class-level cache for the `BuildConfiguration` object.
   _build_configuration = None
 
-  def __init__(self, options_bootstrapper, working_set=None, exiter=sys.exit, init_logging=True,
-               force_init_plugins=False):
+  def __init__(self, options_bootstrapper, working_set=None, exiter=sys.exit):
     """
     :param OptionsBootStrapper options_bootstrapper: An options bootstrapper instance.
     :param pkg_resources.WorkingSet working_set: The working set of the current run as returned by
                                                  PluginResolver.resolve().
     :param func exiter: A function that accepts an exit code value and exits (for tests).
-    :param bool init_logging: Whether or not to initialize logging as part of setup.
-    :param bool force_init_plugins: Whether or not to force initialization of plugins. By default,
-                                    this only happens the first time `OptionsInitializer.setup()`
-                                    is called.
     """
     self._options_bootstrapper = options_bootstrapper
     self._working_set = working_set or PluginResolver(self._options_bootstrapper).resolve()
     self._exiter = exiter
-    self._init_logging = init_logging
-    self._force_init_plugins = force_init_plugins
 
   @classmethod
   def has_build_configuration(cls):
@@ -135,9 +128,13 @@ class OptionsInitializer(object):
 
     return options
 
-  def setup(self):
+  def setup(self, init_logging=True, force_init_plugins=False):
     """Initializes logging, loads backends/plugins and parses options.
 
+    :param bool init_logging: Whether or not to initialize logging as part of setup.
+    :param bool force_init_plugins: Whether or not to force initialization of plugins. By default,
+                                    this only happens the first time `OptionsInitializer.setup()`
+                                    is called.
     :returns: A tuple of (options, build_configuration).
     """
     global_bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
@@ -149,13 +146,13 @@ class OptionsInitializer(object):
       )
 
     # Get logging setup prior to loading backends so that they can log as needed.
-    if self._init_logging:
+    if init_logging:
       self._setup_logging(global_bootstrap_options.quiet,
                           global_bootstrap_options.level,
                           global_bootstrap_options.logdir)
 
     # Conditionally load backends/plugins and materialize a `BuildConfiguration` object.
-    if not self.has_build_configuration() or self._force_init_plugins:
+    if not self.has_build_configuration() or force_init_plugins:
       deprecated_conditional(
         lambda: not set(global_bootstrap_options.default_backend_packages).issubset(
           global_bootstrap_options.backend_packages),
