@@ -64,7 +64,7 @@ function do_open() {
 
 # generate html from markdown pages.
 ${PANTS_EXE} markdown --fragment \
-  src:: examples:: contrib:: //:readme \
+  src:: examples:: contrib::  \
   testprojects/src/java/org/pantsbuild/testproject/page:readme || \
     die "Failed to generate HTML from markdown'."
 
