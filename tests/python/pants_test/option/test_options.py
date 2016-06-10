@@ -339,6 +339,9 @@ class OptionsTest(unittest.TestCase):
     check([1, 2, 3, 4, 5], './pants --listy=4 --listy=5')
     check([1, 2, 3, 4, 5], './pants --listy=+[4,5]')
 
+    # Subtracting from the default.
+    check([1, 3], './pants --listy=-[2]')
+
     # Replacing the default.
     check([4, 5], './pants --listy=[4,5]')
 
@@ -347,8 +350,17 @@ class OptionsTest(unittest.TestCase):
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
           config={'GLOBAL': {'listy': '+[4,5]'}})
 
-    # Overwriting from env, then appending.
-    check([6, 7, 8, 9], './pants --listy=+[8,9]',
+    # Appending and subtracting across env, config and flags (in the right order).
+    check([2, 3, 4, 7], './pants --listy=-[1,5,6]',
+          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
+          config={'GLOBAL': {'listy': '+[4,5]'}})
+
+    check([1, 2, 8, 9], './pants --listy=+[8,9]',
+          env={'PANTS_GLOBAL_LISTY': '-[4,5]'},
+          config={'GLOBAL': {'listy': '|+[4,5]|-[3]|'}})
+
+    # Overwriting from env, then appending and subtracting.
+    check([7, 8, 9], './pants --listy=|+[8,9]|-[6]|',
           env={'PANTS_GLOBAL_LISTY': '[6,7]'},
           config={'GLOBAL': {'listy': '+[4,5]'}})
 
@@ -360,7 +372,7 @@ class OptionsTest(unittest.TestCase):
     # Overwriting from flags.
     check([8, 9], './pants --listy=[8,9]',
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
-          config={'GLOBAL': {'listy': '[4,5]'}})
+          config={'GLOBAL': {'listy': '|[4,5]|-8|'}})
 
   def test_dict_list_option(self):
     def check(expected, args_str, env=None, config=None):

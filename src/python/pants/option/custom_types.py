@@ -87,11 +87,13 @@ class ListValueComponent(object):
 
   One or more instances of this class can be merged to form a list value.
 
-  Each component may either replace or extend the preceding component.  So that, e.g., a cmd-line
+  A component consists of values to add and values to subtract while constructing the final list.
+
+  Each component may either replace or modify the preceding component.  So that, e.g., a cmd-line
   flag can append to the value specified in the config file, instead of having to repeat it.
   """
   REPLACE = 'REPLACE'
-  EXTEND = 'EXTEND'
+  MODIFY = 'MODIFY'
 
   @classmethod
   def merge(cls, components):
@@ -103,23 +105,36 @@ class ListValueComponent(object):
     :return: An instance representing the result of merging the components.
     :rtype: `ListValueComponent`
     """
-    # Note that action of the merged component is EXTEND until the first REPLACE is encountered.
+    # Note that action of the merged component is MODIFY until the first REPLACE is encountered.
     # This guarantees associativity.
-    action = cls.EXTEND
-    val = []
+    action = cls.MODIFY
+    additions = []
+    subtractions = []
     for component in components:
-      if component.action is cls.REPLACE:
-        val = component.val
+      if component._action is cls.REPLACE:
+        additions = component._additions
+        subtractions = component._subtractions
         action = cls.REPLACE
-      elif component.action is cls.EXTEND:
-        val.extend(component.val)
+      elif component._action is cls.MODIFY:
+        additions.extend(component._additions)
+        subtractions.extend(component._subtractions)
       else:
         raise ParseError('Unknown action for list value: {}'.format(component.action))
-    return cls(action, val)
+    ret = cls(action, additions, subtractions)
+    return ret
 
-  def __init__(self, action, val):
-    self.action = action
-    self.val = val
+  def __init__(self, action, additions, subtractions):
+    self._action = action
+    self._additions = additions
+    self._subtractions = subtractions
+
+  @property
+  def val(self):
+    ret = list(self._additions)
+    for x in self._subtractions:
+      # Note: can't do ret.remove(x) because that only removes the first instance of x.
+      ret = [y for y in ret if y != x]
+    return ret
 
   @classmethod
   def create(cls, value):
@@ -129,33 +144,40 @@ class ListValueComponent(object):
 
     :param value: The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
                   a string representation (possibly prefixed by +) of a list or tuple, or any
-                  allowed member_type.
+                  allowed member_type.  Can also be a |-delimited string, in which case we split
+                  it on the bars and merge the results of calling this method on those strings.
     :rtype: `ListValueComponent`
     """
     if isinstance(value, six.string_types):
       value = ensure_text(value)
+      if value.startswith('|'):
+        return cls.merge([cls.create(x) for x in value.split('|') if x])
+
+    action = cls.MODIFY
+    additions = []
+    subtractions = []
     if isinstance(value, cls):  # Ensure idempotency.
-      action = value.action
-      val = value.val
+      action = value._action
+      additions = value._additions
+      subtractions = value._subtractions
     elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
       action = cls.REPLACE
-      val = value
+      additions = value
     elif value.startswith('[') or value.startswith('('):
       action = cls.REPLACE
-      val = _convert(value, (list, tuple))
+      additions = _convert(value, (list, tuple))
     elif value.startswith('+[') or value.startswith('+('):
-      action = cls.EXTEND
-      val = _convert(value[1:], (list, tuple))
+      additions = _convert(value[1:], (list, tuple))
+    elif value.startswith('-[') or value.startswith('-('):
+      subtractions = _convert(value[1:], (list, tuple))
     elif isinstance(value, six.string_types):
-      action = cls.EXTEND
-      val = [value]
+      additions = [value]
     else:
-      action = cls.EXTEND
-      val = _convert('[{}]'.format(value), list)
-    return cls(action, list(val))
+      additions = _convert('[{}]'.format(value), list)
+    return cls(action, list(additions), list(subtractions))
 
   def __repr__(self):
-    return b'{} {}'.format(self.action, self.val)
+    return b'{} +{} -{}'.format(self._action, self._additions, self._subtractions)
 
 
 class DictValueComponent(object):
