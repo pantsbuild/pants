@@ -25,11 +25,14 @@ logger = logging.getLogger(__name__)
 
 
 class OptionsInitializer(object):
-  """Initializes backends/plugins, global options and logging."""
+  """Initializes backends/plugins, global options and logging.
 
-  # Class-level cache for the `BuildConfiguration` object. This permits multiple invocations of
-  # `OptionsInitializer` in the same runtime context without re-incurring backend/plugin loading,
-  # which can be expensive and cause issues (double task registration, etc).
+  This class uses a class-level cache for the internally generated `BuildConfiguration` object,
+  which permits multiple invocations in the same runtime context without re-incurring backend &
+  plugin loading, which can be expensive and cause issues (double task registration, etc).
+  """
+
+  # Class-level cache for the `BuildConfiguration` object.
   _build_configuration = None
 
   def __init__(self, options_bootstrapper, working_set=None, exiter=sys.exit, init_logging=True,
@@ -77,6 +80,7 @@ class OptionsInitializer(object):
 
   def _load_plugins(self, working_set, python_paths, plugins, backend_packages):
     """Load backends and plugins.
+
     :returns: A `BuildConfiguration` object constructed during backend/plugin loading.
     """
     # Add any extra paths to python path (e.g., for loading extra source backends).
@@ -104,6 +108,7 @@ class OptionsInitializer(object):
 
   def _install_options(self, options_bootstrapper, build_configuration):
     """Parse and register options.
+
     :returns: An Options object representing the full set of runtime options.
     """
     # TODO: This inline import is currently necessary to resolve a ~legitimate cycle between
@@ -135,6 +140,7 @@ class OptionsInitializer(object):
 
   def setup(self):
     """Initializes logging, loads backends/plugins and parses options.
+
     :returns: A tuple of (options, build_configuration).
     """
     global_bootstrap_options = self._get_bootstrap_options(self._options_bootstrapper)
