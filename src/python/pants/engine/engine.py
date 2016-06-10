@@ -171,15 +171,21 @@ def _execute_step(cache_save, debug, process_state, step, resolve_results=False)
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
+
+  :param callable cache_save: Callable used to save cache results.
+  :param bool debug: Determines if we do extra debugging steps.
+  :param process_state: State object containing storage and node builder.
+  :param step: Step to be executed.
+  :param bool resolve_results: Determines if results should be resolved from storage
+                               or have the key returned.
   """
   node_builder, storage = process_state
   step_id = step.step_id
 
   def execute():
     resolved_request = storage.resolve_request(step)
-    if resolve_results:
-      result = resolved_request(node_builder)
-    else:
+    result = resolved_request(node_builder)
+    if not resolve_results:
       result = storage.key_for_result(result)
     if debug:
       _try_pickle(result)
@@ -304,7 +310,7 @@ class ThreadHybridEngine(ConcurrentEngine):
     self._pending.remove(finished_future)
 
   def _submit_until(self, pending_submission, in_flight, n):
-    """Submit pending while there's capacity, and more than `n` items pending_submission."""
+    """Submit pending while there's capacity, and more than `n` items in pending_submission."""
     to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
     submitted = 0
     for _ in range(to_submit):
@@ -337,7 +343,7 @@ class ThreadHybridEngine(ConcurrentEngine):
     if not in_flight:
       raise InFlightException('Awaited an empty pool!')
 
-    # Drop silently None results (these are cache misses)
+    # Drop silently None results (these are cache misses).
     result = None
     while not result:
       step_id, result = self._processed_queue.get().result()
@@ -350,6 +356,7 @@ class ThreadHybridEngine(ConcurrentEngine):
     for f in self._pending:
       f.cancel()
     self._pool.shutdown()  # Wait for pool to cleanup before we cleanup storage.
+    super(ThreadHybridEngine, self).close()
 
 
 def _process_initializer(node_builder, storage):
