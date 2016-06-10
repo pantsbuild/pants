@@ -47,20 +47,20 @@ class OptionsInitializer(object):
     self._exiter = exiter
 
   @classmethod
-  def has_build_configuration(cls):
+  def _has_build_configuration(cls):
     return cls._build_configuration is not None
 
   @classmethod
-  def get_build_configuration(cls):
+  def _get_build_configuration(cls):
     return cls._build_configuration
 
   @classmethod
-  def set_build_configuration(cls, build_configuration):
+  def _set_build_configuration(cls, build_configuration):
     cls._build_configuration = build_configuration
 
   @classmethod
   def reset(cls):
-    cls.set_build_configuration(None)
+    cls._set_build_configuration(None)
 
   def _setup_logging(self, quiet, level, log_dir):
     """Initializes logging."""
@@ -128,13 +128,10 @@ class OptionsInitializer(object):
 
     return options
 
-  def setup(self, init_logging=True, force_init_plugins=False):
+  def setup(self, init_logging=True):
     """Initializes logging, loads backends/plugins and parses options.
 
     :param bool init_logging: Whether or not to initialize logging as part of setup.
-    :param bool force_init_plugins: Whether or not to force initialization of plugins. By default,
-                                    this only happens the first time `OptionsInitializer.setup()`
-                                    is called.
     :returns: A tuple of (options, build_configuration).
     """
     global_bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
@@ -152,7 +149,7 @@ class OptionsInitializer(object):
                           global_bootstrap_options.logdir)
 
     # Conditionally load backends/plugins and materialize a `BuildConfiguration` object.
-    if not self.has_build_configuration() or force_init_plugins:
+    if not self._has_build_configuration():
       deprecated_conditional(
         lambda: not set(global_bootstrap_options.default_backend_packages).issubset(
           global_bootstrap_options.backend_packages),
@@ -169,9 +166,9 @@ class OptionsInitializer(object):
                                                global_bootstrap_options.pythonpath,
                                                global_bootstrap_options.plugins,
                                                backends)
-      self.set_build_configuration(build_configuration)
+      self._set_build_configuration(build_configuration)
     else:
-      build_configuration = self.get_build_configuration()
+      build_configuration = self._get_build_configuration()
 
     # Parse and register options.
     options = self._install_options(self._options_bootstrapper, build_configuration)
