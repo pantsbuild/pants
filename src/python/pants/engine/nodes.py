@@ -333,7 +333,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     if type(output_state) in (Return, Throw, Waiting):
       return output_state
     elif type(output_state) is Noop:
-      return Noop('Successfully projected, but no source of output product for {}.', output_node)
+      return Throw(ValueError('No source of projected dependency {}'.format(output_node)))
     else:
       raise State.raise_unrecognized(output_state)
 
