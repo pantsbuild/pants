@@ -28,11 +28,23 @@ class ReadLink(datatype('ReadLink', ['path'])):
     return super(ReadLink, cls).__new__(cls, six.text_type(path))
 
 
-class Stats(datatype('Stats', ['files', 'dirs', 'links'])):
-  """Sets of File, Dir, and Link objects."""
+class Stats(datatype('Stats', ['dependencies'])):
+  """A set of Stat objects."""
 
-  def __new__(cls, files=tuple(), dirs=tuple(), links=tuple()):
-    return super(Stats, cls).__new__(cls, files, dirs, links)
+  def _filtered(self, cls):
+    return tuple(s for s in self.dependencies if type(s) is cls)
+
+  @property
+  def files(self):
+    return self._filtered(File)
+
+  @property
+  def dirs(self):
+    return self._filtered(Dir)
+
+  @property
+  def links(self):
+    return self._filtered(Link)
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -215,40 +227,18 @@ def scan_directory(project_tree, directory):
 
   :returns: A Stats object containing the members of the directory.
   """
-  dirs = list()
-  files = list()
-  links = list()
-  for stat in project_tree.scandir(directory.path):
-    if type(stat) is Dir:
-      dirs.append(stat)
-    elif type(stat) is File:
-      files.append(stat)
-    elif type(stat) is Link:
-      links.append(stat)
-    else:
-      raise ValueError('Unrecognized stat type for {}: {}'.format(project_tree, stat))
-  return Stats(files=tuple(files),
-               dirs=tuple(dirs),
-               links=tuple(links))
+  return Stats(tuple(project_tree.scandir(directory.path)))
 
 
 def merge_stats(stats_list):
   """Merge Stats lists."""
-  def generate(field):
-    for stats in stats_list:
-      for stat in getattr(stats, field):
-        yield stat
-  return Stats(files=tuple(generate('files')),
-               dirs=tuple(generate('dirs')),
-               links=tuple(generate('links')))
+  return Stats(tuple(s for stats in stats_list for s in stats.dependencies))
 
 
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given Stats object using the given PathWildcard."""
-  def filtered(entries):
-    return tuple(stat for stat in entries
-                 if fnmatch.fnmatch(basename(stat.path), path_wildcard.wildcard))
-  return Stats(files=filtered(stats.files), dirs=filtered(stats.dirs), links=filtered(stats.links))
+  return Stats(tuple(s for s in stats.dependencies
+                     if fnmatch.fnmatch(basename(s.path), path_wildcard.wildcard)))
 
 
 def apply_path_literal(dirs, path_literal):
@@ -313,9 +303,7 @@ def filter_path_stats(stats, path):
 
   This is used to allow the Stat for a Path to be satisfied by a scandir for its dirname.
   """
-  def f(field):
-    return tuple(s for s in getattr(stats, field) if s.path == path.path)
-  return Stats(files=f('files'), dirs=f('dirs'), links=f('links'))
+  return Stats(tuple(s for s in stats.dependencies if s.path == path.path))
 
 
 def file_content(project_tree, f):
