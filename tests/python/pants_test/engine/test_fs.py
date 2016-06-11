@@ -29,13 +29,13 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     """Construct a ProjectTree for the given src path."""
     pass
 
-  def specs(self, ftype, relative_to, *filespecs):
-    return PathGlobs.create_from_specs(ftype, relative_to, filespecs)
+  def specs(self, relative_to, *filespecs):
+    return PathGlobs.create_from_specs(relative_to, filespecs)
 
-  def assert_walk(self, ftype, filespecs, files):
+  def assert_walk(self, ftype, filespecs, paths):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, Stat, self.specs(ftype, '', *filespecs))[0]
+      result = self.execute(scheduler, ftype, self.specs('', *filespecs))[0]
       self.assertEquals(set([p.path for p in result]), set(files))
 
   def assert_content(self, filespecs, expected_content):

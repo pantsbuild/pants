@@ -215,7 +215,7 @@ def addresses_from_address_families(address_families):
 
 def descendant_addresses_to_globs(descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
-  return PathGlobs.create(Dirs, descendant_addresses.directory, globs=['.', '*', '**/*'])
+  return PathGlobs.create(descendant_addresses.directory, globs=['.', '*', '**/*'])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):

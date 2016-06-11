@@ -9,7 +9,7 @@ import os
 from abc import abstractproperty
 
 from pants.engine.addressable import Exactly, addressable
-from pants.engine.fs import Files, PathGlobs
+from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct
 
@@ -55,12 +55,11 @@ class Sources(Struct, Locatable):
 
   @property
   def path_globs(self):
-    """Creates a `PathGlobs` object for the files held by these Sources.
+    """Creates a `PathGlobs` object for the paths matched by these Sources.
 
     This field may be projected to request the content of the files for this Sources object.
     """
-    return PathGlobs.create(Files,
-                            self.spec_path,
+    return PathGlobs.create(self.spec_path,
                             files=self.files,
                             globs=self.globs,
                             rglobs=self.rglobs,

@@ -116,11 +116,9 @@ class PathGlob(AbstractClass):
     """The symbolic name (specific to the execution of this PathGlob) for the canonical_stat."""
 
   @classmethod
-  def create_from_spec(cls, ftype, canonical_stat, symbolic_path, filespec):
+  def create_from_spec(cls, canonical_stat, symbolic_path, filespec):
     """Given a filespec, return a PathGlob object.
 
-    :param ftype: The Stat subclass intended to be matched by this PathGlobs. TODO: this
-      value is only used by the Scheduler currently, which is weird. Move to a wrapper?
     :param canonical_stat: A canonical Dir relative to the ProjectTree, to which the filespec
       is relative.
     :param symbolic_path: A symbolic name for the canonical_stat (or the same name, if no symlinks
@@ -140,23 +138,23 @@ class PathGlob(AbstractClass):
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
       remainders = (join(*parts[1:]), join(*parts[0:]))
-      return PathDirWildcard(ftype, canonical_stat, symbolic_path, parts[0], remainders)
+      return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
     elif len(parts) == 1:
       # This is the path basename, and it may contain a single wildcard.
       return PathWildcard(canonical_stat, symbolic_path, parts[0])
     elif cls._SINGLE not in parts[0]:
-      return PathLiteral(ftype, canonical_stat, symbolic_path, parts[0], join(*parts[1:]))
+      return PathLiteral(canonical_stat, symbolic_path, parts[0], join(*parts[1:]))
     else:
       # This is a path dirname, and it contains a wildcard.
       remainders = (join(*parts[1:]),)
-      return PathDirWildcard(ftype, canonical_stat, symbolic_path, parts[0], remainders)
+      return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
 
 
 class PathWildcard(datatype('PathWildcard', ['canonical_stat', 'symbolic_path', 'wildcard']), PathGlob):
   """A PathGlob with a wildcard in the basename component."""
 
 
-class PathLiteral(datatype('PathLiteral', ['ftype', 'canonical_stat', 'symbolic_path', 'literal', 'remainder']), PathGlob):
+class PathLiteral(datatype('PathLiteral', ['canonical_stat', 'symbolic_path', 'literal', 'remainder']), PathGlob):
   """A PathGlob representing a partially-expanded literal Path.
 
   While it still requires recursion, a PathLiteral is simpler to execute than either `wildcard`
@@ -170,14 +168,14 @@ class PathLiteral(datatype('PathLiteral', ['ftype', 'canonical_stat', 'symbolic_
     return join(self.canonical_stat.path, self.literal)
 
 
-class PathDirWildcard(datatype('PathDirWildcard', ['ftype', 'canonical_stat', 'symbolic_path', 'wildcard', 'remainders']), PathGlob):
+class PathDirWildcard(datatype('PathDirWildcard', ['canonical_stat', 'symbolic_path', 'wildcard', 'remainders']), PathGlob):
   """A PathGlob with a single or double-level wildcard in a directory name.
 
   Each remainders value is applied relative to each directory matched by the wildcard.
   """
 
 
-class PathGlobs(datatype('PathGlobs', ['ftype', 'dependencies'])):
+class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   """A set of 'PathGlob' objects.
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
@@ -188,12 +186,11 @@ class PathGlobs(datatype('PathGlobs', ['ftype', 'dependencies'])):
   """
 
   @classmethod
-  def create(cls, ftype, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
+  def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
     :param relative_to: The path that all patterns are relative to (which will itself be relative
       to the buildroot).
-    :param ftype: A Stat subclass indicating which Stat type will be matched.
     :param files: A list of relative file paths to include.
     :type files: list of string.
     :param string globs: A relative glob pattern of files to include.
@@ -216,16 +213,15 @@ class PathGlobs(datatype('PathGlobs', ['ftype', 'dependencies'])):
       new_specs = res.get('globs', None)
       if new_specs:
         filespecs.update(new_specs)
-    return cls.create_from_specs(ftype, relative_to, filespecs)
+    return cls.create_from_specs(relative_to, filespecs)
 
   @classmethod
-  def create_from_specs(cls, ftype, relative_to, filespecs):
+  def create_from_specs(cls, relative_to, filespecs):
     # TODO: We bootstrap the `canonical_stat` value here without validating that it
     # represents a canonical path in the ProjectTree. Should add validation that only
     # canonical paths are used with ProjectTree (probably in ProjectTree).
-    entries = tuple(PathGlob.create_from_spec(ftype, Dir(relative_to), relative_to, filespec)
-                    for filespec in filespecs)
-    return cls(ftype, entries)
+    return cls(tuple(PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec)
+                     for filespec in filespecs))
 
 
 def scan_directory(project_tree, directory):
@@ -260,15 +256,14 @@ def apply_path_literal(dirs, path_literal):
 
   Expects to match zero or one directory.
   """
-  ftype = path_literal.ftype
   if len(dirs.dependencies) > 1:
     raise AssertionError('{} matched more than one directory!: {}'.format(path_literal, dirs))
 
   paths = [(d, join(path_literal.symbolic_path, path_literal.literal)) for d in dirs.dependencies]
   # For each match, create a PathGlob.
-  path_globs = tuple(PathGlob.create_from_spec(ftype, canonical_stat, symbolic_path, path_literal.remainder)
+  path_globs = tuple(PathGlob.create_from_spec(canonical_stat, symbolic_path, path_literal.remainder)
                      for canonical_stat, symbolic_path in paths)
-  return PathGlobs(ftype, path_globs)
+  return PathGlobs(path_globs)
 
 
 def apply_path_dir_wildcard(dirs, path_dir_wildcard):
@@ -277,7 +272,6 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   The resulting PathGlobs will have longer canonical prefixes than this wildcard, in the
   sense that they will be relative to known-canonical subdirectories.
   """
-  ftype = path_dir_wildcard.ftype
   # Zip each matching+canonical Stat with its symbolic path (made by combining the parent
   # directory's symbolic path with the basename of the matched Stat).
   # TODO: ...it's not correct to use the basename of the canonical_stat here: we've already discarded
@@ -286,10 +280,10 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
            for canonical_stat in dirs.dependencies
            if fnmatch.fnmatch(basename(canonical_stat.path), path_dir_wildcard.wildcard)]
   # For each match, create a PathGlob per remainder.
-  path_globs = tuple(PathGlob.create_from_spec(ftype, canonical_stat, symbolic_path, remainder)
+  path_globs = tuple(PathGlob.create_from_spec(canonical_stat, symbolic_path, remainder)
                      for canonical_stat, symbolic_path in paths
                      for remainder in path_dir_wildcard.remainders)
-  return PathGlobs(ftype, path_globs)
+  return PathGlobs(path_globs)
 
 
 def resolve_dir_links(direct_stats, linked_dirs):
