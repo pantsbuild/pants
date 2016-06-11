@@ -75,12 +75,19 @@ Surround strings with single or double quotes if they contain embedded spaces: `
 
 ### List Options
 
-List options can be appended to, as well as overridden. For example, for an option `--foo`
-whose default value is `[1, 2]`, then in `pants.ini`:
+List options can be added to and subtracted from, as well as overridden.
+For example, for an option `--foo` whose default value is `[1, 2]`, then in `pants.ini`:
 
 + `foo: 3` will yield `[1, 2, 3]`.
 + `foo: +[3, 4]` will yield `[1, 2, 3, 4]`.
++ `foo: -[1]` will yield `[2]`.
 + `foo: [3, 4]` will yield `[3, 4]`.
+
+Multiple expressions may be delimited with pipes, allowing you to add and subtract simultaneously:
+
++ `foo: |+[3,4]|-[1]|` will yield `[2, 3, 4]`.
+
+Note that the leading and trailing pipes matter.
 
 On the command line you can append multiple times:
 
