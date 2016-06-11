@@ -201,9 +201,9 @@ class InlinedGraphTest(GraphTestBase):
     self.assertEqual(type(state), Throw)
     error_msg = '\n'.join(scheduler.product_graph.trace(root))
     self.assertTrue('cycle' in error_msg)
-    self.assertThrowsAreLeaves(error_msg, Throw.__name__)
+    self.assert_throws_are_leaves(error_msg, Throw.__name__)
 
-  def assertThrowsAreLeaves(self, error_msg, throw_name):
+  def assert_throws_are_leaves(self, error_msg, throw_name):
     def indent(s):
       return len(s) - len(s.lstrip())
 
