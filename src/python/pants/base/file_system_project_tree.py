@@ -30,7 +30,15 @@ class FileSystemProjectTree(ProjectTree):
     return glob1(self._join(dir_relpath), glob)
 
   def _scandir_raw(self, relpath):
-    for entry in scandir(self._join(relpath)):
+    # Sanity check. TODO: this should probably be added to the ProjectTree interface as
+    # an optional call, so that we can use it in fs.py rather than applying it by default.
+    abspath = os.path.normpath(self._join(relpath))
+    if os.path.realpath(abspath) != abspath:
+      print('>>> {} vs {}'.format(os.path.realpath(abspath), abspath))
+      raise ValueError('scandir for non-canonical path "{}" not supported in {}.'.format(
+        relpath, self))
+
+    for entry in scandir(abspath):
       # NB: We don't use `DirEntry.stat`, as the scandir docs indicate that that always requires
       # an additional syscall on Unixes.
       entry_path = os.path.normpath(os.path.join(relpath, entry.name))
