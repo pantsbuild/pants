@@ -47,6 +47,16 @@ class Stats(datatype('Stats', ['dependencies'])):
     return self._filtered(Link)
 
 
+class Paths(datatype('Paths', ['paths', 'stats'])):
+  """A set of known-existing symbolic paths with their underlying canonical Stats."""
+
+  def __new__(cls, paths, stats):
+    if len(paths) != len(stats):
+      raise ValueError('{} expects to receive equal-length lists. Got:\n  {}\n  {}'.format(
+        cls, paths, stats))
+    return super(Paths, cls).__new__(cls, paths, stats)
+
+
 class FileContent(datatype('FileContent', ['path', 'content'])):
   """The content of a file, or None if it did not exist."""
 
@@ -76,6 +86,17 @@ def _norm_with_dir(path):
   return normed
 
 
+class Path(datatype('Path', ['path'])):
+  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
+
+  def __new__(cls, path):
+    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
+
+  @property
+  def dirname(self):
+    return dirname(self.path)
+
+
 class PathGlob(AbstractClass):
   """A filename pattern.
 
@@ -91,7 +112,7 @@ class PathGlob(AbstractClass):
     """A Dir relative to the ProjectTree, to which the remainder of this PathGlob is relative."""
 
   @abstractproperty
-  def symbolic_name(self):
+  def symbolic_path(self):
     """The symbolic name (specific to the execution of this PathGlob) for the canonical_stat."""
 
   @classmethod
@@ -129,17 +150,6 @@ class PathGlob(AbstractClass):
       # This is a path dirname, and it contains a wildcard.
       remainders = (join(*parts[1:]),)
       return PathDirWildcard(ftype, canonical_stat, symbolic_path, parts[0], remainders)
-
-
-class Path(datatype('Path', ['path']), PathGlob):
-  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
-
-  def __new__(cls, path):
-    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
-
-  @property
-  def dirname(self):
-    return dirname(self.path)
 
 
 class PathWildcard(datatype('PathWildcard', ['canonical_stat', 'symbolic_path', 'wildcard']), PathGlob):
@@ -219,7 +229,7 @@ class PathGlobs(datatype('PathGlobs', ['ftype', 'dependencies'])):
 
 
 def scan_directory(project_tree, directory):
-  """List Paths directly below the given path, relative to the ProjectTree.
+  """List Stats directly below the given path, relative to the ProjectTree.
 
   Fails eagerly if the path does not exist or is not a directory: since the input is
   a `Dir` instance, the path it represents should already have been confirmed to be an
@@ -230,15 +240,19 @@ def scan_directory(project_tree, directory):
   return Stats(tuple(project_tree.scandir(directory.path)))
 
 
-def merge_stats(stats_list):
-  """Merge Stats lists."""
-  return Stats(tuple(s for stats in stats_list for s in stats.dependencies))
+def merge_paths(paths_list):
+  """Merge Paths lists."""
+  return Paths(tuple(p for paths in paths_list for p in paths.paths),
+               tuple(s for paths in paths_list for s in paths.stats))
 
 
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given Stats object using the given PathWildcard."""
-  return Stats(tuple(s for s in stats.dependencies
-                     if fnmatch.fnmatch(basename(s.path), path_wildcard.wildcard)))
+  matched_stats = tuple(s for s in stats.dependencies
+                        if fnmatch.fnmatch(basename(s.path), path_wildcard.wildcard))
+  matched_paths = tuple(normpath(join(path_wildcard.symbolic_path, basename(s.path)))
+                        for s in matched_stats)
+  return Paths(matched_paths, matched_stats)
 
 
 def apply_path_literal(dirs, path_literal):
@@ -252,8 +266,8 @@ def apply_path_literal(dirs, path_literal):
 
   paths = [(d, join(path_literal.symbolic_path, path_literal.literal)) for d in dirs.dependencies]
   # For each match, create a PathGlob.
-  path_globs = tuple(PathGlob.create_from_spec(ftype, canonical_stat, symbolic_name, path_literal.remainder)
-                     for canonical_stat, symbolic_name in paths)
+  path_globs = tuple(PathGlob.create_from_spec(ftype, canonical_stat, symbolic_path, path_literal.remainder)
+                     for canonical_stat, symbolic_path in paths)
   return PathGlobs(ftype, path_globs)
 
 
@@ -272,8 +286,8 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
            for canonical_stat in dirs.dependencies
            if fnmatch.fnmatch(basename(canonical_stat.path), path_dir_wildcard.wildcard)]
   # For each match, create a PathGlob per remainder.
-  path_globs = tuple(PathGlob.create_from_spec(ftype, canonical_stat, symbolic_name, remainder)
-                     for canonical_stat, symbolic_name in paths
+  path_globs = tuple(PathGlob.create_from_spec(ftype, canonical_stat, symbolic_path, remainder)
+                     for canonical_stat, symbolic_path in paths
                      for remainder in path_dir_wildcard.remainders)
   return PathGlobs(ftype, path_globs)
 
@@ -339,7 +353,7 @@ def create_fs_tasks():
   """Creates tasks that consume the native filesystem Node type."""
   return [
     # Glob execution.
-    (Stats,
+    (Paths,
      [SelectProjection(Stats, Dir, ('canonical_stat',), PathWildcard),
       Select(PathWildcard)],
      apply_path_wildcard),
@@ -351,9 +365,9 @@ def create_fs_tasks():
      [SelectProjection(Dirs, Dir, ('canonical_stat',), PathDirWildcard),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
-    (Stats,
-     [SelectDependencies(Stats, PathGlobs)],
-     merge_stats),
+    (Paths,
+     [SelectDependencies(Paths, PathGlobs)],
+     merge_paths),
   ] + [
     # Link resolution.
     (Dirs,
@@ -374,15 +388,14 @@ def create_fs_tasks():
      [SelectProjection(Stats, Dir, ('dirname',), Path),
       Select(Path)],
      filter_path_stats),
-  ] + [
-    # TODO: These are boilerplatey: aggregation should become native:
-    #   see https://github.com/pantsbuild/pants/issues/3169
     (Files,
      [SelectDependencies(Files, Links)],
      merge_files),
     (Dirs,
      [SelectDependencies(Dirs, Links)],
      merge_dirs),
+  ] + [
+    # File content.
     (FilesContent,
      [SelectDependencies(FileContent, Files)],
      FilesContent),
