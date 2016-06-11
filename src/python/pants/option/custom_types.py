@@ -120,8 +120,7 @@ class ListValueComponent(object):
         subtractions.extend(component._subtractions)
       else:
         raise ParseError('Unknown action for list value: {}'.format(component.action))
-    ret = cls(action, additions, subtractions)
-    return ret
+    return cls(action, additions, subtractions)
 
   def __init__(self, action, additions, subtractions):
     self._action = action
