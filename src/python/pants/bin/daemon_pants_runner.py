@@ -130,7 +130,7 @@ class DaemonPantsRunner(ProcessManager):
     # Invoke a Pants run with stdio redirected.
     with self._nailgunned_stdio(self._socket):
       # Clean global state.
-      clean_global_runtime_state()
+      clean_global_runtime_state(reset_subsystem=True)
 
       try:
         LocalPantsRunner(self._exiter, self._args, self._env, self._build_graph).run()
