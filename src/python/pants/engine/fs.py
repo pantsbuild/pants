@@ -294,22 +294,23 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   return PathGlobs(path_globs)
 
 
+def _zip_links(links, linked_paths):
+  """Given a set of Paths and a resolved collection per Link in the Paths, merge."""
+  # Alias the resolved destinations with the symbolic name of the Paths used to resolve them.
+  if len(links) != len(linked_paths):
+    raise ValueError('Expected to receive resolved Paths per Link. Got: {} and {}'.format(
+      links, linked_paths))
+  return tuple(Path(link.path, dest.dependencies[0].stat)
+               for link, dest in zip(links, linked_paths)
+               if len(dest.dependencies) > 0)
+
+
 def resolve_dir_links(direct_paths, linked_dirs):
-  """Given a set of Paths, and a resolved Dirs object per Link in the paths, return merged Dirs."""
-  # Alias the resolved Dir with the symbolic name of the Paths used to resolve it.
-  # Zip links to their directories.
-  if len(direct_paths.links) != len(linked_dirs):
-    raise ValueError('Expected to receive a Dirs object per Link. Got: {} vs {}'.format(
-      direct_paths.links, linked_dirs))
-  linked_paths = tuple(Path(l.path, dirs.dependencies[0].stat)
-                       for l, dirs in zip(direct_paths.links, linked_dirs)
-                       if len(dirs.dependencies) > 0)
-  # Entries that were already directories, and Links that (recursively) pointed to directories.
-  return Dirs(direct_paths.dirs + linked_paths)
+  return Dirs(direct_paths.dirs + _zip_links(direct_paths.links, linked_dirs))
 
 
-def resolve_file_links(direct_stats, linked_files):
-  return Files(tuple(f for files in (direct_stats.files, linked_files.dependencies) for f in files))
+def resolve_file_links(direct_paths, linked_files):
+  return Files(direct_paths.files + _zip_links(direct_paths.links, linked_files))
 
 
 def read_link(project_tree, link):

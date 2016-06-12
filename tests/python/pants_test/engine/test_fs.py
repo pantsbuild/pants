@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import Dirs, FileContent, FileDigest, Path, Files, PathGlobs, ReadLink, Stats
+from pants.engine.fs import Dirs, FileContent, FileDigest, Files, PathGlobs, ReadLink, Stats
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -60,13 +60,12 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      request = self.execute_request(scheduler, Path, self.specs('', *filespecs))
+      request = self.execute_request(scheduler, ftype, self.specs('', *filespecs))
 
       # Validate that FilesystemNodes for exactly the given subjects are reachable under this
       # request.
       fs_nodes = [n for n, _ in scheduler.product_graph.walk(roots=request.roots)
                   if type(n) is FilesystemNode]
-      print('>>> got {}'.format(fs_nodes))
       self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
 
   def test_walk_literal(self):
