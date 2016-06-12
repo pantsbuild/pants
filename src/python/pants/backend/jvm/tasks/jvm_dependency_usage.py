@@ -104,7 +104,13 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     fh.flush()
 
   def _resolve_aliases(self, target):
-    """Recursively resolve `target` aliases."""
+    """Recursively resolve `target` aliases.
+
+    :param Target target: target whose dependencies are to be resolved recursively.
+    :returns: An iterator of (resolved_dependency, resolved_from) tuples.
+      `resolved_from` is the top level target alias that depends on `resolved_dependency`,
+      and `None` if `resolved_dependency` is not a dependency of a target alias.
+    """
     for declared in target.dependencies:
       if type(declared) == Target:
         for r, _ in self._resolve_aliases(declared):
@@ -283,7 +289,7 @@ class Node(object):
   def add_edge(self, edge, dest, dest_aliased_from=None):
     self.dep_edges[dest] += edge
     if dest_aliased_from:
-      self.dep_aliases[dest_aliased_from].add(dest)
+      self.dep_aliases[dest].add(dest_aliased_from)
 
   def combine(self, other_node):
     assert other_node.concrete_target == self.concrete_target
@@ -300,8 +306,9 @@ class Node(object):
         'is_declared': self.dep_edges[dest].is_declared,
       }
     aliases = {}
-    for alias, deps in self.dep_aliases.items():
-      aliases[alias.address.spec] = [dep.address.spec for dep in deps]
+
+    for dep, aliases in self.dep_aliases.items():
+      aliases[dep.address.spec] = [alias.address.spec for alias in aliases]
 
     return {
       'target': self.concrete_target.address.spec,
@@ -320,9 +327,9 @@ class Node(object):
       res.dep_edges[target_resolve_func(edge)] = Edge(
         is_declared=cached_dict['dep_edges'][edge]['is_declared'],
         products_used=set(cached_dict['dep_edges'][edge]['products_used']))
-    for alias in cached_dict['aliases']:
-      for dep in cached_dict['aliases'][alias]:
-        res.dep_aliases[target_resolve_func(alias)].add(target_resolve_func(dep))
+    for dep in cached_dict['aliases']:
+      for alias in cached_dict['aliases'][dep]:
+        res.dep_aliases[target_resolve_func(dep)].add(target_resolve_func(alias))
     return res
 
 
@@ -401,19 +408,13 @@ class DependencyUsageGraph(object):
     """Outputs the entire graph."""
     res_dict = {}
 
-    def gen_dep_edge(node, edge, dep_tgt):
+    def gen_dep_edge(node, edge, dep_tgt, aliases):
       return {
         'target': dep_tgt.address.spec,
         'dependency_type': self._edge_type(node.concrete_target, edge, dep_tgt),
         'products_used': len(edge.products_used),
         'products_used_ratio': self._used_ratio(dep_tgt, edge),
-      }
-
-    def gen_dep_aliases(node, alias, deps):
-      return {
-        'target': alias.address.spec,
-        'dependencies': [dep.address.spec for dep in deps],
-        'has_products_used': 1 if any(len(node.dep_edges[dep].products_used) > 0 for dep in deps) else 0
+        'aliases': [alias.address.spec for alias in aliases],
       }
 
     for node in self._nodes.values():
@@ -421,7 +422,7 @@ class DependencyUsageGraph(object):
         'cost': self._cost(node.concrete_target),
         'cost_transitive': self._trans_cost(node.concrete_target),
         'products_total': node.products_total,
-        'dependencies': [gen_dep_edge(node, edge, dep_tgt) for dep_tgt, edge in node.dep_edges.items()],
-        'aliases': [gen_dep_aliases(node, alias, deps) for alias, deps in node.dep_aliases.items()],
+        'dependencies': [gen_dep_edge(node, edge, dep_tgt, node.dep_aliases.get(dep_tgt, {}))
+                         for dep_tgt, edge in node.dep_edges.items()],
       }
     yield json.dumps(res_dict, indent=2, sort_keys=True)

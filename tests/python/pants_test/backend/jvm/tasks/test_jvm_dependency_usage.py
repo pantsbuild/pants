@@ -127,8 +127,8 @@ class TestJvmDependencyUsage(TaskTestBase):
 
     # With alias to its resolved targets mapping we can determine which aliases are unused.
     # In this example `alias_b` has none of its resolved dependencies being used.
-    self.assertEqual({a, b}, graph._nodes[c].dep_aliases[alias_a_b])
-    self.assertEqual({b}, graph._nodes[c].dep_aliases[alias_b])
+    self.assertEqual({alias_a_b}, graph._nodes[c].dep_aliases[a])
+    self.assertEqual({alias_b, alias_a_b}, graph._nodes[c].dep_aliases[b])
 
   def test_overlapping_globs(self):
     t1 = self.make_java_target(spec=':t1', sources=['a.java'])
