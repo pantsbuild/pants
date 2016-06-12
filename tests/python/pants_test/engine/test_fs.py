@@ -10,9 +10,9 @@ import unittest
 from abc import abstractmethod
 from contextlib import contextmanager
 
-from pants.base.project_tree import Dir, Link, Stat
+from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import Dirs, FileContent, FileDigest, Files, PathGlobs, ReadLink, Stats
+from pants.engine.fs import Dirs, FileContent, FileDigest, Path, Files, PathGlobs, ReadLink, Stats
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -36,12 +36,12 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       result = self.execute(scheduler, ftype, self.specs('', *filespecs))[0]
-      self.assertEquals(set([p.path for p in result]), set(files))
+      self.assertEquals(set([p.path for p in result]), set(paths))
 
   def assert_content(self, filespecs, expected_content):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, FileContent, self.specs(Files, '', *filespecs))[0]
+      result = self.execute(scheduler, FileContent, self.specs('', *filespecs))[0]
       def validate(e):
         self.assertEquals(type(e), FileContent)
         return True
@@ -51,7 +51,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def assert_digest(self, filespecs, expected_files):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, FileDigest, self.specs(Files, '', *filespecs))[0]
+      result = self.execute(scheduler, FileDigest, self.specs('', *filespecs))[0]
       # Confirm all expected files were digested.
       self.assertEquals(set(expected_files), set(f.path for f in result))
       # And that each distinct path had a distinct digest.
@@ -60,12 +60,13 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      request = self.execute_request(scheduler, Stat, self.specs(ftype, '', *filespecs))
+      request = self.execute_request(scheduler, Path, self.specs('', *filespecs))
 
       # Validate that FilesystemNodes for exactly the given subjects are reachable under this
       # request.
       fs_nodes = [n for n, _ in scheduler.product_graph.walk(roots=request.roots)
                   if type(n) is FilesystemNode]
+      print('>>> got {}'.format(fs_nodes))
       self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
 
   def test_walk_literal(self):
@@ -143,14 +144,14 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_fsnodes(Files, ['c.ln/2'], [
         (Dir(''), Stats),
         (Link('c.ln'), ReadLink),
-        (Dir('c.ln'), Stats),
         (Dir('a'), Stats),
+        (Dir('a/b'), Stats),
       ])
     self.assert_fsnodes(Files, ['d.ln/b/1.txt'], [
         (Dir(''), Stats),
         (Link('d.ln'), ReadLink),
-        (Dir('d.ln'), Stats),
-        (Dir('d.ln/b'), Stats),
+        (Dir('a'), Stats),
+        (Dir('a/b'), Stats),
       ])
 
   def test_nodes_symlink_globbed_dir(self):
@@ -160,16 +161,9 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         # Read links to determine whether they're actually directories.
         (Link('c.ln'), ReadLink),
         (Link('d.ln'), ReadLink),
-        # Scan link destinations.
-        # TODO: Unfortunately, to preserve the (seemingly redundant) behaviour demonstrated in
-        # `test_walk_*` (where a single canonical path can be returned under different names) the
-        # `alias_link` method preserves the original name of a path. This means that we
-        # occasionally Stat the same canonical path multiple times, as is the case here with
-        # c.ln and d.ln pointing to the same directory. It's only wasteful in very heavily
-        # symlinked cases, but it hurts my sensibilities.
+        # Scan second level destinations: `a/b` is matched via `c.ln`.
         (Dir('a'), Stats),
-        (Dir('c.ln'), Stats),
-        (Dir('d.ln'), Stats),
+        (Dir('a/b'), Stats),
       ])
 
   def test_nodes_symlink_globbed_file(self):
@@ -179,8 +173,8 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         (Dir(''), Stats),
         # Traverse one symlink.
         (Link('d.ln'), ReadLink),
-        (Dir('d.ln'), Stats),
-        (Dir('d.ln/b'), Stats),
+        (Dir('a'), Stats),
+        (Dir('a/b'), Stats),
       ])
 
 

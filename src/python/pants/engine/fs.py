@@ -28,16 +28,13 @@ class ReadLink(datatype('ReadLink', ['symbolic_path'])):
     return super(ReadLink, cls).__new__(cls, six.text_type(path))
 
   @property
-  def path(self):
+  def path_globs(self):
     """Supports projecting the Path resulting from a ReadLink as a PathGlob.
 
     Because symlinks may be dead or point inside of other symlinks, it's necessary to resolve
     their components from the top of the buildroot.
     """
-    path_literal = PathGlob.create_from_spec(Dir(''), '', self.symbolic_path)
-    if type(path_literal) is not PathLiteral:
-      raise ValueError('Symbolic link content contains a wildcard: {}.'.format(self))
-    return path_literal
+    return PathGlobs.create_from_specs('', [self.symbolic_path])
 
 
 class Stats(datatype('Stats', ['dependencies'])):
@@ -205,9 +202,6 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
   globs/rglobs/zglobs into 'filespecs'.
-
-  A glob ending in 'os.sep' explicitly matches a directory; otherwise, globs only match
-  files.
   """
 
   @classmethod
@@ -293,16 +287,9 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   The resulting PathGlobs will have longer canonical prefixes than this wildcard, in the
   sense that they will be relative to known-canonical subdirectories.
   """
-  # Zip each matching+canonical Stat with its symbolic path (made by combining the parent
-  # directory's symbolic path with the basename of the matched Stat).
-  # TODO: ...it's not correct to use the basename of the canonical_stat here: we've already discarded
-  # the name it originally had.
-  paths = [(canonical_stat, join(path_dir_wildcard.symbolic_path, basename(canonical_stat.path)))
-           for canonical_stat in dirs.dependencies
-           if fnmatch.fnmatch(basename(canonical_stat.path), path_dir_wildcard.wildcard)]
-  # For each match, create a PathGlob per remainder.
-  path_globs = tuple(PathGlob.create_from_spec(canonical_stat, symbolic_path, remainder)
-                     for canonical_stat, symbolic_path in paths
+  # For each matching Path, create a PathGlob per remainder.
+  path_globs = tuple(PathGlob.create_from_spec(d.stat, d.path, remainder)
+                     for d in dirs.dependencies
                      for remainder in path_dir_wildcard.remainders)
   return PathGlobs(path_globs)
 
@@ -337,6 +324,18 @@ def filter_paths(stats, path_literal):
   return FilteredPaths(Paths(paths))
 
 
+def filter_wildcard_paths(stats, path_dir_wildcard):
+  """Filter the given Stats object into Paths matching the given PathLiteral.
+  
+  TODO: This can definitely be merged with filter_paths/PathLiteral now!
+  """
+  entries = [(s, basename(s.path)) for s in stats.dependencies]
+  paths = tuple(Path(join(path_dir_wildcard.symbolic_path, basename), stat)
+                for stat, basename in entries
+                if fnmatch.fnmatch(basename, path_dir_wildcard.wildcard))
+  return FilteredPaths(Paths(paths))
+
+
 def file_content(project_tree, f):
   """Return a FileContent for a known-existing File.
 
@@ -355,7 +354,7 @@ def file_digest(project_tree, f):
 
 
 def resolve_link(stats):
-  """Given the result of resolving a link"""
+  """"""
   return stats
 
 
@@ -375,6 +374,9 @@ def create_fs_tasks():
   return [
     # Glob execution.
     (Paths,
+     [SelectDependencies(Paths, PathGlobs)],
+     merge_paths),
+    (Paths,
      [SelectProjection(Stats, Dir, ('canonical_stat',), PathWildcard),
       Select(PathWildcard)],
      apply_path_wildcard),
@@ -383,20 +385,19 @@ def create_fs_tasks():
       Select(PathLiteral)],
      apply_path_literal),
     (PathGlobs,
-     [SelectProjection(Dirs, Dir, ('canonical_stat',), PathDirWildcard),
+     [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
-    (Paths,
-     [SelectDependencies(Paths, PathGlobs)],
-     merge_paths),
     (FilteredPaths,
      [SelectProjection(Stats, Dir, ('canonical_stat',), PathLiteral),
       Select(PathLiteral)],
      filter_paths),
+    (FilteredPaths,
+     [SelectProjection(Stats, Dir, ('canonical_stat',), PathDirWildcard),
+      Select(PathDirWildcard)],
+     filter_wildcard_paths),
   ] + [
     # Link resolution.
-
-    # for Paths.
     (Dirs,
      [Select(Paths),
       SelectDependencies(Dirs, Paths, field='link_stats')],
@@ -405,15 +406,11 @@ def create_fs_tasks():
      [Select(Paths),
       SelectDependencies(Files, Paths, field='link_stats')],
      resolve_file_links),
-
-
-    # for a Link.
     (Dirs,
-     [SelectProjection(Dirs, PathLiteral, ('path',), ReadLink)],
+     [SelectProjection(Dirs, PathGlobs, ('path_globs',), ReadLink)],
      resolve_link),
     (Files,
-     [Select(Path),
-      SelectProjection(Files, PathLiteral, ('path',), ReadLink)],
+     [SelectProjection(Files, PathGlobs, ('path_globs',), ReadLink)],
      resolve_link),
   ] + [
     # File content.

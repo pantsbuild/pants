@@ -15,7 +15,7 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
-from pants.engine.fs import Dirs, File, FileContent, FilesContent, PathGlobs, create_fs_tasks
+from pants.engine.fs import Dirs, FilesContent, Path, PathGlobs, create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
@@ -428,8 +428,7 @@ def setup_json_scheduler(build_root, inline_nodes=True):
       'list': Address,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
-      'ls': File,
-      'cat': FileContent,
+      'ls': Path,
     }
   tasks = [
       # Codegen
