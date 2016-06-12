@@ -99,25 +99,6 @@ class Path(datatype('Path', ['path', 'stat'])):
   """
 
 
-class Paths(datatype('Paths', ['dependencies'])):
-  """A set of Path objects."""
-
-  def _filtered(self, cls):
-    return tuple(p for p in self.dependencies if type(p.stat) is cls)
-
-  @property
-  def files(self):
-    return self._filtered(File)
-
-  @property
-  def dirs(self):
-    return self._filtered(Dir)
-
-  @property
-  def links(self):
-    return self._filtered(Link)
-
-
 class PathGlob(AbstractClass):
   """A filename pattern.
 
@@ -304,12 +285,12 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   return PathGlobs(path_globs)
 
 
-def resolve_dir_links(direct_paths, linked_dirs):
-  return Dirs(tuple(d for dirs in (direct_paths.dirs, linked_dirs.dependencies) for d in dirs))
+def resolve_dir_links(direct_stats, linked_dirs):
+  return Dirs(tuple(d for dirs in (direct_stats.dirs, linked_dirs.dependencies) for d in dirs))
 
 
-def resolve_file_links(direct_paths, linked_files):
-  return Files(tuple(f for files in (direct_paths.files, linked_files.dependencies) for f in files))
+def resolve_file_links(direct_stats, linked_files):
+  return Files(tuple(f for files in (direct_stats.files, linked_files.dependencies) for f in files))
 
 
 def merge_dirs(dirs_list):
@@ -357,6 +338,7 @@ Files = Collection.of(File)
 FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 Links = Collection.of(Link)
+Paths = Collection.of(Path)
 
 
 def create_fs_tasks():
@@ -385,15 +367,18 @@ def create_fs_tasks():
   ] + [
     # Link resolution.
     (Dirs,
-     [Select(Paths),
-      SelectProjection(Dirs, Links, ('links',), Paths)],
+     [Select(Stats),
+      SelectProjection(Dirs, Links, ('links',), Stats)],
      resolve_dir_links),
+    (Dirs,
+     [SelectProjection(Dirs, PathLiteral, ('path',), ReadLink)],
+     resolve_link),
     (Files,
-     [Select(Paths),
-      SelectProjection(Files, Links, ('links',), Paths)],
+     [Select(Stats),
+      SelectProjection(Files, Links, ('links',), Stats)],
      resolve_file_links),
-    (Paths,
-     [SelectProjection(Paths, PathLiteral, ('path',), ReadLink)],
+    (Files,
+     [SelectProjection(Files, PathLiteral, ('path',), ReadLink)],
      resolve_link),
     (Files,
      [SelectDependencies(Files, Links)],
