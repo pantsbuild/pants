@@ -14,7 +14,7 @@ from pants.base.project_tree import Dir
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.fs import Dirs, Files, FilesContent, PathGlobs
+from pants.engine.fs import Dirs, File, Files, FilesContent, Path, PathGlobs, Stats
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -35,9 +35,12 @@ class BuildFiles(datatype('BuildFiles', ['files'])):
   """A list of Paths that are known to match a BUILD file pattern."""
 
 
-def filter_buildfile_paths(address_mapper, files):
-  build_files = tuple(f for f in files.dependencies
-                      if address_mapper.build_pattern.match(os_path_basename(f.path)))
+def filter_buildfile_paths(address_mapper, stats):
+  build_pattern = address_mapper.build_pattern
+  def match(stat):
+    return type(stat) is File and build_pattern.match(os_path_basename(stat.path))
+  build_files = tuple(Path(stat.path, stat)
+                      for stat in stats.dependencies if match(stat))
   return BuildFiles(build_files)
 
 
@@ -243,7 +246,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      parse_address_family),
     (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(Files)],
+      Select(Stats)],
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
@@ -262,7 +265,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
      addresses_from_address_family),
     (Addresses,
-     [SelectDependencies(AddressFamily, Dirs)],
+     [SelectDependencies(AddressFamily, Dirs, field='stats')],
      addresses_from_address_families),
     (PathGlobs,
      [Select(DescendantAddresses)],
