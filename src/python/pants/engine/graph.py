@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-from os.path import basename as os_path_basename
+from os.path import basename, join
 
 import six
 
@@ -38,7 +38,7 @@ class BuildFiles(datatype('BuildFiles', ['files'])):
 def filter_buildfile_paths(address_mapper, stats):
   build_pattern = address_mapper.build_pattern
   def match(stat):
-    return type(stat) is File and build_pattern.match(os_path_basename(stat.path))
+    return type(stat) is File and build_pattern.match(basename(stat.path))
   build_files = tuple(Path(stat.path, stat)
                       for stat in stats.dependencies if match(stat))
   return BuildFiles(build_files)
@@ -200,7 +200,7 @@ def address_from_address_family(address_family, single_address):
   """
   name = single_address.name
   if name is None:
-    name = os_path_basename(single_address.directory)
+    name = basename(single_address.directory)
   if name not in address_family.objects_by_name:
     _raise_did_you_mean(address_family, single_address.name)
   return Addresses(tuple([Address(address_family.namespace, name)]))
@@ -218,7 +218,8 @@ def addresses_from_address_families(address_families):
 
 def descendant_addresses_to_globs(descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
-  return PathGlobs.create(descendant_addresses.directory, globs=['.', '*', '**/*'])
+  filespecs = [join(descendant_addresses.directory, wildcard) for wildcard in ('.', '*', '**/*')]
+  return PathGlobs.create_from_specs('', filespecs)
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):

@@ -76,20 +76,6 @@ class FileDigest(datatype('FileDigest', ['path', 'digest'])):
   """A unique fingerprint for the content of a File."""
 
 
-def _norm_with_dir(path):
-  """Form of `normpath` that preserves a trailing slash-dot.
-
-  In this case, a trailing slash-dot is used to explicitly indicate that a directory is
-  being matched.
-
-  TODO: No longer the case, AFAIK: could probably switch to just normpath.
-  """
-  normed = normpath(path)
-  if path.endswith(os_sep + '.'):
-    return normed + os_sep + '.'
-  return normed
-
-
 class Path(datatype('Path', ['path', 'stat'])):
   """A filesystem path, holding both its symbolic path name, and underlying canonical Stat.
 
@@ -151,7 +137,7 @@ class PathGlob(AbstractClass):
     if not isinstance(canonical_stat, Dir):
       raise ValueError('Expected a Dir as the canonical_stat. Got: {}'.format(canonical_stat))
 
-    parts = _norm_with_dir(filespec).split(os_sep)
+    parts = normpath(filespec).split(os_sep)
     if cls._DOUBLE in parts[0]:
       if parts[0] != cls._DOUBLE:
         raise ValueError(
@@ -172,11 +158,11 @@ class PathGlob(AbstractClass):
 
 
 class PathWildcard(datatype('PathWildcard', ['canonical_stat', 'symbolic_path', 'wildcard']), PathGlob):
-  """A PathGlob with a wildcard in the basename component."""
+  """A PathGlob matching a basename."""
 
 
 class PathDirWildcard(datatype('PathDirWildcard', ['canonical_stat', 'symbolic_path', 'wildcard', 'remainders']), PathGlob):
-  """A PathGlob with a single or double-level wildcard in a directory name.
+  """A PathGlob matching a dirname.
 
   Each remainders value is applied relative to each directory matched by the wildcard.
   """
@@ -221,9 +207,6 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
   @classmethod
   def create_from_specs(cls, relative_to, filespecs):
-    # TODO: We bootstrap the `canonical_stat` value here without validating that it
-    # represents a canonical path in the ProjectTree. Should add validation that only
-    # canonical paths are used with ProjectTree (probably in ProjectTree).
     return cls(tuple(PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec)
                      for filespec in filespecs))
 

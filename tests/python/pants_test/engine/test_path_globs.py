@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from os.path import join
 
-from pants.engine.fs import Dirs, Files, Path, PathDirWildcard, PathGlobs, PathLiteral, PathWildcard
+from pants.engine.fs import Dirs, Path, PathDirWildcard, PathGlobs, PathWildcard
 
 
 class PathGlobsTest(unittest.TestCase):
@@ -21,7 +21,7 @@ class PathGlobsTest(unittest.TestCase):
     name = 'Blah.java'
     self.assert_pg_equals([Path(name)], '', [name])
     self.assert_pg_equals([Path(join(subdir, name))], subdir, [name])
-    self.assert_pg_equals([PathLiteral(Files, subdir, name)], '', [join(subdir, name)])
+    self.assert_pg_equals([PathDirWildcard(subdir, name)], '', [join(subdir, name)])
 
   def test_wildcard(self):
     name = '*.java'
@@ -33,7 +33,7 @@ class PathGlobsTest(unittest.TestCase):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '*'
-    self.assert_pg_equals([PathDirWildcard(Files, subdir, wildcard, (name,))],
+    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, (name,))],
                           subdir,
                           [join(wildcard, name)])
 
@@ -53,6 +53,6 @@ class PathGlobsTest(unittest.TestCase):
     subdir = 'foo'
     wildcard = '**'
     expected_remainders = (name, join(wildcard, name))
-    self.assert_pg_equals([PathDirWildcard(Files, subdir, wildcard, expected_remainders)],
+    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, expected_remainders)],
                           subdir,
                           [join(wildcard, name)])
