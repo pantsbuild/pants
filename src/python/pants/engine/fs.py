@@ -117,6 +117,10 @@ class Paths(datatype('Paths', ['dependencies'])):
   def links(self):
     return self._filtered(Link)
 
+  @property
+  def link_stats(self):
+    return tuple(p.stat for p in self.links)
+
 
 class PathGlob(AbstractClass):
   """A filename pattern.
@@ -303,20 +307,22 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   return PathGlobs(path_globs)
 
 
-def resolve_dir_links(direct_stats, linked_dirs):
-  return Dirs(tuple(d for dirs in (direct_stats.dirs, linked_dirs.dependencies) for d in dirs))
+def resolve_dir_links(direct_paths, linked_dirs):
+  """Given a set of Paths, and a resolved Dirs object per Link in the paths, return merged Dirs."""
+  # Alias the resolved Dir with the symbolic name of the Paths used to resolve it.
+  # Zip links to their directories.
+  if len(direct_paths.links) != len(linked_dirs):
+    raise ValueError('Expected to receive a Dirs object per Link. Got: {} vs {}'.format(
+      direct_paths.links, linked_dirs))
+  linked_paths = tuple(Path(l.path, dirs.dependencies[0].stat)
+                       for l, dirs in zip(direct_paths.links, linked_dirs)
+                       if len(dirs.dependencies) > 0)
+  # Entries that were already directories, and Links that (recursively) pointed to directories.
+  return Dirs(direct_paths.dirs + linked_paths)
 
 
 def resolve_file_links(direct_stats, linked_files):
   return Files(tuple(f for files in (direct_stats.files, linked_files.dependencies) for f in files))
-
-
-def merge_dirs(dirs_list):
-  return Dirs(tuple(d for dirs in dirs_list for d in dirs.dependencies))
-
-
-def merge_files(files_list):
-  return Files(tuple(f for files in files_list for f in files.dependencies))
 
 
 def read_link(project_tree, link):
@@ -393,11 +399,11 @@ def create_fs_tasks():
     # for Paths.
     (Dirs,
      [Select(Paths),
-      SelectProjection(Dirs, Links, ('links',), Paths)],
+      SelectDependencies(Dirs, Paths, field='link_stats')],
      resolve_dir_links),
     (Files,
      [Select(Paths),
-      SelectProjection(Files, Links, ('links',), Paths)],
+      SelectDependencies(Files, Paths, field='link_stats')],
      resolve_file_links),
 
 
@@ -409,20 +415,6 @@ def create_fs_tasks():
      [Select(Path),
       SelectProjection(Files, PathLiteral, ('path',), ReadLink)],
      resolve_link),
-
-
-
-
-
-
-    (Files,
-     [Select(Links),
-      SelectDependencies(Files, Links)],
-     merge_files),
-    (Dirs,
-     [Select(Links),
-      SelectDependencies(Dirs, Links)],
-     merge_dirs),
   ] + [
     # File content.
     (FilesContent,
