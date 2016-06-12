@@ -9,7 +9,7 @@ import fnmatch
 from abc import abstractproperty
 from hashlib import sha1
 from os import sep as os_sep
-from os.path import basename, dirname, join, normpath
+from os.path import basename, join, normpath
 
 import six
 from twitter.common.collections.orderedset import OrderedSet
@@ -21,11 +21,23 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class ReadLink(datatype('ReadLink', ['path'])):
+class ReadLink(datatype('ReadLink', ['symbolic_path'])):
   """The result of reading a symbolic link."""
 
   def __new__(cls, path):
     return super(ReadLink, cls).__new__(cls, six.text_type(path))
+
+  @property
+  def path(self):
+    """Supports projecting the Path resulting from a ReadLink as a PathGlob.
+
+    Because symlinks may be dead or point inside of other symlinks, it's necessary to resolve
+    their components from the top of the buildroot.
+    """
+    path_literal = PathGlob.create_from_spec(Dir(''), '', self.symbolic_path)
+    if type(path_literal) is not PathLiteral:
+      raise ValueError('Symbolic link content contains a wildcard: {}.'.format(self))
+    return path_literal
 
 
 class Stats(datatype('Stats', ['dependencies'])):
@@ -47,14 +59,8 @@ class Stats(datatype('Stats', ['dependencies'])):
     return self._filtered(Link)
 
 
-class Paths(datatype('Paths', ['paths', 'stats'])):
-  """A set of known-existing symbolic paths with their underlying canonical Stats."""
-
-  def __new__(cls, paths, stats):
-    if len(paths) != len(stats):
-      raise ValueError('{} expects to receive equal-length lists. Got:\n  {}\n  {}'.format(
-        cls, paths, stats))
-    return super(Paths, cls).__new__(cls, paths, stats)
+class FilteredStats(datatype('FilteredStats', ['stats'])):
+  """A wrapper around Stats object that has been filtered by some pattern."""
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -86,15 +92,11 @@ def _norm_with_dir(path):
   return normed
 
 
-class Path(datatype('Path', ['path'])):
-  """A potentially non-existent filesystem path, relative to the ProjectTree's buildroot."""
+class Path(datatype('Path', ['path', 'stat'])):
+  """A filesystem path, holding both its symbolic path name, and underlying canonical Stat.
 
-  def __new__(cls, path):
-    return super(Path, cls).__new__(cls, normpath(six.text_type(path)))
-
-  @property
-  def dirname(self):
-    return dirname(self.path)
+  Both values are relative to the ProjectTree's buildroot.
+  """
 
 
 class PathGlob(AbstractClass):
@@ -238,17 +240,14 @@ def scan_directory(project_tree, directory):
 
 def merge_paths(paths_list):
   """Merge Paths lists."""
-  return Paths(tuple(p for paths in paths_list for p in paths.paths),
-               tuple(s for paths in paths_list for s in paths.stats))
+  return Paths(tuple(p for paths in paths_list for p in paths.dependencies))
 
 
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given Stats object using the given PathWildcard."""
-  matched_stats = tuple(s for s in stats.dependencies
-                        if fnmatch.fnmatch(basename(s.path), path_wildcard.wildcard))
-  matched_paths = tuple(normpath(join(path_wildcard.symbolic_path, basename(s.path)))
-                        for s in matched_stats)
-  return Paths(matched_paths, matched_stats)
+  return Paths(tuple(Path(normpath(join(path_wildcard.symbolic_path, basename(s.path))), s)
+                     for s in stats.dependencies
+                     if fnmatch.fnmatch(basename(s.path), path_wildcard.wildcard)))
 
 
 def apply_path_literal(dirs, path_literal):
@@ -306,12 +305,10 @@ def read_link(project_tree, link):
   return ReadLink(project_tree.readlink(link.path))
 
 
-def filter_path_stats(stats, path):
-  """Filter the given Stats object to contain only entries matching the given Path.
-
-  This is used to allow the Stat for a Path to be satisfied by a scandir for its dirname.
-  """
-  return Stats(tuple(s for s in stats.dependencies if s.path == path.path))
+def filter_path_stats(stats, path_literal):
+  """Filter the given Stats object to contain only entries matching the given PathLiteral."""
+  filtered = tuple(s for s in stats.dependencies if basename(s.path) == path_literal.literal)
+  return FilteredStats(Stats(filtered))
 
 
 def file_content(project_tree, f):
@@ -341,6 +338,7 @@ Files = Collection.of(File)
 FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 Links = Collection.of(Link)
+Paths = Collection.of(Path)
 
 
 def create_fs_tasks():
@@ -352,7 +350,7 @@ def create_fs_tasks():
       Select(PathWildcard)],
      apply_path_wildcard),
     (PathGlobs,
-     [SelectProjection(Dirs, Path, ('directory',), PathLiteral),
+     [SelectProjection(Dirs, Stats, ('stats',), FilteredStats),
       Select(PathLiteral)],
      apply_path_literal),
     (PathGlobs,
@@ -362,6 +360,10 @@ def create_fs_tasks():
     (Paths,
      [SelectDependencies(Paths, PathGlobs)],
      merge_paths),
+    (FilteredStats,
+     [SelectProjection(Stats, Dir, ('canonical_stat',), PathLiteral),
+      Select(PathLiteral)],
+     filter_path_stats),
   ] + [
     # Link resolution.
     (Dirs,
@@ -369,19 +371,15 @@ def create_fs_tasks():
       SelectProjection(Dirs, Links, ('links',), Stats)],
      resolve_dir_links),
     (Dirs,
-     [SelectProjection(Dirs, Path, ('path',), ReadLink)],
+     [SelectProjection(Dirs, PathLiteral, ('path',), ReadLink)],
      resolve_link),
     (Files,
      [Select(Stats),
       SelectProjection(Files, Links, ('links',), Stats)],
      resolve_file_links),
     (Files,
-     [SelectProjection(Files, Path, ('path',), ReadLink)],
+     [SelectProjection(Files, PathLiteral, ('path',), ReadLink)],
      resolve_link),
-    (Stats,
-     [SelectProjection(Stats, Dir, ('dirname',), Path),
-      Select(Path)],
-     filter_path_stats),
     (Files,
      [SelectDependencies(Files, Links)],
      merge_files),

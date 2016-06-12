@@ -322,10 +322,14 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
       values.append(getattr(input_product, field))
 
     # If there was only one projected field and it is already of the correct type, project it.
-    if len(values) == 1 and type(values[0]) is self.projected_subject:
-      projected_subject = values[0]
-    else:
-      projected_subject = self.projected_subject(*values)
+    try:
+      if len(values) == 1 and type(values[0]) is self.projected_subject:
+        projected_subject = values[0]
+      else:
+        projected_subject = self.projected_subject(*values)
+    except Exception as e:
+      return Throw(ValueError('Fields {} of {} could not be projected as {}: {}'.format(
+        self.fields, input_product, self.projected_subject, e)))
     output_node = self._output_node(step_context, projected_subject)
 
     # When the output node is available, return its result.
