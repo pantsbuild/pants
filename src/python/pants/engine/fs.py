@@ -59,8 +59,8 @@ class Stats(datatype('Stats', ['dependencies'])):
     return self._filtered(Link)
 
 
-class FilteredStats(datatype('FilteredStats', ['stats'])):
-  """A wrapper around Stats object that has been filtered by some pattern."""
+class FilteredPaths(datatype('FilteredPaths', ['paths'])):
+  """A wrapper around a Paths object that has been filtered by some pattern."""
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -97,6 +97,25 @@ class Path(datatype('Path', ['path', 'stat'])):
 
   Both values are relative to the ProjectTree's buildroot.
   """
+
+
+class Paths(datatype('Paths', ['dependencies'])):
+  """A set of Path objects."""
+
+  def _filtered(self, cls):
+    return tuple(p for p in self.dependencies if type(p.stat) is cls)
+
+  @property
+  def files(self):
+    return self._filtered(File)
+
+  @property
+  def dirs(self):
+    return self._filtered(Dir)
+
+  @property
+  def links(self):
+    return self._filtered(Link)
 
 
 class PathGlob(AbstractClass):
@@ -258,10 +277,9 @@ def apply_path_literal(dirs, path_literal):
   if len(dirs.dependencies) > 1:
     raise AssertionError('{} matched more than one directory!: {}'.format(path_literal, dirs))
 
-  paths = [(d, join(path_literal.symbolic_path, path_literal.literal)) for d in dirs.dependencies]
   # For each match, create a PathGlob.
-  path_globs = tuple(PathGlob.create_from_spec(canonical_stat, symbolic_path, path_literal.remainder)
-                     for canonical_stat, symbolic_path in paths)
+  path_globs = tuple(PathGlob.create_from_spec(d.stat, d.path, path_literal.remainder)
+                     for d in dirs.dependencies)
   return PathGlobs(path_globs)
 
 
@@ -305,10 +323,12 @@ def read_link(project_tree, link):
   return ReadLink(project_tree.readlink(link.path))
 
 
-def filter_path_stats(stats, path_literal):
-  """Filter the given Stats object to contain only entries matching the given PathLiteral."""
-  filtered = tuple(s for s in stats.dependencies if basename(s.path) == path_literal.literal)
-  return FilteredStats(Stats(filtered))
+def filter_paths(stats, path_literal):
+  """Filter the given Stats object into Paths matching the given PathLiteral."""
+  paths = tuple(Path(join(path_literal.symbolic_path, path_literal.literal), s)
+                for s in stats.dependencies
+                if basename(s.path) == path_literal.literal)
+  return FilteredPaths(Paths(paths))
 
 
 def file_content(project_tree, f):
@@ -329,16 +349,19 @@ def file_digest(project_tree, f):
 
 
 def resolve_link(stats):
-  """Passes through the Stats resulting from resolving an underlying Link."""
+  """Given the result of resolving a link"""
   return stats
 
 
+# TODO: The types here are currently lies. These are each wrappers around _Path_ objects
+# for the relevant type of Stat.
 Dirs = Collection.of(Dir)
 Files = Collection.of(File)
+Links = Collection.of(Link)
+
+
 FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
-Links = Collection.of(Link)
-Paths = Collection.of(Path)
 
 
 def create_fs_tasks():
@@ -350,7 +373,7 @@ def create_fs_tasks():
       Select(PathWildcard)],
      apply_path_wildcard),
     (PathGlobs,
-     [SelectProjection(Dirs, Stats, ('stats',), FilteredStats),
+     [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
       Select(PathLiteral)],
      apply_path_literal),
     (PathGlobs,
@@ -360,31 +383,45 @@ def create_fs_tasks():
     (Paths,
      [SelectDependencies(Paths, PathGlobs)],
      merge_paths),
-    (FilteredStats,
+    (FilteredPaths,
      [SelectProjection(Stats, Dir, ('canonical_stat',), PathLiteral),
       Select(PathLiteral)],
-     filter_path_stats),
+     filter_paths),
   ] + [
     # Link resolution.
+
+    # for Paths.
     (Dirs,
-     [Select(Stats),
-      SelectProjection(Dirs, Links, ('links',), Stats)],
+     [Select(Paths),
+      SelectProjection(Dirs, Links, ('links',), Paths)],
      resolve_dir_links),
+    (Files,
+     [Select(Paths),
+      SelectProjection(Files, Links, ('links',), Paths)],
+     resolve_file_links),
+
+
+    # for a Link.
     (Dirs,
      [SelectProjection(Dirs, PathLiteral, ('path',), ReadLink)],
      resolve_link),
     (Files,
-     [Select(Stats),
-      SelectProjection(Files, Links, ('links',), Stats)],
-     resolve_file_links),
-    (Files,
-     [SelectProjection(Files, PathLiteral, ('path',), ReadLink)],
+     [Select(Path),
+      SelectProjection(Files, PathLiteral, ('path',), ReadLink)],
      resolve_link),
+
+
+
+
+
+
     (Files,
-     [SelectDependencies(Files, Links)],
+     [Select(Links),
+      SelectDependencies(Files, Links)],
      merge_files),
     (Dirs,
-     [SelectDependencies(Dirs, Links)],
+     [Select(Links),
+      SelectDependencies(Dirs, Links)],
      merge_dirs),
   ] + [
     # File content.

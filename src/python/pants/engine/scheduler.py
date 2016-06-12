@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
-from pants.engine.fs import Paths, PathGlobs
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return, SelectNode,
                                 State, StepContext, TaskNode, Throw, Waiting)
 from pants.engine.objects import Closable
