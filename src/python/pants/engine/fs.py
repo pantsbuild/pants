@@ -163,32 +163,16 @@ class PathGlob(AbstractClass):
       remainders = (join(*parts[1:]), join(*parts[0:]))
       return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
     elif len(parts) == 1:
-      # This is the path basename, and it may contain a single wildcard.
+      # This is the path basename.
       return PathWildcard(canonical_stat, symbolic_path, parts[0])
-    elif cls._SINGLE not in parts[0]:
-      return PathLiteral(canonical_stat, symbolic_path, parts[0], join(*parts[1:]))
     else:
-      # This is a path dirname, and it contains a wildcard.
+      # This is a path dirname.
       remainders = (join(*parts[1:]),)
       return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
 
 
 class PathWildcard(datatype('PathWildcard', ['canonical_stat', 'symbolic_path', 'wildcard']), PathGlob):
   """A PathGlob with a wildcard in the basename component."""
-
-
-class PathLiteral(datatype('PathLiteral', ['canonical_stat', 'symbolic_path', 'literal', 'remainder']), PathGlob):
-  """A PathGlob representing a partially-expanded literal Path.
-
-  While it still requires recursion, a PathLiteral is simpler to execute than either `wildcard`
-  type: it only needs to stat each directory on the way down, rather than listing them.
-
-  TODO: Should be possible to merge with PathDirWildcard.
-  """
-
-  @property
-  def directory(self):
-    return join(self.canonical_stat.path, self.literal)
 
 
 class PathDirWildcard(datatype('PathDirWildcard', ['canonical_stat', 'symbolic_path', 'wildcard', 'remainders']), PathGlob):
@@ -268,20 +252,6 @@ def apply_path_wildcard(stats, path_wildcard):
                      if fnmatch.fnmatch(basename(s.path), path_wildcard.wildcard)))
 
 
-def apply_path_literal(dirs, path_literal):
-  """Given a PathLiteral, generate a PathGlobs object with a longer canonical_at prefix.
-
-  Expects to match zero or one directory.
-  """
-  if len(dirs.dependencies) > 1:
-    raise AssertionError('{} matched more than one directory!: {}'.format(path_literal, dirs))
-
-  # For each match, create a PathGlob.
-  path_globs = tuple(PathGlob.create_from_spec(d.stat, d.path, path_literal.remainder)
-                     for d in dirs.dependencies)
-  return PathGlobs(path_globs)
-
-
 def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   """Given a PathDirWildcard, compute a PathGlobs object that encompasses its children.
 
@@ -318,19 +288,8 @@ def read_link(project_tree, link):
   return ReadLink(project_tree.readlink(link.path))
 
 
-def filter_paths(stats, path_literal):
-  """Filter the given Stats object into Paths matching the given PathLiteral."""
-  paths = tuple(Path(join(path_literal.symbolic_path, path_literal.literal), s)
-                for s in stats.dependencies
-                if basename(s.path) == path_literal.literal)
-  return FilteredPaths(Paths(paths))
-
-
-def filter_wildcard_paths(stats, path_dir_wildcard):
-  """Filter the given Stats object into Paths matching the given PathLiteral.
-  
-  TODO: This can definitely be merged with filter_paths/PathLiteral now!
-  """
+def filter_paths(stats, path_dir_wildcard):
+  """Filter the given Stats object into Paths matching the given PathDirWildcard."""
   entries = [(s, basename(s.path)) for s in stats.dependencies]
   paths = tuple(Path(join(path_dir_wildcard.symbolic_path, basename), stat)
                 for stat, basename in entries
@@ -390,20 +349,12 @@ def create_fs_tasks():
      apply_path_wildcard),
     (PathGlobs,
      [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
-      Select(PathLiteral)],
-     apply_path_literal),
-    (PathGlobs,
-     [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
     (FilteredPaths,
-     [SelectProjection(Stats, Dir, ('canonical_stat',), PathLiteral),
-      Select(PathLiteral)],
-     filter_paths),
-    (FilteredPaths,
      [SelectProjection(Stats, Dir, ('canonical_stat',), PathDirWildcard),
       Select(PathDirWildcard)],
-     filter_wildcard_paths),
+     filter_paths),
   ] + [
     # Link resolution.
     (Dirs,
