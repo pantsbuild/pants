@@ -429,6 +429,7 @@ def setup_json_scheduler(build_root, inline_nodes=True):
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
       'ls': Files,
+      'cat': FilesContent,
     }
   tasks = [
       # Codegen

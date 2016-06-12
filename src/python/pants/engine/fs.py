@@ -14,7 +14,7 @@ from os.path import basename, join, normpath
 import six
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants.base.project_tree import Dir, File, Link
+from pants.base.project_tree import Dir, File, Link, Stat
 from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
@@ -37,23 +37,20 @@ class ReadLink(datatype('ReadLink', ['symbolic_path'])):
     return PathGlobs.create_from_specs('', [self.symbolic_path])
 
 
-class Stats(datatype('Stats', ['dependencies'])):
-  """A set of Stat objects."""
+class Dirs(datatype('Dirs', ['dependencies'])):
+  """A collection of Path objects with Dir stats."""
 
-  def _filtered(self, cls):
-    return tuple(s for s in self.dependencies if type(s) is cls)
 
-  @property
-  def files(self):
-    return self._filtered(File)
+class Files(datatype('Files', ['dependencies'])):
+  """A collection of Path objects with File stats."""
 
   @property
-  def dirs(self):
-    return self._filtered(Dir)
+  def stats(self):
+    return tuple(s.stat for s in self.dependencies)
 
-  @property
-  def links(self):
-    return self._filtered(Link)
+
+class Links(datatype('Links', ['dependencies'])):
+  """A collection of Path objects with Link stats."""
 
 
 class FilteredPaths(datatype('FilteredPaths', ['paths'])):
@@ -355,17 +352,23 @@ def file_digest(project_tree, f):
 
 
 def resolve_link(stats):
-  """"""
+  """Passes through the projected Files/Dirs for link resolution."""
   return stats
 
 
-# TODO: The types here are currently lies. These are each wrappers around _Path_ objects
-# for the relevant type of Stat.
-Dirs = Collection.of(Dir)
-Files = Collection.of(File)
-Links = Collection.of(Link)
+def files_content(files, file_values):
+  entries = tuple(FileContent(f.path, f_value.content)
+                  for f, f_value in zip(files.dependencies, file_values))
+  return FilesContent(entries)
 
 
+def files_digest(files, file_values):
+  entries = tuple(FileDigest(f.path, f_value.digest)
+                  for f, f_value in zip(files.dependencies, file_values))
+  return FilesDigest(entries)
+
+
+Stats = Collection.of(Stat)
 FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 
@@ -416,9 +419,11 @@ def create_fs_tasks():
   ] + [
     # File content.
     (FilesContent,
-     [SelectDependencies(FileContent, Files)],
-     FilesContent),
+     [Select(Files),
+      SelectDependencies(FileContent, Files, field='stats')],
+     files_content),
     (FilesDigest,
-     [SelectDependencies(FileDigest, Files)],
-     FilesDigest),
+     [Select(Files),
+      SelectDependencies(FileDigest, Files, field='stats')],
+     files_digest),
   ]

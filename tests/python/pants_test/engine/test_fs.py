@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import Dirs, FileContent, FileDigest, Files, PathGlobs, ReadLink, Stats
+from pants.engine.fs import Dirs, FilesContent, FilesDigest, Files, PathGlobs, ReadLink, Stats
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -36,26 +36,23 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       result = self.execute(scheduler, ftype, self.specs('', *filespecs))[0]
-      self.assertEquals(set([p.path for p in result]), set(paths))
+      self.assertEquals(set([p.path for p in result.dependencies]), set(paths))
 
   def assert_content(self, filespecs, expected_content):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, FileContent, self.specs('', *filespecs))[0]
-      def validate(e):
-        self.assertEquals(type(e), FileContent)
-        return True
-      actual_content = {f.path: f.content for f in result if validate(f)}
+      result = self.execute(scheduler, FilesContent, self.specs('', *filespecs))[0]
+      actual_content = {f.path: f.content for f in result.dependencies}
       self.assertEquals(expected_content, actual_content)
 
   def assert_digest(self, filespecs, expected_files):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, FileDigest, self.specs('', *filespecs))[0]
+      result = self.execute(scheduler, FilesDigest, self.specs('', *filespecs))[0]
       # Confirm all expected files were digested.
-      self.assertEquals(set(expected_files), set(f.path for f in result))
+      self.assertEquals(set(expected_files), set(f.path for f in result.dependencies))
       # And that each distinct path had a distinct digest.
-      self.assertEquals(len(set(expected_files)), len(set(f.digest for f in result)))
+      self.assertEquals(len(set(expected_files)), len(set(f.digest for f in result.dependencies)))
 
   def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
     with self.mk_project_tree(self._original_src) as project_tree:
@@ -198,6 +195,10 @@ class GitFSTest(unittest.TestCase, FSTestBase):
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_recursive(self):
     super(GitFSTest, self).test_walk_recursive()
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_walk_recursive_all(self):
+    super(GitFSTest, self).test_walk_recursive_all()
 
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_files_content_literal(self):
