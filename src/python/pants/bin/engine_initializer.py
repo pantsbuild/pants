@@ -44,18 +44,16 @@ class LegacySymbolTable(SymbolTable):
   @classmethod
   @memoized_method
   def table(cls):
-    def target_type(alias):
-      # TODO: The alias matching here is to avoid elevating "TargetAdaptors" into the public
-      # API until until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
-      # These should likely move onto Target subclasses as the engine gets deeper into beta
-      # territory.
-      if alias == 'jvm_app':
-        return JvmAppAdaptor
-      elif alias in ('python_library', 'python_tests', 'python_binary'):
-        return PythonTargetAdaptor
-      else:
-        return TargetAdaptor
-    return {alias: target_type(alias) for alias in cls.aliases().target_types}
+    aliases = {alias: TargetAdaptor for alias in cls.aliases().target_types}
+    # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
+    # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
+    # These should likely move onto Target subclasses as the engine gets deeper into beta
+    # territory.
+    aliases['jvm_app'] = JvmAppAdaptor
+    for alias in ('python_library', 'python_tests', 'python_binary'):
+      aliases[alias] = PythonTargetAdaptor
+
+    return aliases
 
 
 class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler',
