@@ -157,6 +157,10 @@ class JvmCompile(NailgunTaskBase):
              help='Capture classpath to per-target newline-delimited text files. These files will '
                   'be packaged into any jar artifacts that are created from the jvm targets.')
 
+    register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True,
+             help='Use jar files on the compile_classpath. Note: Using this option degrades '
+                  'incremental compile between targets.')
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmCompile, cls).prepare(options, round_manager)
@@ -358,6 +362,11 @@ class JvmCompile(NailgunTaskBase):
     compile_classpath = self.context.products.get_data('compile_classpath')
     classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
 
+    def classpath_for_context(context):
+      if self.get_options().use_classpath_jars:
+        return context.jar_file
+      return context.classes_dir
+
     fingerprint_strategy = self._fingerprint_strategy(classpath_product)
     # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
     # we begin writing artifacts out to the cache immediately instead of waiting for
@@ -371,8 +380,8 @@ class JvmCompile(NailgunTaskBase):
       compile_contexts = {vt.target: self._compile_context(vt.target, vt.results_dir)
                           for vt in invalidation_check.all_vts}
       for cc in compile_contexts.values():
-        classpath_product.add_for_target(cc.target,
-                                         [(conf, cc.classes_dir) for conf in self._confs])
+        classpath_product.add_for_target(cc.target, [(conf, classpath_for_context(cc))
+                                                     for conf in self._confs])
 
       # Register products for valid targets.
       valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
@@ -388,12 +397,13 @@ class JvmCompile(NailgunTaskBase):
           self.extra_compile_time_classpath_elements(),
         )
 
-      # Once compilation has completed, replace the classpath entry for each target with
-      # its jar'd representation.
-      for cc in compile_contexts.values():
-        for conf in self._confs:
-          classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
-          classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+      if not self.get_options().use_classpath_jars:
+        # Once compilation has completed, replace the classpath entry for each target with
+        # its jar'd representation.
+        for cc in compile_contexts.values():
+          for conf in self._confs:
+            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
   def do_compile(self,
                  invalidation_check,
@@ -607,13 +617,18 @@ class JvmCompile(NailgunTaskBase):
             target.address.spec, pruned))
     else:
       classpath_targets = target.closure(bfs=True, **self._target_closure_kwargs)
-    ret = ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
-                                          extra_compile_time_classpath, self._confs)
+
+    classpath_targets = (t for t in classpath_targets if t != target)
+    cp_entries = [compile_context.classes_dir]
+    cp_entries.extend(ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
+                                                      extra_compile_time_classpath, self._confs))
+
     if isinstance(target, JavacPlugin):
       # Javac plugins need to compile against our distribution's tools.jar. There's no way to
       # express this via traversable_dependency_specs, so we inject it into the classpath here.
-      ret = self.dist.find_libs(['tools.jar']) + ret
-    return ret
+      cp_entries = self.dist.find_libs(['tools.jar']) + cp_entries
+
+    return cp_entries
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""

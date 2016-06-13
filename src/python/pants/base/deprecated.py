@@ -104,6 +104,7 @@ def deprecated_conditional(predicate,
 
   :param () -> bool predicate: A function that returns True if the deprecation warning should be on.
   :param string removal_version: The pants version which will remove the deprecated functionality.
+  :param string entity_description: A description of the deprecated entity.
   :param string hint_message: An optional hint pointing to alternatives to the deprecation.
   :param int stacklevel: How far up in the stack do we go to find the calling fn to report
   :raises DeprecationApplicationError if the deprecation is applied improperly.

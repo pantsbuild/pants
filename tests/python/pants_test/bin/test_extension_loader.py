@@ -296,7 +296,7 @@ class LoaderTest(unittest.TestCase):
     def reg_alias():
       return BuildFileAliases(targets={'override-alias': DummyTarget2})
     self.working_set.add(self.get_mock_plugin('pluginalias', '0.0.1', alias=reg_alias))
-    plugins=['pluginalias==0.0.1'];
+    plugins=['pluginalias==0.0.1']
     aliases = BuildFileAliases(targets={'override-alias': DummyTarget})
     with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
       backends=[backend_module]
