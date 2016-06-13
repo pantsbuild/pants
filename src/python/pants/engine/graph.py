@@ -14,7 +14,7 @@ from pants.base.project_tree import Dir
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.fs import Dirs, File, Files, FilesContent, Path, PathGlobs, Stats
+from pants.engine.fs import Dirs, File, Files, FilesContent, Path, PathGlobs, DirectoryListing
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -35,12 +35,14 @@ class BuildFiles(datatype('BuildFiles', ['files'])):
   """A list of Paths that are known to match a BUILD file pattern."""
 
 
-def filter_buildfile_paths(address_mapper, stats):
+def filter_buildfile_paths(address_mapper, directory_listing):
+  if not directory_listing.exists:
+    raise ResolveError('Directory "{}" does not exist.'.format(directory_listing.directory))
   build_pattern = address_mapper.build_pattern
   def match(stat):
     return type(stat) is File and build_pattern.match(basename(stat.path))
   build_files = tuple(Path(stat.path, stat)
-                      for stat in stats.dependencies if match(stat))
+                      for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)
 
 
@@ -49,6 +51,8 @@ def parse_address_family(address_mapper, path, build_files_content):
 
   The AddressFamily may be empty, but it will not be None.
   """
+  if not build_files_content.dependencies:
+    raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
   for filepath, filecontent in build_files_content.dependencies:
     address_maps.append(AddressMap.parse(filepath,
@@ -256,7 +260,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      parse_address_family),
     (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(Stats)],
+      Select(DirectoryListing)],
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks

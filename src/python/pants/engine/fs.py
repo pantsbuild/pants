@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
 import fnmatch
 from abc import abstractproperty
 from hashlib import sha1
@@ -14,7 +15,7 @@ from os.path import basename, join, normpath
 import six
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants.base.project_tree import Dir, File, Link, Stat
+from pants.base.project_tree import Dir, File, Link
 from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
@@ -109,7 +110,7 @@ class Paths(datatype('Paths', ['dependencies'])):
 class PathGlob(AbstractClass):
   """A filename pattern.
 
-  All PathGlob subclasses represent in-progress recursion that may match zero or more Stats. The
+  All PathGlob subclasses represent in-progress recursion that may match zero or more Paths. The
   leaves of a "tree" of PathGlobs will be Path objects which may or may not exist.
   """
 
@@ -226,16 +227,25 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
                      for filespec in filespecs))
 
 
-def scan_directory(project_tree, directory):
-  """List Stats directly below the given path, relative to the ProjectTree.
+class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):
+  """A list of Stat objects representing a directory listing.
 
-  Fails eagerly if the path does not exist or is not a directory: since the input is
-  a `Dir` instance, the path it represents should already have been confirmed to be an
-  existing directory.
-
-  :returns: A Stats object containing the members of the directory.
+  If exists=False, then the entries list will be empty.
   """
-  return Stats(tuple(project_tree.scandir(directory.path)))
+
+
+def scan_directory(project_tree, directory):
+  """List Stat objects directly below the given path, relative to the ProjectTree.
+
+  :returns: A DirectoryListing.
+  """
+  try:
+    return DirectoryListing(directory, tuple(project_tree.scandir(directory.path)), exists=True)
+  except (IOError, OSError) as e:
+    if e.errno == errno.ENOENT:
+      return DirectoryListing(directory, tuple(), exists=False)
+    else:
+      raise e
 
 
 def merge_paths(paths_list):
@@ -249,7 +259,7 @@ def apply_path_root(path_root):
 
 
 def apply_path_wildcard(stats, path_wildcard):
-  """Filter the given Stats object using the given PathWildcard."""
+  """Filter the given DirectoryListing object using the given PathWildcard."""
   return Paths(tuple(Path(normpath(join(path_wildcard.symbolic_path, basename(s.path))), s)
                      for s in stats.dependencies
                      if fnmatch.fnmatch(basename(s.path), path_wildcard.wildcard)))
@@ -292,7 +302,7 @@ def read_link(project_tree, link):
 
 
 def filter_paths(stats, path_dir_wildcard):
-  """Filter the given Stats object into Paths matching the given PathDirWildcard."""
+  """Filter the given DirectoryListing object into Paths matching the given PathDirWildcard."""
   entries = [(s, basename(s.path)) for s in stats.dependencies]
   paths = tuple(Path(join(path_dir_wildcard.symbolic_path, basename), stat)
                 for stat, basename in entries
@@ -334,7 +344,6 @@ def files_digest(files, file_values):
   return FilesDigest(entries)
 
 
-Stats = Collection.of(Stat)
 FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 
@@ -350,7 +359,7 @@ def create_fs_tasks():
      [Select(PathRoot)],
      apply_path_root),
     (Paths,
-     [SelectProjection(Stats, Dir, ('canonical_stat',), PathWildcard),
+     [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathWildcard),
       Select(PathWildcard)],
      apply_path_wildcard),
     (PathGlobs,
@@ -358,7 +367,7 @@ def create_fs_tasks():
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
     (FilteredPaths,
-     [SelectProjection(Stats, Dir, ('canonical_stat',), PathDirWildcard),
+     [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathDirWildcard),
       Select(PathDirWildcard)],
      filter_paths),
   ] + [

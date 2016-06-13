@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
-from pants.engine.fs import (FileContent, FileDigest, ReadLink, Stats, file_content, file_digest,
+from pants.engine.fs import (FileContent, FileDigest, ReadLink, DirectoryListing, file_content, file_digest,
                              read_link, scan_directory)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
@@ -393,7 +393,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   """A native node type for filesystem operations."""
 
   _FS_PAIRS = {
-      (Stats, Dir),
+      (DirectoryListing, Dir),
       (FileContent, File),
       (FileDigest, File),
       (ReadLink, Link),
@@ -416,12 +416,12 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       # ReadLink, or FileContent for the literal path.
       yield File(f)
       yield Link(f)
-      # Stats for parent dirs.
+      # DirectoryListing for parent dirs.
       yield Dir(dirname(f))
 
   def step(self, step_context):
     try:
-      if self.product is Stats:
+      if self.product is DirectoryListing:
         return Return(scan_directory(step_context.project_tree, self.subject))
       elif self.product is FileContent:
         return Return(file_content(step_context.project_tree, self.subject))
