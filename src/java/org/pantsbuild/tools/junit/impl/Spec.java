@@ -9,6 +9,8 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import org.pantsbuild.junit.annotations.TestParallel;
+import org.pantsbuild.junit.annotations.TestParallelClassesAndMethods;
+import org.pantsbuild.junit.annotations.TestParallelMethods;
 import org.pantsbuild.junit.annotations.TestSerial;
 
 /**
@@ -46,6 +48,10 @@ class Spec {
       return Concurrency.SERIAL;
     } else if (clazz.isAnnotationPresent(TestParallel.class)) {
       return Concurrency.PARALLEL_CLASSES;
+    } else if (clazz.isAnnotationPresent(TestParallelMethods.class)) {
+      return Concurrency.PARALLEL_METHODS;
+    } else if (clazz.isAnnotationPresent(TestParallelClassesAndMethods.class)) {
+      return Concurrency.PARALLEL_CLASSES_AND_METHODS;
     }
     return defaultConcurrency;
   }

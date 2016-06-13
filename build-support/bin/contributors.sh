@@ -38,8 +38,13 @@ done
 function contributors() {
   range="${1:-HEAD}"
 
-  # Include all commits in range but exclude all commits from the imported zinc tree.
-  git log --use-mailmap --format=format:%aN ${range} ^imported_zinc_tree
+  # Include all commits in range but exclude:
+  #  - all commits from the imported zinc tree.
+  #  - commits that are from running the publish goal
+  git log --use-mailmap --format="format:%aN;%s" ${range} ^imported_zinc_tree \
+    | grep -v "pants build committing publish data" \
+    | sed -e 's/;.*$//'
+
 }
 
 if [[ -n "${since}" ]]; then

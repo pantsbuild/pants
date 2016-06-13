@@ -3,6 +3,55 @@
 
 This document describes releases from the ``1.0.x`` ``stable`` branch.
 
+1.0.1 (05/31/2016)
+------------------
+
+The 1.0.1 release: there were no additional changes since the 1.0.1-rc0 release candidate.
+
+
+1.0.1-rc0 (05/21/2016)
+----------------------
+
+This release contains a few performance and behaviour fixes since the 1.0.0 release.
+
+API Changes
+~~~~~~~~~~~
+
+* Add 'transitive' and 'scope' attributes to export of target
+  `RB #3845 <https://rbcommons.com/s/twitter/r/3845>`_
+
+* Upgrade to pex 1.1.6.
+  `RB #3768 <https://rbcommons.com/s/twitter/r/3768>`_
+
+Bugfixes
+~~~~~~~~
+
+* Make pinger.py work with both HTTP and HTTPS.
+  `RB #3904 <https://rbcommons.com/s/twitter/r/3904>`_
+
+* Addresses should not equal things that are not addresses.
+  `RB #3791 <https://rbcommons.com/s/twitter/r/3791>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Split release notes by release branch
+  `RB #3890 <https://rbcommons.com/s/twitter/r/3890>`_
+  `RB #3907 <https://rbcommons.com/s/twitter/r/3907>`_
+
+* Use a set for the contains check in topo order path for invalidation
+  `RB #3786 <https://rbcommons.com/s/twitter/r/3786>`_
+
+* Scrooge gen: Cache resolved scrooge deps
+  `RB #3790 <https://rbcommons.com/s/twitter/r/3790>`_
+
+
+1.0.0 (05/01/2016)
+------------------
+
+The 1.0.0 release! The 1.0.0-rc3 release candidate was accepted without any additional changes.
+
+
 1.0.0-rc3 (04/26/2016)
 ----------------------
 

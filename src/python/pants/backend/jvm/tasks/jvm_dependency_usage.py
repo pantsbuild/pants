@@ -161,8 +161,12 @@ class JvmDependencyUsage(Task):
     analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
     targets_by_file = analyzer.targets_by_file(self.context.targets())
     def creator(target):
-      node = self.create_dep_usage_node(target, targets_by_file, get_buildroot(),
-                                        classes_by_source, runtime_classpath, product_deps_by_src)
+      node = self.create_dep_usage_node(target,
+                                        targets_by_file, get_buildroot(),
+                                        classes_by_source,
+                                        runtime_classpath,
+                                        product_deps_by_src,
+                                        self._compute_transitive_deps_by_target())
       vt = target_to_vts[target]
       with open(self.nodes_json(vt.results_dir), mode='w') as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
@@ -216,8 +220,14 @@ class JvmDependencyUsage(Task):
   def cache_target_dirs(self):
     return True
 
-  def create_dep_usage_node(self, target, targets_by_file, buildroot,
-                            classes_by_source, runtime_classpath, product_deps_by_src):
+  def create_dep_usage_node(self,
+                            target,
+                            targets_by_file,
+                            buildroot,
+                            classes_by_source,
+                            runtime_classpath,
+                            product_deps_by_src,
+                            transitive_deps_by_target):
     concrete_target = target.concrete_derived_from
     products_total = self._count_products(runtime_classpath, target)
     node = Node(concrete_target)
@@ -237,6 +247,11 @@ class JvmDependencyUsage(Task):
         for dep_tgt in targets_by_file.get(product_dep, []):
           derived_from = dep_tgt.concrete_derived_from
           if not self._select(derived_from):
+            continue
+          # Create edge only for those direct or transitive dependencies in order to
+          # disqualify irrelevant targets that happen to share some file in sources,
+          # not uncommon when globs especially rglobs is used.
+          if not derived_from in transitive_deps_by_target.get(concrete_target):
             continue
           is_declared = self._is_declared_dep(target, dep_tgt)
           normalized_deps = self._analyzer.normalize_product_dep(buildroot, classes_by_source, product_dep)

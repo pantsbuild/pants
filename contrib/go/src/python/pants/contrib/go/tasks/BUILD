@@ -28,7 +28,7 @@ python_library(
   name='go_buildgen',
   sources=['go_buildgen.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
+    'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets:go_binary',
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
@@ -71,7 +71,7 @@ python_library(
   name='go_fetch',
   sources=['go_fetch.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
+    'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
     'src/python/pants/base:exceptions',
@@ -107,8 +107,7 @@ python_library(
   name='go_task',
   sources=['go_task.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
-    'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
+    'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets:go_binary',
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_local_source',

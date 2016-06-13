@@ -35,7 +35,7 @@ class LegacyPythonCallbacksParser(Parser):
   @memoized_method
   def _get_symbols(cls, symbol_table_cls):
     symbol_table = symbol_table_cls.table()
-    # TODO: nasty escape hatch
+    # TODO: Nasty escape hatch: see https://github.com/pantsbuild/pants/issues/3561
     aliases = symbol_table_cls.aliases()
 
     class Registrar(BuildFileTargetFactory):
@@ -51,18 +51,14 @@ class LegacyPythonCallbacksParser(Parser):
       def __call__(self, *args, **kwargs):
         name = kwargs.get('name')
         if name and self._serializable:
-          obj = self._object_type(type_alias=self._type_alias, **kwargs)
+          kwargs['type_alias'] = self._type_alias
+          obj = self._object_type(**kwargs)
           cls._objects.append(obj)
           return obj
         else:
           return self._object_type(*args, **kwargs)
 
-    # Compute a single ParseContext for a default path, which we will mutate for each parsed path.
     symbols = {}
-    for alias, target_macro_factory in aliases.target_macro_factories.items():
-      for target_type in target_macro_factory.target_types:
-        symbols[target_type] = TargetAdaptor
-    parse_context = ParseContext(rel_path='', type_aliases=symbols)
 
     for alias, symbol in symbol_table.items():
       registrar = Registrar(alias, symbol)
@@ -73,16 +69,20 @@ class LegacyPythonCallbacksParser(Parser):
       symbols.update(aliases.objects)
 
     # Compute "per path" symbols (which will all use the same mutable ParseContext).
-    aliases = symbol_table_cls.aliases()
+    # TODO: See https://github.com/pantsbuild/pants/issues/3561
+    parse_context = ParseContext(rel_path='', type_aliases=symbols)
     for alias, object_factory in aliases.context_aware_object_factories.items():
       symbols[alias] = object_factory(parse_context)
 
     for alias, target_macro_factory in aliases.target_macro_factories.items():
+      underlying_symbol = symbols.get(alias, TargetAdaptor)
       symbols[alias] = target_macro_factory.target_macro(parse_context)
       for target_type in target_macro_factory.target_types:
-        symbols[target_type] = TargetAdaptor
+        symbols[target_type] = Registrar(alias, underlying_symbol)
 
     # TODO: Replace builtins for paths with objects that will create wrapped PathGlobs objects.
+    # The strategy for https://github.com/pantsbuild/pants/issues/3560 should account for
+    # migrating these additional captured arguments to typed Sources.
     symbols['globs'] = Globs
     symbols['rglobs'] = RGlobs
     symbols['zglobs'] = ZGlobs
@@ -100,5 +100,5 @@ class LegacyPythonCallbacksParser(Parser):
 
     with cls._lock:
       del cls._objects[:]
-      six.exec_(python, symbols, {})
+      six.exec_(python, symbols)
       return list(cls._objects)

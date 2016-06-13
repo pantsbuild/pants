@@ -5,13 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import types
 from textwrap import dedent
 
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.go import register
-from pants.contrib.go.subsystems.fetchers import Fetcher, Fetchers
+from pants.contrib.go.subsystems.fetcher import Fetcher
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
@@ -19,11 +20,16 @@ from pants.contrib.go.tasks.go_buildgen import GoBuildgen, GoTargetGenerator
 
 
 class FakeFetcher(Fetcher):
-  def root(self, import_path):
+  def root(self):
     return 'pantsbuild.org/fake'
 
-  def fetch(self, import_path, dest, rev=None):
+  def fetch(self, dest, rev=None):
     raise AssertionError('No fetches should be executed during go.buildgen')
+
+
+class FakeFetcherFactory(object):
+  def get_fetcher(self, import_path):
+    return FakeFetcher(import_path)
 
 
 class GoBuildgenTest(TaskTestBase):
@@ -31,6 +37,11 @@ class GoBuildgenTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return GoBuildgen
+
+  def create_task(self, context, workdir=None):
+    task = super(GoBuildgenTest, self).create_task(context, workdir)
+    task.get_fetcher_factory = types.MethodType(lambda s: FakeFetcherFactory(), task)
+    return task
 
   @property
   def alias_groups(self):
@@ -201,10 +212,6 @@ class GoBuildgenTest(TaskTestBase):
 
   def stitch_deps_remote(self, remote=True, materialize=False, fail_floating=False):
     self.set_options(remote=remote, materialize=materialize, fail_floating=fail_floating)
-    self.set_options_for_scope(Fetchers.options_scope,
-                               mapping={r'pantsbuild.org/.*':
-                                        '{}.{}'.format(FakeFetcher.__module__,
-                                                       FakeFetcher.__name__)})
 
     if materialize:
       # We need physical directories on disk for `--materialize` since it does scans.
@@ -308,11 +315,6 @@ class GoBuildgenTest(TaskTestBase):
     # newer, encouraged, target-less invocation of GoBuildgen.
 
     self.set_options(remote=True, materialize=True, fail_floating=True)
-    self.set_options_for_scope(Fetchers.options_scope,
-                               mapping={r'pantsbuild.org/.*':
-                                          '{}.{}'.format(FakeFetcher.__module__,
-                                                         FakeFetcher.__name__)})
-
     self.add_to_build_file(relpath='3rdparty/go/pantsbuild.org/fake',
                            target='go_remote_library(rev="v4.5.6")')
 

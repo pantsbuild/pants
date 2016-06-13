@@ -11,6 +11,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Bill Farner
 + Brian Larson
 + Brian Wickman
++ Bruno Bieth
 + Chris Aniszczyk
 + Chris Burroughs
 + Chris Chen
@@ -28,6 +29,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Divij Rajkumar
 + Dominic Hamon
 + Dumitru Daniliuc
++ Ebube Chuba
 + Emily Caveness
 + Eric Ayers
 + Eric Danielson
@@ -119,5 +121,6 @@ Created by running `build-support/bin/contributors.sh`.
 + Travis Crawford
 + Ugo Di Girolamo
 + Wei An
++ Wolfram Arnold
 + Yi Cheng
 + Yujie Chen

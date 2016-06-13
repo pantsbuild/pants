@@ -33,7 +33,7 @@ junit_tests(name='annotated-parallel',
 
 # Even though these tests are run with 'parallel_classes' concurrency, they are annotated
 # with @TestSerial, so they should run serially, even when even when
-# --test-junit-default-concurrency={PARALLEL_CLASSES, PARALLEL_METHODS, PARALLEL_BOTH} is set
+# --test-junit-default-concurrency={PARALLEL_CLASSES, PARALLEL_METHODS, PARALLEL_CLASSES_AND_METHODS} is set
 # See: https://github.com/pantsbuild/pants/issues/3209
 junit_tests(name='annotated-serial',
   sources=globs('AnnotatedSerialTest*.java'),

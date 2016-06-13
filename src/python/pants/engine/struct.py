@@ -310,12 +310,12 @@ class StructWithDeps(Struct):
     """
 
 
-class HasStructs(AbstractClass):
-  """A mixin to mark an object as containing a collection of Structs in one of its fields."""
+class HasProducts(AbstractClass):
+  """A mixin for a class that has a collection of products which it would like to expose."""
 
   @abstractproperty
-  def collection_field(cls):
-    """Returns the name of the field of this Class that contains a collection of Structs."""
+  def products(self):
+    """Returns a collection of products held by this class."""
 
 
 class Variants(Struct):

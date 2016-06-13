@@ -15,15 +15,14 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
-from pants.engine.fs import Dirs, File, FileContent, FilesContent, PathGlobs, create_fs_tasks
+from pants.engine.fs import Dirs, Files, FilesContent, PathGlobs, create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
-from pants.engine.storage import Storage
-from pants.engine.struct import HasStructs, Struct, StructWithDeps, Variants
+from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants_test.engine.examples.graph_validator import GraphValidator
@@ -41,12 +40,11 @@ def printing_func(func):
   return wrapper
 
 
-class Target(Struct, HasStructs):
+class Target(Struct, HasProducts):
   """A placeholder for the most-numerous Struct subclass.
 
   This particular implementation holds a collection of other Structs in a `configurations` field.
   """
-  collection_field = 'configurations'
 
   def __init__(self, name=None, configurations=None, **kwargs):
     """
@@ -56,6 +54,10 @@ class Target(Struct, HasStructs):
     super(Target, self).__init__(name=name, **kwargs)
 
     self.configurations = configurations
+
+  @property
+  def products(self):
+    return self.configurations
 
   @addressable_list(SubclassesOf(Struct))
   def configurations(self):
@@ -119,7 +121,7 @@ def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
   specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
-  return PathGlobs.create_from_specs(Dirs, '', specs)
+  return PathGlobs.create_from_specs('', specs)
 
 
 @printing_func
@@ -403,21 +405,18 @@ class ExampleTable(SymbolTable):
             'inferred_scala': ScalaInferredDepsSources}
 
 
-def setup_json_scheduler(build_root, debug=True):
+def setup_json_scheduler(build_root, inline_nodes=True):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype A tuple of :class:`pants.engine.scheduler.LocalScheduler`,
-    :class:`pants.engine.storage.Storage`.
+  :rtype :class:`pants.engine.scheduler.LocalScheduler`
   """
-
-  storage = Storage.create(debug=debug)
 
   symbol_table_cls = ExampleTable
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
   address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                                  build_pattern=r'^BLD.json$',
+                                                  build_pattern='BLD.json',
                                                   parser_cls=JsonParser)
   source_roots = SourceRoots(('src/java','src/scala'))
   scrooge_tool_address = Address.parse('src/scala/scrooge')
@@ -429,8 +428,8 @@ def setup_json_scheduler(build_root, debug=True):
       'list': Address,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
-      'ls': File,
-      'cat': FileContent,
+      'ls': Files,
+      'cat': FilesContent,
     }
   tasks = [
       # Codegen
@@ -464,7 +463,7 @@ def setup_json_scheduler(build_root, debug=True):
        extract_scala_imports),
       (Address,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Dirs)],
+        SelectDependencies(AddressFamily, Dirs, field='stats')],
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),
@@ -510,4 +509,9 @@ def setup_json_scheduler(build_root, debug=True):
     )
 
   project_tree = FileSystemProjectTree(build_root)
-  return LocalScheduler(goals, tasks, storage, project_tree, None, GraphValidator(symbol_table_cls)), storage
+  return LocalScheduler(goals,
+                        tasks,
+                        project_tree,
+                        graph_lock=None,
+                        inline_nodes=inline_nodes,
+                        graph_validator=GraphValidator(symbol_table_cls))

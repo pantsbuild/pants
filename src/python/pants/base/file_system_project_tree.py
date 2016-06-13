@@ -5,13 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
-import stat
 from glob import glob1
 
-from pants.base.project_tree import PTSTAT_DIR, PTSTAT_FILE, PTSTAT_LINK, ProjectTree
+from pants.base.project_tree import Dir, File, Link, ProjectTree
 from pants.util.dirutil import fast_relpath, safe_walk
+
+
+# Use the built-in version of scandir/walk if possible, otherwise
+# use the scandir module version
+try:
+  from os import scandir
+except ImportError:
+  from scandir import scandir
 
 
 class FileSystemProjectTree(ProjectTree):
@@ -23,10 +29,26 @@ class FileSystemProjectTree(ProjectTree):
   def _glob1_raw(self, dir_relpath, glob):
     return glob1(self._join(dir_relpath), glob)
 
-  def _listdir_raw(self, relpath):
-    # TODO: use scandir which is backported from 3.x
-    # https://github.com/pantsbuild/pants/issues/3250
-    return os.listdir(self._join(relpath))
+  def _scandir_raw(self, relpath):
+    # Sanity check. TODO: this should probably be added to the ProjectTree interface as
+    # an optional call, so that we can use it in fs.py rather than applying it by default.
+    abspath = os.path.normpath(self._join(relpath))
+    if os.path.realpath(abspath) != abspath:
+      raise ValueError('scandir for non-canonical path "{}" not supported in {}.'.format(
+        relpath, self))
+
+    for entry in scandir(abspath):
+      # NB: We don't use `DirEntry.stat`, as the scandir docs indicate that that always requires
+      # an additional syscall on Unixes.
+      entry_path = os.path.normpath(os.path.join(relpath, entry.name))
+      if entry.is_file(follow_symlinks=False):
+        yield File(entry_path)
+      elif entry.is_dir(follow_symlinks=False):
+        yield Dir(entry_path)
+      elif entry.is_symlink():
+        yield Link(entry_path)
+      else:
+        raise IOError('Unsupported file type in {}: {}'.format(self, entry_path))
 
   def _isdir_raw(self, relpath):
     return os.path.isdir(self._join(relpath))
@@ -43,23 +65,6 @@ class FileSystemProjectTree(ProjectTree):
 
   def _relative_readlink_raw(self, relpath):
     return os.readlink(self._join(relpath))
-
-  def _lstat_raw(self, relpath):
-    try:
-      mode = os.lstat(self._join(relpath)).st_mode
-      if stat.S_ISLNK(mode):
-        return PTSTAT_LINK
-      elif stat.S_ISDIR(mode):
-        return PTSTAT_DIR
-      elif stat.S_ISREG(mode):
-        return PTSTAT_FILE
-      else:
-        raise IOError('Unsupported file type in {}: {}'.format(self, relpath))
-    except (IOError, OSError) as e:
-      if e.errno == errno.ENOENT:
-        return None
-      else:
-        raise e
 
   def _walk_raw(self, relpath, topdown=True):
     def onerror(error):

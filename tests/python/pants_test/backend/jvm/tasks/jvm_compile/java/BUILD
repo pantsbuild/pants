@@ -23,6 +23,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   tags = {'integration'},
+  timeout=240,
 )
 
 python_tests(
@@ -36,6 +37,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   tags = {'integration'},
+  timeout=180,
 )
 
 python_tests(
@@ -67,6 +69,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test/java/distribution',
   ],
 )
 

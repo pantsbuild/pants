@@ -31,6 +31,7 @@ class TestNailgunProtocol(unittest.TestCase):
   EMPTY_PAYLOAD = ''
   TEST_COMMAND = 'test'
   TEST_OUTPUT = 't e s t'
+  TEST_UNICODE_PAYLOAD = u'([\d０-９]{1,4}\s?[年月日])'.encode('utf-8')
   TEST_WORKING_DIR = '/path/to/a/repo'
   TEST_ARGUMENTS = ['t', 'e', 's', 't']
   TEST_ENVIRON = dict(TEST_VAR='success')
@@ -173,6 +174,14 @@ class TestNailgunProtocol(unittest.TestCase):
     self.assertEqual(
       (chunk_type, payload),
       (ChunkType.EXIT, self.TEST_OUTPUT)
+    )
+
+  def test_send_unicode_chunk(self):
+    NailgunProtocol.send_stdout(self.server_sock, self.TEST_UNICODE_PAYLOAD)
+    chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
+    self.assertEqual(
+      (chunk_type, payload),
+      (ChunkType.STDOUT, self.TEST_UNICODE_PAYLOAD)
     )
 
   def test_isatty_from_empty_env(self):

@@ -17,6 +17,7 @@ python_library(
   sources = ['project_tree.py'],
   dependencies = [
     '3rdparty/python:pathspec',
+    '3rdparty/python:six',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
@@ -27,6 +28,7 @@ python_library(
   name = 'file_system_project_tree',
   sources = ['file_system_project_tree.py'],
   dependencies = [
+    '3rdparty/python:scandir',
     ':project_tree',
     'src/python/pants/util:dirutil',
   ]

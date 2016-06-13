@@ -12,7 +12,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.specs import DescendantAddresses, SingleAddress
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
 from pants.engine.engine import LocalSerialEngine
@@ -21,19 +21,20 @@ from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, Diffe
                                  DuplicateNameError, ResolveError, UnaddressableObjectError)
 from pants.engine.nodes import Throw
 from pants.engine.parser import SymbolTable
-from pants.engine.storage import Storage
-from pants.engine.struct import HasStructs, Struct
+from pants.engine.struct import HasProducts, Struct
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Target(Struct, HasStructs):
-  collection_field = 'configurations'
-
+class Target(Struct, HasProducts):
   def __init__(self, name=None, configurations=None, **kwargs):
     super(Target, self).__init__(name=name, **kwargs)
     self.configurations = configurations
+
+  @property
+  def products(self):
+    return self.configurations
 
   @addressable_list(SubclassesOf(Struct))
   def configurations(self):
@@ -159,18 +160,14 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     # Set up a scheduler that supports address mapping.
     symbol_table_cls = TargetTable
-    self.storage = Storage.create(in_memory=True)
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=JsonParser,
-                                   build_pattern=r'.+\.BUILD.json$')
+                                   build_pattern='*.BUILD.json')
     tasks = create_graph_tasks(address_mapper, symbol_table_cls)
 
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
     self.build_root = project_tree.build_root
-    self.scheduler, _ = self.mk_scheduler(tasks=tasks,
-                                          project_tree=project_tree,
-                                          storage=self.storage,
-                                          symbol_table_cls=symbol_table_cls)
+    self.scheduler = self.mk_scheduler(tasks=tasks, project_tree=project_tree)
 
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',
@@ -178,12 +175,9 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              configurations=['//a', Struct(embedded='yes')],
                              type_alias='target')
 
-  def tearDown(self):
-    self.storage.close()
-
   def resolve(self, spec):
     request = self.scheduler.execution_request([UnhydratedStruct], [spec])
-    result = LocalSerialEngine(self.scheduler, self.storage).execute(request)
+    result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error
 
@@ -224,7 +218,11 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def addr(spec):
     return Address.parse(spec)
 
-  def test_walk_addressables(self):
+  def test_walk_siblings(self):
+    self.assertEqual({self.addr('a/b:b'): self.a_b_target},
+                     self.resolve_multi(SiblingAddresses('a/b')))
+
+  def test_walk_descendants(self):
     self.assertEqual({self.addr('//:root'): Struct(name='root', type_alias='struct'),
                       self.addr('a/b:b'): self.a_b_target,
                       self.addr('a/d:d'): Target(name='d', type_alias='target'),
@@ -232,14 +230,14 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                       self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
                      self.resolve_multi(DescendantAddresses('')))
 
-  def test_walk_addressables_rel_path(self):
+  def test_walk_descendants_rel_path(self):
     self.assertEqual({self.addr('a/d:d'): Target(name='d', type_alias='target'),
                       self.addr('a/d/e:e'): Target(name='e', type_alias='target'),
                       self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
                      self.resolve_multi(DescendantAddresses('a/d')))
 
   @pytest.mark.xfail(reason='''Excludes are not implemented: expects excludes=['a/b', 'a/d/e'])''')
-  def test_walk_addressables_path_excludes(self):
+  def test_walk_descendants_path_excludes(self):
     self.assertEqual({self.addr('//:root'): Struct(name='root'),
                       self.addr('a/d:d'): Target(name='d')},
                      self.resolve_multi(DescendantAddresses('')))

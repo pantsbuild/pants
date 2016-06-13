@@ -23,11 +23,12 @@ python_tests(
 )
 
 python_tests(
-  name = 'graph_invalidation',
-  sources = ['test_graph_invalidation.py'],
+  name = 'graph',
+  sources = ['test_graph.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/bin'
+    'src/python/pants/bin',
+    'src/python/pants/build_graph',
   ]
 )
 
@@ -39,4 +40,13 @@ python_tests(
   ],
   tags = {'integration'},
   timeout = 180,
+)
+
+python_tests(
+  name = 'pants_engine_integration',
+  sources = ['test_pants_engine_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test'
+  ],
+  tags = {'integration'}
 )

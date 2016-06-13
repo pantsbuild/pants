@@ -56,6 +56,7 @@ python_tests(
   name='path_globs',
   sources=['test_path_globs.py'],
   dependencies=[
+    'src/python/pants/base:project_tree',
     'src/python/pants/engine:fs',
   ]
 )
@@ -86,13 +87,15 @@ python_tests(
   name='graph',
   sources=['test_graph.py'],
   dependencies=[
+    ':scheduler_test_base',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/engine/examples:parsers',
+    'src/python/pants/engine:engine',
     'src/python/pants/engine:graph',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:storage',
     'src/python/pants/engine:struct',
+    'tests/python/pants_test/engine/examples:parsers',
   ]
 )
 

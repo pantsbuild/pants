@@ -15,7 +15,7 @@ import static org.junit.Assert.assertTrue;
  * For all methods in ParallelTest1 and ParallelTest2
  * to succeed, both test classes  must be running at the same time. Intended to test the flags
  * <pre>
- * -default-parallel -parallel-threads 2
+ * -default-concurrency PARALLEL_CLASSES -parallel-threads 2
  * </pre>
  * when running with just these two classes as specs.
  * <p>

@@ -96,6 +96,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/fs',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:objects',
   ],
 )
 
@@ -236,6 +237,7 @@ python_library(
   sources = ['jar_publish.py'],
   resource_targets = [
     ':jar_publish_resources',
+    ':reports_resources'
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -308,6 +310,21 @@ python_library(
 )
 
 python_library(
+  name = 'reports',
+  sources = globs('reports/*.py'),
+  dependencies = [
+    'src/python/pants/base:mustache',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
+  ],
+)
+
+resources(
+  name = 'reports_resources',
+  sources = globs('reports/templates/*.mustache'),
+)
+
+python_library(
   name = 'junit_run',
   sources = ['junit_run.py'],
   dependencies = [
@@ -320,6 +337,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:coverage',
+    'src/python/pants/backend/jvm/tasks:reports',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',

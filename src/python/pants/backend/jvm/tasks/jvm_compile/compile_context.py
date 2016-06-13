@@ -100,7 +100,6 @@ class CompileContext(object):
     """
     for dep in self._plugin_dependencies(dep_context):
       yield dep
-    yield self.target
     for declared in self.declared_dependencies(dep_context, compiler_plugins=True):
       if isinstance(declared, dep_context.compiler_plugin_types):
         for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
