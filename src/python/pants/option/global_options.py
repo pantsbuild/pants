@@ -61,23 +61,17 @@ class GlobalOptionsRegistrar(Optionable):
              help='Cache resolved plugin requirements here.')
 
     register('--backend-packages', advanced=True, type=list,
-             help='Load backends from these packages that are already on the path.')
+             help='Load backends from these packages that are already on the path. '
+                  'Add contrib and custom backends to this list.')
     register('--default-backend-packages', advanced=True, type=list,
              default=['pants.backend.graph_info',
-                      'pants.backend.docgen',
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.codegen',
                       'pants.backend.project_info'],
-             removal_version='1.3.0',
-             removal_hint='Add the backends you need to --backend-packages instead.  To see '
-                          'available backends run: '
-                          './pants help-advanced | grep default-backend-packages | egrep -o -m1 '
-                          '"default: [^)]+" . '
-                          'In the future there will be no default backends and all backends will'
-                          'have to be opted into via --backend packages.',
-             help='Temporary helper option to ease the transition to requiring repos to '
-                  'opt-in to any needed backend.')
+             help='Load these backends by default.  These backends come distributed with Pants. '
+                  'Remove unused backends from this list to speed up execution. '
+                  'Use --backend-packages to configure additional backends with Pants.')
 
     register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
              help='Use this dir for global cache.')

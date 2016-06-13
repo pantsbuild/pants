@@ -78,6 +78,7 @@ function execute_packaged_pants_with_internal_backends() {
     --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[ \
+        'pants.backend.docgen', \
         'internal_backend.optional', \
         'internal_backend.repositories', \
         'internal_backend.sitegen', \
