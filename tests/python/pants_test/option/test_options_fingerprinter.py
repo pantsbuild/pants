@@ -5,10 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.option.custom_types import dict_option, file_option, list_option, target_option
 from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 
 
@@ -71,6 +74,12 @@ class OptionsFingerprinterTest(BaseTest):
     self.assertNotEquals(fp1, fp2)
     self.assertNotEquals(fp1, fp3)
     self.assertNotEquals(fp2, fp3)
+
+  def test_fingerprint_file_outside_buildroot(self):
+    with temporary_dir() as tmp:
+      outside_buildroot = self.create_file(os.path.join(tmp, 'foobar'), contents='foobar')
+      with self.assertRaises(ValueError):
+        self.options_fingerprinter.fingerprint(file_option, outside_buildroot)
 
   def test_fingerprint_file_list(self):
     f1, f2, f3 = (self.create_file(f, contents=c) for (f, c) in

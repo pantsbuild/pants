@@ -241,7 +241,6 @@ class BaseZincCompile(JvmCompile):
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
-
     self.set_distribution(jdk=True)
     try:
       # Zinc uses com.sun.tools.javac.Main for in-process java compilation.
