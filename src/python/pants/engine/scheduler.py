@@ -584,7 +584,7 @@ class LocalScheduler(object):
           elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
             yield DependenciesNode(subject, product, None, Addresses, None)
           elif type(subject) is PathGlobs:
-            yield DependenciesNode(subject, product, None, subject.ftype, None)
+            yield SelectNode(subject, product, None, None)
           else:
             raise ValueError('Unsupported root subject type: {}'.format(subject))
 

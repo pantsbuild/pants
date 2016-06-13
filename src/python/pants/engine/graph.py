@@ -6,14 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-from os.path import basename as os_path_basename
+from fnmatch import fnmatch
+from os.path import basename, dirname, join
 
 import six
 
+from pants.base.project_tree import Dir
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.fs import Dir, Dirs, Files, FilesContent, PathGlobs
+from pants.engine.fs import DirectoryListing, File, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -30,13 +32,23 @@ def _key_func(entry):
   return key
 
 
+class BuildDirs(datatype('BuildDirs', ['dependencies'])):
+  """A list of Stat objects for directories containing build files."""
+
+
 class BuildFiles(datatype('BuildFiles', ['files'])):
-  """A list of Paths that are known to match a BUILD file pattern."""
+  """A list of Paths that are known to match a build file pattern."""
 
 
-def filter_buildfile_paths(address_mapper, files):
-  build_files = tuple(f for f in files.dependencies
-                      if address_mapper.build_pattern.match(os_path_basename(f.path)))
+def filter_buildfile_paths(address_mapper, directory_listing):
+  if not directory_listing.exists:
+    raise ResolveError('Directory "{}" does not exist.'.format(directory_listing.directory.path))
+
+  build_pattern = address_mapper.build_pattern
+  def match(stat):
+    return type(stat) is File and fnmatch(basename(stat.path), build_pattern)
+  build_files = tuple(Path(stat.path, stat)
+                      for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)
 
 
@@ -45,6 +57,8 @@ def parse_address_family(address_mapper, path, build_files_content):
 
   The AddressFamily may be empty, but it will not be None.
   """
+  if not build_files_content.dependencies:
+    raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
   for filepath, filecontent in build_files_content.dependencies:
     address_maps.append(AddressMap.parse(filepath,
@@ -196,7 +210,7 @@ def address_from_address_family(address_family, single_address):
   """
   name = single_address.name
   if name is None:
-    name = os_path_basename(single_address.directory)
+    name = basename(single_address.directory)
   if name not in address_family.objects_by_name:
     _raise_did_you_mean(address_family, single_address.name)
   return Addresses(tuple([Address(address_family.namespace, name)]))
@@ -212,9 +226,20 @@ def addresses_from_address_families(address_families):
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
 
 
-def descendant_addresses_to_globs(descendant_addresses):
-  """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
-  return PathGlobs.create(Dirs, descendant_addresses.directory, globs=['.', '*', '**/*'])
+def filter_build_dirs(build_files):
+  """Given Files matching a build pattern, return their parent directories as BuildDirs."""
+  dirnames = set(dirname(f.stat.path) for f in build_files.dependencies)
+  return BuildDirs(tuple(Dir(d) for d in dirnames))
+
+
+def descendant_addresses_to_globs(address_mapper, descendant_addresses):
+  """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
+  
+  This allows us to limit our AddressFamily requests to directories that contain build files.
+  """
+
+  pattern = address_mapper.build_pattern
+  return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -242,7 +267,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      parse_address_family),
     (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(Files)],
+      Select(DirectoryListing)],
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
@@ -252,7 +277,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      identity)
     for product in symbol_table_cls.table().values() if product is not Struct
   ] + [
-    # Spec handling.
+    # Simple spec handling.
     (Addresses,
      [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
       Select(SingleAddress)],
@@ -260,10 +285,17 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     (Addresses,
      [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
      addresses_from_address_family),
+  ] + [
+    # Recursive spec handling: locate directories that contain build files, and request
+    # AddressFamilies for each of them.
     (Addresses,
-     [SelectDependencies(AddressFamily, Dirs)],
+     [SelectDependencies(AddressFamily, BuildDirs)],
      addresses_from_address_families),
+    (BuildDirs,
+     [Select(Files)],
+     filter_build_dirs),
     (PathGlobs,
-     [Select(DescendantAddresses)],
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(DescendantAddresses)],
      descendant_addresses_to_globs),
   ]

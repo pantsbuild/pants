@@ -107,7 +107,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     return scheduler
 
   def create_json(self):
-    return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
+    return self.create(build_pattern='*.BUILD.json', parser_cls=JsonParser)
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
@@ -171,12 +171,12 @@ class InlinedGraphTest(GraphTestBase):
     self.do_test_codegen_simple(scheduler)
 
   def test_python(self):
-    scheduler = self.create(build_pattern=r'.+\.BUILD.python$',
+    scheduler = self.create(build_pattern='*.BUILD.python',
                             parser_cls=PythonAssignmentsParser)
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
-    scheduler = self.create(build_pattern=r'.+\.BUILD$',
+    scheduler = self.create(build_pattern='*.BUILD',
                             parser_cls=PythonCallbacksParser)
     self.do_test_codegen_simple(scheduler)
 
@@ -294,11 +294,11 @@ class LazyResolvingGraphTest(GraphTestBase):
     self.do_test_codegen_simple(scheduler)
 
   def test_python(self):
-    scheduler = self.create(build_pattern=r'.+\.BUILD.python$',
+    scheduler = self.create(build_pattern='*.BUILD.python',
                             parser_cls=PythonAssignmentsParser)
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
-    scheduler = self.create(build_pattern=r'.+\.BUILD$',
+    scheduler = self.create(build_pattern='*.BUILD',
                             parser_cls=PythonCallbacksParser)
     self.do_test_codegen_simple(scheduler)
