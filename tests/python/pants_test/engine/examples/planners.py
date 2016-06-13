@@ -463,7 +463,7 @@ def setup_json_scheduler(build_root, inline_nodes=True):
        extract_scala_imports),
       (Address,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Dirs)],
+        SelectDependencies(AddressFamily, Dirs, field='stats')],
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),

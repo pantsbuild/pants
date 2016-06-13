@@ -41,6 +41,10 @@ class ReadLink(datatype('ReadLink', ['symbolic_path'])):
 class Dirs(datatype('Dirs', ['dependencies'])):
   """A collection of Path objects with Dir stats."""
 
+  @property
+  def stats(self):
+    return tuple(s.stat for s in self.dependencies)
+
 
 class Files(datatype('Files', ['dependencies'])):
   """A collection of Path objects with File stats."""
