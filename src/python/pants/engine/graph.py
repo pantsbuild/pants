@@ -6,7 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-from os.path import basename, join
+from fnmatch import fnmatch
+from os.path import basename, dirname, join
 
 import six
 
@@ -14,7 +15,7 @@ from pants.base.project_tree import Dir
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.fs import Dirs, File, Files, FilesContent, Path, PathGlobs, DirectoryListing
+from pants.engine.fs import DirectoryListing, File, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -31,16 +32,21 @@ def _key_func(entry):
   return key
 
 
+class BuildDirs(datatype('BuildDirs', ['dependencies'])):
+  """A list of Stat objects for directories containing build files."""
+
+
 class BuildFiles(datatype('BuildFiles', ['files'])):
-  """A list of Paths that are known to match a BUILD file pattern."""
+  """A list of Paths that are known to match a build file pattern."""
 
 
 def filter_buildfile_paths(address_mapper, directory_listing):
   if not directory_listing.exists:
-    raise ResolveError('Directory "{}" does not exist.'.format(directory_listing.directory))
+    raise ResolveError('Directory "{}" does not exist.'.format(directory_listing.directory.path))
+
   build_pattern = address_mapper.build_pattern
   def match(stat):
-    return type(stat) is File and build_pattern.match(basename(stat.path))
+    return type(stat) is File and fnmatch(basename(stat.path), build_pattern)
   build_files = tuple(Path(stat.path, stat)
                       for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)
@@ -220,11 +226,20 @@ def addresses_from_address_families(address_families):
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
 
 
-def descendant_addresses_to_globs(descendant_addresses):
-  """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
-  literal = descendant_addresses.directory
-  wildcards = [join(literal, wildcard) for wildcard in ('*', '**/*')]
-  return PathGlobs.create_from_specs('', [literal] + wildcards)
+def filter_build_dirs(build_files):
+  """Given Files matching a build pattern, return their parent directories as BuildDirs."""
+  dirnames = set(dirname(f.stat.path) for f in build_files.dependencies)
+  return BuildDirs(tuple(Dir(d) for d in dirnames))
+
+
+def descendant_addresses_to_globs(address_mapper, descendant_addresses):
+  """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
+  
+  This allows us to limit our AddressFamily requests to directories that contain build files.
+  """
+
+  pattern = address_mapper.build_pattern
+  return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -262,7 +277,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      identity)
     for product in symbol_table_cls.table().values() if product is not Struct
   ] + [
-    # Spec handling.
+    # Simple spec handling.
     (Addresses,
      [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
       Select(SingleAddress)],
@@ -270,10 +285,17 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     (Addresses,
      [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
      addresses_from_address_family),
+  ] + [
+    # Recursive spec handling: locate directories that contain build files, and request
+    # AddressFamilies for each of them.
     (Addresses,
-     [SelectDependencies(AddressFamily, Dirs, field='stats')],
+     [SelectDependencies(AddressFamily, BuildDirs)],
      addresses_from_address_families),
+    (BuildDirs,
+     [Select(Files)],
+     filter_build_dirs),
     (PathGlobs,
-     [Select(DescendantAddresses)],
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(DescendantAddresses)],
      descendant_addresses_to_globs),
   ]

@@ -6,8 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
-import fnmatch
 from abc import abstractproperty
+from fnmatch import fnmatch
 from hashlib import sha1
 from os import sep as os_sep
 from os.path import basename, join, normpath
@@ -40,10 +40,6 @@ class ReadLink(datatype('ReadLink', ['symbolic_path'])):
 
 class Dirs(datatype('Dirs', ['dependencies'])):
   """A collection of Path objects with Dir stats."""
-
-  @property
-  def stats(self):
-    return tuple(s.stat for s in self.dependencies)
 
 
 class Files(datatype('Files', ['dependencies'])):
@@ -262,7 +258,7 @@ def apply_path_wildcard(stats, path_wildcard):
   """Filter the given DirectoryListing object using the given PathWildcard."""
   return Paths(tuple(Path(normpath(join(path_wildcard.symbolic_path, basename(s.path))), s)
                      for s in stats.dependencies
-                     if fnmatch.fnmatch(basename(s.path), path_wildcard.wildcard)))
+                     if fnmatch(basename(s.path), path_wildcard.wildcard)))
 
 
 def apply_path_dir_wildcard(dirs, path_dir_wildcard):
@@ -306,7 +302,7 @@ def filter_paths(stats, path_dir_wildcard):
   entries = [(s, basename(s.path)) for s in stats.dependencies]
   paths = tuple(Path(join(path_dir_wildcard.symbolic_path, basename), stat)
                 for stat, basename in entries
-                if fnmatch.fnmatch(basename, path_dir_wildcard.wildcard))
+                if fnmatch(basename, path_dir_wildcard.wildcard))
   return FilteredPaths(Paths(paths))
 
 

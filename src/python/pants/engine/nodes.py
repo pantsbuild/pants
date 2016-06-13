@@ -13,8 +13,8 @@ from twitter.common.collections import OrderedSet
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
-from pants.engine.fs import (FileContent, FileDigest, ReadLink, DirectoryListing, file_content, file_digest,
-                             read_link, scan_directory)
+from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
+                             file_digest, read_link, scan_directory)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
