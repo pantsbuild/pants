@@ -14,6 +14,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.util.dirutil import fast_relpath
@@ -112,7 +113,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       and `None` if `resolved_dependency` is not a dependency of a target alias.
     """
     for declared in target.dependencies:
-      if type(declared) == Target:
+      if type(declared) in (Target, AliasTarget):
         for r, _ in self._resolve_aliases(declared):
           yield r, declared
       else:

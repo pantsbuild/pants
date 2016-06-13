@@ -109,7 +109,8 @@ class TestJvmDependencyUsage(TaskTestBase):
     b = self.make_java_target(spec=':b', sources=['b.java'])
     alias_a_b = self.make_target(spec=':alias_a_b', dependencies=[a, b])
     alias_b = self.make_target(spec=':alias_b', dependencies=[b])
-    c = self.make_java_target(spec=':c', sources=['c.java'], dependencies=[alias_a_b, alias_b])
+    nested_alias_b = self.make_target(spec=':nest_alias_b', dependencies=[alias_b])
+    c = self.make_java_target(spec=':c', sources=['c.java'], dependencies=[alias_a_b, nested_alias_b])
     self.set_options(strict_deps=False)
     dep_usage, product_deps_by_src = self._setup({
       a: ['a.class'],
@@ -118,7 +119,7 @@ class TestJvmDependencyUsage(TaskTestBase):
     })
 
     product_deps_by_src[c] = {'c.java': ['a.class']}
-    graph = self.create_graph(dep_usage, [a, b, c, alias_a_b, alias_b])
+    graph = self.create_graph(dep_usage, [a, b, c, alias_a_b, alias_b, nested_alias_b])
     # both `:a` and `:b` are resolved from target aliases, one is used the other is not.
     self.assertTrue(graph._nodes[c].dep_edges[a].is_declared)
     self.assertEquals({'a.class'}, graph._nodes[c].dep_edges[a].products_used)
@@ -128,7 +129,7 @@ class TestJvmDependencyUsage(TaskTestBase):
     # With alias to its resolved targets mapping we can determine which aliases are unused.
     # In this example `alias_b` has none of its resolved dependencies being used.
     self.assertEqual({alias_a_b}, graph._nodes[c].dep_aliases[a])
-    self.assertEqual({alias_b, alias_a_b}, graph._nodes[c].dep_aliases[b])
+    self.assertEqual({nested_alias_b, alias_a_b}, graph._nodes[c].dep_aliases[b])
 
   def test_overlapping_globs(self):
     t1 = self.make_java_target(spec=':t1', sources=['a.java'])
