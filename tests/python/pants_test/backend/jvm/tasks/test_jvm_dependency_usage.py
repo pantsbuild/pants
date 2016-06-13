@@ -127,7 +127,8 @@ class TestJvmDependencyUsage(TaskTestBase):
     self.assertEquals(set(), graph._nodes[c].dep_edges[b].products_used)
 
     # With alias to its resolved targets mapping we can determine which aliases are unused.
-    # In this example `alias_b` has none of its resolved dependencies being used.
+    # In this example `nested_alias_b` has none of its resolved dependencies being used.
+    # Also note when there are transitive aliases only top level alias `nested_alias_b` is saved.
     self.assertEqual({alias_a_b}, graph._nodes[c].dep_aliases[a])
     self.assertEqual({nested_alias_b, alias_a_b}, graph._nodes[c].dep_aliases[b])
 
