@@ -194,49 +194,61 @@ class InlinedGraphTest(GraphTestBase):
 
     self.assertEquals(java1, self.resolve(scheduler, java1_address))
 
-  def do_test_cycle(self, scheduler, address_str):
-    walk = self.walk(scheduler, Address.parse(address_str))
+  def get_trace_message(self, scheduler, parsed_address):
+    walk = self.walk(scheduler, parsed_address)
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     root, state = walk[0]
     self.assertEqual(type(state), Throw)
-    error_msg = '\n'.join(scheduler.product_graph.trace(root))
-    self.assertTrue('cycle' in error_msg)
-    self.assert_throws_are_leaves(error_msg, Throw.__name__)
+    return '\n'.join(scheduler.product_graph.trace(root))
+
+  def do_test_trace_message(self, scheduler, parsed_address, expected_string=None):
+    trace_message = self.get_trace_message(scheduler, parsed_address)
+    self.assert_throws_are_leaves(trace_message, Throw.__name__)
+    if expected_string:
+      self.assertTrue(expected_string in trace_message)
+
+  def do_test_cycle(self, address_str):
+    scheduler = self.create_json()
+    parsed_address = Address.parse(address_str)
+    self.do_test_trace_message(scheduler, parsed_address, 'cycle')
 
   def assert_throws_are_leaves(self, error_msg, throw_name):
-    def indent(s):
+    def indent_of(s):
       return len(s) - len(s.lstrip())
 
     lines = error_msg.splitlines()
     line_indices_of_throws = [i for i, v in enumerate(lines) if throw_name in v]
     for idx in line_indices_of_throws:
       # Make sure lines with Throw have more or equal indentation than its neighbors.
-      self.assertTrue(indent(lines[idx]) >= indent(lines[max(0, idx - 1)]))
-      self.assertTrue(indent(lines[idx]) >= indent(lines[min(len(lines) - 1, idx + 1)]))
+      self.assertTrue(indent_of(lines[idx]) >= indent_of(lines[max(0, idx - 1)]))
+      self.assertTrue(indent_of(lines[idx]) >= indent_of(lines[min(len(lines) - 1, idx + 1)]))
 
   def test_cycle_self(self):
-    self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')
+    self.do_test_cycle('graph_test:self_cycle')
 
   def test_cycle_direct(self):
-    self.do_test_cycle(self.create_json(), 'graph_test:direct_cycle')
+    self.do_test_cycle('graph_test:direct_cycle')
 
   def test_cycle_indirect(self):
-    self.do_test_cycle(self.create_json(), 'graph_test:indirect_cycle')
+    self.do_test_cycle('graph_test:indirect_cycle')
 
   def test_type_mismatch_error(self):
     scheduler = self.create_json()
     mismatch = Address.parse('graph_test:type_mismatch')
     self.assertEquals(type(self.resolve_failure(scheduler, mismatch)), ResolvedTypeMismatchError)
+    self.do_test_trace_message(scheduler, mismatch)
 
   def test_not_found_but_family_exists(self):
     scheduler = self.create_json()
     dne = Address.parse('graph_test:this_addressable_does_not_exist')
     self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
+    self.do_test_trace_message(scheduler, dne)
 
   def test_not_found_and_family_does_not_exist(self):
     scheduler = self.create_json()
     dne = Address.parse('this/dir/does/not/exist')
     self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
+    self.do_test_trace_message(scheduler, dne)
 
 
 class LazyResolvingGraphTest(GraphTestBase):
