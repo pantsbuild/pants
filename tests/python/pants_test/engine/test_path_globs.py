@@ -9,7 +9,7 @@ import unittest
 from os.path import join
 
 from pants.base.project_tree import Dir
-from pants.engine.fs import PathRoot, PathDirWildcard, PathGlobs, PathWildcard
+from pants.engine.fs import PathDirWildcard, PathGlobs, PathRoot, PathWildcard
 
 
 def pw(relative_to, *args):
