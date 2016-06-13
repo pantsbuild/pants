@@ -12,7 +12,8 @@ from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import Dirs, Files, FilesContent, FilesDigest, PathGlobs, ReadLink, Stats
+from pants.engine.fs import (DirectoryListing, Dirs, Files, FilesContent, FilesDigest, PathGlobs,
+                             ReadLink)
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -133,44 +134,44 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 
   def test_nodes_file(self):
     self.assert_fsnodes(Files, ['4.txt'], [
-        (Dir(''), Stats),
+        (Dir(''), DirectoryListing),
       ])
 
   def test_nodes_symlink_file(self):
     self.assert_fsnodes(Files, ['c.ln/2'], [
-        (Dir(''), Stats),
+        (Dir(''), DirectoryListing),
         (Link('c.ln'), ReadLink),
-        (Dir('a'), Stats),
-        (Dir('a/b'), Stats),
+        (Dir('a'), DirectoryListing),
+        (Dir('a/b'), DirectoryListing),
       ])
     self.assert_fsnodes(Files, ['d.ln/b/1.txt'], [
-        (Dir(''), Stats),
+        (Dir(''), DirectoryListing),
         (Link('d.ln'), ReadLink),
-        (Dir('a'), Stats),
-        (Dir('a/b'), Stats),
+        (Dir('a'), DirectoryListing),
+        (Dir('a/b'), DirectoryListing),
       ])
 
   def test_nodes_symlink_globbed_dir(self):
     self.assert_fsnodes(Files, ['*/2'], [
         # Scandir for the root.
-        (Dir(''), Stats),
+        (Dir(''), DirectoryListing),
         # Read links to determine whether they're actually directories.
         (Link('c.ln'), ReadLink),
         (Link('d.ln'), ReadLink),
         # Scan second level destinations: `a/b` is matched via `c.ln`.
-        (Dir('a'), Stats),
-        (Dir('a/b'), Stats),
+        (Dir('a'), DirectoryListing),
+        (Dir('a/b'), DirectoryListing),
       ])
 
   def test_nodes_symlink_globbed_file(self):
     self.assert_fsnodes(Files, ['d.ln/b/*.txt'], [
         # NB: Needs to scandir every Dir on the way down to track whether
         # it is traversing a symlink.
-        (Dir(''), Stats),
+        (Dir(''), DirectoryListing),
         # Traverse one symlink.
         (Link('d.ln'), ReadLink),
-        (Dir('a'), Stats),
-        (Dir('a/b'), Stats),
+        (Dir('a'), DirectoryListing),
+        (Dir('a/b'), DirectoryListing),
       ])
 
 
