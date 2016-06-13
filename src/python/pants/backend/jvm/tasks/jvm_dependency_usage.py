@@ -111,6 +111,9 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     :returns: An iterator of (resolved_dependency, resolved_from) tuples.
       `resolved_from` is the top level target alias that depends on `resolved_dependency`,
       and `None` if `resolved_dependency` is not a dependency of a target alias.
+
+    When there are nested aliases, this implementation returns just the top level,
+    consider returning the entire path to allow more fine grained alias usage analysis.
     """
     for declared in target.dependencies:
       if type(declared) in (Target, AliasTarget):
