@@ -34,7 +34,6 @@ class FileSystemProjectTree(ProjectTree):
     # an optional call, so that we can use it in fs.py rather than applying it by default.
     abspath = os.path.normpath(self._join(relpath))
     if os.path.realpath(abspath) != abspath:
-      print('>>> {} vs {}'.format(os.path.realpath(abspath), abspath))
       raise ValueError('scandir for non-canonical path "{}" not supported in {}.'.format(
         relpath, self))
 

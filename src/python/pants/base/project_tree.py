@@ -85,8 +85,7 @@ class ProjectTree(AbstractClass):
     if self.isignored(relpath, directory=True):
       self._raise_access_ignored(relpath)
 
-    stats = list(self._scandir_raw(relpath))
-    return self._filter_ignored(stats, selector=lambda e: e.path)
+    return self._filter_ignored(self._scandir_raw(relpath), selector=lambda e: e.path)
 
   def isdir(self, relpath):
     """Returns True if path is a directory and is not ignored."""
@@ -163,21 +162,18 @@ class ProjectTree(AbstractClass):
     match_result = list(self.ignore.match_files([relpath]))
     return len(match_result) > 0
 
-  def _filter_ignored(self, entry_list, selector=None):
+  def _filter_ignored(self, entries, selector=None):
     """Given an opaque entry list, filter any ignored entries.
 
+    :param entries: A list or generator that produces entries to filter.
     :param selector: A function that computes a path for an entry relative to the root of the
       ProjectTree, or None to use identity.
     """
     selector = selector or (lambda x: x)
-    prefixed_entry_list = [(self._append_slash_if_dir_path(selector(entry)), entry)
-                          for entry in entry_list]
-    ignored_paths = set(self.ignore.match_files([path for path, _ in prefixed_entry_list]))
-    if not ignored_paths:
-      return entry_list
-
-    # There were some ignored paths: filter the entries.
-    return [entry for path, entry in prefixed_entry_list if path not in ignored_paths]
+    prefixed_entries = [(self._append_slash_if_dir_path(selector(entry)), entry)
+                          for entry in entries]
+    ignored_paths = set(self.ignore.match_files(path for path, _ in prefixed_entries))
+    return [entry for path, entry in prefixed_entries if path not in ignored_paths]
 
   def _relpath_no_dot(self, relpath):
     return relpath.lstrip('./') if relpath != '.' else ''
