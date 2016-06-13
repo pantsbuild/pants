@@ -218,8 +218,9 @@ def addresses_from_address_families(address_families):
 
 def descendant_addresses_to_globs(descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
-  filespecs = [join(descendant_addresses.directory, wildcard) for wildcard in ('.', '*', '**/*')]
-  return PathGlobs.create_from_specs('', filespecs)
+  literal = descendant_addresses.directory
+  wildcards = [join(literal, wildcard) for wildcard in ('*', '**/*')]
+  return PathGlobs.create_from_specs('', [literal] + wildcards)
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):

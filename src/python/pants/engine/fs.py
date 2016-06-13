@@ -138,7 +138,10 @@ class PathGlob(AbstractClass):
       raise ValueError('Expected a Dir as the canonical_stat. Got: {}'.format(canonical_stat))
 
     parts = normpath(filespec).split(os_sep)
-    if cls._DOUBLE in parts[0]:
+    if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
+      # A request for the root path.
+      return PathRoot()
+    elif cls._DOUBLE in parts[0]:
       if parts[0] != cls._DOUBLE:
         raise ValueError(
             'Illegal component "{}" in filespec under {}: {}'.format(
@@ -155,6 +158,18 @@ class PathGlob(AbstractClass):
       # This is a path dirname.
       remainders = (join(*parts[1:]),)
       return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
+
+
+class PathRoot(datatype('PathRoot', []), PathGlob):
+  """A PathGlob matching the root of the ProjectTree.
+
+  The root is special because it's the only symbolic path that we can implicit trust is
+  not a symlink.
+  """
+  canonical_stat = Dir('')
+  symbolic_path = ''
+
+  paths = Paths((Path(symbolic_path, canonical_stat),))
 
 
 class PathWildcard(datatype('PathWildcard', ['canonical_stat', 'symbolic_path', 'wildcard']), PathGlob):
@@ -226,6 +241,11 @@ def scan_directory(project_tree, directory):
 def merge_paths(paths_list):
   """Merge Paths lists."""
   return Paths(tuple(p for paths in paths_list for p in paths.dependencies))
+
+
+def apply_path_root(path_root):
+  """Returns the `Paths` for the root of the repo."""
+  return path_root.paths
 
 
 def apply_path_wildcard(stats, path_wildcard):
@@ -326,6 +346,9 @@ def create_fs_tasks():
     (Paths,
      [SelectDependencies(Paths, PathGlobs)],
      merge_paths),
+    (Paths,
+     [Select(PathRoot)],
+     apply_path_root),
     (Paths,
      [SelectProjection(Stats, Dir, ('canonical_stat',), PathWildcard),
       Select(PathWildcard)],
