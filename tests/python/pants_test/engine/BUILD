@@ -56,6 +56,7 @@ python_tests(
   name='path_globs',
   sources=['test_path_globs.py'],
   dependencies=[
+    'src/python/pants/base:project_tree',
     'src/python/pants/engine:fs',
   ]
 )

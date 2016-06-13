@@ -8,7 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from os.path import join
 
-from pants.engine.fs import Dirs, Path, PathDirWildcard, PathGlobs, PathWildcard
+from pants.base.project_tree import Dir
+from pants.engine.fs import PathRoot, PathDirWildcard, PathGlobs, PathWildcard
+
+
+def pw(relative_to, *args):
+  return PathWildcard(Dir(relative_to), relative_to, *args)
+
+
+def pdw(relative_to, *args):
+  return PathDirWildcard(Dir(relative_to), relative_to, *args)
 
 
 class PathGlobsTest(unittest.TestCase):
@@ -16,24 +25,27 @@ class PathGlobsTest(unittest.TestCase):
   def assert_pg_equals(self, pathglobs, relative_to, filespecs):
     self.assertEquals(PathGlobs(tuple(pathglobs)), PathGlobs.create_from_specs(relative_to, filespecs))
 
+  def test_root(self):
+    self.assert_pg_equals([PathRoot()], '', [''])
+
   def test_literal(self):
     subdir = 'foo'
     name = 'Blah.java'
-    self.assert_pg_equals([Path(name)], '', [name])
-    self.assert_pg_equals([Path(join(subdir, name))], subdir, [name])
-    self.assert_pg_equals([PathDirWildcard(subdir, name)], '', [join(subdir, name)])
+    self.assert_pg_equals([pw('', name)], '', [name])
+    self.assert_pg_equals([pw(subdir, name)], subdir, [name])
+    self.assert_pg_equals([pdw('', subdir, (name,))], '', [join(subdir, name)])
 
   def test_wildcard(self):
     name = '*.java'
     subdir = 'foo'
-    self.assert_pg_equals([PathWildcard('', name)], '', [name])
-    self.assert_pg_equals([PathWildcard(subdir, name)], subdir, [name])
+    self.assert_pg_equals([pw('', name)], '', [name])
+    self.assert_pg_equals([pw(subdir, name)], subdir, [name])
 
   def test_dir_wildcard(self):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '*'
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, (name,))],
+    self.assert_pg_equals([pdw(subdir, wildcard, (name,))],
                           subdir,
                           [join(wildcard, name)])
 
@@ -41,10 +53,10 @@ class PathGlobsTest(unittest.TestCase):
     subdir = 'foo'
     wildcard = '*'
     name = '.'
-    self.assert_pg_equals([PathDirWildcard(Dirs, '', wildcard, (name,))],
+    self.assert_pg_equals([pw('', wildcard)],
                           '',
                           [join(wildcard, name)])
-    self.assert_pg_equals([PathDirWildcard(Dirs, subdir, wildcard, (name,))],
+    self.assert_pg_equals([pw(subdir, wildcard)],
                           subdir,
                           [join(wildcard, name)])
 
@@ -53,6 +65,6 @@ class PathGlobsTest(unittest.TestCase):
     subdir = 'foo'
     wildcard = '**'
     expected_remainders = (name, join(wildcard, name))
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, expected_remainders)],
+    self.assert_pg_equals([pdw(subdir, wildcard, expected_remainders)],
                           subdir,
                           [join(wildcard, name)])
