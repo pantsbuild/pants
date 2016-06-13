@@ -311,8 +311,8 @@ class Node(object):
       }
     aliases = {}
 
-    for dep, aliases in self.dep_aliases.items():
-      aliases[dep.address.spec] = [alias.address.spec for alias in aliases]
+    for dep, dep_aliases in self.dep_aliases.items():
+      aliases[dep.address.spec] = [alias.address.spec for alias in dep_aliases]
 
     return {
       'target': self.concrete_target.address.spec,
