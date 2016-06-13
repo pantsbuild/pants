@@ -193,11 +193,19 @@ def identity(v):
   return v
 
 
-def address_from_address_family(address_family, single_address):
-  """Given an AddressFamily and a SingleAddress, return an Addresses object containing the Address.
+def address_from_address_family(address_families, single_address):
+  """Given AddressFamilies matching a SingleAddress (ie, at most one), return an Addresses object.
 
   Raises an exception if the SingleAddress does not match an existing Address.
   """
+  if len(address_families) > 1:
+    raise AssertionError('Received more AddressFamily objects than expected for {}: {}'.format(
+      address_families, single_address))
+  if len(address_families) < 1:
+    raise ResolveError('Directory "{}" does not exist, or does not contain build files.'.format(
+      single_address.directory))
+
+  address_family, = address_families
   name = single_address.name
   if name is None:
     name = basename(single_address.directory)
@@ -211,16 +219,16 @@ def addresses_from_address_families(address_families):
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
 
 
+def single_or_sib_to_globs(single_or_sib):
+  """Given a SingleAddress or SiblingAddresses object, return PathGlobs for its directory."""
+  return PathGlobs.create_from_specs('', [single_or_sib.directory])
+
+
 def descendant_addresses_to_globs(descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching directories."""
   literal = descendant_addresses.directory
   wildcards = [join(literal, wildcard) for wildcard in ('*', '**/*')]
   return PathGlobs.create_from_specs('', [literal] + wildcards)
-
-
-def sibling_addresses_to_globs(sibling_addresses):
-  """Given a SiblingAddresses object, return a PathGlobs object for the matching directory."""
-  return PathGlobs.create_from_specs('', [sibling_addresses.directory])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -260,16 +268,19 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   ] + [
     # Spec handling.
     (Addresses,
-     [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
+     [SelectDependencies(AddressFamily, Dirs, field='stats'),
       Select(SingleAddress)],
      address_from_address_family),
     (Addresses,
      [SelectDependencies(AddressFamily, Dirs, field='stats')],
      addresses_from_address_families),
     (PathGlobs,
-     [Select(DescendantAddresses)],
-     descendant_addresses_to_globs),
+     [Select(SingleAddress)],
+     single_or_sib_to_globs),
     (PathGlobs,
      [Select(SiblingAddresses)],
-     sibling_addresses_to_globs),
+     single_or_sib_to_globs),
+    (PathGlobs,
+     [Select(DescendantAddresses)],
+     descendant_addresses_to_globs),
   ]
