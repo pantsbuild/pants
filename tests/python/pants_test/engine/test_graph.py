@@ -194,15 +194,13 @@ class InlinedGraphTest(GraphTestBase):
 
     self.assertEquals(java1, self.resolve(scheduler, java1_address))
 
-  def get_trace_message(self, scheduler, parsed_address):
+  def do_test_trace_message(self, scheduler, parsed_address, expected_string=None):
     walk = self.walk(scheduler, parsed_address)
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     root, state = walk[0]
     self.assertEqual(type(state), Throw)
-    return '\n'.join(scheduler.product_graph.trace(root))
+    trace_message = '\n'.join(scheduler.product_graph.trace(root))
 
-  def do_test_trace_message(self, scheduler, parsed_address, expected_string=None):
-    trace_message = self.get_trace_message(scheduler, parsed_address)
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
     if expected_string:
       self.assertTrue(expected_string in trace_message)
