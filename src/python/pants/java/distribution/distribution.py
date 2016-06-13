@@ -114,6 +114,12 @@ class Distribution(object):
     """
     return self._get_version(self.java)
 
+  def tools_jar_spec(self, buildgraph):
+    synthetic_address = Address.parse('//:{}-tools-jar-synthetic'.format(self.version))
+    if not buildgraph.contains_address(synthetic_address):
+      buildgraph.inject_synthetic_target(synthetic_address, ToolsJar)
+    return synthetic_address.spec
+
   def find_libs(self, names):
     """Looks for jars in the distribution lib folder(s).
 
@@ -594,8 +600,10 @@ class DistributionLocator(Subsystem):
                   'everything else (before the JDK_HOME, JAVA_HOME, PATH environment variables) '
                   'when locating a jvm to use. The same OS can be specified via several different '
                   'aliases, according to this map: {}'.format(human_readable_os_aliases))
-    register('--minimum-version', advanced=True, help='Minimum version of the JVM pants will use')
-    register('--maximum-version', advanced=True, help='Maximum version of the JVM pants will use')
+    register('--minimum-version', advanced=True, fingerprint=True,
+             help='Minimum version of the JVM pants will use')
+    register('--maximum-version', advanced=True, fingerprint=True,
+             help='Maximum version of the JVM pants will use')
 
   def all_jdk_paths(self):
     """Get all explicitly configured JDK paths.

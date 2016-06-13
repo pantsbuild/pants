@@ -115,14 +115,10 @@ class BaseZincCompile(JvmCompile):
       zinc_args.extend(settings_args)
     return zinc_args
 
-  @memoized_method
-  def compiler_plugins(self):
-    """A dict of compiler plugin target types and their additional classpath entries."""
-    return {
-        AnnotationProcessor: [],
-        JavacPlugin: list(self.dist.find_libs(['tools.jar'])),
-        ScalacPlugin: [],
-      }
+  @classmethod
+  def compiler_plugin_types(cls):
+    """A tuple of target types which are compiler plugins."""
+    return (AnnotationProcessor, JavacPlugin, ScalacPlugin)
 
   @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):

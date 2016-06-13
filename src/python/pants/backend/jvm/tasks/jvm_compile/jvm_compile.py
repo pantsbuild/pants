@@ -195,13 +195,10 @@ class JvmCompile(NailgunTaskBase):
   def name(cls):
     return cls._name
 
-  @memoized_property
-  def compiler_plugin_types(self):
-    return tuple(self.compiler_plugins.keys())
-
-  def compiler_plugins(self):
-    """A dict of compiler plugin target types and their additional classpath entries."""
-    return {}
+  @classmethod
+  def compiler_plugin_types(cls):
+    """A tuple of target types which are compiler plugins."""
+    return ()
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -333,7 +330,7 @@ class JvmCompile(NailgunTaskBase):
 
     self._analysis_tools = self.create_analysis_tools()
 
-    self._dep_context = DependencyContext(self.compiler_plugins(),
+    self._dep_context = DependencyContext(self.compiler_plugin_types(),
                                           dict(include_scopes=Scopes.JVM_COMPILE_SCOPES,
                                                respect_intransitive=True))
 
