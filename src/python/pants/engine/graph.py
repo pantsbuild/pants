@@ -210,6 +210,11 @@ def address_from_address_family(address_family, single_address):
   return Addresses(tuple([Address(address_family.namespace, name)]))
 
 
+def addresses_from_address_family(address_family):
+  """Given an AddressFamily, return an Addresses objects containing all of its `addressables`."""
+  return Addresses(tuple(address_family.addressables.keys()))
+
+
 def addresses_from_address_families(address_families):
   """Given a list of AddressFamilies, return an Addresses object containing all addressables."""
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
@@ -220,11 +225,6 @@ def descendant_addresses_to_globs(descendant_addresses):
   literal = descendant_addresses.directory
   wildcards = [join(literal, wildcard) for wildcard in ('*', '**/*')]
   return PathGlobs.create_from_specs('', [literal] + wildcards)
-
-
-def sibling_addresses_to_globs(sibling_addresses):
-  """Given a SiblingAddresses object, return a PathGlobs object for the matching directory."""
-  return PathGlobs.create_from_specs('', [sibling_addresses.directory])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -268,12 +268,12 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
       Select(SingleAddress)],
      address_from_address_family),
     (Addresses,
+     [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
+     addresses_from_address_family),
+    (Addresses,
      [SelectDependencies(AddressFamily, Dirs, field='stats')],
      addresses_from_address_families),
     (PathGlobs,
      [Select(DescendantAddresses)],
      descendant_addresses_to_globs),
-    (PathGlobs,
-     [Select(SiblingAddresses)],
-     sibling_addresses_to_globs),
   ]
