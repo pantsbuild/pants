@@ -18,7 +18,6 @@ from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 
 

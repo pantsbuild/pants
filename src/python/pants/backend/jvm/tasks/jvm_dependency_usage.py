@@ -17,6 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.task.task import Task
+from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
 
 
