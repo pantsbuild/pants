@@ -201,7 +201,7 @@ class JvmDependencyUsage(Task):
     return os.path.join(target_results_dir, 'node.json')
 
   def create_dep_usage_nodes(self, targets, node_creator):
-    nodes = dict()
+    nodes = {}
     for target in targets:
       if not self._select(target):
         continue
@@ -230,13 +230,13 @@ class JvmDependencyUsage(Task):
     """
     if dep.endswith(".jar"):
       # NB: We preserve jars "whole" here, because zinc does not support finer granularity.
-      return set([dep])
+      return {dep}
     elif dep.endswith(".class"):
-      return set([dep])
+      return {dep}
     else:
       # Assume a source file and convert to classfiles.
       rel_src = fast_relpath(dep, buildroot)
-      return set(p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths)
+      return {p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths}
 
   def create_dep_usage_node(self,
                             target,
@@ -259,7 +259,7 @@ class JvmDependencyUsage(Task):
 
     # Record the used products and undeclared Edges for this target. Note that some of
     # these may be self edges, which are considered later.
-    target_product_deps_by_src = product_deps_by_src.get(target, dict())
+    target_product_deps_by_src = product_deps_by_src.get(target, {})
     for src in target.sources_relative_to_buildroot():
       for product_dep in target_product_deps_by_src.get(os.path.join(buildroot, src), []):
         for dep_tgt in targets_by_file.get(product_dep, []):

@@ -150,7 +150,7 @@ class JvmDependencyAnalyzer(object):
 
     # Flatten the product deps of this target.
     product_deps = set()
-    for dep_entries in product_deps_by_src.get(compile_context.target, dict()).values():
+    for dep_entries in product_deps_by_src.get(compile_context.target, {}).values():
       product_deps.update(dep_entries)
 
     # Determine which of the deps in the declared set of this target were used.
@@ -173,7 +173,7 @@ class JvmDependencyAnalyzer(object):
 
     # If there were no unused deps, break.
     if not unused:
-      return dict()
+      return {}
 
     # For any deps that were used, count their derived-from targets used as well.
     # TODO: Refactor to do some of this above once tests are in place.
@@ -189,11 +189,11 @@ class JvmDependencyAnalyzer(object):
         unused.remove(dep)
 
     if not unused:
-      return dict()
+      return {}
 
     # For any deps that were not used, determine whether their transitive deps were used, and
     # recommend those as replacements.
-    replacements = dict()
+    replacements = {}
     for dep in unused:
       replacements[dep] = set()
       for t in dep.closure():
