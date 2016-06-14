@@ -84,26 +84,35 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
                        'watchman': {'socket_path': '/tmp/watchman.{}.sock'.format(os.getpid())}}
       checker = PantsDaemonMonitor(pid_dir)
 
+      print('log: {}/pantsd/pantsd.log'.format(workdir))
       # Explicitly kill any running pantsd instances for the current buildroot.
+      print('\nkill-pantsd')
       self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
       try:
         # Start pantsd implicitly via a throwaway invocation.
+        print('help')
         self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
         checker.await_pantsd()
 
         # This run should execute via pantsd testing the end to end client/server.
+        print('list')
         self.assert_success(self.run_pants_with_workdir(['list', '3rdparty/python::'],
                                                         workdir,
                                                         pantsd_config))
         checker.assert_running()
 
         # And again using the cached BuildGraph.
+        print('cached list')
         self.assert_success(self.run_pants_with_workdir(['list', '3rdparty/python::'],
                                                         workdir,
                                                         pantsd_config))
         checker.assert_running()
       finally:
+        for line in read_pantsd_log(workdir):
+          print(line)
+
         # Explicitly kill pantsd (from a pantsd-launched runner).
+        print('kill-pantsd')
         self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
 
       checker.assert_stopped()
