@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_task import JvmTask
+from pants.backend.jvm.targets.tools_jar import ToolsJar
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.util.dirutil import relative_symlink
 from pants.util.memo import memoized_property
 
@@ -16,7 +17,7 @@ def is_tools_jar(target):
   return isinstance(target, ToolsJar)
 
 
-class ProvideToolsJar(JvmTask):
+class ProvideToolsJar(JvmToolTaskMixin):
   """Symlinks and adds the tools.jar as a classpath entry for ToolsJar targets."""
 
   @classmethod
