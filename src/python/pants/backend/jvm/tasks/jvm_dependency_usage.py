@@ -159,14 +159,16 @@ class JvmDependencyUsage(Task):
     stores the result to the build cache.
     """
     analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
-    targets_by_file = analyzer.targets_by_file(self.context.targets())
+    targets = self.context.targets()
+    targets_by_file = analyzer.targets_by_file(targets)
+    transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
     def creator(target):
       node = self.create_dep_usage_node(target,
                                         targets_by_file, get_buildroot(),
                                         classes_by_source,
                                         runtime_classpath,
                                         product_deps_by_src,
-                                        self._compute_transitive_deps_by_target())
+                                        transitive_deps_by_target)
       vt = target_to_vts[target]
       with open(self.nodes_json(vt.results_dir), mode='w') as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
@@ -220,6 +222,21 @@ class JvmDependencyUsage(Task):
   def cache_target_dirs(self):
     return True
 
+  def _normalize_product_dep(self, buildroot, classes_by_source, dep):
+    """Normalizes the given product dep from the given dep into a set of classfiles.
+
+    Product deps arrive as sources, jars, and classfiles: this method normalizes them to classfiles and jars.
+    """
+    if dep.endswith(".jar"):
+      # NB: We preserve jars "whole" here, because zinc does not support finer granularity.
+      return set([dep])
+    elif dep.endswith(".class"):
+      return set([dep])
+    else:
+      # Assume a source file and convert to classfiles.
+      rel_src = fast_relpath(dep, buildroot)
+      return set(p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths)
+
   def create_dep_usage_node(self,
                             target,
                             targets_by_file,
@@ -254,7 +271,7 @@ class JvmDependencyUsage(Task):
           if not derived_from in transitive_deps_by_target.get(concrete_target):
             continue
           is_declared = self._is_declared_dep(target, dep_tgt)
-          normalized_deps = self._analyzer.normalize_product_dep(buildroot, classes_by_source, product_dep)
+          normalized_deps = self._normalize_product_dep(buildroot, classes_by_source, product_dep)
           node.add_edge(Edge(is_declared=is_declared, products_used=normalized_deps), derived_from)
 
     return node
