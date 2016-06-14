@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.jvm.targets.tools_jar import ToolsJar
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.util.dirutil import relative_symlink
 from pants.util.memo import memoized_property
@@ -24,8 +25,14 @@ class ProvideToolsJar(JvmToolTaskMixin):
   def product_types(cls):
     return ['compile_classpath']
 
+  @property
+  def create_target_dirs(self):
+    # Create-but-don't-cache the target directories. The created symlinks are not portable.
+    return True
+
   def execute(self):
-    compile_classpath = self.context.products.get_data('compile_classpath')
+    cp_init_func = ClasspathProducts.init_func(self.get_options().pants_workdir)
+    compile_classpath = self.context.products.get_data('compile_classpath', init_func=cp_init_func)
 
     with self.invalidated(self.context.targets(is_tools_jar)) as invalidation_check:
       for vt in invalidation_check.all_vts:
