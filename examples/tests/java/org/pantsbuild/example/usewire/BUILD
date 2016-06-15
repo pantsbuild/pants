@@ -7,6 +7,7 @@ junit_tests(name='usewire',
   sources=['UseWireTest.java',],
   dependencies=[
     '3rdparty:junit',
+    '3rdparty:wire-runtime',
     'examples/src/wire/org/pantsbuild/example/temperature',
   ],
 )

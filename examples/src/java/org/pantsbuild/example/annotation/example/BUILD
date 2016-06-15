@@ -5,6 +5,6 @@
 
 java_library(name='example',
   sources=['Example.java'],
-  # Is only used as an annotation processor.
-  tags={'exported'},
+  # Is used by an annotation processor.
+  scope='compile',
 )

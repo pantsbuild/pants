@@ -4,6 +4,7 @@
 jvm_binary(name='temperatureservice',
   basename='wire-temperature-example',
   dependencies=[
+    '3rdparty:wire-runtime',
     'examples/src/wire/org/pantsbuild/example/temperature',
   ],
   source='WireTemperatureExample.java',

@@ -602,31 +602,32 @@ class JvmCompile(NailgunTaskBase):
     with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
       # Compute replacement deps.
       product_deps_by_src = self.context.products.get_data('product_deps_by_src')
-      replacements = self._dep_analyzer.compute_unused_deps(product_deps_by_src,
-                                                            self._dep_context,
-                                                            compile_context)
+      replacement_deps = self._dep_analyzer.compute_unused_deps(product_deps_by_src,
+                                                                compile_context)
 
-      if not replacements:
+      if not replacement_deps:
         return
 
       # Warn or error for unused.
       def unused_msg(entry):
-        dep, reps = entry
-        if reps:
-          return '{}{}'.format(
-              dep.address.spec,
-              ' (suggested replacement: {})'.format(' & '.join(str(r.address.spec) for r in reps)))
+        dep, replacements = entry
+        if replacements:
+          replacements_str = ', '.join('\'{}\''.format(r.address.spec) for r in replacements)
+          return '{} (suggested replacement: {})'.format(dep.address.spec, replacements_str)
         else:
           return dep.address.spec
       unused_msg = (
-          'unused dependencies:\n  {}\n'.format(
-            '\n  '.join(unused_msg(entry) for entry in sorted(replacements.items())),
+          """unused dependencies:\n  {}\n"""
+          """(If you're seeing this message in error, you might need to """
+          """change the `scope` of the dependencies.)""".format(
+            '\n  '.join(unused_msg(entry) for entry in sorted(replacement_deps.items())),
           )
         )
       if self.get_options().unused_deps == 'fatal':
         raise TaskError(unused_msg)
       else:
-        self.context.log.warn('Target {} had {}'.format(compile_context.target.address.spec, unused_msg))
+        self.context.log.warn('Target {} had {}\n'.format(
+          compile_context.target.address.spec, unused_msg))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""

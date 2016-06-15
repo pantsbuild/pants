@@ -53,13 +53,10 @@ class CompileContext(object):
     else:
       return self.all_dependencies(dep_context)
 
-  def declared_dependencies(self, dep_context, compiler_plugins=True, exported=True):
+  def declared_dependencies(self):
     """Compute the declared dependencies for this target, recursively resolving target aliases.
 
-    TODO: Formalize the `exported` tag.
-    TODO: Switch to using scopes rather than types to identify plugins.
-    TODO: Consider moving this API to `Target`.
-    TODO: Javac plugins/processors should use -processorpath instead of the classpath.
+    TODO: Move this API to `Target` (it's just "direct_deps+aliases"
     """
     def resolve(t):
       for declared in t.dependencies:
@@ -67,15 +64,6 @@ class CompileContext(object):
           # Is an alias. Recurse to expand.
           for r in resolve(declared):
             yield r
-        elif 'exported' in declared.tags:
-          # Is exported: include the target and its declared dependencies.
-          if exported:
-            yield declared
-            for r in resolve(declared):
-              yield r
-        elif isinstance(declared, dep_context.compiler_plugin_types):
-          if compiler_plugins:
-            yield declared
         else:
           yield declared
 
@@ -88,7 +76,7 @@ class CompileContext(object):
     Results in a list similar to the list for `declared_dependencies`, with the addition
     of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
     """
-    for declared in self.declared_dependencies(dep_context, compiler_plugins=True):
+    for declared in self.declared_dependencies():
       if isinstance(declared, dep_context.compiler_plugin_types):
         for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
           yield r

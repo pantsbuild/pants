@@ -13,3 +13,6 @@ class ToolsJar(Target):
 
   The classpath for this target is provided by the ProvideToolsJar task.
   """
+
+  def __init__(self, *args, **kwargs):
+    super(ToolsJar, self).__init__(scope='compile', *args, **kwargs)

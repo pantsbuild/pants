@@ -73,8 +73,8 @@ jar_library(name='protobuf-2.4.1',
             jars = [
               jar(org='com.google.protobuf', name='protobuf-java', rev='2.4.1'),
             ],
-            # Protobuf message builders require undeclared types to be present at compiletime.
-            tags={'exported'},)
+            # javac requires protobuf to be present in order to compile the MessageBuilders API.
+            scope='forced',)
 
 target(name='protobuf-java', dependencies = [':protobuf-2.4.1'])
 
@@ -100,11 +100,13 @@ jar_library(name='slf4j-api',
             ])
 
 # NB: we have two versions of thrift here due to scrooge requiring one version while apache
-# thrift requires another. this is not usually recommended
+# thrift requires another. This is not usually recommended.
 jar_library(name='libthrift-0.9.2',
             jars = [
               jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
-            ])
+            ],
+            # javac uses undeclared types to build the MessageBuilder API.
+            scope='forced',)
 
 target(name='thrift-0.9.2', dependencies = [':libthrift-0.9.2'])
 
@@ -144,10 +146,17 @@ jar_library(name='junit',
             jars=[
               jar('junit', 'junit', '4.12')
             ],
-            # Frequently used only for its annotations.
-            tags={'exported'},)
+            # junit is frequently used only for its annotations.
+            scope='forced',)
 
 jar_library(name='scalatest',
             jars=[
               scala_jar('org.scalatest', 'scalatest', '2.2.4')
             ])
+
+jar_library(name='wire-runtime',
+            jars=[
+              jar(org='com.squareup.wire', name='wire-runtime', rev='1.8.0'),
+            ],
+            # javac uses undeclared types to build the MessageBuilder API.
+            scope='forced',)

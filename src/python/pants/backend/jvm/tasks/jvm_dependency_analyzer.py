@@ -16,6 +16,7 @@ from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
+from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.memo import memoized_method, memoized_property
@@ -139,7 +140,7 @@ class JvmDependencyAnalyzer(object):
       transitive_deps_by_target[target] = transitive_deps
     return transitive_deps_by_target
 
-  def compute_unused_deps(self, product_deps_by_src, dep_context, compile_context):
+  def compute_unused_deps(self, product_deps_by_src, compile_context):
     """Uses `product_deps_by_src` to compute unused deps.
 
     TODO: Move `compile_context.declared_dependencies` to Target to allow this method
@@ -156,10 +157,11 @@ class JvmDependencyAnalyzer(object):
     # Determine which of the deps in the declared set of this target were used.
     used = set()
     unused = set()
-    for dep in compile_context.declared_dependencies(dep_context,
-                                                     compiler_plugins=False,
-                                                     exported=False):
+    for dep in compile_context.declared_dependencies():
       if dep in used or dep in unused:
+        continue
+      if dep.scope != Scopes.DEFAULT:
+        # Only `DEFAULT` scoped deps are eligible for the unused dep check.
         continue
       # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
       # incorrectly skip "empty" `*_library` targets, which could then be used as a loophole.

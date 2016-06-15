@@ -152,22 +152,18 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                                     option=jvm_tool.key,
                                     scope=jvm_tool.scope,
                                     default_classpath=':'.join(map(str, jvm_tool.classpath or ()))))
-            # TODO: Make optional during tool registration perhaps?
-            tags = {'exported'}
             if jvm_tool.classpath:
               tool_classpath_target = JarLibrary(name=dep_address.target_name,
                                                  address=dep_address,
                                                  build_graph=build_graph,
-                                                 jars=jvm_tool.classpath,
-                                                 tags=tags)
+                                                 jars=jvm_tool.classpath)
             else:
               # The tool classpath is empty by default, so we just inject a dummy target that
               # ivy resolves as the empty list classpath.  JarLibrary won't do since it requires
               # one or more jars, so we just pick a target type ivy has no resolve work to do for.
               tool_classpath_target = Target(name=dep_address.target_name,
                                              address=dep_address,
-                                             build_graph=build_graph,
-                                             tags=tags)
+                                             build_graph=build_graph)
             build_graph.inject_target(tool_classpath_target, synthetic=True)
 
     # We use the trick of not returning alternate roots, but instead just filling the dep_spec
