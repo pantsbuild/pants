@@ -23,11 +23,12 @@ python_tests(
 )
 
 python_tests(
-  name = 'graph_invalidation',
-  sources = ['test_graph_invalidation.py'],
+  name = 'graph',
+  sources = ['test_graph.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/bin'
+    'src/python/pants/bin',
+    'src/python/pants/build_graph',
   ]
 )
 

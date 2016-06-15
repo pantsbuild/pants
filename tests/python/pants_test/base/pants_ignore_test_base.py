@@ -114,8 +114,8 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     files_list = self._project_tree.glob1('fruit', '*')
     self.assertEquals({'banana', 'orange', 'fruit'}, set(files_list))
 
-    files_list = self._project_tree.listdir('fruit')
-    self.assertEquals({'banana', 'orange', 'fruit'}, set(files_list))
+    files_list = [s.path for s in self._project_tree.scandir('fruit')]
+    self.assertEquals({'fruit/banana', 'fruit/orange', 'fruit/fruit'}, set(files_list))
 
     with self.assertRaises(self._project_tree.AccessIgnoredPathError):
       self._project_tree.content('fruit/apple')
@@ -158,7 +158,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     files_list = self._project_tree.glob1('', '*e')
     self.assertEquals(set(), set(files_list))
 
-    files_list = self._project_tree.listdir('')
+    files_list = [s.path for s in self._project_tree.scandir('')]
     self.assertEquals({'banana', 'fruit', 'grocery'}, set(files_list))
 
   def test_ignore_pattern_two_asterisks(self):
@@ -173,7 +173,8 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     self.assertFalse(self._project_tree.isdir('fruit/fruit'))
     self.assertFalse(self._project_tree.exists('fruit/fruit'))
     self.assertEquals({'apple', 'banana', 'orange'}, set(self._project_tree.glob1('fruit', '*')))
-    self.assertEquals({'apple', 'banana', 'orange'}, set(self._project_tree.listdir('fruit')))
+    self.assertEquals({'fruit/apple', 'fruit/banana', 'fruit/orange'},
+                      set(s.path for s in self._project_tree.scandir('fruit')))
 
   def test_ignore_dir_path_ignore_2(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ['fruit/'])
@@ -181,4 +182,5 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     self.assertFalse(self._project_tree.isdir('fruit'))
     self.assertFalse(self._project_tree.exists('fruit'))
     self.assertEquals({'apple', 'banana', 'orange', 'grocery'}, set(self._project_tree.glob1('', '*')))
-    self.assertEquals({'apple', 'banana', 'orange', 'grocery'}, set(self._project_tree.listdir('')))
+    self.assertEquals({'apple', 'banana', 'orange', 'grocery'},
+                      set(s.path for s in self._project_tree.scandir('')))

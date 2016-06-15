@@ -14,6 +14,7 @@ python_library(
     ':report',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
+    'src/python/pants/base:file_system_project_tree',
     'src/python/pants/base:mustache',
     'src/python/pants/base:run_info',
     'src/python/pants/base:workunit',
