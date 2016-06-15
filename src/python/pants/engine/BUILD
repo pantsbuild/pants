@@ -72,6 +72,7 @@ python_library(
     ':mapper',
     ':objects',
     ':selectors',
+    'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
   ]
 )
@@ -95,6 +96,7 @@ python_library(
     ':addressable',
     ':fs',
     ':struct',
+    'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',
   ]

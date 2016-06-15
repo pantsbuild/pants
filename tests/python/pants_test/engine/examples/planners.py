@@ -15,7 +15,7 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
-from pants.engine.fs import Dirs, File, FileContent, FilesContent, PathGlobs, create_fs_tasks
+from pants.engine.fs import Dirs, Files, FilesContent, PathGlobs, create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
@@ -121,7 +121,7 @@ def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
   specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
-  return PathGlobs.create_from_specs(Dirs, '', specs)
+  return PathGlobs.create_from_specs('', specs)
 
 
 @printing_func
@@ -416,7 +416,7 @@ def setup_json_scheduler(build_root, inline_nodes=True):
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
   address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                                  build_pattern=r'^BLD.json$',
+                                                  build_pattern='BLD.json',
                                                   parser_cls=JsonParser)
   source_roots = SourceRoots(('src/java','src/scala'))
   scrooge_tool_address = Address.parse('src/scala/scrooge')
@@ -428,8 +428,8 @@ def setup_json_scheduler(build_root, inline_nodes=True):
       'list': Address,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
-      'ls': File,
-      'cat': FileContent,
+      'ls': Files,
+      'cat': FilesContent,
     }
   tasks = [
       # Codegen
@@ -463,7 +463,7 @@ def setup_json_scheduler(build_root, inline_nodes=True):
        extract_scala_imports),
       (Address,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Dirs)],
+        SelectDependencies(AddressFamily, Dirs, field='stats')],
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),

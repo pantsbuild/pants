@@ -13,7 +13,6 @@ from six import string_types
 from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address import Addresses
 from pants.engine.addressable import Exactly, addressable_list
-from pants.engine.fs import Files as FSFiles
 from pants.engine.fs import PathGlobs
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
@@ -243,8 +242,8 @@ class BaseGlobs(AbstractClass):
   def to_path_globs(self, relpath):
     """Return two PathGlobs representing the included and excluded Files for these patterns."""
     return (
-        PathGlobs.create_from_specs(FSFiles, relpath, self._filespecs),
-        PathGlobs.create_from_specs(FSFiles, relpath, self._excluded_filespecs)
+        PathGlobs.create_from_specs(relpath, self._filespecs),
+        PathGlobs.create_from_specs(relpath, self._excluded_filespecs)
       )
 
 

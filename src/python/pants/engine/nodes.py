@@ -10,11 +10,11 @@ from os.path import dirname
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
-from pants.engine.fs import (Dir, DirectoryListing, File, FileContent, FileDigest, Link, Path,
-                             ReadLink, Stats, file_content, file_digest, list_directory, path_stat,
-                             read_link)
+from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
+                             file_digest, read_link, scan_directory)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
@@ -322,10 +322,14 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
       values.append(getattr(input_product, field))
 
     # If there was only one projected field and it is already of the correct type, project it.
-    if len(values) == 1 and type(values[0]) is self.projected_subject:
-      projected_subject = values[0]
-    else:
-      projected_subject = self.projected_subject(*values)
+    try:
+      if len(values) == 1 and type(values[0]) is self.projected_subject:
+        projected_subject = values[0]
+      else:
+        projected_subject = self.projected_subject(*values)
+    except Exception as e:
+      return Throw(ValueError('Fields {} of {} could not be projected as {}: {}'.format(
+        self.fields, input_product, self.projected_subject, e)))
     output_node = self._output_node(step_context, projected_subject)
 
     # When the output node is available, return its result.
@@ -333,7 +337,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
     if type(output_state) in (Return, Throw, Waiting):
       return output_state
     elif type(output_state) is Noop:
-      return Noop('Successfully projected, but no source of output product for {}.', output_node)
+      return Throw(ValueError('No source of projected dependency {}'.format(output_node)))
     else:
       raise State.raise_unrecognized(output_state)
 
@@ -392,7 +396,6 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       (DirectoryListing, Dir),
       (FileContent, File),
       (FileDigest, File),
-      (Stats, Path),
       (ReadLink, Link),
     }
 
@@ -410,23 +413,20 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def generate_subjects(self, filenames):
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
-      # Stats, ReadLink, or FileContent for the literal path.
-      yield Path(f)
+      # ReadLink, or FileContent for the literal path.
       yield File(f)
       yield Link(f)
-      # DirectoryListings for parent dirs.
+      # DirectoryListing for parent dirs.
       yield Dir(dirname(f))
 
   def step(self, step_context):
     try:
-      if self.product is Stats:
-        return Return(path_stat(step_context.project_tree, self.subject))
+      if self.product is DirectoryListing:
+        return Return(scan_directory(step_context.project_tree, self.subject))
       elif self.product is FileContent:
         return Return(file_content(step_context.project_tree, self.subject))
       elif self.product is FileDigest:
         return Return(file_digest(step_context.project_tree, self.subject))
-      elif self.product is DirectoryListing:
-        return Return(list_directory(step_context.project_tree, self.subject))
       elif self.product is ReadLink:
         return Return(read_link(step_context.project_tree, self.subject))
       else:
