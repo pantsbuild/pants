@@ -65,6 +65,7 @@ python_tests(
   name='struct',
   sources=['test_struct.py'],
   dependencies=[
+    'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
     'src/python/pants/engine:objects',
     'src/python/pants/engine:struct',
