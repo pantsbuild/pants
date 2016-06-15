@@ -56,7 +56,8 @@ class CompileContext(object):
   def declared_dependencies(self):
     """Compute the declared dependencies for this target, recursively resolving target aliases.
 
-    TODO: Move this API to `Target` (it's just "direct_deps+aliases"
+    TODO: This is just '_resolve_aliases', which we have implemented a few different places. Should
+    move it onto Target probably.
     """
     def resolve(t):
       for declared in t.dependencies:
