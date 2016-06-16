@@ -357,10 +357,10 @@ class OptionsTest(unittest.TestCase):
 
     check([1, 2, 8, 9], './pants --listy=+[8,9]',
           env={'PANTS_GLOBAL_LISTY': '-[4,5]'},
-          config={'GLOBAL': {'listy': '|+[4,5]|-[3]|'}})
+          config={'GLOBAL': {'listy': '+[4,5],-[3]'}})
 
     # Overwriting from env, then appending and filtering.
-    check([7, 8, 9], './pants --listy=|+[8,9]|-[6]|',
+    check([7, 8, 9], './pants --listy=+[8,9],-[6]',
           env={'PANTS_GLOBAL_LISTY': '[6,7]'},
           config={'GLOBAL': {'listy': '+[4,5]'}})
 
@@ -372,7 +372,7 @@ class OptionsTest(unittest.TestCase):
     # Overwriting from flags.
     check([8, 9], './pants --listy=[8,9]',
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
-          config={'GLOBAL': {'listy': '|[4,5]|-[8]|'}})
+          config={'GLOBAL': {'listy': '+[4,5],-[8]'}})
 
     # Filtering all instances of repeated values.
     check([1, 2, 3, 4, 6], './pants --listy=-[5]',
@@ -385,7 +385,7 @@ class OptionsTest(unittest.TestCase):
 
     # Filtering a value even though it was appended again at the same rank.
     check([1, 2, 3, 5], './pants',
-          env={'PANTS_GLOBAL_LISTY': '|-[4]|+[4]|'},
+          env={'PANTS_GLOBAL_LISTY': '-[4],+[4]'},
           config={'GLOBAL': {'listy': '+[4, 5]'}})
 
     # Overwriting cancels filters.

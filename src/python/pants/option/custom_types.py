@@ -5,10 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
+
 import six
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
+from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_text
 
 
@@ -96,6 +99,28 @@ class ListValueComponent(object):
   REPLACE = 'REPLACE'
   MODIFY = 'MODIFY'
 
+  # We use a regex to parse the comma-separated lists of modifier expressions (each of which is
+  # a list or tuple literal preceded by a + or a -).  Note that these expressions are technically
+  # a context-free grammar, but in practice using this regex as a heuristic will work fine. The
+  # values that could defeat it are extremely unlikely to be encountered in practice.
+  # If we do ever encounter them, we'll have to replace this with a real parser.
+  @classmethod
+  @memoized_method
+  def _get_modifier_expr_re(cls):
+    # Note that the regex consists of a positive lookbehind assertion for a ] or a ),
+    # followed by a comma (possibly surrounded by whitespace), followed by a
+    # positive lookahead assertion for [ or (.  The lookahead/lookbehind assertions mean that
+    # the bracket/paren characters don't get consumed in the split.
+    return re.compile(r'(?<=\]|\))\s*,\s*(?=[+-](?:\[|\())')
+
+  @classmethod
+  def _split_modifier_expr(cls, s):
+    # This check ensures that the first expression (before the first split point) is a modification.
+    if s.startswith('+') or s.startswith('-'):
+      return cls._get_modifier_expr_re().split(s)
+    else:
+      return [s]
+
   @classmethod
   def merge(cls, components):
     """Merges components into a single component, applying their actions appropriately.
@@ -143,15 +168,16 @@ class ListValueComponent(object):
     Note that we accept tuple literals, but the internal value is always a list.
 
     :param value: The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
-                  a string representation (possibly prefixed by +) of a list or tuple, or any
-                  allowed member_type.  Can also be a |-delimited string, in which case we split
-                  it on the bars and merge the results of calling this method on those strings.
+                  a string representation of a list or tuple (possibly prefixed by + or -
+                  indicating modification instead of replacement), or any allowed member_type.
+                  May also be a comma-separated sequence of modifications.
     :rtype: `ListValueComponent`
     """
     if isinstance(value, six.string_types):
       value = ensure_text(value)
-      if value.startswith('|'):
-        return cls.merge([cls.create(x) for x in value.split('|') if x])
+      comma_separated_exprs = cls._split_modifier_expr(value)
+      if len(comma_separated_exprs) > 1:
+        return cls.merge([cls.create(x) for x in comma_separated_exprs])
 
     action = cls.MODIFY
     appends = []

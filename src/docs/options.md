@@ -83,12 +83,10 @@ For example, for an option `--foo` whose default value is `[1, 2]`, then in `pan
 + `foo: -[1]` will yield `[2]`.
 + `foo: [3, 4]` will yield `[3, 4]`.
 
-Multiple expressions may be delimited with pipes, allowing you to append and filter 
-simultaneously:
+Multiple append and filter expressions may be delimited with commas, 
+allowing you to append and filter simultaneously:
 
-+ `foo: |+[3,4]|-[1]|` will yield `[2, 3, 4]`.
-
-Note that the leading and trailing pipes matter.
++ `foo: +[3,4],-[1]` will yield `[2, 3, 4]`.
 
 On the command line you can append single values multiple times:
 
