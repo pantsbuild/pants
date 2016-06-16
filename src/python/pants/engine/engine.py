@@ -19,6 +19,7 @@ from pants.base.exceptions import TaskError
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulPool
 from pants.engine.storage import Cache, Storage
+from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -110,6 +111,7 @@ class Engine(AbstractClass):
     """Returns cache stats for the engine."""
     return self._cache.get_stats()
 
+  @memoized_method
   def _should_cache(self, step_request):
     return step_request.node.is_cacheable
 
@@ -235,6 +237,14 @@ class ConcurrentEngine(Engine):
       submit_until(self._pool_size)
       await_one()
 
+  @abstractmethod
+  def _submit_until(self, pending_submission, in_flight, n):
+    """Submit pending while there's capacity, and more than `n` items in pending_submission."""
+
+  @abstractmethod
+  def _await_one(self, in_flight):
+    """Await one completed step, and remove it from in_flight."""
+
 
 class ThreadHybridEngine(ConcurrentEngine):
   """An engine that runs locally but allows nodes to be optionally run concurrently.
@@ -279,6 +289,41 @@ class ThreadHybridEngine(ConcurrentEngine):
     else:
       return step_request.step_id, None
 
+  def _execute_step(debug, process_state, step, cache_save=None, resolve_results=False):
+    """A function to help support local step execution.
+
+    Executes the Step for the given node builder and storage, and returns a tuple of step id and
+    result or exception.
+
+    :param callable cache_save: Callable used to save cache results.
+    :param bool debug: Determines if we do extra debugging steps.
+    :param process_state: State object containing storage and node builder.
+    :param step: Step to be executed.
+    :param bool resolve_results: Determines if results should be resolved from storage
+                                 or have the key returned.
+    """
+    node_builder, storage = process_state
+    step_id = step.step_id
+
+    def execute():
+      resolved_request = storage.resolve_request(step)
+      result = resolved_request(node_builder)
+      if not resolve_results:
+        result = storage.key_for_result(result)
+      if debug:
+        _try_pickle(result)
+      if cache_save:
+        cache_save(step, result)
+      return result
+
+    try:
+      return step_id, execute()
+    except Exception as e:
+      # Trap any exception raised by the execution node that bubbles up, and
+      # pass this back to our main thread for handling.
+      logger.warn(traceback.format_exc())
+      return step_id, e
+
   def _deferred_step(self, step):
     """Create a callable to process a step that is able to be passed to the thread pool
 
@@ -320,13 +365,25 @@ class ThreadHybridEngine(ConcurrentEngine):
           raise InFlightException('{} is already in_flight!'.format(step))
 
         in_flight[step.step_id] = promise
-        futures = [
-          self._pool.submit(self._deferred_cache(step)),
-          self._pool.submit(self._deferred_step(step))
-        ]
-        for f in futures:
-          self._pending.add(f)
-          f.add_done_callback(self._processed_node_callback)
+        # futures = [
+        #   self._pool.submit(self._deferred_cache(step)),
+        #   self._pool.submit(self._deferred_step(step))
+        # ]
+        futures = []
+        step_future = self._pool.submit(self._deferred_step(step))
+        step_future.add_done_callback(self._processed_node_callback)
+        futures.append(step_future)
+
+        should_cache = self._should_cache(step)
+        if should_cache:
+          cache_future = self._pool.submit(self.deferred_cache(step))
+          cache_future.add_done_callback(self._processed_cache_callback)
+
+        # for f in futures:
+        #   self._pending.add(f)
+        #   f.add_done_callback(self._processed_node_callback)
+
+
         submitted += 1
 
       else:

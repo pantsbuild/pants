@@ -13,7 +13,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.options_initializer import OptionsInitializer
-from pants.engine.engine import LocalSerialEngine
+from pants.engine.engine import LocalSerialEngine, ThreadHybridEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
@@ -112,7 +112,8 @@ class EngineInitializer(object):
     )
 
     scheduler = LocalScheduler(dict(), tasks, project_tree)
-    engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
+    #engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
+    engine = ThreadHybridEngine(scheduler, Storage.create(debug=False))
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
 
