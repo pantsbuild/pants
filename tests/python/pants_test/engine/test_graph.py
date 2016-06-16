@@ -146,7 +146,7 @@ class InlinedGraphTest(GraphTestBase):
                                           strict=False,
                                           lang='java')
     public = Struct(address=address('public'),
-                           url='https://oss.sonatype.org/#stagingRepositories')
+                    url='https://oss.sonatype.org/#stagingRepositories')
     thrift1 = Target(address=address('thrift1'))
     thrift2 = Target(address=address('thrift2'), dependencies=[thrift1])
     expected_java1 = Target(address=address('java1'),
@@ -203,7 +203,7 @@ class InlinedGraphTest(GraphTestBase):
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
     if expected_string:
-      self.assertTrue(expected_string in trace_message)
+      self.assertIn(expected_string, trace_message)
 
   def do_test_cycle(self, address_str):
     scheduler = self.create_json()
@@ -214,12 +214,21 @@ class InlinedGraphTest(GraphTestBase):
     def indent_of(s):
       return len(s) - len(s.lstrip())
 
+    def assert_equal_or_more_indentation(more_indented_line, less_indented_line):
+      self.assertTrue(indent_of(more_indented_line) >= indent_of(less_indented_line),
+                      '\n"{}"\nshould have more equal or more indentation than\n"{}"'.format(more_indented_line,
+                                                                                             less_indented_line))
+
     lines = error_msg.splitlines()
     line_indices_of_throws = [i for i, v in enumerate(lines) if throw_name in v]
     for idx in line_indices_of_throws:
       # Make sure lines with Throw have more or equal indentation than its neighbors.
-      self.assertTrue(indent_of(lines[idx]) >= indent_of(lines[max(0, idx - 1)]))
-      self.assertTrue(indent_of(lines[idx]) >= indent_of(lines[min(len(lines) - 1, idx + 1)]))
+      current_line = lines[idx]
+      line_above = lines[max(0, idx - 1)]
+      line_below = lines[min(len(lines) - 1, idx + 1)]
+
+      assert_equal_or_more_indentation(current_line, line_above)
+      assert_equal_or_more_indentation(current_line, line_below)
 
   def test_cycle_self(self):
     self.do_test_cycle('graph_test:self_cycle')
@@ -265,7 +274,7 @@ class LazyResolvingGraphTest(GraphTestBase):
 
     public_address = address('public')
     expected_public = Struct(address=public_address,
-                                    url='https://oss.sonatype.org/#stagingRepositories')
+                             url='https://oss.sonatype.org/#stagingRepositories')
 
     thrift2_address = address('thrift2')
     expected_java1 = Target(address=java1_address,
