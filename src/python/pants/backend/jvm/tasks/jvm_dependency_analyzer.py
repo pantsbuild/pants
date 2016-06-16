@@ -149,6 +149,9 @@ class JvmDependencyAnalyzer(object):
     :param scope: When specified, only deps with this scope are included. This is more
       than a filter, because it prunes the subgraphs represented by aliases with
       un-matched scopes.
+    :returns: An iterator of (resolved_dependency, resolved_from) tuples.
+      `resolved_from` is the top level target alias that depends on `resolved_dependency`,
+      and `None` if `resolved_dependency` is not a dependency of a target alias.
     """
     for declared in target.dependencies:
       if scope is not None and declared.scope != scope:
@@ -156,10 +159,10 @@ class JvmDependencyAnalyzer(object):
         continue
       elif type(declared) in (AliasTarget, Target):
         # Is an alias. Recurse to expand.
-        for r in self.resolve_aliases(declared, scope=scope):
-          yield r
+        for r, _ in self.resolve_aliases(declared, scope=scope):
+          yield r, declared
       else:
-        yield declared
+        yield declared, None
 
   def compute_unused_deps(self, product_deps_by_src, target):
     """Uses `product_deps_by_src` to compute unused deps for the given Target.
@@ -175,7 +178,7 @@ class JvmDependencyAnalyzer(object):
     # Determine which of the DEFAULT deps in the declared set of this target were used.
     used = set()
     unused = set()
-    for dep in self.resolve_aliases(target, scope=Scopes.DEFAULT):
+    for dep, _ in self.resolve_aliases(target, scope=Scopes.DEFAULT):
       if dep in used or dep in unused:
         continue
       # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would

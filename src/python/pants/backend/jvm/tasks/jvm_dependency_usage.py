@@ -98,7 +98,7 @@ class JvmDependencyUsage(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmDependencyUsage, cls).implementation_version() + [('JvmDependencyUsage', 5)]
+    return super(JvmDependencyUsage, cls).implementation_version() + [('JvmDependencyUsage', 6)]
 
   def _render(self, graph, fh):
     chunks = graph.to_summary() if self.get_options().summary else graph.to_json()
@@ -170,15 +170,15 @@ class JvmDependencyUsage(Task):
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
     def creator(target):
       transitive_deps = set(transitive_deps_by_target.get(target))
-      declared_deps = set(analyzer.resolve_aliases(target))
-      eligible_unused_deps = set(analyzer.resolve_aliases(target, scope=Scopes.DEFAULT))
+      declared_deps_with_aliases = set(analyzer.resolve_aliases(target))
+      eligible_unused_deps = set(d for d, _ in analyzer.resolve_aliases(target, scope=Scopes.DEFAULT))
       node = self.create_dep_usage_node(target,
                                         targets_by_file, get_buildroot(),
                                         classes_by_source,
                                         runtime_classpath,
                                         product_deps_by_src,
                                         transitive_deps,
-                                        declared_deps,
+                                        declared_deps_with_aliases,
                                         eligible_unused_deps)
       vt = target_to_vts[target]
       with open(self.nodes_json(vt.results_dir), mode='w') as fp:
@@ -256,9 +256,10 @@ class JvmDependencyUsage(Task):
                             runtime_classpath,
                             product_deps_by_src,
                             transitive_deps,
-                            declared_deps,
+                            declared_deps_with_aliases,
                             eligible_unused_deps):
     concrete_target = target.concrete_derived_from
+    declared_deps = [resolved for resolved, _ in declared_deps_with_aliases]
     products_total = self._count_products(runtime_classpath, target)
     node = Node(concrete_target)
     node.add_derivation(target, products_total)
@@ -272,10 +273,10 @@ class JvmDependencyUsage(Task):
       return Edge(is_declared=is_declared, is_used=is_used, products_used=products_used)
 
     # Record declared Edges, initially all as "unused" or "declared".
-    for dep_tgt in declared_deps:
+    for dep_tgt, aliased_from in declared_deps_with_aliases:
       derived_from = dep_tgt.concrete_derived_from
       if self._select(derived_from):
-        node.add_edge(_construct_edge(dep_tgt, products_used=set()), derived_from)
+        node.add_edge(_construct_edge(dep_tgt, products_used=set()), derived_from, aliased_from)
 
     # Record the used products and undeclared Edges for this target. Note that some of
     # these may be self edges, which are considered later.
@@ -304,19 +305,24 @@ class Node(object):
     self.derivations = set()
     # Dict mapping concrete dependency targets to an Edge object.
     self.dep_edges = defaultdict(Edge)
+    # Dict mapping concrete dependency targets to where they are aliased from.
+    self.dep_aliases = defaultdict(set)
 
   def add_derivation(self, derived_target, derived_products):
     self.derivations.add(derived_target)
     self.products_total += derived_products
 
-  def add_edge(self, edge, dest):
+  def add_edge(self, edge, dest, dest_aliased_from=None):
     self.dep_edges[dest] += edge
+    if dest_aliased_from:
+      self.dep_aliases[dest].add(dest_aliased_from)
 
   def combine(self, other_node):
     assert other_node.concrete_target == self.concrete_target
     self.products_total += other_node.products_total
     self.derivations.update(other_node.derivations)
     self.dep_edges.update(other_node.dep_edges)
+    self.dep_aliases.update(other_node.dep_aliases)
 
   def to_cacheable_dict(self):
     edges = {}
@@ -326,11 +332,17 @@ class Node(object):
         'is_declared': self.dep_edges[dest].is_declared,
         'is_used': self.dep_edges[dest].is_used,
       }
+    aliases = {}
+
+    for dep, dep_aliases in self.dep_aliases.items():
+      aliases[dep.address.spec] = [alias.address.spec for alias in dep_aliases]
+
     return {
       'target': self.concrete_target.address.spec,
       'products_total': self.products_total,
       'derivations': [derivation.address.spec for derivation in self.derivations],
-      'dep_edges': edges
+      'dep_edges': edges,
+      'aliases': aliases,
     }
 
   @staticmethod
@@ -343,6 +355,9 @@ class Node(object):
         is_declared=cached_dict['dep_edges'][edge]['is_declared'],
         is_used=cached_dict['dep_edges'][edge]['is_used'],
         products_used=set(cached_dict['dep_edges'][edge]['products_used']))
+    for dep in cached_dict['aliases']:
+      for alias in cached_dict['aliases'][dep]:
+        res.dep_aliases[target_resolve_func(dep)].add(target_resolve_func(alias))
     return res
 
 
@@ -425,12 +440,13 @@ class DependencyUsageGraph(object):
     """Outputs the entire graph."""
     res_dict = {}
 
-    def gen_dep_edge(node, edge, dep_tgt):
+    def gen_dep_edge(node, edge, dep_tgt, aliases):
       return {
         'target': dep_tgt.address.spec,
         'dependency_type': self._edge_type(node.concrete_target, edge, dep_tgt),
         'products_used': len(edge.products_used),
         'products_used_ratio': self._used_ratio(dep_tgt, edge),
+        'aliases': [alias.address.spec for alias in aliases],
       }
 
     for node in self._nodes.values():
@@ -438,6 +454,7 @@ class DependencyUsageGraph(object):
         'cost': self._cost(node.concrete_target),
         'cost_transitive': self._trans_cost(node.concrete_target),
         'products_total': node.products_total,
-        'dependencies': [gen_dep_edge(node, edge, dep_tgt) for dep_tgt, edge in node.dep_edges.items()]
+        'dependencies': [gen_dep_edge(node, edge, dep_tgt, node.dep_aliases.get(dep_tgt, {}))
+                         for dep_tgt, edge in node.dep_edges.items()],
       }
     yield json.dumps(res_dict, indent=2, sort_keys=True)
