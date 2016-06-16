@@ -603,7 +603,7 @@ class JvmCompile(NailgunTaskBase):
       # Compute replacement deps.
       product_deps_by_src = self.context.products.get_data('product_deps_by_src')
       replacement_deps = self._dep_analyzer.compute_unused_deps(product_deps_by_src,
-                                                                compile_context)
+                                                                compile_context.target)
 
       if not replacement_deps:
         return

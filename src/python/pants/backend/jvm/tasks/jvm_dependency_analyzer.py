@@ -14,8 +14,10 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
@@ -140,28 +142,34 @@ class JvmDependencyAnalyzer(object):
       transitive_deps_by_target[target] = transitive_deps
     return transitive_deps_by_target
 
-  def compute_unused_deps(self, product_deps_by_src, compile_context):
-    """Uses `product_deps_by_src` to compute unused deps.
+  def _resolve_eligible_unused_aliases(self, target):
+    for declared in target.dependencies:
+      if declared.scope != Scopes.DEFAULT:
+        # Only `DEFAULT` scoped deps are eligible for the unused dep check.
+        continue
+      elif type(declared) in (AliasTarget, Target):
+        # Is an alias. Recurse to expand.
+        for r in self._resolve_eligible_unused_aliases(declared):
+          yield r
+      else:
+        yield declared
 
-    TODO: Move `compile_context.declared_dependencies` to Target to allow this method
-    to take a Target instead of a CompileContext.
+  def compute_unused_deps(self, product_deps_by_src, target):
+    """Uses `product_deps_by_src` to compute unused deps for the given Target.
 
     :returns: dict of unused targets to suggested replacements.
     """
 
     # Flatten the product deps of this target.
     product_deps = set()
-    for dep_entries in product_deps_by_src.get(compile_context.target, {}).values():
+    for dep_entries in product_deps_by_src.get(target, {}).values():
       product_deps.update(dep_entries)
 
     # Determine which of the deps in the declared set of this target were used.
     used = set()
     unused = set()
-    for dep in compile_context.declared_dependencies():
+    for dep in self._resolve_eligible_unused_aliases(target):
       if dep in used or dep in unused:
-        continue
-      if dep.scope != Scopes.DEFAULT:
-        # Only `DEFAULT` scoped deps are eligible for the unused dep check.
         continue
       # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
       # incorrectly skip "empty" `*_library` targets, which could then be used as a loophole.

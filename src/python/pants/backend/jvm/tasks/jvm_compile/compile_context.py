@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import zipfile
 from contextlib import contextmanager
 
+from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
 
@@ -53,31 +54,22 @@ class CompileContext(object):
     else:
       return self.all_dependencies(dep_context)
 
-  def declared_dependencies(self):
-    """Compute the declared dependencies for this target, recursively resolving target aliases.
-
-    TODO: This is just '_resolve_aliases', which we have implemented a few different places. Should
-    move it onto Target probably.
-    """
-    def resolve(t):
-      for declared in t.dependencies:
-        if type(declared) == Target:
-          # Is an alias. Recurse to expand.
-          for r in resolve(declared):
-            yield r
-        else:
-          yield declared
-
-    for dep in resolve(self.target):
-      yield dep
+  def _resolve_aliases(self, t):
+    for declared in t.dependencies:
+      if type(declared) in (AliasTarget, Target):
+        # Is an alias. Recurse to expand.
+        for r in self._resolve_aliases(declared):
+          yield r
+      else:
+        yield declared
 
   def strict_dependencies(self, dep_context):
     """Compute the 'strict' compile target dependencies for this target.
 
-    Results in a list similar to the list for `declared_dependencies`, with the addition
+    Results the declared dependencies of a target after alias expansion, with the addition
     of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
     """
-    for declared in self.declared_dependencies():
+    for declared in self._resolve_aliases(self.target):
       if isinstance(declared, dep_context.compiler_plugin_types):
         for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
           yield r
