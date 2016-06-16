@@ -75,7 +75,7 @@ Surround strings with single or double quotes if they contain embedded spaces: `
 
 ### List Options
 
-List options can be added to and subtracted from, as well as overridden.
+List options can be appended to and filtered, as well as overridden.
 For example, for an option `--foo` whose default value is `[1, 2]`, then in `pants.ini`:
 
 + `foo: 3` will yield `[1, 2, 3]`.
@@ -83,18 +83,28 @@ For example, for an option `--foo` whose default value is `[1, 2]`, then in `pan
 + `foo: -[1]` will yield `[2]`.
 + `foo: [3, 4]` will yield `[3, 4]`.
 
-Multiple expressions may be delimited with pipes, allowing you to add and subtract simultaneously:
+Multiple expressions may be delimited with pipes, allowing you to append and filter 
+simultaneously:
 
 + `foo: |+[3,4]|-[1]|` will yield `[2, 3, 4]`.
 
 Note that the leading and trailing pipes matter.
 
-On the command line you can append multiple times:
+On the command line you can append single values multiple times:
 
 + `--foo=3 --foo=4` will yield the value `[1, 2, 3, 4]`.
 
-Note that the command line values will be appended to the value determined from the defaults
+Note that these command line values will be appended to the value determined from the defaults
 plus the values in `pants.ini`. To override the value, use `--foo=[3, 4]`.
+
+Filters apply to the entire list constructed so far, and will filter all appearances of the value:
+
++ `--foo=1 --foo=1 --foo=2 --foo=-[1]` will yield `[2, 2]`.
+
+Filters take precedence over appends, so you cannot "add something back in":
+
++ `--foo=-[2] --foo=2` will yield `[1]`.
+
 
 ### Dict Options
 

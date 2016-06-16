@@ -87,10 +87,11 @@ class ListValueComponent(object):
 
   One or more instances of this class can be merged to form a list value.
 
-  A component consists of values to add and values to subtract while constructing the final list.
+  A component consists of values to append and values to filter while constructing the final list.
 
-  Each component may either replace or modify the preceding component.  So that, e.g., a cmd-line
-  flag can append to the value specified in the config file, instead of having to repeat it.
+  Each component may either replace or modify the preceding component.  So that, e.g., a config
+  file can append to and/or filter the default value list, instead of having to repeat most
+  of the contents of the default value list.
   """
   REPLACE = 'REPLACE'
   MODIFY = 'MODIFY'
@@ -108,29 +109,29 @@ class ListValueComponent(object):
     # Note that action of the merged component is MODIFY until the first REPLACE is encountered.
     # This guarantees associativity.
     action = cls.MODIFY
-    additions = []
-    subtractions = []
+    appends = []
+    filters = []
     for component in components:
       if component._action is cls.REPLACE:
-        additions = component._additions
-        subtractions = component._subtractions
+        appends = component._appends
+        filters = component._filters
         action = cls.REPLACE
       elif component._action is cls.MODIFY:
-        additions.extend(component._additions)
-        subtractions.extend(component._subtractions)
+        appends.extend(component._appends)
+        filters.extend(component._filters)
       else:
         raise ParseError('Unknown action for list value: {}'.format(component.action))
-    return cls(action, additions, subtractions)
+    return cls(action, appends, filters)
 
-  def __init__(self, action, additions, subtractions):
+  def __init__(self, action, appends, filters):
     self._action = action
-    self._additions = additions
-    self._subtractions = subtractions
+    self._appends = appends
+    self._filters = filters
 
   @property
   def val(self):
-    ret = list(self._additions)
-    for x in self._subtractions:
+    ret = list(self._appends)
+    for x in self._filters:
       # Note: can't do ret.remove(x) because that only removes the first instance of x.
       ret = [y for y in ret if y != x]
     return ret
@@ -153,30 +154,30 @@ class ListValueComponent(object):
         return cls.merge([cls.create(x) for x in value.split('|') if x])
 
     action = cls.MODIFY
-    additions = []
-    subtractions = []
+    appends = []
+    filters = []
     if isinstance(value, cls):  # Ensure idempotency.
       action = value._action
-      additions = value._additions
-      subtractions = value._subtractions
+      appends = value._appends
+      filters = value._filters
     elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
       action = cls.REPLACE
-      additions = value
+      appends = value
     elif value.startswith('[') or value.startswith('('):
       action = cls.REPLACE
-      additions = _convert(value, (list, tuple))
+      appends = _convert(value, (list, tuple))
     elif value.startswith('+[') or value.startswith('+('):
-      additions = _convert(value[1:], (list, tuple))
+      appends = _convert(value[1:], (list, tuple))
     elif value.startswith('-[') or value.startswith('-('):
-      subtractions = _convert(value[1:], (list, tuple))
+      filters = _convert(value[1:], (list, tuple))
     elif isinstance(value, six.string_types):
-      additions = [value]
+      appends = [value]
     else:
-      additions = _convert('[{}]'.format(value), list)
-    return cls(action, list(additions), list(subtractions))
+      appends = _convert('[{}]'.format(value), list)
+    return cls(action, list(appends), list(filters))
 
   def __repr__(self):
-    return b'{} +{} -{}'.format(self._action, self._additions, self._subtractions)
+    return b'{} +{} -{}'.format(self._action, self._appends, self._filters)
 
 
 class DictValueComponent(object):
