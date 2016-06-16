@@ -11,6 +11,7 @@ from pants.base.build_environment import get_scm
 from pants.base.exceptions import TaskError
 from pants.build_graph.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
+from pants.util.memo import memoized_property
 
 
 class ChangeCalculator(object):
@@ -45,6 +46,13 @@ class ChangeCalculator(object):
       self._mapper_cache = SpecSourceMapper(self._address_mapper, self._build_graph, self._fast)
     return self._mapper_cache
 
+  @memoized_property
+  def excludes(self):
+    return [re.compile(pattern) for pattern in self._exclude_target_regexp]
+
+  def excluded(self, target):
+    return any(exclude.search(target.spec) is not None for exclude in self.excludes)
+
   def changed_files(self):
     """Determines the files changed according to SCM/workspace and options."""
     if self._diffspec:
@@ -59,7 +67,8 @@ class ChangeCalculator(object):
     result = set()
     for src in self.changed_files():
       result.update(set(targets_for_source(src)))
-    return result
+
+    return set(t for t in result if not self.excluded(t))
 
   def _find_changed_targets(self):
     # Internal helper to find changed targets, optionally including their dependees.
@@ -96,14 +105,7 @@ class ChangeCalculator(object):
 
     :returns: A set of target addresses.
     """
-    # Find changed targets (and maybe their dependees).
-    changed = self._find_changed_targets()
-
-    # Remove any that match the exclude_target_regexp list.
-    excludes = [re.compile(pattern) for pattern in self._exclude_target_regexp]
-    return set([
-      t for t in changed if not any(exclude.search(t.spec) is not None for exclude in excludes)
-    ])
+    return set(t for t in self._find_changed_targets() if not self.excluded(t))
 
 
 class ChangedFileTaskMixin(object):

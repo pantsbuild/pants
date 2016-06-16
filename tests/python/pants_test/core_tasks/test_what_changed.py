@@ -396,3 +396,16 @@ class WhatChangedTestWithIgnorePatterns(WhatChangedTestBasic):
       'root/src/py/a:alpha',
       workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'])
     )
+
+
+class WhatChangedTestWithExcludeRegexp(WhatChangedTestBasic):
+  def test_exclude_regexp_with_dependees(self):
+    # Both `b` and its dependee `a` are excluded, because the explicit exclusion of
+    # `b` also implies that its direct dependees aren't traversed.
+    self.assert_console_output(
+      options={
+        'include_dependees': 'direct',
+        'exclude_target_regexp': ['root/src/py/dependency_tree/b:b'],
+      },
+      workspace=self.workspace(files=['root/src/py/dependency_tree/b/b.py'])
+    )
