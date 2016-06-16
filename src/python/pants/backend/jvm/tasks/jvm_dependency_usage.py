@@ -14,8 +14,10 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.build_graph.target_scopes import Scopes
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
@@ -44,14 +46,14 @@ class JvmDependencyUsage(Task):
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyUsage, cls).register_options(register)
-    register('--internal-only', default=True, type=bool,
+    register('--internal-only', default=True, type=bool, fingerprint=True,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
     register('--summary', default=True, type=bool,
              help='When set, outputs a summary of the "worst" dependencies; otherwise, '
                   'outputs a JSON report.')
     register('--size-estimator',
-             choices=list(cls.size_estimators.keys()), default='filesize',
+             choices=list(cls.size_estimators.keys()), default='filesize', fingerprint=True,
              help='The method of target size estimation.')
     register('--transitive', default=True, type=bool,
              help='Score all targets in the build graph transitively.')
@@ -96,7 +98,7 @@ class JvmDependencyUsage(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmDependencyUsage, cls).implementation_version() + [('JvmDependencyUsage', 4)]
+    return super(JvmDependencyUsage, cls).implementation_version() + [('JvmDependencyUsage', 5)]
 
   def _render(self, graph, fh):
     chunks = graph.to_summary() if self.get_options().summary else graph.to_json()
@@ -104,23 +106,26 @@ class JvmDependencyUsage(Task):
       fh.write(chunk)
     fh.flush()
 
-  def _resolve_aliases(self, target):
-    """Recursively resolve `target` aliases."""
-    for declared in target.dependencies:
-      if type(declared) == Target:
-        for r in self._resolve_aliases(declared):
-          yield r
-      else:
-        yield declared
+  def _dep_type(self, target, dep, declared_deps, eligible_unused_deps, is_used):
+    """Returns a tuple of a 'declared'/'undeclared' boolean, and 'used'/'unused' boolean.
 
-  def _is_declared_dep(self, target, dep):
-    """Returns true if the given dep target should be considered a declared dep of target."""
-    return dep in self._resolve_aliases(target)
+    These values are related, because some declared deps are not eligible to be considered unused.
+
+    :param target: The source target.
+    :param dep: The dependency to compute a type for.
+    :param declared_deps: The declared dependencies of the target.
+    :param eligible_unused_deps: The declared dependencies of the target that are eligible
+      to be considered unused; this is generally only 'DEFAULT' scoped dependencies.
+    :param is_used: True if the dep was actually used at compile time.
+    """
+    if target == dep:
+      return True, True
+    return (dep in declared_deps), (is_used or dep not in eligible_unused_deps)
 
   def _select(self, target):
     if self.get_options().internal_only and isinstance(target, JarLibrary):
       return False
-    elif isinstance(target, Resources) or type(target) == Target:
+    elif isinstance(target, Resources) or type(target) in (AliasTarget, Target):
       return False
     else:
       return True
@@ -164,12 +169,17 @@ class JvmDependencyUsage(Task):
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
     def creator(target):
+      transitive_deps = set(transitive_deps_by_target.get(target))
+      declared_deps = set(analyzer.resolve_aliases(target))
+      eligible_unused_deps = set(analyzer.resolve_aliases(target, scope=Scopes.DEFAULT))
       node = self.create_dep_usage_node(target,
                                         targets_by_file, get_buildroot(),
                                         classes_by_source,
                                         runtime_classpath,
                                         product_deps_by_src,
-                                        transitive_deps_by_target)
+                                        transitive_deps,
+                                        declared_deps,
+                                        eligible_unused_deps)
       vt = target_to_vts[target]
       with open(self.nodes_json(vt.results_dir), mode='w') as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
@@ -245,17 +255,27 @@ class JvmDependencyUsage(Task):
                             classes_by_source,
                             runtime_classpath,
                             product_deps_by_src,
-                            transitive_deps_by_target):
+                            transitive_deps,
+                            declared_deps,
+                            eligible_unused_deps):
     concrete_target = target.concrete_derived_from
     products_total = self._count_products(runtime_classpath, target)
     node = Node(concrete_target)
     node.add_derivation(target, products_total)
 
-    # Record declared Edges.
-    for dep_tgt in self._resolve_aliases(target):
+    def _construct_edge(dep_tgt, products_used):
+      is_declared, is_used = self._dep_type(target,
+                                            dep_tgt,
+                                            declared_deps,
+                                            eligible_unused_deps,
+                                            len(products_used) > 0)
+      return Edge(is_declared=is_declared, is_used=is_used, products_used=products_used)
+
+    # Record declared Edges, initially all as "unused" or "declared".
+    for dep_tgt in declared_deps:
       derived_from = dep_tgt.concrete_derived_from
       if self._select(derived_from):
-        node.add_edge(Edge(is_declared=True, products_used=set()), derived_from)
+        node.add_edge(_construct_edge(dep_tgt, products_used=set()), derived_from)
 
     # Record the used products and undeclared Edges for this target. Note that some of
     # these may be self edges, which are considered later.
@@ -269,11 +289,10 @@ class JvmDependencyUsage(Task):
           # Create edge only for those direct or transitive dependencies in order to
           # disqualify irrelevant targets that happen to share some file in sources,
           # not uncommon when globs especially rglobs is used.
-          if not derived_from in transitive_deps_by_target.get(concrete_target):
+          if not derived_from in transitive_deps:
             continue
-          is_declared = self._is_declared_dep(target, dep_tgt)
           normalized_deps = self._normalize_product_dep(buildroot, classes_by_source, product_dep)
-          node.add_edge(Edge(is_declared=is_declared, products_used=normalized_deps), derived_from)
+          node.add_edge(_construct_edge(dep_tgt, products_used=normalized_deps), derived_from)
 
     return node
 
@@ -305,6 +324,7 @@ class Node(object):
       edges[dest.address.spec] = {
         'products_used': list(self.dep_edges[dest].products_used),
         'is_declared': self.dep_edges[dest].is_declared,
+        'is_used': self.dep_edges[dest].is_used,
       }
     return {
       'target': self.concrete_target.address.spec,
@@ -321,6 +341,7 @@ class Node(object):
     for edge in cached_dict['dep_edges']:
       res.dep_edges[target_resolve_func(edge)] = Edge(
         is_declared=cached_dict['dep_edges'][edge]['is_declared'],
+        is_used=cached_dict['dep_edges'][edge]['is_used'],
         products_used=set(cached_dict['dep_edges'][edge]['products_used']))
     return res
 
@@ -328,13 +349,15 @@ class Node(object):
 class Edge(object):
   """Record a set of used products, and a boolean indicating that a depedency edge was declared."""
 
-  def __init__(self, is_declared=False, products_used=None):
+  def __init__(self, is_declared=False, is_used=False, products_used=None):
     self.products_used = products_used or set()
     self.is_declared = is_declared
+    self.is_used = is_used
 
   def __iadd__(self, that):
     self.products_used |= that.products_used
     self.is_declared |= that.is_declared
+    self.is_used |= that.is_used
     return self
 
 
@@ -359,8 +382,10 @@ class DependencyUsageGraph(object):
   def _edge_type(self, target, edge, dep):
     if target == dep:
       return 'self'
-    elif edge.is_declared:
+    elif edge.is_declared and edge.is_used:
       return 'declared'
+    elif edge.is_declared and not edge.is_used:
+      return 'unused'
     else:
       return 'undeclared'
 

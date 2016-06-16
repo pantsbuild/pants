@@ -142,14 +142,21 @@ class JvmDependencyAnalyzer(object):
       transitive_deps_by_target[target] = transitive_deps
     return transitive_deps_by_target
 
-  def _resolve_eligible_unused_aliases(self, target):
+  def resolve_aliases(self, target, scope=None):
+    """Resolve aliases in the direct dependencies of the target.
+
+    :param target: The direct dependencies of this target are included.
+    :param scope: When specified, only deps with this scope are included. This is more
+      than a filter, because it prunes the subgraphs represented by aliases with
+      un-matched scopes.
+    """
     for declared in target.dependencies:
-      if declared.scope != Scopes.DEFAULT:
+      if scope is not None and declared.scope != scope:
         # Only `DEFAULT` scoped deps are eligible for the unused dep check.
         continue
       elif type(declared) in (AliasTarget, Target):
         # Is an alias. Recurse to expand.
-        for r in self._resolve_eligible_unused_aliases(declared):
+        for r in self.resolve_aliases(declared, scope=scope):
           yield r
       else:
         yield declared
@@ -165,10 +172,10 @@ class JvmDependencyAnalyzer(object):
     for dep_entries in product_deps_by_src.get(target, {}).values():
       product_deps.update(dep_entries)
 
-    # Determine which of the deps in the declared set of this target were used.
+    # Determine which of the DEFAULT deps in the declared set of this target were used.
     used = set()
     unused = set()
-    for dep in self._resolve_eligible_unused_aliases(target):
+    for dep in self.resolve_aliases(target, scope=Scopes.DEFAULT):
       if dep in used or dep in unused:
         continue
       # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
