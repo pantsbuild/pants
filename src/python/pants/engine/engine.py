@@ -167,42 +167,6 @@ def _try_pickle(obj):
     raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
-def _execute_step(cache_save, debug, process_state, step, resolve_results=False):
-  """A picklable top-level function to help support local multiprocessing uses.
-
-  Executes the Step for the given node builder and storage, and returns a tuple of step id and
-  result or exception. Since step execution is only on cache misses, this also saves result
-  to the cache.
-
-  :param callable cache_save: Callable used to save cache results.
-  :param bool debug: Determines if we do extra debugging steps.
-  :param process_state: State object containing storage and node builder.
-  :param step: Step to be executed.
-  :param bool resolve_results: Determines if results should be resolved from storage
-                               or have the key returned.
-  """
-  node_builder, storage = process_state
-  step_id = step.step_id
-
-  def execute():
-    resolved_request = storage.resolve_request(step)
-    result = resolved_request(node_builder)
-    if not resolve_results:
-      result = storage.key_for_result(result)
-    if debug:
-      _try_pickle(result)
-    cache_save(step, result)
-    return result
-
-  try:
-    return step_id, execute()
-  except Exception as e:
-    # Trap any exception raised by the execution node that bubbles up, and
-    # pass this back to our main thread for handling.
-    logger.warn(traceback.format_exc())
-    return step_id, e
-
-
 class ConcurrentEngine(Engine):
   def reduce(self, execution_request):
     """The main reduction loop."""
@@ -289,31 +253,27 @@ class ThreadHybridEngine(ConcurrentEngine):
     else:
       return step_request.step_id, None
 
-  def _execute_step(debug, process_state, step, cache_save=None, resolve_results=False):
+  def _execute_step(self, step, cache_save=None, debug=False):
     """A function to help support local step execution.
 
     Executes the Step for the given node builder and storage, and returns a tuple of step id and
     result or exception.
 
-    :param callable cache_save: Callable used to save cache results.
+    :param callable cache_save: Callable used to save cache results. If None skip saving to cache.
     :param bool debug: Determines if we do extra debugging steps.
-    :param process_state: State object containing storage and node builder.
     :param step: Step to be executed.
-    :param bool resolve_results: Determines if results should be resolved from storage
-                                 or have the key returned.
     """
-    node_builder, storage = process_state
+    node_builder, storage = self._state
     step_id = step.step_id
 
     def execute():
       resolved_request = storage.resolve_request(step)
       result = resolved_request(node_builder)
-      if not resolve_results:
-        result = storage.key_for_result(result)
       if debug:
         _try_pickle(result)
       if cache_save:
-        cache_save(step, result)
+        keyed_result = storage.key_for_result(result)
+        cache_save(step, keyed_result)
       return result
 
     try:
@@ -324,18 +284,13 @@ class ThreadHybridEngine(ConcurrentEngine):
       logger.warn(traceback.format_exc())
       return step_id, e
 
-  def _deferred_step(self, step):
+  def _deferred_step(self, step, should_cache):
     """Create a callable to process a step that is able to be passed to the thread pool
 
     Deferred method returns (step_id, result) so that it can be processed later.
     """
-    return functools.partial(
-      _execute_step,
-      self._maybe_cache_put,
-      self._debug,
-      self._state,
-      step,
-      resolve_results=True)
+    cache_save = self._self._cache.put if should_cache else None
+    return functools.partial(self._execute_step, step, cache_save = cache_save)
 
   def _deferred_cache(self, step):
     """Create a callable to fetch cache that is able to be passed to the thread pool
@@ -365,24 +320,17 @@ class ThreadHybridEngine(ConcurrentEngine):
           raise InFlightException('{} is already in_flight!'.format(step))
 
         in_flight[step.step_id] = promise
-        # futures = [
-        #   self._pool.submit(self._deferred_cache(step)),
-        #   self._pool.submit(self._deferred_step(step))
-        # ]
-        futures = []
-        step_future = self._pool.submit(self._deferred_step(step))
-        step_future.add_done_callback(self._processed_node_callback)
-        futures.append(step_future)
 
         should_cache = self._should_cache(step)
+        futures = [self._pool.submit(self._deferred_step(step, should_cache))]
+
         if should_cache:
           cache_future = self._pool.submit(self.deferred_cache(step))
-          cache_future.add_done_callback(self._processed_cache_callback)
+          futures.append(cache_future)
 
-        # for f in futures:
-        #   self._pending.add(f)
-        #   f.add_done_callback(self._processed_node_callback)
-
+        for f in futures:
+          self._pending.add(f)
+          f.add_done_callback(self._processed_node_callback)
 
         submitted += 1
 
@@ -425,6 +373,32 @@ def _process_initializer(node_builder, storage):
   processes are done.
   """
   return node_builder, Storage.clone(storage)
+
+
+def _execute_step(cache_save, debug, process_state, step):
+  """A picklable top-level function to help support local multiprocessing uses.
+  Executes the Step for the given node builder and storage, and returns a tuple of step id and
+  result or exception. Since step execution is only on cache misses, this also saves result
+  to the cache.
+  """
+  node_builder, storage = process_state
+  step_id = step.step_id
+
+  def execute():
+    resolved_request = storage.resolve_request(step)
+    result = resolved_request(node_builder)
+    if debug:
+      _try_pickle(result)
+    cache_save(step, result)
+    return storage.key_for_result(result)
+
+  try:
+    return step_id, execute()
+  except Exception as e:
+    # Trap any exception raised by the execution node that bubbles up, and
+    # pass this back to our main thread for handling.
+    logger.warn(traceback.format_exc())
+    return step_id, e
 
 
 class LocalMultiprocessEngine(ConcurrentEngine):
