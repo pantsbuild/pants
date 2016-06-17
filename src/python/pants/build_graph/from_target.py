@@ -5,9 +5,34 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from textwrap import dedent
+
 import six
 
+from pants.base.deprecated import deprecated
 from pants.build_graph.address import Addresses
+
+
+from_target_deprecation_hint = dedent('''
+    Using sources = from_target() has been deprecated. Try using remote_sources() instead.
+
+    For example, instead of this:
+
+      java_protobuf_library(name='proto',
+        sources=from_target(':other-target'),
+        platform='java7',
+      )
+
+    Try this:
+
+      remote_sources(name='proto',
+        dest=java_protobuf_library,
+        sources_target=':other-target',
+        args=dict(
+          platform='java7',
+        )
+      )
+  ''').strip()
 
 
 class FromTarget(object):
@@ -19,6 +44,7 @@ class FromTarget(object):
   def __init__(self, parse_context):
     self._parse_context = parse_context
 
+  @deprecated(removal_version='1.3.0', hint_message=from_target_deprecation_hint)
   def __call__(self, address):
     """
     :param string address: A target address.
