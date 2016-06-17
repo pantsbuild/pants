@@ -25,27 +25,27 @@ class Clean(Task):
   @classmethod
   def register_options(cls, register):
     super(Clean, cls).register_options(register)
-    register('--async', type=bool,
+    register('--async', type=bool, default=False,
              help='Allows clean-all to run in the background. Can dramatically speed up clean-all'
                   'for large .pants.d files.')
 
   def execute(self):
-    # get current pants working directory
+    # Get current pants working directory.
     pants_wd = self.get_options().pants_workdir
     if self.get_options().async:
-      # although cleanup is set to False, temp dir is still deleted in subprocess
+      # Although cleanup is set to False, temp dir is still deleted in subprocess.
       with temporary_dir(cleanup=False) as tmpdir:
-        # creates subdirectory to move contents to
+        # Creates subdirectory to move contents.
         clean_dir = os.path.join(tmpdir, "clean")
         safe_mkdir(clean_dir)
         logger.info('Temporary directory created at {tmpdir}'.format(tmpdir=tmpdir))
 
-        # moves contents of .pants.d to cleanup dir
+        # Moves contents of .pants.d to cleanup dir.
         safe_concurrent_rename(pants_wd, clean_dir)
 
-        # deletes temporary dir (including old .pants.d) in subprocess
+        # Deletes temporary dir (including old .pants.d) in subprocess.
         subprocess.Popen(["rm", "-rf", tmpdir])
     else:
-      # recursively removes pants cache; user waits patiently
+      # Recursively removes pants cache; user waits patiently.
       logger.info('For async removal, run `./pants clean-all -a`')
       safe_rmtree(pants_wd)
