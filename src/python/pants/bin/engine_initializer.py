@@ -13,7 +13,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.options_initializer import OptionsInitializer
-from pants.engine.engine import LocalMultiprocessEngine, LocalSerialEngine, ThreadHybridEngine
+from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
