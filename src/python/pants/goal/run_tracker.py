@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import logging
 import multiprocessing
 import os
 import sys
@@ -13,6 +14,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
+from logging import Handler
 
 import requests
 
@@ -27,6 +29,14 @@ from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
+
+class LogHandler(Handler):
+  def __init__(self, run_tracker):
+    super(LogHandler, self).__init__()
+    self._run_tracker = run_tracker
+
+  def emit(self, record):
+    self._run_tracker.log(Report.log_level_from_string(record.levelname), record.getMessage())
 
 class RunTracker(Subsystem):
   """Tracks and times the execution of a pants run.
@@ -143,6 +153,20 @@ class RunTracker(Subsystem):
     SubprocPool.foreground()
 
     self._aborted = False
+
+  def log_handler(self):
+    return LogHandler(self)
+
+  def setup_logging(self):
+    handler = LogHandler(self)
+    handler.setLevel("DEBUG") # The report ensures the right level,
+                              # so we want all to pass through to it.
+    logger = logging.getLogger(None)
+    # replace the bootstrap console logger
+    for old_handler in logger.handlers:
+      if type(old_handler) is logging.StreamHandler:
+        logger.removeHandler(old_handler)
+    logger.addHandler(handler)
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
