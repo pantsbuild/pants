@@ -94,6 +94,25 @@ class BundleCreate(JvmBinaryTask):
     v = target.payload.get_field_value(key, None)
     return option_value if v is None else v
 
+  def _create_symlinks(self, vt, bundle_dir, archivepath, app):
+    name = vt.target.basename if self.get_options().use_basename_prefix else app.id
+    bundle_symlink = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(name))
+    safe_symlink(bundle_dir, bundle_symlink)
+    self.context.log.info(
+      'created bundle symlink {}'.format(os.path.relpath(bundle_symlink, get_buildroot())))
+
+    if archive and archivepath:
+      archive_copy = os.path.join(self.get_options().pants_distdir,
+                                  '{}.{}'.format(name, app.archive))
+      safe_file_copy(archivepath, archive_copy)
+      self.context.log.info(
+        'created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
+
+  def _add_product(self, deployable_archive, app, path):
+    deployable_archive.add(
+      app.target, os.path.dirname(path)).append(os.path.basename(path))
+    self.context.log.debug('created {}'.format(os.path.relpath(path, get_buildroot())))
+
   def execute(self):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
@@ -117,36 +136,17 @@ class BundleCreate(JvmBinaryTask):
                                   self._resolved_option(vt.target, 'deployjar'),
                                   self._resolved_option(vt.target, 'archive'))
 
-        archiver = archive.archiver(app.archive) if app.archive else None
-
         bundle_dir = self.bundle(app, vt.results_dir)
-        # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
-        # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
-        # expect the product to be cached, a user running an 'rm' on the dist/ directory could
-        # cause inconsistencies.
-        jvm_bundles_product.add(app.target, os.path.dirname(bundle_dir)).append(os.path.basename(bundle_dir))
+        self._add_product(jvm_bundles_product, app, bundle_dir)
 
-        archivepath = ''
+        archiver = archive.archiver(app.archive) if app.archive else None
+        archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
         if archiver:
-          archivepath = archiver.create(
-            bundle_dir,
-            vt.results_dir,
-            app.id
-          )
-          bundle_archive_product.add(app.target, os.path.dirname(archivepath)).append(os.path.basename(archivepath))
-          self.context.log.debug('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
+          self._add_product(bundle_archive_product, app, archive_path)
 
         # For root targets, create symlink.
         if vt.target in self.context.target_roots:
-          name = vt.target.basename if self.get_options().use_basename_prefix else app.id
-          bundle_symlink = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(name))
-          safe_symlink(bundle_dir, bundle_symlink)
-          self.context.log.info('created bundle symlink {}'.format(os.path.relpath(bundle_symlink, get_buildroot())))
-
-          if archive and archivepath:
-            archive_copy = os.path.join(self.get_options().pants_distdir, '{}.{}'.format(name, app.archive))
-            safe_file_copy(archivepath, archive_copy)
-            self.context.log.info('created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
+          self._create_symlinks(vt, bundle_dir, archive_path, app)
 
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""
