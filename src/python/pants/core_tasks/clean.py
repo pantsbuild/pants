@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import subprocess
 
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
