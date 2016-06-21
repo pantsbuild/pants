@@ -4,6 +4,53 @@ Master Pre-Releases
 This document describes ``pre`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.1.0-pre5 (06/10/2016)
+-----------------------
+
+This is the sixth `1.1.0-pre` release on the way to the `1.1.0` stable branch.
+
+API Changes
+~~~~~~~~~~~
+* Remove docgen from list of default packages, don't deprecate the --default-backend-packages option.
+  `RB #3972 <https://rbcommons.com/s/twitter/r/3972>`_
+  `RB #3988 <https://rbcommons.com/s/twitter/r/3988>`_
+
+* Delete the spindle-plugin from contrib.
+  `RB #3990 <https://rbcommons.com/s/twitter/r/3990>`_
+
+Bugfixes
+~~~~~~~~
+* Fix warnings about AliasTarget not having a BUILD alias.
+  `RB #3993 <https://rbcommons.com/s/twitter/r/3993>`_
+
+* Make checkstyle's options filename-agnostic.
+  `Issue #3555 <https://github.com/pantsbuild/pants/issues/3555>`_
+  `RB #3975 <https://rbcommons.com/s/twitter/r/3975>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+* [engine] Capture the `resources=globs` argument for Python targets
+  `Issue #3506 <https://github.com/pantsbuild/pants/issues/3506>`_
+  `RB #3979 <https://rbcommons.com/s/twitter/r/3979>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Use the z.jar files on the zinc classpath instead of the destination directory of the class files.
+  `RB #3955 <https://rbcommons.com/s/twitter/r/3955>`_
+  `RB #3982 <https://rbcommons.com/s/twitter/r/3982>`_
+
+* logs kill server info when creating server
+  `RB #3983 <https://rbcommons.com/s/twitter/r/3983>`_
+
+* Add format to mustache filenames
+  `RB #3976 <https://rbcommons.com/s/twitter/r/3976>`_
+
+* Support for transitioning to making all backends opt-in.
+  `RB #3972 <https://rbcommons.com/s/twitter/r/3972>`_
+
+* dep-usage: create edge only for those direct or transitive dependencies.
+  `RB #3978 <https://rbcommons.com/s/twitter/r/3978>`_
+
 1.1.0-pre4 (06/03/2016)
 -----------------------
 

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import re
 from collections import OrderedDict
 
 from pants.build_graph.address import Address
@@ -163,14 +162,14 @@ class AddressMapper(object):
     Both the set of files that define a mappable BUILD files and the parser used to parse those
     files can be customized.  See the `pants.engine.parsers` module for example parsers.
 
-    :param string build_pattern: A regular expression for identifying BUILD files used to resolve
-                                 addresses; by default looks for `BUILD*` files.
+    :param string build_pattern: A fnmatch-compatible pattern for identifying BUILD files used
+      to resolve addresses; by default looks for `BUILD*` files.
     :param parser_cls: The BUILD file parser cls to use.
     :type parser_cls: A :class:`pants.engine.parser.Parser`
     """
     self.symbol_table_cls = symbol_table_cls
     self.parser_cls = parser_cls
-    self.build_pattern = re.compile(build_pattern or r'^BUILD(\.[a-zA-Z0-9_-]+)?$')
+    self.build_pattern = build_pattern or 'BUILD*'
 
   def __eq__(self, other):
     if self is other:
@@ -190,7 +189,7 @@ class AddressMapper(object):
 
   def __repr__(self):
     return 'AddressMapper(parser={}, symbol_table={}, build_pattern={})'.format(
-      self.parser_cls, self.symbol_table_cls, self.build_pattern.pattern)
+      self.parser_cls, self.symbol_table_cls, self.build_pattern)
 
   def __str__(self):
     return repr(self)

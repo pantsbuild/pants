@@ -13,7 +13,7 @@ from textwrap import dedent
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.binaries import binary_util
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import Files, PathGlobs
+from pants.engine.fs import PathGlobs
 from pants.engine.storage import Storage
 from pants.util.contextutil import temporary_file_path
 from pants_test.engine.examples.planners import setup_json_scheduler
@@ -82,5 +82,5 @@ def main_filespecs():
   build_root, goals, args = pop_build_root_and_goals('[build root path] [filespecs]*', sys.argv[1:])
 
   # Create PathGlobs for each arg relative to the buildroot.
-  path_globs = [PathGlobs.create(Files, '', globs=[arg]) for arg in args]
+  path_globs = [PathGlobs.create('', globs=[arg]) for arg in args]
   visualize_build_request(build_root, goals, path_globs)

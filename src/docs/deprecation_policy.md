@@ -8,7 +8,10 @@ This assumes a rough timeline of 3 months lifetime per minor release.
 API Definition
 --------------
 
-A module, variable, method, function or class is part of the public API if its definition's docstring is marked `:API: public`, and if its enclosing definition, if any, is part of the public API.
+A module, variable, method, function or class is part of the public API if:
+
+- Its definition's docstring is marked `:API: public`, and its enclosing definition, if any, is part of the public API.
+- It's abstract or effectively abstract (required to be re-defined by the declaring class) and its declaring class or any inheriting class published by Pants is marked `:API: public`.
 
 For example, a method `baz` of class `Bar` defined at the top level of module `foo` is part of the public API if and only if the docstrings of `foo`, `Bar` and `baz` are all marked `:API: public`. e.g.
 

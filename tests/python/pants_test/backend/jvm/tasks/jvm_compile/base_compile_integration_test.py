@@ -20,6 +20,8 @@ class BaseCompileIT(PantsRunIntegrationTest):
   :API: public
   """
 
+  _EXTRA_TASK_ARGS=[]
+
   @contextmanager
   def do_test_compile(self, target, expected_files=None, iterations=2, expect_failure=False,
                       extra_args=None, workdir_outside_of_buildroot=False):
@@ -67,7 +69,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
     global_args = [
         '--cache-write',
         '--cache-write-to=[\'{}\']'.format(cachedir),
-    ]
+    ] + self._EXTRA_TASK_ARGS
     args = ['compile', target] + (extra_args if extra_args else [])
     # Clean-all on the first iteration.
     if clean_all:

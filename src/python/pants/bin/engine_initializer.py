@@ -18,7 +18,7 @@ from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import JvmAppAdaptor, TargetAdaptor
+from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -38,15 +38,21 @@ class LegacySymbolTable(SymbolTable):
   @memoized_method
   def aliases(cls):
     """TODO: This is a nasty escape hatch to pass aliases to LegacyPythonCallbacksParser."""
-    _, build_config = OptionsInitializer(OptionsBootstrapper(), init_logging=False).setup()
+    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
     return build_config.registered_aliases()
 
   @classmethod
   @memoized_method
   def table(cls):
     def target_type(alias):
+      # TODO: The alias matching here is to avoid elevating "TargetAdaptors" into the public
+      # API until until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
+      # These should likely move onto Target subclasses as the engine gets deeper into beta
+      # territory.
       if alias == 'jvm_app':
         return JvmAppAdaptor
+      elif alias in ('python_library', 'python_tests', 'python_binary'):
+        return PythonTargetAdaptor
       else:
         return TargetAdaptor
     return {alias: target_type(alias) for alias in cls.aliases().target_types}
@@ -74,7 +80,7 @@ class EngineInitializer(object):
   @staticmethod
   def parse_commandline_to_spec_roots(options=None, args=None, build_root=None):
     if not options:
-      options, _ = OptionsInitializer(OptionsBootstrapper(args=args), init_logging=False).setup()
+      options, _ = OptionsInitializer(OptionsBootstrapper(args=args)).setup(init_logging=False)
     cmd_line_spec_parser = CmdLineSpecParser(build_root or get_buildroot())
     spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
     return spec_roots
