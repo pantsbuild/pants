@@ -17,7 +17,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.util.dirutil import safe_file_copy, safe_mkdir, safe_symlink
+from pants.util.dirutil import safe_mkdir, safe_symlink
+from pants.util.fileutil import atomic_copy
 from pants.util.objects import datatype
 
 
@@ -94,17 +95,18 @@ class BundleCreate(JvmBinaryTask):
     v = target.payload.get_field_value(key, None)
     return option_value if v is None else v
 
-  def _create_symlinks(self, vt, bundle_dir, archivepath, app):
+  def _store_results(self, vt, bundle_dir, archivepath, app):
+    """Store a copy of the bundle and archive from the results dir in dist."""
+    dist_dir = self.get_options().pants_distdir
     name = vt.target.basename if self.get_options().use_basename_prefix else app.id
-    bundle_symlink = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(name))
-    safe_symlink(bundle_dir, bundle_symlink)
+    bundle_copy = os.path.join(dist_dir, '{}-bundle'.format(name))
+    atomic_copy(bundle_dir, bundle_copy)
     self.context.log.info(
-      'created bundle symlink {}'.format(os.path.relpath(bundle_symlink, get_buildroot())))
+      'created bundle copy {}'.format(os.path.relpath(bundle_copy, get_buildroot())))
 
     if archive and archivepath:
-      archive_copy = os.path.join(self.get_options().pants_distdir,
-                                  '{}.{}'.format(name, app.archive))
-      safe_file_copy(archivepath, archive_copy)
+      archive_copy = os.path.join(dist_dir,'{}.{}'.format(name, app.archive))
+      atomic_copy(archivepath, archive_copy)
       self.context.log.info(
         'created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
 
@@ -146,7 +148,7 @@ class BundleCreate(JvmBinaryTask):
 
         # For root targets, create symlink.
         if vt.target in self.context.target_roots:
-          self._create_symlinks(vt, bundle_dir, archive_path, app)
+          self._store_results(vt, bundle_dir, archive_path, app)
 
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""
