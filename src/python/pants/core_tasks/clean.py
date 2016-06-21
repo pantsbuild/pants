@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import subprocess
 
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
@@ -34,21 +35,17 @@ class Clean(Task):
     if self.get_options().async:
       # Although cleanup is set to False, temp dir is still deleted in subprocess.
       with temporary_dir(cleanup=False) as tmpdir:
-        pid = os.fork()
+        # Creates subdirectory to move contents.
+        clean_dir = os.path.join(tmpdir, "clean")
+        safe_mkdir(clean_dir)
+        logger.info('Temporary directory created at {tmpdir}'.format(tmpdir=tmpdir))
 
-        if pid == 0:
-          logger.info('Temporary directory created at {tmpdir}'.format(tmpdir=tmpdir))
-          # Creates subdirectory to move contents.
-          clean_dir = os.path.join(tmpdir, "clean")
-          safe_mkdir(clean_dir)
+        # Moves contents of .pants.d to cleanup dir.
+        safe_concurrent_rename(pants_wd, clean_dir)
 
-          # Moves contents of .pants.d to cleanup dir.
-          safe_concurrent_rename(pants_wd, clean_dir)
-
-          # Deletes temporary dir (including old .pants.d) in subprocess.
-          safe_rmtree(tmpdir)
-          os._exit(0)
+        # Deletes temporary dir (including old .pants.d) in subprocess.
+        subprocess.Popen(["rm", "-rf", tmpdir])
     else:
       # Recursively removes pants cache; user waits patiently.
-      logger.info('For async removal, run `./pants clean-all --async`')
+      logger.info('For async removal, run `./pants clean-all -a`')
       safe_rmtree(pants_wd)

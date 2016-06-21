@@ -5,20 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class CleanAllTest(PantsRunIntegrationTest):
+
   def test_clean_all_on_wrong_dir(self):
     with temporary_dir() as workdir:
       self.assert_failure(self.run_pants_with_workdir(["clean-all"], workdir))
-      self.assert_failure(self.run_pants_with_workdir(["clean-all", "--async"], workdir))
-
-  # Ensure async clean-all exits normally.
-  def test_clean_all_async(self):
-    self.run_pants(["clean-all", "--async"])
-    _, status = os.waitpid()
-    self.assertEquals(status, 0)
