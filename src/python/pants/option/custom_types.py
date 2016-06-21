@@ -5,10 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
+
 import six
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
+from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_text
 
 
@@ -98,11 +101,36 @@ class ListValueComponent(object):
 
   One or more instances of this class can be merged to form a list value.
 
-  Each component may either replace or extend the preceding component.  So that, e.g., a cmd-line
-  flag can append to the value specified in the config file, instead of having to repeat it.
+  A component consists of values to append and values to filter while constructing the final list.
+
+  Each component may either replace or modify the preceding component.  So that, e.g., a config
+  file can append to and/or filter the default value list, instead of having to repeat most
+  of the contents of the default value list.
   """
   REPLACE = 'REPLACE'
-  EXTEND = 'EXTEND'
+  MODIFY = 'MODIFY'
+
+  # We use a regex to parse the comma-separated lists of modifier expressions (each of which is
+  # a list or tuple literal preceded by a + or a -).  Note that these expressions are technically
+  # a context-free grammar, but in practice using this regex as a heuristic will work fine. The
+  # values that could defeat it are extremely unlikely to be encountered in practice.
+  # If we do ever encounter them, we'll have to replace this with a real parser.
+  @classmethod
+  @memoized_method
+  def _get_modifier_expr_re(cls):
+    # Note that the regex consists of a positive lookbehind assertion for a ] or a ),
+    # followed by a comma (possibly surrounded by whitespace), followed by a
+    # positive lookahead assertion for [ or (.  The lookahead/lookbehind assertions mean that
+    # the bracket/paren characters don't get consumed in the split.
+    return re.compile(r'(?<=\]|\))\s*,\s*(?=[+-](?:\[|\())')
+
+  @classmethod
+  def _split_modifier_expr(cls, s):
+    # This check ensures that the first expression (before the first split point) is a modification.
+    if s.startswith('+') or s.startswith('-'):
+      return cls._get_modifier_expr_re().split(s)
+    else:
+      return [s]
 
   @classmethod
   def merge(cls, components):
@@ -114,23 +142,35 @@ class ListValueComponent(object):
     :return: An instance representing the result of merging the components.
     :rtype: `ListValueComponent`
     """
-    # Note that action of the merged component is EXTEND until the first REPLACE is encountered.
+    # Note that action of the merged component is MODIFY until the first REPLACE is encountered.
     # This guarantees associativity.
-    action = cls.EXTEND
-    val = []
+    action = cls.MODIFY
+    appends = []
+    filters = []
     for component in components:
-      if component.action is cls.REPLACE:
-        val = component.val
+      if component._action is cls.REPLACE:
+        appends = component._appends
+        filters = component._filters
         action = cls.REPLACE
-      elif component.action is cls.EXTEND:
-        val.extend(component.val)
+      elif component._action is cls.MODIFY:
+        appends.extend(component._appends)
+        filters.extend(component._filters)
       else:
         raise ParseError('Unknown action for list value: {}'.format(component.action))
-    return cls(action, val)
+    return cls(action, appends, filters)
 
-  def __init__(self, action, val):
-    self.action = action
-    self.val = val
+  def __init__(self, action, appends, filters):
+    self._action = action
+    self._appends = appends
+    self._filters = filters
+
+  @property
+  def val(self):
+    ret = list(self._appends)
+    for x in self._filters:
+      # Note: can't do ret.remove(x) because that only removes the first instance of x.
+      ret = [y for y in ret if y != x]
+    return ret
 
   @classmethod
   def create(cls, value):
@@ -139,34 +179,42 @@ class ListValueComponent(object):
     Note that we accept tuple literals, but the internal value is always a list.
 
     :param value: The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
-                  a string representation (possibly prefixed by +) of a list or tuple, or any
-                  allowed member_type.
+                  a string representation of a list or tuple (possibly prefixed by + or -
+                  indicating modification instead of replacement), or any allowed member_type.
+                  May also be a comma-separated sequence of modifications.
     :rtype: `ListValueComponent`
     """
     if isinstance(value, six.string_types):
       value = ensure_text(value)
+      comma_separated_exprs = cls._split_modifier_expr(value)
+      if len(comma_separated_exprs) > 1:
+        return cls.merge([cls.create(x) for x in comma_separated_exprs])
+
+    action = cls.MODIFY
+    appends = []
+    filters = []
     if isinstance(value, cls):  # Ensure idempotency.
-      action = value.action
-      val = value.val
+      action = value._action
+      appends = value._appends
+      filters = value._filters
     elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
       action = cls.REPLACE
-      val = value
+      appends = value
     elif value.startswith('[') or value.startswith('('):
       action = cls.REPLACE
-      val = _convert(value, (list, tuple))
+      appends = _convert(value, (list, tuple))
     elif value.startswith('+[') or value.startswith('+('):
-      action = cls.EXTEND
-      val = _convert(value[1:], (list, tuple))
+      appends = _convert(value[1:], (list, tuple))
+    elif value.startswith('-[') or value.startswith('-('):
+      filters = _convert(value[1:], (list, tuple))
     elif isinstance(value, six.string_types):
-      action = cls.EXTEND
-      val = [value]
+      appends = [value]
     else:
-      action = cls.EXTEND
-      val = _convert('[{}]'.format(value), list)
-    return cls(action, list(val))
+      appends = _convert('[{}]'.format(value), list)
+    return cls(action, list(appends), list(filters))
 
   def __repr__(self):
-    return b'{} {}'.format(self.action, self.val)
+    return b'{} +{} -{}'.format(self._action, self._appends, self._filters)
 
 
 class DictValueComponent(object):
