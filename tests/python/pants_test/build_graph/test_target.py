@@ -7,7 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os.path
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
+from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target import Target
 from pants.source.payload_fields import DeferredSourcesField
 from pants_test.base_test import BaseTest
@@ -98,3 +100,41 @@ class TargetTest(BaseTest):
     short_id = short_target.id
     self.assertEqual(short_id,
                      'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.foo')
+
+  def test_create_sources_field_with_string_fails(self):
+    target = self.make_target(':a-target', Target)
+
+    # No key_arg.
+    with self.assertRaises(TargetDefinitionException) as cm:
+      target.create_sources_field(sources='a-string', sources_rel_path='')
+    self.assertIn("Expected a glob, an address or a list, but was <type \'unicode\'>",
+                  str(cm.exception))
+
+    # With key_arg.
+    with self.assertRaises(TargetDefinitionException) as cm:
+      target.create_sources_field(sources='a-string', sources_rel_path='', key_arg='my_cool_field')
+    self.assertIn("Expected 'my_cool_field' to be a glob, an address or a list, but was <type \'unicode\'>",
+                  str(cm.exception))
+    #could also test address case, but looks like nothing really uses it.
+
+  def test_sources_with_more_than_one_address_fails(self):
+    addresses = Addresses(['a', 'b', 'c'], '')
+    t = self.make_target(':t', Target)
+
+    # With address, no key_arg.
+    with self.assertRaises(Target.WrongNumberOfAddresses) as cm:
+      t.create_sources_field(sources=addresses, sources_rel_path='', address=Address.parse('a:b'))
+    self.assertIn("Expected a single address to from_target() as argument to 'a:b'",
+                  str(cm.exception))
+
+    # With no address.
+    with self.assertRaises(Target.WrongNumberOfAddresses) as cm:
+      t.create_sources_field(sources=addresses, sources_rel_path='')
+    self.assertIn("Expected a single address to from_target() as argument",
+                  str(cm.exception))
+
+    # With key_arg.
+    with self.assertRaises(Target.WrongNumberOfAddresses) as cm:
+      t.create_sources_field(sources=addresses, sources_rel_path='', key_arg='cool_field')
+    self.assertIn("Expected 'cool_field' to be a single address to from_target() as argument",
+                  str(cm.exception))

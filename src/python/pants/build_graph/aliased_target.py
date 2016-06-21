@@ -33,6 +33,7 @@ class AliasTargetMacro(TargetMacro):
                                       'The alias() must have a "target" parameter.')
     self._parse_context.create_object(
       AliasTarget,
+      type_alias='alias_target',
       name=name,
       dependencies=[target] if target else [],
       **kwargs

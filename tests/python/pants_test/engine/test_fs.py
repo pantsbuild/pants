@@ -10,9 +10,10 @@ import unittest
 from abc import abstractmethod
 from contextlib import contextmanager
 
+from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import (Dir, DirectoryListing, Dirs, FileContent, FileDigest, Files, Link,
-                             Path, PathGlobs, ReadLink, Stat, Stats)
+from pants.engine.fs import (DirectoryListing, Dirs, Files, FilesContent, FilesDigest, PathGlobs,
+                             ReadLink)
 from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -29,38 +30,35 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     """Construct a ProjectTree for the given src path."""
     pass
 
-  def specs(self, ftype, relative_to, *filespecs):
-    return PathGlobs.create_from_specs(ftype, relative_to, filespecs)
+  def specs(self, relative_to, *filespecs):
+    return PathGlobs.create_from_specs(relative_to, filespecs)
 
-  def assert_walk(self, ftype, filespecs, files):
+  def assert_walk(self, ftype, filespecs, paths):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, Stat, self.specs(ftype, '', *filespecs))[0]
-      self.assertEquals(set(files), set([p.path for p in result]))
+      result = self.execute(scheduler, ftype, self.specs('', *filespecs))[0]
+      self.assertEquals(set([p.path for p in result.dependencies]), set(paths))
 
   def assert_content(self, filespecs, expected_content):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, FileContent, self.specs(Files, '', *filespecs))[0]
-      def validate(e):
-        self.assertEquals(type(e), FileContent)
-        return True
-      actual_content = {f.path: f.content for f in result if validate(f)}
+      result = self.execute(scheduler, FilesContent, self.specs('', *filespecs))[0]
+      actual_content = {f.path: f.content for f in result.dependencies}
       self.assertEquals(expected_content, actual_content)
 
   def assert_digest(self, filespecs, expected_files):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, FileDigest, self.specs(Files, '', *filespecs))[0]
+      result = self.execute(scheduler, FilesDigest, self.specs('', *filespecs))[0]
       # Confirm all expected files were digested.
-      self.assertEquals(set(expected_files), set(f.path for f in result))
+      self.assertEquals(set(expected_files), set(f.path for f in result.dependencies))
       # And that each distinct path had a distinct digest.
-      self.assertEquals(len(set(expected_files)), len(set(f.digest for f in result)))
+      self.assertEquals(len(set(expected_files)), len(set(f.digest for f in result.dependencies)))
 
   def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      request = self.execute_request(scheduler, Stat, self.specs(ftype, '', *filespecs))
+      request = self.execute_request(scheduler, ftype, self.specs('', *filespecs))
 
       # Validate that FilesystemNodes for exactly the given subjects are reachable under this
       # request.
@@ -71,13 +69,13 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def test_walk_literal(self):
     self.assert_walk(Files, ['4.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/1.txt', 'a/b/2'], ['a/b/1.txt', 'a/b/2'])
-    self.assert_walk(Files, ['c.ln/2'], ['a/b/2'])
-    self.assert_walk(Files, ['d.ln/b/1.txt'], ['a/b/1.txt'])
+    self.assert_walk(Files, ['c.ln/2'], ['c.ln/2'])
+    self.assert_walk(Files, ['d.ln/b/1.txt'], ['d.ln/b/1.txt'])
     self.assert_walk(Files, ['a/3.txt'], ['a/3.txt'])
     self.assert_walk(Files, ['z.txt'], [])
 
   def test_walk_literal_directory(self):
-    self.assert_walk(Dirs, ['c.ln'], ['a/b'])
+    self.assert_walk(Dirs, ['c.ln'], ['c.ln'])
     self.assert_walk(Dirs, ['a'], ['a'])
     self.assert_walk(Dirs, ['a/b'], ['a/b'])
     self.assert_walk(Dirs, ['z'], [])
@@ -86,27 +84,44 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def test_walk_siblings(self):
     self.assert_walk(Files, ['*.txt'], ['4.txt'])
     self.assert_walk(Files, ['a/b/*.txt'], ['a/b/1.txt'])
-    self.assert_walk(Files, ['c.ln/*.txt'], ['a/b/1.txt'])
+    self.assert_walk(Files, ['c.ln/*.txt'], ['c.ln/1.txt'])
     self.assert_walk(Files, ['a/b/*'], ['a/b/1.txt', 'a/b/2'])
     self.assert_walk(Files, ['*/0.txt'], [])
 
   def test_walk_recursive(self):
-    self.assert_walk(Files, ['**/*.txt.ln'], ['4.txt'])
-    self.assert_walk(Files, ['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
-    self.assert_walk(Files, ['*.txt', '**/*.txt'], ['a/3.txt', 'a/b/1.txt', '4.txt'])
-    self.assert_walk(Files, ['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/b/2'])
-    self.assert_walk(Files, ['**/3.t*t'], ['a/3.txt'])
+    self.assert_walk(Files, ['**/*.txt.ln'], ['a/4.txt.ln', 'd.ln/4.txt.ln'])
+    self.assert_walk(Files,
+                     ['**/*.txt'],
+                     ['a/3.txt', 'a/b/1.txt', 'c.ln/1.txt', 'd.ln/3.txt', 'd.ln/b/1.txt'])
+    self.assert_walk(Files,
+                     ['**/*.txt', '*.txt'],
+                     ['a/3.txt', 'a/b/1.txt', 'c.ln/1.txt', 'd.ln/3.txt', 'd.ln/b/1.txt', '4.txt'])
+    self.assert_walk(Files, ['**/3.t*t'], ['a/3.txt', 'd.ln/3.txt'])
     self.assert_walk(Files, ['**/*.zzz'], [])
 
+  def test_walk_recursive_all(self):
+    self.assert_walk(Files, ['*', '**/*'], [
+        '4.txt',
+        'a/3.txt',
+        'a/4.txt.ln',
+        'a/b/1.txt',
+        'a/b/2',
+        'c.ln/1.txt',
+        'c.ln/2',
+        'd.ln/3.txt',
+        'd.ln/4.txt.ln',
+        'd.ln/b/1.txt',
+        'd.ln/b/2',
+      ])
+
   def test_walk_recursive_directory(self):
-    self.assert_walk(Dirs, ['*'], ['a', 'a/b'])
-    self.assert_walk(Dirs, ['*/*'], ['a/b'])
-    self.assert_walk(Dirs, ['**/*'], ['a/b'])
+    self.assert_walk(Dirs, ['*'], ['a', 'c.ln', 'd.ln'])
+    self.assert_walk(Dirs, ['*/*'], ['a/b', 'd.ln/b'])
+    self.assert_walk(Dirs, ['**/*'], ['a/b', 'd.ln/b'])
     self.assert_walk(Dirs, ['*/*/*'], [])
 
   def test_files_content_literal(self):
-    self.assert_content(['4.txt'], {'4.txt': 'four\n'})
-    self.assert_content(['a/4.txt.ln'], {'4.txt': 'four\n'})
+    self.assert_content(['4.txt', 'a/4.txt.ln'], {'4.txt': 'four\n', 'a/4.txt.ln': 'four\n'})
 
   def test_files_content_directory(self):
     with self.assertRaises(Exception):
@@ -119,54 +134,44 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 
   def test_nodes_file(self):
     self.assert_fsnodes(Files, ['4.txt'], [
-        (Path('4.txt'), Stats),
+        (Dir(''), DirectoryListing),
       ])
 
   def test_nodes_symlink_file(self):
     self.assert_fsnodes(Files, ['c.ln/2'], [
+        (Dir(''), DirectoryListing),
         (Link('c.ln'), ReadLink),
-        (Path('c.ln'), Stats),
-        (Path('a/b'), Stats),
-        (Path('a/b/2'), Stats),
+        (Dir('a'), DirectoryListing),
+        (Dir('a/b'), DirectoryListing),
       ])
     self.assert_fsnodes(Files, ['d.ln/b/1.txt'], [
-        (Path('d.ln'), Stats),
+        (Dir(''), DirectoryListing),
         (Link('d.ln'), ReadLink),
-        (Path('a'), Stats),
-        (Path('a/b'), Stats),
-        (Path('a/b/1.txt'), Stats),
+        (Dir('a'), DirectoryListing),
+        (Dir('a/b'), DirectoryListing),
       ])
 
   def test_nodes_symlink_globbed_dir(self):
     self.assert_fsnodes(Files, ['*/2'], [
-        # Glob the root.
+        # Scandir for the root.
         (Dir(''), DirectoryListing),
-        # Stat each entry.
-        (Path('a'), Stats),
-        (Path('c.ln'), Stats),
-        (Path('d.ln'), Stats),
-        (Path('4.txt'), Stats),
         # Read links to determine whether they're actually directories.
         (Link('c.ln'), ReadLink),
         (Link('d.ln'), ReadLink),
-        # Stat the detination of one link (the other was already stat'd during the initial list).
-        (Path('a/b'), Stats),
-        # Look up the literal in each path.
-        (Path('a/b/2'), Stats),
-        (Path('a/2'), Stats),
+        # Scan second level destinations: `a/b` is matched via `c.ln`.
+        (Dir('a'), DirectoryListing),
+        (Dir('a/b'), DirectoryListing),
       ])
 
   def test_nodes_symlink_globbed_file(self):
     self.assert_fsnodes(Files, ['d.ln/b/*.txt'], [
-        # NB: Needs to stat every path on the way down to track whether
+        # NB: Needs to scandir every Dir on the way down to track whether
         # it is traversing a symlink.
-        (Path('d.ln'), Stats),
+        (Dir(''), DirectoryListing),
+        # Traverse one symlink.
         (Link('d.ln'), ReadLink),
-        (Path('a'), Stats),
-        (Path('a/b'), Stats),
+        (Dir('a'), DirectoryListing),
         (Dir('a/b'), DirectoryListing),
-        (Path('a/b/2'), Stats),
-        (Path('a/b/1.txt'), Stats),
       ])
 
 
@@ -191,6 +196,10 @@ class GitFSTest(unittest.TestCase, FSTestBase):
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_recursive(self):
     super(GitFSTest, self).test_walk_recursive()
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_walk_recursive_all(self):
+    super(GitFSTest, self).test_walk_recursive_all()
 
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_files_content_literal(self):

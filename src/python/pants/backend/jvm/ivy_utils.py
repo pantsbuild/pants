@@ -987,7 +987,7 @@ class IvyUtils(object):
       excludes=excludes,
       overrides=overrides)
 
-    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy.mustache')
+    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy.xml.mustache')
     cls._write_ivy_xml_file(ivyxml, template_data, template_relpath)
 
   @classmethod
@@ -1012,7 +1012,7 @@ class IvyUtils(object):
                                  extra_configurations=extra_configurations,
                                  dependencies=dependencies)
 
-    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy_fetch.mustache')
+    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy_fetch.xml.mustache')
     cls._write_ivy_xml_file(ivyxml, template_data, template_relpath)
 
   @classmethod

@@ -216,10 +216,15 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
 
 def _eager_fileset_with_spec(spec_path, filespecs, source_files_digest, excluded_source_files):
   excluded = {f.path for f in excluded_source_files.dependencies}
-  file_hashes = {fast_relpath(fd.path, spec_path): fd.digest
+  file_tuples = [(fast_relpath(fd.path, spec_path), fd.digest)
                  for fd in source_files_digest.dependencies
-                 if fd.path not in excluded}
-  return EagerFilesetWithSpec(spec_path, filespecs, file_hashes)
+                 if fd.path not in excluded]
+  # NB: In order to preserve declared ordering, we record a list of matched files
+  # independent of the file hash dict.
+  return EagerFilesetWithSpec(spec_path,
+                              filespecs,
+                              files=tuple(f for f, _ in file_tuples),
+                              file_hashes=dict(file_tuples))
 
 
 def hydrate_sources(sources_field, source_files_digest, excluded_source_files):

@@ -97,14 +97,6 @@ jar_library(name='slf4j-api',
               jar(org='org.slf4j', name='slf4j-api', rev='1.6.1'),
             ])
 
-jar_library(name='spindle-runtime',
-            jars=[
-              scala_jar(org='com.foursquare', name='spindle-runtime', rev='3.0.0-M7'),
-            ],
-            dependencies=[
-              'contrib/spindle/3rdparty:rogue',
-            ])
-
 # NB: we have two versions of thrift here due to scrooge requiring one version while apache
 # thrift requires another. this is not usually recommended
 jar_library(name='libthrift-0.9.2',

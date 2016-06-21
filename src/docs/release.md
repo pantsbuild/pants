@@ -170,7 +170,6 @@ Right now that's:
 - pantsbuild.pants.contrib.android
 - pantsbuild.pants.contrib.buildgen
 - pantsbuild.pants.contrib.scrooge
-- pantsbuild.pants.contrib.spindle
 - pantsbuild.pants.testinfra
 
 You can run the following to get a full ownership roster for each
