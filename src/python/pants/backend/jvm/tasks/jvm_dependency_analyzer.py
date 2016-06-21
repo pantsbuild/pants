@@ -171,9 +171,9 @@ class JvmDependencyAnalyzer(object):
         yield declared, None
 
   def compute_unused_deps(self, target):
-    """Uses `product_deps_by_src` to compute unused deps for the given Target.
+    """Computes unused deps for the given Target.
 
-    :returns: dict of unused targets to suggested replacements.
+    :returns: A set of directly declared but unused targets, and a set of suggested replacements.
     """
 
     # Flatten the product deps of this target.

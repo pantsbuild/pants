@@ -18,7 +18,6 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.task.task import Task
-from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
 
 
@@ -45,7 +44,7 @@ class JvmDependencyUsage(Task):
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyUsage, cls).register_options(register)
-    register('--internal-only', default=True, type=bool, fingerprint=True,
+    register('--internal-only', default=False, type=bool, fingerprint=True,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
     register('--summary', default=True, type=bool,
@@ -97,7 +96,7 @@ class JvmDependencyUsage(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmDependencyUsage, cls).implementation_version() + [('JvmDependencyUsage', 6)]
+    return super(JvmDependencyUsage, cls).implementation_version() + [('JvmDependencyUsage', 7)]
 
   def _render(self, graph, fh):
     chunks = graph.to_summary() if self.get_options().summary else graph.to_json()
@@ -222,21 +221,6 @@ class JvmDependencyUsage(Task):
   def cache_target_dirs(self):
     return True
 
-  def _normalize_product_dep(self, buildroot, classes_by_source, dep):
-    """Normalizes the given product dep from the given dep into a set of classfiles.
-
-    Product deps arrive as sources, jars, and classfiles: this method normalizes them to classfiles and jars.
-    """
-    if dep.endswith(".jar"):
-      # NB: We preserve jars "whole" here, because zinc does not support finer granularity.
-      return {dep}
-    elif dep.endswith(".class"):
-      return {dep}
-    else:
-      # Assume a source file and convert to classfiles.
-      rel_src = fast_relpath(dep, buildroot)
-      return {p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths}
-
   def create_dep_usage_node(self, target, analyzer, classes_by_source, targets_by_file, transitive_deps):
     buildroot = analyzer.buildroot
     product_deps_by_src = analyzer.product_deps_by_src
@@ -276,8 +260,7 @@ class JvmDependencyUsage(Task):
           # not uncommon when globs especially rglobs is used.
           if not derived_from in transitive_deps:
             continue
-          normalized_deps = self._normalize_product_dep(buildroot, classes_by_source, product_dep)
-          node.add_edge(_construct_edge(dep_tgt, products_used=normalized_deps), derived_from)
+          node.add_edge(_construct_edge(dep_tgt, products_used={product_dep}), derived_from)
 
     return node
 
