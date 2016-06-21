@@ -131,7 +131,7 @@ class BundleCreate(JvmBinaryTask):
     with self.invalidated(targets_to_bundle, invalidate_dependents=True) as invalidation_check:
       jvm_bundles_product = self.context.products.get('jvm_bundles')
       bundle_archive_product = self.context.products.get('deployable_archives')
-      for vt in invalidation_check.all_vts:
+      for vt in invalidation_check.invalid_vts:
         app = self.App.create_app(vt.target,
                                   self._resolved_option(vt.target, 'deployjar'),
                                   self._resolved_option(vt.target, 'archive'))
