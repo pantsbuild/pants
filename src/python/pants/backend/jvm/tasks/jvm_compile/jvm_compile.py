@@ -609,18 +609,18 @@ class JvmCompile(NailgunTaskBase):
         return
 
       # Warn or error for unused.
-      def unused_msg(entry):
-        dep, replacements = entry
-        if replacements:
-          replacements_str = ', '.join('\'{}\''.format(r.address.spec) for r in replacements)
-          return '{} (suggested replacement: {})'.format(dep.address.spec, replacements_str)
-        else:
-          return dep.address.spec
+      def joined_dep_msg(deps):
+        return '\n  '.join('\'{}\','.format(dep.address.spec) for dep in sorted(deps))
+      flat_replacements = set(r for replacements in replacement_deps.values() for r in replacements)
+      replacements_msg = ''
+      if flat_replacements:
+        replacements_msg = 'Suggested replacements:\n  {}\n'.format(joined_dep_msg(flat_replacements))
       unused_msg = (
-          """unused dependencies:\n  {}\n"""
-          """(If you're seeing this message in error, you might need to """
-          """change the `scope` of the dependencies.)""".format(
-            '\n  '.join(unused_msg(entry) for entry in sorted(replacement_deps.items())),
+          'unused dependencies:\n  {}\n{}'
+          '(If you\'re seeing this message in error, you might need to '
+          'change the `scope` of the dependencies.)'.format(
+            joined_dep_msg(replacement_deps.keys()),
+            replacements_msg,
           )
         )
       if self.get_options().unused_deps == 'fatal':
