@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.util.dirutil import safe_mkdir, safe_symlink
+from pants.util.dirutil import safe_mkdir
 from pants.util.fileutil import atomic_copy
 from pants.util.objects import datatype
 
