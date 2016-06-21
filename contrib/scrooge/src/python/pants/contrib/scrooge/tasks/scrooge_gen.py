@@ -61,7 +61,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 2)]
+    return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 3)]
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
