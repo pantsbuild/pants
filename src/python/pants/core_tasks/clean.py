@@ -29,23 +29,27 @@ class Clean(Task):
              help='Allows clean-all to run in the background. Can dramatically speed up clean-all'
                   'for large .pants.d files.')
 
-  def execute(self):
-    # Get current pants working directory.
-    pants_wd = self.get_options().pants_workdir
-    if self.get_options().async:
-      # Although cleanup is set to False, temp dir is still deleted in subprocess.
-      with temporary_dir(cleanup=False) as tmpdir:
-        # Creates subdirectory to move contents.
-        clean_dir = os.path.join(tmpdir, "clean")
-        safe_mkdir(clean_dir)
-        logger.info('Temporary directory created at {tmpdir}'.format(tmpdir=tmpdir))
+    def execute(self):
+      # Get current pants working directory. 
+      pants_wd = self.get_options().pants_workdir
+      if self.get_options().async:
+        # Although cleanup is set to False, temp dir is still deleted in subprocess. 
+        with temporary_dir(cleanup=False) as tmpdir:
+          pid = os.fork()
 
-        # Moves contents of .pants.d to cleanup dir.
-        safe_concurrent_rename(pants_wd, clean_dir)
+          if pid == 0:
+            logger.info('Temporary directory created at {tmpdir}'.format(tmpdir=tmpdir))
+            # Creates subdirectory to move contents. 
+            clean_dir = os.path.join(tmpdir, "clean")
+            safe_mkdir(clean_dir)
 
-        # Deletes temporary dir (including old .pants.d) in subprocess.
-        subprocess.Popen(["rm", "-rf", tmpdir])
-    else:
-      # Recursively removes pants cache; user waits patiently.
-      logger.info('For async removal, run `./pants clean-all -a`')
-      safe_rmtree(pants_wd)
+            # Moves contents of .pants.d to cleanup dir. 
+            safe_concurrent_rename(pants_wd, clean_dir)
+
+            # Deletes temporary dir (including old .pants.d) in subprocess. 
+            safe_rmtree(tmpdir)
+            os._exit(0)
+      else:
+        # Recursively removes pants cache; user waits patiently. 
+        logger.info('For async removal, run `./pants clean-all --async`')
+        safe_rmtree(pants_wd)
