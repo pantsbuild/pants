@@ -17,8 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.util.dirutil import safe_mkdir
-from pants.util.fileutil import atomic_copy
+from pants.util.dirutil import atomic_copy_tree, safe_mkdir
 from pants.util.objects import datatype
 
 
@@ -100,7 +99,7 @@ class BundleCreate(JvmBinaryTask):
     dist_dir = self.get_options().pants_distdir
     name = vt.target.basename if self.get_options().use_basename_prefix else app.id
     bundle_copy = os.path.join(dist_dir, '{}-bundle'.format(name))
-    atomic_copy(bundle_dir, bundle_copy)
+    atomic_copy_tree(bundle_dir, bundle_copy)
     self.context.log.info(
       'created bundle copy {}'.format(os.path.relpath(bundle_copy, get_buildroot())))
 
