@@ -26,29 +26,27 @@ class Clean(Task):
     super(Clean, cls).register_options(register)
     register('--async', type=bool, default=False,
              help='Allows clean-all to run in the background. Can dramatically speed up clean-all'
-                  'for large .pants.d files.')
+                  'for large pants workdir.')
 
-    def execute(self):
-      # Get current pants working directory. 
-      pants_wd = self.get_options().pants_workdir
-      if self.get_options().async:
-        # Although cleanup is set to False, temp dir is still deleted in subprocess. 
-        with temporary_dir(cleanup=False) as tmpdir:
-          pid = os.fork()
+  def execute(self):
+    # Get current pants working directory. 
+    pants_wd = self.get_options().pants_workdir
+    if self.get_options().async:
+      # Although cleanup is set to False, temp dir is still deleted in subprocess. 
+      with temporary_dir(cleanup=False) as tmpdir:
+        pid = os.fork()
 
-          if pid == 0:
-            logger.info('Temporary directory created at {tmpdir}'.format(tmpdir=tmpdir))
-            # Creates subdirectory to move contents. 
-            clean_dir = os.path.join(tmpdir, "clean")
-            safe_mkdir(clean_dir)
+        if pid == 0:
+          logger.info('Temporary directory created at {}'.format(tmpdir))
+          # Creates subdirectory to move contents. 
+          clean_dir = os.path.join(tmpdir, "clean")
+          safe_mkdir(clean_dir)
 
-            # Moves contents of .pants.d to cleanup dir. 
-            safe_concurrent_rename(pants_wd, clean_dir)
-
-            # Deletes temporary dir (including old .pants.d) in subprocess. 
-            safe_rmtree(tmpdir)
-            os._exit(0)
-      else:
-        # Recursively removes pants cache; user waits patiently. 
-        logger.info('For async removal, run `./pants clean-all --async`')
-        safe_rmtree(pants_wd)
+          # Moves contents of .pants.d to cleanup dir and deletes 
+          safe_concurrent_rename(pants_wd, clean_dir)
+          safe_rmtree(tmpdir)
+          os._exit(0)
+    else:
+      # Recursively removes pants cache; user waits patiently. 
+      logger.info('For async removal, run `./pants clean-all --async`')
+      safe_rmtree(pants_wd)

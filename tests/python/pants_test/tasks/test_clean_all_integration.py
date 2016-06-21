@@ -17,8 +17,8 @@ class CleanAllTest(PantsRunIntegrationTest):
       self.assert_failure(self.run_pants_with_workdir(["clean-all"], workdir))
       self.assert_failure(self.run_pants_with_workdir(["clean-all", "--async"], workdir))
 
-      # Ensure async clean-all exits normally. 
-      def test_clean_all_async(self):
-         self.run_pants(["clean-all", "--async"])
-         _, status = os.waitpid()
-         self.assertEquals(status, 0)
+  # Ensure async clean-all exits normally. 
+  def test_clean_all_async(self):
+    self.run_pants(["clean-all", "--async"])
+    _, status = os.waitpid(0, 0) # waits for forked process to finish, gets exit status
+    self.assertEquals(status, 0)
