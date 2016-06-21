@@ -143,7 +143,7 @@ class BundleCreate(JvmBinaryTask):
           safe_symlink(bundle_dir, bundle_symlink)
           self.context.log.info('created bundle symlink {}'.format(os.path.relpath(bundle_symlink, get_buildroot())))
 
-          if archive and archivepath:
+          if archiver and archivepath:
             archive_copy = os.path.join(self.get_options().pants_distdir, '{}.{}'.format(name, app.archive))
             safe_file_copy(archivepath, archive_copy)
             self.context.log.info('created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
