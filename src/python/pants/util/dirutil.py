@@ -74,6 +74,17 @@ def safe_file_dump(filename, payload):
     f.write(payload)
 
 
+def safe_file_copy(src, dst):
+  """Copy a file at src to dst
+
+  :param string src: path to source file
+  :param string dst: path to destination
+  :return: None
+  """
+  safe_mkdir_for(dst)
+  shutil.copy(src, dst)
+
+
 def read_file(filename):
   """Read and return the contents of a file in a single file.read().
 
