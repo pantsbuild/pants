@@ -161,18 +161,17 @@ class TestJvmDependencyUsage(TaskTestBase):
     classes_by_source = task.context.products.get_data('classes_by_source')
     runtime_classpath = task.context.products.get_data('runtime_classpath')
     product_deps_by_src = task.context.products.get_data('product_deps_by_src')
-    analyzer = JvmDependencyAnalyzer(self.build_root, runtime_classpath)
+    analyzer = JvmDependencyAnalyzer('', runtime_classpath, product_deps_by_src)
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
 
     def node_creator(target):
+      transitive_deps = set(transitive_deps_by_target.get(target))
       return task.create_dep_usage_node(target,
-                                        targets_by_file,
-                                        '',
+                                        analyzer,
                                         classes_by_source,
-                                        runtime_classpath,
-                                        product_deps_by_src,
-                                        transitive_deps_by_target)
+                                        targets_by_file,
+                                        transitive_deps)
 
     return DependencyUsageGraph(task.create_dep_usage_nodes(targets, node_creator),
                                 task.size_estimators[task.get_options().size_estimator])

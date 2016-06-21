@@ -31,9 +31,10 @@ class JvmDependencyAnalyzer(object):
   determining which targets correspond to the actual source dependencies of any given target.
   """
 
-  def __init__(self, buildroot, runtime_classpath):
-    self._buildroot = buildroot
-    self._runtime_classpath = runtime_classpath
+  def __init__(self, buildroot, runtime_classpath, product_deps_by_src):
+    self.buildroot = buildroot
+    self.runtime_classpath = runtime_classpath
+    self.product_deps_by_src = product_deps_by_src
 
   @memoized_method
   def files_for_target(self, target):
@@ -46,17 +47,17 @@ class JvmDependencyAnalyzer(object):
       # Compute src -> target.
       if isinstance(target, JvmTarget):
         for src in target.sources_relative_to_buildroot():
-          yield os.path.join(self._buildroot, src)
+          yield os.path.join(self.buildroot, src)
       # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
       if isinstance(target, ScalaLibrary):
         for java_source in target.java_sources:
           for src in java_source.sources_relative_to_buildroot():
-            yield os.path.join(self._buildroot, src)
+            yield os.path.join(self.buildroot, src)
 
       # Compute classfile -> target and jar -> target.
-      files = ClasspathUtil.classpath_contents((target,), self._runtime_classpath)
+      files = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)
       # And jars; for binary deps, zinc doesn't emit precise deps (yet).
-      cp_entries = ClasspathUtil.classpath((target,), self._runtime_classpath)
+      cp_entries = ClasspathUtil.classpath((target,), self.runtime_classpath)
       jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
       for coll in [files, jars]:
         for f in coll:
@@ -85,6 +86,11 @@ class JvmDependencyAnalyzer(object):
       for cls in jar.namelist():
         if cls.endswith(b'.class'):
           yield cls
+
+  def count_products(self, target):
+    contents = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)
+    # Generators don't implement len.
+    return sum(1 for _ in contents)
 
   @memoized_property
   def bootstrap_jar_classfiles(self):
@@ -164,7 +170,7 @@ class JvmDependencyAnalyzer(object):
       else:
         yield declared, None
 
-  def compute_unused_deps(self, product_deps_by_src, target):
+  def compute_unused_deps(self, target):
     """Uses `product_deps_by_src` to compute unused deps for the given Target.
 
     :returns: dict of unused targets to suggested replacements.
@@ -172,7 +178,7 @@ class JvmDependencyAnalyzer(object):
 
     # Flatten the product deps of this target.
     product_deps = set()
-    for dep_entries in product_deps_by_src.get(target, {}).values():
+    for dep_entries in self.product_deps_by_src.get(target, {}).values():
       product_deps.update(dep_entries)
 
     # Determine which of the DEFAULT deps in the declared set of this target were used.

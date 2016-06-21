@@ -10,6 +10,7 @@ import os
 from pants.backend.jvm.targets.tools_jar import ToolsJar
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.base.exceptions import TaskError
 from pants.util.dirutil import relative_symlink
 from pants.util.memo import memoized_property
 

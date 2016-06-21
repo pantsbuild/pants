@@ -341,7 +341,8 @@ class JvmCompile(NailgunTaskBase):
   @memoized_property
   def _dep_analyzer(self):
     return JvmDependencyAnalyzer(get_buildroot(),
-                                 self.context.products.get_data('runtime_classpath'))
+                                 self.context.products.get_data('runtime_classpath'),
+                                 self.context.products.get_data('product_deps_by_src'))
 
   @property
   def _analysis_parser(self):

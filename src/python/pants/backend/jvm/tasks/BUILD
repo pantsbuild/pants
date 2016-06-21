@@ -410,7 +410,6 @@ python_library(
   name = 'jvm_dependency_usage',
   sources = ['jvm_dependency_usage.py'],
   dependencies = [
-    ':classpath_util',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',

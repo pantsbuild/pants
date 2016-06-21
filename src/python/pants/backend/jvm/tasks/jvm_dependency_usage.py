@@ -11,7 +11,6 @@ import sys
 from collections import defaultdict, namedtuple
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.aliased_target import AliasTarget
@@ -130,11 +129,6 @@ class JvmDependencyUsage(Task):
     else:
       return True
 
-  def _count_products(self, classpath_products, target):
-    contents = ClasspathUtil.classpath_contents((target,), classpath_products)
-    # Generators don't implement len.
-    return sum(1 for _ in contents)
-
   def create_dep_usage_graph(self, targets):
     """Creates a graph of concrete targets, with their sum of products and dependencies.
 
@@ -164,22 +158,17 @@ class JvmDependencyUsage(Task):
     `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
     stores the result to the build cache.
     """
-    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
+    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath, product_deps_by_src)
     targets = self.context.targets()
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
     def creator(target):
       transitive_deps = set(transitive_deps_by_target.get(target))
-      declared_deps_with_aliases = set(analyzer.resolve_aliases(target))
-      eligible_unused_deps = set(d for d, _ in analyzer.resolve_aliases(target, scope=Scopes.DEFAULT))
       node = self.create_dep_usage_node(target,
-                                        targets_by_file, get_buildroot(),
+                                        analyzer,
                                         classes_by_source,
-                                        runtime_classpath,
-                                        product_deps_by_src,
-                                        transitive_deps,
-                                        declared_deps_with_aliases,
-                                        eligible_unused_deps)
+                                        targets_by_file,
+                                        transitive_deps)
       vt = target_to_vts[target]
       with open(self.nodes_json(vt.results_dir), mode='w') as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
@@ -248,19 +237,14 @@ class JvmDependencyUsage(Task):
       rel_src = fast_relpath(dep, buildroot)
       return {p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths}
 
-  def create_dep_usage_node(self,
-                            target,
-                            targets_by_file,
-                            buildroot,
-                            classes_by_source,
-                            runtime_classpath,
-                            product_deps_by_src,
-                            transitive_deps,
-                            declared_deps_with_aliases,
-                            eligible_unused_deps):
+  def create_dep_usage_node(self, target, analyzer, classes_by_source, targets_by_file, transitive_deps):
+    buildroot = analyzer.buildroot
+    product_deps_by_src = analyzer.product_deps_by_src
+    declared_deps_with_aliases = set(analyzer.resolve_aliases(target))
+    eligible_unused_deps = set(d for d, _ in analyzer.resolve_aliases(target, scope=Scopes.DEFAULT))
     concrete_target = target.concrete_derived_from
     declared_deps = [resolved for resolved, _ in declared_deps_with_aliases]
-    products_total = self._count_products(runtime_classpath, target)
+    products_total = analyzer.count_products(target)
     node = Node(concrete_target)
     node.add_derivation(target, products_total)
 
