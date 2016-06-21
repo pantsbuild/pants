@@ -37,7 +37,7 @@ class SourcesField(PayloadField):
   def filespec(self):
     return self.sources.filespec
 
-  def matches(self, path):
+  def matches(self, path, skip_deferred_sources=False):
     return matches_filespec(path, self.filespec)
 
   @property
@@ -57,12 +57,12 @@ class SourcesField(PayloadField):
     """Returns the address this sources field refers to (used by some derived classses)"""
     return self._ref_address
 
-  def has_sources(self, extension=None):
+  def has_sources(self, extension=None, skip_deferred_sources=False):
     if not self.source_paths:
       return False
     return any(source.endswith(extension) for source in self.source_paths)
 
-  def relative_to_buildroot(self):
+  def relative_to_buildroot(self, skip_deferred_sources=False):
     """All sources joined with ``self.rel_path``."""
     return [os.path.join(self.rel_path, source) for source in self.source_paths]
 
@@ -135,7 +135,19 @@ class DeferredSourcesField(SourcesField):
     self._validate_populated()
     return self._sources
 
-  def matches(self, path):
+  def relative_to_buildroot(self, skip_deferred_sources=False):
+    if skip_deferred_sources:
+      self._populate_with_empty_sources()
+    return super(DeferredSourcesField, self).relative_to_buildroot()
+
+  def has_sources(self, extension=None, skip_deferred_sources=False):
+    if skip_deferred_sources:
+      self._populate_with_empty_sources()
+    return super(DeferredSourcesField, self).has_sources(extension)
+
+  def matches(self, path, skip_deferred_sources=False):
+    if skip_deferred_sources:
+      self._populate_with_empty_sources()
     if not self._populated:
       raise self.NotPopulatedError()
     return matches_filespec(path, self.filespec)
@@ -152,3 +164,8 @@ class DeferredSourcesField(SourcesField):
     if self._populated:
       return super(DeferredSourcesField, self)._validate_sources(sources)
     return sources
+
+  def _populate_with_empty_sources(self):
+    self._populated = True
+    if not self._sources:
+      self._sources = self._validate_sources(FilesetWithSpec.empty(self._ref_address))

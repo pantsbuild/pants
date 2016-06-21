@@ -69,7 +69,7 @@ class SpecSourceMapper(SourceMapper):
           """
           :type resource: pants.build_graph.resources.Resources
           """
-          if resource.payload.sources.matches(source):
+          if resource.payload.sources.matches(source, skip_deferred_sources=True):
             yield address
 
 
@@ -152,10 +152,10 @@ class LazySourceMapper(SourceMapper):
       target = self._build_graph.get_target(address)
       if target.has_resources:
         for resource in target.resources:
-          for item in resource.sources_relative_to_buildroot():
+          for item in resource.sources_relative_to_buildroot(skip_deferred_sources=True):
             self._source_to_address[item].add(target.address)
 
-      for target_source in target.sources_relative_to_buildroot():
+      for target_source in target.sources_relative_to_buildroot(skip_deferred_sources=True):
         self._source_to_address[target_source].add(target.address)
       if not target.is_synthetic:
         self._source_to_address[target.address.build_file.relpath].add(target.address)

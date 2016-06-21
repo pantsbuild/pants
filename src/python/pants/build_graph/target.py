@@ -506,22 +506,36 @@ class Target(AbstractTarget):
       return sources_field
     return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
 
-  def has_sources(self, extension=''):
+  def has_sources(self, extension='', skip_deferred_sources=False):
     """
     :API: public
 
     :param string extension: suffix of filenames to test for
+    :param bool skip_deferred_sources: skip past unpopulated deferred source targets.
+    See note about skip_deferred_sources on sources_relative_to_buildroot
     :return: True if the target contains sources that match the optional extension suffix
     :rtype: bool
     """
-    return self._sources_field.has_sources(extension)
+    return self._sources_field.has_sources(extension=extension, skip_deferred_sources=skip_deferred_sources)
 
-  def sources_relative_to_buildroot(self):
+  def sources_relative_to_buildroot(self, skip_deferred_sources=False):
     """
+    Note: Not all sources are available immedately after the build graph is constructed.
+    Some tasks create source files (unpack_jars for example) and are effectively code generators.
+    These tasks should create a `deferred_sources` product type that your task can depend on.
+
+    If you intend to call this from a task that runs without somehow depending on output from
+    the `compile` or `resolve` goals, you may want to pass `skip_deferred_sources=True` to avoid
+    having to wait on these other tasks to run.  If you do want your task to return these
+    sources, make sure your task depends on the `deferred_sources` product so that it gets
+    scheduled to run after these sources are populated.
+
     :API: public
+
+    :param bool skip_deferred_sources: skip past unpopulated deferred source targets
     """
-    if self.has_sources():
-      return self.payload.sources.relative_to_buildroot()
+    if self.has_sources(skip_deferred_sources=skip_deferred_sources):
+      return self.payload.sources.relative_to_buildroot(skip_deferred_sources)
     else:
       return []
 

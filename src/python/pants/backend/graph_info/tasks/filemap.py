@@ -16,7 +16,7 @@ class Filemap(ConsoleTask):
     for target in self._find_targets():
       if target not in visited:
         visited.add(target)
-        for rel_source in target.sources_relative_to_buildroot():
+        for rel_source in target.sources_relative_to_buildroot(skip_deferred_sources=True):
           yield '{} {}'.format(rel_source, target.address.spec)
 
   def _find_targets(self):

@@ -47,7 +47,7 @@ class CountLinesOfCode(ConsoleTask):
       list_file = os.path.join(tmpdir, 'list_file')
       with open(list_file, 'w') as list_file_out:
         for target in targets:
-          for source in target.sources_relative_to_buildroot():
+          for source in target.sources_relative_to_buildroot(skip_deferred_sources=True):
             list_file_out.write(os.path.join(buildroot, source))
             list_file_out.write(b'\n')
 
@@ -70,12 +70,15 @@ class CountLinesOfCode(ConsoleTask):
       if result != 0:
         raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
 
-      with open(report_file, 'r') as report_file_in:
-        for line in report_file_in.read().split('\n'):
-          yield line
-
-      if self.get_options().ignored:
-        yield 'Ignored the following files:'
-        with open(ignored_file, 'r') as ignored_file_in:
-          for line in ignored_file_in.read().split('\n'):
+      if not os.path.exists(report_file):
+        yield 'No report file was generated.  Are there any source files in your project?'
+      else:
+        with open(report_file, 'r') as report_file_in:
+          for line in report_file_in.read().split('\n'):
             yield line
+
+        if self.get_options().ignored:
+          yield 'Ignored the following files:'
+          with open(ignored_file, 'r') as ignored_file_in:
+            for line in ignored_file_in.read().split('\n'):
+              yield line
