@@ -83,7 +83,7 @@ For example, for an option `--foo` whose default value is `[1, 2]`, then in `pan
 + `foo: -[1]` will yield `[2]`.
 + `foo: [3, 4]` will yield `[3, 4]`.
 
-Multiple append and filter expressions may be delimited with commas, 
+Multiple append and filter expressions may be delimited with commas,
 allowing you to append and filter simultaneously:
 
 + `foo: +[3,4],-[1]` will yield `[2, 3, 4]`.
