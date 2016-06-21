@@ -10,7 +10,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.option.custom_types import dict_option, list_option, ListValueComponent
+from pants.option.custom_types import ListValueComponent, dict_option, list_option
 from pants.option.errors import ParseError
 from pants.util.strutil import ensure_binary
 
