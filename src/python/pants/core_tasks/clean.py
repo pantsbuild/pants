@@ -34,8 +34,8 @@ class Clean(Task):
     if self.get_options().async:
       # Although cleanup is set to False, temp dir is still deleted in subprocess. 
       with temporary_dir(cleanup=False) as tmpdir:
-        pid = os.fork()
         logger.info('Temporary directory created at {}'.format(tmpdir))
+
         # Creates subdirectory to move contents. 
         clean_dir = os.path.join(tmpdir, "clean")
         safe_mkdir(clean_dir)
@@ -44,6 +44,7 @@ class Clean(Task):
         safe_concurrent_rename(pants_wd, clean_dir)
 
         # deletes in child process
+        pid = os.fork()
         if pid == 0:
           safe_rmtree(tmpdir)
           os._exit(0)
