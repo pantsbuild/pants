@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import atexit
 import errno
-import filecmp
 import os
 import tempfile
 import time
