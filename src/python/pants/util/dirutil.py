@@ -282,6 +282,7 @@ def absolute_symlink(source_path, target_path):
   try:
     if os.path.lexists(target_path):
       os.unlink(target_path)
+    safe_mkdir_for(target_path)
     os.symlink(source_path, target_path)
   except OSError as e:
     # Another run may beat us to deletion or creation.
