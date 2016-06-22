@@ -6,9 +6,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 
+from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import warn_or_error
+from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.from_target import from_target_deprecation_hint
+from pants.build_graph.remote_sources import RemoteSources
 from pants.source.payload_fields import DeferredSourcesField
+from pants.source.wrapped_globs import Files
 from pants.task.task import Task
 
 
@@ -45,11 +53,26 @@ class DeferredSourcesMapper(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data('unpacked_archives')
 
-  def execute(self):
+  @classmethod
+  def register_options(cls, register):
+    register('--allow-from-target', default=True, type=bool,
+             help='Allows usage of `from_target` in BUILD files. If false, usages of `from_target` '
+                  'will cause errors to be thrown. This will allow individual repositories to '
+                  'disable the use of `from_target` in advance of its deprecation.')
+
+  def map_deferred_sources(self):
+    """Inject sources into targets that set their sources to from_target() objects."""
     deferred_sources_fields = []
     def find_deferred_sources_fields(target):
       for name, payload_field in target.payload.fields:
         if isinstance(payload_field, DeferredSourcesField):
+          if not self.get_options().allow_from_target:
+            raise TargetDefinitionException(target, from_target_deprecation_hint)
+          warn_or_error(
+              removal_version='1.3.0',
+              deprecated_entity_description='DeferredSourcesField',
+              hint=from_target_deprecation_hint,
+          )
           deferred_sources_fields.append((target, name, payload_field))
     addresses = [target.address for target in self.context.targets()]
     self.context.build_graph.walk_transitive_dependency_graph(addresses,
@@ -71,3 +94,24 @@ class DeferredSourcesMapper(Task):
       # we explicitly register it here.
       self.context.source_roots.add_source_root(rel_unpack_dir)
       payload_field.populate(sources, rel_unpack_dir)
+
+  def process_remote_sources(self):
+    """Create synthetic targets with populated sources from remote_sources targets."""
+    unpacked_sources = self.context.products.get_data('unpacked_archives')
+    remote_sources_targets = self.context.targets(predicate=lambda t: isinstance(t, RemoteSources))
+    for target in remote_sources_targets:
+      sources, rel_unpack_dir = unpacked_sources[target.sources_target]
+      synthetic_target = self.context.add_new_target(
+        address=Address(os.path.relpath(self.workdir, get_buildroot()), target.id),
+        target_type=target.destination_target_type,
+        dependencies=target.dependencies,
+        sources=Files.create_fileset_with_spec(rel_unpack_dir, *sources),
+        derived_from=target,
+        **target.destination_target_args
+      )
+      for dependent in self.context.build_graph.dependents_of(target.address):
+        self.context.build_graph.inject_dependency(dependent.address, synthetic_target.address)
+
+  def execute(self):
+    self.map_deferred_sources()
+    self.process_remote_sources()
