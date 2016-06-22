@@ -31,23 +31,28 @@ class Clean(Task):
   def execute(self):
     # Get current pants working directory. 
     pants_wd = self.get_options().pants_workdir
+    trash_dir = os.path.join(pants_wd, "trash")
     if self.get_options().async:
       # Although cleanup is set to False, temp dir is still deleted in subprocess. 
       with temporary_dir(cleanup=False) as tmpdir:
         logger.info('Temporary directory created at {}'.format(tmpdir))
 
         # Creates subdirectory to move contents. 
-        clean_dir = os.path.join(tmpdir, "clean")
+        clean_dir = os.path.join(tmpdir, "trash")
         safe_mkdir(clean_dir)
 
         # Moves contents of .pants.d to cleanup dir
         safe_concurrent_rename(pants_wd, clean_dir)
+        safe_concurrent_rename(tmpdir, pants_wd)
 
         # deletes in child process
         pid = os.fork()
         if pid == 0:
-          safe_rmtree(tmpdir)
-          os._exit(0)
+          try:
+            safe_rmtree(trash_dir)
+            os._exit(0)
+          except OSError:
+            logger.warning("Async clean-all failed. Please try again.")
     else:
       # Recursively removes pants cache; user waits patiently. 
       logger.info('For async removal, run `./pants clean-all --async`')
