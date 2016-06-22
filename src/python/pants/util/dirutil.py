@@ -16,7 +16,6 @@ import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 
-from pants.base.build_root import BuildRoot
 from pants.util.strutil import ensure_text
 
 
