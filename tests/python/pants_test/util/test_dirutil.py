@@ -19,10 +19,10 @@ import six
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir, read_file,
-                                relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
-                                safe_file_copy, safe_file_dump, safe_mkdir,
-                                safe_rm_oldest_items_in_dir, safe_symlink, touch)
+from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
+                                get_basedir, read_file, relative_symlink, relativize_paths, rm_rf,
+                                safe_concurrent_creation, safe_file_copy, safe_file_dump,
+                                safe_mkdir, safe_rm_oldest_items_in_dir, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -292,7 +292,7 @@ class DirutilTest(unittest.TestCase):
 
   def test_safe_symlink(self):
     def _create_and_check_link(source, link):
-      safe_symlink(source, link)
+      absolute_symlink(source, link)
       self.assertTrue(os.path.islink(link))
       self.assertEquals(source, os.readlink(link))
 

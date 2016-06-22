@@ -25,9 +25,9 @@ def atomic_copy_tree(src, dst):
   try:
     shutil.copytree(src, path, symlinks=True)
     os.chmod(path, os.stat(src).st_mode)
-    safe_rmtree(dst)
     os.rename(path, dst)
   finally:
+
     shutil.rmtree(path, ignore_errors=True)
 
 
@@ -263,6 +263,30 @@ def chmod_plus_x(path):
   if path_mode & stat.S_IROTH:
     path_mode |= stat.S_IXOTH
   os.chmod(path, path_mode)
+
+
+def absolute_symlink(source_path, target_path):
+  """Create a symlink at target pointing to source using the absolute path.
+
+  :param source_path: Absolute path to source file
+  :param target_path: Absolute path to intended symlink
+  :raises ValueError if source_path or link_path are not unique, absolute paths
+  :raises OSError on failure UNLESS file already exists or no such file/directory
+  """
+  if not os.path.isabs(source_path):
+    raise ValueError("Path for source:{} must be absolute".format(source_path))
+  if not os.path.isabs(target_path):
+    raise ValueError("Path for link:{} must be absolute".format(target_path))
+  if source_path == target_path:
+    raise ValueError("Path for link is identical to source:{}".format(source_path))
+  try:
+    if os.path.lexists(target_path):
+      os.unlink(target_path)
+    os.symlink(source_path, target_path)
+  except OSError as e:
+    # Another run may beat us to deletion or creation.
+    if not (e.errno == errno.EEXIST or e.errno == errno.ENOENT):
+      raise
 
 
 def relative_symlink(source_path, link_path):
