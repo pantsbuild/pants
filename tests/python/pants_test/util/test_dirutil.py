@@ -21,8 +21,8 @@ from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
                                 get_basedir, read_file, relative_symlink, relativize_paths, rm_rf,
-                                safe_concurrent_creation, safe_file_copy, safe_file_dump,
-                                safe_mkdir, safe_rm_oldest_items_in_dir, touch)
+                                safe_concurrent_creation, safe_file_dump, safe_mkdir,
+                                safe_rm_oldest_items_in_dir, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -235,16 +235,6 @@ class DirutilTest(unittest.TestCase):
 
       self.assertFalse(os.path.exists(safe_path))
       self.assertTrue(os.path.exists(expected_file))
-
-  def test_safe_file_copy(self):
-    with temporary_dir() as td:
-      source = os.path.join(td, 'source')
-      touch(source)
-      dest = os.path.join(td, 'a/b/c/d/e/dst')
-
-      safe_file_copy(source, dest)
-      self.assertTrue(os.path.exists(dest))
-      self.assertTrue(filecmp.cmp(source, dest))
 
   def test_safe_rm_oldest_items_in_dir(self):
     with temporary_dir() as td:
