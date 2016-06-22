@@ -13,6 +13,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_mkdir_for
 from pants.util.fileutil import atomic_copy
 
 
@@ -54,6 +55,7 @@ class PythonBinaryCreate(PythonTask):
 
         # Create a copy for pex.
         pex_copy = os.path.join(self._distdir, os.path.basename(pex_path))
+        safe_mkdir_for(pex_copy)
         atomic_copy(pex_path, pex_copy)
         self.context.log.info('created pex copy {}'.format(os.path.relpath(pex_copy, get_buildroot())))
 
