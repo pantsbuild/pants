@@ -25,6 +25,7 @@ def atomic_copy_tree(src, dst):
   try:
     shutil.copytree(src, path, symlinks=True)
     os.chmod(path, os.stat(src).st_mode)
+    safe_rmtree(dst)
     os.rename(path, dst)
   finally:
     shutil.rmtree(path, ignore_errors=True)
