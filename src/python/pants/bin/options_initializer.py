@@ -11,6 +11,7 @@ import sys
 import pkg_resources
 
 from pants.base.build_environment import pants_version
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import BuildConfigurationError
 from pants.bin.extension_loader import load_backends_and_plugins
 from pants.bin.plugin_resolver import PluginResolver
@@ -149,6 +150,20 @@ class OptionsInitializer(object):
 
     # Conditionally load backends/plugins and materialize a `BuildConfiguration` object.
     if not self._has_build_configuration():
+      missing = (set(global_bootstrap_options.default_backend_packages).difference(
+                 global_bootstrap_options.backend_packages))
+      deprecated_conditional(
+          lambda: len(missing) > 0,
+          '1.3.0',
+          'default_backend_packages option',
+          'You are relying on the following backends being listed in the deprecated '
+          'default_backend_packages option: {}.\n  '
+          'This is probably because you are overwriting the value of the backend_packages option '
+          'in your pants.ini, instead of appending to it.\n  To get rid of this message, change '
+          'backend_packages: [...] to backend_packages: +[...] in your pants.ini.'.format(
+              ', '.join(missing))
+      )
+
       backends = (global_bootstrap_options.default_backend_packages +
                   global_bootstrap_options.backend_packages)
       build_configuration = self._load_plugins(self._working_set,

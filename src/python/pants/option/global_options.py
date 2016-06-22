@@ -61,9 +61,19 @@ class GlobalOptionsRegistrar(Optionable):
              help='Cache resolved plugin requirements here.')
 
     register('--backend-packages', advanced=True, type=list,
+             default=['pants.backend.graph_info',
+                      'pants.backend.python',
+                      'pants.backend.jvm',
+                      'pants.backend.codegen',
+                      'pants.backend.project_info'],
              help='Load backends from these packages that are already on the path. '
                   'Add contrib and custom backends to this list.')
     register('--default-backend-packages', advanced=True, type=list,
+             removal_version='1.3.0',
+             removal_hint='All backends must be specified using the backend_packages option. '
+                          'That option has the same defaults as this one, and you can append'
+                          'and filter those using +[...] and -[...] syntax, as described here: '
+                          'http://www.pantsbuild.org/options.html#list-options.',
              default=['pants.backend.graph_info',
                       'pants.backend.python',
                       'pants.backend.jvm',
