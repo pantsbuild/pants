@@ -339,6 +339,9 @@ class OptionsTest(unittest.TestCase):
     check([1, 2, 3, 4, 5], './pants --listy=4 --listy=5')
     check([1, 2, 3, 4, 5], './pants --listy=+[4,5]')
 
+    # Filtering from the default.
+    check([1, 3], './pants --listy=-[2]')
+
     # Replacing the default.
     check([4, 5], './pants --listy=[4,5]')
 
@@ -347,8 +350,17 @@ class OptionsTest(unittest.TestCase):
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
           config={'GLOBAL': {'listy': '+[4,5]'}})
 
-    # Overwriting from env, then appending.
-    check([6, 7, 8, 9], './pants --listy=+[8,9]',
+    # Appending and filtering across env, config and flags (in the right order).
+    check([2, 3, 4, 7], './pants --listy=-[1,5,6]',
+          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
+          config={'GLOBAL': {'listy': '+[4,5]'}})
+
+    check([1, 2, 8, 9], './pants --listy=+[8,9]',
+          env={'PANTS_GLOBAL_LISTY': '-[4,5]'},
+          config={'GLOBAL': {'listy': '+[4,5],-[3]'}})
+
+    # Overwriting from env, then appending and filtering.
+    check([7, 8, 9], './pants --listy=+[8,9],-[6]',
           env={'PANTS_GLOBAL_LISTY': '[6,7]'},
           config={'GLOBAL': {'listy': '+[4,5]'}})
 
@@ -360,7 +372,26 @@ class OptionsTest(unittest.TestCase):
     # Overwriting from flags.
     check([8, 9], './pants --listy=[8,9]',
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
-          config={'GLOBAL': {'listy': '[4,5]'}})
+          config={'GLOBAL': {'listy': '+[4,5],-[8]'}})
+
+    # Filtering all instances of repeated values.
+    check([1, 2, 3, 4, 6], './pants --listy=-[5]',
+          config={'GLOBAL': {'listy': '[1, 2, 5, 3, 4, 5, 6, 5, 5]'}})
+
+    # Filtering a value even though it was appended again at a higher rank.
+    check([1, 2, 3, 5], './pants --listy=+[4]',
+          env={'PANTS_GLOBAL_LISTY': '-[4]'},
+          config={'GLOBAL': {'listy': '+[4, 5]'}})
+
+    # Filtering a value even though it was appended again at the same rank.
+    check([1, 2, 3, 5], './pants',
+          env={'PANTS_GLOBAL_LISTY': '-[4],+[4]'},
+          config={'GLOBAL': {'listy': '+[4, 5]'}})
+
+    # Overwriting cancels filters.
+    check([4], './pants',
+          env={'PANTS_GLOBAL_LISTY': '[4]'},
+          config={'GLOBAL': {'listy': '-[4]'}})
 
   def test_dict_list_option(self):
     def check(expected, args_str, env=None, config=None):
