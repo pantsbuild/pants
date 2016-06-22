@@ -19,6 +19,4 @@ class CleanAllTest(PantsRunIntegrationTest):
 
   # Ensure async clean-all exits normally. 
   def test_clean_all_async(self):
-    self.run_pants(["clean-all", "--async"])
-    _, status = os.waitpid(0, 0) # waits for forked process to finish, gets exit status
-    self.assertEquals(status, 0)
+    self.assertEquals(self.run_pants(["clean-all", "--async"]).returncode, 0)
