@@ -31,29 +31,33 @@ class Clean(Task):
   def execute(self):
     # Get current pants working directory. 
     pants_wd = self.get_options().pants_workdir
-    trash_dir = os.path.join(pants_wd, "trash")
+    pants_trash = os.path.join(pants_wd, "trash")
+    safe_mkdir(pants_trash)
+
+    # Although cleanup is set to False, temp dir is still deleted in subprocess. 
+    with temporary_dir(cleanup=False, root_dir=os.path.dirname(pants_wd)) as tmpdir:
+      logger.info('Temporary directory created at {}'.format(tmpdir))
+
+      # Creates subdirectory to move contents. 
+      safe_mkdir(tmpdir)
+      tmp_trash = os.path.join(tmpdir, "trash")
+      safe_mkdir(tmp_trash)
+
+      # Moves contents of .pants.d to cleanup dir
+      safe_concurrent_rename(pants_wd, tmp_trash)
+      safe_concurrent_rename(tmpdir, pants_wd)
+
     if self.get_options().async:
-      # Although cleanup is set to False, temp dir is still deleted in subprocess. 
-      with temporary_dir(cleanup=False) as tmpdir:
-        logger.info('Temporary directory created at {}'.format(tmpdir))
-
-        # Creates subdirectory to move contents. 
-        clean_dir = os.path.join(tmpdir, "trash")
-        safe_mkdir(clean_dir)
-
-        # Moves contents of .pants.d to cleanup dir
-        safe_concurrent_rename(pants_wd, clean_dir)
-        safe_concurrent_rename(tmpdir, pants_wd)
-
-        # deletes in child process
-        pid = os.fork()
-        if pid == 0:
-          try:
-            safe_rmtree(trash_dir)
-            os._exit(0)
-          except OSError:
-            logger.warning("Async clean-all failed. Please try again.")
+      # deletes in child process
+      pid = os.fork()
+      if pid == 0:
+        try:
+          safe_rmtree(pants_trash)
+        except (IOError, OSError):
+          logger.warning("Async clean-all failed. Please try again.")
+        finally:
+          os._exit(0)
     else:
       # Recursively removes pants cache; user waits patiently. 
       logger.info('For async removal, run `./pants clean-all --async`')
-      safe_rmtree(pants_wd)
+      safe_rmtree(pants_trash)

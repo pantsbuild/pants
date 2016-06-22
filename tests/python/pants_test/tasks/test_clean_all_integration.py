@@ -17,4 +17,4 @@ class CleanAllTest(PantsRunIntegrationTest):
 
   # Ensure async clean-all exits normally. 
   def test_clean_all_async(self):
-    self.assertEquals(self.run_pants(["clean-all", "--async"]).returncode, 0)
+    self.assert_success(self.run_pants(["clean-all", "--async"]))
