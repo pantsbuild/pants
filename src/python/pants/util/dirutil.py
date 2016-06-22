@@ -19,18 +19,6 @@ from contextlib import contextmanager
 from pants.util.strutil import ensure_text
 
 
-def atomic_copy_tree(src, dst):
-  """Copy the directory src to dst, overwriting dst atomically."""
-  path = tempfile.mkdtemp()
-  try:
-    shutil.copytree(src, path, symlinks=True)
-    os.chmod(path, os.stat(src).st_mode)
-    os.rename(path, dst)
-  finally:
-
-    shutil.rmtree(path, ignore_errors=True)
-
-
 def fast_relpath(path, start):
   """A prefix-based relpath, with no normalization or support for returning `..`."""
   if not path.startswith(start):
