@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.util.dirutil import absolute_symlink, safe_mkdir
+from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_mkdir_for
 from pants.util.fileutil import atomic_copy
 from pants.util.objects import datatype
 
@@ -106,6 +106,7 @@ class BundleCreate(JvmBinaryTask):
 
     if archive and archivepath:
       archive_copy = os.path.join(dist_dir,'{}.{}'.format(name, app.archive))
+      safe_mkdir_for(archive_copy)  # Ensure parent dir exists
       atomic_copy(archivepath, archive_copy)
       self.context.log.info(
         'created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
