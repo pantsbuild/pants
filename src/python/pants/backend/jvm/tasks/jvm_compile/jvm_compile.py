@@ -602,7 +602,6 @@ class JvmCompile(NailgunTaskBase):
     """Uses `product_deps_by_src` to check unused deps and warn or error."""
     with self.context.new_workunit('unused-check', labels=[WorkUnitLabel.COMPILER]):
       # Compute replacement deps.
-      product_deps_by_src = self.context.products.get_data('product_deps_by_src')
       replacement_deps = self._dep_analyzer.compute_unused_deps(compile_context.target)
 
       if not replacement_deps:
