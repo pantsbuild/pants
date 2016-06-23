@@ -29,24 +29,19 @@ class Clean(Task):
                   'for large pants workdirs.')
 
   def execute(self):
-    # Get current pants working directory. 
     pants_wd = self.get_options().pants_workdir
-    pants_trash = os.path.join(pants_wd, "trash")
+    pants_trash = os.path.join(os.path.dirname(pants_wd), ".pants_cleanall")
+    safe_mkdir(pants_trash)
 
-    # Although cleanup is set to False, temp dir is still deleted in subprocess. 
-    with temporary_dir(cleanup=False, root_dir=os.path.dirname(pants_wd), prefix=".pants_cleanall") as tmpdir:
+    # Creates, and eventually deletes, trash dir created inside current pants wd.
+    with temporary_dir(cleanup=False, root_dir=pants_trash) as tmpdir:
       logger.debug('Moving trash to {} for deletion'.format(tmpdir))
 
-      # Creates subdirectory to move contents. 
-      tmp_trash = os.path.join(tmpdir, "trash")
-      safe_mkdir(tmp_trash)
-
       # Moves contents of .pants.d to cleanup dir
-      safe_concurrent_rename(pants_wd, tmp_trash)
-      safe_concurrent_rename(tmpdir, pants_wd)
+      safe_concurrent_rename(pants_wd, tmpdir)
 
     if self.get_options().async:
-      # The temporary directory is deleted in a child process that may continue running after execution.
+      # The trash directory is deleted in a child process.
       pid = os.fork()
       if pid == 0:
         try:

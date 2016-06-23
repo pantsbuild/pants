@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -18,3 +20,16 @@ class CleanAllTest(PantsRunIntegrationTest):
   # Ensure async clean-all exits normally. 
   def test_clean_all_async(self):
     self.assert_success(self.run_pants(["clean-all", "--async"]))
+
+  # The tests below check for the existence of trash directories
+  def test_empty_trash(self):
+    with self.temporary_workdir() as work_dir:
+      trash_dir = os.path.join(os.path.dirname(work_dir), ".pants_cleanall")
+      self.run_pants(["clean-all"])
+      self.assertFalse(os.path.exists(trash_dir))
+
+  def test_empty_trash_async(self):
+    with self.temporary_workdir() as work_dir:
+      trash_dir = os.path.join(os.path.dirname(work_dir), ".pants_cleanall")
+      self.run_pants(["clean-all", "--async"])
+      self.assertFalse(os.path.exists(trash_dir))
