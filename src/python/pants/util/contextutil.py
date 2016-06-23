@@ -62,7 +62,7 @@ def stdio_as(stdout, stderr, stdin=None):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix=str(), permissions=None):
+def temporary_dir(root_dir=None, cleanup=True, suffix=str(), permissions=None, prefix=None):
   """
     A with-context that creates a temporary directory.
 
@@ -73,7 +73,10 @@ def temporary_dir(root_dir=None, cleanup=True, suffix=str(), permissions=None):
     :param bool cleanup: Whether or not to clean up the temporary directory.
     :param int permissions: If provided, sets the directory permissions to this mode.
   """
-  path = tempfile.mkdtemp(dir=root_dir, suffix=suffix)
+  if prefix is not None:
+    path = tempfile.mkdtemp(dir=root_dir, suffix=suffix, prefix=prefix)
+  else:
+    path = tempfile.mkdtemp(dir=root_dir, suffix=suffix)
   try:
     if permissions is not None:
       os.chmod(path, permissions)
