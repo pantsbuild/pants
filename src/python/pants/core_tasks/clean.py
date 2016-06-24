@@ -33,11 +33,11 @@ class Clean(Task):
     pants_trash = os.path.join(os.path.dirname(pants_wd), ".pants_cleanall")
     safe_mkdir(pants_trash)
 
-    # Creates, and eventually deletes, trash dir created inside current pants wd.
+    # Creates, and eventually deletes, trash dir created in .pants_cleanall.
     with temporary_dir(cleanup=False, root_dir=pants_trash) as tmpdir:
       logger.debug('Moving trash to {} for deletion'.format(tmpdir))
 
-      # Moves contents of .pants.d to cleanup dir
+      # Moves contents of .pants.d to cleanup dir.
       safe_concurrent_rename(pants_wd, tmpdir)
 
       if self.get_options().async:

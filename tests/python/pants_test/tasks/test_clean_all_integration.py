@@ -25,11 +25,11 @@ class CleanAllTest(PantsRunIntegrationTest):
   def test_empty_trash(self):
     with self.temporary_workdir() as work_dir:
       trash_dir = os.path.join(os.path.dirname(work_dir), ".pants_cleanall")
-      self.run_pants(["clean-all"])
+      self.run_pants_with_workdir(["clean-all"], work_dir)
       self.assertTrue(os.listdir(trash_dir) == [])
 
   def test_empty_trash_async(self):
     with self.temporary_workdir() as work_dir:
       trash_dir = os.path.join(os.path.dirname(work_dir), ".pants_cleanall")
-      self.run_pants(["clean-all", "--async"])
+      self.run_pants_with_workdir(["clean-all", "--async"], work_dir)
       self.assertTrue(os.listdir(trash_dir) == [])
