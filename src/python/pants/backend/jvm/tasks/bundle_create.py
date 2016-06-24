@@ -134,25 +134,32 @@ class BundleCreate(JvmBinaryTask):
     with self.invalidated(targets_to_bundle, invalidate_dependents=True) as invalidation_check:
       jvm_bundles_product = self.context.products.get('jvm_bundles')
       bundle_archive_product = self.context.products.get('deployable_archives')
-      for vt in invalidation_check.invalid_vts:
+      for vt in invalidation_check.all_vts:
         app = self.App.create_app(vt.target,
                                   self._resolved_option(vt.target, 'deployjar'),
                                   self._resolved_option(vt.target, 'archive'))
 
-        bundle_dir = self.bundle(app, vt.results_dir)
-        self._add_product(jvm_bundles_product, app, bundle_dir)
+        if vt.valid:
+          bundle_dir = self._get_bundle_dir(app, vt.results_dir)
+          self._add_product(jvm_bundles_product, app, bundle_dir)
 
-        archiver = archive.archiver(app.archive) if app.archive else None
-        archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
-        if archiver:
-          self._add_product(bundle_archive_product, app, archive_path)
+          archiver = archive.archiver(app.archive) if app.archive else None
+          archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
+          if archiver:
+            self._add_product(bundle_archive_product, app, archive_path)
+        else:
+          bundle_dir = self.bundle(app, vt.results_dir)
+          self._add_product(jvm_bundles_product, app, bundle_dir)
 
-        # For root targets, create symlink.
-        if vt.target in self.context.target_roots:
-          self._store_results(vt, bundle_dir, archive_path, app)
+          # For root targets, create symlink.
+          if vt.target in self.context.target_roots:
+            self._store_results(vt, bundle_dir, archive_path, app)
 
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""
+
+  def _get_bundle_dir(self, app, results_dir):
+    return os.path.join(results_dir, '{}-bundle'.format(app.id))
 
   def bundle(self, app, results_dir):
     """Create a self-contained application bundle.
@@ -162,7 +169,7 @@ class BundleCreate(JvmBinaryTask):
 
     assert(isinstance(app, BundleCreate.App))
 
-    bundle_dir = os.path.join(results_dir, '{}-bundle'.format(app.id))
+    bundle_dir = self._get_bundle_dir(app, results_dir)
     self.context.log.debug('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
     safe_mkdir(bundle_dir, clean=True)
