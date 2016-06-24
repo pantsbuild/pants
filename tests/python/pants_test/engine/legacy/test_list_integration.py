@@ -45,7 +45,7 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
   def test_list_nested_function_scopes(self):
     target_name = ':'.join((
       'testprojects/tests/python/pants/build_parsing',
-      'test-nested-variable-access-in-function-call'
+      'test_nested_variable_access_in_function_call'
     ))
 
     pants_run = self.do_command('list', target_name, success=True, enable_v2_engine=True)
