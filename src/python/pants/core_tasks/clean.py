@@ -33,7 +33,6 @@ class Clean(Task):
     pants_trash = os.path.join(os.path.dirname(pants_wd), ".pants_cleanall")
     safe_mkdir(pants_trash)
 
-## TODO: test this rigourously and make this pass because it should
     # Creates, and eventually deletes, trash dir created inside current pants wd.
     with temporary_dir(cleanup=False, root_dir=pants_trash) as tmpdir:
       logger.debug('Moving trash to {} for deletion'.format(tmpdir))
@@ -57,4 +56,3 @@ class Clean(Task):
         # Recursively removes pants cache; user waits patiently. 
         logger.info('For async removal, run `./pants clean-all --async`')
         safe_rmtree(tmpdir)
-        print(str(os.listdir(pants_trash)))
