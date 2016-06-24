@@ -138,13 +138,13 @@ class BundleCreate(JvmBinaryTask):
         app = self.App.create_app(vt.target,
                                   self._resolved_option(vt.target, 'deployjar'),
                                   self._resolved_option(vt.target, 'archive'))
+        archiver = archive.archiver(app.archive) if app.archive else None
+        archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
 
         if vt.valid:
           bundle_dir = self._get_bundle_dir(app, vt.results_dir)
           self._add_product(jvm_bundles_product, app, bundle_dir)
 
-          archiver = archive.archiver(app.archive) if app.archive else None
-          archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
           if archiver:
             self._add_product(bundle_archive_product, app, archive_path)
         else:
