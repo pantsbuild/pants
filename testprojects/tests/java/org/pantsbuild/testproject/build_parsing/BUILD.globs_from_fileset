@@ -1,0 +1,9 @@
+from twitter.common.dirutil import Fileset
+
+jvm_app(
+  name='test_bundle_fileset_globs',
+  bundles=[
+    bundle(fileset=Fileset.globs('*'))
+  ]
+)
+
