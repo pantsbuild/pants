@@ -132,25 +132,28 @@ class BundleCreate(JvmBinaryTask):
       self.check_basename_conflicts([t for t in self.context.target_roots if t in targets_to_bundle])
 
     with self.invalidated(targets_to_bundle, invalidate_dependents=True) as invalidation_check:
+      extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
       jvm_bundles_product = self.context.products.get('jvm_bundles')
       bundle_archive_product = self.context.products.get('deployable_archives')
       for vt in invalidation_check.all_vts:
         app = self.App.create_app(vt.target,
                                   self._resolved_option(vt.target, 'deployjar'),
                                   self._resolved_option(vt.target, 'archive'))
-        archiver = archive.archiver(app.archive) if app.archive else None
-        archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
 
+        archiver = archive.archiver(app.archive) if app.archive else None
         if vt.valid:
           bundle_dir = self._get_bundle_dir(app, vt.results_dir)
-          self._add_product(jvm_bundles_product, app, bundle_dir)
-
-          if archiver:
-            self._add_product(bundle_archive_product, app, archive_path)
+          filename = '{}.{}'.format(app.id, extensions.get(app.archive))
+          archive_path = os.path.join(vt.results_dir, filename)
         else:
           bundle_dir = self.bundle(app, vt.results_dir)
-          self._add_product(jvm_bundles_product, app, bundle_dir)
+          archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
 
+        self._add_product(jvm_bundles_product, app, bundle_dir)
+        if archiver:
+          self._add_product(bundle_archive_product, app, archive_path)
+
+        if vt.valid:
           # For root targets, create symlink.
           if vt.target in self.context.target_roots:
             self._store_results(vt, bundle_dir, archive_path, app)
