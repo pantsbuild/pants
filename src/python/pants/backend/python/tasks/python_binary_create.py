@@ -20,7 +20,7 @@ from pants.util.fileutil import atomic_copy
 class PythonBinaryCreate(PythonTask):
   @classmethod
   def product_types(cls):
-    return ['deployable_archives']
+    return ['jvm_archives', 'pex_archives', 'deployable_archives']
 
   @property
   def cache_target_dirs(self):
