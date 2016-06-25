@@ -157,28 +157,7 @@ class BundleCreate(JvmBinaryTask):
         # For root targets, create symlink.
         if vt.target in self.context.target_roots:
           self._store_results(vt, bundle_dir, archive_path, app)
-      # for vt in invalidation_check.all_vts:
-      #   app = self.App.create_app(vt.target,
-      #                             self._resolved_option(vt.target, 'deployjar'),
-      #                             self._resolved_option(vt.target, 'archive'))
-      #
-      #   archiver = archive.archiver(app.archive) if app.archive else None
-      #   if vt.valid:
-      #     bundle_dir = self._get_bundle_dir(app, vt.results_dir)
-      #     filename = '{}.{}'.format(app.id, extensions.get(app.archive))
-      #     archive_path = os.path.join(vt.results_dir, filename)
-      #   # else:
-      #   #   bundle_dir = self.bundle(app, vt.results_dir)
-      #   #   archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
-      #
-      #   self._add_product(jvm_bundles_product, app, bundle_dir)
-      #   if archiver:
-      #     self._add_product(bundle_archive_product, app, archive_path)
-      #
-      #   if vt.valid:
-      #     # For root targets, create symlink.
-      #     if vt.target in self.context.target_roots:
-      #       self._store_results(vt, bundle_dir, archive_path, app)
+
 
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""
