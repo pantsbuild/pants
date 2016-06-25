@@ -4,6 +4,57 @@ Master Pre-Releases
 This document describes ``pre`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.1.0-pre6 (06/24/2016)
+-----------------------
+
+This is the seventh `1.1.0-pre` release on the way to the `1.1.0` stable branch.
+It bumps the version of the JUnit runner and is highlighted by a new hybrid engine.
+
+New Features
+~~~~~~~~~~~~
+* Create a hybrid optionally async engine.
+  `RB #3897 <https://rbcommons.com/s/twitter/r/3897>`_
+
+API Changes
+~~~~~~~~~~~
+* Ability to filter list options.
+  `RB #3997 <https://rbcommons.com/s/twitter/r/3997>`_
+
+* Add an :API: public exception for abstract members.
+  `RB #3968 <https://rbcommons.com/s/twitter/r/3968>`_
+
+Bugfixes
+~~~~~~~~
+* When source fields are strings, not collections, raise an error; Test deferred sources addresses error
+  `RB #3970 <https://rbcommons.com/s/twitter/r/3970>`_
+
+* Report JUnit tests with failing assumptions as skipped tests
+  `RB #4010 <https://rbcommons.com/s/twitter/r/4010>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+* [engine] refine exception output
+  `RB #3992 <https://rbcommons.com/s/twitter/r/3992>`_
+
+* [engine] Fix imports of classes that moved from fs to project_tree
+  `RB #4005 <https://rbcommons.com/s/twitter/r/4005>`_
+
+* [engine] Use scandir, and preserve symlink paths in output
+  `RB #3991 <https://rbcommons.com/s/twitter/r/3991>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Use junit-runner-1.0.10
+  `RB #4010 <https://rbcommons.com/s/twitter/r/4010>`_
+  `RB #4020 <https://rbcommons.com/s/twitter/r/4020>`_
+
+* A `remote_sources` target as a better mechanism for from_target.
+  `RB #3830 <https://rbcommons.com/s/twitter/r/3830>`_
+  `RB #4014 <https://rbcommons.com/s/twitter/r/4014>`_
+
+* dep-usage: output aliases information
+  `RB #3984 <https://rbcommons.com/s/twitter/r/3984>`_
+
 1.1.0-pre5 (06/10/2016)
 -----------------------
 
