@@ -135,12 +135,8 @@ class BundleCreate(JvmBinaryTask):
       extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
       jvm_bundles_product = self.context.products.get('jvm_bundles')
       bundle_archive_product = self.context.products.get('deployable_archives')
-      for vt in invalidation_check.all_vts:
-        app = self.App.create_app(vt.target,
-                                  self._resolved_option(vt.target, 'deployjar'),
-                                  self._resolved_option(vt.target, 'archive'))
 
-      for vt in invalidation_check.invalid_vts:
+      for vt in invalidation_check.all_vts:
         app = self.App.create_app(vt.target,
                                   self._resolved_option(vt.target, 'deployjar'),
                                   self._resolved_option(vt.target, 'archive'))
@@ -149,7 +145,7 @@ class BundleCreate(JvmBinaryTask):
         if vt.valid:
           bundle_dir = self._get_bundle_dir(app, vt.results_dir)
           filename = '{}.{}'.format(app.id, extensions.get(app.archive))
-          archive_path = os.path.join(vt.results_dir, filename)
+          archive_path = os.path.join(vt.results_dir, filename) if app.archive else ''
         else:
           bundle_dir = self.bundle(app, vt.results_dir)
           archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
