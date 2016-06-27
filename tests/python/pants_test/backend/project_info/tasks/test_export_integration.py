@@ -119,21 +119,21 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       json_data = self.run_export(test_target, workdir, load_libs=True)
       with subsystem_instance(IvySubsystem) as ivy_subsystem:
         ivy_cache_dir = ivy_subsystem.get_options().cache_dir
-        common_lang_lib_info = json_data.get('libraries').get('commons-lang:commons-lang:2.5')
+        common_lang_lib_info = json_data.get('libraries').get('junit:junit:4.12')
         self.assertIsNotNone(common_lang_lib_info)
         self.assertEquals(
           common_lang_lib_info.get('default'),
-          os.path.join(ivy_cache_dir, 'commons-lang/commons-lang/jars/commons-lang-2.5.jar')
+          os.path.join(ivy_cache_dir, 'junit/junit/jars/junit-4.12.jar')
         )
         self.assertEquals(
           common_lang_lib_info.get('javadoc'),
           os.path.join(ivy_cache_dir,
-                       'commons-lang/commons-lang/javadocs/commons-lang-2.5-javadoc.jar')
+                       'junit/junit/javadocs/junit-4.12-javadoc.jar')
         )
         self.assertEquals(
           common_lang_lib_info.get('sources'),
           os.path.join(ivy_cache_dir,
-                       'commons-lang/commons-lang/sources/commons-lang-2.5-sources.jar')
+                       'junit/junit/sources/junit-4.12-sources.jar')
         )
 
   def test_dep_map_for_java_sources(self):
