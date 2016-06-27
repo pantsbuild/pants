@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from textwrap import dedent
 
-from pants.option.custom_types import dict_option, list_option
+import pytest
+
+from pants.option.custom_types import ListValueComponent, dict_option, list_option
 from pants.option.errors import ParseError
 from pants.util.strutil import ensure_binary
 
@@ -28,6 +30,9 @@ class CustomTypesTest(unittest.TestCase):
   def _do_test_dict_error(self, s):
     with self.assertRaises(ParseError):
       self._do_test({}, s)
+
+  def _do_split(self, expr, expected):
+    self.assertEqual(expected, ListValueComponent._split_modifier_expr(expr))
 
   def test_dict(self):
     self._do_test({}, '{}')
@@ -56,6 +61,48 @@ class CustomTypesTest(unittest.TestCase):
     self._do_test(['1,2'], '1,2')
     self._do_test([1, 2], '+[1,2]')
     self._do_test(['\\'], '\\')
+
+  def test_split_list_modifier_expressions(self):
+    self._do_split('1', ['1'])
+    self._do_split('foo', ['foo'])
+    self._do_split('1,2', ['1,2'])
+    self._do_split('[1,2]', ['[1,2]'])
+    self._do_split('[1,2],[3,4]', ['[1,2],[3,4]'])
+    self._do_split('+[1,2],[3,4]', ['+[1,2],[3,4]'])
+    self._do_split('[1,2],-[3,4]', ['[1,2],-[3,4]'])
+    self._do_split('+[1,2],foo', ['+[1,2],foo'])
+
+    self._do_split('+[1,2],-[3,4]', ['+[1,2]', '-[3,4]'])
+    self._do_split('-[1,2],+[3,4]', ['-[1,2]', '+[3,4]'])
+    self._do_split('-[1,2],+[3,4],-[5,6],+[7,8]', ['-[1,2]', '+[3,4]', '-[5,6]', '+[7,8]'])
+    self._do_split('+[-1,-2],-[-3,-4]', ['+[-1,-2]', '-[-3,-4]'])
+    self._do_split('+["-"],-["+"]', ['+["-"]', '-["+"]'])
+    self._do_split('+["+[3,4]"],-["-[4,5]"]', ['+["+[3,4]"]', '-["-[4,5]"]'])
+
+    # Spot-check that this works with literal tuples as well as lists.
+    self._do_split('+(1,2),-(3,4)', ['+(1,2)', '-(3,4)'])
+    self._do_split('-[1,2],+[3,4],-(5,6),+[7,8]', ['-[1,2]', '+[3,4]', '-(5,6)', '+[7,8]'])
+    self._do_split('+(-1,-2),-[-3,-4]', ['+(-1,-2)', '-[-3,-4]'])
+    self._do_split('+("+(3,4)"),-("-(4,5)")', ['+("+(3,4)")', '-("-(4,5)")'])
+
+    # Check that whitespace around the comma is OK.
+    self._do_split('+[1,2] , -[3,4]', ['+[1,2]', '-[3,4]'])
+    self._do_split('+[1,2]    ,-[3,4]', ['+[1,2]', '-[3,4]'])
+    self._do_split('+[1,2] ,     -[3,4]', ['+[1,2]', '-[3,4]'])
+
+    # We will split some invalid expressions, but that's OK, we'll error out later on the
+    # broken components.
+    self._do_split('+1,2],-[3,4', ['+1,2]','-[3,4'])
+    self._do_split('+(1,2],-[3,4)', ['+(1,2]', '-[3,4)'])
+
+  @pytest.mark.xfail(reason='The heuristic list modifier expression splitter cannot handle '
+                            'certain very unlikely cases.')
+  def test_split_unlikely_list_modifier_expression(self):
+    # Example of the kind of (unlikely) values that will defeat our heuristic, regex-based
+    # splitter of list modifier expressions.
+    funky_string = '],+['
+    self._do_split('+["{}"],-["foo"]'.format(funky_string),
+                   ['+["{}"]'.format(funky_string), '-["foo"]'])
 
   def test_unicode_comments(self):
     """We had a bug where unicode characters in comments would cause the option parser to fail.

@@ -18,6 +18,8 @@ import org.pantsbuild.tools.junit.lib.ConsoleRunnerTestBase;
 import org.pantsbuild.tools.junit.lib.FailingTestRunner;
 import org.pantsbuild.tools.junit.lib.XmlReportAllIgnoredTest;
 import org.pantsbuild.tools.junit.lib.XmlReportAllPassingTest;
+import org.pantsbuild.tools.junit.lib.XmlReportAssumeSetupTest;
+import org.pantsbuild.tools.junit.lib.XmlReportAssumeTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailInSetupTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailingParameterizedTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailingTestRunnerTest;
@@ -129,6 +131,34 @@ public class XmlReportTest extends ConsoleRunnerTestBase {
     assertEquals(0, testSuite.getFailures());
     assertEquals(0, testSuite.getErrors());
     assertEquals(1, testSuite.getSkipped());
+    assertTrue(Float.parseFloat(testSuite.getTime()) > 0);
+    assertEquals(testClassName, testSuite.getName());
+  }
+
+  @Test
+  public void testXmlReportAssume() throws Exception {
+    String testClassName = XmlReportAssumeTest.class.getCanonicalName();
+    AntJunitXmlReportListener.TestSuite testSuite = runTestAndParseXml(testClassName, true);
+
+    assertNotNull(testSuite);
+    assertEquals(3, testSuite.getTests());
+    assertEquals(1, testSuite.getFailures());
+    assertEquals(0, testSuite.getErrors());
+    assertEquals(1, testSuite.getSkipped());
+    assertTrue(Float.parseFloat(testSuite.getTime()) > 0);
+    assertEquals(testClassName, testSuite.getName());
+  }
+
+  @Test
+  public void testXmlReportAssumeInSetup() throws Exception {
+    String testClassName = XmlReportAssumeSetupTest.class.getCanonicalName();
+    AntJunitXmlReportListener.TestSuite testSuite = runTestAndParseXml(testClassName, false);
+
+    assertNotNull(testSuite);
+    assertEquals(2, testSuite.getTests());
+    assertEquals(0, testSuite.getFailures());
+    assertEquals(0, testSuite.getErrors());
+    assertEquals(2, testSuite.getSkipped());
     assertTrue(Float.parseFloat(testSuite.getTime()) > 0);
     assertEquals(testClassName, testSuite.getName());
   }
