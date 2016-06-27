@@ -372,8 +372,16 @@ class DependencyUsageGraph(object):
       return 'undeclared'
 
   def _used_ratio(self, dep_tgt, edge):
-    dep_tgt_products_total = max(self._nodes[dep_tgt].products_total if dep_tgt in self._nodes else 1, 1)
-    return len(edge.products_used) / dep_tgt_products_total
+    if edge.products_used:
+      # If products were recorded as used, generate a legitimate ratio.
+      dep_tgt_products_total = self._nodes[dep_tgt].products_total if dep_tgt in self._nodes else 1
+      return len(edge.products_used) / max(dep_tgt_products_total, 1)
+    elif edge.is_used:
+      # Else, the dep might not be in the default scope, and must considered to be used.
+      return 1.0
+    else:
+      # Otherwise, definitely not used.
+      return 0.0
 
   def to_summary(self):
     """Outputs summarized dependencies ordered by a combination of max usage and cost."""
