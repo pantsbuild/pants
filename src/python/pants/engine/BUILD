@@ -124,6 +124,9 @@ python_library(
 python_library(
   name='processing',
   sources=['processing.py'],
+  dependencies=[
+    '3rdparty/python:futures',
+  ]
 )
 
 python_library(
