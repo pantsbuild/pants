@@ -11,29 +11,29 @@ from contextlib import contextmanager
 
 import mock
 
-from pants.bin.goal_runner import EngineInitializer
+from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
 from pants.build_graph.address import Address
 
 
 class GraphInvalidationTest(unittest.TestCase):
-  def _make_setup_args(self, *specs):
+  def _make_setup_args(self, specs, symbol_table_cls=None):
     options = mock.Mock()
     options.target_specs = specs
-    return dict(options=options)
+    return dict(options=options, symbol_table_cls=symbol_table_cls)
 
   @contextmanager
-  def open_scheduler(self, *specs):
-    kwargs = self._make_setup_args(*specs)
+  def open_scheduler(self, specs, symbol_table_cls=None):
+    kwargs = self._make_setup_args(specs, symbol_table_cls=symbol_table_cls)
     with EngineInitializer.open_legacy_graph(**kwargs) as triple:
       yield triple
 
   @contextmanager
-  def open_pg(self, *specs):
-    with self.open_scheduler(*specs) as (_, _, scheduler):
+  def open_pg(self, specs):
+    with self.open_scheduler(specs) as (_, _, scheduler):
       yield scheduler.product_graph
 
   def test_invalidate_fsnode(self):
-    with self.open_pg('3rdparty/python::') as product_graph:
+    with self.open_pg(['3rdparty/python::']) as product_graph:
       initial_node_count = len(product_graph)
       self.assertGreater(initial_node_count, 0)
 
@@ -42,7 +42,7 @@ class GraphInvalidationTest(unittest.TestCase):
       self.assertLess(len(product_graph), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
-    with self.open_pg('3rdparty::') as product_graph:
+    with self.open_pg(['3rdparty::']) as product_graph:
       node_count = len(product_graph)
       self.assertGreater(node_count, 0)
 
@@ -56,7 +56,7 @@ class GraphInvalidationTest(unittest.TestCase):
 
   def test_sources_ordering(self):
     spec = 'testprojects/src/resources/org/pantsbuild/testproject/ordering'
-    with self.open_scheduler(spec) as (graph, _, _):
+    with self.open_scheduler([spec]) as (graph, _, _):
       target = graph.get_target(Address.parse(spec))
       sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
       self.assertEquals(['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd', 'p', 'a', 'n', 't', 's'],
@@ -65,9 +65,8 @@ class GraphInvalidationTest(unittest.TestCase):
   def test_target_macro_override(self):
     """Tests that we can "wrap" an existing target type with additional functionality."""
     # We install an additional TargetMacro that adds a tag to any defined `python_tests` target.
-    # If parsing succeeds, then we know that installing the TargetMacro did not destroy the
-    # underlying symbol.
     tag = 'tag_added_by_macro'
-    with self.open_scheduler('testprojects/tests/python/pants/dummies:') as (graph, addresses, _):
+    spec = 'testprojects/tests/python/pants/dummies:'
+    with self.open_scheduler([spec], symbol_table_cls=LegacySymbolTable) as (graph, addresses, _):
       for address in addresses:
         self.assertIn(tag, graph.get_target(address).tags)

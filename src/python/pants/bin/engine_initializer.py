@@ -84,17 +84,19 @@ class EngineInitializer(object):
     return spec_roots
 
   @staticmethod
-  def setup_legacy_graph(path_ignore_patterns):
+  def setup_legacy_graph(path_ignore_patterns, symbol_table_cls=None):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                       usually taken from the `--pants-ignore` global option.
+    :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
+                                         None to use the default.
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 
     build_root = get_buildroot()
     project_tree = FileSystemProjectTree(build_root, path_ignore_patterns)
-    symbol_table_cls = LegacySymbolTable
+    symbol_table_cls = symbol_table_cls or LegacySymbolTable
 
     # Register "literal" subjects required for these tasks.
     # TODO: Replace with `Subsystems`.
@@ -116,7 +118,7 @@ class EngineInitializer(object):
 
   @classmethod
   @contextmanager
-  def open_legacy_graph(cls, options=None, path_ignore_patterns=None):
+  def open_legacy_graph(cls, options=None, path_ignore_patterns=None, symbol_table_cls=None):
     """A context manager that yields a usable, legacy LegacyBuildGraph by way of the v2 scheduler.
 
     This is used primarily for testing and non-daemon runs.
@@ -125,6 +127,8 @@ class EngineInitializer(object):
     :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                       usually taken from the `--pants-ignore` global option.
                                       Defaults to: ['.*']
+    :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
+                                         None to use the default.
     :yields: A tuple of (graph, addresses, scheduler).
     """
     path_ignore_patterns = path_ignore_patterns or ['.*']
@@ -132,7 +136,7 @@ class EngineInitializer(object):
     (scheduler,
      engine,
      symbol_table_cls,
-     build_graph_cls) = cls.setup_legacy_graph(path_ignore_patterns)
+     build_graph_cls) = cls.setup_legacy_graph(path_ignore_patterns, symbol_table_cls=symbol_table_cls)
 
     engine.start()
     try:
