@@ -45,7 +45,8 @@ class Clean(Task):
         pid = os.fork()
         if pid == 0:
           try:
-            safe_rmtree(tmpdir)
+            for tmp_trash in os.listdir(pants_trash):
+              safe_rmtree(os.path.join(pants_trash, tmp_trash))
           except (IOError, OSError):
             logger.warning("Async clean-all failed. Please try again.")
           finally:
@@ -55,4 +56,5 @@ class Clean(Task):
       else:
         # Recursively removes pants cache; user waits patiently. 
         logger.info('For async removal, run `./pants clean-all --async`')
-        safe_rmtree(tmpdir)
+        for tmp_trash in os.listdir(pants_trash):
+          safe_rmtree(os.path.join(pants_trash, tmp_trash))
