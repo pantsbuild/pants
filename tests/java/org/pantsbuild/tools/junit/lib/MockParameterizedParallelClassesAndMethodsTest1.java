@@ -13,7 +13,7 @@ import static org.junit.Assert.assertTrue;
 @RunWith(Parameterized.class)
 public class MockParameterizedParallelClassesAndMethodsTest1 {
   private static final int NUM_CONCURRENT_TESTS = 5;
-  private static final int RETRY_TIMEOUT_MS = 1000;
+  private static final int RETRY_TIMEOUT_MS = 3000;
   private static CountDownLatch latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
 
   private String parameter;
