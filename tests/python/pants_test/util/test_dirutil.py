@@ -279,7 +279,7 @@ class DirutilTest(unittest.TestCase):
       touch(os.path.join(td, 'file1'))
       self.assertEqual(len(os.listdir(td)), 1)
 
-  def test_safe_symlink(self):
+  def test_absolute_symlink(self):
     def _create_and_check_link(source, link):
       absolute_symlink(source, link)
       self.assertTrue(os.path.islink(link))

@@ -63,6 +63,11 @@ class BundleCreate(JvmBinaryTask):
   class App(datatype('App', ['address', 'binary', 'bundles', 'id', 'deployjar', 'archive', 'target'])):
     """A uniform interface to an app."""
 
+    @property
+    def extension(self):
+      extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
+      return extensions.get(self.archive, self.archive)
+
     @staticmethod
     def is_app(target):
       return isinstance(target, (JvmApp, JvmBinary))
@@ -104,8 +109,8 @@ class BundleCreate(JvmBinaryTask):
     self.context.log.info(
       'created bundle copy {}'.format(os.path.relpath(bundle_copy, get_buildroot())))
 
-    if archive and archivepath:
-      archive_copy = os.path.join(dist_dir,'{}.{}'.format(name, app.archive))
+    if archivepath:
+      archive_copy = os.path.join(dist_dir,'{}.{}'.format(name, app.extension))
       safe_mkdir_for(archive_copy)  # Ensure parent dir exists
       atomic_copy(archivepath, archive_copy)
       self.context.log.info(
@@ -132,9 +137,9 @@ class BundleCreate(JvmBinaryTask):
       self.check_basename_conflicts([t for t in self.context.target_roots if t in targets_to_bundle])
 
     with self.invalidated(targets_to_bundle, invalidate_dependents=True) as invalidation_check:
-      extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
       jvm_bundles_product = self.context.products.get('jvm_bundles')
       bundle_archive_product = self.context.products.get('deployable_archives')
+      jvm_archive_product = self.context.products.get('jvm_archives')
 
       for vt in invalidation_check.all_vts:
         app = self.App.create_app(vt.target,
@@ -144,7 +149,7 @@ class BundleCreate(JvmBinaryTask):
 
         if vt.valid:
           bundle_dir = self._get_bundle_dir(app, vt.results_dir)
-          filename = '{}.{}'.format(app.id, extensions.get(app.archive))
+          filename = '{}.{}'.format(app.id, app.extension)
           archive_path = os.path.join(vt.results_dir, filename) if app.archive else ''
         else:
           bundle_dir = self.bundle(app, vt.results_dir)
@@ -153,6 +158,7 @@ class BundleCreate(JvmBinaryTask):
         self._add_product(jvm_bundles_product, app, bundle_dir)
         if archiver:
           self._add_product(bundle_archive_product, app, archive_path)
+          self._add_product(jvm_archive_product, app, archive_path)
 
         # For root targets, create symlink.
         if vt.target in self.context.target_roots:

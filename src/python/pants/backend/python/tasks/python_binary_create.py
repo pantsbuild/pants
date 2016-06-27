@@ -47,10 +47,12 @@ class PythonBinaryCreate(PythonTask):
       names[name] = binary
 
     with self.invalidated(binaries, invalidate_dependents=True) as invalidation_check:
-      python_pex_product = self.context.products.get('deployable_archives')
+      python_deployable_archive = self.context.products.get('deployable_archives')
+      python_pex_product = self.context.products.get('pex_archives')
       for vt in invalidation_check.all_vts:
         pex_path = self.create_binary(vt.target, vt.results_dir)
         python_pex_product.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
+        python_deployable_archive.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
         self.context.log.debug('created {}'.format(os.path.relpath(pex_path, get_buildroot())))
 
         # Create a copy for pex.

@@ -164,14 +164,14 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     product_path = os.path.join(product_basedir, product_fullname)
     return product_path
 
-  def _check_archive_products(self, archive_name_prefix, archive_type, check_copy=False, copy_name_prefix=''):
+  def _check_archive_products(self, archive_name_prefix, archive_extension, check_copy=False, copy_name_prefix=''):
     products = self.task_context.products.get('deployable_archives')
-    archive_fullname = '{}.{}'.format(archive_name_prefix, archive_type)
+    archive_fullname = '{}.{}'.format(archive_name_prefix, archive_extension)
     archive_path = self._check_products(products, archive_fullname)
     self.assertTrue(os.path.isfile(archive_path))
 
     if check_copy:
-      copy_fullname = '{}.{}'.format(copy_name_prefix, archive_type) if copy_name_prefix else archive_fullname
+      copy_fullname = '{}.{}'.format(copy_name_prefix, archive_extension) if copy_name_prefix else archive_fullname
       copy_path = os.path.join(self.dist_root, copy_fullname)
       self.assertTrue(os.path.isfile(copy_path))
 
