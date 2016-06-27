@@ -24,12 +24,12 @@ class CleanAllTest(PantsRunIntegrationTest):
   # The tests below check for the existence of trash directories.
   def test_empty_trash(self):
     with self.temporary_workdir() as work_dir:
-      trash_dir = os.path.join(os.path.dirname(work_dir), ".pants_cleanall")
+      trash_dir = os.path.join(work_dir, "trash")
       self.run_pants_with_workdir(["clean-all"], work_dir)
-      self.assertTrue(os.listdir(trash_dir) == [])
+      self.assertFalse(os._exists(trash_dir))
 
   def test_empty_trash_async(self):
     with self.temporary_workdir() as work_dir:
-      trash_dir = os.path.join(os.path.dirname(work_dir), ".pants_cleanall")
+      trash_dir = os.path.join(work_dir, "trash")
       self.run_pants_with_workdir(["clean-all", "--async"], work_dir)
-      self.assertTrue(os.listdir(trash_dir) == [])
+      self.assertFalse(os._exists(trash_dir))

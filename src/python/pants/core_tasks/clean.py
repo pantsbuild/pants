@@ -30,23 +30,24 @@ class Clean(Task):
 
   def execute(self):
     pants_wd = self.get_options().pants_workdir
-    pants_trash = os.path.join(os.path.dirname(pants_wd), ".pants_cleanall")
-    safe_mkdir(pants_trash)
 
     # Creates, and eventually deletes, trash dir created in .pants_cleanall.
-    with temporary_dir(cleanup=False, root_dir=pants_trash) as tmpdir:
+    with temporary_dir(cleanup=False, root_dir=os.path.dirname(pants_wd), prefix=".pants_cleanall") as tmpdir:
       logger.debug('Moving trash to {} for deletion'.format(tmpdir))
 
+      tmp_trash = os.path.join(tmpdir, "trash")
+
       # Moves contents of .pants.d to cleanup dir.
-      safe_concurrent_rename(pants_wd, tmpdir)
+      safe_mkdir(tmp_trash)
+      safe_concurrent_rename(pants_wd, tmp_trash)
+      safe_concurrent_rename(tmpdir, pants_wd)
 
       if self.get_options().async:
         # The trash directory is deleted in a child process.
         pid = os.fork()
         if pid == 0:
           try:
-            for tmp_trash in os.listdir(pants_trash):
-              safe_rmtree(os.path.join(pants_trash, tmp_trash))
+            safe_rmtree(os.path.join(pants_wd, "trash"))
           except (IOError, OSError):
             logger.warning("Async clean-all failed. Please try again.")
           finally:
@@ -56,5 +57,4 @@ class Clean(Task):
       else:
         # Recursively removes pants cache; user waits patiently. 
         logger.info('For async removal, run `./pants clean-all --async`')
-        for tmp_trash in os.listdir(pants_trash):
-          safe_rmtree(os.path.join(pants_trash, tmp_trash))
+        safe_rmtree(os.path.join(pants_wd, "trash"))
