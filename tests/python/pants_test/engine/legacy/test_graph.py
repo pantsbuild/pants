@@ -11,10 +11,10 @@ from contextlib import contextmanager
 
 import mock
 
-from pants.build_graph.target import Target
 from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
+from pants.build_graph.target import Target
 
 
 class GraphInvalidationTest(unittest.TestCase):
