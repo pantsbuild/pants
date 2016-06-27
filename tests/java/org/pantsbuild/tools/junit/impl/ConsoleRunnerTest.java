@@ -263,7 +263,6 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
     assertEquals("ppmtest1:one ppmtest1:three ppmtest1:two", TestRegistry.getCalledTests());
   }
 
-
   @Test
   public void testConcurrencyParameterizedParallelClassesAndMethods() {
     // These tests only work with the experimental runner

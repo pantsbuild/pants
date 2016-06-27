@@ -1,3 +1,6 @@
+// Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 package org.pantsbuild.tools.junit.lib;
 
 import com.squareup.burst.BurstJUnit4;
@@ -5,7 +8,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.pantsbuild.junit.annotations.TestParallelClassesAndMethods;
 
 import static org.junit.Assert.assertTrue;
 
