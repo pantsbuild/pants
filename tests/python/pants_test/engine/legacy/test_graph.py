@@ -61,3 +61,13 @@ class GraphInvalidationTest(unittest.TestCase):
       sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
       self.assertEquals(['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd', 'p', 'a', 'n', 't', 's'],
                         sources)
+
+  def test_target_macro_override(self):
+    """Tests that we can "wrap" an existing target type with additional functionality."""
+    # We install an additional TargetMacro that adds a tag to any defined `python_tests` target.
+    # If parsing succeeds, then we know that installing the TargetMacro did not destroy the
+    # underlying symbol.
+    tag = 'tag_added_by_macro'
+    with self.open_scheduler('testprojects/tests/python/pants/dummies:') as (graph, addresses, _):
+      for address in addresses:
+        self.assertIn(tag, graph.get_target(address).tags)
