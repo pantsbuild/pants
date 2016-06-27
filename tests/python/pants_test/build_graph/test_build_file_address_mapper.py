@@ -73,6 +73,9 @@ class BuildFileAddressMapperTest(BaseTest):
                                  '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec //non-existent-path:a'):
       self.address_mapper.spec_to_address('//non-existent-path:a')
+    with self.assertRaisesRegexp(BuildFileAddressMapper.InvalidBuildFileReference,
+                                 '^Spec : has no name part\s+when translating spec :'):
+      self.address_mapper.spec_to_address(':')
 
   def test_raises_address_not_in_one_build_file(self):
     self.add_to_build_file('BUILD', 'target(name="foo")')
@@ -113,6 +116,14 @@ class BuildFileAddressMapperTest(BaseTest):
     self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.InvalidAddressError(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.BuildFileScanError(), AddressLookupError)
+
+  def test_raises_wrong_dependencies_type(self):
+    self.add_to_build_file('BUILD', 'target(name="foo", dependencies="bar")')
+    address = Address.parse(':foo')
+    with self.assertRaisesRegexp(AddressLookupError,
+                                 '^Invalid target.*foo.*.'
+                                 'dependencies passed to Target constructors must be a sequence of strings'):
+      self.address_mapper.resolve(address)
 
 
 class BuildFileAddressMapperWithIgnoreTest(BaseTest):

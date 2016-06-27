@@ -14,6 +14,7 @@ from pants.build_graph.from_target import FromTarget
 from pants.build_graph.intransitive_dependency import (IntransitiveDependencyFactory,
                                                        ProvidedDependencyFactory)
 from pants.build_graph.prep_command import PrepCommand
+from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import ScopedDependencyFactory
@@ -41,6 +42,7 @@ def build_file_aliases():
       'alias': AliasTargetFactory(),
       'prep_command': PrepCommand,
       'resources': Resources,
+      'remote_sources': RemoteSources,
       'target': Target,
     },
     objects={

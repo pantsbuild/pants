@@ -19,6 +19,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.from_target import FromTarget
+from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.workspace import Workspace
@@ -41,6 +42,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
         'java_thrift_library': JavaThriftLibrary,
         'java_protobuf_library': JavaProtobufLibrary,
         'python_thrift_library': PythonThriftLibrary,
+        'remote_sources': RemoteSources,
       },
       context_aware_object_factories={
         'globs': Globs,
@@ -343,6 +345,34 @@ class WhatChangedTest(WhatChangedTestBasic):
     self.add_to_build_file('root/proto', dedent("""
       java_protobuf_library(name='unpacked_jars',
         sources=from_target(':external-source'),
+      )
+
+      unpacked_jars(name='external-source',
+        libraries=[':external-source-jars'],
+        include_patterns=[
+          'com/squareup/testing/**/*.proto',
+        ],
+      )
+
+      jar_library(name='external-source-jars',
+        jars=[
+          jar(org='com.squareup.testing.protolib', name='protolib-external-test', rev='0.0.2'),
+        ],
+      )
+    """))
+
+    self.assert_console_output(
+      'root/proto:unpacked_jars',
+      'root/proto:external-source',
+      'root/proto:external-source-jars',
+      workspace=self.workspace(files=['root/proto/BUILD'])
+    )
+
+  def test_deferred_sources_new(self):
+    self.add_to_build_file('root/proto', dedent("""
+      remote_sources(name='unpacked_jars',
+        dest=java_protobuf_library,
+        sources_target=':external-source',
       )
 
       unpacked_jars(name='external-source',
