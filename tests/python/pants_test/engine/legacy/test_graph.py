@@ -11,8 +11,10 @@ from contextlib import contextmanager
 
 import mock
 
+from pants.build_graph.target import Target
 from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
 from pants.build_graph.address import Address
+from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 
 
 class GraphInvalidationTest(unittest.TestCase):
@@ -63,10 +65,32 @@ class GraphInvalidationTest(unittest.TestCase):
                         sources)
 
   def test_target_macro_override(self):
-    """Tests that we can "wrap" an existing target type with additional functionality."""
-    # We install an additional TargetMacro that adds a tag to any defined `python_tests` target.
+    """Tests that we can "wrap" an existing target type with additional functionality.
+
+    Installs an additional TargetMacro that wraps `target` aliases to add a tag to all definitions.
+    """
     tag = 'tag_added_by_macro'
-    spec = 'testprojects/tests/python/pants/dummies:'
-    with self.open_scheduler([spec], symbol_table_cls=LegacySymbolTable) as (graph, addresses, _):
+    target_cls = Target
+    spec = 'testprojects/tests/python/pants/build_parsing:'
+
+    # Macro that adds the specified tag.
+    def macro(parse_context, tags=None, **kwargs):
+      tags = tags or set()
+      tags.add(tag)
+      parse_context.create_object(target_cls, tags=tags, **kwargs)
+
+    # SymbolTable that extends the legacy table to apply the macro.
+    class TaggingSymbolTable(LegacySymbolTable):
+      @classmethod
+      def aliases(cls):
+        return super(TaggingSymbolTable, cls).aliases().merge(
+            BuildFileAliases(
+              targets={'target': TargetMacro.Factory.wrap(macro, target_cls),}
+            )
+          )
+
+    # Confirm that python_tests in a small directory are marked.
+    with self.open_scheduler([spec], symbol_table_cls=TaggingSymbolTable) as (graph, addresses, _):
+      self.assertTrue(len(addresses) > 0, 'No targets matched by {}'.format(addresses))
       for address in addresses:
         self.assertIn(tag, graph.get_target(address).tags)
