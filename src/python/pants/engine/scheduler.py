@@ -282,16 +282,31 @@ class ProductGraph(object):
     TODO: This could use polish. In particular, the `__str__` representations of Nodes and
     States are probably not sufficient for user output.
     """
+
     traced = set()
-    def _format(level, node, state):
-      return '{}Computing {} for {}: {}'.format('  ' * level, node.product.__name__, node.subject, state)
+
+    def is_bottom(entry):
+      return type(entry.state) in (Noop, Return) or entry in traced
+
+    def is_one_level_above_bottom(parent_entry):
+      return all(is_bottom(child_entry) for child_entry in parent_entry.dependencies)
+
+    def _format(level, entry, state):
+      output = '{}Computing {} for {}'.format('  ' * level,
+                                              entry.node.product.__name__,
+                                              entry.node.subject)
+      if is_one_level_above_bottom(entry):
+        output += '\n{}{}'.format('  ' * (level + 1), state)
+
+      return output
+
     def _trace(entry, level):
-      if type(entry.state) in (Noop, Return) or entry in traced:
+      if is_bottom(entry):
         return
       traced.add(entry)
-      yield _format(level, entry.node, entry.state)
+      yield _format(level, entry, entry.state)
       for dep in entry.cyclic_dependencies:
-        yield _format(level, entry.node, Noop.cycle(entry.node, dep))
+        yield _format(level, entry, Noop.cycle(entry.node, dep))
       for dep_entry in entry.dependencies:
         for l in _trace(dep_entry, level+1):
           yield l
