@@ -173,6 +173,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
     else:
       classpath_products = None
 
+    target_roots_set = set(self.context.target_roots)
+
     def process_target(current_target):
       """
       :type current_target:pants.build_graph.target.Target
@@ -209,7 +211,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
       info['transitive'] = current_target.transitive
       info['scope'] = str(current_target.scope)
-      info['is_target_root'] = current_target in self.context.target_roots
+      info['is_target_root'] = current_target in target_roots_set
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
