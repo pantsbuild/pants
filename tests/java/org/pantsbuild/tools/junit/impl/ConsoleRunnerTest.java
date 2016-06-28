@@ -10,6 +10,8 @@ import org.apache.commons.io.FileUtils;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
+import org.pantsbuild.tools.junit.lib.AnnotatedParallelClassesAndMethodsTest1;
+import org.pantsbuild.tools.junit.lib.AnnotatedParallelMethodsTest1;
 import org.pantsbuild.tools.junit.lib.AnnotatedParallelTest1;
 import org.pantsbuild.tools.junit.lib.AnnotatedSerialTest1;
 import org.pantsbuild.tools.junit.lib.ConsoleRunnerTestBase;
@@ -191,9 +193,29 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   }
 
   @Test
+  public void testParallelMethodsAnnotation() throws Exception {
+    // @ParallelTestMethods only works reliably under the experimental runner
+    assumeThat(parameters.useExperimentalRunner, is(true));
+    AnnotatedParallelMethodsTest1.reset();
+    invokeConsoleRunner("AnnotatedParallelMethodsTest1 AnnotatedParallelMethodsTest2"
+        + " -parallel-threads 2");
+    assertEquals("apmtest11 apmtest12 apmtest21 apmtest22", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testParallelClassesAndMethodsAnnotation() throws Exception {
+    // @ParallelClassesAndMethods only works reliably under the experimental runner
+    assumeThat(parameters.useExperimentalRunner, is(true));
+    AnnotatedParallelClassesAndMethodsTest1.reset();
+    invokeConsoleRunner("AnnotatedParallelClassesAndMethodsTest1"
+        + " AnnotatedParallelClassesAndMethodsTest2 -parallel-threads 4");
+    assertEquals("apcamtest11 apcamtest12 apcamtest21 apcamtest22", TestRegistry.getCalledTests());
+  }
+
+  @Test
   public void testSerialAnnotation() throws Exception {
     AnnotatedSerialTest1.reset();
-    invokeConsoleRunner("AnnotatedSerialTest1 AnnotatedSerialTest2 -parallel-threads 2");
+    invokeConsoleRunner("AnnotatedSerialTest1 AnnotatedSerialTest2");
     assertEquals("astest1 astest2", TestRegistry.getCalledTests());
   }
 
@@ -201,7 +223,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   @Test
   public void testParallelDefaultParallel() throws Exception {
     ParallelTest1.reset();
-    invokeConsoleRunner("ParallelTest1 ParallelTest2 -parallel-threads 2 -default-parallel");
+    invokeConsoleRunner("ParallelTest1 ParallelTest2 -default-parallel -parallel-threads 2");
     assertEquals("ptest1 ptest2", TestRegistry.getCalledTests());
   }
 
@@ -209,14 +231,14 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   public void testConcurrencyParallelClasses() throws Exception {
     assumeThat(parameters.defaultConcurrency, is(Concurrency.PARALLEL_CLASSES));
     ParallelTest1.reset();
-    invokeConsoleRunner("ParallelTest1 ParallelTest2 "
-        + "-parallel-threads 2 -default-concurrency PARALLEL_CLASSES");
+    invokeConsoleRunner("ParallelTest1 ParallelTest2 -parallel-threads 2"
+        + " -default-concurrency PARALLEL_CLASSES");
     assertEquals("ptest1 ptest2", TestRegistry.getCalledTests());
   }
 
   @Test
   public void testConcurrencyParallelMethods() throws Exception {
-    // These tests only work with the experimental runner
+    // -default-concurrency PARALLEL_METHODS tests only work reliably with the experimental runner
     assumeThat(parameters.useExperimentalRunner, is(true));
     assumeThat(parameters.defaultConcurrency, is(Concurrency.PARALLEL_METHODS));
     ParallelMethodsDefaultParallelTest1.reset();
@@ -254,7 +276,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
   @Test
   public void testConcurrencyParameterizedParallelMethods() {
-    // These tests only work with the experimental runner
+    // -default-concurrency PARALLEL_METHODS tests only work reliably with the experimental runner
     assumeThat(parameters.useExperimentalRunner, is(true));
     // Requires parallel methods
     assumeThat(parameters.defaultConcurrency, is(Concurrency.PARALLEL_METHODS));
@@ -265,7 +287,8 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
   @Test
   public void testConcurrencyParameterizedParallelClassesAndMethods() {
-    // These tests only work with the experimental runner
+    // -default-concurrency PARALLEL_CLASSES_AND_METHODS tests only work reliably with the
+    // experimental runner
     assumeThat(parameters.useExperimentalRunner, is(true));
     // Requires parallel methods
     assumeThat(parameters.defaultConcurrency, is(Concurrency.PARALLEL_CLASSES_AND_METHODS));
@@ -279,7 +302,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
   @Test
   public void testConcurrencyBurstParallelMethods() {
-    // These tests only work with the experimental runner
+    // -default-concurrency PARALLEL_METHODS tests only work reliably with the experimental runner
     assumeThat(parameters.useExperimentalRunner, is(true));
     // Requires parallel methods
     assumeThat(parameters.defaultConcurrency, anyOf(is(Concurrency.PARALLEL_METHODS),
@@ -293,7 +316,8 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
   @Test
   public void testConcurrencyBurstParallelClassesAndMethods() {
-    // These tests only work with the experimental runner
+    // -default-concurrency PARALLEL_CLASSES_AND_METHODS tests only work reliably with the
+    // experimental runner
     assumeThat(parameters.useExperimentalRunner, is(true));
     // Requires parallel methods
     assumeThat(parameters.defaultConcurrency, is(Concurrency.PARALLEL_CLASSES_AND_METHODS));
