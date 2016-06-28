@@ -218,7 +218,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def test_version(self):
     result = self.execute_export_json('project_info:first')
     # If you have to update this test, make sure export.md is updated with changelog notes
-    self.assertEqual('1.0.8', result['version'])
+    self.assertEqual('1.0.9', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
@@ -272,6 +272,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       'is_code_gen': False,
       'targets': ['project_info:jar_lib', '//:scala-library'],
       'is_synthetic': False,
+      'is_target_root': True,
       'roots': [
          {
            'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),

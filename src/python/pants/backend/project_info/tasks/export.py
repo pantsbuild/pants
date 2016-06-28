@@ -56,7 +56,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.8'
+  DEFAULT_EXPORT_VERSION = '1.0.9'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -209,6 +209,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
       info['transitive'] = current_target.transitive
       info['scope'] = str(current_target.scope)
+      info['is_target_root'] = current_target in self.context.target_roots
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
