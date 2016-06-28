@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import subprocess
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -25,11 +26,13 @@ class CleanAllTest(PantsRunIntegrationTest):
   def test_empty_trash(self):
     with self.temporary_workdir() as work_dir:
       trash_dir = os.path.join(work_dir, "trash")
-      self.run_pants_with_workdir(["clean-all"], work_dir)
+      subprocess.call(["touch", trash_dir + "foo.txt"])
+      self.assert_success(self.run_pants_with_workdir(["clean-all"], work_dir))
       self.assertFalse(os._exists(trash_dir))
 
   def test_empty_trash_async(self):
     with self.temporary_workdir() as work_dir:
       trash_dir = os.path.join(work_dir, "trash")
-      self.run_pants_with_workdir(["clean-all", "--async"], work_dir)
+      subprocess.call(["touch", trash_dir + "foo.txt"])
+      self.assert_success(self.run_pants_with_workdir(["clean-all", "--async"], work_dir))
       self.assertFalse(os._exists(trash_dir))
