@@ -142,13 +142,13 @@ class PathGlob(AbstractClass):
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
       # A request for the root path.
       return (PathRoot(),)
-    elif cls._DOUBLE in parts[0] and len(parts) == 1:
+    elif parts[0] == cls._DOUBLE and len(parts) == 1:
       # Per https://git-scm.com/docs/gitignore:
       #
       #  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
       #   directory "abc", relative to the location of the .gitignore file, with infinite depth."
       #
-      return (PathDirWildcard(canonical_stat, symbolic_path, '*', ('*', '**/*')),
+      return (PathDirWildcard(canonical_stat, symbolic_path, '*', ('**',)),
               PathWildcard(canonical_stat, symbolic_path, '*'))
     elif cls._DOUBLE in parts[0]:
       if parts[0] != cls._DOUBLE:
@@ -158,13 +158,12 @@ class PathGlob(AbstractClass):
       # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
-      remainders = (join(*parts[1:]), join(*parts[0:]))
+      pathglob_with_doublestar = PathDirWildcard(canonical_stat, symbolic_path, '*', (join(*parts[0:]),))
       if len(parts) == 2:
-        empty_double_star = PathWildcard(canonical_stat, symbolic_path, parts[1])
+        pathglob_no_doublestar = PathWildcard(canonical_stat, symbolic_path, parts[1])
       else:
-        empty_double_star = PathDirWildcard(canonical_stat, symbolic_path, parts[1], (join(*parts[2:]), ))
-      return (PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders),
-              empty_double_star)
+        pathglob_no_doublestar = PathDirWildcard(canonical_stat, symbolic_path, parts[1], (join(*parts[2:]),))
+      return (pathglob_with_doublestar, pathglob_no_doublestar)
     elif len(parts) == 1:
       # This is the path basename.
       return (PathWildcard(canonical_stat, symbolic_path, parts[0]),)
@@ -236,8 +235,8 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
   @classmethod
   def create_from_specs(cls, relative_to, filespecs):
-    return cls(tuple(chain.from_iterable(tuple(PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec)
-                     for filespec in filespecs))))
+    path_globs = tuple(PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec) for filespec in filespecs)
+    return cls(tuple(chain.from_iterable(path_globs)))
 
 
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):

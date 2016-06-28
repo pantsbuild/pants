@@ -64,7 +64,12 @@ class PathGlobsTest(unittest.TestCase):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '**'
-    expected_remainders = (name, join(wildcard, name))
-    self.assert_pg_equals([pdw(subdir, wildcard, expected_remainders)],
+    expected_remainders = (join(wildcard, name),)
+    self.assert_pg_equals([pdw(subdir, '*', expected_remainders), pw(subdir, name)],
                           subdir,
                           [join(wildcard, name)])
+
+  def test_invalid_wildcard(self):
+    subdir = 'foo'
+    self.assertRaises(ValueError, PathGlobs.create_from_specs, subdir, ['**abc'])
+    self.assertRaises(ValueError, PathGlobs.create_from_specs, subdir, ['**abc/xyz'])
