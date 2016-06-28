@@ -32,6 +32,10 @@ public class AnnotatedParallelTest1 {
   private static final int RETRY_TIMEOUT_MS = 3000;
   private static CountDownLatch latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
 
+  public static void reset() {
+    latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
+  }
+
   @Test
   public void aptest1() throws Exception {
     awaitLatch("aptest1");
