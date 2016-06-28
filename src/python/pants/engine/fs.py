@@ -9,6 +9,7 @@ import errno
 from abc import abstractproperty
 from fnmatch import fnmatch
 from hashlib import sha1
+from itertools import chain
 from os import sep as os_sep
 from os.path import basename, join, normpath
 
@@ -140,14 +141,15 @@ class PathGlob(AbstractClass):
     parts = normpath(filespec).split(os_sep)
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
       # A request for the root path.
-      return PathRoot()
+      return (PathRoot(),)
     elif cls._DOUBLE in parts[0] and len(parts) == 1:
       # Per https://git-scm.com/docs/gitignore:
       #
       #  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
       #   directory "abc", relative to the location of the .gitignore file, with infinite depth."
       #
-      return PathDirWildcard(canonical_stat, symbolic_path, '*', ('*', '**/*'))
+      return (PathDirWildcard(canonical_stat, symbolic_path, '*', ('*', '**/*')),
+              PathWildcard(canonical_stat, symbolic_path, '*'))
     elif cls._DOUBLE in parts[0]:
       if parts[0] != cls._DOUBLE:
         raise ValueError('Illegal component "{}" in filespec under {}: {}'
@@ -157,14 +159,19 @@ class PathGlob(AbstractClass):
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
       remainders = (join(*parts[1:]), join(*parts[0:]))
-      return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
+      if len(parts) == 2:
+        empty_double_star = PathWildcard(canonical_stat, symbolic_path, parts[1])
+      else:
+        empty_double_star = PathDirWildcard(canonical_stat, symbolic_path, parts[1], (join(*parts[2:]), ))
+      return (PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders),
+              empty_double_star)
     elif len(parts) == 1:
       # This is the path basename.
-      return PathWildcard(canonical_stat, symbolic_path, parts[0])
+      return (PathWildcard(canonical_stat, symbolic_path, parts[0]),)
     else:
       # This is a path dirname.
       remainders = (join(*parts[1:]),)
-      return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
+      return (PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders),)
 
 
 class PathRoot(datatype('PathRoot', []), PathGlob):
@@ -229,8 +236,8 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
   @classmethod
   def create_from_specs(cls, relative_to, filespecs):
-    return cls(tuple(PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec)
-                     for filespec in filespecs))
+    return cls(tuple(chain.from_iterable(tuple(PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec)
+                     for filespec in filespecs))))
 
 
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):
@@ -281,7 +288,7 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   path_globs = tuple(PathGlob.create_from_spec(d.stat, d.path, remainder)
                      for d in dirs.dependencies
                      for remainder in path_dir_wildcard.remainders)
-  return PathGlobs(path_globs)
+  return PathGlobs(tuple(chain.from_iterable(path_globs)))
 
 
 def _zip_links(links, linked_paths):

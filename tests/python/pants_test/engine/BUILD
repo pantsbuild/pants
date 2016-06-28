@@ -150,6 +150,7 @@ python_tests(
   sources=['scheduler_test_base.py'],
   dependencies=[
     'src/python/pants/base:file_system_project_tree',
+    'src/python/pants/engine:engine',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
