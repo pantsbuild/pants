@@ -417,28 +417,73 @@ class Promise(object):
       return self._success
 
 
+class TaskRule(datatype('TaskRule', ['output_product_type', 'input_selects', 'task']), Rule):
+  """A rule for producing nodes from task triples."""
+
+  def as_node(self, subject, product_type, variants):
+    assert product_type == self.output_product_type
+    return TaskNode(subject, product_type, variants, self.task, self.input_selects)
+
+
+class SnapshottedProcess(datatype('SnapshottedProcess',['product_type',
+                                                        'binary_type',
+                                                        'input_selectors',
+                                                        'input_conversion',
+                                                        'output_conversion']), Rule):
+  """A rule for snapshotted processes."""
+
+  def as_node(self, subject, product_type, variants):
+    return ProcessOrchestrationNode(subject, self)
+
+  @property
+  def output_product_type(self):
+    return self.product_type
+
+  @property
+  def input_selects(self):
+    return self.input_selectors
+
+
 class NodeBuilder(Closable):
-  """Holds an index of tasks used to instantiate TaskNodes."""
+  """Holds an index of rules used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, tasks):
-    """Indexes tasks by their output type."""
-    serializable_tasks = defaultdict(set)
-    for output_type, input_selects, task in tasks:
-      serializable_tasks[output_type].add((task, tuple(input_selects)))
-    return cls(serializable_tasks)
+  def create(cls, rule_entries):
+    """Creates a NodeBuilder with rules indexed by their output type."""
+    serializable_rules = defaultdict(set)
+    for entry in rule_entries:
+      if isinstance(entry, (tuple, list)) and len(entry) == 3:
+        output_type, input_selects, task = entry
+        serializable_rules[output_type].add(
+          TaskRule(output_type, tuple(input_selects), task)
+        )
+      elif isinstance(entry, Rule):
+        serializable_rules[entry.output_product_type].add(entry)
+      else:
+        raise Exception("Unexpected rule type for entry {}".format(entry))
 
-  def __init__(self, tasks):
-    self._tasks = tasks
+    intrinsic_rules = FilesystemNode.as_intrinsic_rules()
+    return cls(serializable_rules, intrinsic_rules)
 
-  def gen_nodes(self, subject, product, variants):
-    if FilesystemNode.is_filesystem_pair(type(subject), product):
-      # Native filesystem operations.
-      yield FilesystemNode(subject, product, variants)
+  def __init__(self, rules, intrinsics):
+    self._rules = rules
+    self._intrinsics = intrinsics
+
+  def gen_nodes(self, subject, product_type, variants):
+    # Intrinsic rules that provide the requested product for the current subject type.
+    matching_intrinsic_rule = self._lookup_intrinsic(product_type, subject)
+    if matching_intrinsic_rule:
+      yield matching_intrinsic_rule.as_node(subject, product_type, variants)
     else:
-      # Tasks.
-      for task, anded_clause in self._tasks[product]:
-        yield TaskNode(subject, product, variants, task, anded_clause)
+      # Task rules that provide the requested product.
+      for rule in self._lookup_rules(product_type):
+        yield rule.as_node(subject, product_type, variants)
+
+  def _lookup_rules(self, product_type):
+    return self._rules[product_type]
+
+  def _lookup_intrinsic(self, product_type, subject):
+    return self._intrinsics.get((type(subject), product_type))
 
 
 class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'inline_nodes', 'project_tree'])):
@@ -501,9 +546,8 @@ class LocalScheduler(object):
                             attempt. Very expensive, very experimental.
     """
     self._products_by_goal = goals
-    self._tasks = tasks
     self._project_tree = project_tree
-    self._node_builder = NodeBuilder.create(self._tasks)
+    self._node_builder = NodeBuilder.create(tasks)
 
     self._graph_validator = graph_validator
     self._product_graph = ProductGraph()

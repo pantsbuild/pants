@@ -15,6 +15,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
 from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
                              file_digest, read_link, scan_directory)
+from pants.engine.rule import Rule
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
@@ -382,11 +383,19 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
       return Throw(e)
 
   def __repr__(self):
-    return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}'\
+    return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}' \
       .format(self.subject, self.product, self.variants, self.func.__name__, self.clause)
 
   def __str__(self):
     return repr(self)
+
+
+class FilesystemRule(datatype('FSRule', ['output_product_type', 'subject_type']), Rule):
+  def as_node(self, subject, product_type, variants):
+    assert self.subject_type == type(subject)
+    assert self.output_product_type == product_type
+
+    return FilesystemNode(subject, product_type, variants)
 
 
 class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants']), Node):
@@ -399,18 +408,17 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       (ReadLink, Link),
     }
 
-  _FS_PRODUCT_TYPES = {product for product, subject in _FS_PAIRS}
-
   is_cacheable = False
   is_inlineable = False
 
   @classmethod
-  def is_filesystem_pair(cls, subject_type, product):
-    """True if the given subject type and product type should be computed using a FileystemNode."""
-    return (product, subject_type) in cls._FS_PAIRS
+  def as_intrinsic_rules(cls):
+    """Returns a dict of tuple(sbj type, product type) -> list of rules for that subject product type tuple."""
+    return {(subject_type, product_type): [FilesystemRule(product_type, subject_type)]
+            for product_type, subject_type in cls._FS_PAIRS}
 
   @classmethod
-  def generate_subjects(self, filenames):
+  def generate_subjects(cls, filenames):
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
       # ReadLink, or FileContent for the literal path.
