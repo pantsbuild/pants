@@ -5,4 +5,6 @@ jar_library(name='value',
   jars=[
     jar(org='com.google.auto.value', name='auto-value', rev='1.1'),
   ],
+  # Is used as an annotation processor.
+  scope='compile',
 )

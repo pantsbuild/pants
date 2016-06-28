@@ -53,6 +53,11 @@ class TargetAddressable(Addressable):
     self._name = kwargs['name']
     self._dependency_specs = self._kwargs.pop('dependencies', [])
 
+    if not isinstance(self.dependency_specs, (list, set, tuple)):
+      msg = ('dependencies passed to Target constructors must be a sequence of strings, received {}'
+             .format(type(self.dependency_specs)))
+      raise TargetDefinitionException(target=self, msg=msg)
+
     for dep_spec in self.dependency_specs:
       if not isinstance(dep_spec, string_types):
         msg = ('dependencies passed to Target constructors must be strings.  {dep_spec} is not'

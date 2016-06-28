@@ -5,6 +5,6 @@
 
 java_library(name='example',
   sources=['Example.java'],
-  dependencies=[
-  ],
+  # Is used by an annotation processor.
+  scope='compile',
 )

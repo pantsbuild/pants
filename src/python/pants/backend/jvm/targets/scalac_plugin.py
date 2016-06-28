@@ -12,8 +12,11 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 class ScalacPlugin(ScalaLibrary):
   """A Scala compiler plugin."""
 
-  def __init__(self, classname=None, plugin=None, *args, **kwargs):
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(ScalacPlugin, cls).subsystem_dependencies() + (ScalaPlatform,)
 
+  def __init__(self, classname=None, plugin=None, *args, **kwargs):
     """
     :param classname: The fully qualified plugin class name - required.
     :param plugin: The name of the plugin. Defaults to name if not supplied.

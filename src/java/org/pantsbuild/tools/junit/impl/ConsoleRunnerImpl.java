@@ -43,6 +43,8 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
+import org.pantsbuild.junit.annotations.TestParallel;
+import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
 import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
 
@@ -565,6 +567,13 @@ public class ConsoleRunnerImpl {
     // The legacy runner makes Requests out of each individual method in a class. This isn't
     // designed to work for JUnit3 and isn't appropriate for custom runners.
     if (Util.isJunit3Test(clazz) || Util.isUsingCustomRunner(clazz)) {
+      return false;
+    }
+
+    // TestSerial and TestParallel take precedence over the default concurrency command
+    // line parameter
+    if (clazz.isAnnotationPresent(TestSerial.class)
+        || clazz.isAnnotationPresent(TestParallel.class)) {
       return false;
     }
 

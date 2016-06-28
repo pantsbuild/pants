@@ -4,6 +4,7 @@
 java_library(name='cucumber',
   sources=globs('*.java'),
   dependencies = [
-    '3rdparty:cucumber-java',
+    # This dependency is only used for an annotation, which zinc's analysis will not report.
+    scoped('3rdparty:cucumber-java', scope='forced'),
   ],
 )
