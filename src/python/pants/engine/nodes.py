@@ -414,7 +414,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   @classmethod
   def as_intrinsic_rules(cls):
     """Returns a dict of tuple(sbj type, product type) -> list of rules for that subject product type tuple."""
-    return {(subject_type, product_type): [FilesystemRule(product_type, subject_type)]
+    return {(subject_type, product_type): FilesystemRule(product_type, subject_type)
             for product_type, subject_type in cls._FS_PAIRS}
 
   @classmethod
