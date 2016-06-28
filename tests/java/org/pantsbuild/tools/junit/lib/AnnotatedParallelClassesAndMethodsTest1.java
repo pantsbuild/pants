@@ -5,7 +5,7 @@ package org.pantsbuild.tools.junit.lib;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
-import org.pantsbuild.junit.annotations.TestParallel;
+import org.pantsbuild.junit.annotations.TestParallelClassesAndMethods;
 
 import static org.junit.Assert.assertTrue;
 
@@ -13,9 +13,9 @@ import static org.junit.Assert.assertTrue;
  * This test is intentionally under a java_library() BUILD target so it will not be run
  * on its own. It is run by the ConsoleRunnerTest suite to test ConsoleRunnerImpl.
  * <p>
- * Exercises the TestParallel annotation.
+ * Exercises the TestParallelClassesAndMethods annotation.
  * <p>
- * For all methods in AnnotatedParallelTest1 and AnnotatedParallelTest2
+ * For all methods in AnnotatedParallelMethodsTest1 and AnnotatedParallelMethodsTest2
  * to succeed, both test classes  must be running at the same time with the flag:
  * <pre>
  *  -parallel-threads 2
@@ -26,10 +26,10 @@ import static org.junit.Assert.assertTrue;
  * up 2 threads, so it has a generous timeout set.
  * </p>
  */
-@TestParallel
-public class AnnotatedParallelTest1 {
-  private static final int NUM_CONCURRENT_TESTS = 2;
-  private static final int RETRY_TIMEOUT_MS = 3000;
+@TestParallelClassesAndMethods
+public class AnnotatedParallelClassesAndMethodsTest1 {
+  private static final int NUM_CONCURRENT_TESTS = 4;
+  private static final int WAIT_TIMEOUT_MS = 3000;
   private static CountDownLatch latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
 
   public static void reset() {
@@ -37,13 +37,17 @@ public class AnnotatedParallelTest1 {
   }
 
   @Test
-  public void aptest1() throws Exception {
-    awaitLatch("aptest1");
+  public void apmcatest11() throws Exception {
+    awaitLatch("apcamtest11");
   }
 
-  static void awaitLatch(String methodName) throws Exception {
-    TestRegistry.registerTestCall(methodName);
-    latch.countDown();
-    assertTrue(latch.await(RETRY_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+  @Test
+  public void apmcatest12() throws Exception {
+    awaitLatch("apcamtest12");
   }
+    static void awaitLatch(String methodName) throws Exception {
+      TestRegistry.registerTestCall(methodName);
+      latch.countDown();
+      assertTrue(latch.await(WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+    }
 }

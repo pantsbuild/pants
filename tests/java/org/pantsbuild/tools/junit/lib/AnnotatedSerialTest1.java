@@ -33,6 +33,10 @@ public class AnnotatedSerialTest1 {
   private static final int WAIT_TIMEOUT_MS = 1000;
   private static final AtomicBoolean waiting = new AtomicBoolean(false);
 
+  public static void reset() {
+    waiting.set(false);
+  }
+
   @Test
   public void astest1() throws Exception {
     awaitLatch("astest1");
