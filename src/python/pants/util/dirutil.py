@@ -251,11 +251,11 @@ def absolute_symlink(source_path, target_path):
   :raises OSError on failure UNLESS file already exists or no such file/directory
   """
   if not os.path.isabs(source_path):
-    raise ValueError("Path for source:{} must be absolute".format(source_path))
+    raise ValueError("Path for source : {} must be absolute".format(source_path))
   if not os.path.isabs(target_path):
-    raise ValueError("Path for link:{} must be absolute".format(target_path))
+    raise ValueError("Path for link : {} must be absolute".format(target_path))
   if source_path == target_path:
-    raise ValueError("Path for link is identical to source:{}".format(source_path))
+    raise ValueError("Path for link is identical to source : {}".format(source_path))
   try:
     if os.path.lexists(target_path):
       os.unlink(target_path)

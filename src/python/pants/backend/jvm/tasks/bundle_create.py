@@ -57,16 +57,15 @@ class BundleCreate(JvmBinaryTask):
                   'identifier derived from target will be used.')
 
   @classmethod
+  def implementation_version(cls):
+    return super(BundleCreate, cls).implementation_version() + [('BundleCreate', 1)]
+
+  @classmethod
   def product_types(cls):
     return ['jvm_archives', 'jvm_bundles', 'deployable_archives']
 
   class App(datatype('App', ['address', 'binary', 'bundles', 'id', 'deployjar', 'archive', 'target'])):
     """A uniform interface to an app."""
-
-    @property
-    def extension(self):
-      extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
-      return extensions.get(self.archive, self.archive)
 
     @staticmethod
     def is_app(target):
@@ -110,7 +109,8 @@ class BundleCreate(JvmBinaryTask):
       'created bundle copy {}'.format(os.path.relpath(bundle_copy, get_buildroot())))
 
     if archivepath:
-      archive_copy = os.path.join(dist_dir,'{}.{}'.format(name, app.extension))
+      ext = archive.archive_extensions.get(app.archive, app.archive)
+      archive_copy = os.path.join(dist_dir,'{}.{}'.format(name, ext))
       safe_mkdir_for(archive_copy)  # Ensure parent dir exists
       atomic_copy(archivepath, archive_copy)
       self.context.log.info(
@@ -147,13 +147,13 @@ class BundleCreate(JvmBinaryTask):
                                   self._resolved_option(vt.target, 'archive'))
         archiver = archive.archiver(app.archive) if app.archive else None
 
-        if vt.valid:
-          bundle_dir = self._get_bundle_dir(app, vt.results_dir)
-          filename = '{}.{}'.format(app.id, app.extension)
-          archive_path = os.path.join(vt.results_dir, filename) if app.archive else ''
-        else:
-          bundle_dir = self.bundle(app, vt.results_dir)
-          archive_path = archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
+        bundle_dir = self._get_bundle_dir(app, vt.results_dir)
+        ext = archive.archive_extensions.get(app.archive, app.archive)
+        filename = '{}.{}'.format(app.id, ext)
+        archive_path = os.path.join(vt.results_dir, filename) if app.archive else ''
+        if not vt.valid:
+          self.bundle(app, vt.results_dir)
+          archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
 
         self._add_product(jvm_bundles_product, app, bundle_dir)
         if archiver:
@@ -163,7 +163,6 @@ class BundleCreate(JvmBinaryTask):
         # For root targets, create symlink.
         if vt.target in self.context.target_roots:
           self._store_results(vt, bundle_dir, archive_path, app)
-
 
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""

@@ -22,6 +22,10 @@ class PythonBinaryCreate(PythonTask):
   def product_types(cls):
     return ['pex_archives', 'deployable_archives']
 
+  @classmethod
+  def implementation_version(cls):
+    return super(PythonBinaryCreate, cls).implementation_version() + [('PythonBinaryCreate', 1)]
+
   @property
   def cache_target_dirs(self):
     return True
@@ -50,10 +54,9 @@ class PythonBinaryCreate(PythonTask):
       python_deployable_archive = self.context.products.get('deployable_archives')
       python_pex_product = self.context.products.get('pex_archives')
       for vt in invalidation_check.all_vts:
-        if vt.valid:
-          pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
-        else:
-          pex_path = self.create_binary(vt.target, vt.results_dir)
+        pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
+        if not vt.valid:
+          self.create_binary(vt.target, vt.results_dir)
 
         python_pex_product.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
         python_deployable_archive.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
