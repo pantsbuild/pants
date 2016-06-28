@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import subprocess
+import uuid
 from abc import abstractproperty
 
 from pants.engine.fs import Files
@@ -217,16 +218,18 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
       State.raise_unrecognized(select_state)
 
     # TODO Create / find snapshot directory via configuration.
-    build_root = step_context.project_tree.build_root
-    archive_dir = os.path.join(build_root, 'snapshots')
+
+    with temporary_dir(cleanup=False) as dir:
+      archive_dir = dir
     safe_mkdir(archive_dir)
 
     file_list = select_state.value
 
     logger.debug('snapshotting for files: {}'.format(file_list))
-    # TODO name snapshot archive based on subject, maybe.
-    tar_location = os.path.join(archive_dir, 'my-tar.tar')
+    # TODO name snapshot archive based on subject, perhaps.
+    tar_location = os.path.join(archive_dir, '{}.tar'.format(uuid.uuid4().hex))
 
+    build_root = step_context.project_tree.build_root
     with open_tar(tar_location, mode='w:gz') as tar:
       for file in file_list.dependencies:
         tar.add(os.path.join(build_root, file.path), file.path)
