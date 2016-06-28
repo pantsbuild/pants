@@ -7,7 +7,7 @@
 java_thrift_library(name='distance-java',
   sources=['distance.thrift'],
   provides = artifact(org='org.pantsbuild.example',
-                      name='distance-thrift-scala',
+                      name='distance-thrift-java',
                       repo=public),
 )
 

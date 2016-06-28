@@ -9,6 +9,7 @@ import os
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_dependency_usage import DependencyUsageGraph, JvmDependencyUsage
 from pants.util.dirutil import safe_mkdir, touch
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
@@ -160,12 +161,17 @@ class TestJvmDependencyUsage(TaskTestBase):
     classes_by_source = task.context.products.get_data('classes_by_source')
     runtime_classpath = task.context.products.get_data('runtime_classpath')
     product_deps_by_src = task.context.products.get_data('product_deps_by_src')
-    transitive_deps_by_target = task._compute_transitive_deps_by_target()
+    analyzer = JvmDependencyAnalyzer('', runtime_classpath, product_deps_by_src)
+    targets_by_file = analyzer.targets_by_file(targets)
+    transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
 
     def node_creator(target):
-      return task.create_dep_usage_node(target, '',
-                                        classes_by_source, runtime_classpath, product_deps_by_src,
-                                        transitive_deps_by_target)
+      transitive_deps = set(transitive_deps_by_target.get(target))
+      return task.create_dep_usage_node(target,
+                                        analyzer,
+                                        classes_by_source,
+                                        targets_by_file,
+                                        transitive_deps)
 
     return DependencyUsageGraph(task.create_dep_usage_nodes(targets, node_creator),
                                 task.size_estimators[task.get_options().size_estimator])

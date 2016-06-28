@@ -10,5 +10,5 @@ annotation_processor(name='processor',
     'examples/src/java/org/pantsbuild/example/annotation/example',
     '3rdparty:guava',
   ],
+  scope='forced',
 )
-

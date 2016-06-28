@@ -157,8 +157,3 @@ class ApacheThriftGen(SimpleCodegenTask):
   def execute_codegen(self, target, target_workdir):
     self._validate(target)
     self._generate_thrift(target, target_workdir)
-
-  @property
-  def _copy_target_attributes(self):
-    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
-    return ['provides']

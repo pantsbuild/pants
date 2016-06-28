@@ -6,31 +6,32 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
+import org.pantsbuild.junit.annotations.TestParallelMethods;
 
 import static org.junit.Assert.assertTrue;
 
 /**
  * This test is intentionally under a java_library() BUILD target so it will not be run
  * on its own. It is run by the ConsoleRunnerTest suite to test ConsoleRunnerImpl.
- *<p>
- * Exercises the junit runner PARALLEL_METHODS concurrency strategy.
  * <p>
- * For all methods in ParallelMethodsDefaultParallelTest1 and ParallelMethodsDefaultParallelTest2
- * to succeed all of the test methods must be running at the same time.  But the classes should
- * not run in parallel. Intended to test the flags
+ * Exercises the TestParallelMethods annotation.
  * <p>
- * -default-concurrency PARALLEL_METHODS -parallel-threads 4
- * <p>
+ * For all methods in AnnotatedParallelMethodsTest1 and AnnotatedParallelMethodsTest2
+ * to succeed, both test classes  must be running at the same time with the flag:
+ * <pre>
+ *  -parallel-threads 2
+ * </pre>
  * when running with just these two classes as specs.
  * <p>
  * Runs in on the order of 10 milliseconds locally, but it may take longer on a CI machine to spin
- * up 4 threads, so it has a generous timeout set.
+ * up 2 threads, so it has a generous timeout set.
  * </p>
  */
-public class ParallelMethodsDefaultParallelTest1 {
+@TestParallelMethods
+public class AnnotatedParallelMethodsTest1 {
   private static final int NUM_CONCURRENT_TESTS = 2;
   private static final int WAIT_TIMEOUT_MS = 3000;
-  private static volatile CountDownLatch latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
+  private static CountDownLatch latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
   private static final AtomicInteger numRunning = new AtomicInteger(0);
 
   public static void reset() {
@@ -39,13 +40,13 @@ public class ParallelMethodsDefaultParallelTest1 {
   }
 
   @Test
-  public void pmdptest11() throws Exception {
-    awaitLatch("pmdptest11");
+  public void apmtest11() throws Exception {
+    awaitLatch("apmtest11");
   }
 
   @Test
-  public void pmdptest12() throws Exception {
-    awaitLatch("pmdptest12");
+  public void apmtest12() throws Exception {
+    awaitLatch("apmtest12");
   }
 
   static void awaitLatch(String methodName) throws Exception {
