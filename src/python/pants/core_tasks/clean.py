@@ -10,7 +10,7 @@ import os
 
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_concurrent_rename, safe_mkdir, safe_rmtree
+from pants.util.dirutil import safe_concurrent_rename, safe_rmtree
 
 
 logger = logging.getLogger(__name__)
