@@ -268,7 +268,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       test_target = 'examples/tests/java/org/pantsbuild/example/::'
       json_data = self.run_export(test_target, workdir, load_libs=False)
       for target_address, attributes in json_data['targets'].iteritems():
-        # Make sure all target under "examples/tests/java/org/pantsbuild/example" is target root.
+        # Make sure all targets under `test_target`'s directory are target roots.
         self.assertEqual(
           attributes['is_target_root'],
           target_address.startswith("examples/tests/java/org/pantsbuild/example")
