@@ -50,18 +50,20 @@ class PythonBinaryCreate(PythonTask):
       python_deployable_archive = self.context.products.get('deployable_archives')
       python_pex_product = self.context.products.get('pex_archives')
       for vt in invalidation_check.all_vts:
-        pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
+        if vt.valid:
+          pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
+        else:
+          pex_path = self.create_binary(vt.target, vt.results_dir)
+
         python_pex_product.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
         python_deployable_archive.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
         self.context.log.debug('created {}'.format(os.path.relpath(pex_path, get_buildroot())))
 
-        if not vt.valid:
-          # Create a copy for pex.
-          self.create_binary(vt.target, vt.results_dir)
-          pex_copy = os.path.join(self._distdir, os.path.basename(pex_path))
-          safe_mkdir_for(pex_copy)
-          atomic_copy(pex_path, pex_copy)
-          self.context.log.info('created pex copy {}'.format(os.path.relpath(pex_copy, get_buildroot())))
+        # Create a copy for pex.
+        pex_copy = os.path.join(self._distdir, os.path.basename(pex_path))
+        safe_mkdir_for(pex_copy)
+        atomic_copy(pex_path, pex_copy)
+        self.context.log.info('created pex copy {}'.format(os.path.relpath(pex_copy, get_buildroot())))
 
   def create_binary(self, binary, results_dir):
     interpreter = self.select_interpreter_for_targets(binary.closure())
