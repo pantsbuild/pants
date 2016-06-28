@@ -128,7 +128,7 @@ archive_extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
 
 TAR = TarArchiver('w:', archive_extensions['tar'])
 TGZ = TarArchiver('w:gz', archive_extensions['tgz'])
-TBZ2 = TarArchiver('w:bz2', archive_extensions['tgbz2'])
+TBZ2 = TarArchiver('w:bz2', archive_extensions['tbz2'])
 ZIP = ZipArchiver(ZIP_DEFLATED, archive_extensions['zip'])
 
 _ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
