@@ -33,7 +33,7 @@ class PathGlobsTest(unittest.TestCase):
     name = 'Blah.java'
     self.assert_pg_equals([pw('', name)], '', [name])
     self.assert_pg_equals([pw(subdir, name)], subdir, [name])
-    self.assert_pg_equals([pdw('', subdir, (name,))], '', [join(subdir, name)])
+    self.assert_pg_equals([pdw('', subdir, name)], '', [join(subdir, name)])
 
   def test_wildcard(self):
     name = '*.java'
@@ -45,7 +45,7 @@ class PathGlobsTest(unittest.TestCase):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '*'
-    self.assert_pg_equals([pdw(subdir, wildcard, (name,))],
+    self.assert_pg_equals([pdw(subdir, wildcard, name)],
                           subdir,
                           [join(wildcard, name)])
 
@@ -64,10 +64,16 @@ class PathGlobsTest(unittest.TestCase):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '**'
-    expected_remainders = (join(wildcard, name),)
-    self.assert_pg_equals([pdw(subdir, '*', expected_remainders), pw(subdir, name)],
+    self.assert_pg_equals([pdw(subdir, '*', join(wildcard, name)), pw(subdir, name)],
                           subdir,
                           [join(wildcard, name)])
+
+  def test_trailing_doublestar(self):
+    subdir = 'foo'
+    wildcard = '**'
+    self.assert_pg_equals([pdw(subdir, '*', wildcard), pw(subdir, '*')],
+                          subdir,
+                          [wildcard])
 
   def test_invalid_wildcard(self):
     subdir = 'foo'

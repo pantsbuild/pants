@@ -140,9 +140,12 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
                                           'd.ln/4.txt.ln',
                                           'd.ln/b/1.txt',
                                           'd.ln/b/2'])
+    self.assert_walk(Dirs, ['a/**'], ['a/b'])
+
+  def test_walk_recursive_slash_doublestar_slash(self):
     self.assert_walk(Files, ['a/**/3.txt'], ['a/3.txt'])
     self.assert_walk(Files, ['a/**/b/1.txt'], ['a/b/1.txt'])
-    self.assert_walk(Dirs, ['a/**'], ['a/b'])
+    self.assert_walk(Files, ['a/**/2'], ['a/b/2'])
 
   def test_walk_recursive_directory(self):
     self.assert_walk(Dirs, ['*'], ['a', 'c.ln', 'd.ln'])
