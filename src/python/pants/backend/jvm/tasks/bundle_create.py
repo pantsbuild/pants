@@ -101,6 +101,7 @@ class BundleCreate(JvmBinaryTask):
 
   def _store_results(self, vt, bundle_dir, archivepath, app):
     """Store a copy of the bundle and archive from the results dir in dist."""
+    # TODO (from mateor) move distdir management somewhere more general purpose.
     dist_dir = self.get_options().pants_distdir
     name = vt.target.basename if self.get_options().use_basename_prefix else app.id
     bundle_copy = os.path.join(dist_dir, '{}-bundle'.format(name))
@@ -125,6 +126,10 @@ class BundleCreate(JvmBinaryTask):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
+
+    # TODO (from mateor) The consolidate classpath is something that we could do earlier in the
+    # pipeline and it would be nice to just add those unpacked classed to a product and get the
+    # consolidated classpath for free.
     targets_to_consolidate = self.find_consolidate_classpath_candidates(
       runtime_classpath,
       self.context.targets(**self._target_closure_kwargs),
@@ -153,7 +158,8 @@ class BundleCreate(JvmBinaryTask):
         archive_path = os.path.join(vt.results_dir, filename) if app.archive else ''
         if not vt.valid:
           self.bundle(app, vt.results_dir)
-          archiver.create(bundle_dir, vt.results_dir, app.id) if app.archive else ''
+          if app.archive:
+            archiver.create(bundle_dir, vt.results_dir, app.id)
 
         self._add_product(jvm_bundles_product, app, bundle_dir)
         if archiver:
