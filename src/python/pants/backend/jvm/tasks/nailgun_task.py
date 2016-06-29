@@ -11,7 +11,6 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.java import util
-from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.pantsd.subsystem.subprocess import Subprocess
@@ -40,8 +39,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
   @classmethod
   def global_subsystems(cls):
-    return super(NailgunTaskBase, cls).global_subsystems() + (DistributionLocator,
-                                                              Subprocess.Factory)
+    return super(NailgunTaskBase, cls).global_subsystems() + (Subprocess.Factory,)
 
   def __init__(self, *args, **kwargs):
     """
@@ -54,19 +52,6 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._identity = '_'.join(id_tuple)
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
-    self.set_distribution()    # Use default until told otherwise.
-    # TODO: Choose default distribution based on options.
-
-  def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
-    try:
-      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
-                                              maximum_version=maximum_version, jdk=jdk)
-    except DistributionLocator.Error as e:
-      raise TaskError(e)
-
-  @property
-  def dist(self):
-    return self._dist
 
   def create_java_executor(self):
     """Create java executor that uses this task's ng daemon, if allowed.

@@ -31,6 +31,7 @@ python_library(
     ':prepare_resources',
     ':prepare_services',
     ':properties',
+    ':provide_tools_jar',
     ':resources_task',
     ':run_jvm_prep_command',
     ':scala_repl',
@@ -379,11 +380,10 @@ python_library(
     ':classpath_util',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
-    'src/python/pants/task',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ]
 )
@@ -411,11 +411,11 @@ python_library(
   name = 'jvm_dependency_usage',
   sources = ['jvm_dependency_usage.py'],
   dependencies = [
-    ':classpath_util',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:fileutil',
   ]
 )
@@ -525,6 +525,18 @@ python_library(
   sources = ['properties.py'],
   dependencies = [
     '3rdparty/python:six',
+  ],
+)
+
+python_library(
+  name = 'provide_tools_jar',
+  sources = ['provide_tools_jar.py'],
+  dependencies = [
+    ':classpath_products',
+    ':jvm_tool_task_mixin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

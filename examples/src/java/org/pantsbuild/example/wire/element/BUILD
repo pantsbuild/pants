@@ -4,12 +4,10 @@
 jvm_binary(name='element',
   basename='wire-element-example',
   dependencies=[
+    '3rdparty:wire-runtime',
     'examples/src/wire/org/pantsbuild/example/element',
+    'examples/src/wire/org/pantsbuild/example/temperature',
   ],
   source='WireElementExample.java',
   main='org.pantsbuild.example.wire.element.WireElementExample',
-  # TODO: The 'wire' library is not actually defined in a BUILD file: it comes in
-  # via the tool classpath of the sythetic target.
-  strict_deps=False,
 )
-

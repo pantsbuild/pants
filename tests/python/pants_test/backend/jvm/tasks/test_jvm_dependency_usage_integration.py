@@ -23,6 +23,8 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
     with temporary_dir() as outdir:
       outfile = os.path.join(outdir, 'out.json')
       args = [
+          # Enable the on-line equivalent of this check, to confirm consistency.
+          '--compile-zinc-unused-deps=fatal',
           'dep-usage',
           target,
           '--dep-usage-jvm-output-file={}'.format(outfile),

@@ -53,6 +53,7 @@ from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
+from pants.backend.jvm.tasks.provide_tools_jar import ProvideToolsJar
 from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepCommand,
                                                           RunCompileJvmPrepCommand,
                                                           RunTestJvmPrepCommand)
@@ -135,6 +136,7 @@ def register_goals():
   task(name='jvm-platform-validate', action=JvmPlatformValidate).install('jvm-platform-validate')
 
   task(name='bootstrap-jvm-tools', action=BootstrapJvmTools).install('bootstrap')
+  task(name='provide-tools-jar', action=ProvideToolsJar).install('bootstrap')
 
   # Compile
   task(name='zinc', action=ZincCompile).install('compile')

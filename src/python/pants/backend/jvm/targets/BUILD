@@ -24,6 +24,7 @@ python_library(
     'jvm_prep_command.py',
     'jvm_target.py',
     'managed_jar_dependencies.py',
+    'tools_jar.py',
     'unpacked_jars.py',
   ],
   dependencies = [
@@ -59,9 +60,10 @@ python_library(
     'java_tests.py',
   ],
   dependencies = [
-    ':jvm',
     '3rdparty/python:six',
+    ':jvm',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
   ],
 )
 
