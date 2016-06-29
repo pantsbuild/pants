@@ -18,9 +18,10 @@ import six
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir, read_file,
-                                relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
-                                safe_file_dump, safe_mkdir, safe_rm_oldest_items_in_dir, touch)
+from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
+                                get_basedir, read_file, relative_symlink, relativize_paths, rm_rf,
+                                safe_concurrent_creation, safe_file_dump, safe_mkdir,
+                                safe_rm_oldest_items_in_dir, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -277,3 +278,22 @@ class DirutilTest(unittest.TestCase):
       safe_rm_oldest_items_in_dir(td, 1)
       touch(os.path.join(td, 'file1'))
       self.assertEqual(len(os.listdir(td)), 1)
+
+  def test_absolute_symlink(self):
+    def _create_and_check_link(source, link):
+      absolute_symlink(source, link)
+      self.assertTrue(os.path.islink(link))
+      self.assertEquals(source, os.readlink(link))
+
+    with temporary_dir() as td:
+      link = os.path.join(td, 'link')
+
+      # Do it twice, to make sure we can overwrite existing link
+      source = os.path.join(td, 'source1')
+      _create_and_check_link(source, link)
+      source = os.path.join(td, 'source2')
+      _create_and_check_link(source, link)
+
+      # Check if parent dirs will be created for the link
+      link = os.path.join(td, 'a/b/c/link')
+      _create_and_check_link(source, link)
