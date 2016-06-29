@@ -118,21 +118,6 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
                                             'd.ln/b/1.txt',
                                             'd.ln/b/2'])
 
-  # TODO: Kill this in favor of the subsequent test when #3589 is resolved.
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3589')
-  def test_walk_recursive_trailing_greedy_doublestar_current(self):
-    self.assert_walk(Files, ['**'], ['a/3.txt',
-                                     'a/4.txt.ln',
-                                     'a/b/1.txt',
-                                     'a/b/2',
-                                     'c.ln/1.txt',
-                                     'c.ln/2',
-                                     'd.ln/3.txt',
-                                     'd.ln/4.txt.ln',
-                                     'd.ln/b/1.txt',
-                                     'd.ln/b/2'])
-
-  #@unittest.skip('https://github.com/pantsbuild/pants/issues/3589')
   def test_walk_recursive_trailing_greedy_doublestar(self):
     self.assert_walk(Files, ['**'], ['4.txt',
                                      'a/3.txt',
@@ -146,7 +131,6 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
                                      'd.ln/b/1.txt',
                                      'd.ln/b/2'])
 
-  #@unittest.skip('https://github.com/pantsbuild/pants/issues/3589')
   def test_walk_recursive_trailing_doublestar(self):
     self.assert_walk(Files, ['a/**'], ['a/3.txt',
                                        'a/4.txt.ln',
