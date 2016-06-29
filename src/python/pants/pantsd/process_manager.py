@@ -269,15 +269,19 @@ class ProcessManager(ProcessMetadataManager):
     return self._socket or self.read_metadata_by_name(self._name, 'socket', self._socket_type)
 
   @classmethod
-  def get_subprocess_output(cls, *args):
+  def get_subprocess_output(cls, command, ignore_stderr=True, **kwargs):
     """Get the output of an executed command.
 
-    :param *args: An iterable representing the command to execute (e.g. ['ls', '-al']).
+    :param command: An iterable representing the command to execute (e.g. ['ls', '-al']).
+    :param ignore_stderr: Whether or not to ignore stderr output vs interleave it with stdout.
     :raises: `ProcessManager.ExecutionError` on `OSError` or `CalledProcessError`.
     :returns: The output of the command.
     """
+    if ignore_stderr is False:
+      kwargs.setdefault('stderr', subprocess.STDOUT)
+
     try:
-      return subprocess.check_output(*args, stderr=subprocess.STDOUT)
+      return subprocess.check_output(command, **kwargs)
     except (OSError, subprocess.CalledProcessError) as e:
       subprocess_output = getattr(e, 'output', '').strip()
       raise cls.ExecutionError(str(e), subprocess_output)
