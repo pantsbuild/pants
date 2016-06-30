@@ -28,9 +28,61 @@ public class PantsRunnerTest {
           "testprojects.src.java.org.pantsbuild.testproject.runner.main-class-0.jar");
   static final String MAIN_CLASS = "org.pantsbuild.testproject.runner.MainClass";
 
+  static class Reader extends Thread {
+    static Reader start(InputStream stream) {
+      Reader reader = new Reader(stream);
+      reader.start();
+      return reader;
+    }
+
+    private static final int BUFFER_SIZE = 8 * 1024;
+
+    private final InputStream stream;
+    private final ByteArrayOutputStream capturedData = new ByteArrayOutputStream(BUFFER_SIZE);
+
+    private Reader(InputStream stream) {
+      this.stream = stream;
+    }
+
+    @Override
+    public void run() {
+      byte[] buffer = new byte[BUFFER_SIZE];
+      int read;
+      while ((read = read(buffer)) != -1) {
+        capturedData.write(buffer, 0, read);
+      }
+    }
+
+    private int read(byte[] buffer) {
+      try {
+        return stream.read(buffer);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    String readAll() throws InterruptedException {
+      join();
+      return capturedData.toString();
+    }
+  }
+
   @BeforeClass
-  public static void setup() throws Exception {
-    assertEquals(0, Runtime.getRuntime().exec("./pants bundle " + TEST_PROJECT).waitFor());
+  public static void setUpClass() throws Exception {
+    String command = "./pants bundle " + TEST_PROJECT;
+    Process process = Runtime.getRuntime().exec(command);
+    Reader stdout = Reader.start(process.getInputStream());
+    Reader stderr = Reader.start(process.getErrorStream());
+    int result = process.waitFor();
+    assertEquals(
+        String.format(
+            "Problem running %s - exited with %d:\nSTDOUT:\n%s\n\nSTDERR:\n%s",
+            command,
+            result,
+            stdout.readAll(),
+            stderr.readAll()),
+        0,
+        result);
     assertTrue(SYNTHETIC_JAR.exists());
     assertTrue(MAIN_JAR.exists());
   }
