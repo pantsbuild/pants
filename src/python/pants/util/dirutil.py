@@ -258,7 +258,10 @@ def absolute_symlink(source_path, target_path):
     raise ValueError("Path for link is identical to source : {}".format(source_path))
   try:
     if os.path.lexists(target_path):
-      os.unlink(target_path)
+      if os.path.islink(target_path) or os.path.isfile(target_path):
+        os.unlink(target_path)
+      else:
+        shutil.rmtree(target_path)
     safe_mkdir_for(target_path)
     os.symlink(source_path, target_path)
   except OSError as e:
