@@ -90,34 +90,67 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
 
   def test_walk_recursive(self):
     self.assert_walk(Files, ['**/*.txt.ln'], ['a/4.txt.ln', 'd.ln/4.txt.ln'])
-    self.assert_walk(Files,
-                     ['**/*.txt'],
-                     ['a/3.txt', 'a/b/1.txt', 'c.ln/1.txt', 'd.ln/3.txt', 'd.ln/b/1.txt'])
-    self.assert_walk(Files,
-                     ['**/*.txt', '*.txt'],
-                     ['a/3.txt', 'a/b/1.txt', 'c.ln/1.txt', 'd.ln/3.txt', 'd.ln/b/1.txt', '4.txt'])
+    self.assert_walk(Files, ['**/*.txt'], ['4.txt',
+                                           'a/3.txt',
+                                           'a/b/1.txt',
+                                           'c.ln/1.txt',
+                                           'd.ln/3.txt',
+                                           'd.ln/b/1.txt'])
+    self.assert_walk(Files, ['**/*.txt', '*.txt'], ['a/3.txt',
+                                                    'a/b/1.txt',
+                                                    'c.ln/1.txt',
+                                                    'd.ln/3.txt',
+                                                    'd.ln/b/1.txt',
+                                                    '4.txt'])
     self.assert_walk(Files, ['**/3.t*t'], ['a/3.txt', 'd.ln/3.txt'])
     self.assert_walk(Files, ['**/*.zzz'], [])
 
   def test_walk_recursive_all(self):
-    self.assert_walk(Files, ['*', '**/*'], [
-        '4.txt',
-        'a/3.txt',
-        'a/4.txt.ln',
-        'a/b/1.txt',
-        'a/b/2',
-        'c.ln/1.txt',
-        'c.ln/2',
-        'd.ln/3.txt',
-        'd.ln/4.txt.ln',
-        'd.ln/b/1.txt',
-        'd.ln/b/2',
-      ])
+    self.assert_walk(Files, ['*', '**/*'], ['4.txt',
+                                            'a/3.txt',
+                                            'a/4.txt.ln',
+                                            'a/b/1.txt',
+                                            'a/b/2',
+                                            'c.ln/1.txt',
+                                            'c.ln/2',
+                                            'd.ln/3.txt',
+                                            'd.ln/4.txt.ln',
+                                            'd.ln/b/1.txt',
+                                            'd.ln/b/2'])
+
+  def test_walk_recursive_trailing_greedy_doublestar(self):
+    self.assert_walk(Files, ['**'], ['4.txt',
+                                     'a/3.txt',
+                                     'a/4.txt.ln',
+                                     'a/b/1.txt',
+                                     'a/b/2',
+                                     'c.ln/1.txt',
+                                     'c.ln/2',
+                                     'd.ln/3.txt',
+                                     'd.ln/4.txt.ln',
+                                     'd.ln/b/1.txt',
+                                     'd.ln/b/2'])
+
+  def test_walk_recursive_trailing_doublestar(self):
+    self.assert_walk(Files, ['a/**'], ['a/3.txt',
+                                       'a/4.txt.ln',
+                                       'a/b/1.txt',
+                                       'a/b/2'])
+    self.assert_walk(Files, ['d.ln/**'], ['d.ln/3.txt',
+                                          'd.ln/4.txt.ln',
+                                          'd.ln/b/1.txt',
+                                          'd.ln/b/2'])
+    self.assert_walk(Dirs, ['a/**'], ['a/b'])
+
+  def test_walk_recursive_slash_doublestar_slash(self):
+    self.assert_walk(Files, ['a/**/3.txt'], ['a/3.txt'])
+    self.assert_walk(Files, ['a/**/b/1.txt'], ['a/b/1.txt'])
+    self.assert_walk(Files, ['a/**/2'], ['a/b/2'])
 
   def test_walk_recursive_directory(self):
     self.assert_walk(Dirs, ['*'], ['a', 'c.ln', 'd.ln'])
     self.assert_walk(Dirs, ['*/*'], ['a/b', 'd.ln/b'])
-    self.assert_walk(Dirs, ['**/*'], ['a/b', 'd.ln/b'])
+    self.assert_walk(Dirs, ['**/*'], ['a', 'c.ln', 'd.ln', 'a/b', 'd.ln/b'])
     self.assert_walk(Dirs, ['*/*/*'], [])
 
   def test_files_content_literal(self):
@@ -204,3 +237,15 @@ class GitFSTest(unittest.TestCase, FSTestBase):
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_files_content_literal(self):
     super(GitFSTest, self).test_files_content_literal()
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_walk_recursive_trailing_greedy_doublestar_current(self):
+    super(GitFSTest, self).test_walk_recursive_trailing_greedy_doublestar_current()
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_walk_recursive_trailing_greedy_doublestar(self):
+    super(GitFSTest, self).test_walk_recursive_trailing_greedy_doublestar()
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_walk_recursive_trailing_doublestar(self):
+    super(GitFSTest, self).test_walk_recursive_trailing_doublestar()
