@@ -1,7 +1,7 @@
   1.1.0-rc0 (7/1/2016)
   --------------------
 
-  This is the first `1.1.0-rc` release on the way to the `1.1.0`.
+  This is the first `1.1.0-rc` release on the way to `1.1.0`.
 
   New Features
   ~~~~~~~~~~~~
