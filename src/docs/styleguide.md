@@ -33,3 +33,21 @@ Bad
 ## String Interpolation and formatting
 
 * Prefer `.format` for formatting strings over using `%`.
+
+## Collection Literals
+
+Where possible, use the literals for the various collection types.
+
+### Sets
+
+    a_set = {a}
+    # Instead of
+    a_set = set([a])
+
+### Tuples
+
+    a_tuple = (a, b)
+    another_tuple = (a,)
+    # Instead of
+    a_tuple = tuple([a, b])
+    another_tuple = tuple([a])
