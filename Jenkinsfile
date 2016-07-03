@@ -16,30 +16,35 @@ def void ansiColor(Closure<Void> wrapped) {
   }
 }
 
-def Closure<Void> ciShNodeSpawner(String os, String flags) {
+def Closure<Void> ciShNodeSpawner(int id, String os, String flags) {
   return { ->
     node(os) {
       ansiColor {
-        // Avoid failing on transient git issues.
-        retry(3) {
-          checkout scm
+        dir("shard${id}") { 
+          /*
+           * Work around various concurrency issues associated with tools that use paths under the
+           * HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
+           * use of them would support concurrent usage robustly, at which point this hack could be
+           * removed.
+           */
+          env.HOME = "${pwd()}/.home"
+        
+          // For c/c++ contrib plugin tests.
+          env.CXX = 'g++'
+
+          // Isolate the clone and home dirs.
+          dir('clone') {
+            // Avoid failing on transient git issues.
+            retry(3) {
+              checkout scm
+            }
+
+            sh("""
+              ./build-support/ci/print_node_info.sh
+              ./build-support/bin/ci.sh ${flags}
+              """)
+          }
         }
-
-        /*
-         * Work around various concurrency issues associated with tools that use paths under the
-         * HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
-         * use of them would support concurrent usage robustly, at which point this hack could be
-         * removed.
-         */
-        env.HOME = "${pwd()}/.home"
-
-        // For c/c++ contrib plugin tests.
-        env.CXX = "g++"
-
-        sh("""
-          ./build-support/ci/print_node_info.sh
-          ./build-support/bin/ci.sh ${flags}
-          """)
       }
     }
   }
@@ -53,7 +58,7 @@ def List shardList() {
     // NB: We use maps instead of a simple `Shard` struct class because the jenkins pipeline
     // security sandbox disallows `new Shard(...)` and offers no way to approve the action.
     // If this could be figured out we could use `List<Shard>` here and in `buildShards` below.
-    shards << [os: os, branchName: branchName, flags: flags]
+    shards << [id: shards.size(), os: os, branchName: branchName, flags: flags]
   }
 
   nodes = ['linux': 10]
@@ -81,7 +86,7 @@ def List shardList() {
 def Map<String, Closure<Void>> buildShards(List shards) {
   Map<String, Closure<Void>> shardsByBranch = [:]
   for (shard in shards) {
-    shardsByBranch[shard.branchName] = ciShNodeSpawner(shard.os, shard.flags)
+    shardsByBranch[shard.branchName] = ciShNodeSpawner(shard.id, shard.os, shard.flags)
   }
   return shardsByBranch
 }
