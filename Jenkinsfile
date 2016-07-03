@@ -20,11 +20,6 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
   return { ->
     node(os) {
       ansiColor {
-        // Avoid failing on transient git issues.
-        retry(3) {
-          checkout scm
-        }
-
         /*
          * Work around various concurrency issues associated with tools that use paths under the
          * HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
@@ -34,12 +29,20 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
         env.HOME = "${pwd()}/.home"
 
         // For c/c++ contrib plugin tests.
-        env.CXX = "g++"
+        env.CXX = 'g++'
 
-        sh("""
-          ./build-support/ci/print_node_info.sh
-          ./build-support/bin/ci.sh ${flags}
-          """)
+        // Isolate the clone and home dirs.
+        dir('clone') {
+          // Avoid failing on transient git issues.
+          retry(3) {
+            checkout scm
+          }
+
+          sh("""
+            ./build-support/ci/print_node_info.sh
+            ./build-support/bin/ci.sh ${flags}
+            """)
+        }
       }
     }
   }
