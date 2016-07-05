@@ -34,6 +34,14 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
         args=dict(
           platform='java8',
         ),
+        dependencies=[
+          ':proto-sources',
+        ],
+      )
+
+      remote_sources(name='proto-sources',
+        dest=resources,
+        sources_target=':external-source',
       )
 
       unpacked_jars(name='external-source',
