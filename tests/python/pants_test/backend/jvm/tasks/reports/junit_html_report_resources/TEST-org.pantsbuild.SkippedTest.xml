@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<testsuite name="org.pantsbuild.SkippedTest" errors="0" failures="0" skipped="1" tests="1" time="0">
+  <properties/>
+  <testcase classname="org.pantsbuild.SkippedTest" name="skipTest" time="0">
+    <skipped></skipped>
+  </testcase>
+  <system-out></system-out>
+  <system-err></system-err>
+</testsuite>
