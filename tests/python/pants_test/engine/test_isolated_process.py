@@ -11,9 +11,9 @@ from functools import partial
 
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import (Binary, Checkout, ProcessExecutionNode, Snapshot,
+from pants.engine.isolated_process import (Binary, Checkout, ProcessExecutionNode, SnapshotID,
                                            SnapshottedProcessRequest, SnapshottedProcessResult,
-                                           SnapshottingRule)
+                                           SnapshottingRule, _snapshot_path)
 from pants.engine.nodes import Return, StepContext
 from pants.engine.scheduler import SnapshottedProcess
 from pants.engine.selectors import Select, SelectLiteral
@@ -138,9 +138,13 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def test_gather_snapshot_of_pathglobs(self):
-    scheduler = self.mk_scheduler_in_example_fs([SnapshottingRule()])
+    rules = [SnapshottingRule()]
+    project_tree = self.mk_example_fs_tree()
+    scheduler = self.mk_scheduler(tasks=rules,
+                                  project_tree=project_tree)
 
-    request = scheduler.execution_request([Snapshot],
+
+    request = scheduler.execution_request([SnapshotID],
                                           [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
@@ -149,9 +153,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
     snapshot = state.value
 
-    with open_tar(snapshot.archive, errorlevel=1) as tar:
-      self.assertEqual(['fs_test/a/b/1.txt', 'fs_test/a/b/2'],
-                       [tar_info.path for tar_info in tar.getmembers()])
+    self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], snapshot, project_tree)
 
   def test_process_exec_node_directly(self):
     # process exec node needs to be able to do nailgun
@@ -232,6 +234,11 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     classpath_entry = state.value
     self.assertIsInstance(classpath_entry, ClasspathEntry)
     self.assertTrue(os.path.exists(os.path.join(classpath_entry.path, 'simple', 'Simple.class')))
+
+  def assert_archive_files(self, expected_archive_files, snapshot, project_tree):
+    with open_tar(_snapshot_path(snapshot, project_tree), errorlevel=1) as tar:
+      self.assertEqual(expected_archive_files,
+                       [tar_info.path for tar_info in tar.getmembers()])
 
   def assertFirstEntryIsReturn(self, root_entries, scheduler):
     root, state = root_entries[0]

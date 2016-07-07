@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import subprocess
-import uuid
 from abc import abstractproperty
+from hashlib import sha1
 
 from pants.engine.fs import Files
 from pants.engine.nodes import Node, Noop, Return, State, TaskNode, Throw, Waiting
@@ -23,8 +23,52 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-class Snapshot(datatype('Snapshot', ['archive'])):
-  """Holds a reference to the archived snapshot of something."""
+def _create_snapshot_archive(snapshot_id, file_list, step_context):
+  # TODO Create / find snapshot directory via configuration.
+  # TODO name snapshot archive based on subject, perhaps.
+  tar_location = _snapshot_path(snapshot_id, step_context.project_tree)
+  logger.debug('snapshotting for files: {}'.format(file_list))
+  with open_tar(tar_location, mode='w:gz') as tar:
+    for file in file_list.dependencies:
+      tar.add(os.path.join(step_context.project_tree.build_root, file.path), file.path)
+
+
+def _snapshot_path(snapshot_id, project_tree):
+  archive_dir = os.path.join(project_tree.build_root, '.snapshots')
+  safe_mkdir(archive_dir)
+  tar_location = os.path.join(archive_dir, '{}.tar'.format(snapshot_id.fingerprint))
+  return tar_location
+
+
+def _extract_snapshot(step_context, snapshot_id, checkout, subject):
+  with open_tar(_snapshot_path(snapshot_id, step_context.project_tree), errorlevel=1) as tar:
+    tar.extractall(checkout.path)
+  logger.debug('extracted {} snapshot to {}'.format(subject, checkout.path))
+
+
+def _create_snapshot_id(select_state, step_context):
+  file_list = select_state.value
+  file_hash = _hash_files(step_context.project_tree.build_root, file_list)
+  snapshot_id = SnapshotID(file_hash)
+  return file_list, snapshot_id
+
+
+def _hash_files(build_root, file_list):
+  hasher = sha1()
+  hasher.update(build_root)
+  # Perhaps this could / should be projected into a Sources field? Then we could re-use the hashing from there.
+  # Alternatively, we could extract the hashing mechanism from there and make a common one.
+  # Or, we might want to use FileDigest instead
+  for file in sorted(file_list.dependencies):
+    hasher.update(file.path)
+    with open(os.path.join(build_root, file.path), 'rb') as f:
+      hasher.update(f.read())
+  file_hash = hasher.hexdigest()
+  return file_hash
+
+
+class SnapshotID(datatype('SnapshotID', ['fingerprint'])):
+  """Holds a fingerprint of the snapshotted files."""
 
 
 class Binary(datatype('Binary', [])):
@@ -205,7 +249,7 @@ class ProcessOrchestrationNode(datatype('ProcessOrchestrationNode',
 class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
   is_inlineable = False
   is_cacheable = True
-  product = Snapshot
+  product = SnapshotID
 
   def step(self, step_context):
     selector = Select(Files)
@@ -217,32 +261,19 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
     elif type(select_state) is not Return:
       State.raise_unrecognized(select_state)
 
-    # TODO Create / find snapshot directory via configuration.
+    file_list, snapshot_id = _create_snapshot_id(select_state, step_context)
 
-    with temporary_dir(cleanup=False) as dir:
-      archive_dir = dir
-    safe_mkdir(archive_dir)
+    _create_snapshot_archive(snapshot_id, file_list, step_context)
 
-    file_list = select_state.value
-
-    logger.debug('snapshotting for files: {}'.format(file_list))
-    # TODO name snapshot archive based on subject, perhaps.
-    tar_location = os.path.join(archive_dir, '{}.tar'.format(uuid.uuid4().hex))
-
-    build_root = step_context.project_tree.build_root
-    with open_tar(tar_location, mode='w:gz') as tar:
-      for file in file_list.dependencies:
-        tar.add(os.path.join(build_root, file.path), file.path)
-
-    return Return(Snapshot(tar_location))
+    return Return(snapshot_id)
 
 
 class SnapshottingRule(Rule):
   input_selects = Select(Files)
-  output_product_type = Snapshot
+  output_product_type = SnapshotID
 
   def as_node(self, subject, product_type, variants):
-    assert product_type == Snapshot
+    assert product_type == SnapshotID
     return SnapshotNode(subject, variants)
 
 
@@ -265,14 +296,13 @@ class ApplyCheckoutNode(datatype('CheckoutNode', ['subject', 'checkout']), Node)
   variants = None
 
   def step(self, step_context):
-    node = step_context.select_node(Select(Snapshot), self.subject, None)
+    node = step_context.select_node(Select(SnapshotID), self.subject, None)
     select_state = step_context.get(node)
     if type(select_state) in {Waiting, Throw, Noop}:
       return select_state
     elif type(select_state) is not Return:
       State.raise_unrecognized(select_state)
 
-    with open_tar(select_state.value.archive, errorlevel=1) as tar:
-      tar.extractall(self.checkout.path)
-    logger.debug('extracted {} snapshot to {}'.format(self.subject, self.checkout.path))
+    _extract_snapshot(step_context, select_state.value, self.checkout, self.subject)
+
     return Return(self.checkout)
