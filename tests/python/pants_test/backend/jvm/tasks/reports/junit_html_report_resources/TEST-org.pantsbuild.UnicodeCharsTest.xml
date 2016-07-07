@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<testsuite name="org.pantsbuild.PåssingTest" errors="1" failures="0" skipped="0" tests="2" time="0.35">
+  <properties/>
+  <testcase classname="org.pantsbuild.PåssingTest" name="testOne" time="0.01" />
+  <testcase classname="org.pantsbuild.PåssingTest" name="testTwö" time="0.34">
+    <error type="java.lang.RuntimeException">java.lang.RuntimeException
+      at org.pantsbuild.PåssingTest.testTwö(ErrorTest.java:29)
+      at org.pantsbuild.tools.junit.ConsoleRunner.main(ConsoleRunner.java:12)
+    </error>
+  </testcase>
+  <system-out>This is sample standard output 快乐</system-out>
+  <system-err>This is sample standard error output 悲しい</system-err>
+</testsuite>

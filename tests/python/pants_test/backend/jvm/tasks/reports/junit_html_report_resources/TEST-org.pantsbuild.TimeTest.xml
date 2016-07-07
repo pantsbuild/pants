@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<testsuite name="org.pantsbuild.TimeTest" errors="0" failures="0" skipped="0" tests="4" time="0.5">
+  <properties/>
+  <testcase classname="org.pantsbuild.TimeTest" name="zeroTime" time="0"/>
+  <testcase classname="org.pantsbuild.TimeTest" name="zeroPointZeroTime" time="0.0"/>
+  <testcase classname="org.pantsbuild.TimeTest" name="halfTime" time="0.5"/>
+  <testcase classname="org.pantsbuild.TimeTest" name="noTime"/>
+  <system-out></system-out>
+  <system-err></system-err>
+</testsuite>
