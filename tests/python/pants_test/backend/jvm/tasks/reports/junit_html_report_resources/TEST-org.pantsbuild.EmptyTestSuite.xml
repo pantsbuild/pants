@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<testsuite name="org.pantsbuild.EmptyTestSuite" errors="0" failures="0" tests="0" time="0">
+  <properties>
+    <property name="java.specification.version" value="1.8"/>
+    <property name="java.vm.specification.version" value="1.8"/>
+  </properties>
+</testsuite>
