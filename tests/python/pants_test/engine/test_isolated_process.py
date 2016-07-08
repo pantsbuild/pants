@@ -56,7 +56,7 @@ def file_list_to_args_for_cat(files):
 
 def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(files):
   return SnapshottedProcessRequest(args=tuple(f.path for f in files.dependencies),
-                                   snapshot_subjects=[files])
+                                   snapshot_subjects=(files,))
 
 
 def process_result_to_concatted_from_outfile(process_result, checkout):
@@ -100,7 +100,7 @@ class Javac(Binary):
 def java_sources_to_javac_args(java_sources, out_dir):
   return SnapshottedProcessRequest(args=('-d', out_dir.path)+
                                         tuple(f.path for f in java_sources.dependencies),
-                                   snapshot_subjects=[java_sources],
+                                   snapshot_subjects=(java_sources,),
                                    directories_to_create=(out_dir.path,))
 
 
@@ -120,12 +120,13 @@ def process_result_to_classpath_entry(process_result, checkout):
 
 
 class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
-  def test_converts_unhashable_args_to_tuples(self):
-    request = SnapshottedProcessRequest(args=['1'], snapshot_subjects=[])
-
-    self.assertIsInstance(request.args, tuple)
-    self.assertIsInstance(request.snapshot_subjects, tuple)
-    self.assertTrue(hash(request))
+  def test_blows_up_on_unhashable_args(self):
+    with self.assertRaises(ValueError):
+      SnapshottedProcessRequest(args=['1'])
+    with self.assertRaises(ValueError):
+      SnapshottedProcessRequest(args=('1',), snapshot_subjects=[])
+    with self.assertRaises(ValueError):
+      SnapshottedProcessRequest(args=('1',), directories_to_create=[])
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
@@ -149,7 +150,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def test_integration_simple_concat_test(self):
     scheduler = self.mk_scheduler_in_example_fs(
-      [SnapshottedProcess(product_type=Concatted, binary_type=ShellCat,
+      [SnapshottedProcess(product_type=Concatted,
+                          binary_type=ShellCat,
                           input_selectors=(Select(Files),),
                           input_conversion=file_list_to_args_for_cat,
                           output_conversion=process_result_to_concatted),

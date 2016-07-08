@@ -100,9 +100,11 @@ class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
     :param directories_to_create: Directories to ensure exist in the sandbox before execution.
     """
     if not isinstance(args, tuple):
-      args = tuple(args)
+      raise ValueError('args must be a tuple.')
     if not isinstance(snapshot_subjects, tuple):
-      snapshot_subjects = tuple(snapshot_subjects)
+      raise ValueError('snapshot_subjects must be a tuple.')
+    if not isinstance(directories_to_create, tuple):
+      raise ValueError('directories_to_create must be a tuple.')
     return super(SnapshottedProcessRequest, cls).__new__(cls, args, snapshot_subjects, directories_to_create, **kwargs)
 
 
