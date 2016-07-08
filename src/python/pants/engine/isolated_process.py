@@ -13,7 +13,7 @@ from hashlib import sha1
 
 from pants.engine.fs import Files, PathGlobs
 from pants.engine.nodes import Node, Noop, Return, State, TaskNode, Throw, Waiting
-from pants.engine.selectors import Select
+from pants.engine.selectors import Select, SelectDependencies
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
@@ -108,44 +108,12 @@ class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
 
 
 class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', 'stderr', 'exit_code'])):
-  """Contains the stdout / stderr from executing a process."""
+  """Contains the stdout, stderr and exit code from executing a process."""
 
 
-class UncacheableTaskNode(TaskNode):
-  """A task node that isn't cacheable."""
-  is_cacheable = False
-
-
-class ProcessExecutionNode(datatype('ProcessNode', ['binary', 'process_request', 'checkout']),
+class ProcessExecutionNode(datatype('ProcessOrchestrationNode',
+                                    ['subject', 'snapshotted_process']),
                            Node):
-  """Executes processes in a checkout directory."""
-
-  is_cacheable = False
-  is_inlineable = False
-  variants = None
-
-  def step(self, step_context):
-    command = self.binary.prefix_of_command() + tuple(self.process_request.args)
-    logger.debug('Running command: "{}" in {}'.format(command, self.checkout.path))
-
-    popen = subprocess.Popen(command,
-                             stderr=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             cwd=self.checkout.path)
-    # TODO At some point, we may want to replace this blocking wait with a timed one that returns
-    # some kind of in progress state.
-    popen.wait()
-
-    logger.debug('Done running command in {}'.format(self.checkout.path))
-
-    return Return(
-      SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
-    )
-
-
-class ProcessOrchestrationNode(datatype('ProcessOrchestrationNode',
-                                        ['subject', 'snapshotted_process']),
-                               Node):
   """Wraps a process execution, preparing and tearing down the execution environment."""
 
   is_cacheable = True
@@ -182,47 +150,49 @@ class ProcessOrchestrationNode(datatype('ProcessOrchestrationNode',
 
     # If the process requires snapshots, request a checkout with the requested snapshots applied.
     if process_request.snapshot_subjects:
-      # TODO investigate converting this into either a dependency op or a projection.
-      open_node = OpenCheckoutNode(process_request)
-      state_open = step_context.get(open_node)
-      if type(state_open) in (Waiting, Throw, Noop):
-        return state_open
+      node = step_context.select_node(SelectDependencies(SnapshotID, SnapshottedProcessRequest, 'snapshot_subjects'),
+                                      process_request, self.variants)
+      state = step_context.get(node)
+      if type(state) is not Return:
+        return state
 
-      checkout = state_open.value
+      snapshot_ids_and_subjects = zip(state.value, process_request.snapshot_subjects)
 
-      for snapshot_subject in process_request.snapshot_subjects:
-        ss_apply_node = ApplyCheckoutNode(snapshot_subject, checkout)
-        ss_state = step_context.get(ss_apply_node)
-        if type(ss_state) is Return:
-          pass # NB the return value here isn't interesting. We're purely interested in the
-               # modifications taking place.
-        elif type(ss_state) in (Waiting, Throw, Noop):
-          return ss_state
+      with temporary_dir(cleanup=False) as outdir:
+        checkout = Checkout(outdir)
+
+      for snapshot_id, subject in snapshot_ids_and_subjects:
+        _extract_snapshot(step_context, snapshot_id, checkout, subject)
+
       # All of the snapshots have been checked out now.
       if process_request.prep_fn:
         process_request.prep_fn(checkout)
+
     else:
       # If there are no things to snapshot, then do no snapshotting or checking out and just use the
       # project dir.
       checkout = Checkout(step_context.project_tree.build_root)
 
-    exec_node = self._process_exec_node(binary_value, process_request, checkout)
-    exec_state = step_context.get(exec_node)
-    if type(exec_state) in (Waiting, Throw, Noop):
-      return exec_state
-    elif type(exec_state) is not Return:
-      State.raise_unrecognized(exec_state)
+    command = binary_value.prefix_of_command() + tuple(process_request.args)
+    logger.debug('Running command: "{}" in {}'.format(command, checkout.path))
 
-    process_result = exec_state.value
+    popen = subprocess.Popen(command,
+                             stderr=subprocess.PIPE,
+                             stdout=subprocess.PIPE,
+                             cwd=checkout.path)
+    # TODO At some point, we may want to replace this blocking wait with a timed one that returns
+    # some kind of in progress state.
+    popen.wait()
+
+    logger.debug('Done running command in {}'.format(checkout.path))
+
+    process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
 
     converted_output = self.snapshotted_process.output_conversion(process_result, checkout)
 
     # TODO clean up the checkout.
 
     return Return(converted_output)
-
-  def _process_exec_node(self, binary_value, process_request, checkout):
-    return ProcessExecutionNode(binary_value, process_request, checkout)
 
   def _binary_select_node(self, step_context):
     return step_context.select_node(Select(self.snapshotted_process.binary_type),
@@ -231,11 +201,11 @@ class ProcessOrchestrationNode(datatype('ProcessOrchestrationNode',
                                     variants=None)
 
   def _request_task_node(self):
-    return UncacheableTaskNode(subject=self.subject,
-                               product=SnapshottedProcessRequest,
-                               variants=None,  # TODO figure out what this should be
-                               func=self.snapshotted_process.input_conversion,
-                               clause=self.snapshotted_process.input_selectors)
+    return TaskNode(subject=self.subject,
+                    product=SnapshottedProcessRequest,
+                    variants=None,  # TODO figure out what this should be
+                    func=self.snapshotted_process.input_conversion,
+                    clause=self.snapshotted_process.input_selectors)
 
   def __repr__(self):
     return 'ProcessOrchestrationNode(subject={}, snapshotted_process={}' \
@@ -275,34 +245,3 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
     _create_snapshot_archive(snapshot_id, file_list, step_context)
 
     return Return(snapshot_id)
-
-
-class OpenCheckoutNode(datatype('CheckoutNode', ['subject']), Node):
-  is_cacheable = True
-  is_inlineable = False
-  product = Checkout
-  variants = None
-
-  def step(self, step_context):
-    logger.debug('Constructing checkout for {}'.format(self.subject))
-    with temporary_dir(cleanup=False) as outdir:
-      return Return(Checkout(outdir))
-
-
-class ApplyCheckoutNode(datatype('CheckoutNode', ['subject', 'checkout']), Node):
-  is_cacheable = False
-  is_inlineable = False
-  product = Checkout
-  variants = None
-
-  def step(self, step_context):
-    node = step_context.select_node(Select(SnapshotID), self.subject, None)
-    select_state = step_context.get(node)
-    if type(select_state) in {Waiting, Throw, Noop}:
-      return select_state
-    elif type(select_state) is not Return:
-      State.raise_unrecognized(select_state)
-
-    _extract_snapshot(step_context, select_state.value, self.checkout, self.subject)
-
-    return Return(self.checkout)

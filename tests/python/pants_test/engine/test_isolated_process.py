@@ -11,10 +11,9 @@ from functools import partial
 
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import (Binary, Checkout, ProcessExecutionNode, SnapshotID,
-                                           SnapshottedProcessRequest, SnapshottedProcessResult,
+from pants.engine.isolated_process import (Binary, SnapshotID, SnapshottedProcessRequest,
                                            _snapshot_path)
-from pants.engine.nodes import Return, StepContext
+from pants.engine.nodes import Return
 from pants.engine.scheduler import SnapshottedProcess
 from pants.engine.selectors import Select, SelectLiteral
 from pants.util.contextutil import open_tar
@@ -137,6 +136,7 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
+  # TODO test exercising what happens if a snapshot file doesn't exist after hitting cache for snapshot node.
   def test_gather_snapshot_of_pathglobs(self):
     project_tree = self.mk_example_fs_tree()
     scheduler = self.mk_scheduler(project_tree=project_tree)
@@ -152,19 +152,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     snapshot = state.value
 
     self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], snapshot, project_tree)
-
-  def test_process_exec_node_directly(self):
-    # process exec node needs to be able to do nailgun
-    binary = ShellCat()  # Not 100% sure I like this here TODO make it better.
-    process_request = SnapshottedProcessRequest(['fs_test/a/b/1.txt', 'fs_test/a/b/2'])
-    project_tree = self.mk_example_fs_tree()
-
-    context = StepContext(None, project_tree, tuple(), False)
-
-    node = ProcessExecutionNode(binary, process_request, Checkout(project_tree.build_root))
-    step_result = node.step(context)
-
-    self.assertEqual(Return(SnapshottedProcessResult(stdout='one\ntwo\n', stderr='', exit_code=0)), step_result)
 
   def test_integration_simple_concat_test(self):
     scheduler = self.mk_scheduler_in_example_fs(

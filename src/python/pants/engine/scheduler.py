@@ -16,7 +16,7 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.isolated_process import ProcessOrchestrationNode, SnapshotNode
+from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return, SelectNode,
                                 State, StepContext, TaskNode, Throw, Waiting)
 from pants.engine.objects import Closable
@@ -427,7 +427,7 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
   """A rule for snapshotted processes."""
 
   def as_node(self, subject, product_type, variants):
-    return ProcessOrchestrationNode(subject, self)
+    return ProcessExecutionNode(subject, self)
 
   @property
   def output_product_type(self):
