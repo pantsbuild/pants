@@ -3,6 +3,7 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import com.google.common.base.Throwables;
 import org.junit.runner.Description;
 import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
@@ -24,6 +25,17 @@ abstract class AbortableListener extends ForwardingListener {
   AbortableListener(boolean failFast) {
     this.failFast = failFast;
     addListener(result.createListener());
+  }
+
+  @Override public void testRunFinished(Result result) throws Exception {
+    try {
+      super.testRunFinished(result);
+    } catch (Throwable t) {
+      // See https://github.com/pantsbuild/pants/issues/3638, without this debug stmt the runner
+      // fails without printing out any errors
+      System.err.println(Throwables.getStackTraceAsString(t));
+      Throwables.propagate(t);
+    }
   }
 
   @Override
