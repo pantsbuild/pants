@@ -15,7 +15,6 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
 from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
                              file_digest, read_link, scan_directory)
-from pants.engine.rule import Rule
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
@@ -390,14 +389,6 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     return repr(self)
 
 
-class FilesystemRule(datatype('FSRule', ['output_product_type', 'subject_type']), Rule):
-  def as_node(self, subject, product_type, variants):
-    assert self.subject_type == type(subject)
-    assert self.output_product_type == product_type
-
-    return FilesystemNode(subject, product_type, variants)
-
-
 class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants']), Node):
   """A native node type for filesystem operations."""
 
@@ -412,10 +403,15 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   is_inlineable = False
 
   @classmethod
-  def as_intrinsic_rules(cls):
-    """Returns a dict of tuple(sbj type, product type) -> list of rules for that subject product type tuple."""
-    return {(subject_type, product_type): FilesystemRule(product_type, subject_type)
+  def as_intrinsics(cls):
+    """Returns a dict of tuple(sbj type, product type) -> functions returning a fs node for that subject product type tuple."""
+    return {(subject_type, product_type): FilesystemNode.create
             for product_type, subject_type in cls._FS_PAIRS}
+
+  @classmethod
+  def create(cls, subject, product_type, variants):
+    assert (product_type, type(subject)) in cls._FS_PAIRS
+    return FilesystemNode(subject, product_type, variants)
 
   @classmethod
   def generate_subjects(cls, filenames):

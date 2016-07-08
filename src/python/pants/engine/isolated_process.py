@@ -11,9 +11,8 @@ import subprocess
 from abc import abstractproperty
 from hashlib import sha1
 
-from pants.engine.fs import Files
+from pants.engine.fs import Files, PathGlobs
 from pants.engine.nodes import Node, Noop, Return, State, TaskNode, Throw, Waiting
-from pants.engine.rule import Rule
 from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir
@@ -251,6 +250,16 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
   is_cacheable = True
   product = SnapshotID
 
+  @classmethod
+  def as_intrinsics(cls):
+    return {(Files, SnapshotID): cls.create,
+            (PathGlobs, SnapshotID): cls.create}
+
+  @classmethod
+  def create(cls, subject, product_type, variants):
+    assert product_type == SnapshotID
+    return SnapshotNode(subject, variants)
+
   def step(self, step_context):
     selector = Select(Files)
     node = step_context.select_node(selector, self.subject, self.variants)
@@ -266,15 +275,6 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
     _create_snapshot_archive(snapshot_id, file_list, step_context)
 
     return Return(snapshot_id)
-
-
-class SnapshottingRule(Rule):
-  input_selects = Select(Files)
-  output_product_type = SnapshotID
-
-  def as_node(self, subject, product_type, variants):
-    assert product_type == SnapshotID
-    return SnapshotNode(subject, variants)
 
 
 class OpenCheckoutNode(datatype('CheckoutNode', ['subject']), Node):

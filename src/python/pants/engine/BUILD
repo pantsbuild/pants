@@ -37,13 +37,6 @@ python_library(
   ]
 )
 
-
-python_library(
-  name='rule',
-  sources=['rule.py'],
-  dependencies=[]
-)
-
 python_library(
   name='engine',
   sources=['engine.py'],
@@ -103,7 +96,6 @@ python_library(
     ':addressable',
     ':fs',
     ':nodes',
-    ':rule',
     ':struct',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',
@@ -117,7 +109,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':addressable',
     ':fs',
-    ':rule',
     ':struct',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
@@ -171,7 +162,6 @@ python_library(
     ':fs',
     ':isolated_process',
     ':nodes',
-    ':rule',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',

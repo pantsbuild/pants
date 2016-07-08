@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import logging
 import threading
 import time
@@ -15,11 +16,10 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.isolated_process import ProcessOrchestrationNode
+from pants.engine.isolated_process import ProcessOrchestrationNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return, SelectNode,
                                 State, StepContext, TaskNode, Throw, Waiting)
 from pants.engine.objects import Closable
-from pants.engine.rule import Rule
 from pants.util.objects import datatype
 
 
@@ -419,19 +419,11 @@ class Promise(object):
       return self._success
 
 
-class TaskRule(datatype('TaskRule', ['output_product_type', 'input_selects', 'task']), Rule):
-  """A rule for producing nodes from task triples."""
-
-  def as_node(self, subject, product_type, variants):
-    assert product_type == self.output_product_type
-    return TaskNode(subject, product_type, variants, self.task, self.input_selects)
-
-
-class SnapshottedProcess(datatype('SnapshottedProcess',['product_type',
-                                                        'binary_type',
-                                                        'input_selectors',
-                                                        'input_conversion',
-                                                        'output_conversion']), Rule):
+class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
+                                                         'binary_type',
+                                                         'input_selectors',
+                                                         'input_conversion',
+                                                         'output_conversion'])):
   """A rule for snapshotted processes."""
 
   def as_node(self, subject, product_type, variants):
@@ -457,15 +449,21 @@ class NodeBuilder(Closable):
       if isinstance(entry, (tuple, list)) and len(entry) == 3:
         output_type, input_selects, task = entry
         serializable_rules[output_type].add(
-          TaskRule(output_type, tuple(input_selects), task)
+          functools.partial(cls.create_task_node, clause=tuple(input_selects), task_func=task)
         )
-      elif isinstance(entry, Rule):
-        serializable_rules[entry.output_product_type].add(entry)
+      elif isinstance(entry, SnapshottedProcess):
+        serializable_rules[entry.output_product_type].add(entry.as_node)
       else:
         raise Exception("Unexpected rule type for entry {}".format(entry))
 
-    intrinsic_rules = FilesystemNode.as_intrinsic_rules()
+    intrinsic_rules = dict()
+    intrinsic_rules.update(FilesystemNode.as_intrinsics())
+    intrinsic_rules.update(SnapshotNode.as_intrinsics())
     return cls(serializable_rules, intrinsic_rules)
+
+  @classmethod
+  def create_task_node(cls, subject, product_type, variants, task_func, clause):
+    return TaskNode(subject, product_type, variants, task_func, clause)
 
   def __init__(self, rules, intrinsics):
     self._rules = rules
@@ -473,13 +471,13 @@ class NodeBuilder(Closable):
 
   def gen_nodes(self, subject, product_type, variants):
     # Intrinsic rules that provide the requested product for the current subject type.
-    matching_intrinsic_rule = self._lookup_intrinsic(product_type, subject)
-    if matching_intrinsic_rule:
-      yield matching_intrinsic_rule.as_node(subject, product_type, variants)
+    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject)
+    if intrinsic_node_factory:
+      yield intrinsic_node_factory(subject, product_type, variants)
     else:
       # Task rules that provide the requested product.
-      for rule in self._lookup_rules(product_type):
-        yield rule.as_node(subject, product_type, variants)
+      for node_factory in self._lookup_rules(product_type):
+        yield node_factory(subject, product_type, variants)
 
   def _lookup_rules(self, product_type):
     return self._rules[product_type]

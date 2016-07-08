@@ -13,7 +13,7 @@ from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
 from pants.engine.isolated_process import (Binary, Checkout, ProcessExecutionNode, SnapshotID,
                                            SnapshottedProcessRequest, SnapshottedProcessResult,
-                                           SnapshottingRule, _snapshot_path)
+                                           _snapshot_path)
 from pants.engine.nodes import Return, StepContext
 from pants.engine.scheduler import SnapshottedProcess
 from pants.engine.selectors import Select, SelectLiteral
@@ -138,10 +138,8 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def test_gather_snapshot_of_pathglobs(self):
-    rules = [SnapshottingRule()]
     project_tree = self.mk_example_fs_tree()
-    scheduler = self.mk_scheduler(tasks=rules,
-                                  project_tree=project_tree)
+    scheduler = self.mk_scheduler(project_tree=project_tree)
 
 
     request = scheduler.execution_request([SnapshotID],
@@ -189,7 +187,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def test_integration_concat_with_snapshot_subjects_test(self):
     scheduler = self.mk_scheduler_in_example_fs([
-      SnapshottingRule(),
       # subject to files / product of subject to files for snapshot.
       SnapshottedProcess(product_type=Concatted,
                          binary_type=ShellCatToOutFile,
@@ -214,7 +211,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     sources = PathGlobs.create('', files=['scheduler_inputs/src/java/simple/Simple.java'])
 
     scheduler = self.mk_scheduler_in_example_fs([
-      SnapshottingRule(),
       SnapshottedProcess(ClasspathEntry,
                          Javac,
                          (Select(Files), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
