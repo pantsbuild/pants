@@ -19,24 +19,26 @@ import xsbti.compile.CompileOrder
  * All parsed command-line options.
  */
 case class Settings(
-  help: Boolean              = false,
-  version: Boolean           = false,
-  consoleLog: ConsoleOptions = ConsoleOptions(),
-  captureLog: Option[File]   = None,
-  sources: Seq[File]         = Seq.empty,
-  classpath: Seq[File]       = Seq.empty,
-  classesDirectory: File     = new File("."),
-  scala: ScalaLocation       = ScalaLocation(),
-  scalacOptions: Seq[String] = Seq.empty,
-  javaHome: Option[File]     = None,
-  forkJava: Boolean          = false,
-  javaOnly: Boolean          = false,
-  javacOptions: Seq[String]  = Seq.empty,
-  compileOrder: CompileOrder = CompileOrder.Mixed,
-  sbt: SbtJars               = SbtJars(),
-  incOptions: IncOptions     = IncOptions(),
-  analysis: AnalysisOptions  = AnalysisOptions(),
-  properties: Seq[String]    = Seq.empty
+  help: Boolean                        = false,
+  version: Boolean                     = false,
+  consoleLog: ConsoleOptions           = ConsoleOptions(),
+  captureLog: Option[File]             = None,
+  sources: Seq[File]                   = Seq.empty,
+  classpath: Seq[File]                 = Seq.empty,
+  classesDirectory: File               = new File("."),
+  scala: ScalaLocation                 = ScalaLocation(),
+  scalacOptions: Seq[String]           = Seq.empty,
+  javaHome: Option[File]               = None,
+  forkJava: Boolean                    = false,
+  javaOnly: Boolean                    = false,
+  javacOptions: Seq[String]            = Seq.empty,
+  compileOrder: CompileOrder           = CompileOrder.Mixed,
+  sbt: SbtJars                         = SbtJars(),
+  incOptions: IncOptions               = IncOptions(),
+  analysis: AnalysisOptions            = AnalysisOptions(),
+  properties: Seq[String]              = Seq.empty,
+  fatalWarnings: Boolean               = false,
+  nonFatalWarningsPatterns: Seq[Regex] = Seq.empty
 )
 
 /** Due to the limit of 22 elements in a case class, options must get broken down into sub-groups.
@@ -207,6 +209,9 @@ object Settings {
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(      "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),
+    boolean(   "-fatal-warnings",              "Increase severity of warnings to errors",    (s: Settings) => s.copy(fatalWarnings = true)),
+    string(    "-non-fatal-warnings-patterns", "regex",
+      "Specify warnings that are from -fatal-warnings",                                      (s: Settings, re: String) => s.copy(nonFatalWarningsPatterns = s.nonFatalWarningsPatterns :+ re.r)),
 
     header("Scala options:"),
     file(      "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),

@@ -160,6 +160,8 @@ class BaseZincCompile(JvmCompile):
                '-C.*': False,
                '-file-filter': True,
                '-msg-filter': True,
+               '-fatal-warnings': False,
+               '-non-fatal-warnings-patterns': True,
                },
              help='A dict of option regexes that make up pants\' supported API for zinc. '
                   'Options not listed here are subject to change/removal. The value of the dict '
