@@ -166,6 +166,7 @@ class BundleField(tuple, PayloadField):
 
   Must be initialized with an iterable of Bundle instances.
   """
+
   def __new__(cls, bundles):
     new_bundles = []
     for bundle in bundles:
