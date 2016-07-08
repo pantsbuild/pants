@@ -89,23 +89,21 @@ class Checkout(datatype('Checkout', ['path'])):
 
 
 class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
-                                         ['args', 'snapshot_subjects', 'prep_fn'])):
-  """Request for execution with binary args and snapshots to extract.
+                                         ['args', 'snapshot_subjects', 'directories_to_create'])):
+  """Request for execution with binary args and snapshots to extract."""
 
-  args - Arguments to the binary being run.
-  snapshot_subjects - Subjects for requesting snapshots that will be checked out into the work dir
-                      for the process.
-  prep_fn - escape hatch for manipulating the work dir.
+  def __new__(cls, args, snapshot_subjects=tuple(), directories_to_create=tuple(), **kwargs):
+    """
 
-            TODO come up with a better scheme for preparing for execution that's transparent to the engine.
-  """
-
-  def __new__(cls, args, snapshot_subjects=tuple(), prep_fn=None, **kwargs):
+    :param args: Arguments to the binary being run.
+    :param snapshot_subjects: Subjects used to request snapshots that will be checked out into the sandbox.
+    :param directories_to_create: Directories to ensure exist in the sandbox before execution.
+    """
     if not isinstance(args, tuple):
       args = tuple(args)
     if not isinstance(snapshot_subjects, tuple):
       snapshot_subjects = tuple(snapshot_subjects)
-    return super(SnapshottedProcessRequest, cls).__new__(cls, args, snapshot_subjects, prep_fn, **kwargs)
+    return super(SnapshottedProcessRequest, cls).__new__(cls, args, snapshot_subjects, directories_to_create, **kwargs)
 
 
 class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', 'stderr', 'exit_code'])):
@@ -166,9 +164,9 @@ class ProcessExecutionNode(datatype('ProcessOrchestrationNode',
         _extract_snapshot(step_context, snapshot, checkout, subject)
 
       # All of the snapshots have been checked out now.
-      if process_request.prep_fn:
-        process_request.prep_fn(checkout)
-
+      if process_request.directories_to_create:
+        for d in process_request.directories_to_create:
+          safe_mkdir(os.path.join(checkout.path, d))
     else:
       # If there are no things to snapshot, then do no snapshotting or checking out and just use the
       # project dir.

@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from functools import partial
 
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
@@ -17,7 +16,6 @@ from pants.engine.nodes import Return
 from pants.engine.scheduler import SnapshottedProcess
 from pants.engine.selectors import Select, SelectLiteral
 from pants.util.contextutil import open_tar
-from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -99,15 +97,11 @@ class Javac(Binary):
     return '/usr/bin/javac'
 
 
-def create_outdir(out_dir, checkout):
-  safe_mkdir(os.path.join(checkout.path, out_dir.path))
-
-
 def java_sources_to_javac_args(java_sources, out_dir):
   return SnapshottedProcessRequest(args=('-d', out_dir.path)+
                                         tuple(f.path for f in java_sources.dependencies),
                                    snapshot_subjects=[java_sources],
-                                   prep_fn=partial(create_outdir, out_dir))
+                                   directories_to_create=(out_dir.path,))
 
 
 def javac_bin():
