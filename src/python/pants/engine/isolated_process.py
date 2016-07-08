@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import shutil
 import subprocess
 from abc import abstractproperty
 from hashlib import sha1
@@ -14,7 +15,7 @@ from hashlib import sha1
 from pants.engine.fs import Files, PathGlobs
 from pants.engine.nodes import Node, Noop, Return, State, TaskNode, Throw, Waiting
 from pants.engine.selectors import Select, SelectDependencies
-from pants.util.contextutil import open_tar, temporary_dir
+from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
 
@@ -22,17 +23,34 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-def _create_snapshot_archive(snapshot, file_list, step_context):
-  # TODO Create / find snapshot directory via configuration.
-  # TODO name snapshot archive based on subject, perhaps.
+def _create_snapshot_archive(file_list, step_context):
+  logger.debug('snapshotting files: {}'.format(file_list))
+
+  # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
+  with temporary_file_path(cleanup=False) as tmp_path:
+    with open_tar(tmp_path, mode='w:gz') as tar:
+      for file in file_list.dependencies:
+        tar.add(os.path.join(step_context.project_tree.build_root, file.path), file.path)
+    snapshot = Snapshot(_fingerprint_files_in_tar(file_list, tmp_path))
   tar_location = _snapshot_path(snapshot, step_context.project_tree)
-  logger.debug('snapshotting for files: {}'.format(file_list))
-  with open_tar(tar_location, mode='w:gz') as tar:
+
+  shutil.move(tmp_path, tar_location)
+
+  return snapshot
+
+
+def _fingerprint_files_in_tar(file_list, tar_location):
+  hasher = sha1()
+  with open_tar(tar_location, mode='r:gz') as tar:
     for file in file_list.dependencies:
-      tar.add(os.path.join(step_context.project_tree.build_root, file.path), file.path)
+      hasher.update(file.path)
+      hasher.update(tar.extractfile(file.path).read())
+  return hasher.hexdigest()
 
 
 def _snapshot_path(snapshot, project_tree):
+  # TODO Create / find snapshot directory via configuration.
+  # TODO Consider naming snapshot archive based also on the subject and not just the fingerprint of the contained files.
   archive_dir = os.path.join(project_tree.build_root, '.snapshots')
   safe_mkdir(archive_dir)
   tar_location = os.path.join(archive_dir, '{}.tar'.format(snapshot.fingerprint))
@@ -45,35 +63,18 @@ def _extract_snapshot(step_context, snapshot, checkout, subject):
   logger.debug('extracted {} snapshot to {}'.format(subject, checkout.path))
 
 
-def _create_snapshot(select_state, step_context):
-  file_list = select_state.value
-  file_hash = _hash_files(step_context.project_tree.build_root, file_list)
-  snapshot = Snapshot(file_hash)
-  return file_list, snapshot
-
-
-def _hash_files(build_root, file_list):
-  hasher = sha1()
-  hasher.update(build_root)
-  # Perhaps this could / should be projected into a Sources field? Then we could re-use the hashing from there.
-  # Alternatively, we could extract the hashing mechanism from there and make a common one.
-  # Or, we might want to use FileDigest instead
-  for file in sorted(file_list.dependencies):
-    hasher.update(file.path)
-    with open(os.path.join(build_root, file.path), 'rb') as f:
-      hasher.update(f.read())
-  file_hash = hasher.hexdigest()
-  return file_hash
-
-
 class Snapshot(datatype('Snapshot', ['fingerprint'])):
-  """A snapshot of a collection of files fingerprinted by their contents."""
+  """A snapshot of a collection of files fingerprinted by their contents.
+
+  Snapshots are used to make it easier to isolate process execution by fixing the contents of the files being operated
+  on and easing their movement to and from isolated execution sandboxes.
+  """
 
 
 class Binary(datatype('Binary', [])):
   """Binary in the product graph.
 
-  Still working out the contract here."""
+  TODO these should use BinaryUtil to find binaries."""
 
   @abstractproperty
   def bin_path(self):
@@ -239,9 +240,8 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
       return select_state
     elif type(select_state) is not Return:
       State.raise_unrecognized(select_state)
+    file_list = select_state.value
 
-    file_list, snapshot = _create_snapshot(select_state, step_context)
-
-    _create_snapshot_archive(snapshot, file_list, step_context)
+    snapshot = _create_snapshot_archive(file_list, step_context)
 
     return Return(snapshot)
