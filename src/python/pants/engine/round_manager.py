@@ -36,6 +36,7 @@ class RoundManager(object):
     self._dependencies = set()
     self._context = context
     self._producer_infos_by_product_type = None
+    self._known_langs = set()
 
   def require(self, product_type):
     """Schedules the tasks that produce product_type to be executed before the requesting task.
@@ -63,8 +64,13 @@ class RoundManager(object):
   def _get_producer_infos_by_product_type(self, product_type):
     if self._producer_infos_by_product_type is None:
       self._producer_infos_by_product_type = self._index_products()
+      self._known_langs = set(self._context.source_roots.all_langs())
 
     producer_infos = self._producer_infos_by_product_type[product_type]
-    if not producer_infos:
+    # Products named for languages ('java', 'scala', 'python' etc.) are special: they represent
+    # source files in those languages, and are implicitly provided by a relevant source root.
+    # They may happen to also be explicitly provided by tasks (e.g., codegen(, but we don't want
+    # to fail with a MissingProductError if not.
+    if not producer_infos and product_type not in self._known_langs:
       raise self.MissingProductError("No producers registered for '{0}'".format(product_type))
     return producer_infos

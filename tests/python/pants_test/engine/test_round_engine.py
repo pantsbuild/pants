@@ -142,10 +142,24 @@ class RoundEngineTest(EngineTestBase, BaseTest):
       self.engine.attempt(self._context, self.as_goals('goal1'))
 
   def test_missing_product(self):
-    task =  self.install_task('task1', goal='goal1', required_data=['1'])
+    task = self.install_task('task1', goal='goal1', required_data=['1'])
     self.create_context(for_task_types=task)
     with self.assertRaises(self.engine.MissingProductError):
       self.engine.attempt(self._context, self.as_goals('goal1'))
+
+  def test_implicit_language_products(self):
+    task1 = self.install_task('task1', goal='goal1', required_data=['java'])
+    task2 = self.install_task('task2', goal='goal2', required_data=['scala'])
+    self.create_context(for_task_types=(task1 + task2))
+    self.create_dir('fixed/java')
+    self._context.source_roots.add_source_root('fixed/java', ['java'])
+
+    # Shouldn't raise, as we have a java source root to provide implicit java products.
+    self.engine.attempt(self._context, self.as_goals('goal1'))
+
+    # Should raise, as we do not have a scala source root, or any other source of scala products.
+    with self.assertRaises(self.engine.MissingProductError):
+      self.engine.attempt(self._context, self.as_goals('goal2'))
 
   def test_goal_cycle_direct(self):
     task1 = self.install_task('task1', goal='goal1', required_data=['2'], product_types=['1'])

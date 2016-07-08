@@ -79,6 +79,33 @@ class SourceRootTest(BaseTest):
                       trie.find('mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
     self.assertIsNone(trie.find('my/project/mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
 
+  def test_trie_traversal(self):
+    trie = SourceRootTrie(SourceRootFactory({}))
+    trie.add_pattern('foo1/bar1/baz1')
+    trie.add_pattern('foo1/bar1/baz2/qux')
+    trie.add_pattern('foo1/bar2/baz1')
+    trie.add_pattern('foo1/bar2/baz2')
+    trie.add_pattern('foo2/bar1')
+    trie.add_fixed('fixed1/bar1', ['lang1'])
+    trie.add_fixed('fixed2/bar2', ['lang2'])
+
+    # Test raw traversal.
+    self.assertEquals([('baz1', ()), ('baz2/qux', ())],
+                      list(trie._root.children['foo1'].children['bar1'].subpatterns()))
+
+    self.assertEquals([('bar1/baz1', ()), ('bar1/baz2/qux', ()),
+                       ('bar2/baz1', ()), ('bar2/baz2', ())],
+                      list(trie._root.children['foo1'].subpatterns()))
+
+    self.assertEquals([('foo1/bar1/baz1', ()), ('foo1/bar1/baz2/qux', ()),
+                       ('foo1/bar2/baz1', ()), ('foo1/bar2/baz2', ()), ('foo2/bar1', ()),
+                       ('^/fixed1/bar1', ('lang1',)), ('^/fixed2/bar2', ('lang2',))],
+                      list(trie._root.subpatterns()))
+
+    # Test the fixed() method.
+    self.assertEquals([('fixed1/bar1', ('lang1',)), ('fixed2/bar2', ('lang2',))],
+                      trie.fixed())
+
   def test_all_roots(self):
     self.create_dir('contrib/go/examples/3rdparty/go')
     self.create_dir('contrib/go/examples/src/go/src')
@@ -87,6 +114,7 @@ class SourceRootTest(BaseTest):
     self.create_dir('src/example/java')
     self.create_dir('src/example/python')
     self.create_dir('my/project/src/java')
+    self.create_dir('fixed/root/jvm')
     self.create_dir('not/a/srcroot/java')
 
     options = {
@@ -105,11 +133,16 @@ class SourceRootTest(BaseTest):
     options.update(self.options[''])  # We need inherited values for pants_workdir etc.
 
     source_roots = create_subsystem(SourceRootConfig, **options).get_source_roots()
+    # Ensure that we see any manually added roots.
+    source_roots.add_source_root('fixed/root/jvm', ('java', 'scala'))
+    source_roots.all_roots()
+
     self.assertEquals({SourceRoot('contrib/go/examples/3rdparty/go', ('go_remote',)),
                        SourceRoot('contrib/go/examples/src/go/src', ('go',)),
                        SourceRoot('src/java', ('java',)),
                        SourceRoot('src/python', ('python',)),
                        SourceRoot('src/example/java', ('java',)),
                        SourceRoot('src/example/python', ('python',)),
-                       SourceRoot('my/project/src/java', ('java',))},
+                       SourceRoot('my/project/src/java', ('java',)),
+                       SourceRoot('fixed/root/jvm', ('java','scala'))},
                       set(source_roots.all_roots()))
