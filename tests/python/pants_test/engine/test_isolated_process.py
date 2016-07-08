@@ -11,7 +11,7 @@ from functools import partial
 
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import (Binary, SnapshotID, SnapshottedProcessRequest,
+from pants.engine.isolated_process import (Binary, Snapshot, SnapshottedProcessRequest,
                                            _snapshot_path)
 from pants.engine.nodes import Return
 from pants.engine.scheduler import SnapshottedProcess
@@ -142,7 +142,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler(project_tree=project_tree)
 
 
-    request = scheduler.execution_request([SnapshotID],
+    request = scheduler.execution_request([Snapshot],
                                           [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 

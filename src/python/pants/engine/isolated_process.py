@@ -22,34 +22,34 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-def _create_snapshot_archive(snapshot_id, file_list, step_context):
+def _create_snapshot_archive(snapshot, file_list, step_context):
   # TODO Create / find snapshot directory via configuration.
   # TODO name snapshot archive based on subject, perhaps.
-  tar_location = _snapshot_path(snapshot_id, step_context.project_tree)
+  tar_location = _snapshot_path(snapshot, step_context.project_tree)
   logger.debug('snapshotting for files: {}'.format(file_list))
   with open_tar(tar_location, mode='w:gz') as tar:
     for file in file_list.dependencies:
       tar.add(os.path.join(step_context.project_tree.build_root, file.path), file.path)
 
 
-def _snapshot_path(snapshot_id, project_tree):
+def _snapshot_path(snapshot, project_tree):
   archive_dir = os.path.join(project_tree.build_root, '.snapshots')
   safe_mkdir(archive_dir)
-  tar_location = os.path.join(archive_dir, '{}.tar'.format(snapshot_id.fingerprint))
+  tar_location = os.path.join(archive_dir, '{}.tar'.format(snapshot.fingerprint))
   return tar_location
 
 
-def _extract_snapshot(step_context, snapshot_id, checkout, subject):
-  with open_tar(_snapshot_path(snapshot_id, step_context.project_tree), errorlevel=1) as tar:
+def _extract_snapshot(step_context, snapshot, checkout, subject):
+  with open_tar(_snapshot_path(snapshot, step_context.project_tree), errorlevel=1) as tar:
     tar.extractall(checkout.path)
   logger.debug('extracted {} snapshot to {}'.format(subject, checkout.path))
 
 
-def _create_snapshot_id(select_state, step_context):
+def _create_snapshot(select_state, step_context):
   file_list = select_state.value
   file_hash = _hash_files(step_context.project_tree.build_root, file_list)
-  snapshot_id = SnapshotID(file_hash)
-  return file_list, snapshot_id
+  snapshot = Snapshot(file_hash)
+  return file_list, snapshot
 
 
 def _hash_files(build_root, file_list):
@@ -66,8 +66,8 @@ def _hash_files(build_root, file_list):
   return file_hash
 
 
-class SnapshotID(datatype('SnapshotID', ['fingerprint'])):
-  """Holds a fingerprint of the snapshotted files."""
+class Snapshot(datatype('Snapshot', ['fingerprint'])):
+  """A snapshot of a collection of files fingerprinted by their contents."""
 
 
 class Binary(datatype('Binary', [])):
@@ -150,19 +150,19 @@ class ProcessExecutionNode(datatype('ProcessOrchestrationNode',
 
     # If the process requires snapshots, request a checkout with the requested snapshots applied.
     if process_request.snapshot_subjects:
-      node = step_context.select_node(SelectDependencies(SnapshotID, SnapshottedProcessRequest, 'snapshot_subjects'),
+      node = step_context.select_node(SelectDependencies(Snapshot, SnapshottedProcessRequest, 'snapshot_subjects'),
                                       process_request, self.variants)
       state = step_context.get(node)
       if type(state) is not Return:
         return state
 
-      snapshot_ids_and_subjects = zip(state.value, process_request.snapshot_subjects)
+      snapshots_and_subjects = zip(state.value, process_request.snapshot_subjects)
 
       with temporary_dir(cleanup=False) as outdir:
         checkout = Checkout(outdir)
 
-      for snapshot_id, subject in snapshot_ids_and_subjects:
-        _extract_snapshot(step_context, snapshot_id, checkout, subject)
+      for snapshot, subject in snapshots_and_subjects:
+        _extract_snapshot(step_context, snapshot, checkout, subject)
 
       # All of the snapshots have been checked out now.
       if process_request.prep_fn:
@@ -218,16 +218,16 @@ class ProcessExecutionNode(datatype('ProcessOrchestrationNode',
 class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
   is_inlineable = False
   is_cacheable = True
-  product = SnapshotID
+  product = Snapshot
 
   @classmethod
   def as_intrinsics(cls):
-    return {(Files, SnapshotID): cls.create,
-            (PathGlobs, SnapshotID): cls.create}
+    return {(Files, Snapshot): cls.create,
+            (PathGlobs, Snapshot): cls.create}
 
   @classmethod
   def create(cls, subject, product_type, variants):
-    assert product_type == SnapshotID
+    assert product_type == Snapshot
     return SnapshotNode(subject, variants)
 
   def step(self, step_context):
@@ -240,8 +240,8 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
     elif type(select_state) is not Return:
       State.raise_unrecognized(select_state)
 
-    file_list, snapshot_id = _create_snapshot_id(select_state, step_context)
+    file_list, snapshot = _create_snapshot(select_state, step_context)
 
-    _create_snapshot_archive(snapshot_id, file_list, step_context)
+    _create_snapshot_archive(snapshot, file_list, step_context)
 
-    return Return(snapshot_id)
+    return Return(snapshot)
