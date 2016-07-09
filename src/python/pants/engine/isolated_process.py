@@ -174,13 +174,16 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
 
     # If the process requires snapshots, request a checkout with the requested snapshots applied.
     if process_request.snapshot_subjects:
-      node = step_context.select_node(SelectDependencies(Snapshot, SnapshottedProcessRequest, 'snapshot_subjects'),
-                                      process_request, self.variants)
-      state = step_context.get(node)
-      if type(state) is not Return:
-        return state
+      snapshot_subjects_node = step_context.select_node(SelectDependencies(Snapshot,
+                                                                           SnapshottedProcessRequest,
+                                                                           'snapshot_subjects'),
+                                                        process_request,
+                                                        self.variants)
+      snapshot_subjects_state = step_context.get(snapshot_subjects_node)
+      if type(snapshot_subjects_state) is not Return:
+        return snapshot_subjects_state
 
-      snapshots_and_subjects = zip(state.value, process_request.snapshot_subjects)
+      snapshots_and_subjects = zip(snapshot_subjects_state.value, process_request.snapshot_subjects)
 
       with temporary_dir(cleanup=False) as outdir:
         checkout = Checkout(outdir)
