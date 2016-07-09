@@ -12,32 +12,12 @@ from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
 from pants.engine.isolated_process import (Binary, Snapshot, SnapshottedProcessRequest,
                                            _snapshot_path)
-from pants.engine.nodes import Return
+from pants.engine.nodes import Return, Throw
 from pants.engine.scheduler import SnapshottedProcess
 from pants.engine.selectors import Select, SelectLiteral
 from pants.util.contextutil import open_tar
 from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-
-
-class FakeClassPath(object):
-  pass
-
-
-class GenericBinary(object):
-  pass
-
-
-class NothingInParticular(object):
-  pass
-
-
-def nothing_in_particular_to_request(args):
-  pass
-
-
-def request_to_fake_classpath(args):
-  pass
 
 
 class Concatted(datatype('Concatted', ['value'])):
@@ -69,21 +49,25 @@ def process_result_to_concatted(process_result, checkout):
   return Concatted(process_result.stdout)
 
 
-def shell_cat_binary():
-  return ShellCat()
-
-
-def to_outfile_cat_binary():
-  return ShellCatToOutFile()
-
-
 class ShellCatToOutFile(Binary):
   def prefix_of_command(self):
     return tuple(['sh', '-c', 'cat $@ > outfile', 'unused'])
 
-  @property
-  def bin_path(self):
-    return '/bin/cat'
+
+class ShellFailCommand(Binary):
+  def prefix_of_command(self):
+    return tuple(['sh', '-c', 'exit 1'])
+
+  def __repr__(self):
+    return 'ShellFailCommand'
+
+
+def fail_process_result(process_result, checkout):
+  raise Exception('Failed in output conversion!')
+
+
+def empty_process_request():
+  return SnapshottedProcessRequest(args=tuple())
 
 
 class JavaOutputDir(datatype('JavaOutputDir', ['path'])):
@@ -102,10 +86,6 @@ def java_sources_to_javac_args(java_sources, out_dir):
                                         tuple(f.path for f in java_sources.dependencies),
                                    snapshot_subjects=(java_sources,),
                                    directories_to_create=(out_dir.path,))
-
-
-def javac_bin():
-  return Javac()
 
 
 class ClasspathEntry(datatype('ClasspathEntry', ['path'])):
@@ -155,7 +135,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
                           input_selectors=(Select(Files),),
                           input_conversion=file_list_to_args_for_cat,
                           output_conversion=process_result_to_concatted),
-       [ShellCat, [], shell_cat_binary]])
+       [ShellCat, [], ShellCat]])
 
     request = scheduler.execution_request([Concatted],
                                           [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
@@ -176,7 +156,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
                          input_selectors=(Select(Files),),
                          input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                          output_conversion=process_result_to_concatted_from_outfile),
-      [ShellCatToOutFile, [], to_outfile_cat_binary]
+      [ShellCatToOutFile, [], ShellCatToOutFile]
     ])
 
     request = scheduler.execution_request([Concatted],
@@ -199,7 +179,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
                          (Select(Files), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
                          java_sources_to_javac_args,
                          process_result_to_classpath_entry),
-      [Javac, [], javac_bin]
+      [Javac, [], Javac]
     ])
 
     request = scheduler.execution_request(
@@ -214,6 +194,46 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertIsInstance(classpath_entry, ClasspathEntry)
     self.assertTrue(os.path.exists(os.path.join(classpath_entry.path, 'simple', 'Simple.class')))
 
+  def test_failed_command_propagates_throw(self):
+    scheduler = self.mk_scheduler_in_example_fs([
+      # subject to files / product of subject to files for snapshot.
+      SnapshottedProcess(product_type=Concatted,
+                         binary_type=ShellFailCommand,
+                         input_selectors=tuple(),
+                         input_conversion=empty_process_request,
+                         output_conversion=fail_process_result),
+      [ShellFailCommand, [], ShellFailCommand]
+    ])
+
+    request = scheduler.execution_request([Concatted],
+                                          [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
+    LocalSerialEngine(scheduler).reduce(request)
+
+    root_entries = scheduler.root_entries(request).items()
+    self.assertEquals(1, len(root_entries))
+    self.assertFirstEntryIsThrow(root_entries,
+                                 in_msg='Running ShellFailCommand failed with non-zero exit code: 1')
+
+  def test_failed_output_conversion_propagates_throw(self):
+    scheduler = self.mk_scheduler_in_example_fs([
+      # subject to files / product of subject to files for snapshot.
+      SnapshottedProcess(product_type=Concatted,
+                         binary_type=ShellCatToOutFile,
+                         input_selectors=(Select(Files),),
+                         input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
+                         output_conversion=fail_process_result),
+      [ShellCatToOutFile, [], ShellCatToOutFile]
+    ])
+
+    request = scheduler.execution_request([Concatted],
+                                          [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
+    LocalSerialEngine(scheduler).reduce(request)
+
+    root_entries = scheduler.root_entries(request).items()
+    self.assertEquals(1, len(root_entries))
+    self.assertFirstEntryIsThrow(root_entries,
+                                 in_msg='Failed in output conversion!')
+
   def assert_archive_files(self, expected_archive_files, snapshot, project_tree):
     with open_tar(_snapshot_path(snapshot, project_tree), errorlevel=1) as tar:
       self.assertEqual(expected_archive_files,
@@ -222,6 +242,13 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
   def assertFirstEntryIsReturn(self, root_entries, scheduler):
     root, state = root_entries[0]
     self.assertReturn(state, root, scheduler)
+    return state
+
+  def assertFirstEntryIsThrow(self, root_entries, in_msg=None):
+    root, state = root_entries[0]
+    self.assertIsInstance(state, Throw)
+    if in_msg:
+      self.assertIn(in_msg, str(state))
     return state
 
   def mk_example_fs_tree(self):

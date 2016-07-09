@@ -71,7 +71,7 @@ class Snapshot(datatype('Snapshot', ['fingerprint'])):
   """
 
 
-class Binary(datatype('Binary', [])):
+class Binary(object):
   """Binary in the product graph.
 
   TODO these should use BinaryUtil to find binaries."""
@@ -112,9 +112,7 @@ class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', '
   """Contains the stdout, stderr and exit code from executing a process."""
 
 
-class ProcessExecutionNode(datatype('ProcessOrchestrationNode',
-                                    ['subject', 'snapshotted_process']),
-                           Node):
+class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'snapshotted_process']), Node):
   """Wraps a process execution, preparing and tearing down the execution environment."""
 
   is_cacheable = True
@@ -188,8 +186,14 @@ class ProcessExecutionNode(datatype('ProcessOrchestrationNode',
     logger.debug('Done running command in {}'.format(checkout.path))
 
     process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
+    if process_result.exit_code > 0:
+      return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(binary_value,
+                                                                                    process_result.exit_code)))
 
-    converted_output = self.snapshotted_process.output_conversion(process_result, checkout)
+    try:
+      converted_output = self.snapshotted_process.output_conversion(process_result, checkout)
+    except Exception as e:
+      return Throw(e)
 
     # TODO clean up the checkout.
 
@@ -207,13 +211,6 @@ class ProcessExecutionNode(datatype('ProcessOrchestrationNode',
                     variants=None,  # TODO figure out what this should be
                     func=self.snapshotted_process.input_conversion,
                     clause=self.snapshotted_process.input_selectors)
-
-  def __repr__(self):
-    return 'ProcessOrchestrationNode(subject={}, snapshotted_process={}' \
-      .format(self.subject, self.snapshotted_process)
-
-  def __str__(self):
-    return repr(self)
 
 
 class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
