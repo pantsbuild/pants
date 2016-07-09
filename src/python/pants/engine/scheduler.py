@@ -424,7 +424,7 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
                                                          'input_selectors',
                                                          'input_conversion',
                                                          'output_conversion'])):
-  """A rule for snapshotted processes."""
+  """A task type for defining execution of snapshotted processes."""
 
   def as_node(self, subject, product_type, variants):
     return ProcessExecutionNode(subject, variants, self)
@@ -439,48 +439,48 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
 
 
 class NodeBuilder(Closable):
-  """Holds an index of rules used to instantiate Nodes."""
+  """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, rule_entries):
-    """Creates a NodeBuilder with rules indexed by their output type."""
-    serializable_rules = defaultdict(set)
-    for entry in rule_entries:
+  def create(cls, task_entries):
+    """Creates a NodeBuilder with tasks indexed by their output type."""
+    serializable_tasks = defaultdict(set)
+    for entry in task_entries:
       if isinstance(entry, (tuple, list)) and len(entry) == 3:
         output_type, input_selects, task = entry
-        serializable_rules[output_type].add(
+        serializable_tasks[output_type].add(
           functools.partial(cls.create_task_node, clause=tuple(input_selects), task_func=task)
         )
       elif isinstance(entry, SnapshottedProcess):
-        serializable_rules[entry.output_product_type].add(entry.as_node)
+        serializable_tasks[entry.output_product_type].add(entry.as_node)
       else:
-        raise Exception("Unexpected rule type for entry {}".format(entry))
+        raise Exception("Unexpected type for entry {}".format(entry))
 
-    intrinsic_rules = dict()
-    intrinsic_rules.update(FilesystemNode.as_intrinsics())
-    intrinsic_rules.update(SnapshotNode.as_intrinsics())
-    return cls(serializable_rules, intrinsic_rules)
+    intrinsics = dict()
+    intrinsics.update(FilesystemNode.as_intrinsics())
+    intrinsics.update(SnapshotNode.as_intrinsics())
+    return cls(serializable_tasks, intrinsics)
 
   @classmethod
   def create_task_node(cls, subject, product_type, variants, task_func, clause):
     return TaskNode(subject, product_type, variants, task_func, clause)
 
-  def __init__(self, rules, intrinsics):
-    self._rules = rules
+  def __init__(self, tasks, intrinsics):
+    self._tasks = tasks
     self._intrinsics = intrinsics
 
   def gen_nodes(self, subject, product_type, variants):
-    # Intrinsic rules that provide the requested product for the current subject type.
+    # Intrinsics that provide the requested product for the current subject type.
     intrinsic_node_factory = self._lookup_intrinsic(product_type, subject)
     if intrinsic_node_factory:
       yield intrinsic_node_factory(subject, product_type, variants)
     else:
-      # Task rules that provide the requested product.
-      for node_factory in self._lookup_rules(product_type):
+      # Tasks that provide the requested product.
+      for node_factory in self._lookup_tasks(product_type):
         yield node_factory(subject, product_type, variants)
 
-  def _lookup_rules(self, product_type):
-    return self._rules[product_type]
+  def _lookup_tasks(self, product_type):
+    return self._tasks[product_type]
 
   def _lookup_intrinsic(self, product_type, subject):
     return self._intrinsics.get((type(subject), product_type))
