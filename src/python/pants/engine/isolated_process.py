@@ -13,7 +13,7 @@ from abc import abstractproperty
 from hashlib import sha1
 
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.nodes import Node, Noop, Return, State, TaskNode, Throw, Waiting
+from pants.engine.nodes import Node, Noop, Return, State, Throw, Waiting
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir
@@ -112,40 +112,65 @@ class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', '
   """Contains the stdout, stderr and exit code from executing a process."""
 
 
-class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'snapshotted_process']), Node):
+class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'snapshotted_process']), Node):
   """Wraps a process execution, preparing and tearing down the execution environment."""
 
   is_cacheable = True
   is_inlineable = False
-  variants = None
 
   @property
   def product(self):
     return self.snapshotted_process.product_type
 
   def step(self, step_context):
-    # Create the request from the request callback.
-    task_state = step_context.get(self._request_task_node())
-
-    if type(task_state) in (Waiting, Throw):
-      return task_state
-    elif type(task_state) is Noop:
-      return Noop("Couldn't construct process request: {}".format(task_state))
-    elif type(task_state) is not Return:
-      State.raise_unrecognized(task_state)
-
-    process_request = task_state.value
-
+    waiting_nodes = []
     # Get the binary.
-    binary_state = step_context.get(self._binary_select_node(step_context))
-    if type(binary_state) in (Waiting, Throw):
+    binary_select_node = step_context.select_node(Select(self.snapshotted_process.binary_type),
+                                    subject=self.subject,
+                                    variants=self.variants)
+    binary_state = step_context.get(binary_select_node)
+    if type(binary_state) is Throw:
       return binary_state
+    elif type(binary_state) is Waiting:
+      waiting_nodes.append(binary_select_node)
     elif type(binary_state) is Noop:
       return Noop("Couldn't find binary: {}".format(binary_state))
     elif type(binary_state) is not Return:
       State.raise_unrecognized(binary_state)
 
+    # Create the request from the request callback after resolving its input clauses.
+    input_select_nodes = [step_context.select_node(s, self.subject, self.variants)
+                          for s in self.snapshotted_process.input_selectors]
+
+    input_values = []
+    for input_selector, input_select_node in zip(self.snapshotted_process.input_selectors, input_select_nodes):
+      sn_state = step_context.get(input_select_node)
+      if type(sn_state) is Waiting:
+        waiting_nodes.extend(sn_state.dependencies)
+      elif type(sn_state) is Return:
+        input_values.append(sn_state.value)
+      elif type(sn_state) is Noop:
+        if input_selector.optional:
+          input_values.append(None)
+        else:
+          return Noop('Was missing value for (at least) input {}'.format(input_select_node))
+      elif type(sn_state) is Throw:
+        return sn_state
+      else:
+        State.raise_unrecognized(sn_state)
+
+    if waiting_nodes:
+      return Waiting(waiting_nodes)
+
+    # Now that we've returned on waiting, we can assume that the binary has a value, and that we're ready to do input
+    # conversion.
     binary_value = binary_state.value
+
+    try:
+      process_request = self.snapshotted_process.input_conversion(*input_values)
+    except Exception as e:
+      return Throw(e)
+
 
     # If the process requires snapshots, request a checkout with the requested snapshots applied.
     if process_request.snapshot_subjects:
@@ -198,19 +223,6 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'snapsho
     # TODO clean up the checkout.
 
     return Return(converted_output)
-
-  def _binary_select_node(self, step_context):
-    return step_context.select_node(Select(self.snapshotted_process.binary_type),
-                                    # TODO figure out what these should be
-                                    subject=None,
-                                    variants=None)
-
-  def _request_task_node(self):
-    return TaskNode(subject=self.subject,
-                    product=SnapshottedProcessRequest,
-                    variants=None,  # TODO figure out what this should be
-                    func=self.snapshotted_process.input_conversion,
-                    clause=self.snapshotted_process.input_selectors)
 
 
 class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):

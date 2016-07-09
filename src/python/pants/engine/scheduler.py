@@ -427,7 +427,7 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
   """A rule for snapshotted processes."""
 
   def as_node(self, subject, product_type, variants):
-    return ProcessExecutionNode(subject, self)
+    return ProcessExecutionNode(subject, variants, self)
 
   @property
   def output_product_type(self):
