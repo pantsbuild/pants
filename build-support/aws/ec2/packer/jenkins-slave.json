@@ -2,7 +2,7 @@
   "builders": [{
     "type": "amazon-ebs",
     "region": "us-east-1",
-    "source_ami": "ami-840910ee",
+    "source_ami": "ami-ddf13fb0",
     "instance_type": "r3.xlarge",
     "ssh_username": "ubuntu",
     "ami_name": "pantsbuild-jenkins-slave.{{timestamp}}"
