@@ -159,8 +159,10 @@ class OptionsInitializer(object):
           'You are relying on the following backends being listed in the deprecated '
           'default_backend_packages option: {}.\n  '
           'This is probably because you are overwriting the value of the backend_packages option '
-          'in your pants.ini, instead of appending to it.\n  To get rid of this message, change '
-          'backend_packages: [...] to backend_packages: +[...] in your pants.ini.'.format(
+          'in your pants.ini, instead of appending to it.\n  To get rid of this message, consider '
+          'changing backend_packages: [...] to backend_packages: +[...] in your pants.ini. '
+          'Once you are happy with the state of your backend_packages option, you can set '
+          'default_backend_packages to [] to silence this warning.'.format(
               ', '.join(missing))
       )
 
