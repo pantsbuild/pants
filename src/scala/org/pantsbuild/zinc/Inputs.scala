@@ -178,8 +178,7 @@ object Inputs {
       "api diff context size"  -> incOptions.apiDiffContextSize,
       "transactional"          -> incOptions.transactional,
       "backup directory"       -> incOptions.backup,
-      "recompile on macro def" -> incOptions.recompileOnMacroDef,
-      "name hashing"           -> incOptions.nameHashing
+      "recompile on macro def" -> incOptions.recompileOnMacroDef
     )
 
     val values = Seq(

@@ -123,8 +123,7 @@ case class IncOptions(
   apiDumpDirectory: Option[File] = m2o(defaultIncOptions.apiDumpDirectory),
   transactional: Boolean         = false,
   backup: Option[File]           = None,
-  recompileOnMacroDef: Option[Boolean] = m2o(defaultIncOptions.recompileOnMacroDef).map(_.booleanValue),
-  nameHashing: Boolean           = defaultIncOptions.nameHashing
+  recompileOnMacroDef: Option[Boolean] = m2o(defaultIncOptions.recompileOnMacroDef).map(_.booleanValue)
 ) {
   def options(log: Logger): xsbti.compile.IncOptions = {
     new xsbti.compile.IncOptions(
@@ -136,7 +135,7 @@ case class IncOptions(
       o2m(apiDumpDirectory),
       classfileManager(log),
       o2m(recompileOnMacroDef.map(java.lang.Boolean.valueOf)),
-      nameHashing,
+      true, // nameHashing
       false, // antStyle
       Map.empty.asJava // extra
     )
@@ -225,8 +224,6 @@ object Settings {
     file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
     boolean(   "-recompileOnMacroDefDisabled", "Disable recompilation of all dependencies of a macro def",
       (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = Some(false)))),
-    boolean(   "-no-name-hashing",             "Disable improved incremental compilation algorithm",
-      (s: Settings) => s.copy(incOptions = s.incOptions.copy(nameHashing = false))),
 
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
