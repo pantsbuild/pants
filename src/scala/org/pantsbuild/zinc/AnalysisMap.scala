@@ -10,7 +10,11 @@ import java.io.{
   IOException
 }
 
-import xsbti.compile.{CompileAnalysis, MiniSetup}
+import xsbti.compile.{
+  CompileAnalysis,
+  DefinesClass,
+  MiniSetup
+}
 import sbt.internal.inc.{
   AnalysisStore,
   FileBasedStore,
@@ -47,7 +51,7 @@ case class AnalysisMap private[AnalysisMap] (
    * TODO: This optimization is unnecessary for jars on the classpath, which are already indexed.
    * Can remove after the sbt jar output patch lands.
    */
-  def definesClass(classpathEntry: File): String => Boolean = {
+  def definesClass(classpathEntry: File): DefinesClass = {
       /* TODO: re-enable this optimization once we figure out the new way to get access to relations.
       getAnalysis(classpathEntry).map { analysis =>
         log.debug(s"Hit analysis cache for class definitions with ${classpathEntry}")

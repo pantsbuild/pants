@@ -9,7 +9,7 @@ import java.util.{ List => JList, Map => JMap }
 
 import scala.collection.JavaConverters._
 
-import sbt.io.Path._
+import sbt.io.syntax._
 import sbt.util.Logger
 import xsbti.compile.CompileOrder
 

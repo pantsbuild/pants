@@ -6,6 +6,7 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import sbt.io.{ Hash, IO }
+import sbt.io.syntax._
 
 object Util {
   //

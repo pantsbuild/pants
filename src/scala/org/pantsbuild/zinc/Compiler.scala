@@ -15,7 +15,8 @@ import sbt.internal.inc.{
   RawCompiler,
   javac
 }
-import sbt.io.Path._
+import sbt.io.Path
+import sbt.io.syntax._
 import sbt.util.Logger
 import sbt.internal.inc.LoggerReporter
 import xsbti.compile.{
@@ -75,7 +76,7 @@ object Compiler {
     new AnalyzingCompiler(
       instance,
       CompilerInterfaceProvider.constant(interfaceJar),
-      sbt.internal.inc.ClasspathOptions.auto
+      sbt.internal.inc.ClasspathOptionsUtil.auto
     )
 
   /**
@@ -93,7 +94,7 @@ object Compiler {
         }
       }
 
-    val options = sbt.internal.inc.ClasspathOptions.javac(compiler = false)
+    val options = sbt.internal.inc.ClasspathOptionsUtil.javac(compiler = false)
     new javac.JavaCompilerAdapter(compiler, instance, options)
   }
 
@@ -124,7 +125,7 @@ object Compiler {
    */
   def scalaLoader(jars: Seq[File]) =
     new URLClassLoader(
-      toURLs(jars),
+      Path.toURLs(jars),
       sbt.internal.inc.classpath.ClasspathUtilities.rootLoader
     )
 
@@ -149,7 +150,7 @@ object Compiler {
         targetJar,
         Seq(setup.compilerInterface),
         CompilerInterfaceId,
-        new RawCompiler(scalaInstance, sbt.internal.inc.ClasspathOptions.auto, log),
+        new RawCompiler(scalaInstance, sbt.internal.inc.ClasspathOptionsUtil.auto, log),
         log
       )
     val dir = setup.cacheDir / interfaceId(scalaInstance.actualVersion)
