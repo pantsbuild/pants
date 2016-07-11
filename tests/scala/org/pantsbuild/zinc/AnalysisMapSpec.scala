@@ -23,7 +23,7 @@ class AnalysisMapSpec extends WordSpec with MustMatchers {
     "succeed for empty analysis" in {
       IO.withTemporaryDirectory { classpathEntry =>
         val am = AnalysisMap.create(Map(), ConsoleLogger(ConsoleOut.systemOut))
-        val dc = am.definesClass(classpathEntry)
+        val dc = am.getPCELookup.definesClass(classpathEntry)
         dc("NonExistent.class") must be(false)
       }
     }

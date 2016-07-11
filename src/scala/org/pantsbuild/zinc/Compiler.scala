@@ -82,21 +82,16 @@ object Compiler {
   /**
    * Create a new java compiler.
    */
-  def newJavaCompiler(instance: ScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler = {
-    val compiler =
-      if (fork || javaHome.isDefined) {
-        javac.JavaCompiler.fork(javaHome)
-      } else {
-        javac.JavaCompiler.local.getOrElse {
-          throw new RuntimeException(
-            "Unable to locate javac directly. Please ensure that a JDK is on zinc's classpath."
-          )
-        }
+  def newJavaCompiler(instance: ScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler =
+    if (fork || javaHome.isDefined) {
+      javac.JavaCompiler.fork(javaHome)
+    } else {
+      javac.JavaCompiler.local.getOrElse {
+        throw new RuntimeException(
+          "Unable to locate javac directly. Please ensure that a JDK is on zinc's classpath."
+        )
       }
-
-    val options = sbt.internal.inc.ClasspathOptionsUtil.javac(compiler = false)
-    new javac.JavaCompilerAdapter(compiler, instance, options)
-  }
+    }
 
   /**
    * Create new globals cache.
@@ -206,8 +201,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
          javacOptions,
          previousAnalysis,
          previousSetup,
-         analysisMap = analysisMap.getAnalysis _,
-         definesClass = analysisMap.definesClass _,
+         perClasspathEntryLookup = analysisMap.getPCELookup,
          reporter,
          compileOrder,
          skip = false,

@@ -10,10 +10,12 @@ import java.io.{
   IOException
 }
 
+import xsbti.Maybe
 import xsbti.compile.{
   CompileAnalysis,
   DefinesClass,
-  MiniSetup
+  MiniSetup,
+  PerClasspathEntryLookup
 }
 import sbt.internal.inc.{
   AnalysisStore,
@@ -21,6 +23,7 @@ import sbt.internal.inc.{
   Locate
 }
 import sbt.util.Logger
+import sbt.util.Logger.{m2o, o2m}
 
 import org.pantsbuild.zinc.cache.{
   Cache,
@@ -44,36 +47,39 @@ case class AnalysisMap private[AnalysisMap] (
   // log
   log: Logger
 ) {
-  /**
-   * An implementation of definesClass that will use analysis for an input directory to determine
-   * whether it defines a particular class.
-   *
-   * TODO: This optimization is unnecessary for jars on the classpath, which are already indexed.
-   * Can remove after the sbt jar output patch lands.
-   */
-  def definesClass(classpathEntry: File): DefinesClass = {
-      /* TODO: re-enable this optimization once we figure out the new way to get access to relations.
-      getAnalysis(classpathEntry).map { analysis =>
-        log.debug(s"Hit analysis cache for class definitions with ${classpathEntry}")
-        // strongly hold the classNames, and transform them to ensure that they are unlinked from
-        // the remainder of the analysis
-        analysis.relations.classes.reverseMap.keys.toList.toSet
-      }.map { classes =>
-        (s: String) => classes(s)
-      }.getOrElse {
-        ???
-      }
-      */
-      // no analysis: return a function that will scan instead
-      Locate.definesClass(classpathEntry)
-    }
 
-  /**
-   * Gets analysis for a classpath entry (if it exists) by translating its path to a potential
-   * cache location and then checking the cache.
-   */
-  def getAnalysis(classpathEntry: File): Option[CompileAnalysis] =
-    analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get)
+  def getPCELookup = new PerClasspathEntryLookup {
+    /**
+     * Gets analysis for a classpath entry (if it exists) by translating its path to a potential
+     * cache location and then checking the cache.
+     */
+    def analysis(classpathEntry: File): Maybe[CompileAnalysis] =
+      o2m(analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get))
+
+    /**
+     * An implementation of definesClass that will use analysis for an input directory to determine
+     * whether it defines a particular class.
+     *
+     * TODO: This optimization is unnecessary for jars on the classpath, which are already indexed.
+     * Can remove after the sbt jar output patch lands.
+     */
+    def definesClass(classpathEntry: File): DefinesClass = {
+        /* TODO: re-enable this optimization once we figure out the new way to get access to relations.
+        getAnalysis(classpathEntry).map { analysis =>
+          log.debug(s"Hit analysis cache for class definitions with ${classpathEntry}")
+          // strongly hold the classNames, and transform them to ensure that they are unlinked from
+          // the remainder of the analysis
+          analysis.relations.classes.reverseMap.keys.toList.toSet
+        }.map { classes =>
+          (s: String) => classes(s)
+        }.getOrElse {
+          ???
+        }
+        */
+        // no analysis: return a function that will scan instead
+        Locate.definesClass(classpathEntry)
+      }
+  }
 }
 
 object AnalysisMap {
