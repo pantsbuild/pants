@@ -439,6 +439,7 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
 
 class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type'])):
   """A set-friendly curried TaskNode constructor."""
+
   def as_node(self, subject, product_type, variants):
     return TaskNode(subject, product_type, variants, self.task_func, self.input_selects)
 
