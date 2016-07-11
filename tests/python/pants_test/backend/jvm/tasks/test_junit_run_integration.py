@@ -10,18 +10,8 @@ import os.path
 import time
 from unittest import expectedFailure, skipIf
 
-from pants.java.distribution.distribution import DistributionLocator
+from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
-
-
-def missing_jvm(version):
-  with subsystem_instance(DistributionLocator):
-    try:
-      DistributionLocator.locate(minimum_version=version, maximum_version='{}.9999'.format(version))
-      return False
-    except DistributionLocator.Error:
-      return True
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
@@ -33,19 +23,19 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   # See https://github.com/pantsbuild/pants/issues/2894 for details on why this is
   # marked xfail.
   @expectedFailure
-  @skipIf(missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
+  @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_java_eight(self):
     self._testjvms('eight')
 
-  @skipIf(missing_jvm('1.7'), 'no java 1.7 installation on testing machine')
+  @skipIf(is_missing_jvm('1.7'), 'no java 1.7 installation on testing machine')
   def test_java_seven(self):
     self._testjvms('seven')
 
-  @skipIf(missing_jvm('1.6'), 'no java 1.6 installation on testing machine')
+  @skipIf(is_missing_jvm('1.6'), 'no java 1.6 installation on testing machine')
   def test_java_six(self):
     self._testjvms('six')
 
-  @skipIf(missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
+  @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_with_test_platform(self):
     self._testjvms('eight-test-platform')
 
@@ -114,3 +104,15 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
        '--no-jvm-synthetic-classpath',
        'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:test']).stdout_data
     self.assertIn('Synthetic jar run is not detected', output)
+
+  def test_junit_run_with_html_report(self):
+    with self.pants_results(['clean-all', 'test.junit', 'testprojects/tests/java/org/pantsbuild/testproject/htmlreport::', '--test-junit-html-report']) as results:
+      self.assert_failure(results)
+      report_html = os.path.join(results.workdir, 'test/junit/reports/junit-report.html')
+      self.assertTrue(os.path.isfile(report_html))
+      with codecs.open(report_html, 'r', encoding='utf8') as src:
+        html = src.read()
+        self.assertIn('testPasses', html)
+        self.assertIn('testFails', html)
+        self.assertIn('testErrors', html)
+        self.assertIn('testSkipped', html)

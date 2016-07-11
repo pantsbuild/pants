@@ -31,7 +31,6 @@ PantsResult = namedtuple(
 def ensure_cached(expected_num_artifacts=None):
   """Decorator for asserting cache writes in an integration test.
 
-  :param task_cls: Class of the task to check the artifact cache for. (e.g. JarCreate)
   :param expected_num_artifacts: Expected number of artifacts to be in the task's
                                  cache after running the test. If unspecified, will
                                  assert that the number of artifacts in the cache is
@@ -62,6 +61,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   PANTS_SUCCESS_CODE = 0
   PANTS_SCRIPT_NAME = 'pants'
+
+  @classmethod
+  def hermetic(cls):
+    """Subclasses may override to acknowledge that they are hermetic.
+
+    That is, that they should run without reading the real pants.ini.
+    """
+    return False
 
   @classmethod
   def has_python_version(cls, version):
@@ -112,10 +119,21 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              **kwargs):
 
-    args = ['--no-pantsrc',
-            '--pants-workdir=' + workdir,
-            '--kill-nailguns',
-            '--print-exception-stacktrace']
+    args = [
+      '--no-pantsrc',
+      '--pants-workdir={}'.format(workdir),
+      '--kill-nailguns',
+      '--print-exception-stacktrace',
+    ]
+
+    if self.hermetic():
+      args.extend(['--pants-config-files=[]',
+                   # Turn off cache globally.  A hermetic integration test shouldn't rely on cache,
+                   # or we have no idea if it's actually testing anything.
+                   '--no-cache-read', '--no-cache-write',
+                   # Turn cache on just for tool bootstrapping, for performance.
+                   '--cache-bootstrap-read', '--cache-bootstrap-write'
+                   ])
 
     if config:
       config_data = config.copy()
@@ -132,8 +150,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
     pants_command = [pants_script] + args + command
 
-    env = os.environ.copy()
-    env.update(extra_env or {})
+    if self.hermetic():
+      env = {}
+    else:
+      env = os.environ.copy()
+    if extra_env:
+      env.update(extra_env)
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
@@ -191,40 +213,40 @@ class PantsRunIntegrationTest(unittest.TestCase):
     bundle_jar_name = bundle_jar_name or bundle_name
     bundle_options = bundle_options or []
     bundle_options = ['bundle.jvm'] + bundle_options + ['--archive=zip', target]
-    pants_run = self.run_pants(bundle_options)
-    self.assert_success(pants_run)
+    with self.pants_results(bundle_options) as pants_run:
+      self.assert_success(pants_run)
 
-    self.assertTrue(check_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
-                                   library_jars_are_symlinks))
-    # TODO(John Sirois): We need a zip here to suck in external library classpath elements
-    # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
-    # contextmanager that yields its results while the tmpdir workdir is still active and change
-    # this test back to using an un-archived bundle.
-    with temporary_dir() as workdir:
-      ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
-      if expected_bundle_content:
-        self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
-      if expected_bundle_jar_content:
-        with temporary_dir() as check_bundle_jar_dir:
-          bundle_jar = os.path.join(workdir, '{bundle_jar_name}.jar'
-                                    .format(bundle_jar_name=bundle_jar_name))
-          ZIP.extract(bundle_jar, check_bundle_jar_dir)
-          self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
+      self.assertTrue(check_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
+                                     library_jars_are_symlinks))
+      # TODO(John Sirois): We need a zip here to suck in external library classpath elements
+      # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
+      # contextmanager that yields its results while the tmpdir workdir is still active and change
+      # this test back to using an un-archived bundle.
+      with temporary_dir() as workdir:
+        ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
+        if expected_bundle_content:
+          self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
+        if expected_bundle_jar_content:
+          with temporary_dir() as check_bundle_jar_dir:
+            bundle_jar = os.path.join(workdir, '{bundle_jar_name}.jar'
+                                      .format(bundle_jar_name=bundle_jar_name))
+            ZIP.extract(bundle_jar, check_bundle_jar_dir)
+            self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
 
-      optional_args = []
-      if args:
-        optional_args = args
-      java_run = subprocess.Popen(['java',
-                                   '-jar',
-                                   '{bundle_jar_name}.jar'.format(bundle_jar_name=bundle_jar_name)]
-                                  + optional_args,
-                                  stdout=subprocess.PIPE,
-                                  cwd=workdir)
+        optional_args = []
+        if args:
+          optional_args = args
+        java_run = subprocess.Popen(['java',
+                                     '-jar',
+                                     '{bundle_jar_name}.jar'.format(bundle_jar_name=bundle_jar_name)]
+                                    + optional_args,
+                                    stdout=subprocess.PIPE,
+                                    cwd=workdir)
 
-      stdout, _ = java_run.communicate()
-    java_returncode = java_run.returncode
-    self.assertEquals(java_returncode, 0)
-    return stdout
+        stdout, _ = java_run.communicate()
+      java_returncode = java_run.returncode
+      self.assertEquals(java_returncode, 0)
+      return stdout
 
   def assert_success(self, pants_run, msg=None):
     self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=True, msg=msg)
@@ -265,3 +287,37 @@ class PantsRunIntegrationTest(unittest.TestCase):
       yield
     finally:
       os.rename(real_path, test_path)
+
+  @contextmanager
+  def temporary_file_content(self, path, content):
+    """Temporarily write content to a file for the purpose of an integration test."""
+    path = os.path.realpath(path)
+    assert path.startswith(
+      os.path.realpath(get_buildroot())), 'cannot write paths outside of the buildroot!'
+    assert not os.path.exists(path), 'refusing to overwrite an existing path!'
+    with open(path, 'wb') as fh:
+      fh.write(content)
+    try:
+      yield
+    finally:
+      os.unlink(path)
+
+  def do_command(self, *args, **kwargs):
+    """Wrapper around run_pants method.
+
+    :param args: command line arguments used to run pants
+    :param kwargs: handles 2 keys
+      success - indicate whether to expect pants run to succeed or fail.
+      enable_v2_engine - indicate whether to use v2 engine or not.
+    :return: a PantsResult object
+    """
+    success = kwargs.get('success', True)
+    enable_v2_engine = kwargs.get('enable_v2_engine', False)
+    cmd = ['--enable-v2-engine'] if enable_v2_engine else []
+    cmd.extend(list(args))
+    pants_run = self.run_pants(cmd)
+    if success:
+      self.assert_success(pants_run)
+    else:
+      self.assert_failure(pants_run)
+    return pants_run

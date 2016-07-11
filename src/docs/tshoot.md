@@ -1,150 +1,70 @@
 Troubleshooting
 ===============
 
-Sometimes Pants doesn't do what you hoped.
-Pants has good error messages for common errors, but
-some messages are not so useful.
-(Please report these when you see them.
-We want Pants' error messages to be useful.)
-Sometimes Pants just plain doesn't work. (Please report these, too.) The
-following workarounds can get you up and running again.
+Reporting Server
+----------------
 
-<a pantsmark="tshoot_verbosity"> </a>
-
-Pants Run Log
-------------
-
-The console output you get when running pants is also logged under the
-pants workdir.  An HTML formatted version of the log from previous
-runs will be stored under `.pants.d/reports` and the most recent run
-is in `.pants.d/reports/latest`.  Additional information from the run
-will be logged under `.pants.d/runs`.
-
-An easy way to view this output is to use the reporting server.
-
-```bash
-$ ./pants server --open
-Launching server with pid 6991 at http://localhost:49266
-```
-
-Your browser should open up automatically to the main reporting server
-page, or you can use the specified URL.  On this page you will be able to
-browse through all of the runs since the last call to `./pants
-clean-all`.
-
-![image](images/report-server-page.png)
-
-When viewed under the reporting server, there is additional
-information available such as:
-
-- Performance timings
-- Links to source code
-- Details of the command line and stdout/stderr from running tasks
-- Details on which targets are being operated on
-- Artifact cache usage information (if artifact caching is enabled)
+You can get a huge amount of useful debugging information from the detailed HTML
+build reports. See  for information on how to view these reports.
 
 
 Maximum Verbosity
 -----------------
 
-To run a Pants command so that it outputs much much more information to
-stdout, you can set some environment variables and pass the `-ldebug`
-flag (along with the parameters you meant to pass):
+To output verbose debugging information to stdout set the log level to `debug`:
 
     :::bash
-    $ PEX_VERBOSE=5 ./pants -ldebug ...
+    $ ./pants -ldebug ...
 
-This can be especially useful if you're trying to figure out what Pants
-was "looking at" when it crashed.
 
 <a pantsmark="washpants"> </a>
 
-Scrub the Environment
----------------------
+Cleaning
+--------
 
-If you suspect that Pants has cached some corrupt data somewhere, but
-don't want to track down exactly what, you can reset your state:
+If you suspect that your build products are in a bad state you can remove
+them with `./pants clean-all`.
 
--   **Clean many cached files:** `./build-support/python/clean.sh`
--   **Clean more cached files:** If your source tree lives under source
-    control, use your source control tool to clean up more files. For
-    example with `git`, you might do something like:
 
-        :::bash
-        $ git status  # look for untracked files
-        $ git add path/to/file1 path/to/file2  # preserve untracked files you don't want deleted
-        $ git clean -fdx  # delete all untracked files
+Stopping Nailguns
+-----------------
 
--   **Stop background processes:**
+Pants runs JVM processes in persistent daemons called "nailguns".  If you think they may
+be holding bad state, you can kill them with `./pants ng-killall`.  They will
+restart on the next build.
 
-        :::bash
-        $ ./pants ng-killall --everywhere
+Nailgun Errors
+--------------
 
-Nailgun 10 seconds
-------------------
+If nailguns stop resonding, look for clues in the `stdout` and `stderr` files in
+`.pants.d/ng/*/*`.
 
-If Pants fails with a stack trace that ends with something like
+
+Ivy Failures
+------------
+
+You can see an Ivy invocation's detailed outputs in the [[HTML report|pants('src/docs:reporting_server')]].
+
+You can get more verbose information from Ivy with the `--resolve-ivy-debug` option.
+
+This setting does not affect the output of the Ivy tasks used for bootstrapping tools.
+
+Ivy Resolution
+--------------
+
+You can view Ivy's report of how it resolved each (transitive) third-party dependency:
 
     :::bash
-    File "pants/tasks/nailgun_task.py", line 255, in _spawn_nailgun_server
-    File "pants/tasks/nailgun_task.py", line 226, in _await_nailgun_server
-    pants.java.nailgun_client.NailgunError: Failed to read ng output after 10 seconds...
+    $ ./pants resolve.ivy --open examples/tests/java/org/pantsbuild/example/hello/greet
 
-The exception might show some command args.
 
-Pants uses a program called nailgun to run some JVM jobs. Pants runs
-nailgun as a server in the background and then sends requests to it. If
-nailgun runs into problems, it might not respond.
-
-To debug this, look in `.pants.d/ng/*/*`: these files should be named
-`stdout` and `stderr`.
-
-One typical cause behind this symptom: if you removed your machine's Ivy
-cache, Pants may try to use symbolic links to files that have gone away.
-To recover from this, <a pantsref="washpants">scrub the environment</a>.
-
-Troubleshooting Ivy download failures
----------------------------------
-
-Sometimes Ivy will refuse to download a particular artifact.   When
-the ivy step fails, pants echos the ivy output to the console.
-You can go back and look at previous runs or get more insight
-by starting the reporting server with `./pants server --open` and
-looking at the report for the failed run.
-
-* If you missed it the first time, you can open up the `[ivy-resolve]`
-or one of the `bootstrap` steps in the output and check the stderr
-and stdout links.
-
-* Using a web browser, navigate to the URLs that are failing the Ivy
-download and see if you can download the artifact manually.
-If you are downloading through a proxy you may find a configuration
-issue or an artifact missing from the proxy's cache.
-
-There are other options you can use to enable more debugging in
-Ivy if you think you need it.
-
-### Add the `-debug` flag to the ivy tool
-
-You can get more debugging in the ivy resolve task by passing the
-`-debug` argument when ivy is invoked:
-
-```ini
-[resolve.ivy]
-args: [ "-debug" ]
-```
-
-This makes the ivy output much more verbose.  You can see the output in the
-pants reporting server window for stderr and stdout for the
-`[ivy-resolve]` step.  This setting does not affect the output of the
-bootstrapping task for downloading tools.
-
-### Turn on HTTP header debugging in Ivy
+Ivy HTTP Debugging
+------------------
 
 This is a bit more involved, but gives you deeper inspection into the
 network traffic between Ivy and the repo.
 
-First, you need to add commons-httpclient to the bootstrapped ivy
+First, you need to add commons-httpclient to the bootstrapped Ivy
 installation by creating a custom ivy.xml.  You can
 start with the org.apache.ivy xml file under the ivy cache and just
 add a dependency for commons-httpclient as follows:
@@ -215,8 +135,7 @@ by expanding the `stderr` nodes.
 2015/03/12 03:55:57:451 PDT [DEBUG] header - -<< "X-Timer: S1426157757.333469,VS0,VE36[\r][\n]"
 ```
 
-
 Questions, Issues, Bug Reports
 ------------------------------
 
-See [[How to Ask|pants('src/python/pants/docs:howto_ask')]]
+See [[How to Ask|pants('src/docs:howto_ask')]]

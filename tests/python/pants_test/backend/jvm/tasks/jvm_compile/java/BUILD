@@ -23,6 +23,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   tags = {'integration'},
+  timeout=240,
 )
 
 python_tests(
@@ -35,6 +36,18 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
+  tags = {'integration'},
+  timeout=180,
+)
+
+python_tests(
+  name='javac_plugin_integration',
+  sources=['test_javac_plugin_integration.py'],
+  dependencies=[
+    'tests/python/pants_test/backend/jvm/tasks:missing_jvm_check',
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+  ],
+  timeout = 120,
   tags = {'integration'},
 )
 
@@ -56,6 +69,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test/java/distribution',
   ],
 )
 

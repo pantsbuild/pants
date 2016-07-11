@@ -2,6 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name = 'argutil',
+  sources = ['argutil.py'],
+)
+
+python_library(
    name = 'contextutil',
    sources = ['contextutil.py'],
    dependencies = [
@@ -68,6 +73,11 @@ python_library(
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
+)
+
+python_library(
+  name = 'retry',
+  sources = ['retry.py'],
 )
 
 python_library(

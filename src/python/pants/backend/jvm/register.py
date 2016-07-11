@@ -22,6 +22,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
@@ -52,6 +53,7 @@ from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
+from pants.backend.jvm.tasks.provide_tools_jar import ProvideToolsJar
 from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepCommand,
                                                           RunCompileJvmPrepCommand,
                                                           RunTestJvmPrepCommand)
@@ -72,6 +74,7 @@ def build_file_aliases():
       'jar_library': JarLibrary,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
+      'javac_plugin': JavacPlugin,
       'java_tests': JavaTests,
       'junit_tests': JavaTests,
       'jvm_app': JvmApp,
@@ -133,6 +136,7 @@ def register_goals():
   task(name='jvm-platform-validate', action=JvmPlatformValidate).install('jvm-platform-validate')
 
   task(name='bootstrap-jvm-tools', action=BootstrapJvmTools).install('bootstrap')
+  task(name='provide-tools-jar', action=ProvideToolsJar).install('bootstrap')
 
   # Compile
   task(name='zinc', action=ZincCompile).install('compile')
@@ -169,10 +173,7 @@ def register_goals():
   task(name='detect-duplicates', action=DuplicateDetector).install()
 
   # Publishing.
-  task(
-    name='check_published_deps',
-    action=CheckPublishedDeps,
-  ).install('check_published_deps')
+  task(name='check-published-deps', action=CheckPublishedDeps).install('check-published-deps')
 
   task(name='jar', action=JarPublish).install('publish')
 

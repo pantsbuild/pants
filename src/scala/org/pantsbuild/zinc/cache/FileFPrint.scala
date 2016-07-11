@@ -25,6 +25,9 @@ object FileFPrint {
   private val LongStringLen = (2l^31).toString.size
 
   /**
+   * Fingerprint the given File. The resulting FileFPrint will be for the canonical file behind
+   * the given path, and thus FileFPrint.file may not equal the input file.
+   *
    * NB: This used to SHA1 the entire analysis file to generate fingerprint, but in the context
    * of many, many small projects that is too expensive an operation. Instead, we use only the
    * analysis file name and lastModified time here.
@@ -38,11 +41,12 @@ object FileFPrint {
       if (!file.exists()) {
         return None
       }
-      val filePath = file.getCanonicalPath()
-      val hasher = HashFunction.newHasher(filePath.size + (2 * LongStringLen))
-      hasher.putString(filePath, Charsets.UTF_8)
+      val canonicalFile = file.getCanonicalFile()
+      val canonicalPath = canonicalFile.getPath()
+      val hasher = HashFunction.newHasher(canonicalPath.size + (2 * LongStringLen))
+      hasher.putString(canonicalPath, Charsets.UTF_8)
       hasher.putLong(file.lastModified)
-      Some(new FileFPrint(file, hasher.hash.toString))
+      Some(new FileFPrint(canonicalFile, hasher.hash.toString))
     } catch {
       case e: FileNotFoundException => None
     }

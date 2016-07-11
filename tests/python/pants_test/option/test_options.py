@@ -13,16 +13,18 @@ import warnings
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.base.deprecated import CodeRemovedError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import file_option, target_option
-from pants.option.errors import (BooleanOptionNameWithNo, DeprecatedOptionError, FrozenRegistration,
-                                 ImplicitValIsNone, InvalidKwarg, InvalidMemberType,
-                                 MemberTypeNotAllowed, NoOptionNames, OptionNameDash,
+from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
+                                 InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
+                                 NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
                                  OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
                                  Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
+from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
@@ -98,12 +100,12 @@ class OptionsTest(unittest.TestCase):
     register_global('--b', type=int, recursive=True)
 
     # Deprecated global options
-    register_global('--global-crufty', deprecated_version='999.99.9',
-                    deprecated_hint='use a less crufty global option')
-    register_global('--global-crufty-boolean', type=bool, deprecated_version='999.99.9',
-                    deprecated_hint='say no to crufty global options')
-    register_global('--global-crufty-expired', deprecated_version='0.0.1',
-                    deprecated_hint='use a less crufty global option')
+    register_global('--global-crufty', removal_version='999.99.9',
+                    removal_hint='use a less crufty global option')
+    register_global('--global-crufty-boolean', type=bool, removal_version='999.99.9',
+                      removal_hint='say no to crufty global options')
+    register_global('--global-crufty-expired', removal_version='0.0.1',
+                    removal_hint='use a less crufty global option')
 
     # For the design doc example test.
     options.register('compile', '--c', type=int, recursive=True)
@@ -111,11 +113,11 @@ class OptionsTest(unittest.TestCase):
     # Test deprecated options with a scope
     options.register('stale', '--still-good')
     options.register('stale', '--crufty',
-                     deprecated_version='999.99.9',
-                     deprecated_hint='use a less crufty stale scoped option')
+                     removal_version='999.99.9',
+                     removal_hint='use a less crufty stale scoped option')
     options.register('stale', '--crufty-boolean', type=bool,
-                     deprecated_version='999.99.9',
-                     deprecated_hint='say no to crufty, stale scoped options')
+                     removal_version='999.99.9',
+                     removal_hint='say no to crufty, stale scoped options')
 
     # For task identity test
     options.register('compile.scala', '--modifycompile', fingerprint=True)
@@ -337,6 +339,9 @@ class OptionsTest(unittest.TestCase):
     check([1, 2, 3, 4, 5], './pants --listy=4 --listy=5')
     check([1, 2, 3, 4, 5], './pants --listy=+[4,5]')
 
+    # Filtering from the default.
+    check([1, 3], './pants --listy=-[2]')
+
     # Replacing the default.
     check([4, 5], './pants --listy=[4,5]')
 
@@ -345,8 +350,17 @@ class OptionsTest(unittest.TestCase):
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
           config={'GLOBAL': {'listy': '+[4,5]'}})
 
-    # Overwriting from env, then appending.
-    check([6, 7, 8, 9], './pants --listy=+[8,9]',
+    # Appending and filtering across env, config and flags (in the right order).
+    check([2, 3, 4, 7], './pants --listy=-[1,5,6]',
+          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
+          config={'GLOBAL': {'listy': '+[4,5]'}})
+
+    check([1, 2, 8, 9], './pants --listy=+[8,9]',
+          env={'PANTS_GLOBAL_LISTY': '-[4,5]'},
+          config={'GLOBAL': {'listy': '+[4,5],-[3]'}})
+
+    # Overwriting from env, then appending and filtering.
+    check([7, 8, 9], './pants --listy=+[8,9],-[6]',
           env={'PANTS_GLOBAL_LISTY': '[6,7]'},
           config={'GLOBAL': {'listy': '+[4,5]'}})
 
@@ -358,7 +372,26 @@ class OptionsTest(unittest.TestCase):
     # Overwriting from flags.
     check([8, 9], './pants --listy=[8,9]',
           env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
-          config={'GLOBAL': {'listy': '[4,5]'}})
+          config={'GLOBAL': {'listy': '+[4,5],-[8]'}})
+
+    # Filtering all instances of repeated values.
+    check([1, 2, 3, 4, 6], './pants --listy=-[5]',
+          config={'GLOBAL': {'listy': '[1, 2, 5, 3, 4, 5, 6, 5, 5]'}})
+
+    # Filtering a value even though it was appended again at a higher rank.
+    check([1, 2, 3, 5], './pants --listy=+[4]',
+          env={'PANTS_GLOBAL_LISTY': '-[4]'},
+          config={'GLOBAL': {'listy': '+[4, 5]'}})
+
+    # Filtering a value even though it was appended again at the same rank.
+    check([1, 2, 3, 5], './pants',
+          env={'PANTS_GLOBAL_LISTY': '-[4],+[4]'},
+          config={'GLOBAL': {'listy': '+[4, 5]'}})
+
+    # Overwriting cancels filters.
+    check([4], './pants',
+          env={'PANTS_GLOBAL_LISTY': '[4]'},
+          config={'GLOBAL': {'listy': '-[4]'}})
 
   def test_dict_list_option(self):
     def check(expected, args_str, env=None, config=None):
@@ -425,6 +458,25 @@ class OptionsTest(unittest.TestCase):
           './pants', config={'GLOBAL': {'target_listy': '+["//:c", "//:d"]'} })
     check(['//:c', '//:d'],
           './pants', config={'GLOBAL': {'target_listy': '["//:c", "//:d"]'} })
+
+  def test_dict_option(self):
+    def check(expected, args_str, env=None, config=None):
+      options = self._parse(args_str=args_str, env=env, config=config)
+      self.assertEqual(expected, options.for_global_scope().dicty)
+
+    check({'a': 'b'}, './pants')
+    check({'c': 'd'}, './pants --dicty=\'{"c": "d"}\'')
+    check({'a': 'b', 'c': 'd'}, './pants --dicty=\'+{"c": "d"}\'')
+
+    check({'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '{"c": "d"}'}})
+    check({'a': 'b', 'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '+{"c": "d"}'}})
+    check({'a': 'b', 'c': 'd', 'e': 'f'}, './pants --dicty=\'+{"e": "f"}\'',
+          config={'GLOBAL': {'dicty': '+{"c": "d"}'}})
+
+    # Check that highest rank wins if we have multiple values for the same key.
+    check({'a': 'b+', 'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '+{"a": "b+", "c": "d"}'}})
+    check({'a': 'b++', 'c': 'd'}, './pants --dicty=\'+{"a": "b++"}\'',
+          config={'GLOBAL': {'dicty': '+{"a": "b+", "c": "d"}'}})
 
   def test_defaults(self):
     # Hard-coded defaults.
@@ -605,7 +657,9 @@ class OptionsTest(unittest.TestCase):
         """
       ))
       tmp.flush()
-      cmdline = './pants --target-spec-file={filename} compile morx:tgt fleem:tgt'.format(
+      # Note that we prevent loading a real pants.ini during get_bootstrap_options().
+      cmdline = './pants --target-spec-file={filename} --pants-config-files="[]" ' \
+                'compile morx:tgt fleem:tgt'.format(
         filename=tmp.name)
       bootstrapper = OptionsBootstrapper(args=shlex.split(cmdline))
       bootstrap_options = bootstrapper.get_bootstrap_options().for_global_scope()
@@ -701,8 +755,8 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual('BAR', defaulted_only_options.for_global_scope().pants_foo)
 
   def test_deprecated_option_past_removal(self):
-    """Ensure that expired options raise DeprecatedOptionError on attempted use."""
-    with self.assertRaises(DeprecatedOptionError):
+    """Ensure that expired options raise CodeRemovedError on attempted use."""
+    with self.assertRaises(CodeRemovedError):
       self._parse('./pants --global-crufty-expired=way2crufty').for_global_scope()
 
   @contextmanager
@@ -716,7 +770,8 @@ class OptionsTest(unittest.TestCase):
       self.assertEquals(1, len(w))
       self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
       warning_message = str(w[-1].message)
-      self.assertIn('is deprecated and removed in version', warning_message)
+      self.assertIn("will be removed in version",
+                    warning_message)
       self.assertIn(option_string, warning_message)
 
     with self.warnings_catcher() as w:
@@ -996,3 +1051,75 @@ class OptionsTest(unittest.TestCase):
 
     self.assertEqual(99, options.for_global_scope().b)
     self.assertTrue(options.for_global_scope().store_true_flag)
+
+  def test_double_registration(self):
+    options = Options.create(env={},
+                             config=self._create_config({}),
+                             known_scope_infos=OptionsTest._known_scope_infos,
+                             args=shlex.split('./pants'),
+                             option_tracker=OptionTracker())
+    options.register(GLOBAL_SCOPE, '--foo-bar')
+    self.assertRaises(OptionAlreadyRegistered, lambda: options.register(GLOBAL_SCOPE, '--foo-bar'))
+
+  def test_scope_deprecation(self):
+    # Note: This test demonstrates that two different new scopes can deprecate the same
+    # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
+    class DummyOptionable1(Optionable):
+      options_scope = 'new-scope1'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+      deprecated_options_scope = 'deprecated-scope'
+      deprecated_options_scope_removal_version = '9999.9.9'
+
+    class DummyOptionable2(Optionable):
+      options_scope = 'new-scope2'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+      deprecated_options_scope = 'deprecated-scope'
+      deprecated_options_scope_removal_version = '9999.9.9'
+
+    options = Options.create(env={},
+                             config=self._create_config({
+                               DummyOptionable1.options_scope: {
+                                 'foo': 'xx'
+                               },
+                               DummyOptionable1.deprecated_options_scope: {
+                                 'foo': 'yy',
+                                 'bar': 'zz',
+                                 'baz': 'ww',
+                                 'qux': 'uu'
+                               },
+                             }),
+                             known_scope_infos=[
+                               DummyOptionable1.get_scope_info(),
+                               DummyOptionable2.get_scope_info()
+                             ],
+                             args=shlex.split('./pants --new-scope1-baz=vv'),
+                             option_tracker=OptionTracker())
+
+    options.register(DummyOptionable1.options_scope, '--foo')
+    options.register(DummyOptionable1.options_scope, '--bar')
+    options.register(DummyOptionable1.options_scope, '--baz')
+    options.register(DummyOptionable2.options_scope, '--qux')
+
+    with self.warnings_catcher() as w:
+      vals1 = options.for_scope(DummyOptionable1.options_scope)
+
+    # Check that we got a warning.
+    self.assertEquals(1, len(w))
+    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
+
+    # Check values.
+    # Deprecated scope takes precedence at equal rank.
+    self.assertEquals('yy', vals1.foo)
+    self.assertEquals('zz', vals1.bar)
+    # New scope takes precedence at higher rank.
+    self.assertEquals('vv', vals1.baz)
+
+    with self.warnings_catcher() as w:
+      vals2 = options.for_scope(DummyOptionable2.options_scope)
+
+    # Check that we got a warning.
+    self.assertEquals(1, len(w))
+    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
+
+    # Check values.
+    self.assertEquals('uu', vals2.qux)

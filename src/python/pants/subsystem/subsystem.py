@@ -64,6 +64,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   @classmethod
   def get_scope_info(cls, subscope=None):
+    cls.validate_scope_name_component(cls.options_scope)
     if subscope is None:
       return super(Subsystem, cls).get_scope_info()
     else:
@@ -111,6 +112,10 @@ class Subsystem(SubsystemClientMixin, Optionable):
   @classmethod
   def set_options(cls, options):
     cls._options = options
+
+  @classmethod
+  def is_initialized(cls):
+    return cls._options is not None
 
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
   _scoped_instances = {}

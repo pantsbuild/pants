@@ -1,0 +1,25 @@
+# BUILD file used for integ tests to verify custom scala 2.10 setup works.
+
+jar_library(name = 'scalac',
+            jars = [
+              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.10.4'),
+            ])
+
+jar_library(name = 'scala-library',
+            jars = [
+              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.10.4'),
+            ])
+
+jar_library(name = 'scala-repl',
+            jars = [
+              jar(org = 'org.scala-lang', name = 'jline', rev = '2.10.4', intransitive = True),
+            ],
+            dependencies = [
+              ':scalac',
+              ':scala-library',
+            ])
+
+jar_library(name = 'scalastyle',
+            jars = [
+              scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
+            ])

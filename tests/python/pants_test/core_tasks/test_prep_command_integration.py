@@ -6,55 +6,74 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
+from textwrap import dedent
 
-from pants.util.dirutil import safe_delete
+from pants.util.dirutil import safe_open
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class PrepCommandIntegration(PantsRunIntegrationTest):
+class PrepCommandIntegrationTest(PantsRunIntegrationTest):
 
-  SENTINELS = {
-    'test' : '/tmp/running-prep-in-goal-test.txt',
-    'compile' : '/tmp/running-prep-in-goal-compile.txt',
-    'binary' : '/tmp/running-prep-in-goal-binary.txt'
+  _SENTINELS = {
+    'test': 'running-prep-in-goal-test.txt',
+    'compile': 'running-prep-in-goal-compile.txt',
+    'binary': 'running-prep-in-goal-binary.txt'
   }
 
-  def setUp(self):
-    for path in self.SENTINELS.values():
-      safe_delete(path)
+  @classmethod
+  def _emit_targets(cls, workdir):
+    prep_command_path = os.path.join(workdir, 'src/java/org/pantsbuild/prepcommand')
+    with safe_open(os.path.join(prep_command_path, 'BUILD'), 'w') as fp:
+      for name, touch_target in cls._SENTINELS.items():
+        fp.write(dedent("""
+          prep_command(
+            name='{name}',
+            goal='{goal}',
+            prep_executable='touch',
+            prep_args=['{tmpdir}/{touch_target}'],
+          )
+        """.format(name=name, goal=name, tmpdir=workdir, touch_target=touch_target)))
+    return ['{}:{}'.format(prep_command_path, name) for name in cls._SENTINELS]
 
-  def assert_goal_ran(self, goal):
-    self.assertTrue(os.path.exists(self.SENTINELS[goal]))
+  @classmethod
+  def _goal_ran(cls, basedir, goal):
+    return os.path.exists(os.path.join(basedir, cls._SENTINELS[goal]))
 
-  def assert_goal_did_not_run(self, goal):
-    self.assertFalse(os.path.exists(self.SENTINELS[goal]))
+  def _assert_goal_ran(self, basedir, goal):
+    self.assertTrue(self._goal_ran(basedir, goal))
+
+  def _assert_goal_did_not_run(self, basedir, goal):
+    self.assertFalse(self._goal_ran(basedir, goal))
+
+  @contextmanager
+  def _execute_pants(self, goal):
+    with self.temporary_workdir() as workdir:
+      prep_commands_specs = self._emit_targets(workdir)
+      # Make sure the emitted BUILD under .pants.d is not ignored.
+      config = {
+        'GLOBAL': {
+          'ignore_patterns': []
+        }
+      }
+      pants_run = self.run_pants_with_workdir([goal] + prep_commands_specs, workdir, config=config)
+      self.assert_success(pants_run)
+      yield workdir
 
   def test_prep_command_in_compile(self):
-    pants_run = self.run_pants([
-      'compile',
-      'testprojects/src/java/org/pantsbuild/testproject/prepcommand::'])
-    self.assert_success(pants_run)
-
-    self.assert_goal_ran('compile')
-    self.assert_goal_did_not_run('test')
-    self.assert_goal_did_not_run('binary')
+    with self._execute_pants('compile') as workdir:
+      self._assert_goal_ran(workdir, 'compile')
+      self._assert_goal_did_not_run(workdir, 'test')
+      self._assert_goal_did_not_run(workdir, 'binary')
 
   def test_prep_command_in_test(self):
-    pants_run = self.run_pants([
-      'test',
-      'testprojects/src/java/org/pantsbuild/testproject/prepcommand::'])
-    self.assert_success(pants_run)
-
-    self.assert_goal_ran('compile')
-    self.assert_goal_ran('test')
-    self.assert_goal_did_not_run('binary')
+    with self._execute_pants('test') as workdir:
+      self._assert_goal_ran(workdir, 'compile')
+      self._assert_goal_ran(workdir, 'test')
+      self._assert_goal_did_not_run(workdir, 'binary')
 
   def test_prep_command_in_binary(self):
-    pants_run = self.run_pants([
-      'binary',
-      'testprojects/src/java/org/pantsbuild/testproject/prepcommand::'])
-    self.assert_success(pants_run)
-
-    self.assert_goal_ran('compile')
-    self.assert_goal_ran('binary')
-    self.assert_goal_did_not_run('test')
+    with self._execute_pants('binary') as workdir:
+      self._assert_goal_ran(workdir, 'compile')
+      self._assert_goal_ran(workdir, 'binary')
+      self._assert_goal_did_not_run(workdir, 'test')

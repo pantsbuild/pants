@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from abc import abstractmethod
 from collections import OrderedDict
-from zipfile import ZIP_DEFLATED, ZIP_STORED
+from zipfile import ZIP_DEFLATED
 
 from pants.util.contextutil import open_tar, open_zip
 from pants.util.dirutil import safe_walk
@@ -124,14 +124,14 @@ class ZipArchiver(Archiver):
           zip.write(full_path, relpath)
     return zippath
 
+archive_extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
 
-TAR = TarArchiver('w:', 'tar')
-TGZ = TarArchiver('w:gz', 'tar.gz')
-TBZ2 = TarArchiver('w:bz2', 'tar.bz2')
-ZIP = ZipArchiver(ZIP_DEFLATED, 'zip')
-JAR = ZipArchiver(ZIP_STORED, 'jar')
+TAR = TarArchiver('w:', archive_extensions['tar'])
+TGZ = TarArchiver('w:gz', archive_extensions['tgz'])
+TBZ2 = TarArchiver('w:bz2', archive_extensions['tbz2'])
+ZIP = ZipArchiver(ZIP_DEFLATED, archive_extensions['zip'])
 
-_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP, jar=JAR)
+_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
 

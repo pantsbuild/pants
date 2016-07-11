@@ -17,13 +17,17 @@ from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.util.memo import memoized_property
 
 
 class ApacheThriftGen(SimpleCodegenTask):
+
+  _COMPILER = 'thrift'
+  _LANG = 'java'
+  _RPC_STYLE = 'sync'
 
   @classmethod
   def register_options(cls, register):
@@ -32,7 +36,7 @@ class ApacheThriftGen(SimpleCodegenTask):
     # NB: As of thrift 0.9.2 there is 1 warning that -strict promotes to an error - missing a
     # struct field id.  If an artifact was cached with strict off, we must re-gen with strict on
     # since this case may be present and need to generate a thrift compile error.
-    register('--strict', default=True, fingerprint=True, action='store_true',
+    register('--strict', default=True, fingerprint=True, type=bool,
              help='Run thrift compiler with strict warnings.')
 
     register('--gen-options', advanced=True, fingerprint=True,
@@ -55,6 +59,10 @@ class ApacheThriftGen(SimpleCodegenTask):
   def subsystem_dependencies(cls):
     return (super(ApacheThriftGen, cls).subsystem_dependencies() +
             (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))
+
+  @classmethod
+  def implementation_version(cls):
+    return super(ApacheThriftGen, cls).implementation_version() + [('ApacheThriftGen', 2)]
 
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)
@@ -92,14 +100,24 @@ class ApacheThriftGen(SimpleCodegenTask):
 
   def is_gentarget(self, target):
     return (isinstance(target, JavaThriftLibrary) and
-            'thrift' == self._thrift_defaults.compiler(target))
+            self._COMPILER == self._thrift_defaults.compiler(target))
+
+  def _validate(self, target):
+    if self._thrift_defaults.language(target) != self._LANG:
+      raise TargetDefinitionException(
+          target,
+          'Compiler {} supports only language={}.'.format(self._COMPILER, self._LANG))
+    if self._thrift_defaults.rpc_style(target) != self._RPC_STYLE:
+      raise TargetDefinitionException(
+          target,
+          'Compiler {} supports only rpc_style={}.'.format(self._COMPILER, self._RPC_STYLE))
 
   @memoized_property
   def _thrift_cmd(self):
     cmd = [self._thrift_binary]
 
     gen_options = self.get_options().gen_options
-    cmd.extend(('--gen', 'java:{}'.format(gen_options) if gen_options else 'java'))
+    cmd.extend(('--gen', 'java:{}'.format(gen_options) if gen_options else self._LANG))
 
     if self.get_options().strict:
       cmd.append('-strict')
@@ -137,9 +155,5 @@ class ApacheThriftGen(SimpleCodegenTask):
     os.rmdir(gen_dir)
 
   def execute_codegen(self, target, target_workdir):
+    self._validate(target)
     self._generate_thrift(target, target_workdir)
-
-  @property
-  def _copy_target_attributes(self):
-    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
-    return ['provides']

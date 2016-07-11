@@ -165,7 +165,7 @@ class PomWriter(object):
     if target_jar:
       target_jar = target_jar.extend(dependencies=dependencies.values())
 
-    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.xml.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
     generator = Generator(template_text, project=target_jar)
     with safe_open(path, 'w') as output:
@@ -309,22 +309,22 @@ class JarPublish(ScmPublishMixin, JarTask):
     # Allow re-running this goal with the file as input to support forcing an arbitrary set of
     # revisions and supply of hand edited changelogs.
 
-    register('--dryrun', default=True, action='store_true',
+    register('--dryrun', default=True, type=bool,
              help='Run through a push without actually pushing artifacts, editing publish dbs or '
                   'otherwise writing data')
-    register('--commit', default=True, action='store_true',
+    register('--commit', default=True, type=bool,
              help='Commit the push db. Turn off for local testing.')
     register('--local', metavar='<PATH>',
              help='Publish jars to a maven repository on the local filesystem at this path.')
-    register('--local-snapshot', default=True, action='store_true',
+    register('--local-snapshot', default=True, type=bool,
              help='If --local is specified, publishes jars with -SNAPSHOT revision suffixes.')
     register('--named-snapshot', default=None,
              help='Publish all artifacts with the given snapshot name, replacing their version. '
                   'This is not Semantic Versioning compatible, but is easier to consume in cases '
                   'where many artifacts must align.')
-    register('--transitive', default=True, action='store_true',
+    register('--transitive', default=True, type=bool,
              help='Publish the specified targets and all their internal dependencies transitively.')
-    register('--force', default=False, action='store_true',
+    register('--force', type=bool,
              help='Force pushing jars even if there have been no changes since the last push.')
     register('--override', type=list,
              help='Specifies a published jar revision override in the form: '
@@ -338,22 +338,20 @@ class JarPublish(ScmPublishMixin, JarTask):
                   'Or: --restart-at=src/java/com/twitter/common/base')
     register('--ivy_settings', advanced=True, default=None,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
-    register('--jvm-options', advanced=True, type=list,
-             help='Use these jvm options when running Ivy.')
     register('--repos', advanced=True, type=dict,
              help='Settings for repositories that can be pushed to. See '
                   'https://pantsbuild.github.io/publish.html for details.')
     register('--publish-extras', advanced=True, type=dict,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
-    register('--individual-plugins', advanced=True, default=False, action='store_true',
+    register('--individual-plugins', advanced=True, type=bool,
              help='Extra products to publish as a individual artifact.')
     register('--push-postscript', advanced=True, default=None,
              help='A post-script to add to pushdb commit messages and push tag commit messages.')
-    register('--changelog', default=True, action='store_true',
+    register('--changelog', default=True, type=bool,
              help='A changelog.txt file will be created and printed to the console for each '
                   'artifact published')
-    register('--prompt', default=True, action='store_true',
+    register('--prompt', default=True, type=bool,
              help='Interactively prompt user before publishing each artifact.')
 
   @classmethod
@@ -908,7 +906,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       return ivy.ivy_settings
 
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
-    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.xml.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
 
     published = [TemplateData(org=jar.org, name=jar.name) for jar in publishedjars]
@@ -925,7 +923,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       return wrapper.name
 
   def generate_ivy(self, jar, version, publications):
-    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.xml.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
 
     pubs = [TemplateData(name=None if p.name == jar.name else p.name,

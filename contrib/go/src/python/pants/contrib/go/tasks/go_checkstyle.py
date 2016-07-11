@@ -19,7 +19,7 @@ class GoFmt(GoWorkspaceTask):
   @classmethod
   def register_options(cls, register):
     super(GoFmt, cls).register_options(register)
-    register('--skip', action='store_true', fingerprint=True, help='Skip checkstyle.')
+    register('--skip', type=bool, fingerprint=True, help='Skip checkstyle.')
 
   _GO_SOURCE_EXTENSION = '.go'
 

@@ -45,6 +45,42 @@ python_tests(
   ]
 )
 
+python_library(
+  name = 'project_tree_test_base',
+  sources = ['project_tree_test_base.py'],
+  dependencies = [
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
+  name = 'pants_ignore_test_base',
+  sources = ['pants_ignore_test_base.py'],
+  dependencies = [
+    ':project_tree_test_base',
+  ]
+)
+
+python_tests(
+  name = 'pants_ignore_file_system',
+  sources = ['test_pants_ignore_file_system.py'],
+  dependencies = [
+    ':pants_ignore_test_base',
+    'src/python/pants/base:file_system_project_tree',
+  ]
+)
+
+python_tests(
+  name = 'pants_ignore_scm',
+  sources = ['test_pants_ignore_scm.py'],
+  dependencies = [
+    ':pants_ignore_test_base',
+    'src/python/pants/base:scm_project_tree',
+    'src/python/pants/scm:git',
+  ]
+)
+
 python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],

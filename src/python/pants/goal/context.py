@@ -63,9 +63,6 @@ class Context(object):
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, invalidation_report=None):
-    """
-    :API: public
-    """
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -76,7 +73,7 @@ class Context(object):
     self._products = Products()
     self._buildroot = get_buildroot()
     self._source_roots = SourceRootConfig.global_instance().get_source_roots()
-    self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.run'))
+    self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.workdir.file_lock'))
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
     self._console_outstream = console_outstream or sys.stdout
@@ -147,17 +144,11 @@ class Context(object):
 
   @property
   def workspace(self):
-    """Returns the current workspace, if any.
-
-    :API: public
-    """
+    """Returns the current workspace, if any."""
     return self._workspace
 
   @property
   def invalidation_report(self):
-    """
-    :API: public
-    """
     return self._invalidation_report
 
   def __str__(self):
@@ -259,7 +250,7 @@ class Context(object):
     # initialized somewhere, making it now unsafe to replace targets. Thus callers of this method
     # must know what they're doing!
     #
-    # TODO(John Sirois): This currently has 0 uses (outside ContextTest) in pantsbuild/pants and
+    # TODO(John Sirois): This currently has only 1 use (outside ContextTest) in pantsbuild/pants and
     # only 1 remaining known use case in the Foursquare codebase that will be able to go away with
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)

@@ -27,7 +27,7 @@ class Reporting(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(Reporting, cls).register_options(register)
-    register('--invalidation-report', default=False, action='store_true',
+    register('--invalidation-report', type=bool,
              help='Write a formatted report on the invalid objects to the specified path.')
     register('--reports-dir', advanced=True, metavar='<dir>',
              default=os.path.join(register.bootstrap.pants_workdir, 'reports'),

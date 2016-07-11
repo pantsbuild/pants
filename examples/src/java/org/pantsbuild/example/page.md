@@ -1,11 +1,8 @@
-README Files and Markdown
-=========================
+Markdown
+========
 
-You can write program documentation in the popular Markdown or ReST format;
-Pants eases publishing your docs to places where your users can read it.
-E.g., that `README.md` file in your source code is handy for editing;
-but you might want to generate a web page from that so folks can decide
-whether they want to look at your source code.
+You can write codebase documentation in the popular Markdown or ReST format;
+Pants eases generating readable versions and publishing them so your users can read it.
 
 Markdown to HTML
 ----------------
@@ -127,7 +124,7 @@ Publishing
 You can tell Pants to publish a page. So far, there's only one way to
 publish: as a page in an Atlassian Confluence wiki. (You can add other
 doc-publish backends to Pants;
-[[send us a patch|pants('src/python/pants/docs:howto_contribute')]]!)
+[[send us a patch|pants('src/docs:howto_contribute')]]!)
 
 To specify the "address" to which to publish a page, give it a
 `provides` parameter.
@@ -161,7 +158,7 @@ set its `provides` to something like:
 
 That `wiki` specifies some information about your wiki server. So far, the only kind of thing you
 can publish to is a Confluence wiki. To set up and register this symbol, set up a
-[[Pants plugin|pants('src/python/pants/docs:howto_plugin')]] if your workspace doesn't already
+[[Pants plugin|pants('src/docs:howto_plugin')]] if your workspace doesn't already
 have one. In the plugin, define a `Wiki` and register it:
 
     :::python

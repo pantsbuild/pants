@@ -170,12 +170,12 @@ class BuildFileAddressMapper(object):
     :returns: A new Address instance.
     :rtype: :class:`pants.build_graph.address.BuildFileAddress`
     """
-    spec_path, name = parse_spec(spec, relative_to=relative_to)
-    address = Address(spec_path, name)
     try:
+      spec_path, name = parse_spec(spec, relative_to=relative_to)
+      address = Address(spec_path, name)
       build_file_address, _ = self.resolve(address)
       return build_file_address
-    except AddressLookupError as e:
+    except (ValueError, AddressLookupError) as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
 
@@ -248,7 +248,7 @@ class BuildFileAddressMapper(object):
       logger.debug('excludes:\n  {excludes}'
                    .format(excludes='\n  '.join(self._exclude_target_regexps)))
       targets = ', '.join(excluded_target_map[self._UNMATCHED_KEY])
-      logger.debug('Targets after excludes: {targets}'.format(targets=targets))
+      logger.debug('Targets after excludes: %s', targets)
       excluded_count = 0
       for pattern, targets in six.iteritems(excluded_target_map):
         if pattern != self._UNMATCHED_KEY:

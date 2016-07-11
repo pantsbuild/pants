@@ -70,6 +70,10 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/java/distribution',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:osutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
     'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
@@ -90,6 +94,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 120,
 )
 
 python_tests(
@@ -123,6 +128,15 @@ python_tests(
     ':resolve_jars_test_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'idea_plugin_integration',
+  sources = ['test_idea_plugin_integration.py'],
+  dependencies = [
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

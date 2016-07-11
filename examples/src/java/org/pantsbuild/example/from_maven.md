@@ -14,24 +14,21 @@ Maven, Pants targets might feel familiar. (If you're converting Maven
 `pom.xml`s to `BUILD` files, <a pantsref="setup_mvn2pants">some scripts written by others who
 have done the same</a> can give you a head start.)
 Both Maven and Pants expect code to be laid out in directories in a consistent way. If you're used
-to Maven's commands, many of Pants' goals will feel eerily familiar.
+to Maven's commands, many of Pants' goals will feel familiar.
 
 Pants uses Ivy to manage artifact fetching and publishing; Ivy's
 behavior here is pretty similar to Maven.
 
 Three Pants features that especially confuse Maven experts as they move
-to pants are
+to pants are:
 
 -   Pants has a first-class mechanism for targets depending on other
     targets on the local file system
 -   Pants targets do not specify version numbers; versions are only
     determined during release
--   BUILD files are python code that pants evaluates dynamically.
 
-The first two points are a significant departure from Maven's handling
-of inter-project dependencies. The last point isn't necessary for
-understanding how to read and write most BUILD files, but is helpful to
-be aware of.
+These points are a significant departure from Maven's handling
+of inter-project dependencies.
 
 Folks switching a Maven-built codebase to Pants often encounter another
 source of confusion: they uncover lurking jar-dependency version
@@ -49,32 +46,65 @@ for advice.
 Pants Equivalents
 -----------------
 
-`exec:java` run a binary<br>
-`run`
+### Commands
 
-`-Xdebug` run a binary in the debugger<br>
-`run.jvm --jvm-debug`
+**Run a binary**<br>
+Maven: `exec:java`<br>
+Pants: `run`
 
-`-Dtest=com.foo.BarSpec -Dmaven.surefire.debug=true test` run one test in the debugger<br>
-`test.junit --jvm-debug --test=com.foo.BarSpec`
+**Run a binary in the debugger**<br>
+Maven: `-Xdebug`<br>
+Pants: `run.jvm --jvm-debug`
 
-Depending on Source, not Jars
------------------------------
+**Run one test in the debugger**<br>
+Maven: `-Dtest=com.foo.BarSpec -Dmaven.surefire.debug=true test`<br>
+Pants: `test.junit --jvm-debug --test=com.foo.BarSpec`
 
-Pants arose in an environment of a big multi-project repo. Several teams
-contributed code to the same source tree; projects depended on each
-other. Getting those dependencies to work with Maven was tricky. As the
-number of engineers grew, it wasn't so easy to have one team ask another
-team to release a new jar. Using snapshot dependencies mostly worked,
-but it wasn't always clear what needed rebuilding when pulling fresh
-code from origin; if you weren't sure and didn't want to investigate,
-the safe thing was to rebuild everything your project depended upon.
-Alas, for a big tree of Scala code, that might take 45 minutes.
+**Build a binary package**<br>
+Maven: `package`<br>
+Pants: `binary`<br>
 
-Pants has a first-class concept of "depend on whatever version of this
-project is defined on disk," and caches targets based on their
-fingerprints (i.e. SHAs of the contents of the files and command line
-options used to build the target). When code changes (e.g., after a git
-pull), pants recompiles only those targets whose source files have
-differing contents.
+**Look at dependent projects or artifacts**<br>
+Maven: `dependency:analyze`<br>
+Pants: `depmap`<br>
+Pants: `resolve.ivy --open`<br>
 
+### Configuration
+
+**Shade with an AppendingTransformer**<br>
+
+Maven
+```xml
+<plugins>
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-shade-plugin</artifactId>
+    <executions>
+        <execution>
+            <goals>
+                <goal>shade</goal>
+            </goals>
+            <configuration>
+                <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                        <resource>reference.conf</resource>
+                    </transformer>
+                </transformers>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+</plugins>
+```
+
+Pants
+```python
+jvm_binary(name='your-bin',
+           main = 'pkg.to.my.Main',
+           deploy_jar_rules=jar_rules(rules=[
+              Duplicate('^reference\.conf', Duplicate.CONCAT_TEXT),
+
+              # We need to add this as it is overridden by adding the reference.conf one above.
+              Duplicate('^META-INF/services/', Duplicate.CONCAT_TEXT)
+          ]))
+```

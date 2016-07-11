@@ -6,13 +6,9 @@ package org.pantsbuild.testproject.annotation.processor;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closer;
 import java.io.Closeable;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.processing.AbstractProcessor;
@@ -36,7 +32,6 @@ import javax.tools.StandardLocation;
 public class ResourceMappingProcessor extends AbstractProcessor {
   private static final String REPORT_FILE_NAME = "deprecation_report.txt";
 
-  private ProcessingEnvironment processingEnvironment = null;
   private Elements elementUtils;
 
   private static final class Resource {
@@ -105,8 +100,8 @@ public class ResourceMappingProcessor extends AbstractProcessor {
     }
   }
 
-  @Override public void init(ProcessingEnvironment processingEnvironment) {
-    this.processingEnvironment = processingEnvironment;
+  @Override public synchronized void init(ProcessingEnvironment processingEnvironment) {
+    super.init(processingEnvironment);
     this.elementUtils = processingEnvironment.getElementUtils();
   }
 
@@ -118,9 +113,9 @@ public class ResourceMappingProcessor extends AbstractProcessor {
     return SourceVersion.latest();
   }
 
-  @Override public boolean process(Set<? extends TypeElement> annotations,
-      RoundEnvironment roundEnv) {
-    if (roundEnv.processingOver()) {
+  @Override
+  public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+    if (roundEnv.errorRaised() || roundEnv.processingOver()) {
       return false;
     }
 
@@ -129,14 +124,11 @@ public class ResourceMappingProcessor extends AbstractProcessor {
     try {
       Set<String> typeNames = new HashSet<String>();
       PrintWriter writer = closer.register(new PrintWriter(outputFile.openWriter()));
-      for (TypeElement appAnnotation : annotations) {
-        Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(appAnnotation);
-        Set<TypeElement> elements = ElementFilter.typesIn(annotatedElements);
-        for (Element elem : elements) {
-          if (!(elem instanceof TypeElement))
-            continue;
-          TypeElement typeElem = (TypeElement) elem;
-          String typeName = elementUtils.getBinaryName(typeElem).toString();
+      for (TypeElement annotation : annotations) {
+        Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(annotation);
+        Set<TypeElement> typeElements = ElementFilter.typesIn(annotatedElements);
+        for (TypeElement typeElement : typeElements) {
+          String typeName = elementUtils.getBinaryName(typeElement).toString();
           typeNames.add(typeName);
           writer.println(typeName);
         }
@@ -155,7 +147,7 @@ public class ResourceMappingProcessor extends AbstractProcessor {
 
   private FileObject createResourceOrDie(String packageName, String fileName) {
     try {
-      return processingEnvironment.getFiler().createResource(
+      return processingEnv.getFiler().createResource(
           StandardLocation.CLASS_OUTPUT,
           packageName,
           fileName);
@@ -165,6 +157,6 @@ public class ResourceMappingProcessor extends AbstractProcessor {
   }
 
   private void log(Diagnostic.Kind category, String message, Object... args) {
-    processingEnvironment.getMessager().printMessage(category, String.format(message, args));
+    processingEnv.getMessager().printMessage(category, String.format(message, args));
   }
 }

@@ -19,22 +19,29 @@ class SchedulerService(PantsService):
   in memory.
   """
 
-  def __init__(self, scheduler, fs_event_service):
+  def __init__(self, fs_event_service, legacy_graph_helper):
     """
-    :param LocalScheduler scheduler: A Scheduler instance.
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
                                             filesystem event handlers.
+    :param LegacyGraphHelper legacy_graph_helper: The LegacyGraphHelper instance for graph
+                                                  construction.
     """
     super(SchedulerService, self).__init__()
-    self._logger = logging.getLogger(__name__)
-
-    self._event_queue = Queue.Queue(maxsize=64)
-    self._scheduler = scheduler
     self._fs_event_service = fs_event_service
+    self._graph_helper = legacy_graph_helper
+    self._scheduler = legacy_graph_helper.scheduler
+    self._engine = legacy_graph_helper.engine
+
+    self._logger = logging.getLogger(__name__)
+    self._event_queue = Queue.Queue(maxsize=64)
 
   def setup(self):
-    """Registers filesystem event handlers on an FSEventService instance."""
+    """Service setup."""
+    # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
+
+    # Start the engine.
+    self._engine.start()
 
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
@@ -60,9 +67,9 @@ class SchedulerService(PantsService):
     try:
       subscription, is_initial_event, files = (event['subscription'],
                                                event['is_fresh_instance'],
-                                               event['files'])
-    except KeyError:
-      self._logger.warn('invalid watchman event: %s', event)
+                                               [f.decode('utf-8') for f in event['files']])
+    except (KeyError, UnicodeDecodeError) as e:
+      self._logger.warn('%r raised by invalid watchman event: %s', e, event)
       return
 
     self._logger.debug('processing {} files for subscription {} (first_event={})'
@@ -72,7 +79,16 @@ class SchedulerService(PantsService):
       self._handle_batch_event(files)
     self._event_queue.task_done()
 
+  def get_build_graph(self, spec_roots):
+    """Returns a legacy BuildGraph given a set of input specs."""
+    return self._graph_helper.create_graph(spec_roots)
+
   def run(self):
     """Main service entrypoint."""
     while not self.is_killed:
       self._process_event_queue()
+
+  def terminate(self):
+    """An extension of PantsService.terminate() that tears down the engine."""
+    self._engine.close()
+    super(SchedulerService, self).terminate()

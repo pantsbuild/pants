@@ -13,8 +13,11 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
   def test_go_fetch_integration(self):
     args = ['run',
             'contrib/go/examples/src/go/server']
-    pants_run = self.run_pants(args)
-    self.assert_success(pants_run)
+
+    with self.temporary_workdir() as workdir:
+      self.assert_success(self.run_pants_with_workdir(args, workdir))
+      # Run it again to make sure cached packages are resolved correctly.
+      self.assert_success(self.run_pants_with_workdir(args, workdir))
 
   def test_issues_1998(self):
     # Only the 3 explicit targets below are defined on disk, the 2 implicit AdRoll/goamz targets

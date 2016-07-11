@@ -50,6 +50,24 @@ class JvmToolMixin(object):
   _jvm_tools = []  # List of JvmTool objects.
 
   @classmethod
+  def get_jvm_options_default(cls, bootstrap_option_values):
+    """Subclasses may override to provide different defaults for their JVM options.
+
+    :param bootstrap_option_values: The values of the "bootstrap options" (e.g., pants_workdir).
+                                    Implementations can use these when generating the default.
+                                    See src/python/pants/options/options_bootstrapper.py for
+                                    details.
+    """
+    return ['-Xmx256m']
+
+  @classmethod
+  def register_options(cls, register):
+    super(JvmToolMixin, cls).register_options(register)
+    register('--jvm-options', type=list,  advanced=True, metavar='<option>...',
+             default=cls.get_jvm_options_default(register.bootstrap),
+             help='Run with these JVM options.')
+
+  @classmethod
   def register_jvm_tool(cls,
                         register,
                         key,

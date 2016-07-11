@@ -67,7 +67,6 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
-    'src/python/pants/java/distribution:distribution',
   ],
 )
 
@@ -133,7 +132,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',
-    'src/python/pants/java/distribution',
     'src/python/pants/util:memo',
   ],
 )

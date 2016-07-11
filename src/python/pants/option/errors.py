@@ -25,10 +25,6 @@ class ParseError(OptionsError):
   """An error at flag parsing time."""
 
 
-class DeprecatedOptionError(OptionsError):
-  """An error raised when deprecated options are used beyond their expiration."""
-
-
 # Subclasses of RegistrationError. The distinction between them is useful mainly for testing
 # that the error we get is the one we expect.
 # TODO: Similar thing for ParseError.
@@ -48,6 +44,8 @@ InvalidMemberType = mk_registration_error('member_type {member_type} not allowed
 MemberTypeNotAllowed = mk_registration_error('member_type not allowed on option with type {type_}. '
                                              'It may only be specified if type=list.')
 NoOptionNames = mk_registration_error('No option names provided.')
+OptionAlreadyRegistered = mk_registration_error('An option with this name was already registered '
+                                                'on this scope.')
 OptionNameDash = mk_registration_error('Option name must begin with a dash.')
 OptionNameDoubleDash = mk_registration_error('Long option name must begin with a double-dash.')
 RecursiveSubsystemOption = mk_registration_error("Subsystem option cannot specify 'recursive'. "

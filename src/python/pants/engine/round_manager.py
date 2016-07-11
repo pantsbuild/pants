@@ -33,12 +33,10 @@ class RoundManager(object):
     return producer_info_by_product_type
 
   def __init__(self, context):
-    """
-    :API: public
-    """
     self._dependencies = set()
     self._context = context
     self._producer_infos_by_product_type = None
+    self._known_langs = set()
 
   def require(self, product_type):
     """Schedules the tasks that produce product_type to be executed before the requesting task.
@@ -57,10 +55,7 @@ class RoundManager(object):
     self._context.products.require_data(product_type)
 
   def get_dependencies(self):
-    """Returns the set of data dependencies as producer infos corresponding to data requirements.
-
-    :API: public
-    """
+    """Returns the set of data dependencies as producer infos corresponding to data requirements."""
     producer_infos = set()
     for product_type in self._dependencies:
       producer_infos.update(self._get_producer_infos_by_product_type(product_type))
@@ -69,8 +64,13 @@ class RoundManager(object):
   def _get_producer_infos_by_product_type(self, product_type):
     if self._producer_infos_by_product_type is None:
       self._producer_infos_by_product_type = self._index_products()
+      self._known_langs = set(self._context.source_roots.all_langs())
 
     producer_infos = self._producer_infos_by_product_type[product_type]
-    if not producer_infos:
+    # Products named for languages ('java', 'scala', 'python' etc.) are special: they represent
+    # source files in those languages, and are implicitly provided by a relevant source root.
+    # They may happen to also be explicitly provided by tasks (e.g., codegen(, but we don't want
+    # to fail with a MissingProductError if not.
+    if not producer_infos and product_type not in self._known_langs:
       raise self.MissingProductError("No producers registered for '{0}'".format(product_type))
     return producer_infos

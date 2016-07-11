@@ -37,6 +37,16 @@ class JvmAppTest(BaseTest):
     self.assertEquals(binary_target, app_target.binary)
     self.assertEquals([':foo-binary'], list(app_target.traversable_dependency_specs))
 
+  def test_jvmapp_bundle_payload_fields(self):
+    app_target = self.make_target(':foo_payload',
+                                  JvmApp,
+                                  basename='foo-payload-app',
+                                  archive='zip')
+
+    self.assertEquals('foo-payload-app', app_target.payload.basename)
+    self.assertIsNone(app_target.payload.deployjar)
+    self.assertEquals('zip', app_target.payload.archive)
+
   def test_bad_basename(self):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmApp.* basename must not equal name.'):
@@ -261,6 +271,27 @@ class BundleTest(BaseTest):
     self.assertEqual(fingerprint_before, calc_fingerprint())
     self.create_file(os.path.join(spec_path, 'three.xml'))
     self.assertNotEqual(fingerprint_before, calc_fingerprint())
+
+  def test_jvmapp_fingerprinting_with_non_existing_files(self):
+    spec_path = 'y'
+    def calc_fingerprint():
+      self.reset_build_graph()
+      return self.make_target('y:app',
+                              JvmApp,
+                              dependencies=[],
+                              bundles=[
+                                _bundle(spec_path)(fileset=['one.xml'])
+                              ]).payload.fingerprint()
+
+    fingerprint_non_existing_file = calc_fingerprint()
+    self.create_file(os.path.join(spec_path, 'one.xml'))
+    fingerprint_empty_file = calc_fingerprint()
+    self.create_file(os.path.join(spec_path, 'one.xml'), contents='some content')
+    fingerprint_file_with_content = calc_fingerprint()
+
+    self.assertNotEqual(fingerprint_empty_file, fingerprint_non_existing_file)
+    self.assertNotEqual(fingerprint_empty_file, fingerprint_file_with_content)
+    self.assertNotEqual(fingerprint_file_with_content, fingerprint_empty_file)
 
   def test_rel_path_with_glob_fails(self):
     # Globs are treated as eager, so rel_path doesn't affect their meaning.

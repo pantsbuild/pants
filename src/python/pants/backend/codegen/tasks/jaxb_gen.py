@@ -13,7 +13,6 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.java.distribution.distribution import DistributionLocator
 
 
 class JaxbGen(SimpleCodegenTask, NailgunTask):
@@ -25,13 +24,14 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     :param workdir: inherited parameter from Task
     """
     super(JaxbGen, self).__init__(*args, **kwargs)
+    self.set_distribution(jdk=True)
     self.gen_langs = set()
     lang = 'java'
     if self.context.products.isrequired(lang):
       self.gen_langs.add(lang)
 
   def _compile_schema(self, args):
-    classpath = DistributionLocator.cached(jdk=True).find_libs(['tools.jar'])
+    classpath = self.dist.find_libs(['tools.jar'])
     java_main = 'com.sun.tools.internal.xjc.Driver'
     return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 
@@ -88,8 +88,3 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     if re.search(r'\.{2,}', package) is not None:
       raise ValueError('Package name cannot have consecutive periods! ({})'.format(package))
     return package
-
-  @property
-  def _copy_target_attributes(self):
-    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
-    return ['provides']

@@ -17,8 +17,9 @@ from pants_test.subsystem.subsystem_util import subsystem_instance
 
 class TestWatchmanLauncher(BaseTest):
   @contextmanager
-  def watchman_launcher(self):
-    with subsystem_instance(WatchmanLauncher.Factory) as factory:
+  def watchman_launcher(self, options=None):
+    options = options or {}
+    with subsystem_instance(WatchmanLauncher.Factory, **options) as factory:
       yield factory.create()
 
   def create_mock_watchman(self, is_alive):
@@ -53,7 +54,8 @@ class TestWatchmanLauncher(BaseTest):
 
     with self.watchman_launcher() as wl:
       wl.watchman = mock_watchman
-      self.assertFalse(wl.maybe_launch())
+      with self.assertRaises(wl.watchman.ExecutionError):
+        wl.maybe_launch()
 
     mock_watchman.is_alive.assert_called_once_with()
     mock_watchman.launch.assert_called_once_with()
@@ -61,3 +63,9 @@ class TestWatchmanLauncher(BaseTest):
   def test_watchman_property(self):
     with self.watchman_launcher() as wl:
       self.assertIsInstance(wl.watchman, Watchman)
+
+  def test_watchman_socket_path(self):
+    expected_path = '/a/shorter/path'
+    options = {'watchman': {'socket_path': expected_path}}
+    with self.watchman_launcher(options) as wl:
+      self.assertEquals(wl.watchman._sock_file, expected_path)

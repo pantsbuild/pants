@@ -13,12 +13,56 @@ beginning, make sure your machine fits the requirements. At a minimum, pants req
 After you have pants installed, you'll need to
 [[Set up your code workspace to work with Pants|pants('src/docs:setup_repo')]].
 
+Recommended Installation
+------------------------
+
+To set up pants in your repo, we recommend installing our self-contained `pants` bash script
+in the root (ie, "buildroot") of your repo:
+
+      :::bash
+      curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants && touch pants.ini
+
+The first time you run the new `./pants` script it will install the latest version of pants (using
+virtualenv) and then run it.  It's recommended though, that you pin the version of pants.  To do
+this, first find out the version of pants you just installed:
+
+      :::bash
+      ./pants -V
+      1.0.0
+
+Then add an entry like so to `pants.ini` with that version:
+
+      :::ini
+      [GLOBAL]
+      pants_version: 1.0.0
+
+When you'd like to upgrade pants, just edit the version in `pants.ini` and pants will self-update on
+the next run.  This script stores the various pants versions you use centrally in
+`~/.cache/pants/setup`.  When you switch back and forth between branches pants will select the
+correct version from your local cache and use that.
+
+If you use pants plugins published to pypi you can configure them by adding a `plugins` list as
+follows:
+
+      :::ini
+      [GLOBAL]
+      pants_version: 1.0.0
+
+      plugins: [
+          'pantsbuild.pants.contrib.go==%(pants_version)s',
+          'pantsbuild.pants.contrib.scrooge==%(pants_version)s',
+        ]
+
+Pants notices you changed your plugins and it installs them.
+NB: The formatting of the plugins list is important; all lines below the `plugins:` line must be
+indented by at least one white space to form logical continuation lines. This is standard for python
+ini files, see [[Options|pants('src/docs:options')]].
 
 The ./pants Runner Script
 -------------------------
 
 We highly recommend invoking pants via a checked-in runner script named `pants` in the
-root of your workspace (aka the "buildroot").  Pants uses the presence of such a file, in the
+root of your workspace, as demonstrated above.  Pants uses the presence of such a file, in the
 current working directory or in any of its ancestors, to detect the buildroot, e.g., when
 invoked in a subdirectory.
 
@@ -29,63 +73,15 @@ Note that you can create whatever symlinks or extra wrapper scripts you like.  T
 requirement that pants be invoked directly via `./pants`.  All pants cares about is the existence
 of a file named `pants` in the buildroot, and that file might as well be the runner script!
 
-
-Virtualenv-based Installation
------------------------------
-
-To set up pants in your repo, you can use our self-contained virtualenv-based `pants` bash script:
-
-      :::bash
-      curl -O https://pantsbuild.github.io/setup/pants
-      chmod +x pants
-      touch pants.ini
-
-The first time you run the new `./pants` script it will install the latest version of pants and then
-run it.  It's recommended though, that you pin the version of pants.  To do this, first find out the
-version of pants you just installed:
-
-      :::bash
-      ./pants -V
-      0.0.42
-
-Then add an entry like so to pants.ini with that version:
-
-      :::ini
-      [DEFAULT]
-      pants_version: 0.0.42
-
-When you'd like to upgrade pants, just edit the version in pants.ini and pants will self-update on
-the next run.  This script stores the various pants versions you use centrally in
-`~/.cache/pants/setup`.  When you switch back and forth between branches pants will select the
-correct version from your local cache and use that.
-
-If you use pants plugins published to pypi you can configure them by adding a `plugins` list as
-follows:
-
-      :::ini
-      [DEFAULT]
-      pants_version: 0.0.42
-
-      plugins: [
-          'pantsbuild.pants.contrib.go==%(pants_version)s',
-          'pantsbuild.pants.contrib.scrooge==%(pants_version)s',
-        ]
-
-Pants notices you changed your plugins and it installs them.
-NB: The formatting of the plugins list is important; all lines below the `plugins:` line must be
-indented by at least one white space to form logical continuation lines. This is standard for python
-ini files, see [RFC #822](http://tools.ietf.org/html/rfc822.html#section-3.1) section 3.1.1 for the
-full rules python uses to parse ini file entries.
-
 PEX-based Installation
 ----------------------
-
-To support hermetic builds and not depend on a local pants installation (e.g.: CI machines may
-prohibit software installation), some sites fetch a pre-built `pants.pex` using the `pants_version`
-defined in `pants.ini`. To upgrade pants, they generate a `pants.pex` and upload it to a file
-server at a location computable from the version number. They then write their own `./pants`
-script that checks the `pants.ini` `pants_version` and downloads the appropriate pex from the file
-server to the correct spot.
+The virtualenv-based method is the recommended way of installing Pants.
+However in cases where you can't depend on a local pants installation (e.g., your machines
+prohibit software installation), some sites fetch a pre-built executable `pants.pex` using
+the `pants_version` defined in `pants.ini`.  To upgrade pants, they generate a `pants.pex`
+and upload it to a file server at a location computable  from the version number.
+They then write their own `./pants` script that checks the `pants_version` in
+`pants.ini` and download the appropriate pex from the file server to the correct spot.
 
 Troubleshooting
 ---------------

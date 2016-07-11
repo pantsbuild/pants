@@ -31,6 +31,7 @@ python_library(
     ':prepare_resources',
     ':prepare_services',
     ':properties',
+    ':provide_tools_jar',
     ':resources_task',
     ':run_jvm_prep_command',
     ':scala_repl',
@@ -95,7 +96,9 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
+    'src/python/pants/util:fileutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:objects',
   ],
 )
 
@@ -236,6 +239,7 @@ python_library(
   sources = ['jar_publish.py'],
   resource_targets = [
     ':jar_publish_resources',
+    ':reports_resources'
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -308,6 +312,22 @@ python_library(
 )
 
 python_library(
+  name = 'reports',
+  sources = globs('reports/*.py'),
+  dependencies = [
+    'src/python/pants/base:mustache',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:strutil',
+  ],
+)
+
+resources(
+  name = 'reports_resources',
+  sources = globs('reports/templates/*.mustache'),
+)
+
+python_library(
   name = 'junit_run',
   sources = ['junit_run.py'],
   dependencies = [
@@ -315,16 +335,19 @@ python_library(
     ':classpath_util',
     ':jvm_task',
     ':jvm_tool_task_mixin',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:coverage',
+    'src/python/pants/backend/jvm/tasks:reports',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
     'src/python/pants/java:util',
     'src/python/pants/task',
+    'src/python/pants/util:argutil',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
@@ -358,11 +381,10 @@ python_library(
     ':classpath_util',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
-    'src/python/pants/task',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ]
 )
@@ -390,11 +412,11 @@ python_library(
   name = 'jvm_dependency_usage',
   sources = ['jvm_dependency_usage.py'],
   dependencies = [
-    ':classpath_util',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:fileutil',
   ]
 )
@@ -508,6 +530,18 @@ python_library(
 )
 
 python_library(
+  name = 'provide_tools_jar',
+  sources = ['provide_tools_jar.py'],
+  dependencies = [
+    ':classpath_products',
+    ':jvm_tool_task_mixin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+  ],
+)
+
+python_library(
   name = 'resources_task',
   sources = ['resources_task.py'],
   dependencies = [
@@ -521,10 +555,10 @@ python_library(
   sources = ['run_jvm_prep_command.py'],
   dependencies = [
     ':classpath_util',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/task',
   ],

@@ -42,12 +42,12 @@ class MarkdownToHtml(Task):
     register('--code-style', choices=list(get_all_styles()), default='friendly',
              fingerprint=True,
              help='Use this stylesheet for code highlights.')
-    register('--open', action='store_true',
+    register('--open', type=bool,
              help='Open the generated documents in a browser.')
-    register('--fragment', action='store_true',
+    register('--fragment', type=bool,
              fingerprint=True,
              help='Generate a fragment of html to embed in a page.')
-    register('--ignore-failure', default=False, action='store_true',
+    register('--ignore-failure', type=bool,
              fingerprint=True,
              help='Do not consider rendering errors to be build errors.')
 
@@ -146,8 +146,9 @@ class MarkdownToHtml(Task):
         page = self.context.build_graph.get_target(address)
         anchor = match.group(2) or ''
         if not page:
-          raise TaskError('Invalid markdown link to pants target: "{}". '.format(match.group(1)) +
-                          'Is your page missing a dependency on this target?')
+          raise TaskError('Invalid markdown link to pants target: "{}" when processing {}. '
+                          'Is your page missing a dependency on this target?'.format(
+                          match.group(1), source))
         alias, url = url_builder(page)
         return alias, url + anchor
       else:

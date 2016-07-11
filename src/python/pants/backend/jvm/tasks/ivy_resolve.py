@@ -34,9 +34,9 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              'For example, to specify 2 overrides: '
              '--override=com.foo#bar=0.1.2 '
              '--override=com.baz#spam=file:///tmp/spam.jar ')
-    register('--report', action='store_true', default=False,
+    register('--report', type=bool,
              help='Generate an ivy resolve html report')
-    register('--open', action='store_true', default=False,
+    register('--open', type=bool,
              help='Attempt to open the generated ivy resolve report '
                   'in a browser (implies --report)')
     register('--outdir', help='Emit ivy report outputs in to this directory.')
@@ -90,8 +90,13 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                                       confs=self.get_options().confs,
                                       extra_args=self._args)
     if self._report:
-      for result in results:
-        self._generate_ivy_report(result)
+      results_with_resolved_artifacts = filter(lambda r: r.has_resolved_artifacts, results)
+
+      if not results_with_resolved_artifacts:
+        self.context.log.info("Not generating a report. No resolution performed.")
+      else:
+        for result in results_with_resolved_artifacts:
+          self._generate_ivy_report(result)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible

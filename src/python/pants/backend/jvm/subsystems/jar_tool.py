@@ -17,9 +17,6 @@ class JarTool(JvmToolMixin, Subsystem):
   @classmethod
   def register_options(cls, register):
     super(JarTool, cls).register_options(register)
-    # TODO: All jvm tools will need this option, so might as well have register_jvm_tool add it?
-    register('--jvm-options', advanced=True, type=list, default=['-Xmx64M'],
-             help='Run the jar tool with these JVM options.')
     cls.register_jvm_tool(register,
                           'jar-tool',
                           classpath=[

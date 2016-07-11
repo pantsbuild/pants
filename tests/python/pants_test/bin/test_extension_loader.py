@@ -16,7 +16,7 @@ from pkg_resources import (Distribution, EmptyProvider, VersionConflict, Working
 
 from pants.base.exceptions import BuildConfigurationError
 from pants.bin.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
-                                        load_plugins)
+                                        load_backends_and_plugins, load_plugins)
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
@@ -54,6 +54,13 @@ class DummyTarget(Target):
   @classmethod
   def subsystems(cls):
     return (DummySubsystem1,)
+
+
+class DummyTarget2(Target):
+
+  @classmethod
+  def subsystems(cls):
+    return (DummySubsystem2,)
 
 
 class DummyObject1(object):
@@ -284,3 +291,18 @@ class LoaderTest(unittest.TestCase):
       load_backend(self.build_configuration, backend_package)
       self.assertEqual(self.build_configuration.subsystems(),
                        {DummySubsystem1, DummySubsystem2})
+
+  def test_backend_plugin_ordering(self):
+    def reg_alias():
+      return BuildFileAliases(targets={'override-alias': DummyTarget2})
+    self.working_set.add(self.get_mock_plugin('pluginalias', '0.0.1', alias=reg_alias))
+    plugins=['pluginalias==0.0.1']
+    aliases = BuildFileAliases(targets={'override-alias': DummyTarget})
+    with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
+      backends=[backend_module]
+      load_backends_and_plugins(plugins, self.working_set, backends,
+                                build_configuration=self.build_configuration)
+    # The backend should load first, then the plugins, therefore the alias registered in
+    # the plugin will override the alias registered by the backend
+    registered_aliases = self.build_configuration.registered_aliases()
+    self.assertEqual(DummyTarget2, registered_aliases.target_types['override-alias'])

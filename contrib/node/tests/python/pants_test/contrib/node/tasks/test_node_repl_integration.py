@@ -62,5 +62,5 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command, stdin_data=program)
 
     self.assert_success(pants_run)
-    self.assertEqual('React: <div>Hello World</div>, Calc + 1: 1',
-                     pants_run.stdout_data.strip())
+    self.assertIn('React: <div>Hello World</div>, Calc + 1: 1',
+                  pants_run.stdout_data.splitlines())

@@ -16,6 +16,7 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
+from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 
 
@@ -36,12 +37,16 @@ def swallow_psutil_exceptions():
 class ProcessGroup(object):
   """Wraps a logical group of processes and provides convenient access to ProcessManager objects."""
 
-  def __init__(self, name):
+  def __init__(self, name, metadata_base_dir=None):
     self._name = name
+    self._metadata_base_dir = metadata_base_dir
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
-    return ProcessManager(name=process.name(), pid=process.pid, process_name=process.name())
+    return ProcessManager(name=process.name(),
+                          pid=process.pid,
+                          process_name=process.name(),
+                          metadata_base_dir=self._metadata_base_dir)
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
@@ -57,12 +62,22 @@ class ProcessGroup(object):
 class ProcessMetadataManager(object):
   """"Manages contextual, on-disk process metadata."""
 
-  FILE_WAIT_SEC = 10
-  WAIT_INTERVAL_SEC = .1
-  PID_DIR_NAME = '.pids'  # TODO(kwlzn): Make this configurable.
-
   class MetadataError(Exception): pass
   class Timeout(Exception): pass
+
+  FILE_WAIT_SEC = 10
+  WAIT_INTERVAL_SEC = .1
+
+  def __init__(self, metadata_base_dir=None):
+    """
+    :param str metadata_base_dir: The base directory for process metadata.
+    """
+    super(ProcessMetadataManager, self).__init__()
+
+    self._metadata_base_dir = (
+      metadata_base_dir or
+      Subprocess.Factory.global_instance().create().get_subprocess_dir()
+    )
 
   @staticmethod
   def _maybe_cast(item, caster):
@@ -79,45 +94,6 @@ class ProcessMetadataManager(object):
     except (TypeError, ValueError):
       # N.B. the TypeError catch here (already) protects against the case that caster is None.
       return item
-
-  @classmethod
-  def _get_metadata_dir_by_name(cls, name):
-    """Retrieve the metadata dir by name.
-
-    This should always live outside of the workdir to survive a clean-all.
-    """
-    return os.path.join(get_buildroot(), cls.PID_DIR_NAME, name)
-
-  @classmethod
-  def _maybe_init_metadata_dir_by_name(cls, name):
-    """Initialize the metadata directory for a named identity if it doesn't exist."""
-    safe_mkdir(cls._get_metadata_dir_by_name(name))
-
-  @classmethod
-  def read_metadata_by_name(cls, name, metadata_key, caster=None):
-    """Read process metadata using a named identity.
-
-    :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
-    :param string metadata_key: The metadata key (e.g. 'pid').
-    :param func caster: A casting callable to apply to the read value (e.g. `int`).
-    """
-    try:
-      file_path = os.path.join(cls._get_metadata_dir_by_name(name), metadata_key)
-      return cls._maybe_cast(read_file(file_path).strip(), caster)
-    except (IOError, OSError):
-      return None
-
-  @classmethod
-  def write_metadata_by_name(cls, name, metadata_key, metadata_value):
-    """Write process metadata using a named identity.
-
-    :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
-    :param string metadata_key: The metadata key (e.g. 'pid').
-    :param string metadata_value: The metadata value (e.g. '1729').
-    """
-    cls._maybe_init_metadata_dir_by_name(name)
-    file_path = os.path.join(cls._get_metadata_dir_by_name(name), metadata_key)
-    safe_file_dump(file_path, metadata_value)
 
   @classmethod
   def _deadline_until(cls, closure, timeout, wait_interval=WAIT_INTERVAL_SEC):
@@ -153,8 +129,42 @@ class ProcessMetadataManager(object):
       raise cls.Timeout('exceeded timeout of {} seconds while waiting for file {} to appear'
                          .format(timeout, filename))
 
-  @classmethod
-  def await_metadata_by_name(cls, name, metadata_key, timeout, caster=None):
+  def _get_metadata_dir_by_name(self, name):
+    """Retrieve the metadata dir by name.
+
+    This should always live outside of the workdir to survive a clean-all.
+    """
+    return os.path.join(self._metadata_base_dir, name)
+
+  def _maybe_init_metadata_dir_by_name(self, name):
+    """Initialize the metadata directory for a named identity if it doesn't exist."""
+    safe_mkdir(self._get_metadata_dir_by_name(name))
+
+  def read_metadata_by_name(self, name, metadata_key, caster=None):
+    """Read process metadata using a named identity.
+
+    :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
+    :param string metadata_key: The metadata key (e.g. 'pid').
+    :param func caster: A casting callable to apply to the read value (e.g. `int`).
+    """
+    try:
+      file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+      return self._maybe_cast(read_file(file_path).strip(), caster)
+    except (IOError, OSError):
+      return None
+
+  def write_metadata_by_name(self, name, metadata_key, metadata_value):
+    """Write process metadata using a named identity.
+
+    :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
+    :param string metadata_key: The metadata key (e.g. 'pid').
+    :param string metadata_value: The metadata value (e.g. '1729').
+    """
+    self._maybe_init_metadata_dir_by_name(name)
+    file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+    safe_file_dump(file_path, metadata_value)
+
+  def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
     """Block up to a timeout for process metadata to arrive on disk.
 
     :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
@@ -164,42 +174,51 @@ class ProcessMetadataManager(object):
     :returns: The value of the metadata key (read from disk post-write).
     :raises: :class:`ProcessMetadataManager.Timeout` on timeout.
     """
-    file_path = os.path.join(cls._get_metadata_dir_by_name(name), metadata_key)
-    cls._wait_for_file(file_path, timeout=timeout)
-    return cls.read_metadata_by_name(name, metadata_key, caster)
+    file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+    self._wait_for_file(file_path, timeout=timeout)
+    return self.read_metadata_by_name(name, metadata_key, caster)
 
-  @classmethod
-  def purge_metadata_by_name(cls, name):
+  def purge_metadata_by_name(self, name):
     """Purge a processes metadata directory.
 
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
-    meta_dir = cls._get_metadata_dir_by_name(name)
-    logging.debug('purging metadata directory: {}'.format(meta_dir))
+    meta_dir = self._get_metadata_dir_by_name(name)
+    logger.debug('purging metadata directory: {}'.format(meta_dir))
     try:
       rm_rf(meta_dir)
     except OSError as e:
-      raise cls.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
+      raise self.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
 
 
 class ProcessManager(ProcessMetadataManager):
   """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
-  class ExecutionError(Exception): pass
   class InvalidCommandOutput(Exception): pass
   class NonResponsiveProcess(Exception): pass
+  class ExecutionError(Exception):
+    def __init__(self, message, output=None):
+      super(ProcessManager.ExecutionError, self).__init__(message)
+      self.message = message
+      self.output = output
+
+    def __repr__(self):
+      return '{}(message={!r}, output={!r})'.format(type(self).__name__, self.message, self.output)
 
   KILL_WAIT_SEC = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
 
-  def __init__(self, name, pid=None, socket=None, process_name=None, socket_type=int):
+  def __init__(self, name, pid=None, socket=None, process_name=None, socket_type=int,
+               metadata_base_dir=None):
     """
     :param string name: The process identity/name (e.g. 'pantsd' or 'ng_Zinc').
     :param int pid: The process pid. Overrides fetching of the self.pid @property.
     :param string socket: The socket metadata. Overrides fetching of the self.socket @property.
     :param string process_name: The process name for cmdline executable name matching.
     :param type socket_type: The type to be used for socket type casting (e.g. int).
+    :param str metadata_base_dir: The overridden base directory for process metadata.
     """
+    super(ProcessManager, self).__init__(metadata_base_dir)
     self._name = name
     self._pid = pid
     self._socket = socket
@@ -250,17 +269,22 @@ class ProcessManager(ProcessMetadataManager):
     return self._socket or self.read_metadata_by_name(self._name, 'socket', self._socket_type)
 
   @classmethod
-  def get_subprocess_output(cls, *args):
+  def get_subprocess_output(cls, command, ignore_stderr=True, **kwargs):
     """Get the output of an executed command.
 
-    :param *args: An iterable representing the command to execute (e.g. ['ls', '-al']).
+    :param command: An iterable representing the command to execute (e.g. ['ls', '-al']).
+    :param ignore_stderr: Whether or not to ignore stderr output vs interleave it with stdout.
     :raises: `ProcessManager.ExecutionError` on `OSError` or `CalledProcessError`.
     :returns: The output of the command.
     """
+    if ignore_stderr is False:
+      kwargs.setdefault('stderr', subprocess.STDOUT)
+
     try:
-      return subprocess.check_output(*args)
+      return subprocess.check_output(command, **kwargs)
     except (OSError, subprocess.CalledProcessError) as e:
-      raise cls.ExecutionError(str(e))
+      subprocess_output = getattr(e, 'output', '').strip()
+      raise cls.ExecutionError(str(e), subprocess_output)
 
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to write pid metadata."""
@@ -391,6 +415,7 @@ class ProcessManager(ProcessMetadataManager):
     """
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
+    logger.debug('forking %s', self)
     pid = os.fork()
     if pid == 0:
       os.setsid()
@@ -400,7 +425,7 @@ class ProcessManager(ProcessMetadataManager):
           os.chdir(self._buildroot)
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
-          logging.critical(traceback.format_exc())
+          logger.critical(traceback.format_exc())
 
         os._exit(0)
       else:
@@ -408,7 +433,7 @@ class ProcessManager(ProcessMetadataManager):
           if write_pid: self.write_pid(second_pid)
           self.post_fork_parent(**post_fork_parent_opts or {})
         except Exception:
-          logging.critical(traceback.format_exc())
+          logger.critical(traceback.format_exc())
 
         os._exit(0)
     else:
@@ -432,14 +457,14 @@ class ProcessManager(ProcessMetadataManager):
         os.chdir(self._buildroot)
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
-        logging.critical(traceback.format_exc())
+        logger.critical(traceback.format_exc())
 
       os._exit(0)
     else:
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})
       except Exception:
-        logging.critical(traceback.format_exc())
+        logger.critical(traceback.format_exc())
 
   def pre_fork(self):
     """Pre-fork callback for subclasses."""

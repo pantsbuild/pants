@@ -5,9 +5,10 @@ python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
-    'src/python/pants:version',
-    'src/python/pants/scm:all',
     ':build_root',
+    'src/python/pants/scm',
+    'src/python/pants/scm:git',
+    'src/python/pants:version',
   ]
 )
 
@@ -15,7 +16,11 @@ python_library(
   name = 'project_tree',
   sources = ['project_tree.py'],
   dependencies = [
+    '3rdparty/python:pathspec',
+    '3rdparty/python:six',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -23,6 +28,7 @@ python_library(
   name = 'file_system_project_tree',
   sources = ['file_system_project_tree.py'],
   dependencies = [
+    '3rdparty/python:scandir',
     ':project_tree',
     'src/python/pants/util:dirutil',
   ]
@@ -33,6 +39,7 @@ python_library(
   sources = ['scm_project_tree.py'],
   dependencies = [
     ':project_tree',
+    'src/python/pants/util:memo',
   ]
 )
 

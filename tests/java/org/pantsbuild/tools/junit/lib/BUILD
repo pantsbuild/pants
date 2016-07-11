@@ -4,6 +4,8 @@
 java_library(
   name='test-dep',
   dependencies=[
+    '3rdparty/jvm/com/squareup/burst:burst-junit4',
+    '3rdparty:guava',
     '3rdparty:junit',
     '3rdparty/jvm/commons-io',
     'src/java/org/pantsbuild/junit/annotations',

@@ -37,7 +37,6 @@ function usage() {
   echo "              if running integration tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
   echo "              to run only even tests: '-i 0/2', odd: '-i 1/2'"
-  echo " -a           skip android targets when running tests"
   if (( $# > 0 )); then
     die "$@"
   else

@@ -52,17 +52,6 @@ function pkg_buildgen_install_test() {
   python -c "from pants.contrib.buildgen.build_file_manipulator import *"
 }
 
-PKG_SPINDLE=(
-  "pantsbuild.pants.contrib.spindle"
-  "//contrib/spindle/src/python/pants/contrib/spindle:plugin"
-  "pkg_spindle_install_test"
-)
-function pkg_spindle_install_test() {
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.spindle==$(local_version)']" \
-    --explain gen | grep "spindle" &> /dev/null
-}
-
 PKG_GO=(
   "pantsbuild.pants.contrib.go"
   "//contrib/go/src/python/pants/contrib/go:plugin"
@@ -71,7 +60,7 @@ PKG_GO=(
 function pkg_go_install_test() {
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.go==$(local_version)']" \
-      test.go contrib/go/examples::
+      buildgen test contrib/go/examples::
 }
 
 PKG_NODE=(
@@ -110,14 +99,25 @@ function pkg_python_checks_install_test() {
     --explain compile | grep "pythonstyle" &> /dev/null
 }
 
+PKG_FINDBUGS=(
+  "pantsbuild.pants.contrib.findbugs"
+  "//contrib/findbugs/src/python/pants/contrib/findbugs:plugin"
+  "pkg_findbugs_install_test"
+)
+function pkg_findbugs_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.findbugs==$(local_version)']" \
+      --explain compile | grep "findbugs" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
   PKG_SCROOGE
   PKG_BUILDGEN
-  PKG_SPINDLE
   PKG_GO
   PKG_NODE
   PKG_PYTHON_CHECKS
   PKG_SCALAJS
+  PKG_FINDBUGS
 )

@@ -11,8 +11,10 @@ import subprocess
 import sys
 import unittest
 
-from pants.util.contextutil import (Timer, environment_as, open_zip, pushd, stdio_as, temporary_dir,
-                                    temporary_file)
+import mock
+
+from pants.util.contextutil import (Timer, environment_as, exception_logging, open_zip, pushd,
+                                    stdio_as, temporary_dir, temporary_file)
 
 
 class ContextutilTest(unittest.TestCase):
@@ -175,3 +177,19 @@ class ContextutilTest(unittest.TestCase):
 
     self.assertEquals(sys.stdout, old_stdout)
     self.assertEquals(sys.stderr, old_stderr)
+
+  def test_permissions(self):
+    with temporary_file(permissions=0700) as f:
+      self.assertEquals(0700, os.stat(f.name)[0] & 0777)
+
+    with temporary_dir(permissions=0644) as path:
+      self.assertEquals(0644, os.stat(path)[0] & 0777)
+
+  def test_exception_logging(self):
+    fake_logger = mock.Mock()
+
+    with self.assertRaises(AssertionError):
+      with exception_logging(fake_logger, 'error!'):
+        assert True is False
+
+    fake_logger.exception.assert_called_once_with('error!')

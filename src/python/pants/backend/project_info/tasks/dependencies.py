@@ -23,13 +23,13 @@ class Dependencies(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(Dependencies, cls).register_options(register)
-    register('--internal-only', default=False, action='store_true',
+    register('--internal-only', type=bool,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
-    register('--external-only', default=False, action='store_true',
+    register('--external-only', type=bool,
              help='Specifies that only external dependencies should be included in the graph '
                   'output (only external jars).')
-    register('--transitive', default=True, action='store_true',
+    register('--transitive', default=True, type=bool,
              help='List transitive dependencies. Disable to only list dependencies defined '
                   'in target BUILD file(s).')
 

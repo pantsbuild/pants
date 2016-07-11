@@ -11,10 +11,25 @@ from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_mkdir_for
+from pants.util.fileutil import atomic_copy
 
 
 class PythonBinaryCreate(PythonTask):
+  @classmethod
+  def product_types(cls):
+    return ['pex_archives', 'deployable_archives']
+
+  @classmethod
+  def implementation_version(cls):
+    return super(PythonBinaryCreate, cls).implementation_version() + [('PythonBinaryCreate', 1)]
+
+  @property
+  def cache_target_dirs(self):
+    return True
+
   @staticmethod
   def is_binary(target):
     return isinstance(target, PythonBinary)
@@ -35,10 +50,25 @@ class PythonBinaryCreate(PythonTask):
                         '{} and {} both have the name {}.'.format(binary, names[name], name))
       names[name] = binary
 
-    for binary in binaries:
-      self.create_binary(binary)
+    with self.invalidated(binaries, invalidate_dependents=True) as invalidation_check:
+      python_deployable_archive = self.context.products.get('deployable_archives')
+      python_pex_product = self.context.products.get('pex_archives')
+      for vt in invalidation_check.all_vts:
+        pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
+        if not vt.valid:
+          self.create_binary(vt.target, vt.results_dir)
 
-  def create_binary(self, binary):
+        python_pex_product.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
+        python_deployable_archive.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
+        self.context.log.debug('created {}'.format(os.path.relpath(pex_path, get_buildroot())))
+
+        # Create a copy for pex.
+        pex_copy = os.path.join(self._distdir, os.path.basename(pex_path))
+        safe_mkdir_for(pex_copy)
+        atomic_copy(pex_path, pex_copy)
+        self.context.log.info('created pex copy {}'.format(os.path.relpath(pex_copy, get_buildroot())))
+
+  def create_binary(self, binary, results_dir):
     interpreter = self.select_interpreter_for_targets(binary.closure())
 
     run_info_dict = self.context.run_tracker.run_info.get_as_dict()
@@ -50,5 +80,6 @@ class PythonBinaryCreate(PythonTask):
 
     with self.temporary_chroot(interpreter=interpreter, pex_info=pexinfo, targets=[binary],
                                platforms=binary.platforms) as chroot:
-      pex_path = os.path.join(self._distdir, '{}.pex'.format(binary.name))
+      pex_path = os.path.join(results_dir, '{}.pex'.format(binary.name))
       chroot.package_pex(pex_path)
+      return pex_path

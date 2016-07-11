@@ -30,7 +30,7 @@ class ReportingServerRun(QuietTaskMixin, Task):
                   'temporarily showing build results to a colleague. The special '
                   'value ALL means any client may connect. Use with caution, as '
                   'your source code is exposed to all allowed clients!')
-    register('--open', action='store_true', default=False,
+    register('--open', type=bool,
              help='Attempt to open the server web ui in a browser.')
     register('--template-dir', advanced=True,
              help='Use templates from this dir instead of the defaults.')
@@ -53,5 +53,6 @@ class ReportingServerRun(QuietTaskMixin, Task):
 
       logger.info('Launched server with pid {pid} at http://localhost:{port}'
                   .format(pid=manager.pid, port=manager.socket))
+      logger.info('To kill, run `./pants killserver`')
 
     self._maybe_open(manager.socket)

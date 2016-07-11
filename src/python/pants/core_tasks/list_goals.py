@@ -15,9 +15,9 @@ class ListGoals(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(ListGoals, cls).register_options(register)
-    register('--graph', action='store_true',
+    register('--graph', type=bool,
              help='Generate a graphviz graph of installed goals.')
-    register('--all', action='store_true',
+    register('--all', type=bool,
              help='List all goals even if no description is available.')
 
   def console_output(self, targets):

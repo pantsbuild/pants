@@ -25,7 +25,18 @@ logger = logging.getLogger(__name__)
 
 
 class SimpleCodegenTask(Task):
-  """A base-class for code generation for a single target language."""
+  """A base-class for code generation for a single target language.
+
+  :API: public
+  """
+
+  def __init__(self, context, workdir):
+    """
+    Add pass-thru Task Constructor for public API visibility.
+
+    :API: public
+    """
+    super(SimpleCodegenTask, self).__init__(context, workdir)
 
   @classmethod
   def product_types(cls):
@@ -38,10 +49,10 @@ class SimpleCodegenTask(Task):
   @classmethod
   def register_options(cls, register):
     super(SimpleCodegenTask, cls).register_options(register)
-    register('--allow-empty', action='store_true', default=True, fingerprint=True,
+    register('--allow-empty', type=bool, default=True, fingerprint=True,
              help='Skip targets with no sources defined.',
              advanced=True)
-    register('--allow-dups', action='store_true', default=False, fingerprint=True,
+    register('--allow-dups', type=bool, fingerprint=True,
               help='Allow multiple targets specifying the same sources. If duplicates are '
                    'allowed, the logic of find_sources will associate generated sources with '
                    'the least-dependent targets that generate them.',
@@ -50,6 +61,8 @@ class SimpleCodegenTask(Task):
   @classmethod
   def get_fingerprint_strategy(cls):
     """Override this method to use a fingerprint strategy other than the default one.
+
+    :API: public
 
     :return: a fingerprint strategy, or None to use the default strategy.
     """
@@ -65,6 +78,8 @@ class SimpleCodegenTask(Task):
 
     If targets should have sources, the `--allow-empty` flag indicates whether it is a
     warning or an error for sources to be missing.
+
+    :API: public
     """
     return True
 
@@ -76,6 +91,9 @@ class SimpleCodegenTask(Task):
     :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
     might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
     It may not be necessary to use this parameter depending on the details of the subclass.
+
+    :API: public
+
     :return: a list of dependencies.
     """
     return []
@@ -84,6 +102,9 @@ class SimpleCodegenTask(Task):
     """The type of target this codegen task generates.
 
     For example, the target type for JaxbGen would simply be JavaLibrary.
+
+    :API: public
+
     :return: a type (class) that inherits from Target.
     """
     raise NotImplementedError
@@ -92,6 +113,9 @@ class SimpleCodegenTask(Task):
     """The type of target this codegen task generates.
 
     For example, the target type for JaxbGen would simply be JavaLibrary.
+
+    :API: public
+
     :return: a type (class) that inherits from Target.
     """
     raise NotImplementedError
@@ -100,6 +124,9 @@ class SimpleCodegenTask(Task):
     """Predicate which determines whether the target in question is relevant to this codegen task.
 
     E.g., the JaxbGen task considers JaxbLibrary targets to be relevant, and nothing else.
+
+    :API: public
+
     :param Target target: The target to check.
     :return: True if this class can generate code for the given target, False otherwise.
     """
@@ -107,6 +134,8 @@ class SimpleCodegenTask(Task):
 
   def codegen_targets(self):
     """Finds codegen targets in the dependency graph.
+
+    :API: public
 
     :return: an iterable of dependency targets.
     """
@@ -159,10 +188,16 @@ class SimpleCodegenTask(Task):
 
   @property
   def _copy_target_attributes(self):
-    """Return a list of attributes to be copied from the target to derived synthetic targets."""
-    return []
+    """Return a list of attributes to be copied from the target to derived synthetic targets.
+
+    By default, propagates the provides, scope, and tags attributes.
+    """
+    return ['provides', 'tags', 'scope']
 
   def synthetic_target_dir(self, target, target_workdir):
+    """
+    :API: public
+    """
     return target_workdir
 
   def _inject_synthetic_target(self, target, target_workdir):
@@ -213,6 +248,9 @@ class SimpleCodegenTask(Task):
     return synthetic_target
 
   def resolve_deps(self, unresolved_deps):
+    """
+    :API: public
+    """
     deps = OrderedSet()
     for dep in unresolved_deps:
       try:

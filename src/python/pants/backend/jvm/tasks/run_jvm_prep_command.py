@@ -5,11 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.task import Task
 
@@ -73,7 +73,7 @@ class RunJvmPrepCommandBase(Task):
 
     with self.context.new_workunit(name='jvm_prep_command', labels=[WorkUnitLabel.PREP]) as workunit:
       for target in targets:
-        distribution = self.preferred_jvm_distribution(target.platform)
+        distribution = JvmPlatform.preferred_jvm_distribution([target.platform])
         executor = SubprocessExecutor(distribution)
 
         mainclass = target.payload.get_field_value('mainclass')
@@ -98,12 +98,6 @@ class RunJvmPrepCommandBase(Task):
         workunit.set_outcome(WorkUnit.FAILURE if returncode else WorkUnit.SUCCESS)
         if returncode:
           raise TaskError('RunJvmPrepCommand failed to run {}'.format(mainclass))
-
-  def preferred_jvm_distribution(self, platform):
-    """Returns a jvm Distribution with a version that should work for all the platforms."""
-    if not platform:
-      return DistributionLocator.cached()
-    return DistributionLocator.cached(minimum_version=platform.target_level)
 
 
 class RunBinaryJvmPrepCommand(RunJvmPrepCommandBase):

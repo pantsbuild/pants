@@ -10,15 +10,16 @@ from pants.base.exceptions import TargetDefinitionException
 
 
 class JavaThriftLibrary(JvmTarget):
-  """A Java library generated from Thrift IDL files."""
+  """A Java library generated from Thrift IDL files.
+
+  :API: public
+  """
 
   # TODO(John Sirois): Tasks should register the values they support in a plugin-registration goal.
   # In general a plugin will contribute a target and a task, but in this case we have a shared
   # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
   # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.
   _COMPILERS = frozenset(['thrift', 'scrooge'])
-  _LANGUAGES = frozenset(['java', 'scala', 'android'])
-  _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 
   def __init__(self,
                compiler=None,
@@ -28,6 +29,8 @@ class JavaThriftLibrary(JvmTarget):
                thrift_linter_strict=None,
                **kwargs):
     """
+    :API: public
+
     :param compiler: The compiler used to compile the thrift files. The default is defined in
       the global options under ``--thrift-default-compiler``.
     :param language: The language used to generate the output files. The default is defined in
@@ -52,8 +55,8 @@ class JavaThriftLibrary(JvmTarget):
     # The following fields are only added to the fingerprint via FingerprintStrategy when their
     # values impact the outcome of the task.  See JavaThriftLibraryFingerprintStrategy.
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
-    self._language = check_value_for_arg('language', language, self._LANGUAGES)
-    self._rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)
+    self._language = language
+    self._rpc_style = rpc_style
 
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict

@@ -7,7 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 
 class TaskError(Exception):
-  """Indicates a task has failed."""
+  """Indicates a task has failed.
+
+  :API: public
+  """
 
   def __init__(self, *args, **kwargs):
     """
@@ -31,11 +34,16 @@ class TestFailedTaskError(TaskError):
   """Raised when an actual test run failed.
 
   This is used to distinguish test run failures from infrastructure failures.
+
+  :API: public
   """
 
 
 class TargetDefinitionException(Exception):
-  """Indicates an invalid target definition."""
+  """Indicates an invalid target definition.
+
+  :API: public
+  """
 
   def __init__(self, target, msg):
     """

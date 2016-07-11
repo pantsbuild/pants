@@ -11,26 +11,27 @@ from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin
 
 
 class PEP8Error(Nit):
-  def __init__(self, python_file, code, line_number, offset, text, doc):
-    super(PEP8Error, self).__init__(code, Nit.ERROR, python_file, text, line_number)
+  def __init__(self, python_file, code, line_number, text):
+    line_range = python_file.line_range(line_number)
+    lines = python_file.lines[line_range]
+    super(PEP8Error, self).__init__(code, Nit.ERROR, python_file, text, line_range, lines)
 
 
 class PantsReporter(pep8.BaseReport):
   def init_file(self, filename, lines, expected, line_offset):
     super(PantsReporter, self).init_file(filename, lines, expected, line_offset)
     self._python_file = PythonFile.parse(filename)
-    self._twitter_errors = []
+    self._errors = []
 
   def error(self, line_number, offset, text, check):
     code = super(PantsReporter, self).error(line_number, offset, text, check)
     if code:
-      self._twitter_errors.append(
-          PEP8Error(self._python_file, code, line_number, offset, text[5:], check.__doc__))
+      self._errors.append(PEP8Error(self._python_file, code, line_number, text[5:]))
     return code
 
   @property
-  def twitter_errors(self):
-    return self._twitter_errors
+  def errors(self):
+    return self._errors
 
 
 class PEP8Checker(CheckstylePlugin):
@@ -46,4 +47,4 @@ class PEP8Checker(CheckstylePlugin):
 
   def nits(self):
     report = self.STYLE_GUIDE.check_files([self.python_file.filename])
-    return report.twitter_errors
+    return report.errors

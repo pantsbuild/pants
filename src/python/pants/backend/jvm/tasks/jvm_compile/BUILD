@@ -40,6 +40,7 @@ python_library(
   name = 'compile_context',
   sources = ['compile_context.py'],
   dependencies = [
+    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
   ]
 )
@@ -66,6 +67,7 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_util',
+    'src/python/pants/backend/jvm/tasks:jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
@@ -100,7 +102,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
-    '3rdparty/python:zincutils',
     ':analysis',
     ':analysis_parser',
     ':analysis_tools',
@@ -109,9 +110,11 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/zinc',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:workunit',
+    'src/python/pants/java/distribution',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

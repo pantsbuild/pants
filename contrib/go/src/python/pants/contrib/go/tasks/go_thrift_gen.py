@@ -28,7 +28,7 @@ class GoThriftGen(SimpleCodegenTask):
   def register_options(cls, register):
     super(GoThriftGen, cls).register_options(register)
 
-    register('--strict', default=True, fingerprint=True, action='store_true',
+    register('--strict', default=True, fingerprint=True, type=bool,
              help='Run thrift compiler with strict warnings.')
     register('--gen-options', advanced=True, fingerprint=True,
             help='Use these apache thrift go gen options.')
@@ -145,6 +145,11 @@ class GoThriftGen(SimpleCodegenTask):
 
   def execute_codegen(self, target, target_workdir):
     self._generate_thrift(target, target_workdir)
+
+  @property
+  def _copy_target_attributes(self):
+    """Override `_copy_target_attributes` to exclude `provides`."""
+    return [a for a in super(GoThriftGen, self)._copy_target_attributes if a != 'provides']
 
   def synthetic_target_dir(self, target, target_workdir):
     all_sources = list(target.sources_relative_to_buildroot())

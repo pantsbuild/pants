@@ -33,16 +33,21 @@ class ThriftLinterTest(TaskTestBase):
 
   @patch('pants.contrib.scrooge.tasks.thrift_linter.calculate_compile_sources')
   def test_lint(self, mock_calculate_compile_sources):
+
+    def get_default_jvm_options():
+      return self.task_type().get_jvm_options_default(self.context().options.for_global_scope())
+
     thrift_target = self.create_library('a', 'java_thrift_library', 'a', ['A.thrift'])
     task = self.create_task(self.context(target_roots=thrift_target))
     self._prepare_mocks(task)
-    expected_include_paths = set(['src/thrift/tweet', 'src/thrift/users'])
-    expected_paths = set(['src/thrift/tweet/a.thrift', 'src/thrift/tweet/b.thrift'])
+    expected_include_paths = {'src/thrift/tweet', 'src/thrift/users'}
+    expected_paths = {'src/thrift/tweet/a.thrift', 'src/thrift/tweet/b.thrift'}
     mock_calculate_compile_sources.return_value = (expected_include_paths, expected_paths)
     task._lint(thrift_target)
+
     self._run_java_mock.assert_called_once_with(classpath='foo_classpath',
       main='com.twitter.scrooge.linter.Main',
       args=['--ignore-errors', '--include-path', 'src/thrift/users', '--include-path',
             'src/thrift/tweet', 'src/thrift/tweet/b.thrift', 'src/thrift/tweet/a.thrift'],
-      jvm_options=[],
+      jvm_options=get_default_jvm_options(),
       workunit_labels=['COMPILER'])

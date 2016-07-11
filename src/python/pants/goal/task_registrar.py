@@ -19,8 +19,6 @@ class TaskRegistrar(object):
 
   def __init__(self, name, action, dependencies=None, serialize=True):
     """
-    :API: public
-
     :param name: the name of the task.
     :param action: the Task action object to invoke this task.
     :param dependencies: DEPRECATED
@@ -34,7 +32,7 @@ class TaskRegistrar(object):
 
     if dependencies:
       # TODO(John Sirois): kill this warning and the kwarg after a deprecation cycle.
-      print(dedent('''
+      print(dedent("""
           WARNING: Registered dependencies are now ignored and only `Task.product_types`
           and product requirements as expressed in `Task.prepare` are used to
           infer Task dependencies.
@@ -42,7 +40,7 @@ class TaskRegistrar(object):
           Please fix this registration:
             {reg}
             {location}
-          ''').format(reg=self,
+          """).format(reg=self,
                       location=traceback.format_list([traceback.extract_stack()[-2]])[0]),
             file=sys.stderr)
 

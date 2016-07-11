@@ -22,7 +22,7 @@ jar_library(name='args4j',
 jar_library(name='guava',
             jars=[
               jar('com.google.guava', 'guava', '18.0',
-                  apidocs='http://docs.guava-libraries.googlecode.com/git-history/v18.0/javadoc/'),
+                  apidocs='http://google.github.io/guava/releases/18.0/api/docs/')
             ])
 
 jar_library(name='jansi',
@@ -72,7 +72,9 @@ jar_library(name='log4j',
 jar_library(name='protobuf-2.4.1',
             jars = [
               jar(org='com.google.protobuf', name='protobuf-java', rev='2.4.1'),
-            ])
+            ],
+            # javac requires protobuf to be present in order to compile the MessageBuilders API.
+            scope='forced',)
 
 target(name='protobuf-java', dependencies = [':protobuf-2.4.1'])
 
@@ -97,27 +99,16 @@ jar_library(name='slf4j-api',
               jar(org='org.slf4j', name='slf4j-api', rev='1.6.1'),
             ])
 
-jar_library(name='spindle-runtime',
-            jars=[
-              scala_jar(org='com.foursquare', name='spindle-runtime', rev='3.0.0-M7'),
-            ],
-            dependencies=[
-              'contrib/spindle/3rdparty:rogue',
-            ])
-
 # NB: we have two versions of thrift here due to scrooge requiring one version while apache
-# thrift requires another. this is not usually recommended
+# thrift requires another. This is not usually recommended.
 jar_library(name='libthrift-0.9.2',
             jars = [
               jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
-            ])
+            ],
+            # javac uses undeclared types to build the MessageBuilder API.
+            scope='forced',)
 
-target(name='thrift-0.9.2',
-       dependencies = [
-         ':commons-lang',
-         ':libthrift-0.9.2',
-         ':slf4j-api',
-       ])
+target(name='thrift-0.9.2', dependencies = [':libthrift-0.9.2'])
 
 jar_library(name='libthrift-0.6.1',
             jars = [
@@ -154,9 +145,18 @@ jar_library(name='guava-testlib',
 jar_library(name='junit',
             jars=[
               jar('junit', 'junit', '4.12')
-            ])
+            ],
+            # junit is frequently used only for its annotations.
+            scope='forced',)
 
 jar_library(name='scalatest',
             jars=[
               scala_jar('org.scalatest', 'scalatest', '2.2.4')
             ])
+
+jar_library(name='wire-runtime',
+            jars=[
+              jar(org='com.squareup.wire', name='wire-runtime', rev='1.8.0'),
+            ],
+            # javac uses undeclared types to build the MessageBuilder API.
+            scope='forced',)

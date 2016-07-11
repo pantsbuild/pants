@@ -14,7 +14,7 @@ class PluginSubsystemBase(Subsystem):
   def register_options(cls, register):
     super(PluginSubsystemBase, cls).register_options(register)
     # All checks have this option.
-    register('--skip', default=False, action='store_true',
+    register('--skip', type=bool,
              help='If enabled, skip this style checker.')
 
   def get_plugin(self, python_file):

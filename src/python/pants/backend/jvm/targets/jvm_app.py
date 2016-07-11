@@ -14,11 +14,13 @@ from twitter.common.dirutil import Fileset
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
 from pants.base.validation import assert_list
 from pants.build_graph.target import Target
+from pants.fs import archive as Archive
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
@@ -127,6 +129,11 @@ class Bundle(object):
       filenames, or a Fileset object (e.g. globs()).
       E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
     """
+    deprecated_conditional(lambda: fileset is None,
+                           '1.2.0',
+                           'bare bundle() without `fileset=` param',
+                           "Pass the `fileset=` parameter: `bundle(fileset=globs('*.config')`")
+
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
@@ -167,8 +174,11 @@ class BundleField(tuple, PayloadField):
       buildroot_relative_path = os.path.relpath(abs_path, get_buildroot())
       hasher.update(buildroot_relative_path)
       hasher.update(bundle.filemap[abs_path])
-      with open(abs_path, 'rb') as f:
-        hasher.update(f.read())
+      if os.path.isfile(abs_path):
+        # Update with any additional string to differentiate empty file with non-existing file.
+        hasher.update('e')
+        with open(abs_path, 'rb') as f:
+          hasher.update(f.read())
     return hasher.hexdigest()
 
   def _compute_fingerprint(self):
@@ -182,9 +192,21 @@ class JvmApp(Target):
   self-contained artifact suitable for deployment on some other machine.
   The artifact contains the executable jar, its dependencies, and
   extra files like config files, startup scripts, etc.
-  """
 
-  def __init__(self, name=None, payload=None, binary=None, bundles=None, basename=None, **kwargs):
+  :API: public
+  """
+  class InvalidArchiveType(Exception):
+    """Raised when archive type defined in Target is invalid"""
+
+  def __init__(self,
+               name=None,
+               payload=None,
+               binary=None,
+               bundles=None,
+               basename=None,
+               deployjar=None,
+               archive=None,
+               **kwargs):
     """
     :param string binary: Target spec of the ``jvm_binary`` that contains the
       app main.
@@ -195,12 +217,23 @@ class JvmApp(Target):
       ``name``. Optionally pants uses this in the ``bundle`` goal to name the distribution
       artifact.  Note this is unsafe because of the possible conflict when multiple bundles
       are built.
+    :param boolean deployjar: If True, pack all 3rdparty and internal jar classfiles into
+      a single deployjar in the bundle's root dir. If unset, all jars will go into the
+      bundle's libs directory, the root will only contain a synthetic jar with its manifest's
+      Class-Path set to those jars.
+    :param string archive: Create an archive of this type from the bundle.
     """
+    if archive and archive not in Archive.TYPE_NAMES:
+      raise self.InvalidArchiveType(
+        'Given archive type "{}" is invalid, choose from {}.'.format(archive, list(Archive.TYPE_NAMES)))
+
     payload = payload or Payload()
     payload.add_fields({
       'basename': PrimitiveField(basename or name),
       'binary': PrimitiveField(binary),
       'bundles': BundleField(bundles or []),
+      'deployjar': PrimitiveField(deployjar),
+      'archive': PrimitiveField(archive),
       })
     super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 

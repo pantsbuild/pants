@@ -242,6 +242,34 @@ def chmod_plus_x(path):
   os.chmod(path, path_mode)
 
 
+def absolute_symlink(source_path, target_path):
+  """Create a symlink at target pointing to source using the absolute path.
+
+  :param source_path: Absolute path to source file
+  :param target_path: Absolute path to intended symlink
+  :raises ValueError if source_path or link_path are not unique, absolute paths
+  :raises OSError on failure UNLESS file already exists or no such file/directory
+  """
+  if not os.path.isabs(source_path):
+    raise ValueError("Path for source : {} must be absolute".format(source_path))
+  if not os.path.isabs(target_path):
+    raise ValueError("Path for link : {} must be absolute".format(target_path))
+  if source_path == target_path:
+    raise ValueError("Path for link is identical to source : {}".format(source_path))
+  try:
+    if os.path.lexists(target_path):
+      if os.path.islink(target_path) or os.path.isfile(target_path):
+        os.unlink(target_path)
+      else:
+        shutil.rmtree(target_path)
+    safe_mkdir_for(target_path)
+    os.symlink(source_path, target_path)
+  except OSError as e:
+    # Another run may beat us to deletion or creation.
+    if not (e.errno == errno.EEXIST or e.errno == errno.ENOENT):
+      raise
+
+
 def relative_symlink(source_path, link_path):
   """Create a symlink at link_path pointing to relative source
 

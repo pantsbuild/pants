@@ -12,34 +12,23 @@ from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.engine.engine import Engine
+from pants.engine.legacy_engine import Engine
 from pants.engine.round_manager import RoundManager
 
 
 class GoalExecutor(object):
-  """
-  :API: public
-  """
 
   def __init__(self, context, goal, tasktypes_by_name):
-    """
-    :API: public
-    """
     self._context = context
     self._goal = goal
     self._tasktypes_by_name = tasktypes_by_name
 
   @property
   def goal(self):
-    """
-    :API: public
-    """
     return self._goal
 
   def attempt(self, explain):
     """Attempts to execute the goal's tasks in installed order.
-
-    :API: public
 
     :param bool explain: If ``True`` then the goal plan will be explained instead of being
                          executed.
@@ -202,11 +191,6 @@ class RoundEngine(Engine):
   def _prepare(self, context, goals):
     if len(goals) == 0:
       raise TaskError('No goals to prepare')
-
-    # Option values are usually computed lazily on demand,
-    # but command line options are eagerly computed for validation.
-    for scope in context.options.scope_to_flags.keys():
-      context.options.for_scope(scope)
 
     goal_info_by_goal = OrderedDict()
     target_roots_replacement = self.TargetRootsReplacement()

@@ -98,6 +98,17 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       # generates a fetch ivy.xml.
       self.assertIn('fetch-ivy.xml', os.listdir(resolve_workdir))
 
+  def test_generates_no_report_if_no_resolve_performed(self):
+    with temporary_dir() as ivy_report_dir:
+      run = self.run_pants(['resolve', 'src/java/org/pantsbuild/junit/annotations', '--resolve-ivy-report',
+                             '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)])
+      self.assert_success(run)
+
+      html_report_file, listdir = self._find_html_report(ivy_report_dir)
+      self.assertIsNone(html_report_file,
+                        msg="Expected no report file since no resolve was run.")
+      self.assertIn('Not generating a report.', run.stdout_data)
+
   def test_generating_report_from_fetch(self):
     # Ensure the ivy report file gets generated and populated.
     with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
@@ -115,6 +126,8 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
                         msg="Couldn't find ivy report in {report_dir} containing files {listdir}"
                         .format(report_dir=ivy_report_dir, listdir=listdir))
 
+        with open(os.path.join(ivy_report_dir, html_report_file)) as file:
+          self.assertIn('junit', file.read())
 
       run_pants(['clean-all'])
 

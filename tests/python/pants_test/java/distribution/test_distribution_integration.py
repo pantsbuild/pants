@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
 from unittest import skipIf
 
 from pants.java.distribution.distribution import Distribution, DistributionLocator
@@ -14,43 +15,54 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
-def get_two_distributions():
-  with subsystem_instance(DistributionLocator):
+@contextmanager
+def _distribution_locator(**options):
+  with subsystem_instance(DistributionLocator, **options) as locator:
+    locator._reset()  # Force a fresh locator.
     try:
-      java7 = DistributionLocator.locate(minimum_version='1.7', maximum_version='1.7.9999')
-      java8 = DistributionLocator.locate(minimum_version='1.8', maximum_version='1.8.9999')
+      yield locator
+    finally:
+      locator._reset()  # And make sure we we clean up the values we cache.
+
+
+def _get_two_distributions():
+  with _distribution_locator() as locator:
+    try:
+      java7 = locator.cached(minimum_version='1.7', maximum_version='1.7.9999')
+      java8 = locator.cached(minimum_version='1.8', maximum_version='1.8.9999')
       return java7, java8
     except DistributionLocator.Error:
       return None
 
 
 class DistributionIntegrationTest(PantsRunIntegrationTest):
-
   def _test_two_distributions(self, os_name=None):
-    java7, java8 = get_two_distributions()
+    java7, java8 = _get_two_distributions()
     os_name = os_name or get_os_name()
 
     self.assertNotEqual(java7.home, java8.home)
 
     for (one, two) in ((java7, java8), (java8, java7)):
       target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
-      run = self.run_pants(['run', target_spec], config={
-        'jvm-distributions': {
-          'paths': {
-            os_name: [one.home],
-          }
-        }
-      }, extra_env={
-        'JDK_HOME': two.home,
-      })
+      run = self.run_pants(['run', target_spec],
+                           config={
+                             'jvm-distributions': {
+                               'paths': {
+                                 os_name: [one.home],
+                               }
+                             }
+                           },
+                           extra_env={
+                             'JDK_HOME': two.home,
+                           })
       self.assert_success(run)
       self.assertIn('java.home:{}'.format(os.path.realpath(one.home)), run.stdout_data)
 
-  @skipIf(get_two_distributions() is None, 'Could not find java 7 and java 8 jvms to test with.')
+  @skipIf(_get_two_distributions() is None, 'Could not find java 7 and java 8 jvms to test with.')
   def test_jvm_jdk_paths_supercedes_environment_variables(self):
     self._test_two_distributions()
 
-  @skipIf(get_two_distributions() is None, 'Could not find java 7 and java 8 jvms to test with.')
+  @skipIf(_get_two_distributions() is None, 'Could not find java 7 and java 8 jvms to test with.')
   def test_jdk_paths_with_aliased_os_names(self):
     # NB(gmalmquist): This test will silently no-op and do nothing if the testing machine is running
     # an esoteric os (eg, windows).
@@ -61,30 +73,31 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
           self._test_two_distributions(other)
 
   def test_no_jvm_restriction(self):
-    with subsystem_instance(DistributionLocator):
-      distribution = DistributionLocator.locate()
-    target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
-    run = self.run_pants(['run', target_spec])
-    self.assert_success(run)
-    self.assertIn('java.home:{}'.format(distribution.home), run.stdout_data)
+    with _distribution_locator() as locator:
+      distribution = locator.cached()
+      target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
+      run = self.run_pants(['run', target_spec])
+      self.assert_success(run)
+      self.assertIn('java.home:{}'.format(distribution.home), run.stdout_data)
 
   def test_jvm_meets_min_and_max_distribution(self):
-    with subsystem_instance(DistributionLocator):
-      distribution = DistributionLocator.locate()
-    target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
-    run = self.run_pants(['run', target_spec], config={
-      'jvm-distributions': {
-        'minimum_version': str(distribution.version),
-        'maximum_version': str(distribution.version)
-      }
-    })
-    self.assert_success(run)
-    self.assertIn('java.home:{}'.format(distribution.home), run.stdout_data)
+    with _distribution_locator() as locator:
+      distribution = locator.cached()
+      target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
+      run = self.run_pants(['run', target_spec],
+                           config={
+                             'jvm-distributions': {
+                               'minimum_version': str(distribution.version),
+                               'maximum_version': str(distribution.version)
+                             }
+                           })
+      self.assert_success(run)
+      self.assertIn('java.home:{}'.format(distribution.home), run.stdout_data)
 
   def test_impossible_distribution_requirements(self):
-    with subsystem_instance(DistributionLocator) as dist_loader:
+    with _distribution_locator() as locator:
       with self.assertRaisesRegexp(Distribution.Error, "impossible constraints"):
-        dist_loader.cached('2', '1', jdk=False)
+        locator.cached('2', '1', jdk=False)
 
   def _test_jvm_does_not_meet_distribution_requirements(self,
                                                         min_version_arg=None,
@@ -97,9 +110,9 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
         'maximum_version': max_version_option,
       }
     }
-    with subsystem_instance(DistributionLocator, **options) as dist_loader:
+    with _distribution_locator(**options) as locator:
       with self.assertRaises(Distribution.Error):
-        dist_loader.cached(min_version_arg, max_version_arg, jdk=False)
+        locator.cached(minimum_version=min_version_arg, maximum_version=max_version_arg, jdk=False)
 
   # a version less than all other versions
   BOTTOM = '0.00001'
@@ -119,13 +132,17 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
     self._test_jvm_does_not_meet_distribution_requirements(max_version_arg=self.BOTTOM)
 
   def test_min_option_trumps_min_arg(self):
-    self._test_jvm_does_not_meet_distribution_requirements(min_version_arg=self.BOTTOM, min_version_option=self.TOP)
+    self._test_jvm_does_not_meet_distribution_requirements(min_version_arg=self.BOTTOM,
+                                                           min_version_option=self.TOP)
 
   def test_min_arg_trumps_min_option(self):
-    self._test_jvm_does_not_meet_distribution_requirements(min_version_arg=self.TOP, min_version_option=self.BOTTOM)
+    self._test_jvm_does_not_meet_distribution_requirements(min_version_arg=self.TOP,
+                                                           min_version_option=self.BOTTOM)
 
   def test_max_option_trumps_max_arg(self):
-    self._test_jvm_does_not_meet_distribution_requirements(max_version_arg=self.TOP, max_version_option=self.BOTTOM)
+    self._test_jvm_does_not_meet_distribution_requirements(max_version_arg=self.TOP,
+                                                           max_version_option=self.BOTTOM)
 
   def test_max_arg_trumps_max_option(self):
-    self._test_jvm_does_not_meet_distribution_requirements(max_version_arg=self.BOTTOM, max_version_option=self.TOP)
+    self._test_jvm_does_not_meet_distribution_requirements(max_version_arg=self.BOTTOM,
+                                                           max_version_option=self.TOP)

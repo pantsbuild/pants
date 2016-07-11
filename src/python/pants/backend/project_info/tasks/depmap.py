@@ -28,21 +28,21 @@ class Depmap(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(Depmap, cls).register_options(register)
-    register('--internal-only', default=False, action='store_true',
+    register('--internal-only', type=bool,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
-    register('--external-only', default=False, action='store_true',
+    register('--external-only', type=bool,
              help='Specifies that only external dependencies should be included in the graph '
                   'output (only external jars).')
-    register('--minimal', default=False, action='store_true',
+    register('--minimal', type=bool,
              help='For a textual dependency tree, only prints a dependency the 1st '
                   'time it is encountered. This is a no-op for --graph.')
-    register('--graph', default=False, action='store_true',
+    register('--graph', type=bool,
              help='Specifies the internal dependency graph should be output in the dot digraph '
                   'format.')
-    register('--tree', default=False, action='store_true',
+    register('--tree', type=bool,
              help='For text output, show an ascii tree to help visually line up indentions.')
-    register('--show-types', default=False, action='store_true',
+    register('--show-types', type=bool,
              help='Show types of objects in depmap --graph.')
     register('--separator', default='-',
              help='Specifies the separator to use between the org/name/rev components of a '

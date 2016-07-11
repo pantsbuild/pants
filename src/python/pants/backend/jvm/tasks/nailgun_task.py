@@ -11,9 +11,9 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.java import util
-from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
+from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
 
 
@@ -23,7 +23,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
-    register('--use-nailgun', action='store_true', default=True,
+    register('--use-nailgun', type=bool, default=True,
              help='Use nailgun to make repeated invocations of this task quicker.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
              help='Timeout (secs) for nailgun startup.')
@@ -39,7 +39,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
   @classmethod
   def global_subsystems(cls):
-    return super(NailgunTaskBase, cls).global_subsystems() + (DistributionLocator,)
+    return super(NailgunTaskBase, cls).global_subsystems() + (Subprocess.Factory,)
 
   def __init__(self, *args, **kwargs):
     """
@@ -52,15 +52,6 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._identity = '_'.join(id_tuple)
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
-    self.set_distribution()    # Use default until told otherwise.
-    # TODO: Choose default distribution based on options.
-
-  def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
-    try:
-      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
-                                              maximum_version=maximum_version, jdk=jdk)
-    except DistributionLocator.Error as e:
-      raise TaskError(e)
 
   def create_java_executor(self):
     """Create java executor that uses this task's ng daemon, if allowed.
@@ -124,7 +115,7 @@ class NailgunKillall(Task):
   @classmethod
   def register_options(cls, register):
     super(NailgunKillall, cls).register_options(register)
-    register('--everywhere', default=False, action='store_true',
+    register('--everywhere', type=bool,
              help='Kill all nailguns servers launched by pants for all workspaces on the system.')
 
   def execute(self):
