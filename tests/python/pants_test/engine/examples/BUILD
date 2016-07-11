@@ -26,7 +26,7 @@ python_library(
     ':parsers',
     ':sources',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:file_system_project_tree',
+    'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:graph',

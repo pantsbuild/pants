@@ -11,6 +11,7 @@ from collections import namedtuple
 from six.moves import range
 
 from pants.base.build_environment import get_buildroot
+from pants.base.project_tree_factory import get_project_tree
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
@@ -105,9 +106,6 @@ class SourceRoots(object):
     Note: Does not follow symlinks.
     """
     buildroot = get_buildroot()
-    # Note: If we support other SCMs in the future, add their metadata dirs here if relevant.
-    ignore = {'.git'}.union({os.path.relpath(self._options[k], buildroot) for k in
-                            ['pants_workdir', 'pants_supportdir', 'pants_distdir']})
 
     fixed_roots = set()
     for root, langs in self._trie.fixed():
@@ -115,16 +113,13 @@ class SourceRoots(object):
         yield self._source_root_factory.create(root, langs)
       fixed_roots.add(root)
 
-    for dirpath, dirnames, _ in os.walk(buildroot, topdown=True):
-      relpath = os.path.relpath(dirpath, buildroot)
-      if relpath in ignore:
-        del dirnames[:]  # Don't descend into ignored dirs.
-      else:
-        match = self._trie.find(relpath)
-        if match:
-          if not any(fixed_root.startswith(relpath) for fixed_root in fixed_roots):
-            yield match  # Found a source root not a prefix of any fixed roots.
-          del dirnames[:]  # Don't continue to walk into it.
+    project_tree = get_project_tree(self._options)
+    for relpath, dirnames, _ in project_tree.walk('', topdown=True):
+      match = self._trie.find(relpath)
+      if match:
+        if not any(fixed_root.startswith(relpath) for fixed_root in fixed_roots):
+          yield match  # Found a source root not a prefix of any fixed roots.
+        del dirnames[:]  # Don't continue to walk into it.
 
 
 class SourceRootConfig(Subsystem):
