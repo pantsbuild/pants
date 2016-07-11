@@ -28,11 +28,12 @@ def _create_snapshot_archive(file_list, step_context):
 
   # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
   with temporary_file_path(cleanup=False) as tmp_path:
-    with open_tar(tmp_path, mode='w:gz') as tar:
+    with open_tar(tmp_path, mode='w') as tar:
       for file in file_list.dependencies:
+        # TODO handle GitProjectTree. Using add this this will fail with a non-filesystem project tree.
         tar.add(os.path.join(step_context.project_tree.build_root, file.path), file.path)
     snapshot = Snapshot(_fingerprint_files_in_tar(file_list, tmp_path))
-  tar_location = _snapshot_path(snapshot, step_context.project_tree)
+  tar_location = _snapshot_path(snapshot, step_context.snapshot_archive_root)
 
   shutil.move(tmp_path, tar_location)
 
@@ -41,26 +42,24 @@ def _create_snapshot_archive(file_list, step_context):
 
 def _fingerprint_files_in_tar(file_list, tar_location):
   hasher = sha1()
-  with open_tar(tar_location, mode='r:gz') as tar:
+  with open_tar(tar_location, mode='r') as tar:
     for file in file_list.dependencies:
       hasher.update(file.path)
       hasher.update(tar.extractfile(file.path).read())
   return hasher.hexdigest()
 
 
-def _snapshot_path(snapshot, project_tree):
-  # TODO Create / find snapshot directory via configuration.
+def _snapshot_path(snapshot, archive_root):
   # TODO Consider naming snapshot archive based also on the subject and not just the fingerprint of the contained files.
-  archive_dir = os.path.join(project_tree.build_root, '.snapshots')
-  safe_mkdir(archive_dir)
-  tar_location = os.path.join(archive_dir, '{}.tar'.format(snapshot.fingerprint))
+  safe_mkdir(archive_root)
+  tar_location = os.path.join(archive_root, '{}.tar'.format(snapshot.fingerprint))
   return tar_location
 
 
-def _extract_snapshot(step_context, snapshot, checkout, subject):
-  with open_tar(_snapshot_path(snapshot, step_context.project_tree), errorlevel=1) as tar:
-    tar.extractall(checkout.path)
-  logger.debug('extracted {} snapshot to {}'.format(subject, checkout.path))
+def _extract_snapshot(step_context, snapshot, sandbox_dir, subject):
+  with open_tar(_snapshot_path(snapshot, step_context.snapshot_archive_root), errorlevel=1) as tar:
+    tar.extractall(sandbox_dir)
+  logger.debug('extracted {} snapshot to {}'.format(subject, sandbox_dir))
 
 
 class Snapshot(datatype('Snapshot', ['fingerprint'])):
@@ -74,7 +73,8 @@ class Snapshot(datatype('Snapshot', ['fingerprint'])):
 class Binary(object):
   """Binary in the product graph.
 
-  TODO these should use BinaryUtil to find binaries."""
+  TODO these should use BinaryUtil to find binaries.
+  """
 
   @abstractproperty
   def bin_path(self):
@@ -82,10 +82,6 @@ class Binary(object):
 
   def prefix_of_command(self):
     return tuple([self.bin_path])
-
-
-class Checkout(datatype('Checkout', ['path'])):
-  """Checkout directory of one or more snapshots."""
 
 
 class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
@@ -171,8 +167,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     except Exception as e:
       return Throw(e)
 
-
-    # If the process requires snapshots, request a checkout with the requested snapshots applied.
+    # Request snapshots for the snapshot_subjects from the process request.
     if process_request.snapshot_subjects:
       snapshot_subjects_node = step_context.select_node(SelectDependencies(Snapshot,
                                                                            SnapshottedProcessRequest,
@@ -183,54 +178,49 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
       if type(snapshot_subjects_state) is not Return:
         return snapshot_subjects_state
 
-      snapshots_and_subjects = zip(snapshot_subjects_state.value, process_request.snapshot_subjects)
-
-      with temporary_dir(cleanup=False) as outdir:
-        checkout = Checkout(outdir)
-
-      for snapshot, subject in snapshots_and_subjects:
-        _extract_snapshot(step_context, snapshot, checkout, subject)
+    # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
+    with temporary_dir(cleanup=False) as sandbox_dir:
+      if process_request.snapshot_subjects:
+        snapshots_and_subjects = zip(snapshot_subjects_state.value, process_request.snapshot_subjects)
+        for snapshot, subject in snapshots_and_subjects:
+          _extract_snapshot(step_context, snapshot, sandbox_dir, subject)
 
       # All of the snapshots have been checked out now.
       if process_request.directories_to_create:
         for d in process_request.directories_to_create:
-          safe_mkdir(os.path.join(checkout.path, d))
-    else:
-      # If there are no things to snapshot, then do no snapshotting or checking out and just use the
-      # project dir.
-      checkout = Checkout(step_context.project_tree.build_root)
+          safe_mkdir(os.path.join(sandbox_dir, d))
 
+      popen = self._run_command(binary_value, sandbox_dir, process_request)
+
+      process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
+      if process_result.exit_code != 0:
+        return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(binary_value,
+                                                                                      process_result.exit_code)))
+
+      try:
+        converted_output = self.snapshotted_process.output_conversion(process_result, sandbox_dir)
+      except Exception as e:
+        return Throw(e)
+
+    return Return(converted_output)
+
+  def _run_command(self, binary_value, sandbox_dir, process_request):
     command = binary_value.prefix_of_command() + tuple(process_request.args)
-    logger.debug('Running command: "{}" in {}'.format(command, checkout.path))
-
+    logger.debug('Running command: "{}" in {}'.format(command, sandbox_dir))
     popen = subprocess.Popen(command,
                              stderr=subprocess.PIPE,
                              stdout=subprocess.PIPE,
-                             cwd=checkout.path)
+                             cwd=sandbox_dir)
     # TODO At some point, we may want to replace this blocking wait with a timed one that returns
     # some kind of in progress state.
     popen.wait()
-
-    logger.debug('Done running command in {}'.format(checkout.path))
-
-    process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
-    if process_result.exit_code > 0:
-      return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(binary_value,
-                                                                                    process_result.exit_code)))
-
-    try:
-      converted_output = self.snapshotted_process.output_conversion(process_result, checkout)
-    except Exception as e:
-      return Throw(e)
-
-    # TODO clean up the checkout.
-
-    return Return(converted_output)
+    logger.debug('Done running command in {}'.format(sandbox_dir))
+    return popen
 
 
 class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
   is_inlineable = False
-  is_cacheable = True
+  is_cacheable = False
   product = Snapshot
 
   @classmethod

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from abc import abstractmethod, abstractproperty
 from os.path import dirname
 
@@ -452,6 +453,7 @@ class StepContext(object):
     self._node_states = dict(node_states)
     self._parents = OrderedSet()
     self._inline_nodes = inline_nodes
+    self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
 
   def get(self, node):
     """Given a Node and computed node_states, gets the current state for the Node.

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import logging
 import threading
 import time
@@ -438,6 +437,12 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
     return self.input_selectors
 
 
+class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type'])):
+  """A set-friendly curried TaskNode constructor."""
+  def as_node(self, subject, product_type, variants):
+    return TaskNode(subject, product_type, variants, self.task_func, self.input_selects)
+
+
 class NodeBuilder(Closable):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
@@ -449,10 +454,10 @@ class NodeBuilder(Closable):
       if isinstance(entry, (tuple, list)) and len(entry) == 3:
         output_type, input_selects, task = entry
         serializable_tasks[output_type].add(
-          functools.partial(cls.create_task_node, clause=tuple(input_selects), task_func=task)
+          TaskNodeFactory(tuple(input_selects), task, output_type)
         )
       elif isinstance(entry, SnapshottedProcess):
-        serializable_tasks[entry.output_product_type].add(entry.as_node)
+        serializable_tasks[entry.output_product_type].add(entry)
       else:
         raise Exception("Unexpected type for entry {}".format(entry))
 
@@ -480,7 +485,8 @@ class NodeBuilder(Closable):
         yield node_factory(subject, product_type, variants)
 
   def _lookup_tasks(self, product_type):
-    return self._tasks[product_type]
+    for entry in self._tasks[product_type]:
+      yield entry.as_node
 
   def _lookup_intrinsic(self, product_type, subject):
     return self._intrinsics.get((type(subject), product_type))

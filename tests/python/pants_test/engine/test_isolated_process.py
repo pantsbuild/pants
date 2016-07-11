@@ -12,7 +12,7 @@ from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
 from pants.engine.isolated_process import (Binary, Snapshot, SnapshottedProcessRequest,
                                            _snapshot_path)
-from pants.engine.nodes import Return, Throw
+from pants.engine.nodes import Return, StepContext, Throw
 from pants.engine.scheduler import SnapshottedProcess
 from pants.engine.selectors import Select, SelectLiteral
 from pants.util.contextutil import open_tar
@@ -39,13 +39,13 @@ def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(files):
                                    snapshot_subjects=(files,))
 
 
-def process_result_to_concatted_from_outfile(process_result, checkout):
-  with open(os.path.join(checkout.path, 'outfile')) as f:
+def process_result_to_concatted_from_outfile(process_result, sandbox_dir):
+  with open(os.path.join(sandbox_dir, 'outfile')) as f:
     # TODO might be better to allow for this to be done via Nodes. But I'm not sure how as yet.
     return Concatted(f.read())
 
 
-def process_result_to_concatted(process_result, checkout):
+def process_result_to_concatted(process_result, sandbox_dir):
   return Concatted(process_result.stdout)
 
 
@@ -62,7 +62,7 @@ class ShellFailCommand(Binary):
     return 'ShellFailCommand'
 
 
-def fail_process_result(process_result, checkout):
+def fail_process_result(process_result, sandbox_dir):
   raise Exception('Failed in output conversion!')
 
 
@@ -92,11 +92,11 @@ class ClasspathEntry(datatype('ClasspathEntry', ['path'])):
   """A classpath entry for a subject."""
 
 
-def process_result_to_classpath_entry(process_result, checkout):
+def process_result_to_classpath_entry(process_result, sandbox_dir):
   if not process_result.exit_code:
     # this implies that we should pass some / all of the inputs to the output conversion so they can grab config.
     # TODO string name association isn't great.
-    return ClasspathEntry(os.path.join(checkout.path, 'build'))
+    return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
 
 
 class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
@@ -115,38 +115,18 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
   def test_gather_snapshot_of_pathglobs(self):
     project_tree = self.mk_example_fs_tree()
     scheduler = self.mk_scheduler(project_tree=project_tree)
-
+    empty_step_context = StepContext(node_builder=None, project_tree=project_tree, node_states=[], inline_nodes=False)
 
     request = scheduler.execution_request([Snapshot],
-                                          [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
     snapshot = state.value
-
-    self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], snapshot, project_tree)
-
-  def test_integration_simple_concat_test(self):
-    scheduler = self.mk_scheduler_in_example_fs(
-      [SnapshottedProcess(product_type=Concatted,
-                          binary_type=ShellCat,
-                          input_selectors=(Select(Files),),
-                          input_conversion=file_list_to_args_for_cat,
-                          output_conversion=process_result_to_concatted),
-       [ShellCat, [], ShellCat]])
-
-    request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
-    LocalSerialEngine(scheduler).reduce(request)
-
-    root_entries = scheduler.root_entries(request).items()
-    self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler)
-    concatted = state.value
-
-    self.assertEqual(Concatted('one\ntwo\n'), concatted)
+    self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], snapshot,
+                              empty_step_context)
 
   def test_integration_concat_with_snapshot_subjects_test(self):
     scheduler = self.mk_scheduler_in_example_fs([
@@ -160,7 +140,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
@@ -206,7 +186,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
@@ -226,7 +206,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', rglobs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
@@ -234,8 +214,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Failed in output conversion!')
 
-  def assert_archive_files(self, expected_archive_files, snapshot, project_tree):
-    with open_tar(_snapshot_path(snapshot, project_tree), errorlevel=1) as tar:
+  def assert_archive_files(self, expected_archive_files, snapshot, step_context):
+    with open_tar(_snapshot_path(snapshot, step_context.snapshot_archive_root), errorlevel=1) as tar:
       self.assertEqual(expected_archive_files,
                        [tar_info.path for tar_info in tar.getmembers()])
 
