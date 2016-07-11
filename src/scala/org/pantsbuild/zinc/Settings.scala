@@ -121,6 +121,7 @@ case class IncOptions(
   apiDebug: Boolean              = defaultIncOptions.apiDebug,
   apiDiffContextSize: Int        = defaultIncOptions.apiDiffContextSize,
   apiDumpDirectory: Option[File] = m2o(defaultIncOptions.apiDumpDirectory),
+  transactional: Boolean         = false,
   backup: Option[File]           = None,
   recompileOnMacroDef: Option[Boolean] = m2o(defaultIncOptions.recompileOnMacroDef).map(_.booleanValue),
   nameHashing: Boolean           = defaultIncOptions.nameHashing
@@ -145,11 +146,10 @@ case class IncOptions(
     defaultIncOptions.apiDumpDirectory
 
   def classfileManager(log: Logger): Maybe[ClassfileManagerType] =
-    backup.map { backup =>
-      Maybe.just[ClassfileManagerType](new TransactionalManagerType(backup, log))
-    }.getOrElse {
-      throw new RuntimeException(s"The ${Settings.BackupName} option is required.")
-    }
+    if (transactional && backup.isDefined)
+      Maybe.just(new TransactionalManagerType(backup.get, log))
+    else
+      Maybe.nothing[ClassfileManagerType]
 }
 
 /**
@@ -162,7 +162,6 @@ case class AnalysisOptions(
 
 object Settings {
   val ZincCacheDirName = "-zinc-cache-dir"
-  val BackupName = "-backup"
   /**
    * All available command-line options.
    */
@@ -222,7 +221,8 @@ object Settings {
     boolean(   "-debug-api",                   "Enable analysis API debugging",              (s: Settings) => s.copy(incOptions = s.incOptions.copy(apiDebug = true))),
     file(      "-api-dump", "directory",       "Destination for analysis API dump",          (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(apiDumpDirectory = Some(f)))),
     int(       "-api-diff-context-size", "n",  "Diff context size (in lines) for API debug", (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(apiDiffContextSize = i))),
-    file(      BackupName, "directory",        "A backup/scratch location for classfiles",   (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
+    boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(incOptions = s.incOptions.copy(transactional = true))),
+    file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
     boolean(   "-recompileOnMacroDefDisabled", "Disable recompilation of all dependencies of a macro def",
       (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = Some(false)))),
     boolean(   "-no-name-hashing",             "Disable improved incremental compilation algorithm",
