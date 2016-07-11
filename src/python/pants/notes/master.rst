@@ -4,6 +4,66 @@ Master Pre-Releases
 This document describes ``pre`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.1.0-rc0 (7/1/2016)
+--------------------
+
+This is the first `1.1.0-rc` release on the way to `1.1.0`.
+
+New Features
+~~~~~~~~~~~~
+
+* Subprocess clean-all
+  `RB #4011 <https://rbcommons.com/s/twitter/r/4011>`_
+
+* expose products for jvm bundle create and python binary create tasks
+  `RB #3959 <https://rbcommons.com/s/twitter/r/3959>`_
+  `RB #4015 <https://rbcommons.com/s/twitter/r/4015>`_
+
+* Implement zinc `unused deps` check
+  `RB #3635 <https://rbcommons.com/s/twitter/r/3635>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Add `is_target_root` in export
+  `RB #4030 <https://rbcommons.com/s/twitter/r/4030>`_
+
+Bugfixes
+~~~~~~~~
+
+* ConsoleRunner bugfix for @TestSerial and other test cleanups
+  `RB #4026 <https://rbcommons.com/s/twitter/r/4026>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Proper implementation of `**` globs in the v2 engine
+  `RB #4034 <https://rbcommons.com/s/twitter/r/4034>`_
+
+* [engine] Fix TargetMacro replacements of adapted aliases
+  `Issue #3560 <https://github.com/pantsbuild/pants/issues/3560>`_
+  `Issue #3561 <https://github.com/pantsbuild/pants/issues/3561>`_
+  `RB #4000 <https://rbcommons.com/s/twitter/r/4000>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix dead apidocs link for guava.
+  `RB #4037 <https://rbcommons.com/s/twitter/r/4037>`_
+
+* Bump setproctitle to 1.1.10.
+  `Issue #44 <https://github.com/dvarrazzo/py-setproctitle/issues/44>`_
+  `RB #4035 <https://rbcommons.com/s/twitter/r/4035>`_
+
+* Set a default read timeout for fetching node pre-installed modules. 1 second default often fails
+  `RB #4025 <https://rbcommons.com/s/twitter/r/4025>`_
+
+* Improve stderr handling for ProcessManager.get_subprocess_output().
+  `RB #4019 <https://rbcommons.com/s/twitter/r/4019>`_
+
+* Add AnnotatedParallelClassesAndMethodsTest* and AnnotatedParallelMethodsTest*
+  `RB #4027 <https://rbcommons.com/s/twitter/r/4027>`_
+
 1.1.0-pre6 (06/24/2016)
 -----------------------
 

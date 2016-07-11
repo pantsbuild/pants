@@ -1,0 +1,1 @@
+# This (empty) directory is a dependency of a test, so we use a hidden file to allow git to track the directory.

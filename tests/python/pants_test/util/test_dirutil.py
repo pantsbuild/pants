@@ -18,9 +18,10 @@ import six
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir, read_file,
-                                relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
-                                safe_file_dump, safe_mkdir, safe_rm_oldest_items_in_dir, touch)
+from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
+                                get_basedir, read_file, relative_symlink, relativize_paths, rm_rf,
+                                safe_concurrent_creation, safe_file_dump, safe_mkdir, safe_mkdtemp,
+                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -277,3 +278,58 @@ class DirutilTest(unittest.TestCase):
       safe_rm_oldest_items_in_dir(td, 1)
       touch(os.path.join(td, 'file1'))
       self.assertEqual(len(os.listdir(td)), 1)
+
+
+class AbsoluteSymlinkTest(unittest.TestCase):
+  def setUp(self):
+    self.td = safe_mkdtemp()
+    self.addCleanup(safe_rmtree, self.td)
+
+    self.source = os.path.join(self.td, 'source')
+    self.link = os.path.join(self.td, 'link')
+
+  def _create_and_check_link(self, source, link):
+    absolute_symlink(source, link)
+    self.assertTrue(os.path.islink(link))
+    self.assertEquals(source, os.readlink(link))
+
+  def test_link(self):
+    # Check if parent dirs will be created for the link
+    link = os.path.join(self.td, 'a', 'b', 'c', 'self.link')
+    self._create_and_check_link(self.source, link)
+
+  def test_overwrite_link_link(self):
+    # Do it twice, to make sure we can overwrite existing link
+    self._create_and_check_link(self.source, self.link)
+    self._create_and_check_link(self.source, self.link)
+
+  def test_overwrite_link_file(self):
+    with open(self.source, 'w') as fp:
+      fp.write('evidence')
+
+    # Do it twice, to make sure we can overwrite existing link
+    self._create_and_check_link(self.source, self.link)
+    self._create_and_check_link(self.source, self.link)
+
+    # The link should have been deleted (over-written), not the file it pointed to.
+    with open(self.source) as fp:
+      self.assertEqual('evidence', fp.read())
+
+  def test_overwrite_link_dir(self):
+    nested_dir = os.path.join(self.source, 'a', 'b', 'c')
+    os.makedirs(nested_dir)
+
+    # Do it twice, to make sure we can overwrite existing link
+    self._create_and_check_link(self.source, self.link)
+    self._create_and_check_link(self.source, self.link)
+
+    # The link should have been deleted (over-written), not the dir it pointed to.
+    self.assertTrue(os.path.isdir(nested_dir))
+
+  def test_overwrite_file(self):
+    touch(self.link)
+    self._create_and_check_link(self.source, self.link)
+
+  def test_overwrite_dir(self):
+    os.makedirs(os.path.join(self.link, 'a', 'b', 'c'))
+    self._create_and_check_link(self.source, self.link)

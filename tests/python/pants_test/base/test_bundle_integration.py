@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 from contextlib import contextmanager
-from shutil import rmtree
 
 from pants.base.build_environment import get_buildroot
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -63,7 +62,7 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     missing = []
     for path in paths:
       if os.path.exists(path):
-        rmtree(path)
+        os.unlink(path)
       else:
         missing.append(path)
     self.assertFalse(missing, "Some bundles weren't generated! {missing}"
@@ -76,13 +75,9 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     names = [bundle.spec for bundle in bundles]
     outputs = [bundle.text for bundle in bundles]
 
-    for path in all_paths:
-      if os.path.exists(path):
-        rmtree(path)
-
-    with self._handle_bundles(names) as (paths, jars):
-      with self.pants_results(['bundle'] + args, config=config) as pants_run:
-        self.assert_success(pants_run)
+    with self.pants_results(['bundle'] + args, config=config) as pants_run:
+      self.assert_success(pants_run)
+      with self._handle_bundles(names) as (paths, jars):
         for path, jar, expected in zip(paths, jars, outputs):
           java_run = subprocess.Popen(['java', '-jar', jar],
                                       stdout=subprocess.PIPE,

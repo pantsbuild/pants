@@ -34,43 +34,45 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                       'Expected pattern: {} in {}'.format(pattern, files))
 
   def test_bundle_wire_normal(self):
-    pants_run = self.run_pants(['bundle.jvm',
-                                '--deployjar',
-                                'examples/src/java/org/pantsbuild/example/wire/temperatureservice'])
-    self.assert_success(pants_run)
-    out_path = os.path.join(get_buildroot(), 'dist',
-                            ('examples.src.java.org.pantsbuild.example.wire.temperatureservice.'
-                            'temperatureservice-bundle'))
+    with self.pants_results(['bundle.jvm',
+                         '--deployjar',
+                         'examples/src/java/org/pantsbuild/example/wire/temperatureservice']
+                        ) as pants_run:
+      self.assert_success(pants_run)
+      out_path = os.path.join(get_buildroot(), 'dist',
+                              ('examples.src.java.org.pantsbuild.example.wire.temperatureservice.'
+                              'temperatureservice-bundle'))
 
-    args = ['java', '-cp', 'wire-temperature-example.jar',
-            'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample']
-    java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
-    java_retcode = java_run.wait()
-    java_out = java_run.stdout.read()
-    self.assertEquals(java_retcode, 0)
-    self.assertIn('19 degrees celsius', java_out)
+      args = ['java', '-cp', 'wire-temperature-example.jar',
+              'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample']
+      java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
+      java_retcode = java_run.wait()
+      java_out = java_run.stdout.read()
+      self.assertEquals(java_retcode, 0)
+      self.assertIn('19 degrees celsius', java_out)
 
   def test_bundle_wire_dependent_targets(self):
-    pants_run = self.run_pants(['bundle.jvm',
-                                '--deployjar',
-                                'examples/src/java/org/pantsbuild/example/wire/element'])
-    self.assert_success(pants_run)
-    out_path = os.path.join(get_buildroot(), 'dist',
-                            'examples.src.java.org.pantsbuild.example.wire.element.element-bundle')
+    with self.pants_results(['bundle.jvm',
+                             '--deployjar',
+                             'examples/src/java/org/pantsbuild/example/wire/element']
+                            ) as pants_run:
+      self.assert_success(pants_run)
+      out_path = os.path.join(get_buildroot(), 'dist',
+                              'examples.src.java.org.pantsbuild.example.wire.element.element-bundle')
 
-    java_run = subprocess.Popen(['java', '-cp', 'wire-element-example.jar',
-                                 'org.pantsbuild.example.wire.element.WireElementExample'],
-                                stdout=subprocess.PIPE,
-                                cwd=out_path)
-    java_retcode = java_run.wait()
-    java_out = java_run.stdout.read()
-    self.assertEquals(java_retcode, 0)
-    self.assertIn('Element{symbol=Hg, name=Mercury, atomic_number=80, '
-                  'melting_point=Temperature{unit=celsius, number=-39}, '
-                  'boiling_point=Temperature{unit=celsius, number=357}}', java_out)
-    self.assertIn('Compound{name=Water, primary_element=Element{symbol=O, name=Oxygen, '
-                  'atomic_number=8}, secondary_element=Element{symbol=H, name=Hydrogen, '
-                  'atomic_number=1}}', java_out)
+      java_run = subprocess.Popen(['java', '-cp', 'wire-element-example.jar',
+                                   'org.pantsbuild.example.wire.element.WireElementExample'],
+                                  stdout=subprocess.PIPE,
+                                  cwd=out_path)
+      java_retcode = java_run.wait()
+      java_out = java_run.stdout.read()
+      self.assertEquals(java_retcode, 0)
+      self.assertIn('Element{symbol=Hg, name=Mercury, atomic_number=80, '
+                    'melting_point=Temperature{unit=celsius, number=-39}, '
+                    'boiling_point=Temperature{unit=celsius, number=357}}', java_out)
+      self.assertIn('Compound{name=Water, primary_element=Element{symbol=O, name=Oxygen, '
+                    'atomic_number=8}, secondary_element=Element{symbol=H, name=Hydrogen, '
+                    'atomic_number=1}}', java_out)
 
   def test_compile_wire_roots(self):
     pants_run = self.run_pants(['bundle.jvm', '--deployjar',

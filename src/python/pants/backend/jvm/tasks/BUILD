@@ -96,6 +96,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
+    'src/python/pants/util:fileutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',
   ],
@@ -317,6 +318,7 @@ python_library(
     'src/python/pants/base:mustache',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+    'src/python/pants/util:strutil',
   ],
 )
 

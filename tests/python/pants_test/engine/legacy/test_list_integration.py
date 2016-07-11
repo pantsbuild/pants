@@ -51,3 +51,13 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
       pants_run.stdout_data.strip(),
       'testprojects/tests/python/pants/build_parsing:test-nested-variable-access-in-function-call'
     )
+
+  def test_list_parse_java_targets(self):
+    pants_run = self.do_command('list',
+                                'testprojects/tests/java/org/pantsbuild/build_parsing::',
+                                success=True,
+                                enable_v2_engine=True)
+    self.assertRegexpMatches(
+      pants_run.stdout_data,
+      r'testprojects/tests/java/org/pantsbuild/build_parsing:trailing_glob_doublestar'
+    )

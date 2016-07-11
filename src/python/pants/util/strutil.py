@@ -17,7 +17,7 @@ def ensure_binary(text_or_binary):
   elif isinstance(text_or_binary, six.text_type):
     return text_or_binary.encode('utf8')
   else:
-    raise TypeError('Argument is neither text nor binary type.')
+    raise TypeError('Argument is neither text nor binary type.({})'.format(type(text_or_binary)))
 
 
 def ensure_text(text_or_binary):
@@ -26,7 +26,7 @@ def ensure_text(text_or_binary):
   elif isinstance(text_or_binary, six.text_type):
     return text_or_binary
   else:
-    raise TypeError('Argument is neither text nor binary type.')
+    raise TypeError('Argument is neither text nor binary type ({})'.format(type(text_or_binary)))
 
 
 def is_text_or_binary(obj):

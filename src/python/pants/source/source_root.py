@@ -110,12 +110,10 @@ class SourceRoots(object):
                             ['pants_workdir', 'pants_supportdir', 'pants_distdir']})
 
     fixed_roots = set()
-    for fixed in self._options.source_roots, self._options.test_roots:
-      if fixed:
-        for root, langs in fixed.items():
-          if os.path.exists(os.path.join(buildroot, root)):
-            yield self._source_root_factory.create(root, langs)
-        fixed_roots.update(fixed.keys())
+    for root, langs in self._trie.fixed():
+      if os.path.exists(os.path.join(buildroot, root)):
+        yield self._source_root_factory.create(root, langs)
+      fixed_roots.add(root)
 
     for dirpath, dirnames, _ in os.walk(buildroot, topdown=True):
       relpath = os.path.relpath(dirpath, buildroot)
@@ -127,6 +125,11 @@ class SourceRoots(object):
           if not any(fixed_root.startswith(relpath) for fixed_root in fixed_roots):
             yield match  # Found a source root not a prefix of any fixed roots.
           del dirnames[:]  # Don't continue to walk into it.
+
+  def all_langs(self):
+    for root in self.all_roots():
+      for lang in root.langs:
+        yield lang
 
 
 class SourceRootConfig(Subsystem):
@@ -306,6 +309,17 @@ class SourceRootTrie(object):
       self.children[key] = child
       return child
 
+    def subpatterns(self):
+      if self.children:
+        for key, child in self.children.items():
+          for sp, langs in child.subpatterns():
+            if sp:
+              yield os.path.join(key, sp), langs
+            else:
+              yield key, langs
+      else:
+        yield '', self.langs
+
   def __init__(self, source_root_factory):
     self._source_root_factory = source_root_factory
     self._root = SourceRootTrie.Node()
@@ -314,9 +328,16 @@ class SourceRootTrie(object):
     """Add a pattern to the trie."""
     self._do_add_pattern(pattern, tuple())
 
-  def add_fixed(self, path, langs=None):
+  def add_fixed(self, path, langs):
     """Add a fixed source root to the trie."""
     self._do_add_pattern(os.path.join('^', path), tuple(langs))
+
+  def fixed(self):
+    """Returns a list of just the fixed source roots in the trie."""
+    for key, child in self._root.children.items():
+      if key == '^':
+        return list(child.subpatterns())
+    return []
 
   def _do_add_pattern(self, pattern, langs):
     keys = pattern.split(os.path.sep)

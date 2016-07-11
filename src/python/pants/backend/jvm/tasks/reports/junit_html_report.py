@@ -13,6 +13,7 @@ from functools import total_ordering
 from pants.base.mustache import MustacheRenderer
 from pants.util.dirutil import safe_mkdir
 from pants.util.meta import AbstractClass
+from pants.util.strutil import ensure_binary
 
 
 @total_ordering
@@ -101,7 +102,7 @@ class JUnitHtmlReport(AbstractClass):
     safe_mkdir(report_dir)
     report_file_path = os.path.join(report_dir, 'junit-report.html')
     with open(report_file_path, 'w') as fp:
-      fp.write(self.generate_html(testsuites))
+      fp.write(ensure_binary(self.generate_html(testsuites)))
     return report_file_path
 
   def parse_xml_files(self, xml_dir):
