@@ -34,25 +34,53 @@ class RoundManager(object):
 
   def __init__(self, context):
     self._dependencies = set()
+    self._optional_dependencies = set()
     self._context = context
     self._producer_infos_by_product_type = None
-    self._known_langs = set()
 
   def require(self, product_type):
     """Schedules the tasks that produce product_type to be executed before the requesting task.
+
+    There must be at least one task that produces the required product type, or the
+    dependencies will not be satisfied.
 
     :API: public
     """
     self._dependencies.add(product_type)
     self._context.products.require(product_type)
 
+  def optional_product(self, product_type):
+    """Schedules tasks, if any, that produce product_type to be executed before the requesting task.
+
+    There need not be any tasks that produce the required product type.  All this method
+    guarantees is that if there are any then they will be executed before the requesting task.
+
+    :API: public
+    """
+    self._optional_dependencies.add(product_type)
+    self.require(product_type)
+
   def require_data(self, product_type):
     """Schedules the tasks that produce product_type to be executed before the requesting task.
+
+    There must be at least one task that produces the required product type, or the
+    dependencies will not be satisfied.
 
     :API: public
     """
     self._dependencies.add(product_type)
     self._context.products.require_data(product_type)
+
+  def optional_data(self, product_type):
+    """Schedules tasks, if any, that produce product_type to be executed before the requesting task.
+
+    There need not be any tasks that produce the required product type.  All this method
+    guarantees is that if there are any then they will be executed before the requesting task.
+
+    :API: public
+    """
+    self._optional_dependencies.add(product_type)
+    self.require_data(product_type)
 
   def get_dependencies(self):
     """Returns the set of data dependencies as producer infos corresponding to data requirements."""
@@ -64,13 +92,8 @@ class RoundManager(object):
   def _get_producer_infos_by_product_type(self, product_type):
     if self._producer_infos_by_product_type is None:
       self._producer_infos_by_product_type = self._index_products()
-      self._known_langs = set(self._context.source_roots.all_langs())
 
     producer_infos = self._producer_infos_by_product_type[product_type]
-    # Products named for languages ('java', 'scala', 'python' etc.) are special: they represent
-    # source files in those languages, and are implicitly provided by a relevant source root.
-    # They may happen to also be explicitly provided by tasks (e.g., codegen(, but we don't want
-    # to fail with a MissingProductError if not.
-    if not producer_infos and product_type not in self._known_langs:
+    if not producer_infos and product_type not in self._optional_dependencies:
       raise self.MissingProductError("No producers registered for '{0}'".format(product_type))
     return producer_infos
