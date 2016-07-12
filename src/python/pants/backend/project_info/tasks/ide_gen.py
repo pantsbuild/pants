@@ -106,12 +106,16 @@ class IdeGen(IvyTaskMixin, NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(IdeGen, cls).prepare(options, round_manager)
+    # We optional_product() instead of require() because there's no guarantee
+    # that anything produces these products (typically only codegen produces them,
+    # because checked-in sources aren't considered products, at least in the old engine).
+    # See https://github.com/pantsbuild/pants/issues/3560.
     if options.python:
-      round_manager.require('python')
+      round_manager.optional_product('python')
     if options.java:
-      round_manager.require('java')
+      round_manager.optional_product('java')
     if options.scala:
-      round_manager.require('scala')
+      round_manager.optional_product('scala')
 
   class Error(TaskError):
     """IdeGen Error."""
