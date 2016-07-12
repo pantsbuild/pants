@@ -36,6 +36,7 @@ import org.junit.runner.Result;
 import org.junit.runner.Runner;
 import org.junit.runner.manipulation.Filter;
 import org.junit.runner.notification.Failure;
+import org.junit.runner.notification.RunListener;
 import org.junit.runners.model.InitializationError;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -56,6 +57,8 @@ public class ConsoleRunnerImpl {
   private static boolean callSystemExitOnFinish = true;
   /** Intended to be used in unit testing this class */
   private static int exitStatus;
+  /** Intended to be used in unit testing this class */
+  private static RunListener testListener = null;
 
   /**
    * A stream that allows its underlying output to be swapped.
@@ -395,6 +398,10 @@ public class ConsoleRunnerImpl {
       AntJunitXmlReportListener xmlReportListener =
           new AntJunitXmlReportListener(outdir, streamCapturingListener);
       abortableListener.addListener(xmlReportListener);
+    }
+
+    if (testListener != null) {
+      abortableListener.addListener(testListener);
     }
 
     // TODO: Register all listeners to core instead of to abortableListener because
@@ -849,5 +856,9 @@ public class ConsoleRunnerImpl {
 
   public static void setExitStatus(int v) {
     exitStatus = v;
+  }
+
+  public static void addTestListener(RunListener listener) {
+    testListener = listener;
   }
 }
