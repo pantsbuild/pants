@@ -79,7 +79,7 @@ occur in master, while version changes generally only occur in the relevant rele
 1. In your release branch: Edit the version number in `src/python/pants/version.py`
 2. When a `stable` branch is cut update `src/python/pants/notes/*.rst` and
   `src/python/pants/notes/master.rst` on the master branch to reflect changes captured in the stable
-  branch.  For `dev` releases only update master.rst.  Future changes will be cherry-picked
+  branch.  For `dev` releases only update master.rst.  Future `stable` changes will be cherry-picked
   to the stable branch so master and stable will diverge, only requiring the branch specific notes
   to be updated.  You can run `./build-support/bin/release-changelog-helper.sh`
   to get a head-start creating the relevant changelog entries.
