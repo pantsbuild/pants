@@ -15,6 +15,7 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
+from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return, SelectNode,
                                 State, StepContext, TaskNode, Throw, Waiting)
 from pants.engine.objects import Closable
@@ -417,28 +418,79 @@ class Promise(object):
       return self._success
 
 
+class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
+                                                         'binary_type',
+                                                         'input_selectors',
+                                                         'input_conversion',
+                                                         'output_conversion'])):
+  """A task type for defining execution of snapshotted processes."""
+
+  def as_node(self, subject, product_type, variants):
+    return ProcessExecutionNode(subject, variants, self)
+
+  @property
+  def output_product_type(self):
+    return self.product_type
+
+  @property
+  def input_selects(self):
+    return self.input_selectors
+
+
+class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type'])):
+  """A set-friendly curried TaskNode constructor."""
+
+  def as_node(self, subject, product_type, variants):
+    return TaskNode(subject, product_type, variants, self.task_func, self.input_selects)
+
+
 class NodeBuilder(Closable):
-  """Holds an index of tasks used to instantiate TaskNodes."""
+  """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, tasks):
-    """Indexes tasks by their output type."""
+  def create(cls, task_entries):
+    """Creates a NodeBuilder with tasks indexed by their output type."""
     serializable_tasks = defaultdict(set)
-    for output_type, input_selects, task in tasks:
-      serializable_tasks[output_type].add((task, tuple(input_selects)))
-    return cls(serializable_tasks)
+    for entry in task_entries:
+      if isinstance(entry, (tuple, list)) and len(entry) == 3:
+        output_type, input_selects, task = entry
+        serializable_tasks[output_type].add(
+          TaskNodeFactory(tuple(input_selects), task, output_type)
+        )
+      elif isinstance(entry, SnapshottedProcess):
+        serializable_tasks[entry.output_product_type].add(entry)
+      else:
+        raise Exception("Unexpected type for entry {}".format(entry))
 
-  def __init__(self, tasks):
+    intrinsics = dict()
+    intrinsics.update(FilesystemNode.as_intrinsics())
+    intrinsics.update(SnapshotNode.as_intrinsics())
+    return cls(serializable_tasks, intrinsics)
+
+  @classmethod
+  def create_task_node(cls, subject, product_type, variants, task_func, clause):
+    return TaskNode(subject, product_type, variants, task_func, clause)
+
+  def __init__(self, tasks, intrinsics):
     self._tasks = tasks
+    self._intrinsics = intrinsics
 
-  def gen_nodes(self, subject, product, variants):
-    if FilesystemNode.is_filesystem_pair(type(subject), product):
-      # Native filesystem operations.
-      yield FilesystemNode(subject, product, variants)
+  def gen_nodes(self, subject, product_type, variants):
+    # Intrinsics that provide the requested product for the current subject type.
+    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject)
+    if intrinsic_node_factory:
+      yield intrinsic_node_factory(subject, product_type, variants)
     else:
-      # Tasks.
-      for task, anded_clause in self._tasks[product]:
-        yield TaskNode(subject, product, variants, task, anded_clause)
+      # Tasks that provide the requested product.
+      for node_factory in self._lookup_tasks(product_type):
+        yield node_factory(subject, product_type, variants)
+
+  def _lookup_tasks(self, product_type):
+    for entry in self._tasks[product_type]:
+      yield entry.as_node
+
+  def _lookup_intrinsic(self, product_type, subject):
+    return self._intrinsics.get((type(subject), product_type))
 
 
 class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'inline_nodes', 'project_tree'])):
@@ -501,9 +553,8 @@ class LocalScheduler(object):
                             attempt. Very expensive, very experimental.
     """
     self._products_by_goal = goals
-    self._tasks = tasks
     self._project_tree = project_tree
-    self._node_builder = NodeBuilder.create(self._tasks)
+    self._node_builder = NodeBuilder.create(tasks)
 
     self._graph_validator = graph_validator
     self._product_graph = ProductGraph()

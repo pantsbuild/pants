@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from abc import abstractmethod, abstractproperty
 from os.path import dirname
 
@@ -382,7 +383,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
       return Throw(e)
 
   def __repr__(self):
-    return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}'\
+    return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}' \
       .format(self.subject, self.product, self.variants, self.func.__name__, self.clause)
 
   def __str__(self):
@@ -399,18 +400,22 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       (ReadLink, Link),
     }
 
-  _FS_PRODUCT_TYPES = {product for product, subject in _FS_PAIRS}
-
   is_cacheable = False
   is_inlineable = False
 
   @classmethod
-  def is_filesystem_pair(cls, subject_type, product):
-    """True if the given subject type and product type should be computed using a FileystemNode."""
-    return (product, subject_type) in cls._FS_PAIRS
+  def as_intrinsics(cls):
+    """Returns a dict of tuple(sbj type, product type) -> functions returning a fs node for that subject product type tuple."""
+    return {(subject_type, product_type): FilesystemNode.create
+            for product_type, subject_type in cls._FS_PAIRS}
 
   @classmethod
-  def generate_subjects(self, filenames):
+  def create(cls, subject, product_type, variants):
+    assert (product_type, type(subject)) in cls._FS_PAIRS
+    return FilesystemNode(subject, product_type, variants)
+
+  @classmethod
+  def generate_subjects(cls, filenames):
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
       # ReadLink, or FileContent for the literal path.
@@ -448,6 +453,7 @@ class StepContext(object):
     self._node_states = dict(node_states)
     self._parents = OrderedSet()
     self._inline_nodes = inline_nodes
+    self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
 
   def get(self, node):
     """Given a Node and computed node_states, gets the current state for the Node.
