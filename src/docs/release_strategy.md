@@ -32,10 +32,6 @@ determine whether any existing `stable` branches need new release candidates by 
 [Pants Backport Proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
 sheet. If there are requests "sufficient" to justify `patch` releases for existing `stable` branches, the
 release manager should cut release candidates for those branches.
-3. When a `stable` branch is cut update `src/python/pants/notes/*.rst`, `src/python/pants/notes/master.rst`
-and `CONTRIBUTORS.md` on the master branch to reflect changes captured in the stable branch.  Future
-changes will be cherry-picked to the stable branch so master and stable will diverge, only requiring the
-branch specific notes need to be updated.
 
 In other words, for a given week: _one of either_ a `dev` release or a new `stable` branch are
 created, and additionally, `patch` releases for existing `stable` branches _might_ be created.
