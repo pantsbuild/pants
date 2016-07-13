@@ -135,7 +135,7 @@ class LegacyBuildGraph(BuildGraph):
       if target_cls is JvmApp:
         bundle_list = []
         for bundle in kwargs['bundles']:
-          bundle_list.append(BundleProps.create_bundle_props(bundle))
+          bundle_list.append(BundleProps.create_bundle_props(bundle.kwargs()['fileset']))
         kwargs['bundles'] = bundle_list
 
       # Instantiate.
