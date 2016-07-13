@@ -96,7 +96,7 @@ class Ivy(object):
   def runner(self, jvm_options=None, args=None, executor=None):
     """Creates an ivy commandline client runner for the given args."""
     args = args or []
-    jvm_options = jvm_options or []
+    options = list(jvm_options) if jvm_options else []
     executor = executor or SubprocessExecutor(DistributionLocator.cached())
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
@@ -107,11 +107,11 @@ class Ivy(object):
       # ivysettings.xml.  Ideally we'd support either simple -caches or these hand-crafted cases
       # instead of just hand-crafted.  Clean this up by taking over ivysettings.xml and generating
       # it from BUILD constructs.
-      jvm_options += ['-Divy.cache.dir={}'.format(self._ivy_cache_dir)]
+      options += ['-Divy.cache.dir={}'.format(self._ivy_cache_dir)]
 
     if self._ivy_settings and '-settings' not in args:
       args = ['-settings', self._ivy_settings] + args
 
-    jvm_options += self._extra_jvm_options
+    options += self._extra_jvm_options
     return executor.runner(classpath=self._classpath, main='org.apache.ivy.Main',
-                           jvm_options=jvm_options, args=args)
+                           jvm_options=options, args=args)
