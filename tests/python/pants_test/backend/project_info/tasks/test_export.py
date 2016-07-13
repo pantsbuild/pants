@@ -358,7 +358,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src/python/y')
 
     self.assertEqual(
-      {'globs': ['src/python/y/**/*.py', 'src/python/y/*.py']},
+      {'globs': ['src/python/y/**/*.py']},
       result['targets']['src/python/y:y']['globs']
     )
 
@@ -367,7 +367,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src/python/y:y2')
 
     self.assertEqual(
-      {'globs': ['src/python/y/subdir/**/*.py', 'src/python/y/subdir/*.py']},
+      {'globs': ['src/python/y/subdir/**/*.py']},
       result['targets']['src/python/y:y2']['globs']
     )
 
