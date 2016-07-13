@@ -20,7 +20,6 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
 from pants.base.validation import assert_list
 from pants.build_graph.target import Target
-from pants.engine.legacy.structs import BundleAdaptor
 from pants.fs import archive as Archive
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.util.dirutil import fast_relpath
@@ -166,18 +165,6 @@ class BundleField(tuple, PayloadField):
 
   Must be initialized with an iterable of Bundle instances.
   """
-
-  def __new__(cls, bundles):
-    new_bundles = []
-    for bundle in bundles:
-      new_bundles.append(cls._to_bundle_props(bundle) if isinstance(bundle, BundleAdaptor) else bundle)
-    return super(BundleField, cls).__new__(cls, new_bundles)
-
-  @staticmethod
-  def _to_bundle_props(bundle):
-    file_set = bundle.kwargs()['fileset']
-    mapper = RelativeToMapper(os.path.join(get_buildroot(), file_set.rel_root))
-    return BundleProps(file_set.rel_root, mapper, file_set.files)
 
   @staticmethod
   def _hash_bundle(bundle):
