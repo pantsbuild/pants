@@ -9,6 +9,7 @@ import logging
 
 from twitter.common.collections import maybe_list
 
+from pants.backend.jvm.targets.jvm_app import BundleProps, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -129,6 +130,14 @@ class LegacyBuildGraph(BuildGraph):
       # Pop dependencies, which were already consumed during construction.
       kwargs = target_adaptor.kwargs()
       kwargs.pop('dependencies')
+
+      # Convert BundleAdaptor to BundleProps
+      if target_cls is JvmApp:
+        bundle_list = []
+        for bundle in kwargs['bundles']:
+          bundle_list.append(BundleProps.create_bundle_props(bundle))
+        kwargs['bundles'] = bundle_list
+
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
