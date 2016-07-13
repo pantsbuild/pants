@@ -126,11 +126,6 @@ class SourceRoots(object):
             yield match  # Found a source root not a prefix of any fixed roots.
           del dirnames[:]  # Don't continue to walk into it.
 
-  def all_langs(self):
-    for root in self.all_roots():
-      for lang in root.langs:
-        yield lang
-
 
 class SourceRootConfig(Subsystem):
   """Configuration for roots of source trees.

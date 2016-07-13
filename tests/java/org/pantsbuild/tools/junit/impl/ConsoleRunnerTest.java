@@ -5,11 +5,13 @@ package org.pantsbuild.tools.junit.impl;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
 import org.apache.commons.io.FileUtils;
-import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.Result;
+import org.junit.runner.notification.RunListener;
 import org.pantsbuild.tools.junit.lib.AnnotatedParallelClassesAndMethodsTest1;
 import org.pantsbuild.tools.junit.lib.AnnotatedParallelMethodsTest1;
 import org.pantsbuild.tools.junit.lib.AnnotatedParallelTest1;
@@ -28,9 +30,11 @@ import org.pantsbuild.tools.junit.lib.SerialTest1;
 import org.pantsbuild.tools.junit.lib.TestRegistry;
 
 import static org.hamcrest.CoreMatchers.anyOf;
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeThat;
 
@@ -160,9 +164,9 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
       invokeConsoleRunner("MockTest4 -parallel-threads 1 -xmlreport");
       Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
       String output = outContent.toString();
-      assertThat(output, CoreMatchers.containsString("test41"));
-      assertThat(output, CoreMatchers.containsString("start test42"));
-      assertThat(output, CoreMatchers.containsString("end test42"));
+      assertThat(output, containsString("test41"));
+      assertThat(output, containsString("start test42"));
+      assertThat(output, containsString("end test42"));
     } finally {
       System.setOut(stdout);
       System.setErr(stderr);
@@ -180,9 +184,9 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
     String testClassName = MockTest4.class.getCanonicalName();
     String output = FileUtils.readFileToString(new File(outdir, testClassName + ".out.txt"));
-    assertThat(output, CoreMatchers.containsString("test41"));
-    assertThat(output, CoreMatchers.containsString("start test42"));
-    assertThat(output, CoreMatchers.containsString("end test42"));
+    assertThat(output, containsString("test41"));
+    assertThat(output, containsString("start test42"));
+    assertThat(output, containsString("end test42"));
   }
 
   @Test
@@ -402,5 +406,31 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
         ConsoleRunnerImpl.computeConcurrencyOption(null, false));
     assertEquals(Concurrency.PARALLEL_CLASSES,
         ConsoleRunnerImpl.computeConcurrencyOption(null, true));
+  }
+
+  /**
+   * This test reproduces a problem reported in https://github.com/pantsbuild/pants/issues/3638
+   *
+   * It is intended to show that when the test mechanism breaks catastrophically, you see console
+   * output. Verify this is working by manual inspection running this test in IntellIJ.
+   * We don't have a way to capture the console output here, but we could reproduce this
+   * test in a pants integration test once the fix gets released as a new JUnit runner.
+   */
+  @Test
+  public void testRunFinishFailed() throws Exception {
+
+    class AbortInTestRunFinishedListener extends RunListener {
+      @Override public void testRunFinished(Result result) throws Exception {
+        throw new IOException("Bogus IOException");
+      }
+    }
+
+    ConsoleRunnerImpl.addTestListener(new AbortInTestRunFinishedListener());
+
+    try {
+      invokeConsoleRunner("MockTest1");
+      fail("Expected a runtime exception");
+    } catch (RuntimeException expected) {
+    }
   }
 }

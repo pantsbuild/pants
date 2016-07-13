@@ -533,7 +533,7 @@ Pants' built in scopes are:
 * `runtime`: Indicates that a target is only used at runtime, and should not be presented to the
   compiler. Targets which are only used via JVM reflection are good examples of runtime-only
   dependencies.
-* `forced`: The `forced` scope is equivalent to the `default` scope, but additionally indicates
+* `forced` _(available from pants 1.1.0)_: The `forced` scope is equivalent to the `default` scope, but additionally indicates
   that a target is not eligible to be considered an "unused" dependency. It is sometimes necessary
   to mark a target `forced` due to false positives in the static analysis used for unused
   dependency detection; if possible, you should always prefer to mark a target `runtime` or

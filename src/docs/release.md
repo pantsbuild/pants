@@ -77,10 +77,13 @@ and CONTRIBUTORS management are not. Changelog edits and CONTRIBUTOR updates alw
 occur in master, while version changes generally only occur in the relevant release branch.
 
 1. In your release branch: Edit the version number in `src/python/pants/version.py`
-2. In master and your release branch: Add an entry for the release to the changelog for the branch
-under `src/python/pants/notes/*.rst`. You can run `./build-support/bin/release-changelog-helper.sh`
-to get a head-start creating the relevant changelog entries.
-3. In master: Bring the CONTRIBUTORS roster in
+2. When a `stable` branch is cut update `src/python/pants/notes/*.rst` and
+  `src/python/pants/notes/master.rst` on the master branch to reflect changes captured in the stable
+  branch.  For `dev` releases only update master.rst.  Future `stable` changes will be cherry-picked
+  to the stable branch so master and stable will diverge, only requiring the branch specific notes
+  to be updated.  You can run `./build-support/bin/release-changelog-helper.sh`
+  to get a head-start creating the relevant changelog entries.
+3. In master and the release branch if needed: Bring the CONTRIBUTORS roster in
 [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
 up to date by running `build-support/bin/contributors.sh`.
 
