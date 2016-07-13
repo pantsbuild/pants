@@ -36,7 +36,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':parser',
     ':structs',
-    'src/python/pants/backend/jvm/targets:jvm'
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine:graph',
