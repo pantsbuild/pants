@@ -37,8 +37,8 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       result = self.execute(scheduler, ftype, self.specs('', *filespecs))[0]
-      # Use list here to check for duplicates
-      self.assertEquals(sorted([p.path for p in result.dependencies]), sorted(paths))
+      self.assertEquals(set([p.path for p in result.dependencies]), set(paths))
+      self.assertEquals(len(result.dependencies), len(paths))
 
   def assert_content(self, filespecs, expected_content):
     with self.mk_project_tree(self._original_src) as project_tree:
