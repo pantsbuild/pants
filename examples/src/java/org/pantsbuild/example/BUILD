@@ -6,6 +6,7 @@ page(
     ':from_maven',
     ':publish',
     'examples/src/scala/org/pantsbuild/example:readme',
+    'src/docs:build_files',
     'src/docs:first_concepts',
     'src/docs:first_tutorial',
   ]
@@ -22,6 +23,10 @@ page(
 page(
   name='publish',
   source='publish.md',
+  links=[
+    'src/docs:dev_tasks_publish_extras',
+    'src/docs:howto_plugin',
+  ],
 )
 
 page(

@@ -89,6 +89,20 @@ python_library(
 )
 
 python_library(
+  name='isolated_process',
+  sources=['isolated_process.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':addressable',
+    ':fs',
+    ':nodes',
+    ':struct',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:objects',
+  ]
+)
+
+python_library(
   name='nodes',
   sources=['nodes.py'],
   dependencies=[
@@ -146,6 +160,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':addressable',
     ':fs',
+    ':isolated_process',
     ':nodes',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
