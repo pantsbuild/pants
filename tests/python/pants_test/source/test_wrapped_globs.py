@@ -83,36 +83,23 @@ class FilesetRelPathWrapperTest(BaseTest):
 
   def test_rglob_to_spec_simple(self):
     self._spec_test('rglobs("*.java")',
-                    {'globs': ['y/**/*.java', 'y/*.java']})
+                    {'globs': ['y/**/*.java']})
 
   def test_rglob_to_spec_multi(self):
     self._spec_test('rglobs("a/**/b/*.java")',
-                    {'globs': ['y/a/**/b/**/*.java',
-                               'y/a/**/b/*.java',
-                               'y/a/b/**/*.java',
-                               'y/a/b/*.java']})
+                    {'globs': ['y/a/**/b/**/*.java']})
 
   def test_rglob_to_spec_multi_more(self):
     self._spec_test('rglobs("a/**/b/**/c/*.java")',
-                    {'globs': ['y/a/**/b/**/c/**/*.java',
-                               'y/a/**/b/**/c/*.java',
-                               'y/a/**/b/c/**/*.java',
-                               'y/a/**/b/c/*.java',
-
-                               'y/a/b/**/c/**/*.java',
-                               'y/a/b/**/c/*.java',
-                               'y/a/b/c/**/*.java',
-                               'y/a/b/c/*.java']})
+                    {'globs': ['y/a/**/b/**/c/**/*.java']})
 
   def test_rglob_to_spec_mid(self):
     self._spec_test('rglobs("a/**/b/Fleem.java")',
-                    {'globs': ['y/a/**/b/Fleem.java',
-                               'y/a/b/Fleem.java']})
+                    {'globs': ['y/a/**/b/Fleem.java']})
 
   def test_rglob_to_spec_explicit(self):
     self._spec_test('rglobs("a/**/*.java")',
-                    {'globs': ['y/a/**/*.java',
-                               'y/a/*.java']})
+                    {'globs': ['y/a/**/*.java']})
 
   def test_glob_exclude(self):
     self.add_to_build_file('y/BUILD', dedent("""
