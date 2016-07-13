@@ -35,8 +35,10 @@ class SchedulerService(PantsService):
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=64)
 
-    # Surface the scheduler's `locked` method as part of the service's public API.
-    self.locked = self._scheduler.locked
+  @property
+  def locked(self):
+    """Surfaces the scheduler's `locked` method as part of the service's public API."""
+    return self._scheduler.locked
 
   def setup(self):
     """Service setup."""
