@@ -266,7 +266,6 @@ class RGlobs(FilesetRelPathWrapper):
     # In rglobs, * at the beginning of a path component means "any
     # number of directories, including 0". So every time we see ^*,
     # we need to output "**/*whatever".
-    import pdb;pdb.set_trace()
     rglobs = []
     for arg in args:
       components = arg.split(os.path.sep)
