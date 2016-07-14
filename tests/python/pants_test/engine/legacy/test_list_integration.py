@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class DependenciesIntegrationTest(PantsRunIntegrationTest):
+class ListIntegrationTest(PantsRunIntegrationTest):
 
   def get_target_set(self, std_out):
     return sorted([l for l in std_out.split('\n') if l])
