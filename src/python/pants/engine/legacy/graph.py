@@ -136,7 +136,7 @@ class LegacyBuildGraph(BuildGraph):
         kwargs['bundles'] = [
           BundleProps.create_bundle_props(bundle.kwargs()['fileset'])
           for bundle in kwargs['bundles']
-          ]
+        ]
 
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
