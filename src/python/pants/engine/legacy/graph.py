@@ -131,14 +131,9 @@ class LegacyBuildGraph(BuildGraph):
       kwargs = target_adaptor.kwargs()
       kwargs.pop('dependencies')
 
-      # Convert BundleAdaptor to BundleProps
-      if target_cls is JvmApp:
-        kwargs['bundles'] = [
-          BundleProps.create_bundle_props(bundle.kwargs()['fileset'])
-          for bundle in kwargs['bundles']
-        ]
-
       # Instantiate.
+      if target_cls is JvmApp:
+        return self._instantiate_jvm_app(**kwargs)
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
       raise
@@ -146,6 +141,15 @@ class LegacyBuildGraph(BuildGraph):
       raise TargetDefinitionException(
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
+
+  def _instantiate_jvm_app(self, **kwargs):
+    """For JvmApp target, convert BundleAdaptor to BundleProps."""
+    kwargs['bundles'] = [
+      BundleProps.create_bundle_props(bundle.kwargs()['fileset'])
+      for bundle in kwargs['bundles']
+    ]
+
+    return JvmApp(build_graph=self, **kwargs)
 
   def inject_synthetic_target(self,
                               address,
