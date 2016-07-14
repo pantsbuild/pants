@@ -10,7 +10,6 @@ from collections import namedtuple
 
 from six.moves import range
 
-from pants.base.build_environment import get_buildroot
 from pants.base.project_tree_factory import get_project_tree
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -59,14 +58,12 @@ class SourceRoots(object):
     self._options = source_root_config.get_options()
 
   def add_source_root(self, path, langs=tuple()):
-    """Add the specified fixed source root.
+    """Add the specified fixed source root, which must be relative to the buildroot.
 
     Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
     unknown structure.  Tests should prefer to use dirs that match our source root patterns
     instead of explicitly setting source roots here.
     """
-    if os.path.isabs(path):
-      path = os.path.relpath(path, get_buildroot())
     self._trie.add_fixed(path, langs)
 
   def find(self, target):
@@ -80,12 +77,10 @@ class SourceRoots(object):
   def find_by_path(self, path):
     """Find the source root for the given path, or None.
 
-    :param path: Find the source root for this path.
+    :param path: Find the source root for this path, relative to the buildroot.
     :return: A SourceRoot instance, or None if the path is not located under a source root
              and `unmatched==fail`.
     """
-    if os.path.isabs(path):
-      path = os.path.relpath(path, get_buildroot())
     matched = self._trie.find(path)
     if matched:
       return matched
@@ -105,15 +100,14 @@ class SourceRoots(object):
     However we don't descend into source roots, once found, so this should be fast in practice.
     Note: Does not follow symlinks.
     """
-    buildroot = get_buildroot()
+    project_tree = get_project_tree(self._options)
 
     fixed_roots = set()
     for root, langs in self._trie.fixed():
-      if os.path.exists(os.path.join(buildroot, root)):
+      if project_tree.exists(root):
         yield self._source_root_factory.create(root, langs)
       fixed_roots.add(root)
 
-    project_tree = get_project_tree(self._options)
     for relpath, dirnames, _ in project_tree.walk('', topdown=True):
       match = self._trie.find(relpath)
       if match:
