@@ -75,7 +75,10 @@ class PathGlobsTest(unittest.TestCase):
                           subdir,
                           [wildcard])
 
-  def test_invalid_wildcard(self):
+  def test_doublestar_mixed_wildcard(self):
     subdir = 'foo'
-    self.assertRaises(ValueError, PathGlobs.create_from_specs, subdir, ['**abc'])
-    self.assertRaises(ValueError, PathGlobs.create_from_specs, subdir, ['**abc/xyz'])
+    wildcard = '**abc'
+    name = 'Blah.java'
+
+    self.assert_pg_equals([pw(subdir, wildcard)], subdir, [wildcard])
+    self.assert_pg_equals([pdw(subdir, wildcard, name)], subdir, [join(wildcard, name)])

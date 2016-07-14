@@ -127,9 +127,10 @@ class PathGlob(AbstractClass):
 
   @classmethod
   def _prune_doublestar(cls, parts):
-    # Replace consecutive '**'s with one '**'
+    # This is called only when parts[0] == '**'.
+    # Eliminating consecutive '**'s can prevent engine from doing repetitive traversing.
     idx = 1
-    while idx < len(parts) and cls._DOUBLE in parts[idx]:
+    while idx < len(parts) and cls._DOUBLE == parts[idx]:
       idx += 1
     return parts[0:1] + parts[idx:]
 
@@ -150,11 +151,7 @@ class PathGlob(AbstractClass):
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
       # A request for the root path.
       return (PathRoot(),)
-    elif cls._DOUBLE in parts[0]:
-      if parts[0] != cls._DOUBLE:
-        raise ValueError('Illegal component "{}" in filespec under {}: {}'
-                         .format(parts[0], symbolic_path, filespec))
-
+    elif cls._DOUBLE == parts[0]:
       parts = cls._prune_doublestar(parts)
 
       if len(parts) == 1:
