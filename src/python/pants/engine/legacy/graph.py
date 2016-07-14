@@ -133,7 +133,7 @@ class LegacyBuildGraph(BuildGraph):
 
       # Instantiate.
       if target_cls is JvmApp:
-        return self._instantiate_jvm_app(**kwargs)
+        return self._instantiate_jvm_app(kwargs)
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
       raise
@@ -142,7 +142,7 @@ class LegacyBuildGraph(BuildGraph):
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
 
-  def _instantiate_jvm_app(self, **kwargs):
+  def _instantiate_jvm_app(self, kwargs):
     """For JvmApp target, convert BundleAdaptor to BundleProps."""
     kwargs['bundles'] = [
       BundleProps.create_bundle_props(bundle.kwargs()['fileset'])
