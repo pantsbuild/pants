@@ -35,6 +35,11 @@ class SchedulerService(PantsService):
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=64)
 
+  @property
+  def locked(self):
+    """Surfaces the scheduler's `locked` method as part of the service's public API."""
+    return self._scheduler.locked
+
   def setup(self):
     """Service setup."""
     # Register filesystem event handlers on an FSEventService instance.

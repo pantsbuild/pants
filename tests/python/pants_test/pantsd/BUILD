@@ -69,5 +69,6 @@ python_tests(
     'src/python/pants/pantsd:process_manager',
     'tests/python/pants_test:int-test'
   ],
-  tags = {'integration'}
+  tags = {'integration'},
+  timeout = 120
 )
