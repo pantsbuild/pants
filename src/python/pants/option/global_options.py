@@ -177,6 +177,7 @@ class GlobalOptionsRegistrar(Optionable):
                   'Use to ignore unneeded directories or BUILD files. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     # TODO: Clarify in the help msgs the difference between --ignore-patterns and --pants-ignore.
+    # See https://github.com/pantsbuild/pants/issues/3671.
     register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*', rel_distdir],
              help='Ignore files that match the specified patterns. '
                   'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore). '

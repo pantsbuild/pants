@@ -14,7 +14,6 @@ from pants.util.memo import memoized
 @memoized
 def get_project_tree(options):
   """Creates the project tree for build files for use in a given pants run."""
-  # TODO: Should this be ignore_patterns? What is the difference between them anyway?
   pants_ignore = options.pants_ignore or []
   if options.build_file_rev:
     return ScmProjectTree(get_buildroot(), get_scm(), options.build_file_rev, pants_ignore)
