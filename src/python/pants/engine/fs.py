@@ -126,6 +126,15 @@ class PathGlob(AbstractClass):
     """The symbolic name (specific to the execution of this PathGlob) for the canonical_stat."""
 
   @classmethod
+  def _prune_doublestar(cls, parts):
+    # This is called only when parts[0] == '**'.
+    # Eliminating consecutive '**'s can prevent engine from doing repetitive traversing.
+    idx = 1
+    while idx < len(parts) and cls._DOUBLE == parts[idx]:
+      idx += 1
+    return parts[0:1] + parts[idx:]
+
+  @classmethod
   def create_from_spec(cls, canonical_stat, symbolic_path, filespec):
     """Given a filespec, return a tuple of PathGlob objects.
 
@@ -142,18 +151,17 @@ class PathGlob(AbstractClass):
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
       # A request for the root path.
       return (PathRoot(),)
-    elif parts[0] == cls._DOUBLE and len(parts) == 1:
-      # Per https://git-scm.com/docs/gitignore:
-      #
-      #  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
-      #   directory "abc", relative to the location of the .gitignore file, with infinite depth."
-      #
-      return (PathDirWildcard(canonical_stat, symbolic_path, '*', '**'),
-              PathWildcard(canonical_stat, symbolic_path, '*'))
-    elif cls._DOUBLE in parts[0]:
-      if parts[0] != cls._DOUBLE:
-        raise ValueError('Illegal component "{}" in filespec under {}: {}'
-                         .format(parts[0], symbolic_path, filespec))
+    elif cls._DOUBLE == parts[0]:
+      parts = cls._prune_doublestar(parts)
+
+      if len(parts) == 1:
+        # Per https://git-scm.com/docs/gitignore:
+        #
+        #  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
+        #   directory "abc", relative to the location of the .gitignore file, with infinite depth."
+        #
+        return (PathDirWildcard(canonical_stat, symbolic_path, '*', '**'),
+                PathWildcard(canonical_stat, symbolic_path, '*'))
 
       # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
       # so there are two remainder possibilities: one with the double wildcard included, and the
