@@ -4,8 +4,8 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.2.0dev0 (7/15/2016)
---------------------
+1.2.0-dev0 (7/15/2016)
+----------------------
 
 Regularly scheduled unstable release! Unstable releases from master now use the
 ``dev`` suffix from now on (see `#3382 <https://github.com/pantsbuild/pants/issues/3382>`_).
