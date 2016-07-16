@@ -34,7 +34,8 @@ class ProjectTree(AbstractClass):
 
   def __init__(self, build_root, ignore_patterns=None):
     if not os.path.isabs(build_root):
-      raise self.InvalidBuildRootError('ProjectTree build_root {} must be an absolute path.'.format(build_root))
+      raise self.InvalidBuildRootError(
+          'ProjectTree build_root {} must be an absolute path.'.format(build_root))
     self.build_root = os.path.realpath(build_root)
     logger.debug('ProjectTree ignore_patterns: %s', ignore_patterns)
     self.ignore = PathSpec.from_lines(GitIgnorePattern, ignore_patterns if ignore_patterns else [])
@@ -69,7 +70,10 @@ class ProjectTree(AbstractClass):
 
   @abstractmethod
   def _walk_raw(self, relpath, topdown=True):
-    """Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path."""
+    """Walk the file tree rooted at `path`.
+
+    Works like os.walk but returned root value is relative path.
+    """
 
   def glob1(self, dir_relpath, glob):
     """Returns a list of paths in path that match glob and are not ignored."""
@@ -108,8 +112,8 @@ class ProjectTree(AbstractClass):
     return self._exists_raw(relpath)
 
   def content(self, file_relpath):
-    """
-    Returns the content for file at path. Raises exception if path is ignored.
+    """Returns the content for file at path. Raises exception if path is ignored.
+
     Raises exception if path is ignored.
     """
     if self.isignored(file_relpath):
@@ -118,8 +122,8 @@ class ProjectTree(AbstractClass):
     return self._content_raw(file_relpath)
 
   def relative_readlink(self, relpath):
-    """
-    Execute `readlink` for the given path, which may result in a relative path.
+    """Execute `readlink` for the given path, which may result in a relative path.
+
     Raises exception if path is ignored.
     """
     if self.isignored(self._append_slash_if_dir_path(relpath)):
@@ -127,8 +131,9 @@ class ProjectTree(AbstractClass):
     return self._relative_readlink_raw(relpath)
 
   def walk(self, relpath, topdown=True):
-    """
-    Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path.
+    """Walk the file tree rooted at `path`.
+
+    Works like os.walk but returned root value is relative path.
     Ignored paths will not be returned.
     """
     for root, dirs, files in self._walk_raw(relpath, topdown):

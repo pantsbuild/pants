@@ -27,6 +27,12 @@ python_library(
     'python_thrift_library.py',
   ],
   dependencies = [
+    # Note that this is part of a gnarly dependency chain:
+    #  backend/python:thrift_builder ->
+    #  backend/codegen/targets:python ->
+    #  backend/python/targets:python
+    # This isn't circular, but it's still bad that it crosses between backends and back again.
+    # TODO: Clean this up. thrift_builder should almost certainly be in the codegen backend.
     'src/python/pants/backend/python/targets:python',
   ],
 )
