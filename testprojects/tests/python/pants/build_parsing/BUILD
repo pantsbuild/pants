@@ -3,8 +3,8 @@
 PREFIX = 'test'
 
 def generate_name(name):
-  return '{}-{}'.format(PREFIX, name)
+  return '{}_{}'.format(PREFIX, name)
 
 target(
-  name=generate_name('nested-variable-access-in-function-call')
+  name=generate_name('nested_variable_access_in_function_call')
 )

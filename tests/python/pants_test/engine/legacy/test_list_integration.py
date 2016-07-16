@@ -43,13 +43,21 @@ class ListIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('InvalidCommandLineSpecError', pants_run.stderr_data)
 
   def test_list_nested_function_scopes(self):
-    pants_run = self.do_command('list',
-                                'testprojects/tests/python/pants/build_parsing::',
-                                success=True,
-                                enable_v2_engine=True)
-    self.assertEquals(
-      pants_run.stdout_data.strip(),
-      'testprojects/tests/python/pants/build_parsing:test-nested-variable-access-in-function-call'
+    target_name = ':'.join((
+      'testprojects/tests/python/pants/build_parsing',
+      'test_nested_variable_access_in_function_call'
+    ))
+
+    pants_run = self.do_command('list', target_name, success=True, enable_v2_engine=True)
+
+    self.assertEquals(pants_run.stdout_data.strip(), target_name)
+
+  def test_list_globs_from_fileset(self):
+    self.do_command(
+      'list',
+      'testprojects/tests/java/org/pantsbuild/testproject/build_parsing:test_bundle_fileset_globs',
+      success=True,
+      enable_v2_engine=True
     )
 
   def test_list_parse_java_targets(self):

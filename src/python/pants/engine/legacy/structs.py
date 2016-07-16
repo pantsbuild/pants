@@ -9,6 +9,7 @@ import logging
 from abc import abstractproperty
 
 from six import string_types
+from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address import Addresses
@@ -192,6 +193,8 @@ class BaseGlobs(AbstractClass):
       return Files(sources)
     elif isinstance(sources, (set, list, tuple)):
       return Files(*sources)
+    elif isinstance(sources, Fileset):
+      return Files(*list(sources))
     else:
       raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
