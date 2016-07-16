@@ -37,11 +37,10 @@ class Optionable(AbstractClass):
 
   @classmethod
   def validate_scope_name_component(cls, s):
-    # TODO: turn this deprecation warning into a permanent error after 1.2.0.
-    deprecated_conditional(lambda: not cls.is_valid_scope_name_component(s), '1.2.0',
-                           'options scope {}'.format(s),
-                           'Replace in code with new scope name consisting of dash-separated-words, '
-                           'with words consisting only of lower-case letters and digits.')
+    if not cls.is_valid_scope_name_component(s):
+      raise OptionsError('Options scope "{}" is not valid:\n'
+                         'Replace in code with a new scope name consisting of dash-separated-words, '
+                         'with words consisting only of lower-case letters and digits.'.format(s))
 
   @classmethod
   def get_scope_info(cls):

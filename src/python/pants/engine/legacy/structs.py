@@ -136,15 +136,6 @@ class JvmAppAdaptor(TargetAdaptor):
       path_globs_list = []
       excluded_path_globs_list = []
       for bundle in self.bundles:
-        # Short circuit in the case of `bundles=[..., bundle(), ...]`.
-        if not hasattr(bundle, 'fileset'):
-          # N.B. This notice is duplicated in jvm_app.py::Bundle.__call__() for the old engine.
-          deprecated_conditional(lambda: True,
-                                 '1.2.0',
-                                 'bare bundle() without `fileset=` param',
-                                 "Pass a `fileset=` parameter: `bundle(fileset=globs('*.config')`")
-          logger.warn('Ignoring `bundle()` without `fileset` parameter.')
-          continue
         base_globs = BaseGlobs.from_sources_field(bundle.fileset)
         filespecs_list.append(base_globs.filespecs)
         path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
