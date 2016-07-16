@@ -30,7 +30,6 @@ Bugfixes
 ~~~~~~~~
 
 * RGlobs.to_filespec should generate filespecs that match git spec
-  `RB #, <https://rbcommons.com/s/twitter/r/4034/,>`_
   `RB #4078 <https://rbcommons.com/s/twitter/r/4078>`_
 
 * ivy runner make a copy of jvm_options before mutating it
