@@ -10,7 +10,6 @@ from abc import abstractproperty
 
 from six import string_types
 
-from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address import Addresses
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import PathGlobs

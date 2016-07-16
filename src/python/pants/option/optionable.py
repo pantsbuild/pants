@@ -9,7 +9,6 @@ import re
 
 from six import string_types
 
-from pants.base.deprecated import deprecated_conditional
 from pants.option.errors import OptionsError
 from pants.option.scope import ScopeInfo
 from pants.util.meta import AbstractClass

@@ -14,7 +14,6 @@ from twitter.common.dirutil import Fileset
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
