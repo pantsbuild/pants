@@ -20,32 +20,15 @@ from pants.contrib.go.subsystems.go_import_meta_tag_reader import GoImportMetaTa
 logger = logging.getLogger(__name__)
 
 
-class _DeprecatedFetchers(Subsystem):
-  """Temporary, dummy subsystem to register defunct option during its deprecation period.
-
-  To be removed in 1.2.0.
-  """
-  options_scope = 'fetchers'
-
-  @classmethod
-  def register_options(cls, register):
-    register('--mapping', metavar='<mapping>', type=dict, advanced=True,
-             removal_version='1.2.0',
-             removal_hint='Remove this option from pants.ini.  It does nothing now.',
-             help="Does nothing.")
-
-
 class FetcherFactory(Subsystem):
   """A fetcher that retrieves and unpacks remote libraries from archive files."""
 
   options_scope = 'go-fetchers'
-  deprecated_options_scope = 'archive-fetcher'
-  deprecated_options_scope_removal_version = '1.2.0'
 
   @classmethod
   def subsystem_dependencies(cls):
     return (super(FetcherFactory, cls).subsystem_dependencies() +
-            (ArchiveRetriever, _DeprecatedFetchers, GoImportMetaTagReader))
+            (ArchiveRetriever, GoImportMetaTagReader))
 
   _DEFAULT_MATCHERS = {
     # TODO: Add launchpad.net?

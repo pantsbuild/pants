@@ -291,12 +291,6 @@ class ExportTask(IvyTaskMixin, PythonTask):
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
     }
-    jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
-    if jvm_distributions:
-      deprecated_conditional(lambda: True, '1.1.1',
-                             'jvm_distributions is deprecated in favor of '
-                             'preferred_jvm_distributions.')
-      graph_info['jvm_distributions'] = jvm_distributions
 
     # `jvm_distributions` are static distribution settings from config,
     # `preferred_jvm_distributions` are distributions that pants actually uses for the
