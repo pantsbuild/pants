@@ -105,7 +105,7 @@ class PantsReleases(Subsystem):
   def _branch_name(cls, version):
     """Defines a mapping between versions and branches.
 
-    In particular, `-pre` suffixed releases always live on master. Any other (modern) release
+    In particular, `-dev` suffixed releases always live on master. Any other (modern) release
     lives in a branch.
     """
     components = version.components
@@ -113,8 +113,8 @@ class PantsReleases(Subsystem):
     if suffix is None or suffix.startswith('rc'):
       # An un-suffixed, or suffixed-with-rc version is a release from a stable branch.
       return '{}.{}.x'.format(*components[:2])
-    elif suffix.startswith('pre'):
-      # Suffixed `pre` release version in master.
+    elif suffix.startswith('dev'):
+      # Suffixed `dev` release version in master.
       return 'master'
     else:
       raise ValueError('Unparseable pants version number: {}'.format(version))

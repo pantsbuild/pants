@@ -35,7 +35,6 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
