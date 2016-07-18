@@ -26,8 +26,6 @@ class ArchiveRetriever(Subsystem):
   """Retrieves and unpacks remote libraries from archives."""
 
   options_scope = 'go-archive-retriever'
-  deprecated_options_scope = 'archive-fetcher'
-  deprecated_options_scope_removal_version = '1.2.0'
 
   @classmethod
   def register_options(cls, register):
