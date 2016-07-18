@@ -39,9 +39,9 @@ class PythonSetup(Subsystem):
              help='The parent directory for the requirement resolver cache. '
                   'If unspecified, a standard path under the workdir is used.')
     register('--resolver-cache-ttl', advanced=True, type=int, metavar='<seconds>',
-             default=10 * 365 * 86400,  # 10 years.
+             default=60 * 60,  # 1 hour.
              help='The time in seconds before we consider re-resolving an open-ended requirement, '
-                  'e.g. "flask>=0.2" if a matching distribution is available on disk.')
+                  'e.g. "Flask>=0.11" if a matching distribution is available on disk.')
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the python artifact cache. '
                   'If unspecified, a standard path under the workdir is used.')
