@@ -138,3 +138,11 @@ class TargetTest(BaseTest):
       t.create_sources_field(sources=addresses, sources_rel_path='', key_arg='cool_field')
     self.assertIn("Expected 'cool_field' to be a single address to from_target() as argument",
                   str(cm.exception))
+
+  def test_max_recursion(self):
+    target_a = self.make_target('a', Target)
+    target_b = self.make_target('b', Target, dependencies=[target_a])
+    self.make_target('c', Target, dependencies=[target_b])
+    target_a.inject_dependency(Address.parse('c'))
+    with self.assertRaises(Target.RecursiveDepthError):
+      target_a.transitive_invalidation_hash()
