@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class DependenciesIntegrationTest(PantsRunIntegrationTest):
+class ListIntegrationTest(PantsRunIntegrationTest):
 
   def get_target_set(self, std_out):
     return sorted([l for l in std_out.split('\n') if l])
@@ -50,4 +50,14 @@ class DependenciesIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals(
       pants_run.stdout_data.strip(),
       'testprojects/tests/python/pants/build_parsing:test-nested-variable-access-in-function-call'
+    )
+
+  def test_list_parse_java_targets(self):
+    pants_run = self.do_command('list',
+                                'testprojects/tests/java/org/pantsbuild/build_parsing::',
+                                success=True,
+                                enable_v2_engine=True)
+    self.assertRegexpMatches(
+      pants_run.stdout_data,
+      r'testprojects/tests/java/org/pantsbuild/build_parsing:trailing_glob_doublestar'
     )

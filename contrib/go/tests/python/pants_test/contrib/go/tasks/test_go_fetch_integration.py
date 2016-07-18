@@ -16,7 +16,7 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
 
     with self.temporary_workdir() as workdir:
       self.assert_success(self.run_pants_with_workdir(args, workdir))
-      # run it again to make sure cached packages is resolved correctly
+      # Run it again to make sure cached packages are resolved correctly.
       self.assert_success(self.run_pants_with_workdir(args, workdir))
 
   def test_issues_1998(self):

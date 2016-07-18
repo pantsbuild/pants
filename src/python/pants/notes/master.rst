@@ -1,8 +1,146 @@
 Master Pre-Releases
 ===================
 
-This document describes ``pre`` releases which occur weekly from master, and which do
+This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
+
+1.2.0-dev0 (7/18/2016)
+----------------------
+
+Regularly scheduled unstable release! Unstable releases from master will use the
+``dev`` suffix from now on (see `#3382 <https://github.com/pantsbuild/pants/issues/3382>`_).
+
+New Features
+~~~~~~~~~~~~
+
+None this week!
+
+API Changes
+~~~~~~~~~~~
+
+* Bump Junit Runner to 1.0.12
+  `RB #4072 <https://rbcommons.com/s/twitter/r/4072>`_
+  `RB #4026 <https://rbcommons.com/s/twitter/r/4026>`_
+  `RB #4047 <https://rbcommons.com/s/twitter/r/4047>`_
+
+* Support for Tasks to request optional product requirements.
+  `RB #4071 <https://rbcommons.com/s/twitter/r/4071>`_
+
+Bugfixes
+~~~~~~~~
+
+* RGlobs.to_filespec should generate filespecs that match git spec
+  `RB #4078 <https://rbcommons.com/s/twitter/r/4078>`_
+
+* ivy runner make a copy of jvm_options before mutating it
+  `RB #4080 <https://rbcommons.com/s/twitter/r/4080>`_
+
+* Log exceptions from testRunFinished() in our listener
+  `Issue #3638 <https://github.com/pantsbuild/pants/issues/3638>`_
+  `RB #4060 <https://rbcommons.com/s/twitter/r/4060>`_
+
+* Fix problems with unicode in junit XML output when writing to HTML report
+  `RB #4051 <https://rbcommons.com/s/twitter/r/4051>`_
+
+* [bugfix] Fix `remote_sources()` targets dependency injection.
+  `RB #4052 <https://rbcommons.com/s/twitter/r/4052>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Convert BundleAdaptor to BundleProps during JvmApp target creation
+  `RB #4057 <https://rbcommons.com/s/twitter/r/4057>`_
+
+* Repair pantsd+watchman integration test flakiness.
+  `RB #4067 <https://rbcommons.com/s/twitter/r/4067>`_
+
+* [engine] Isolated Process Execution - First Cut
+  `RB #4029 <https://rbcommons.com/s/twitter/r/4029>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use ProjectTree in SourceRoots.all_roots().
+  `RB #4079 <https://rbcommons.com/s/twitter/r/4079>`_
+
+* Add a note indicating that scope=forced is available beginning in 1.1.0
+  `RB #4070 <https://rbcommons.com/s/twitter/r/4070>`_
+
+* Update version numbering and clarify notes updates
+  `RB #4069 <https://rbcommons.com/s/twitter/r/4069>`_
+
+* Improve deprecation warning for default backend option reliance.
+  `RB #4061 <https://rbcommons.com/s/twitter/r/4061>`_
+  `RB #4053 <https://rbcommons.com/s/twitter/r/4053>`_
+
+* Cleanup the annotation test project code
+  `RB #4056 <https://rbcommons.com/s/twitter/r/4056>`_
+
+* Add documentation for scopes
+  `RB #4050 <https://rbcommons.com/s/twitter/r/4050>`_
+
+* Add collection literals note to styleguide
+  `RB #4028 <https://rbcommons.com/s/twitter/r/4028>`_
+
+1.1.0-rc0 (7/1/2016)
+--------------------
+
+This is the first `1.1.0-rc` release on the way to `1.1.0`.
+
+New Features
+~~~~~~~~~~~~
+
+* Subprocess clean-all
+  `RB #4011 <https://rbcommons.com/s/twitter/r/4011>`_
+
+* expose products for jvm bundle create and python binary create tasks
+  `RB #3959 <https://rbcommons.com/s/twitter/r/3959>`_
+  `RB #4015 <https://rbcommons.com/s/twitter/r/4015>`_
+
+* Implement zinc `unused deps` check
+  `RB #3635 <https://rbcommons.com/s/twitter/r/3635>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Add `is_target_root` in export
+  `RB #4030 <https://rbcommons.com/s/twitter/r/4030>`_
+
+Bugfixes
+~~~~~~~~
+
+* ConsoleRunner bugfix for @TestSerial and other test cleanups
+  `RB #4026 <https://rbcommons.com/s/twitter/r/4026>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Proper implementation of `**` globs in the v2 engine
+  `RB #4034 <https://rbcommons.com/s/twitter/r/4034>`_
+
+* [engine] Fix TargetMacro replacements of adapted aliases
+  `Issue #3560 <https://github.com/pantsbuild/pants/issues/3560>`_
+  `Issue #3561 <https://github.com/pantsbuild/pants/issues/3561>`_
+  `RB #4000 <https://rbcommons.com/s/twitter/r/4000>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix dead apidocs link for guava.
+  `RB #4037 <https://rbcommons.com/s/twitter/r/4037>`_
+
+* Bump setproctitle to 1.1.10.
+  `Issue #44 <https://github.com/dvarrazzo/py-setproctitle/issues/44>`_
+  `RB #4035 <https://rbcommons.com/s/twitter/r/4035>`_
+
+* Set a default read timeout for fetching node pre-installed modules. 1 second default often fails
+  `RB #4025 <https://rbcommons.com/s/twitter/r/4025>`_
+
+* Improve stderr handling for ProcessManager.get_subprocess_output().
+  `RB #4019 <https://rbcommons.com/s/twitter/r/4019>`_
+
+* Add AnnotatedParallelClassesAndMethodsTest* and AnnotatedParallelMethodsTest*
+  `RB #4027 <https://rbcommons.com/s/twitter/r/4027>`_
 
 1.1.0-pre6 (06/24/2016)
 -----------------------

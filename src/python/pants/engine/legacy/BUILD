@@ -17,7 +17,6 @@ python_library(
   name='structs',
   sources=['structs.py'],
   dependencies=[
-    'src/python/pants/base:deprecated',
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
@@ -36,6 +35,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':parser',
     ':structs',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine:graph',

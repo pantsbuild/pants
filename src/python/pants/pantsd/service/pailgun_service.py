@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import select
 import traceback
+from contextlib import contextmanager
 
 from pants.pantsd.pailgun_server import PailgunServer
 from pants.pantsd.service.pants_service import PantsService
@@ -70,7 +71,19 @@ class PailgunService(PantsService):
           )
       return self._runner_class(sock, exiter, arguments, environment, build_graph)
 
-    return PailgunServer(self._bind_addr, runner_factory)
+    @contextmanager
+    def context_lock():
+      """This lock is used to safeguard Pailgun request handling against a fork() with the
+      scheduler lock held by another thread (e.g. the FSEventService thread), which can
+      lead to a pailgun deadlock.
+      """
+      if self._scheduler_service:
+        with self._scheduler_service.locked():
+          yield
+      else:
+        yield
+
+    return PailgunServer(self._bind_addr, runner_factory, context_lock)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""

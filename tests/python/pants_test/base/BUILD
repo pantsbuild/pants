@@ -67,7 +67,7 @@ python_tests(
   sources = ['test_pants_ignore_file_system.py'],
   dependencies = [
     ':pants_ignore_test_base',
-    'src/python/pants/base:file_system_project_tree',
+    'src/python/pants/base:project_tree',
   ]
 )
 
@@ -76,7 +76,7 @@ python_tests(
   sources = ['test_pants_ignore_scm.py'],
   dependencies = [
     ':pants_ignore_test_base',
-    'src/python/pants/base:scm_project_tree',
+    'src/python/pants/base:project_tree',
     'src/python/pants/scm:git',
   ]
 )
@@ -188,7 +188,7 @@ python_tests(
   dependencies = [
     ':build_file_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:scm_project_tree',
+    'src/python/pants/base:project_tree',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
   ]

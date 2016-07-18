@@ -9,6 +9,7 @@ import errno
 from abc import abstractproperty
 from fnmatch import fnmatch
 from hashlib import sha1
+from itertools import chain
 from os import sep as os_sep
 from os.path import basename, join, normpath
 
@@ -115,7 +116,6 @@ class PathGlob(AbstractClass):
   """
 
   _DOUBLE = '**'
-  _SINGLE = '*'
 
   @abstractproperty
   def canonical_stat(self):
@@ -126,8 +126,17 @@ class PathGlob(AbstractClass):
     """The symbolic name (specific to the execution of this PathGlob) for the canonical_stat."""
 
   @classmethod
+  def _prune_doublestar(cls, parts):
+    # This is called only when parts[0] == '**'.
+    # Eliminating consecutive '**'s can prevent engine from doing repetitive traversing.
+    idx = 1
+    while idx < len(parts) and cls._DOUBLE == parts[idx]:
+      idx += 1
+    return parts[0:1] + parts[idx:]
+
+  @classmethod
   def create_from_spec(cls, canonical_stat, symbolic_path, filespec):
-    """Given a filespec, return a PathGlob object.
+    """Given a filespec, return a tuple of PathGlob objects.
 
     :param canonical_stat: A canonical Dir relative to the ProjectTree, to which the filespec
       is relative.
@@ -141,24 +150,34 @@ class PathGlob(AbstractClass):
     parts = normpath(filespec).split(os_sep)
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
       # A request for the root path.
-      return PathRoot()
-    elif cls._DOUBLE in parts[0]:
-      if parts[0] != cls._DOUBLE:
-        raise ValueError(
-            'Illegal component "{}" in filespec under {}: {}'.format(
-              parts[0], symbolic_path, filespec))
+      return (PathRoot(),)
+    elif cls._DOUBLE == parts[0]:
+      parts = cls._prune_doublestar(parts)
+
+      if len(parts) == 1:
+        # Per https://git-scm.com/docs/gitignore:
+        #
+        #  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
+        #   directory "abc", relative to the location of the .gitignore file, with infinite depth."
+        #
+        return (PathDirWildcard(canonical_stat, symbolic_path, '*', '**'),
+                PathWildcard(canonical_stat, symbolic_path, '*'))
+
       # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
-      remainders = (join(*parts[1:]), join(*parts[0:]))
-      return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
+      pathglob_with_doublestar = PathDirWildcard(canonical_stat, symbolic_path, '*', join(*parts[0:]))
+      if len(parts) == 2:
+        pathglob_no_doublestar = PathWildcard(canonical_stat, symbolic_path, parts[1])
+      else:
+        pathglob_no_doublestar = PathDirWildcard(canonical_stat, symbolic_path, parts[1], join(*parts[2:]))
+      return (pathglob_with_doublestar, pathglob_no_doublestar)
     elif len(parts) == 1:
       # This is the path basename.
-      return PathWildcard(canonical_stat, symbolic_path, parts[0])
+      return (PathWildcard(canonical_stat, symbolic_path, parts[0]),)
     else:
       # This is a path dirname.
-      remainders = (join(*parts[1:]),)
-      return PathDirWildcard(canonical_stat, symbolic_path, parts[0], remainders)
+      return (PathDirWildcard(canonical_stat, symbolic_path, parts[0], join(*parts[1:])),)
 
 
 class PathRoot(datatype('PathRoot', []), PathGlob):
@@ -177,10 +196,10 @@ class PathWildcard(datatype('PathWildcard', ['canonical_stat', 'symbolic_path', 
   """A PathGlob matching a basename."""
 
 
-class PathDirWildcard(datatype('PathDirWildcard', ['canonical_stat', 'symbolic_path', 'wildcard', 'remainders']), PathGlob):
+class PathDirWildcard(datatype('PathDirWildcard', ['canonical_stat', 'symbolic_path', 'wildcard', 'remainder']), PathGlob):
   """A PathGlob matching a dirname.
 
-  Each remainders value is applied relative to each directory matched by the wildcard.
+  Remainder value is applied relative to each directory matched by the wildcard.
   """
 
 
@@ -223,8 +242,8 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
   @classmethod
   def create_from_specs(cls, relative_to, filespecs):
-    return cls(tuple(PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec)
-                     for filespec in filespecs))
+    path_globs = (PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec) for filespec in filespecs)
+    return cls(tuple(chain.from_iterable(path_globs)))
 
 
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):
@@ -272,10 +291,8 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   sense that they will be relative to known-canonical subdirectories.
   """
   # For each matching Path, create a PathGlob per remainder.
-  path_globs = tuple(PathGlob.create_from_spec(d.stat, d.path, remainder)
-                     for d in dirs.dependencies
-                     for remainder in path_dir_wildcard.remainders)
-  return PathGlobs(path_globs)
+  path_globs = (PathGlob.create_from_spec(d.stat, d.path, path_dir_wildcard.remainder) for d in dirs.dependencies)
+  return PathGlobs(tuple(chain.from_iterable(path_globs)))
 
 
 def _zip_links(links, linked_paths):

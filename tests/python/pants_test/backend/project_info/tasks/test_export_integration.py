@@ -202,12 +202,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEquals('java7', targets[target_name]['platform'])
       self.assertEquals(
         {
-          'darwin': ['/Library/JDK'],
-          'linux': ['/usr/lib/jdk7', u'/usr/lib/jdk8'],
-        },
-        json_data['jvm_distributions'])
-      self.assertEquals(
-        {
           'default_platform' : 'java7',
           'platforms': {
             'java7': {
@@ -262,3 +256,14 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       synthetic_target = '{}:shadow-unstable-intransitive-1'.format(test_path)
       self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
       self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])
+
+  def test_export_is_target_roots(self):
+    with self.temporary_workdir() as workdir:
+      test_target = 'examples/tests/java/org/pantsbuild/example/::'
+      json_data = self.run_export(test_target, workdir, load_libs=False)
+      for target_address, attributes in json_data['targets'].items():
+        # Make sure all targets under `test_target`'s directory are target roots.
+        self.assertEqual(
+          attributes['is_target_root'],
+          target_address.startswith("examples/tests/java/org/pantsbuild/example")
+        )

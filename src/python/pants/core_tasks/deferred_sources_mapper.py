@@ -110,7 +110,7 @@ class DeferredSourcesMapper(Task):
         **target.destination_target_args
       )
       for dependent in self.context.build_graph.dependents_of(target.address):
-        self.context.build_graph.inject_dependency(dependent.address, synthetic_target.address)
+        self.context.build_graph.inject_dependency(dependent, synthetic_target.address)
 
   def execute(self):
     self.map_deferred_sources()

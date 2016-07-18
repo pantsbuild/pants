@@ -88,13 +88,15 @@ class PailgunHandler(PailgunHandlerBase):
 class PailgunServer(TCPServer):
   """A (forking) pants nailgun server."""
 
-  def __init__(self, server_address, runner_factory, handler_class=None, bind_and_activate=True):
+  def __init__(self, server_address, runner_factory, context_lock,
+               handler_class=None, bind_and_activate=True):
     """Override of TCPServer.__init__().
 
     N.B. the majority of this function is copied verbatim from TCPServer.__init__().
 
     :param tuple server_address: An address tuple of (hostname, port) for socket.bind().
     :param class runner_factory: A factory function for creating a DaemonPantsRunner for each run.
+    :param func context_lock: A contextmgr that will be used as a lock during request handling/forking.
     :param class handler_class: The request handler class to use for each request. (Optional)
     :param bool bind_and_activate: If True, binds and activates networking at __init__ time.
                                    (Optional)
@@ -105,6 +107,7 @@ class PailgunServer(TCPServer):
     self.runner_factory = runner_factory
     self.allow_reuse_address = True           # Allow quick reuse of TCP_WAIT sockets.
     self.server_port = None                   # Set during server_bind() once the port is bound.
+    self._context_lock = context_lock
 
     if bind_and_activate:
       try:
@@ -126,8 +129,9 @@ class PailgunServer(TCPServer):
     handler = self.RequestHandlerClass(request, client_address, self)
 
     try:
-      # Attempt to handle a request with the handler.
-      handler.handle_request()
+      # Attempt to handle a request with the handler under the context_lock.
+      with self._context_lock():
+        handler.handle_request()
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:

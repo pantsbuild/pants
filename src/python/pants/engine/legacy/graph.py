@@ -9,6 +9,7 @@ import logging
 
 from twitter.common.collections import maybe_list
 
+from pants.backend.jvm.targets.jvm_app import BundleProps, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -129,7 +130,10 @@ class LegacyBuildGraph(BuildGraph):
       # Pop dependencies, which were already consumed during construction.
       kwargs = target_adaptor.kwargs()
       kwargs.pop('dependencies')
+
       # Instantiate.
+      if target_cls is JvmApp:
+        return self._instantiate_jvm_app(kwargs)
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
       raise
@@ -137,6 +141,15 @@ class LegacyBuildGraph(BuildGraph):
       raise TargetDefinitionException(
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
+
+  def _instantiate_jvm_app(self, kwargs):
+    """For JvmApp target, convert BundleAdaptor to BundleProps."""
+    kwargs['bundles'] = [
+      BundleProps.create_bundle_props(bundle.kwargs()['fileset'])
+      for bundle in kwargs['bundles']
+    ]
+
+    return JvmApp(build_graph=self, **kwargs)
 
   def inject_synthetic_target(self,
                               address,

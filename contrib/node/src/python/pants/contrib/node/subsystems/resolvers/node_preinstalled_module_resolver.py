@@ -29,6 +29,8 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
 
   @classmethod
   def register_options(cls, register):
+    register('--fetch-timeout-secs', type=int, advanced=True, default=10,
+             help='Timeout the fetch if the connection is idle for longer than this value.')
     super(NodePreinstalledModuleResolver, cls).register_options(register)
     NodeResolve.register_resolver_for_type(NodePreinstalledModule, cls)
 
@@ -53,7 +55,8 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
       try:
         Fetcher().download(target.dependencies_archive_url,
                            listener=Fetcher.ProgressListener(),
-                           path_or_fd=download_path)
+                           path_or_fd=download_path,
+                           timeout_secs=self.get_options().fetch_timeout_secs)
       except Fetcher.Error as error:
         raise TaskError('Failed to fetch preinstalled node_modules for {target} from {url}: {error}'
                         .format(target=target.address.reference(),

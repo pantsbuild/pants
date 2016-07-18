@@ -66,7 +66,9 @@ python_tests(
   name = 'pantsd_integration',
   sources = ['test_pantsd_integration.py'],
   dependencies = [
+    'src/python/pants/pantsd:process_manager',
     'tests/python/pants_test:int-test'
   ],
-  tags = {'integration'}
+  tags = {'integration'},
+  timeout = 120
 )

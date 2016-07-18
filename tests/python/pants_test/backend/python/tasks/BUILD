@@ -28,6 +28,16 @@ python_tests(
 )
 
 python_tests(
+  name='python_binary_create',
+  sources=['test_python_binary_create.py'],
+  dependencies=[
+    ':python_task_test_base',
+    'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/base:run_info',
+  ]
+)
+
+python_tests(
   name='pytest_run',
   sources=['test_pytest_run.py'],
   dependencies=[
