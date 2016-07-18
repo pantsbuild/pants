@@ -16,6 +16,14 @@ python_library(
 )
 
 python_library(
+  name = 'desktop',
+  sources = ['desktop.py'],
+  dependencies = [
+    ':osutil',
+  ],
+)
+
+python_library(
   name = 'dirutil',
   sources = ['dirutil.py'],
   dependencies = [
