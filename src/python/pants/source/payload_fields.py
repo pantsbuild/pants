@@ -11,7 +11,7 @@ from hashlib import sha1
 from pants.base.payload_field import PayloadField
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import Files, FilesetWithSpec, matches_filespec
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 class SourcesField(PayloadField):
@@ -57,6 +57,7 @@ class SourcesField(PayloadField):
     """Returns the address this sources field refers to (used by some derived classses)"""
     return self._ref_address
 
+  @memoized_method()
   def has_sources(self, extension=None):
     if not self.source_paths:
       return False
