@@ -22,7 +22,6 @@ class SelectorsTest(unittest.TestCase):
 
   def test_variant_repr(self):
     self.assert_repr("SelectVariant(AClass, u'field')", SelectVariant(AClass, 'field'))
-    #self.assert_repr("SelectVariant(AClass)", SelectVariant(AClass))
 
   def test_dependencies_repr(self):
     self.assert_repr("SelectDependencies(AClass, AClass)", SelectDependencies(AClass, AClass))
