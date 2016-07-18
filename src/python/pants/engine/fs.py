@@ -269,7 +269,15 @@ def scan_directory(project_tree, directory):
 
 def merge_paths(paths_list):
   """Merge Paths lists."""
-  return Paths(tuple(p for paths in paths_list for p in paths.dependencies))
+  path_seen = set()
+  merged_path = []
+  for paths in paths_list:
+    for p in paths.dependencies:
+      if p not in path_seen:
+        merged_path.append(p)
+        path_seen.add(p)
+  #return Paths(tuple(p for paths in paths_list for p in paths.dependencies))
+  return Paths(tuple(merged_path))
 
 
 def apply_path_root(path_root):
