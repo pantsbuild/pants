@@ -32,6 +32,7 @@ from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util import desktop
 from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
 from pants.util.strutil import pluralize
@@ -561,7 +562,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       if self._html_report:
         html_file_path = JUnitHtmlReport().report(self.workdir, os.path.join(self.workdir, 'reports'))
         if self._open:
-          binary_util.ui_open(html_file_path)
+          desktop.ui_open(html_file_path)
 
     try:
       self._run_tests(tests_and_targets)
