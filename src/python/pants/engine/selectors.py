@@ -19,14 +19,7 @@ class Selector(AbstractClass):
     """Return true if this Selector is optional. It may result in a `None` match."""
 
 
-class Repr(AbstractClass):
-  def __repr__(self):
-    return '{}({}{})'.format(type(self).__name__,
-                             ', '.join(x.__name__ if isinstance(x, type) else repr( x) for x in self),
-                             ', optional' if self.optional else '')
-
-
-class Select(Repr, datatype('Select', ['product', 'optional']), Selector):
+class Select(datatype('Select', ['product', 'optional']), Selector):
   """Selects the given Product for the Subject provided to the constructor.
 
   If optional=True and no matching product can be produced, will return None.
@@ -35,8 +28,13 @@ class Select(Repr, datatype('Select', ['product', 'optional']), Selector):
   def __new__(cls, product, optional=False):
     return super(Select, cls).__new__(cls, product, optional)
 
+  def __repr__(self):
+    return '{}({}{})'.format(type(self).__name__,
+                             self.product.__name__,
+                             ', optional=True' if self.optional else '')
 
-class SelectVariant(Repr, datatype('Variant', ['product', 'variant_key']), Selector):
+
+class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   """Selects the matching Product and variant name for the Subject provided to the constructor.
 
   For example: a SelectVariant with a variant_key of "thrift" and a product of type ApacheThrift
@@ -45,8 +43,13 @@ class SelectVariant(Repr, datatype('Variant', ['product', 'variant_key']), Selec
   """
   optional = False
 
+  def __repr__(self):
+    return '{}({}, {})'.format(type(self).__name__,
+                             self.product.__name__,
+                             repr(self.variant_key))
 
-class SelectDependencies(Repr, datatype('Dependencies', ['product', 'dep_product', 'field']), Selector):
+
+class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'field']), Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
   The dependencies declared on `dep_product` (in the optional `field` parameter, which defaults
@@ -59,8 +62,14 @@ class SelectDependencies(Repr, datatype('Dependencies', ['product', 'dep_product
 
   optional = False
 
+  def __repr__(self):
+    return '{}({}, {}{})'.format(type(self).__name__,
+                             self.product.__name__,
+                             self.dep_product.__name__,
+                             ', {}'.format(repr(self.field)) if self.field else '')
 
-class SelectProjection(Repr, datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
+
+class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
   """Selects a field of the given Subject to produce a Subject, Product dependency from.
 
   Projecting an input allows for deduplication in the graph, where multiple Subjects
@@ -71,10 +80,20 @@ class SelectProjection(Repr, datatype('Projection', ['product', 'projected_subje
   """
   optional = False
 
+  def __repr__(self):
+    return '{}({}, {}, {}, {})'.format(type(self).__name__,
+                             self.product.__name__,
+                             self.projected_subject.__name__,
+                             repr(self.fields),
+                             self.input_product.__name__)
 
-class SelectLiteral(Repr, datatype('Literal', ['subject', 'product']), Selector):
+
+class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
   optional = False
+
+  def __repr__(self):
+    return '{}({}, {})'.format(type(self).__name__, repr(self.subject), self.product.__name__)
 
 
 class Collection(object):
