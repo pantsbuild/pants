@@ -13,6 +13,7 @@ from collections import defaultdict
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
@@ -27,7 +28,6 @@ from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries import binary_util
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -417,7 +417,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           args = remove_arg(args, '-parallel-threads', has_param=True)
           args += ['-parallel-threads', str(threads)]
 
-        with binary_util.safe_args(batch, self.get_options()) as batch_tests:
+        with argfile.safe_args(batch, self.get_options()) as batch_tests:
           self.context.log.debug('CWD = {}'.format(workdir))
           self.context.log.debug('platform = {}'.format(platform))
           with environment_as(**dict(target_env_vars)):
