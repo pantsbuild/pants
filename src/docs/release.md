@@ -94,7 +94,8 @@ the release manager may also need to do a release from a stable branch.
            _For example if you were releasing `1.2.0rc0` you would need to
            create `src/python/pants/notes/1.2.x.rst`._
          * Add the file to pants.ini in the branch_notes section.
-         * Add the new notes file to `src/docs/docsite.json`. <br/>
+         * Add the new notes file to `src/docs/docsite.json`.
+         * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
        For addtional information on generating documenation see the
        [docs reference](http://pantsbuild.github.io/docs#generating-the-site)
     4. Bring the CONTRIBUTORS roster (from master) in
