@@ -34,7 +34,6 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeThat;
 
@@ -163,6 +162,8 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
       invokeConsoleRunner("MockTest4 -parallel-threads 1 -xmlreport");
       Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
+
+      System.out.flush();
       String output = outContent.toString();
       assertThat(output, containsString("test41"));
       assertThat(output, containsString("start test42"));

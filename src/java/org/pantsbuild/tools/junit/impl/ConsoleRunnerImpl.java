@@ -12,6 +12,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -791,8 +792,9 @@ public class ConsoleRunnerImpl {
             options.numTestShards,
             options.numRetries,
             options.useExperimentalRunner,
-            System.out,
-            System.err);
+            // NB: Buffering yields ~factor of 100 speedups for output-heavy tests.
+            new PrintStream(new BufferedOutputStream(System.out)),
+            new PrintStream(new BufferedOutputStream(System.err)));
 
     List<String> tests = Lists.newArrayList();
     for (String test : options.tests) {
