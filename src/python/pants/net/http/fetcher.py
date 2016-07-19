@@ -7,15 +7,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import hashlib
 import os
+import re
 import sys
 import tempfile
 import time
+from abc import abstractmethod, abstractproperty
 from contextlib import closing, contextmanager
 
 import requests
 import six
 
+from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_open
+from pants.util.meta import AbstractClass
 
 
 class Fetcher(object):
@@ -50,8 +54,6 @@ class Fetcher(object):
       May be None it the request failed before receiving a server response.
       """
       return self._response_code
-
-  _TRANSIENT_EXCEPTION_TYPES = (requests.ConnectionError, requests.Timeout)
 
   class Listener(object):
     """A listener callback interface for HTTP GET requests made by a Fetcher."""
@@ -191,13 +193,132 @@ class Fetcher(object):
         sys.stdout.write(' {:.3f}s\n'.format(time.time() - self._start))
         sys.stdout.flush()
 
-  def __init__(self, requests_api=None):
+  def __init__(self, requests_api=None, root_dir=None):
     """Creates a Fetcher that uses the given requests api object.
 
     By default uses the requests module, but can be any object conforming to the requests api like
     a requests Session object.
+
+    :param requests_api: An optional requests api-like object.
+    :param root_dir: An optional root directory to find relative local `file://` url paths against.
+                     The build root is used by default.
     """
     self._requests = requests_api or requests
+    self._root_dir = root_dir or get_buildroot()
+
+  class Response(AbstractClass):
+    """Abstracts a fetch response."""
+
+    @abstractproperty
+    def status_code(self):
+      """The HTTP status code for the fetch.
+
+      :rtype: int
+      """
+
+    @abstractproperty
+    def size(self):
+      """The size of the fetched file in bytes if known; otherwise, `None`.
+
+      :rtype: int
+      :raises :class:`Fetcher.Error` if there is a problem determining the file size.
+      """
+
+    @abstractmethod
+    def iter_content(self, chunk_size_bytes):
+      """Return an iterator over the content of the fetched file's bytes.
+
+      :rtype: :class:`collections.Iterator` over byte chunks.
+      :raises :class:`Fetcher.Error` if there is a problem determining the file size.
+      """
+
+    @abstractmethod
+    def close(self):
+      """Close the underlying fetched file stream."""
+
+  class RequestsResponse(Response):
+    _TRANSIENT_EXCEPTION_TYPES = (requests.ConnectionError, requests.Timeout)
+
+    @classmethod
+    def as_fetcher_error(cls, url, e):
+      exception_factory = (Fetcher.TransientError if isinstance(e, cls._TRANSIENT_EXCEPTION_TYPES)
+                           else Fetcher.PermanentError)
+      return exception_factory('Problem GETing data from {}: {}'.format(url, e))
+
+    def __init__(self, url, resp):
+      self._url = url
+      self._resp = resp
+
+    @property
+    def status_code(self):
+      return self._resp.status_code
+
+    @property
+    def size(self):
+      size = self._resp.headers.get('content-length')
+      return int(size) if size else None
+
+    def iter_content(self, chunk_size_bytes):
+      try:
+        return self._resp.iter_content(chunk_size=chunk_size_bytes)
+      except requests.RequestException as e:
+        raise self.as_fetcher_error(self._url, e)
+
+    def close(self):
+      self._resp.close()
+
+  class LocalFileResponse(Response):
+    def __init__(self, fp):
+      self._fp = fp
+
+    @property
+    def status_code(self):
+      return requests.codes.ok
+
+    @property
+    def size(self):
+      try:
+        stat = os.stat(self._fp.name)
+        return stat.st_size
+      except OSError as e:
+        raise Fetcher.PermanentError('Problem stating {} for its size: {}'.format(self._fp.name, e))
+
+    def iter_content(self, chunk_size_bytes):
+      while True:
+        try:
+          data = self._fp.read(chunk_size_bytes)
+        except IOError as e:
+          raise Fetcher.PermanentError('Problem reading chunk from {}: {}'.format(self._fp.name, e))
+        if not data:
+          break
+        yield data
+
+    def close(self):
+      self._fp.close()
+
+  def _as_local_file_path(self, url):
+    path = re.sub(r'//', '', url.lstrip('file:'))
+    if path.startswith('/'):
+      return path
+    elif url.startswith('file:'):
+      return os.path.join(self._root_dir, path)
+    else:
+      return None
+
+  def _fetch(self, url, timeout_secs=None):
+    path = self._as_local_file_path(url)
+    if path:
+      try:
+        fp = open(path, 'rb')
+        return self.LocalFileResponse(fp)
+      except IOError as e:
+        raise self.PermanentError('Problem reading data from {}: {}'.format(path, e))
+    else:
+      try:
+        resp = self._requests.get(url, stream=True, timeout=timeout_secs, allow_redirects=True)
+        return self.RequestsResponse(url, resp)
+      except requests.RequestException as e:
+        raise self.RequestsResponse.as_fetcher_error(url, e)
 
   def fetch(self, url, listener, chunk_size_bytes=None, timeout_secs=None):
     """Fetches data from the given URL notifying listener of all lifecycle events.
@@ -208,35 +329,27 @@ class Fetcher(object):
     :param timeout_secs: the maximum time to wait for data to be available, 1 second by default
     :raises: Fetcher.Error if there was a problem fetching all data from the given url
     """
-    chunk_size_bytes = chunk_size_bytes or 10 * 1024
-    timeout_secs = timeout_secs or 1.0
-
     if not isinstance(listener, self.Listener):
       raise ValueError('listener must be a Listener instance, given {}'.format(listener))
 
-    try:
-      with closing(self._requests.get(url, stream=True, timeout=timeout_secs,
-                                      allow_redirects=True)) as resp:
-        if resp.status_code != requests.codes.ok:
-          listener.status(resp.status_code)
-          raise self.PermanentError('GET request to {} failed with status code {}'
-                                    .format(url, resp.status_code),
-                                    response_code=resp.status_code)
+    chunk_size_bytes = chunk_size_bytes or 10 * 1024
+    timeout_secs = timeout_secs or 1.0
 
-        size = resp.headers.get('content-length')
-        listener.status(resp.status_code, content_length=int(size) if size else None)
+    with closing(self._fetch(url, timeout_secs=timeout_secs)) as resp:
+      if resp.status_code != requests.codes.ok:
+        listener.status(resp.status_code)
+        raise self.PermanentError('Fetch of {} failed with status code {}'
+                                  .format(url, resp.status_code),
+                                  response_code=resp.status_code)
+      listener.status(resp.status_code, content_length=resp.size)
 
-        read_bytes = 0
-        for data in resp.iter_content(chunk_size=chunk_size_bytes):
-          listener.recv_chunk(data)
-          read_bytes += len(data)
-        if size and read_bytes != int(size):
-          raise self.Error('Expected {} bytes, read {}'.format(size, read_bytes))
-        listener.finished()
-    except requests.RequestException as e:
-      exception_factory = (self.TransientError if isinstance(e, self._TRANSIENT_EXCEPTION_TYPES)
-                           else self.PermanentError)
-      raise exception_factory('Problem GETing data from {}: {}'.format(url, e))
+      read_bytes = 0
+      for data in resp.iter_content(chunk_size_bytes=chunk_size_bytes):
+        listener.recv_chunk(data)
+        read_bytes += len(data)
+      if resp.size and read_bytes != resp.size:
+        raise self.Error('Expected {} bytes, read {}'.format(resp.size, read_bytes))
+      listener.finished()
 
   def download(self, url, listener=None, path_or_fd=None, chunk_size_bytes=None, timeout_secs=None):
     """Downloads data from the given URL.

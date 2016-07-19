@@ -17,9 +17,11 @@ import requests
 from six import StringIO
 
 from pants.net.http.fetcher import Fetcher
-from pants.util.contextutil import temporary_file
+from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.dirutil import safe_open, touch
 
 
+# TODO(John Sirois): Replace mox with mock
 class FetcherTest(mox.MoxTestBase):
   def setUp(self):
     super(FetcherTest, self).setUp()
@@ -40,6 +42,53 @@ class FetcherTest(mox.MoxTestBase):
     chunks = ['0123456789', 'a']
     self.response.iter_content(chunk_size=chunk_size_bytes).AndReturn(chunks)
     return chunks
+
+  def assert_local_file_fetch(self, url_prefix=''):
+    chunks = ['0123456789', 'a']
+    self.listener.status(200, content_length=sum(len(c) for c in chunks))
+    with temporary_file() as fp:
+      for chunk in chunks:
+        fp.write(chunk)
+        self.listener.recv_chunk(chunk)
+      fp.close()
+      self.listener.finished()
+      self.mox.ReplayAll()
+
+      self.fetcher.fetch(url_prefix + fp.name, self.listener, chunk_size_bytes=10)
+
+  def test_file_path(self):
+    self.assert_local_file_fetch()
+
+  def test_file_scheme(self):
+    self.assert_local_file_fetch('file:')
+
+  def test_file_scheme_double_slash_relative(self):
+    expected_contents = b'proof'
+    with temporary_dir() as root_dir:
+      with safe_open(os.path.join(root_dir, 'relative', 'path'), 'wb') as fp:
+        fp.write(expected_contents)
+      with temporary_file() as download_fp:
+        Fetcher(root_dir=root_dir).download('file://relative/path', path_or_fd=download_fp)
+        download_fp.close()
+        with open(download_fp.name, 'rb') as fp:
+          self.assertEqual(expected_contents, fp.read())
+
+  def test_file_scheme_triple_slash(self):
+    self.assert_local_file_fetch('file://')
+
+  def test_file_dne(self):
+    with temporary_dir() as base:
+      with self.assertRaises(self.fetcher.PermanentError):
+        self.fetcher.fetch(os.path.join(base, 'dne'), self.listener)
+
+  def test_file_no_perms(self):
+    with temporary_dir() as base:
+      no_perms = os.path.join(base, 'dne')
+      touch(no_perms)
+      os.chmod(no_perms, 0)
+      self.assertTrue(os.path.exists(no_perms))
+      with self.assertRaises(self.fetcher.PermanentError):
+        self.fetcher.fetch(no_perms, self.listener)
 
   def test_get(self):
     for chunk in self.expect_get('http://bar', chunk_size_bytes=1024, timeout_secs=60):
@@ -246,7 +295,7 @@ class FetcherRedirectTest(unittest.TestCase):
       self.end_headers()
 
   @contextmanager
-  def setup_server(self, return_failed=False):
+  def setup_server(self):
     httpd = None
     httpd_thread = None
     try:
