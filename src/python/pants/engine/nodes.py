@@ -131,7 +131,7 @@ class Node(AbstractClass):
     """
 
 
-class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant_key', 'selector']), Node):
+class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), Node):
   """A Node that selects a product for a subject.
 
   A Select can be satisfied by multiple sources, but fails if multiple sources produce a value. The
@@ -143,21 +143,16 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
   is_cacheable = False
   is_inlineable = True
 
-  def __new__(cls, subject, variants, selector):
-
-    def _new_call(subject, variants, selector, variant_key):
-      return super(SelectNode, cls).__new__(cls, subject, selector.product, variants, variant_key, selector)
-
-    selector_type = type(selector)
-    if selector_type is Select:
-      return _new_call(subject, variants, selector, None)
-    elif selector_type is SelectVariant:
-      return _new_call(subject, variants, selector, selector.variant_key)
-    elif selector_type is SelectLiteral:
-      # NB: Intentionally ignores subject parameter to provide a literal subject.
-      return _new_call(selector.subject, variants, selector, None)
+  @property
+  def variant_key(self):
+    if isinstance(self.selector, SelectVariant):
+      return self.selector.variant_key
     else:
-      raise ValueError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
+      return None
+
+  @property
+  def product(self):
+    return self.selector.product
 
   def _select_literal(self, candidate, variant_value):
     """Looks for has-a or is-a relationships between the given value and the requested product.
@@ -236,7 +231,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     if dependencies:
       return Waiting(dependencies)
     elif len(matches) == 0:
-      return Noop('No source of {} for {}.', self.selector, self.subject)
+      return Noop('No source of {}.', self)
     elif len(matches) > 1:
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
       # by adding support for "mergeable" products. see:
@@ -520,8 +515,11 @@ class StepContext(object):
     need a dependency on the `nodes` package.
     """
     selector_type = type(selector)
-    if selector_type in {Select, SelectVariant, SelectLiteral}:
+    if selector_type in [Select, SelectVariant]:
       return SelectNode(subject, variants, selector)
+    elif selector_type is SelectLiteral:
+      # NB: Intentionally ignores subject parameter to provide a literal subject.
+      return SelectNode(selector.subject, variants, selector)
     elif selector_type is SelectDependencies:
       return DependenciesNode(subject, variants, selector)
     elif selector_type is SelectProjection:
