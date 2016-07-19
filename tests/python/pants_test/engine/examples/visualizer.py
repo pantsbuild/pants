@@ -11,10 +11,10 @@ import sys
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.binaries import binary_util
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import PathGlobs
 from pants.engine.storage import Storage
+from pants.util import desktop
 from pants.util.contextutil import temporary_file_path
 from pants_test.engine.examples.planners import setup_json_scheduler
 
@@ -27,7 +27,7 @@ def visualize_execution_graph(scheduler, request):
   with temporary_file_path(cleanup=False, suffix='.svg') as image_file:
     subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, dot_file), shell=True)
     print('svg file saved to: {}'.format(image_file))
-    binary_util.ui_open(image_file)
+    desktop.ui_open(image_file)
 
 
 def visualize_build_request(build_root, goals, subjects):

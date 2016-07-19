@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import posixpath
-import subprocess
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
@@ -155,7 +154,7 @@ class BinaryUtil(object):
           'No urls are defined for the --pants-support-baseurls option.')
     downloaded_successfully = False
     accumulated_errors = []
-    for baseurl in OrderedSet(self._baseurls):  # Wrap in OrderedSet because duplicates are wasteful.
+    for baseurl in OrderedSet(self._baseurls):  # De-dup URLS: we only want to try each URL once.
       url = posixpath.join(baseurl, binary_path)
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
@@ -215,80 +214,3 @@ class BinaryUtil(object):
     logger.debug('Selected {binary} binary bootstrapped to: {path}'
                  .format(binary=name, path=bootstrapped_binary_path))
     return bootstrapped_binary_path
-
-
-@contextmanager
-def safe_args(args,
-              options,
-              max_args=None,
-              argfile=None,
-              delimiter='\n',
-              quoter=None,
-              delete=True):
-  """Yields args if there are less than a limit otherwise writes args to an argfile and yields an
-  argument list with one argument formed from the path of the argfile.
-
-  :param args: The args to work with.
-  :param OptionValueContainer options: scoped options object for this task
-  :param max_args: The maximum number of args to let though without writing an argfile.  If not
-    specified then the maximum will be loaded from the --max-subprocess-args option.
-  :param argfile: The file to write args to when there are too many; defaults to a temporary file.
-  :param delimiter: The delimiter to insert between args written to the argfile, defaults to '\n'
-  :param quoter: A function that can take the argfile path and return a single argument value;
-    defaults to: <code>lambda f: '@' + f<code>
-  :param delete: If True deletes any arg files created upon exit from this context; defaults to
-    True.
-  """
-  max_args = max_args or options.max_subprocess_args
-  if len(args) > max_args:
-    def create_argfile(f):
-      f.write(delimiter.join(args))
-      f.close()
-      return [quoter(f.name) if quoter else '@{}'.format(f.name)]
-
-    if argfile:
-      try:
-        with safe_open(argfile, 'w') as fp:
-          yield create_argfile(fp)
-      finally:
-        if delete and os.path.exists(argfile):
-          os.unlink(argfile)
-    else:
-      with temporary_file(cleanup=delete) as fp:
-        yield create_argfile(fp)
-  else:
-    yield args
-
-
-def _mac_open(files):
-  subprocess.call(['open'] + list(files))
-
-
-def _linux_open(files):
-  cmd = "xdg-open"
-  if not _cmd_exists(cmd):
-    raise TaskError("The program '{}' isn't in your PATH. Please install and re-run this "
-                    "goal.".format(cmd))
-  for f in list(files):
-    subprocess.call([cmd, f])
-
-
-# From: http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
-def _cmd_exists(cmd):
-  return subprocess.call(["/usr/bin/which", cmd], shell=False, stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE) == 0
-
-_OPENER_BY_OS = {
-  'darwin': _mac_open,
-  'linux': _linux_open
-}
-
-
-def ui_open(*files):
-  """Attempts to open the given files using the preferred native viewer or editor."""
-  if files:
-    osname = os.uname()[0].lower()
-    if not osname in _OPENER_BY_OS:
-      print('Sorry, open currently not supported for ' + osname)
-    else:
-      _OPENER_BY_OS[osname](files)

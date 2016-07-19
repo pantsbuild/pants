@@ -18,9 +18,9 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.task.task import Task
+from pants.util import desktop
 from pants.util.dirutil import safe_mkdir
 
 
@@ -134,7 +134,10 @@ class MarkdownToHtml(Task):
             process_page((wiki, page), basedir, wiki.wiki.url_builder, wikigenmap, fragment=True)
 
     if show:
-      binary_util.ui_open(*show)
+      try:
+        desktop.ui_open(*show)
+      except desktop.OpenError as e:
+        raise TaskError(e)
 
   PANTS_LINK = re.compile(r'''pants\(['"]([^)]+)['"]\)(#.*)?''')
 
