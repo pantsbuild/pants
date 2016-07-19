@@ -269,6 +269,7 @@ def scan_directory(project_tree, directory):
 
 def merge_paths(paths_list):
   """Merge Paths lists."""
+  # comments
   path_seen = set()
   merged_paths = []
   for paths in paths_list:
