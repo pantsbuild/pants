@@ -76,49 +76,46 @@ Although the build and publish are automated, the version bumping, changelog edi
 and CONTRIBUTORS management are not. Changelog edits and CONTRIBUTOR updates always
 occur in master, while version changes generally only occur in the relevant release branch.
 
-Release from Master
--------------------
-
+Releasing from different release branches
+-----------------------------------------
 Every week we do a release from master.  In most cases we will use the `dev` naming convention
-detailed in [Release Strategy](http://pantsbuild.github.io/release_strategy.html). When we are ready
-to create a new stable branch we will release under the `rc` naming convention instead of `dev`.
-For example releases in master should look similar to the following: 1.1.0dev0, 1.1.0dev1,
-1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0.
+detailed in [Release Strategy](http://pantsbuild.github.io/release_strategy.html). When we are
+ready to create a new stable branch we will release under the `rc` naming convention instead of
+`dev`.  For example releases in master should look similar to the following: 1.1.0dev0, 1.1.0dev1,
+1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. In addition to a release from master
+the release manager may also need to do a release from a stable branch.
 
-1. In master: Edit the version number in `src/python/pants/version.py`
-2. Preparation for the release should be done from master.  Update
-  `src/python/pants/notes/master.rst` to reflect the changes for this week.  If this release is also
-  a release candidate then update the corresponding notes file for that release and add the file
-  to pants.ini.  For example if you were releasing `1.2.0rc0` you would need to create
-  `src/python/pants/notes/1.2.x.rst` and then update the branch_notes section of `pants.ini`.
-3. In master: Bring the CONTRIBUTORS roster in [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
-  up to date by running `build-support/bin/contributors.sh`.
-4. If creating the RC create the stable branch from the commit you use to do the release.  For
-  example if you were releasing `1.2.0rc0`, create the branch `1.2.x` from your release commit.
+* ### Release from Master
+    1. Edit the version number in `src/python/pants/version.py`
+    2. Preparation for the release should be done from master.  Update
+       `src/python/pants/notes/master.rst` to reflect the changes for this week.  If this release is
+        also a release candidate then update the corresponding notes file for that release and add
+        the file to pants.ini.  For example if you were releasing `1.2.0rc0` you would need to
+        create `src/python/pants/notes/1.2.x.rst` and then update the branch_notes section of
+        `pants.ini`.
+    3. Bring the CONTRIBUTORS roster (from master) in
+       [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
+       up to date by running `build-support/bin/contributors.sh`.
+    4. If creating the RC create the stable branch from the commit you use to do the release.  For
+       example if you were releasing `1.2.0rc0`, create the branch `1.2.x` from your release commit.
 
-Changes to Stable Branch
-------------------------
+* ###Release from Stable branch
+  See [Release Strategy](http://pantsbuild.github.io/release_strategy.html) for more details about
+  whether a release is needed from a stable branch.
+    1. Cherry pick changes that have been identified in the [backport proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
+    2. In your release branch: Edit the version number in `src/python/pants/version.py`
+    3. Preparation for the release should be done from the stable release branch.  Update
+       `src/python/pants/notes/*.rst` to reflect the changes for this week.  For example if you were
+       releasing 1.2.0rc1 you would need to create `src/python/pants/notes/1.2.x.rst`.
+    4. Bring the CONTRIBUTORS roster (from the stable branch) in
+       [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
+        up to date by running `build-support/bin/contributors.sh`.
+    5. Cherry pick changes to branch specific notes back to master.
 
-After each release candidate teams have a week to report issues that would block release.  When
-fixes are identified they are cherry-picked from master to the stable branch for a new release
-candidate. There will still be a weekly dev release on weeks we release from stable branches, this
-means it's possible we will have multiple release in a week.  After all issues have been resolved
-a Final release is made in stable.
-
-1. Cherry pick changes that have been identified in the [backport proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
-2. In your release branch: Edit the version number in `src/python/pants/version.py`
-3. Preparation for the release should be done from the stable release branch.  Update
-  `src/python/pants/notes/*.rst` to reflect the changes for this week.  For example if you were
-  releasing 1.2.0rc1 you would need to create `src/python/pants/notes/1.2.x.rst`.
-4. In the stable branch: Bring the CONTRIBUTORS roster in
-  [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
-  up to date by running `build-support/bin/contributors.sh`.
-5. Cherry pick changes to branch specific notes back to master.
-
-Finally, send these three changes out for review. When creating a review specify the branch the
-change will be pushed to in the branch field.  This makes it easier for reviewers to understand
-where these changes apply.  If you are releasing from master, this will be one review; if you
-are releasing from a stable branch, it will be more than one review.
+  Finally, send these changes out for review. When creating a review specify the branch the
+  change will be pushed to in the branch field.  This makes it easier for reviewers to understand
+  where these changes apply.  *If you are releasing from master, this will be one review; if you
+  are also releasing from a stable branch, it will be more than one review.*
 
 Dry Run (Optional)
 ------------------
