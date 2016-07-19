@@ -6,7 +6,6 @@ package org.pantsbuild.tools.junit.impl;
 import java.io.PrintStream;
 
 import org.junit.runner.Description;
-import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
 
 /**
@@ -23,7 +22,7 @@ class PerTestConsoleListener extends ConsoleListener {
   @Override
   public void testRunStarted(Description description) throws Exception {
     String displayName = Util.getPantsFriendlyDisplayName(description);
-    if (displayName != "null") {
+    if (!"null".equals(displayName)) {
       out.println(displayName);
     }
   }
@@ -42,5 +41,4 @@ class PerTestConsoleListener extends ConsoleListener {
   public void testFailure(Failure failure) {
     out.println(" -> FAILED");
   }
-
 }
