@@ -645,7 +645,7 @@ class LocalScheduler(object):
     def roots():
       for subject in subjects:
         for product in products:
-          if type(subject) is Address:
+          if isinstance(subject, Address):
             yield SelectNode(subject, product, None, None)
           elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
             yield DependenciesNode(subject, product, None, Addresses, None)

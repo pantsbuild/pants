@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import abstractmethod, abstractproperty
-from os.path import dirname
 
 from twitter.common.collections import OrderedSet
 
@@ -418,11 +417,10 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def generate_subjects(cls, filenames):
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
-      # ReadLink, or FileContent for the literal path.
+      # ReadLink, FileContent, or DirectoryListing for the literal path.
       yield File(f)
       yield Link(f)
-      # DirectoryListing for parent dirs.
-      yield Dir(dirname(f))
+      yield Dir(f)
 
   def step(self, step_context):
     try:
