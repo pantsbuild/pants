@@ -49,10 +49,12 @@ class GraphInvalidationTest(unittest.TestCase):
       self.assertGreater(node_count, 0)
 
       # Invalidate the '3rdparty/python' DirectoryListing, and then the `3rdparty` DirectoryListing.
-      # by "touching" random files.
-      for filename in ('3rdparty/python/BUILD', '3rdparty/CHANGED_RANDOM_FILE'):
+      # by "touching" existing files/dirs.
+      for filename in ('3rdparty/python/BUILD', '3rdparty'):
         invalidated_count = product_graph.invalidate_files([filename])
-        self.assertGreater(invalidated_count, 0)
+        self.assertGreater(invalidated_count,
+                           0,
+                           'File {} did not invalidate any Nodes.'.format(filename))
         node_count, last_node_count = len(product_graph), node_count
         self.assertLess(node_count, last_node_count)
 
