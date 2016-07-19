@@ -88,15 +88,19 @@ the release manager may also need to do a release from a stable branch.
 * ### Release from Master
     1. Edit the version number in `src/python/pants/version.py`
     2. Preparation for the release should be done from master.  Update
-       `src/python/pants/notes/master.rst` to reflect the changes for this week.  If this release is
-        also a release candidate then update the corresponding notes file for that release and add
-        the file to pants.ini.  For example if you were releasing `1.2.0rc0` you would need to
-        create `src/python/pants/notes/1.2.x.rst` and then update the branch_notes section of
-        `pants.ini`.
-    3. Bring the CONTRIBUTORS roster (from master) in
+       `src/python/pants/notes/master.rst` to reflect the changes for this week.
+    3. If this release is also a release candidate then:
+         * Update the corresponding notes file for that release. <br/>
+           _For example if you were releasing `1.2.0rc0` you would need to
+           create `src/python/pants/notes/1.2.x.rst`._
+         * Add the file to pants.ini in the branch_notes section.
+         * Add the new notes file to `src/docs/docsite.json`. <br/>
+       For addtional information on generating documenation see the
+       [docs reference](http://pantsbuild.github.io/docs#generating-the-site)
+    4. Bring the CONTRIBUTORS roster (from master) in
        [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
        up to date by running `build-support/bin/contributors.sh`.
-    4. If creating the RC create the stable branch from the commit you use to do the release.  For
+    5. If creating the RC create the stable branch from the commit you use to do the release.  For
        example if you were releasing `1.2.0rc0`, create the branch `1.2.x` from your release commit.
 
 * ###Release from Stable branch
