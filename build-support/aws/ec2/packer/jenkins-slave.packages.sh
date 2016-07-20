@@ -70,18 +70,18 @@ sudo apt-get -y install g++
 # explicity here for completeness.
 MISC=(
   coreutils # This provides tr, cut, etc.
-  gawk
-  grep
-  sed
   curl
-  wget
+  gawk
+  git
+  grep
+  nfs-common # For NFS / EFS mounting
   openssl # Used for md5 hashing.
   perl # Needed by sloccount.
-  git
+  sed
+  wget
 )
 sudo apt-get -y install ${MISC[@]}
 
 # Finally, top off all our packages.
 sudo apt-get -y update
 sudo apt-get -y upgrade
-
