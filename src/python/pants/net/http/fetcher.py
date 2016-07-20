@@ -17,7 +17,6 @@ from contextlib import closing, contextmanager
 import requests
 import six
 
-from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_open
 from pants.util.meta import AbstractClass
 
@@ -193,20 +192,19 @@ class Fetcher(object):
         sys.stdout.write(' {:.3f}s\n'.format(time.time() - self._start))
         sys.stdout.flush()
 
-  def __init__(self, requests_api=None, root_dir=None):
+  def __init__(self, root_dir, requests_api=None):
     """Creates a Fetcher that uses the given requests api object.
 
     By default uses the requests module, but can be any object conforming to the requests api like
     a requests Session object.
 
+    :param root_dir: The root directory to find relative local `file://` url paths against.
     :param requests_api: An optional requests api-like object.
-    :param root_dir: An optional root directory to find relative local `file://` url paths against.
-                     The build root is used by default.
     """
+    self._root_dir = root_dir
     self._requests = requests_api or requests
-    self._root_dir = root_dir or get_buildroot()
 
-  class Response(AbstractClass):
+  class _Response(AbstractClass):
     """Abstracts a fetch response."""
 
     @abstractproperty
@@ -236,7 +234,7 @@ class Fetcher(object):
     def close(self):
       """Close the underlying fetched file stream."""
 
-  class RequestsResponse(Response):
+  class _RequestsResponse(_Response):
     _TRANSIENT_EXCEPTION_TYPES = (requests.ConnectionError, requests.Timeout)
 
     @classmethod
@@ -267,7 +265,7 @@ class Fetcher(object):
     def close(self):
       self._resp.close()
 
-  class LocalFileResponse(Response):
+  class _LocalFileResponse(_Response):
     def __init__(self, fp):
       self._fp = fp
 
@@ -278,7 +276,7 @@ class Fetcher(object):
     @property
     def size(self):
       try:
-        stat = os.stat(self._fp.name)
+        stat = os.fstat(self._fp.fileno())
         return stat.st_size
       except OSError as e:
         raise Fetcher.PermanentError('Problem stating {} for its size: {}'.format(self._fp.name, e))
@@ -297,7 +295,7 @@ class Fetcher(object):
       self._fp.close()
 
   def _as_local_file_path(self, url):
-    path = re.sub(r'//', '', url.lstrip('file:'))
+    path = re.sub(r'^//', '', url.lstrip('file:'))
     if path.startswith('/'):
       return path
     elif url.startswith('file:'):
@@ -310,15 +308,15 @@ class Fetcher(object):
     if path:
       try:
         fp = open(path, 'rb')
-        return self.LocalFileResponse(fp)
+        return self._LocalFileResponse(fp)
       except IOError as e:
         raise self.PermanentError('Problem reading data from {}: {}'.format(path, e))
     else:
       try:
         resp = self._requests.get(url, stream=True, timeout=timeout_secs, allow_redirects=True)
-        return self.RequestsResponse(url, resp)
+        return self._RequestsResponse(url, resp)
       except requests.RequestException as e:
-        raise self.RequestsResponse.as_fetcher_error(url, e)
+        raise self._RequestsResponse.as_fetcher_error(url, e)
 
   def fetch(self, url, listener, chunk_size_bytes=None, timeout_secs=None):
     """Fetches data from the given URL notifying listener of all lifecycle events.

@@ -28,7 +28,7 @@ class FetcherTest(mox.MoxTestBase):
 
     self.requests = self.mox.CreateMockAnything()
     self.response = self.mox.CreateMock(requests.Response)
-    self.fetcher = Fetcher(requests_api=self.requests)
+    self.fetcher = Fetcher('/unused/root/dir', requests_api=self.requests)
     self.listener = self.mox.CreateMock(Fetcher.Listener)
 
   def expect_get(self, url, chunk_size_bytes, timeout_secs, listener=True):
@@ -62,16 +62,22 @@ class FetcherTest(mox.MoxTestBase):
   def test_file_scheme(self):
     self.assert_local_file_fetch('file:')
 
-  def test_file_scheme_double_slash_relative(self):
+  def assert_local_file_fetch_relative(self, url, *rel_path):
     expected_contents = b'proof'
     with temporary_dir() as root_dir:
-      with safe_open(os.path.join(root_dir, 'relative', 'path'), 'wb') as fp:
+      with safe_open(os.path.join(root_dir, *rel_path), 'wb') as fp:
         fp.write(expected_contents)
       with temporary_file() as download_fp:
-        Fetcher(root_dir=root_dir).download('file://relative/path', path_or_fd=download_fp)
+        Fetcher(root_dir).download(url, path_or_fd=download_fp)
         download_fp.close()
         with open(download_fp.name, 'rb') as fp:
           self.assertEqual(expected_contents, fp.read())
+
+  def test_file_scheme_double_slash_relative(self):
+    self.assert_local_file_fetch_relative('file://relative/path', 'relative', 'path')
+
+  def test_file_scheme_embedded_double_slash(self):
+    self.assert_local_file_fetch_relative('file://a//strange//path', 'a', 'strange', 'path')
 
   def test_file_scheme_triple_slash(self):
     self.assert_local_file_fetch('file://')
@@ -317,7 +323,7 @@ class FetcherRedirectTest(unittest.TestCase):
     Test with a real HTTP server that redirects from one URL to another.
     """
 
-    fetcher = Fetcher()
+    fetcher = Fetcher('/unused/root/dir')
     with self.setup_server() as base_url:
       self._URL = base_url
       self.assertFalse(self._URL2_ACCESSED)
