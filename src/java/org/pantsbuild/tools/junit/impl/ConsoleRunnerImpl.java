@@ -824,9 +824,9 @@ public class ConsoleRunnerImpl {
             options.numTestShards,
             options.numRetries,
             options.useExperimentalRunner,
-            // NB: Buffering yields ~factor of 100 speedups for output-heavy tests.
-            new PrintStream(new BufferedOutputStream(System.out)),
-            new PrintStream(new BufferedOutputStream(System.err)));
+            // NB: Buffering helps speedup output-heavy tests.
+            new PrintStream(new BufferedOutputStream(System.out), true),
+            new PrintStream(new BufferedOutputStream(System.err), true));
 
     List<String> tests = Lists.newArrayList();
     for (String test : options.tests) {
