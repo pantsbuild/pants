@@ -161,7 +161,6 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
       invokeConsoleRunner("MockTest4 -parallel-threads 1 -xmlreport");
       Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
 
-      System.out.flush();
       String output = outContent.toString();
       assertThat(output, containsString("test41"));
       assertThat(output, containsString("start test42"));
