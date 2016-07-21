@@ -4,33 +4,30 @@
 package org.pantsbuild.tools.junit.lib;
 
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * This test is intentionally under a java_library() BUILD target so it will not be run
  * on its own. It is run by the ConsoleRunnerTest suite to test ConsoleRunnerImpl.
  */
-public class XmlReportTest {
+public class AllFailingTest {
   @Test
-  public void testXmlPasses() {
-    System.out.println("Test output");
-    Assert.assertTrue(true);
-  }
-
-  @Test
-  public void testXmlFails() {
+  public void testFailsOne() {
     Assert.assertTrue(false);
   }
 
   @Test
-  public void testXmlErrors() throws Exception {
-    throw new Exception("testXmlErrors exception");
+  public void testFailsTwo() {
+    Assert.assertTrue(false);
   }
 
-  @Ignore
   @Test
-  public void testXmlSkipped() {
-    Assert.assertTrue(true);
+  public void testFailsThree() {
+    Assert.assertTrue(false);
+  }
+
+  @Test
+  public void testFailsFour() {
+    Assert.assertTrue(false);
   }
 }

@@ -12,6 +12,7 @@ from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
@@ -159,7 +160,7 @@ class BinaryUtil(object):
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
         with temporary_file() as dest:
-          fetcher = fetcher or Fetcher()
+          fetcher = fetcher or Fetcher(get_buildroot())
           fetcher.download(url, listener=Fetcher.ProgressListener(), path_or_fd=dest)
           logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
           downloaded_successfully = True
