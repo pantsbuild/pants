@@ -82,13 +82,12 @@ Every week we do a release from master.  In most cases we will use the `dev` nam
 detailed in [Release Strategy](http://pantsbuild.github.io/release_strategy.html). When we are
 ready to create a new stable branch we will release under the `rc` naming convention instead of
 `dev`.  For example releases in master should look similar to the following: 1.1.0dev0, 1.1.0dev1,
-1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. In addition to a release from master
-the release manager may also need to do a release from a stable branch.
+1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. *In addition to a release from master
+the release manager may also need to do a release from a stable branch.*
 
-* ### Release from Master
+* ###Preparation for the release from the master branch
     1. Edit the version number in `src/python/pants/version.py`
-    2. Preparation for the release should be done from master.  Update
-       `src/python/pants/notes/master.rst` to reflect the changes for this week.
+    2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week.
     3. If this release is also a release candidate then:
          * Update the corresponding notes file for that release. <br/>
            _For example if you were releasing `1.2.0rc0` you would need to
@@ -101,26 +100,24 @@ the release manager may also need to do a release from a stable branch.
     4. Bring the CONTRIBUTORS roster (from master) in
        [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
        up to date by running `build-support/bin/contributors.sh`.
-    5. If creating the RC create the stable branch from the commit you use to do the release.  For
-       example if you were releasing `1.2.0rc0`, create the branch `1.2.x` from your release commit.
+    5. If creating the release candidate create the stable branch from the commit you use to do the
+       release.  For example if you were releasing `1.2.0rc0`, create the branch `1.2.x` from your
+       release commit.
+    6. Create a review for changes in the master branch and indicate `master` in the branch field.
 
-* ###Release from Stable branch
+* ###Preparation for the release from the stable branch
   See [Release Strategy](http://pantsbuild.github.io/release_strategy.html) for more details about
   whether a release is needed from a stable branch.
     1. Cherry pick changes that have been identified in the [backport proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
     2. In your release branch: Edit the version number in `src/python/pants/version.py`
-    3. Preparation for the release should be done from the stable release branch.  Update
-       `src/python/pants/notes/*.rst` to reflect the changes for this week.  For example if you were
-       releasing 1.2.0rc1 you would need to create `src/python/pants/notes/1.2.x.rst`.
+    3. Update `src/python/pants/notes/*.rst` to reflect the changes for this week.  For example if
+       you were releasing 1.2.0rc1 you would need to create `src/python/pants/notes/1.2.x.rst`.
     4. Bring the CONTRIBUTORS roster (from the stable branch) in
        [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
         up to date by running `build-support/bin/contributors.sh`.
     5. Cherry pick changes to branch specific notes back to master.
-
-  Finally, send these changes out for review. When creating a review specify the branch the
-  change will be pushed to in the branch field.  This makes it easier for reviewers to understand
-  where these changes apply.  *If you are releasing from master, this will be one review; if you
-  are also releasing from a stable branch, it will be more than one review.*
+    6. Create a review for changes in the stable branch and indicate the stable
+       branch name in the branch field.
 
 Dry Run (Optional)
 ------------------
