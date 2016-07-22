@@ -25,7 +25,6 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
@@ -291,14 +290,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
     }
-    jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
-    if jvm_distributions:
-      deprecated_conditional(lambda: True, '1.1.1',
-                             'jvm_distributions is deprecated in favor of '
-                             'preferred_jvm_distributions.')
-      graph_info['jvm_distributions'] = jvm_distributions
 
-    # `jvm_distributions` are static distribution settings from config,
     # `preferred_jvm_distributions` are distributions that pants actually uses for the
     # given platform setting.
     graph_info['preferred_jvm_distributions'] = {}
