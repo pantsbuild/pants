@@ -34,6 +34,7 @@ class ExplainOptionsTask(ConsoleTask):
              help='Only show values that overrode defaults.')
     register('--skip-inherited', type=bool, default=True,
              help='Do not show inherited options, unless their values differ from their parents.')
+    register('--json', type=bool, default=False, help='Prints the output in JSON format.')
 
   def _scope_filter(self, scope):
     pattern = self.get_options().scope
@@ -73,13 +74,19 @@ class ExplainOptionsTask(ConsoleTask):
   def _format_record(self, record):
     value_color = green if self.get_options().colors else lambda x: x
     rank_color = self._rank_color(record.rank)
-    return '{value} {rank}'.format(
-      value=value_color(str(record.value)),
-      rank=rank_color('(from {rank}{details})'.format(
-        rank=RankedValue.get_rank_name(record.rank),
-        details=' {}'.format(record.details) if record.details else '',
-      )),
+    formatted_value = rank_color(value_color(str(record.value)))
+    simple_rank = RankedValue.get_rank_name(record.rank)
+    formatted_rank = '(from {rank}{details})'.format(
+      rank=simple_rank,
+      details=rank_color(' {}'.format(record.details)) if record.details else '',
     )
+    if self.get_options().json:
+      return formatted_value, rank_color(simple_rank)
+    else:
+      return '{value} {rank}'.format(
+        value=formatted_value,
+        rank=formatted_rank,
+      )
 
   def _show_history(self, history):
     for record in reversed(list(history)[:-1]):
@@ -105,6 +112,8 @@ class ExplainOptionsTask(ConsoleTask):
 
   def console_output(self, targets):
     self._force_option_parsing()
+    if self.get_options().json:
+      yield '{'
     for scope, options in sorted(self.context.options.tracker.option_history_by_scope.items()):
       if not self._scope_filter(scope):
         continue
@@ -123,8 +132,17 @@ class ExplainOptionsTask(ConsoleTask):
           parent_scope, parent_value = self._get_parent_scope_option(scope, option)
           if parent_scope is not None and parent_value == history.latest.value:
             continue
-        yield '{} = {}'.format(self._format_scope(scope, option),
-                               self._format_record(history.latest))
+        if self.get_options().json:
+          opt_vals = self._format_record(history.latest)
+          yield "  '{}': {{value: '{}', source: '{}'}},".format(
+            self._format_scope(scope, option),
+            opt_vals[0],
+            opt_vals[1],)
+        else:
+          yield '{} = {}'.format(self._format_scope(scope, option),
+                                 self._format_record(history.latest))
         if self.get_options().show_history:
           for line in self._show_history(history):
             yield line
+    if self.get_options().json:
+      yield '}'
