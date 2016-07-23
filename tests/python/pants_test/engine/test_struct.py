@@ -13,6 +13,19 @@ from pants.engine.struct import Struct
 
 
 class StructTest(unittest.TestCase):
+
+  def test_attribute_error_raised_in_property(self):
+    """This tests that Struct#__getattr__ doesn't prevent correct attribution of AttributeErrors."""
+    class StructWithProperty(Struct):
+      @property
+      def some_property(self):
+        return self.missing_attribute
+    struct2 = StructWithProperty()
+    with self.assertRaises(AttributeError) as cm:
+      struct2.some_property
+    self.assertEqual("'StructWithProperty' object has no attribute 'missing_attribute'",
+                     str(cm.exception))
+
   def test_address_no_name(self):
     config = Struct(address=Address.parse('a:b'))
     self.assertEqual('b', config.name)

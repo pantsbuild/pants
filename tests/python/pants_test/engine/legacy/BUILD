@@ -2,6 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name = 'address_mapper',
+  sources = ['test_address_mapper.py'],
+  dependencies = [
+    'src/python/pants/engine/legacy:structs',
+  ]
+)
+
+python_tests(
   name = 'bundle_integration',
   sources = ['test_bundle_integration.py'],
   dependencies = [
@@ -42,6 +50,14 @@ python_tests(
 )
 
 python_tests(
+  name = 'structs',
+  sources = ['test_structs.py'],
+  dependencies = [
+    'src/python/pants/engine/legacy:structs',
+  ]
+)
+
+python_tests(
   name = 'list_integration',
   sources = ['test_list_integration.py'],
   dependencies = [
@@ -58,4 +74,14 @@ python_tests(
     'tests/python/pants_test:int-test'
   ],
   tags = {'integration'}
+)
+
+python_tests(
+  name = 'what_changed_integration',
+  sources = ['test_what_changed_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test'
+  ],
+  tags = {'integration'},
+  timeout = 180,
 )

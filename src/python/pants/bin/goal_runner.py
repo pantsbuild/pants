@@ -19,6 +19,8 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
+from pants.engine.legacy.address_mapper import LegacyAddressMapper
+from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
@@ -68,32 +70,40 @@ class GoalRunnerFactory(object):
 
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
     build_ignore_patterns = self._global_options.ignore_patterns or []
-    self._address_mapper = BuildFileAddressMapper(
-      self._build_file_parser,
-      get_project_tree(self._global_options),
-      build_ignore_patterns,
-      exclude_target_regexps=self._global_options.exclude_target_regexp
-    )
-    self._build_graph = self._select_buildgraph(self._global_options.enable_v2_engine,
+    self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
+                                                self._global_options.enable_v2_engine,
                                                 self._global_options.pants_ignore,
+                                                build_ignore_patterns,
                                                 build_graph)
 
-  def _select_buildgraph(self, use_engine, path_ignore_patterns, cached_buildgraph=None):
+  def _select_buildgraph_and_address_mapper(self, use_engine, path_ignore_patterns, build_ignore_patterns, cached_buildgraph=None):
     """Selects a BuildGraph to use then constructs and returns it.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
     :param LegacyBuildGraph cached_buildgraph: A cached graph to reuse, if available.
     """
+
     if cached_buildgraph is not None:
-      return cached_buildgraph
+      # TODO Should there be a type check here?
+      if use_engine:
+        return cached_buildgraph, LegacyAddressMapper(cached_buildgraph)
+      else:
+        # could pull the mapper from the buildgraph
+        return cached_buildgraph, BuildFileAddressMapper(self._build_file_parser, get_project_tree(self._global_options),
+                                 build_ignore_patterns,
+                                 exclude_target_regexps=self._global_options.exclude_target_regexp)
     elif use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
       graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns)
-      return graph_helper.create_graph(root_specs)
+      graph = graph_helper.create_graph(root_specs)
+      return graph, LegacyAddressMapper(graph)
     else:
-      return MutableBuildGraph(self._address_mapper)
+      address_mapper = BuildFileAddressMapper(self._build_file_parser, get_project_tree(self._global_options),
+                                              build_ignore_patterns,
+                                              exclude_target_regexps=self._global_options.exclude_target_regexp)
+      return MutableBuildGraph(address_mapper), address_mapper
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""

@@ -26,6 +26,7 @@ python_library(
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:storage',
+    'src/python/pants/engine/legacy:address_mapper',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:parser',
     'src/python/pants/goal',

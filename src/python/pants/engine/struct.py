@@ -254,7 +254,9 @@ class Struct(Serializable, SerializableFactory, Validatable):
   def __getattr__(self, item):
     if item in self._kwargs:
       return self._kwargs[item]
-    raise AttributeError('{} does not have attribute {!r}'.format(self, item))
+    #  NB: This call ensures that the default missing attribute behavior happens.
+    #      Without it, AttributeErrors inside @property methods will be misattributed.
+    return object.__getattribute__(self, item)
 
   def _key(self):
     if self.address:

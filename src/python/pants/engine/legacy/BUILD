@@ -2,6 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name='address_mapper',
+  sources=['address_mapper.py'],
+  dependencies=[
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:specs',
+    'src/python/pants/build_graph',
+  ],
+)
+
+python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
