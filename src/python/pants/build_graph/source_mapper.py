@@ -61,11 +61,11 @@ class SpecSourceMapper(SourceMapper):
       self._build_graph.inject_address_closure(address)
       target = self._build_graph.get_target(address)
       sources = target.payload.get_field('sources')
-      #TODO, I think this should be an if/elif block
+      # TODO Should this only yield one address per loop iteration?
       if sources and not isinstance(sources, DeferredSourcesField) and sources.matches(source):
         yield address
-      if (isinstance(address, BuildFileAddress) and address.build_file.relpath == source) or \
-          os.path.dirname(source) == spec_path:
+      if ((isinstance(address, BuildFileAddress) and address.build_file.relpath == source) or
+          os.path.dirname(source) == spec_path):
         yield address
       if target.has_resources:
         for resource in target.resources:

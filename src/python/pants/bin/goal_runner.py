@@ -77,11 +77,12 @@ class GoalRunnerFactory(object):
                                                 build_graph)
 
   def _select_buildgraph_and_address_mapper(self, use_engine, path_ignore_patterns, build_ignore_patterns, cached_buildgraph=None):
-    """Selects a BuildGraph to use then constructs and returns it.
+    """Selects a BuildGraph and AddressMapper to use then constructs them and returns them.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
     :param LegacyBuildGraph cached_buildgraph: A cached graph to reuse, if available.
+    :returns a tuple of the graph and the address mapper.
     """
 
     if cached_buildgraph is not None:
@@ -89,10 +90,11 @@ class GoalRunnerFactory(object):
       if use_engine:
         return cached_buildgraph, LegacyAddressMapper(cached_buildgraph)
       else:
-        # could pull the mapper from the buildgraph
-        return cached_buildgraph, BuildFileAddressMapper(self._build_file_parser, get_project_tree(self._global_options),
-                                 build_ignore_patterns,
-                                 exclude_target_regexps=self._global_options.exclude_target_regexp)
+        # TODO This could pull the address mapper off of the cached build graph
+        return cached_buildgraph, BuildFileAddressMapper(self._build_file_parser,
+                                                         get_project_tree(self._global_options),
+                                                         build_ignore_patterns,
+                                                         exclude_target_regexps=self._global_options.exclude_target_regexp)
     elif use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
