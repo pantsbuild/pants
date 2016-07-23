@@ -35,7 +35,7 @@ Refactoring, Improvements, and Tooling
 * [1.1.x\] Clean up export deprecation warning on 1.1.x branch
   `RB #4084 <https://rbcommons.com/s/twitter/r/4084>`_
   `RB #4110 <https://rbcommons.com/s/twitter/r/4110>`_
-   
+
 * Print a message for cycles in the graph when computing the target fingerprint
   `RB #4087 <https://rbcommons.com/s/twitter/r/4087>`_
 
