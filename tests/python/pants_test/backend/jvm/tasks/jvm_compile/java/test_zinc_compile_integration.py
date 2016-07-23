@@ -174,3 +174,15 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                               expected_files=['PrintVersion.class'],
                               extra_args=['--no-compile-zinc-capture-classpath']) as found:
       self.assertFalse(classpath_filename in found)
+
+  def test_custom_javac(self):
+    with self.temporary_workdir() as workdir:
+      with self.temporary_cachedir() as cachedir:
+        pants_run = self.run_test_compile(
+            workdir, cachedir, 'examples/src/java/org/pantsbuild/example/hello/main',
+            extra_args=['--compile-zinc-javac=3rdparty:custom_javactool_for_testing'],
+            clean_all=True
+        )
+        self.assertNotEquals(0, pants_run.returncode)  # Our custom javactool always fails.
+        self.assertIn('Pants caused Zinc to load a custom JavacTool', pants_run.stdout_data)
+
