@@ -9,21 +9,12 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class WhatChangedIntegrationTest(PantsRunIntegrationTest):
-  maxDiff=None
-
-  # NB: this started with the list integration test. There might be places we could lift things into a new set of
-  # abstractions.
-  def get_target_set(self, std_out):
-    ##return sorted(
-    #  [l for l in std_out.split('\n') if l]
-    #)
-    return std_out
 
   def run_engine(self, success, *args):
-    return self.get_target_set(self.do_command(*args, success=success, enable_v2_engine=True).stdout_data)
+    return self.do_command(*args, success=success, enable_v2_engine=True).stdout_data
 
   def run_regular(self, success, *args):
-    return self.get_target_set(self.do_command(*args, success=success, enable_v2_engine=False).stdout_data)
+    return self.do_command(*args, success=success, enable_v2_engine=False).stdout_data
 
   def assert_changed_new_equals_old(self, changed_arguments):
     self.assert_run_new_equals_old(['-q', 'changed'] + changed_arguments, success=True)
