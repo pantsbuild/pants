@@ -35,7 +35,7 @@ def file_list_to_args_for_cat(files):
 
 
 def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(files):
-  return SnapshottedProcessRequest(args=tuple(f.path for f in files.dependencies),
+  return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in files.dependencies)),
                                    snapshot_subjects=(files,))
 
 
@@ -216,8 +216,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def assert_archive_files(self, expected_archive_files, snapshot, step_context):
     with open_tar(_snapshot_path(snapshot, step_context.snapshot_archive_root), errorlevel=1) as tar:
-      self.assertEqual(expected_archive_files,
-                       [tar_info.path for tar_info in tar.getmembers()])
+      self.assertEqual(sorted(expected_archive_files), sorted(tar.getnames()))
 
   def assertFirstEntryIsReturn(self, root_entries, scheduler):
     root, state = root_entries[0]
