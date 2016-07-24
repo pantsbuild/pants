@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Wrapper for self-bootstrapping virtualenv
 set -e
-VIRTUALENV_VERSION=13.1.0
-VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.python.org/packages/source/v/virtualenv}
+VIRTUALENV_VERSION=15.0.2
+VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.io/packages/source/v/virtualenv}
 
 if [[ $GIT_HOOK == 1 ]] ; then
   REPO_ROOT=.
@@ -27,7 +27,7 @@ if ! [ -f "${HERE}/virtualenv.dist/BOOTSTRAPPED-${VIRTUALENV_VERSION}" ]; then
   pushd "${HERE}"
   VIRTUALENV_PACKAGE_FULL_URL=${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-${VIRTUALENV_VERSION}.tar.gz
   log "Downloading ${VIRTUALENV_PACKAGE_FULL_URL}..."
-  curl -O ${VIRTUALENV_PACKAGE_FULL_URL} || \
+  curl -L -O ${VIRTUALENV_PACKAGE_FULL_URL} || \
     die "Failed to download ${VIRTUALENV_PACKAGE_FULL_URL}."
   rm -rf virtualenv-${VIRTUALENV_VERSION} && \
   tar zxvf virtualenv-${VIRTUALENV_VERSION}.tar.gz || \
