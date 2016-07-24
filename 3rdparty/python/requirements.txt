@@ -24,4 +24,4 @@ setproctitle==1.1.10
 setuptools==5.4.1
 six>=1.9.0,<2
 thrift==0.9.1
-wheel==0.24.0
+wheel==0.29.0
