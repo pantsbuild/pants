@@ -67,7 +67,7 @@ function run_local_pants() {
 
 # When we do (dry-run) testing, we need to run the packaged pants.
 # It doesn't have internal backend plugins so when we execute it
-# at the repo build root, the root pants.ini will ask it load
+# at the repo build root, the root pants.ini will ask it to load
 # internal backend packages and their dependencies which it doesn't have,
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
