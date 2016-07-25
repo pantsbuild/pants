@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.engine.legacy.structs import Files, RGlobs
+from pants.engine.legacy.structs import Files
 
 
 class StructTest(unittest.TestCase):
