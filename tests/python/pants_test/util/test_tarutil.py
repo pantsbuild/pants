@@ -20,14 +20,12 @@ class TarutilTest(unittest.TestCase):
     self.file_list = ['a', 'b', 'c']
     self.file_tar = os.path.join(self.basedir, 'test.tar')
 
-    tar = TarFile.open(self.file_tar, mode='w')
-    for f in self.file_list:
-      full_path = os.path.join(self.basedir, f)
-      touch(full_path)
-      tar.add(full_path, f)
-      safe_delete(full_path)
-
-    tar.close()
+    with TarFile.open(self.file_tar, mode='w') as tar:
+      for f in self.file_list:
+        full_path = os.path.join(self.basedir, f)
+        touch(full_path)
+        tar.add(full_path, f)
+        safe_delete(full_path)
 
   def tearDown(self):
     safe_rmtree(self.basedir)
@@ -39,9 +37,8 @@ class TarutilTest(unittest.TestCase):
       fp.write(content[:512+148] + 'aaaaaaaa' + content[512+156:])
 
   def extract_tar(self, path, **kwargs):
-    tar = TarFile.open(self.file_tar, mode='r', **kwargs)
-    tar.extractall(path=self.basedir)
-    tar.close()
+    with TarFile.open(self.file_tar, mode='r', **kwargs) as tar:
+      tar.extractall(path=self.basedir)
 
   def test_invalid_header_errorlevel_0(self):
     self.inject_corruption()
