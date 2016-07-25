@@ -34,6 +34,7 @@ class TarutilTest(unittest.TestCase):
     with open(self.file_tar, 'r+w') as fp:
       content = fp.read()
       fp.seek(0)
+      # Replace 1 byte of good data with garbage.
       fp.write(content[:512+148] + 'aaaaaaaa' + content[512+156:])
 
   def extract_tar(self, path, **kwargs):
