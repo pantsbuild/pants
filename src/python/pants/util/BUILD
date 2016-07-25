@@ -110,6 +110,11 @@ python_library(
 )
 
 python_library(
+  name = 'tarutil',
+  sources = ['tarutil.py'],
+)
+
+python_library(
   name = 'timeout',
   sources = ['timeout.py'],
 )

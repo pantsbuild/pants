@@ -128,6 +128,14 @@ python_tests(
 )
 
 python_tests(
+  name = 'tarutil',
+  sources = ['test_tarutil.py'],
+  dependencies = [
+    'src/python/pants/util:tarutil',
+  ]
+)
+
+python_tests(
   name = 'timeout',
   sources = ['test_timeout.py'],
   dependencies = [
