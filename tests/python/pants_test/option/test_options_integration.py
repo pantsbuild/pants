@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 from textwrap import dedent
 
@@ -35,6 +36,24 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     self.assertNotIn('options.scope = options', pants_run.stdout_data)
     self.assertNotIn('options.name = None', pants_run.stdout_data)
     self.assertIn('publish.jar.scm_push_attempts = ', pants_run.stdout_data)
+
+  def test_valid_json(self):
+    pants_run = self.run_pants(['options', '--output-format=json'])
+    self.assert_success(pants_run)
+    try:
+      json.loads(pants_run.stdout_data)
+    except ValueError:
+      self.fail("Invalid JSON output")
+
+  def test_valid_json_with_history(self):
+    pants_run = self.run_pants(['options', '--output-format=json', '--show-history'])
+    self.assert_success(pants_run)
+    try:
+      output = json.loads(pants_run.stdout_data)
+      for _, val in output.items():
+        self.assertIn("history", val)
+    except ValueError:
+      self.fail("Invalid JSON output")
 
   def test_options_option(self):
     pants_run = self.run_pants(['options', '--no-colors', '--name=colors', '--no-skip-inherited'])
