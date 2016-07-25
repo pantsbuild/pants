@@ -23,9 +23,9 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
-from pants.binaries import binary_util
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.resources import Resources
+from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -360,7 +360,10 @@ class IdeGen(IvyTaskMixin, NailgunTask):
 
     idefile = self.generate_project(self._project)
     if idefile:
-      binary_util.ui_open(idefile)
+      try:
+        desktop.ui_open(idefile)
+      except desktop.OpenError as e:
+        raise TaskError(e)
 
   def generate_project(self, project):
     raise NotImplementedError('Subclasses must generate a project for an ide')

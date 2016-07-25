@@ -2,6 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name='argfile',
+  sources=['argfile.py'],
+  dependencies=[
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
+python_library(
   name='artifact',
   sources=['artifact.py'],
   dependencies=[

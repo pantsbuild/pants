@@ -36,6 +36,9 @@ def Closure<Void> ciShNodeSpawner(String os, String flags) {
         // For c/c++ contrib plugin tests.
         env.CXX = "g++"
 
+        // Tune pants options for unattended runs on slave machines.
+        env.PANTS_CONFIG_OVERRIDE = "['pants.jenkins.ini']"
+
         sh("""
           ./build-support/ci/print_node_info.sh
           ./build-support/bin/ci.sh ${flags}

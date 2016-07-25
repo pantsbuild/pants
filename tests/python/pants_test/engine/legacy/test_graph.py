@@ -61,7 +61,7 @@ class GraphInvalidationTest(unittest.TestCase):
     with self.open_scheduler([spec]) as (graph, _, _):
       target = graph.get_target(Address.parse(spec))
       sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
-      self.assertEquals(['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd', 'p', 'a', 'n', 't', 's'],
+      self.assertEquals(['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd'],
                         sources)
 
   def test_target_macro_override(self):

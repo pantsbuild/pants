@@ -10,5 +10,6 @@ python_tests(
     '3rdparty/python:six',
     'src/python/pants/net',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )

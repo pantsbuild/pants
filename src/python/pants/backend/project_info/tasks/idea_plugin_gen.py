@@ -16,8 +16,8 @@ from pants.backend.project_info.tasks.ide_gen import IdeGen
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
-from pants.binaries import binary_util
 from pants.task.console_task import ConsoleTask
+from pants.util import desktop
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 
@@ -192,4 +192,7 @@ class IdeaPluginGen(IdeGen, ConsoleTask):
         null = open(os.devnull, 'w')
         subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
       else:
-        binary_util.ui_open(ide_file)
+        try:
+          desktop.ui_open(ide_file)
+        except desktop.OpenError as e:
+          raise TaskError(e)

@@ -10,6 +10,7 @@ import os
 import shutil
 
 import six.moves.urllib.parse as urllib_parse
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
@@ -53,10 +54,10 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
                           path=download_path))
 
       try:
-        Fetcher().download(target.dependencies_archive_url,
-                           listener=Fetcher.ProgressListener(),
-                           path_or_fd=download_path,
-                           timeout_secs=self.get_options().fetch_timeout_secs)
+        Fetcher(get_buildroot()).download(target.dependencies_archive_url,
+                                          listener=Fetcher.ProgressListener(),
+                                          path_or_fd=download_path,
+                                          timeout_secs=self.get_options().fetch_timeout_secs)
       except Fetcher.Error as error:
         raise TaskError('Failed to fetch preinstalled node_modules for {target} from {url}: {error}'
                         .format(target=target.address.reference(),

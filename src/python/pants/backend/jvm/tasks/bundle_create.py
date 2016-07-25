@@ -46,10 +46,6 @@ class BundleCreate(JvmBinaryTask):
              help='Create an archive of this type from the bundle. '
                   'This option is also defined in jvm_app target. '
                   'Precedence is CLI option > target option > pants.ini option.')
-    register('--archive-prefix', advanced=True, type=bool,
-             fingerprint=True, removal_hint='redundant option', removal_version='1.1.0',
-             help='If --archive is specified, prefix archive with target basename or a unique '
-                  'identifier as determined by --use-basename-prefix.')
     # `target.id` ensures global uniqueness, this flag is provided primarily for
     # backward compatibility.
     register('--use-basename-prefix', advanced=True, type=bool,

@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
 from pants.base.exceptions import TaskError
-from pants.binaries import binary_util
+from pants.util import desktop
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch
 
@@ -178,4 +178,7 @@ class Cobertura(Coverage):
 
     if self._coverage_open:
       coverage_html_file = os.path.join(self._settings.coverage_dir, 'html', 'index.html')
-      binary_util.ui_open(coverage_html_file)
+      try:
+        desktop.ui_open(coverage_html_file)
+      except desktop.OpenError as e:
+        raise TaskError(e)
