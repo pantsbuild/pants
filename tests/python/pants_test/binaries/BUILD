@@ -6,6 +6,8 @@ python_tests(
   sources=['test_binary_util.py'],
   dependencies=[
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',
   ]
 )
