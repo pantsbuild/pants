@@ -131,6 +131,7 @@ python_tests(
   name = 'tarutil',
   sources = ['test_tarutil.py'],
   dependencies = [
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:tarutil',
   ]
 )
