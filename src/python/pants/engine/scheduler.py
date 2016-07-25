@@ -19,6 +19,7 @@ from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return, SelectNode,
                                 State, StepContext, TaskNode, Throw, Waiting)
 from pants.engine.objects import Closable
+from pants.engine.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
 
 
@@ -645,12 +646,10 @@ class LocalScheduler(object):
     def roots():
       for subject in subjects:
         for product in products:
-          if type(subject) is Address:
-            yield SelectNode(subject, product, None, None)
+          if type(subject) in [Address, PathGlobs]:
+            yield SelectNode(subject, None, Select(product))
           elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
-            yield DependenciesNode(subject, product, None, Addresses, None)
-          elif type(subject) is PathGlobs:
-            yield SelectNode(subject, product, None, None)
+            yield DependenciesNode(subject, None, SelectDependencies(product, Addresses))
           else:
             raise ValueError('Unsupported root subject type: {}'.format(subject))
 

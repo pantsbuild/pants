@@ -77,6 +77,14 @@ python_tests(
 )
 
 python_tests(
+  name='selectors',
+  sources=['test_selectors.py'],
+  dependencies=[
+    'src/python/pants/engine:selectors',
+  ]
+)
+
+python_tests(
   name='struct',
   sources=['test_struct.py'],
   dependencies=[
