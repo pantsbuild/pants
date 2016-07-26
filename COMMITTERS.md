@@ -1,12 +1,10 @@
 Active Committers
 =================
 
-Andy Reitz
 Nick Howard
 Benjy Weinberger
 Chris Heisterkamp
 Matt Olsen
-David Turner
 Eric Ayers
 Fedor Korotkov
 Garrett Malmquist
@@ -16,13 +14,15 @@ Kris Wilson
 Larry Hosken
 Mateo Rodriguez
 Patrick Lawson
-Peiyu Want
+Peiyu Wang
 Stu Hood
-Tejal
-Travis Crawford
+Tejal Desai
 Yi Cheng
 
 Emeritus
 ========
 
+Andy Reitz
 David Taylor
+David Turner
+Travis Crawford
