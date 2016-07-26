@@ -126,11 +126,6 @@ target(name='thrift-0.6.1',
 # Test support
 #
 
-jar_library(name='custom_javactool_for_testing',
-            jars=[
-              jar('org.pantsbuild', 'custom_javactool_for_testing', '0.0.1')
-            ])
-
 jar_library(name='easymock',
             jars=[
               jar('org.easymock', 'easymock', '3.3.1')
