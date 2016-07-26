@@ -10,9 +10,24 @@ import tarfile
 
 class TarFile(tarfile.TarFile):
   def next(self):
-    """A modification of the original next() method in tarfile module
+    """A copy and modification of the next() method in tarfile module.
 
-    Raise InvalidHeaderError whenever seen as long as ignore_zeros is not set
+    The copy is from tarfile.py of CPython @102457:95df96aa2f5a
+
+    # Copyright (C) 2002 Lars Gustäbel <lars@gustaebel.de>
+    # All rights reserved.
+    #
+    # Permission  is  hereby granted,  free  of charge,  to  any person
+    # obtaining a  copy of  this software  and associated documentation
+    # files  (the  "Software"),  to   deal  in  the  Software   without
+    # restriction,  including  without limitation  the  rights to  use,
+    # copy, modify, merge, publish, distribute, sublicense, and/or sell
+    # copies  of  the  Software,  and to  permit  persons  to  whom the
+    # Software  is  furnished  to  do  so,  subject  to  the  following
+    # conditions:
+    #
+    # The above copyright  notice and this  permission notice shall  be
+    # included in all copies or substantial portions of the Software.
     """
     self._check("ra")
     if self.firstmember is not None:
@@ -41,6 +56,7 @@ class TarFile(tarfile.TarFile):
           self._dbg(2, "0x%X: %s" % (self.offset, e))
           self.offset += tarfile.BLOCKSIZE
           continue
+        # Modify here, to raise exceptions if errorlevel is bigger than 0.
         elif self.errorlevel > 0:
           raise tarfile.ReadError(str(e))
       except tarfile.EmptyHeaderError:
