@@ -82,7 +82,6 @@ public abstract class ConsoleRunnerTestBase {
   @Before
   public void setUp() {
     ConsoleRunnerImpl.setCallSystemExitOnFinish(false);
-    ConsoleRunnerImpl.setExitStatus(0);
     ConsoleRunnerImpl.addTestListener(null);
     TestRegistry.reset();
   }
@@ -90,7 +89,6 @@ public abstract class ConsoleRunnerTestBase {
   @After
   public void tearDown() {
     ConsoleRunnerImpl.setCallSystemExitOnFinish(true);
-    ConsoleRunnerImpl.setExitStatus(0);
     ConsoleRunnerImpl.addTestListener(null);
   }
 

@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.binaries import binary_util
+from pants.base.exceptions import TaskError
 from pants.reporting.reporting_server import ReportingServerManager
 from pants.task.task import QuietTaskMixin, Task
+from pants.util import desktop
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,10 @@ class ReportingServerRun(QuietTaskMixin, Task):
 
   def _maybe_open(self, port):
     if self.get_options().open:
-      binary_util.ui_open('http://localhost:{port}'.format(port=port))
+      try:
+        desktop.ui_open('http://localhost:{port}'.format(port=port))
+      except desktop.OpenError as e:
+        raise TaskError(e)
 
   def execute(self):
     manager = ReportingServerManager(self.context, self.get_options())

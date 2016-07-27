@@ -113,7 +113,6 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.pants_run(
         options=['--scala-platform-version=custom', '--scala-platform-suffix-version=2.11']
       )
-      print('XXXXXXXXXXXXXXX {}'.format(pants_run.stdout_data))
       self.assert_failure(pants_run)
       assert "Unable to bootstrap tool: 'scalac'" in pants_run.stdout_data
 

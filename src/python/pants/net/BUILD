@@ -8,5 +8,6 @@ python_library(
     '3rdparty/python:requests',
     '3rdparty/python:six',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
   ],
 )

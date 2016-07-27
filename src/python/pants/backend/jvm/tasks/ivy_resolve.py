@@ -15,8 +15,9 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.binaries import binary_util
+from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.util import desktop
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
@@ -167,4 +168,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     shutil.copy(os.path.join(self.ivy_cache_dir, 'ivy-report.css'), self._outdir)
 
     if self._open and report:
-      binary_util.ui_open(report)
+      try:
+        desktop.ui_open(report)
+      except desktop.OpenError as e:
+        raise TaskError(e)

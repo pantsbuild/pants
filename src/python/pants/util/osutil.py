@@ -32,9 +32,15 @@ def get_os_name():
 
 
 def get_os_id(uname_func=None):
+  """Return an OS identifier sensitive only to its major version.
+
+  :param uname_func: An `os.uname` compliant callable; intended for tests.
+  :returns: a tuple of (OS name, sub identifier) or `None` if the OS is not supported.
+  :rtype: tuple of string, string
+  """
   uname_func = uname_func or os.uname
   sysname, _, release, _, machine = uname_func()
-  os_id = _ID_BY_OS[sysname.lower()]
+  os_id = _ID_BY_OS.get(sysname.lower())
   if os_id:
     return os_id(release, machine)
   return None

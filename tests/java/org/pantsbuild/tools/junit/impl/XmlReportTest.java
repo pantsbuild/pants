@@ -3,6 +3,7 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.IOException;
@@ -180,7 +181,8 @@ public class XmlReportTest extends ConsoleRunnerTestBase {
   @Test
   public void testXmlReportXmlElements() throws Exception {
     String testClassName = XmlReportAllPassingTest.class.getCanonicalName();
-    String xmlOutput = FileUtils.readFileToString(runTestAndReturnXmlFile(testClassName, false));
+    String xmlOutput = FileUtils.readFileToString(
+        runTestAndReturnXmlFile(testClassName, false), Charsets.UTF_8);
 
     assertThat(xmlOutput, containsString("<testsuite"));
     assertThat(xmlOutput, containsString("<properties>"));
@@ -304,7 +306,6 @@ public class XmlReportTest extends ConsoleRunnerTestBase {
     assertThat(testCase.getError().getStacktrace(),
         containsString(FailingTestRunner.class.getCanonicalName() + ".getTestRules("));
   }
-
 
   protected File runTestAndReturnXmlFile(String testClassName, boolean shouldFail)
       throws IOException, JAXBException {

@@ -6,10 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from unittest import skipIf
 
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
+from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
 
 class ZincCompileIntegrationTest(BaseCompileIT):
@@ -174,3 +176,15 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                               expected_files=['PrintVersion.class'],
                               extra_args=['--no-compile-zinc-capture-classpath']) as found:
       self.assertFalse(classpath_filename in found)
+
+  @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
+  def test_custom_javac(self):
+    with self.temporary_workdir() as workdir:
+      with self.temporary_cachedir() as cachedir:
+        pants_run = self.run_test_compile(
+            workdir, cachedir, 'examples/src/java/org/pantsbuild/example/hello/main',
+            extra_args=['--compile-zinc-javac=testprojects/3rdparty/javactool:custom_javactool_for_testing'],
+            clean_all=True
+        )
+        self.assertNotEquals(0, pants_run.returncode)  # Our custom javactool always fails.
+        self.assertIn('Pants caused Zinc to load a custom JavacTool', pants_run.stdout_data)
