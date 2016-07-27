@@ -47,10 +47,11 @@ cache:
     - build-support/pants_dev_deps.venv
 
 language: python
-
+dist: trusty
 python:
   - "2.7"
-
+before_install:
+  - jdk_switcher use oraclejdk8
 install:
   - pip --quiet install coveralls
 
