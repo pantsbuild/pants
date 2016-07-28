@@ -44,18 +44,18 @@ before_cache:
   # thrash the cache.  Skip caching these.
   - rm -rf $HOME/.cache/pants/stats
 
-cache:
-  directories:
-    - $HOME/.cache/pants
-    - $HOME/.ivy2/pants
-    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
-    # using its own isolated cache:
-    #   https://github.com/pantsbuild/pants/issues/2485
-    - $HOME/.npm
-    - $HOME/.android
-    - $ANDROID_SDK_INSTALL_LOCATION
-    - build-support/isort.venv
-    - build-support/pants_dev_deps.venv
+# cache:
+#   directories:
+#     - $HOME/.cache/pants
+#     - $HOME/.ivy2/pants
+#     # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
+#     # using its own isolated cache:
+#     #   https://github.com/pantsbuild/pants/issues/2485
+#     - $HOME/.npm
+#     - $HOME/.android
+#     - $ANDROID_SDK_INSTALL_LOCATION
+#     - build-support/isort.venv
+#     - build-support/pants_dev_deps.venv
 
 
 install:
