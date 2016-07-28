@@ -18,6 +18,9 @@ addons:
     - lib32z1
     - lib32z1-dev
     - python-dev
+    - build-essential
+    - libssl-dev
+    - libffi-dev
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
