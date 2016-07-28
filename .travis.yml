@@ -3,7 +3,7 @@
 # "machines". This is also required in order to use the
 # cache configured below.
 sudo: required
-dist: trusty
+# dist: trusty
 language: python
 python:
   - "2.7"
