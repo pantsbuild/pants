@@ -6,7 +6,7 @@ export CONFIGURE_OPTS="--enable-unicode=ucs4"
 pyenv install 2.7.10
 
 alias python2.7=/home/travis/.pyenv/versions/2.7.10
-pip install --upgrade pip
+sudo pip install --upgrade pip
 # $PYTHON_DIR=$HOME/python27-ucs4/python
 # if [ -f $PYTHON_DIR ];
 # then
