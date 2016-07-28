@@ -67,3 +67,10 @@ class LegacyAddressMapperTest(unittest.TestCase):
     mapper = LegacyAddressMapper(graph_mock, '')
     with self.assertRaises(AddressMapper.BuildFileScanError):
       mapper.resolve(Address('a', 'address'))
+
+  def test_is_declaring_file(self):
+    mapper = LegacyAddressMapper(None, '')
+    self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD'))
+    self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD.suffix'))
+    self.assertFalse(mapper.is_declaring_file(Address('path', 'name'), 'path/not_a_build_file'))
+    self.assertFalse(mapper.is_declaring_file(Address('path', 'name'), 'differing-path/BUILD'))

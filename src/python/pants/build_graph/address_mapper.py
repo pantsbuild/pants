@@ -84,6 +84,14 @@ class AddressMapper(object):
     :raises AddressLookupError: if there is a problem parsing a BUILD file
     """
 
+  @abstractmethod
+  def is_declaring_file(self, address, file_path):
+    """Returns True if the address could be declared in the file at file_path.
+
+    :param Address address: The address to check for.
+    :param string file_path: The path of the file that may contain a declaration for the address.
+    """
+
   def _raise_incorrect_address_error(self, spec_path, wrong_target_name, addresses):
     """Search through the list of targets and return those which originate from the same folder
     which wrong_target_name resides in.

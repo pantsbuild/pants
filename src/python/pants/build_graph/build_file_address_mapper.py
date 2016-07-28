@@ -203,6 +203,9 @@ class BuildFileAddressMapper(AddressMapper):
                            plural=('s' if excluded_count != 1 else '')))
     return addresses
 
+  def is_declaring_file(self, address, file_path):
+    return address.build_file.relpath == file_path
+
   def _scan_spec(self, spec, fail_fast, exclude_spec):
     """Scans the given address spec."""
 

@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
-from pants.base.build_file import BuildFile
-from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.source.payload_fields import DeferredSourcesField
 
@@ -64,7 +62,7 @@ class SpecSourceMapper(SourceMapper):
       sources = target.payload.get_field('sources')
       if self._sources_match(source, sources):
         yield address
-      elif self._source_maybe_build_file_for_address(address, source, spec_path):
+      elif self._address_mapper.is_declaring_file(address, source):
         yield address
       elif target.has_resources:
         for resource in target.resources:
@@ -79,12 +77,6 @@ class SpecSourceMapper(SourceMapper):
     if not sources or isinstance(sources, DeferredSourcesField):
       return False
     return sources.matches(source)
-
-  def _source_maybe_build_file_for_address(self, address, source, spec_path):
-    if isinstance(address, BuildFileAddress):
-      return address.build_file.relpath == source
-    else:
-      return os.path.dirname(source) == spec_path and BuildFile._is_buildfile_name(os.path.basename(source))
 
 
 class LazySourceMapper(SourceMapper):

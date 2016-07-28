@@ -6,9 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
@@ -27,6 +29,13 @@ class LegacyAddressMapper(AddressMapper):
   def __init__(self, graph, build_root):
     self._build_root = build_root
     self._graph = graph
+
+  def is_declaring_file(self, address, file_path):
+    # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
+    # considered the one that declared it. We could call into the engine to ask for the file that
+    # declared the address.
+    return (os.path.dirname(file_path) == address.spec_path and
+            BuildFile._is_buildfile_name(os.path.basename(file_path)))
 
   def addresses_in_spec_path(self, spec_path):
     try:
