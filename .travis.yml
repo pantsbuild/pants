@@ -13,9 +13,9 @@ python:
 before_install:
   - jdk_switcher use oraclejdk8
   # - build-support/build-python.sh
-  - pyenv uninstall 2.7.10
+  - sudo pyenv uninstall 2.7.10
   - export CONFIGURE_OPTS="--enable-unicode=ucs4"
-  - pyenv install 2.7.10
+  - sudo pyenv install 2.7.10
   - which python2.7
   - python2.7 --version
   - sudo pip install --upgrade pip
