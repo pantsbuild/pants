@@ -10,6 +10,7 @@ python:
 before_install:
   - jdk_switcher use oraclejdk8
   - build-support/build-python.sh
+  - alias python2.7=/home/travis/bin/python
 # These are needed to run the Android SDK tools.
 addons:
   apt:
