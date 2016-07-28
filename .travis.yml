@@ -2,7 +2,7 @@
 # which should provide faster startup times and beefier
 # "machines". This is also required in order to use the
 # cache configured below.
-sudo: false
+sudo: required
 dist: trusty
 language: python
 python:
