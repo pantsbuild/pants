@@ -13,6 +13,7 @@ jdk:
 before_install:
   # - jdk_switcher use oraclejdk8
   # - build-support/build-python.sh
+  - pyenv install 2.7.10
   - which python2.7
   - python2.7 --version
   - sudo pip install --upgrade pip
