@@ -4,9 +4,9 @@
 # cache configured below.
 sudo: required
 dist: trusty
-language: generic
-# python:
-#   - "2.7"
+language: python
+python:
+  - "2.7"
 before_install:
   - jdk_switcher use oraclejdk8
   - build-support/build-python.sh
