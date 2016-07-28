@@ -4,21 +4,21 @@
 # cache configured below.
 sudo: required
 dist: trusty
-language: python
-python:
-  - "2.7"
-# jdk:
-#   oraclejdk8
+language: java
+# python:
+#   - "2.7"
+jdk:
+  oraclejdk8
 
 before_install:
-  - jdk_switcher use oraclejdk8
+  # - jdk_switcher use oraclejdk8
   # - build-support/build-python.sh
-  - sudo pyenv uninstall 2.7.10
-  - export CONFIGURE_OPTS="--enable-unicode=ucs4"
-  - sudo pyenv install 2.7.10
+  # - sudo pyenv uninstall 2.7.10
+  # - export CONFIGURE_OPTS="--enable-unicode=ucs4"
+  # - sudo pyenv install 2.7.10
   - which python2.7
   - python2.7 --version
-  - sudo pip install --upgrade pip
+  # - sudo pip install --upgrade pip
   # - exit 1
 
 # These are needed to run the Android SDK tools.
@@ -50,9 +50,8 @@ before_cache:
   # thrash the cache.  Skip caching these.
   - rm -rf $HOME/.cache/pants/stats
 
-cache:
-  directories:
-    - $HOME/python27-ucs4/python
+# cache:
+#   directories:
     # - $HOME/.cache/pants
     # - $HOME/.ivy2/pants
     # # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
