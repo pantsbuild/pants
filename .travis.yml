@@ -17,7 +17,7 @@ before_install:
   - python2.7 --version
   - sudo pip install --upgrade pip
   # - exit 1
-  
+
 # These are needed to run the Android SDK tools.
 addons:
   apt:
@@ -63,7 +63,7 @@ cache:
 
 
 install:
-  - pip --quiet install coveralls
+  - sudo pip --quiet install coveralls
 
 env:
   global:
