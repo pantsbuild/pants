@@ -4,13 +4,14 @@
 # cache configured below.
 sudo: required
 dist: trusty
-language: python
-python:
-  - "2.7"
+language: generic
+# python:
+#   - "2.7"
 before_install:
   - jdk_switcher use oraclejdk8
   - build-support/build-python.sh
-  - alias python2.7=/home/travis/bin/python
+  - which python2.7
+
 # These are needed to run the Android SDK tools.
 addons:
   apt:
@@ -18,11 +19,6 @@ addons:
     - lib32stdc++6
     - lib32z1
     - lib32z1-dev
-#    - python-dev
-#    - build-essential
-#    - libssl-dev
-#    - libffi-dev
-#    - python-cffi
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
@@ -45,18 +41,19 @@ before_cache:
   # thrash the cache.  Skip caching these.
   - rm -rf $HOME/.cache/pants/stats
 
-# cache:
-#   directories:
-#     - $HOME/.cache/pants
-#     - $HOME/.ivy2/pants
-#     # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
-#     # using its own isolated cache:
-#     #   https://github.com/pantsbuild/pants/issues/2485
-#     - $HOME/.npm
-#     - $HOME/.android
-#     - $ANDROID_SDK_INSTALL_LOCATION
-#     - build-support/isort.venv
-#     - build-support/pants_dev_deps.venv
+cache:
+  directories:
+    - $HOME/python27-ucs4/python
+    # - $HOME/.cache/pants
+    # - $HOME/.ivy2/pants
+    # # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
+    # # using its own isolated cache:
+    # #   https://github.com/pantsbuild/pants/issues/2485
+    # - $HOME/.npm
+    # - $HOME/.android
+    # - $ANDROID_SDK_INSTALL_LOCATION
+    # - build-support/isort.venv
+    # - build-support/pants_dev_deps.venv
 
 
 install:
