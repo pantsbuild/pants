@@ -16,7 +16,7 @@ before_install:
   - which python2.7
   - python2.7 --version
   - sudo pip install --upgrade pip
-  - exit 1
+  # - exit 1
   
 # These are needed to run the Android SDK tools.
 addons:
