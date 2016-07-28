@@ -12,14 +12,20 @@ from twitter.common.collections import OrderedSet
 from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
+from pants.util.dirutil import fast_relpath
 
 
 logger = logging.getLogger(__name__)
 
 
 class LegacyAddressMapper(AddressMapper):
+  """Provides a facade over the engine backed build graph.
 
-  def __init__(self, graph):
+  This allows tasks to use the context's address_mapper when the v2 engine is enabled.
+  """
+
+  def __init__(self, graph, build_root):
+    self._build_root = build_root
     self._graph = graph
 
   def addresses_in_spec_path(self, spec_path):
@@ -38,7 +44,6 @@ class LegacyAddressMapper(AddressMapper):
     try:
       target = self._graph.get_target(address)
       if not target:
-
         try:
           addresses = self.addresses_in_spec_path(address.spec_path)
         except AddressLookupError:
@@ -51,7 +56,15 @@ class LegacyAddressMapper(AddressMapper):
       raise self.BuildFileScanError(str(e))
 
   def scan_addresses(self, root=None):
+    if root:
+      try:
+        base_path = fast_relpath(root, self._build_root)
+      except ValueError as e:
+        raise self.InvalidRootError(e)
+    else:
+      base_path = ''
+
     addresses = set()
-    for address in self._graph.inject_specs_closure([DescendantAddresses('')]):
+    for address in self._graph.inject_specs_closure([DescendantAddresses(base_path)]):
       addresses.add(address)
     return addresses

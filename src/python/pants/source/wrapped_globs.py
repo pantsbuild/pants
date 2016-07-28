@@ -171,7 +171,7 @@ class FilesetRelPathWrapper(AbstractClass):
     rel_root = os.path.relpath(root, buildroot)
     if rel_root == '.':
       rel_root = ''
-    filespec = cls.to_filespec(patterns, root=rel_root, excludes=excludes)
+    filespec = cls.to_filespec(patterns, excludes=excludes)
     return LazyFilesetWithSpec(rel_root, filespec, files_calculator)
 
   @staticmethod

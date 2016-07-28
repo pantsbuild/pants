@@ -20,6 +20,7 @@ from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
+from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
@@ -85,21 +86,21 @@ class GoalRunnerFactory(object):
     """
 
     if cached_buildgraph is not None:
-      # TODO Should there be a type check here?
+      if use_engine and not isinstance(cached_buildgraph, LegacyBuildGraph):
+        raise TypeError('Expected {} to be a {}'.format(cached_buildgraph, LegacyBuildGraph.__name__))
+      if not use_engine and not isinstance(cached_buildgraph, MutableBuildGraph):
+        raise TypeError('Expected {} to be a {}'.format(cached_buildgraph, MutableBuildGraph.__name__))
+
       if use_engine:
-        return cached_buildgraph, LegacyAddressMapper(cached_buildgraph)
+        return cached_buildgraph, LegacyAddressMapper(cached_buildgraph, self._root_dir)
       else:
-        # TODO This could pull the address mapper off of the cached build graph
-        return cached_buildgraph, BuildFileAddressMapper(self._build_file_parser,
-                                                         get_project_tree(self._global_options),
-                                                         build_ignore_patterns,
-                                                         exclude_target_regexps=self._global_options.exclude_target_regexp)
+        return cached_buildgraph, cached_buildgraph._address_mapper
     elif use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
       graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns)
       graph = graph_helper.create_graph(root_specs)
-      return graph, LegacyAddressMapper(graph)
+      return graph, LegacyAddressMapper(graph, self._root_dir)
     else:
       address_mapper = BuildFileAddressMapper(self._build_file_parser, get_project_tree(self._global_options),
                                               build_ignore_patterns,

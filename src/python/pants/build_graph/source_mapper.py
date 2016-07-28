@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from pants.base.build_file import BuildFile
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.source.payload_fields import DeferredSourcesField
@@ -61,19 +62,29 @@ class SpecSourceMapper(SourceMapper):
       self._build_graph.inject_address_closure(address)
       target = self._build_graph.get_target(address)
       sources = target.payload.get_field('sources')
-      # TODO Should this only yield one address per loop iteration?
-      if sources and not isinstance(sources, DeferredSourcesField) and sources.matches(source):
+      if self._sources_match(source, sources):
         yield address
-      if ((isinstance(address, BuildFileAddress) and address.build_file.relpath == source) or
-          os.path.dirname(source) == spec_path):
+      elif self._source_maybe_build_file_for_address(address, source, spec_path):
         yield address
-      if target.has_resources:
+      elif target.has_resources:
         for resource in target.resources:
           """
           :type resource: pants.build_graph.resources.Resources
           """
           if resource.payload.sources.matches(source):
             yield address
+            break
+
+  def _sources_match(self, source, sources):
+    if not sources or isinstance(sources, DeferredSourcesField):
+      return False
+    return sources.matches(source)
+
+  def _source_maybe_build_file_for_address(self, address, source, spec_path):
+    if isinstance(address, BuildFileAddress):
+      return address.build_file.relpath == source
+    else:
+      return os.path.dirname(source) == spec_path and BuildFile._is_buildfile_name(os.path.basename(source))
 
 
 class LazySourceMapper(SourceMapper):
