@@ -50,6 +50,9 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
                                'paths': {
                                  os_name: [one.home],
                                }
+                             },
+                             'jvm-platform': {
+                               'default_platform': 'java{}'.format(one.version.components[1])
                              }
                            },
                            extra_env={
