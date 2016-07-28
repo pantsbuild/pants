@@ -3,6 +3,12 @@
 # "machines". This is also required in order to use the
 # cache configured below.
 sudo: false
+dist: trusty
+language: python
+python:
+  - "2.7"
+before_install:
+  - jdk_switcher use oraclejdk8
 
 # These are needed to run the Android SDK tools.
 addons:
@@ -46,12 +52,7 @@ cache:
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
-language: python
-dist: trusty
-python:
-  - "2.7"
-before_install:
-  - jdk_switcher use oraclejdk8
+
 install:
   - pip --quiet install coveralls
 
