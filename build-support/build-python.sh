@@ -5,4 +5,4 @@ cd Python-2.7.10.tgz
 make
 make install
  
-python --version
+which python

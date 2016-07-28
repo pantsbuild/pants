@@ -9,7 +9,7 @@ python:
   - "2.7"
 before_install:
   - jdk_switcher use oraclejdk8
-  - build-support/install-python.sh
+  - build-support/build-python.sh
 # These are needed to run the Android SDK tools.
 addons:
   apt:
