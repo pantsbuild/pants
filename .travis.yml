@@ -3,13 +3,16 @@
 # "machines". This is also required in order to use the
 # cache configured below.
 sudo: required
-dist: trusty
-language: generic
+# dist: trusty
+language: java
 # python:
 #   - "2.7"
+jdk:
+  oraclejdk8
+  
 before_install:
-  - jdk_switcher use oraclejdk8
-  - build-support/build-python.sh
+  # - jdk_switcher use oraclejdk8
+  # - build-support/build-python.sh
   - which python2.7
 
 # These are needed to run the Android SDK tools.
