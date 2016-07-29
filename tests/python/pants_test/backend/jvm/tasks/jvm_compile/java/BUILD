@@ -59,6 +59,7 @@ python_tests(
     ':jvm_platform_integration_mixin',
   ],
   tags = {'integration'},
+  timeout=240,
 )
 
 python_tests(
