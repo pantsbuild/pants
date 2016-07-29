@@ -94,7 +94,7 @@ before_script: |
 script: |
   uname -a
   java -version
-  ./pants test tests/python/pants_test/backend/python/tasks/test_setup_py.py
+  ./pants test tests/python/pants_test/backend/python/tasks:setup_py
   # ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
