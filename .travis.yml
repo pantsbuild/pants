@@ -47,11 +47,11 @@ cache:
     # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
-    - $HOME/.npm
-    - $HOME/.android
-    - $ANDROID_SDK_INSTALL_LOCATION
-    - build-support/isort.venv
-    - build-support/pants_dev_deps.venv
+    # - $HOME/.npm
+    # - $HOME/.android
+    # - $ANDROID_SDK_INSTALL_LOCATION
+    # - build-support/isort.venv
+    # - build-support/pants_dev_deps.venv
 
 
 before_install:
@@ -87,9 +87,9 @@ env:
     # - CI_FLAGS="-fkmsrjlpn -i 5/6 'Python integration tests for pants - shard 6'"
 
 
-before_script: |
-  ./build-support/bin/ci-sync.sh
-  ./build-support/bin/install-android-sdk.sh
+# before_script: |
+#   ./build-support/bin/ci-sync.sh
+#   ./build-support/bin/install-android-sdk.sh
 
 script: |
   uname -a
