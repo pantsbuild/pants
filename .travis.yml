@@ -56,7 +56,7 @@ cache:
 
 before_install:
   - jdk_switcher use oraclejdk8
-  - ./pants test tests/python/pants_test/backend/project_info/tasks:idea_integration
+  # - ./pants test tests/python/pants_test/backend/project_info/tasks:idea_integration
 
 install:
   - pip --quiet install coveralls
