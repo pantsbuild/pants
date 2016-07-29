@@ -10,6 +10,7 @@ jvm_binary(name='unspecified',
 )
 
 java_library(name='lib',
+  platform='java6',
   sources=globs('Unspecified.java'),
 )
 
