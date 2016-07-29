@@ -63,11 +63,11 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
                              classpath,
-                             self._dist,
+                             self.dist,
                              connect_timeout=self.get_options().nailgun_timeout_seconds,
                              connect_attempts=self.get_options().nailgun_connect_attempts)
     else:
-      return SubprocessExecutor(self._dist)
+      return SubprocessExecutor(self.dist)
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
               workunit_labels=None, workunit_log_config=None):
