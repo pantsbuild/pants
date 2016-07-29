@@ -3,10 +3,18 @@
 
 target(name='testjvms',
   dependencies=[
+    ':six',
     ':seven',
     ':eight',
     ':eight-test-platform',
   ],
+)
+
+junit_tests(name='six',
+  sources=['TestSix.java'],
+  platform='java6',
+  dependencies=[':base'],
+  strict_deps=False,
 )
 
 junit_tests(name='seven',
@@ -32,7 +40,7 @@ junit_tests(name='eight-test-platform',
 )
 
 java_library(name='base',
-  platform='java7',
+  platform='java6',
   sources=['TestBase.java'],
   dependencies=['3rdparty:junit'],
 )
