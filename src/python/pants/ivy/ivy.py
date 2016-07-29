@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from six import string_types
 from twitter.common.collections import maybe_list
 
+from pants.base.revision import Revision
 from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import Executor, SubprocessExecutor
@@ -88,7 +89,8 @@ class Ivy(object):
     # a declared dependency on DistributionLocator.
     if executor:
       logger.info("before executor: {}".format(executor.distribution))
-    executor = executor or SubprocessExecutor(DistributionLocator.cached())
+    executor = executor or SubprocessExecutor(
+      DistributionLocator.cached(minimum_version=Revision(1, 7, 0), maximum_version=Revision(1, 8, 999)))
     logger.info("after executor: {}".format(executor.distribution))
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
