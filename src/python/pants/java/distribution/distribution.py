@@ -512,6 +512,7 @@ class _Locator(object):
                             minimum_version=minimum_version,
                             maximum_version=maximum_version,
                             jdk=jdk)
+        logger.info('candidate: {}'.format(dist.home))
         dist.validate()
         logger.debug('Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}'
                      .format(dist, minimum_version, maximum_version, jdk))
