@@ -39,7 +39,7 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
     :API: public
     """
     super(JvmToolTaskMixin, self).__init__(*args, **kwargs)
-    self.set_distribution(minimum_version='1.7.0', maximum_version='1.8.999', jdk=True)    # Use default until told otherwise.
+    self.set_distribution(minimum_version='1.8.0', maximum_version='1.8.999', jdk=True)    # Use default until told otherwise.
     # TODO: Choose default distribution based on options.
 
   def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
