@@ -20,7 +20,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)
     args = ['clean-all', 'test.junit', '--strict-jvm-version', spec]
     if platform_version is not None:
-      args.append('jvm-platform-default-platform=java{}'.format(platform_version))
+      args.append('--jvm-platform-default-platform=java{}'.format(platform_version))
 
     self.assert_success(self.run_pants(args))
 
