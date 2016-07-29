@@ -11,7 +11,6 @@ from hashlib import sha1
 from pants.base.payload_field import PayloadField
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import Files, FilesetWithSpec, matches_filespec
-from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 
 
@@ -39,11 +38,7 @@ class SourcesField(PayloadField):
     return self.sources.filespec
 
   def matches(self, path):
-    try:
-      relpath = fast_relpath(path, self._sources.rel_root)
-    except ValueError:
-      return False
-    return matches_filespec(relpath, self.filespec)
+    return matches_filespec(path, self.filespec)
 
   @property
   def rel_path(self):
