@@ -35,10 +35,6 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   def test_java_seven(self):
     self._testjvms('seven', 7)
 
-  # @skipIf(is_missing_jvm('1.6'), 'no java 1.6 installation on testing machine')
-  # def test_java_six(self):
-  #   self._testjvms('six', 6)
-
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_with_test_platform(self):
     self._testjvms('eight-test-platform')
