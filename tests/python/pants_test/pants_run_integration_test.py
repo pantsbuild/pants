@@ -56,7 +56,7 @@ def ensure_cached(expected_num_artifacts=None):
   return decorator
 
 
-def dual_path_engine_test(f):
+def ensure_engine(f):
   """A decorator for running an integration test with and without the v2 engine enabled via
   temporary environment variables."""
   def wrapper(self, *args, **kwargs):
