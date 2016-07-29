@@ -18,7 +18,6 @@ addons:
     - lib32stdc++6
     - lib32z1
     - lib32z1-dev
-    - oracle-java6-installer
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
