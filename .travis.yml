@@ -18,6 +18,7 @@ addons:
     - lib32stdc++6
     - lib32z1
     - lib32z1-dev
+    - oracle-java8-installer
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
@@ -54,8 +55,8 @@ cache:
     - build-support/pants_dev_deps.venv
 
 
-before_install:
-  - jdk_switcher use oraclejdk8
+# before_install:
+#   - jdk_switcher use oraclejdk8
   # - ./pants test tests/python/pants_test/backend/project_info/tasks:idea_integration
 
 install:
