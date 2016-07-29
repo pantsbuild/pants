@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os.path
 from contextlib import contextmanager
 
@@ -17,6 +18,8 @@ from pants.java.executor import Executor, SubprocessExecutor
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import safe_mkdir
 
+
+logger = logging.getLogger(__name__)
 
 class Ivy(object):
   """Encapsulates the ivy cli taking care of the basic invocation letting you just worry about the
@@ -82,6 +85,7 @@ class Ivy(object):
     # (because it's just a plain old object), because Ivy is only constructed by Bootstrapper, which
     # makes an explicit call to IvySubsystem.global_instance() in its constructor, which in turn has
     # a declared dependency on DistributionLocator.
+    logger.info("executor: {}".format(executor.distribution))
     executor = executor or SubprocessExecutor(DistributionLocator.cached())
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
