@@ -94,6 +94,7 @@ before_script: |
 script: |
   uname -a
   java -version
+  echo $JAVA_HOME
   ./pants test tests/python/pants_test/backend/python/tasks:setup_py
   # ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
