@@ -81,7 +81,7 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
       target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
       run = self.run_pants(['run', target_spec])
       self.assert_success(run)
-      self.assertIn('java.home:{}'.format(distribution.home), run.stdout_data)
+      self.assertIn('java.home:{}'.format(os.path.realpath(distribution.home)), run.stdout_data)
 
   def test_jvm_meets_min_and_max_distribution(self):
     with _distribution_locator() as locator:
