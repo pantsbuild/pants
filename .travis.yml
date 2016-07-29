@@ -56,6 +56,8 @@ cache:
 
 before_install:
   - jdk_switcher use oraclejdk8
+  - echo $JAVA_HOME
+  - export JDK_HOME=$JAVA_HOME
 
 install:
   - pip --quiet install coveralls
