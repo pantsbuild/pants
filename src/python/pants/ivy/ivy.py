@@ -82,7 +82,7 @@ class Ivy(object):
     # (because it's just a plain old object), because Ivy is only constructed by Bootstrapper, which
     # makes an explicit call to IvySubsystem.global_instance() in its constructor, which in turn has
     # a declared dependency on DistributionLocator.
-    executor = executor or SubprocessExecutor(DistributionLocator.cached(minimum_version='1.7'))
+    executor = executor or SubprocessExecutor(DistributionLocator.cached())
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
       with self.resolution_lock:
@@ -108,7 +108,7 @@ class Ivy(object):
       options += ['-Divy.cache.dir={}'.format(self._ivy_cache_dir)]
     options += self._extra_jvm_options
 
-    executor = executor or SubprocessExecutor(DistributionLocator.cached(minimum_version='1.7'))
+    executor = executor or SubprocessExecutor(DistributionLocator.cached())
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))
