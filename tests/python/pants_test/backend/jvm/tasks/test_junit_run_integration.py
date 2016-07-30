@@ -16,13 +16,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
-  def _testjvms(self, spec_name, platform=None):
+  def _testjvms(self, spec_name):
     spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)
-    args = ['clean-all', 'test.junit', '--strict-jvm-version', spec]
-    if platform is not None:
-      args.append('--jvm-platform-default-platform={}'.format(platform))
-
-    self.assert_success(self.run_pants(args))
+    self.assert_success(self.run_pants(['clean-all', 'test.junit', '--strict-jvm-version', spec]))
 
   # See https://github.com/pantsbuild/pants/issues/2894 for details on why this is
   # marked xfail.
@@ -33,11 +29,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
   @skipIf(is_missing_jvm('1.7'), 'no java 1.7 installation on testing machine')
   def test_java_seven(self):
-    self._testjvms('seven', 'java7')
-
-  @skipIf(is_missing_jvm('1.6'), 'no java 1.6 installation on testing machine')
-  def test_java_six(self):
-    self._testjvms('six', 'java6')
+    self._testjvms('seven')
 
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_with_test_platform(self):
