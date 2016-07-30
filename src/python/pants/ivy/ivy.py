@@ -117,7 +117,8 @@ class Ivy(object):
       options += ['-Divy.cache.dir={}'.format(self._ivy_cache_dir)]
     options += self._extra_jvm_options
 
-    executor = executor or SubprocessExecutor(DistributionLocator.cached())
+    executor = executor or SubprocessExecutor(
+      DistributionLocator.cached(minimum_version=Revision(1, 7, 0), maximum_version=Revision(1, 8, 999)))
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))
