@@ -16,11 +16,11 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
-  def _testjvms(self, spec_name, platform_version=None):
+  def _testjvms(self, spec_name, platform=None):
     spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)
     args = ['clean-all', 'test.junit', '--strict-jvm-version', spec]
-    if platform_version is not None:
-      args.append('--jvm-platform-default-platform=java{}'.format(platform_version))
+    if platform is not None:
+      args.append('--jvm-platform-default-platform={}'.format(platform))
 
     self.assert_success(self.run_pants(args))
 
@@ -33,7 +33,11 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
   @skipIf(is_missing_jvm('1.7'), 'no java 1.7 installation on testing machine')
   def test_java_seven(self):
-    self._testjvms('seven', 7)
+    self._testjvms('seven', 'java7')
+
+  @skipIf(is_missing_jvm('1.6'), 'no java 1.6 installation on testing machine')
+  def test_java_six(self):
+    self._testjvms('six', 'java6')
 
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_with_test_platform(self):
