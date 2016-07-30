@@ -90,7 +90,7 @@ class Ivy(object):
     if executor:
       logger.error("before executor: {}".format(executor.distribution))
     executor = executor or SubprocessExecutor(
-      DistributionLocator.cached(minimum_version=Revision(1, 7, 0), maximum_version=Revision(1, 8, 999)))
+      DistributionLocator.cached(minimum_version='1.7'))
     logger.error("after executor: {}".format(executor.distribution))
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
@@ -118,7 +118,7 @@ class Ivy(object):
     options += self._extra_jvm_options
 
     executor = executor or SubprocessExecutor(
-      DistributionLocator.cached(minimum_version=Revision(1, 7, 0), maximum_version=Revision(1, 8, 999)))
+      DistributionLocator.cached(minimum_version='1.7'))
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))
