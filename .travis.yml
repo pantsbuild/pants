@@ -58,6 +58,7 @@ cache:
 before_install:
   - jdk_switcher use oraclejdk8
   - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+  - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
 
 install:
   - pip --quiet install coveralls
