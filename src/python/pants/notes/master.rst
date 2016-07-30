@@ -34,7 +34,6 @@ Bugfixes
 
 * Fix JUnit -fail-fast, add test for early exit hook and remove unused code
   `RB #4060 <https://rbcommons.com/s/twitter/r/4060>`_
-  `RB #, <https://rbcommons.com/s/twitter/r/4060/,>`_
   `RB #4081 <https://rbcommons.com/s/twitter/r/4081>`_
 
 * Fixup the 1.1.x notes, which were not being rendered on the site, and contained rendering errors.
@@ -5837,7 +5836,6 @@ Bugfixes
   `RB #1903 <https://rbcommons.com/s/twitter/r/1903>`_
 
 * Avoid reparsing analysis repeatedly
-  `RB #, <https://rbcommons.com/s/twitter/r/1898/,>`_
   `RB #1938 <https://rbcommons.com/s/twitter/r/1938>`_
 
 API Changes
