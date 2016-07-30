@@ -10,6 +10,7 @@ from abc import abstractmethod, abstractproperty
 
 from twitter.common.collections import OrderedSet
 
+from os.path import dirname
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
@@ -452,6 +453,13 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       yield File(f)
       yield Link(f)
       yield Dir(f)
+      # Additionally, since the FS event service does not send invalidation events
+      # for the root directory, treat any changed file in the root as an invalidation
+      # of the root's listing.
+      print(dirname(f))
+      if dirname(f) in ('.', ''):
+        print('>>>')
+        yield Dir('')
 
   def step(self, step_context):
     try:

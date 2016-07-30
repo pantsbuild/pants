@@ -234,10 +234,13 @@ class ProductGraph(object):
   def invalidate_files(self, filenames):
     """Given a set of changed filenames, invalidate all related FilesystemNodes in the graph."""
     subjects = set(FilesystemNode.generate_subjects(filenames))
-    logger.debug('generated invalidation subjects: %s', subjects)
+    print('generated invalidation subjects: {}'.format(subjects))
 
     def predicate(node, state):
-      return type(node) is FilesystemNode and node.subject in subjects
+      if type(node) is not FilesystemNode:
+        return False
+      print('>>> inspecting {}'.format(node.subject))
+      return node.subject in subjects
 
     return self.invalidate(predicate)
 
