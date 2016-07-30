@@ -96,7 +96,6 @@ script:
   - echo $JAVA_HOME
   # Check if JAVA_HOME is symlinked to the real home
   - ls -l $JAVA_HOME
-  - ls -l /usr/lib/jvm/jdk1.8.0_51
   - ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
