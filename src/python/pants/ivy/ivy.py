@@ -87,11 +87,7 @@ class Ivy(object):
     # (because it's just a plain old object), because Ivy is only constructed by Bootstrapper, which
     # makes an explicit call to IvySubsystem.global_instance() in its constructor, which in turn has
     # a declared dependency on DistributionLocator.
-    if executor:
-      logger.error("before executor: {}".format(executor.distribution))
-    executor = executor or SubprocessExecutor(
-      DistributionLocator.cached(minimum_version='1.7'))
-    logger.error("after executor: {}".format(executor.distribution))
+    executor = executor or SubprocessExecutor(DistributionLocator.cached(minimum_version='1.7'))
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
       with self.resolution_lock:
