@@ -12,15 +12,11 @@ from contextlib import contextmanager
 from six import string_types
 from twitter.common.collections import maybe_list
 
-from pants.base.revision import Revision
 from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import safe_mkdir
-
-
-logger = logging.getLogger(__name__)
 
 
 class Ivy(object):
@@ -113,8 +109,7 @@ class Ivy(object):
       options += ['-Divy.cache.dir={}'.format(self._ivy_cache_dir)]
     options += self._extra_jvm_options
 
-    executor = executor or SubprocessExecutor(
-      DistributionLocator.cached(minimum_version='1.7'))
+    executor = executor or SubprocessExecutor(DistributionLocator.cached(minimum_version='1.7'))
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))
