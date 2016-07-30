@@ -18,7 +18,6 @@ addons:
     - lib32stdc++6
     - lib32z1
     - lib32z1-dev
-    # - oracle-java8-installer
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
@@ -95,9 +94,8 @@ script:
   - uname -a
   - java -version
   - echo $JAVA_HOME
-  - ls -l $JAVA_HOME
+  - ls -l $JAVA_HOME # Check JAVA_HOME is symlinked to the real home
   - ls -l /usr/lib/jvm/jdk1.8.0_51
-  # - ./pants test tests/python/pants_test/backend/python/tasks:setup_py
   - ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
