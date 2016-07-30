@@ -95,7 +95,7 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
                              }
                            })
       self.assert_success(run)
-      self.assertIn('java.home:{}'.format(distribution.home), run.stdout_data)
+      self.assertIn('java.home:{}'.format(os.path.realpath(distribution.home)), run.stdout_data)
 
   def test_impossible_distribution_requirements(self):
     with _distribution_locator() as locator:
