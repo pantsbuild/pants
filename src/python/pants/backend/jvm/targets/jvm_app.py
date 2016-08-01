@@ -158,10 +158,10 @@ class Bundle(object):
     return BundleProps(real_rel_path, mapper, fileset)
 
   def create_bundle_props(self, bundle):
-    rel_path = bundle.rel_path if hasattr(bundle, 'rel_path') else None
-    mapper = bundle.mapper if hasattr(bundle, 'mapper') else None
-    relative_to = bundle.relative_to if hasattr(bundle, 'relative_to') else None
-    fileset = bundle.fileset if hasattr(bundle, 'fileset') else None
+    rel_path = getattr(bundle, 'rel_path', None)
+    mapper = getattr(bundle, 'mapper', None)
+    relative_to = getattr(bundle, 'relative_to', None)
+    fileset = getattr(bundle, 'fileset', None)
     return self(rel_path, mapper, relative_to, fileset)
 
 
