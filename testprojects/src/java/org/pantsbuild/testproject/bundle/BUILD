@@ -31,3 +31,15 @@ jvm_app(name='missing-files',
     bundle(fileset=['data/no-such-file']),
   ]
 )
+
+# Tests `resources=` ordering via integration test.
+jvm_binary(
+  name='bundle-resource-ordering',
+  source='BundleMain.java',
+  main='org.pantsbuild.testproject.bundle.BundleMain',
+  resources=[
+    'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
+    'testprojects/tests/resources/org/pantsbuild/testproject/bundleresources:resources',
+  ],
+  dependencies=['3rdparty:guava']
+)

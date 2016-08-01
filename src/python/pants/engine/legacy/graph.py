@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from twitter.common.collections import maybe_list
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
@@ -88,7 +88,7 @@ class LegacyBuildGraph(BuildGraph):
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
-    deps_to_inject = set()
+    deps_to_inject = OrderedSet()
     addresses_to_inject = set()
     def inject(target, dep_spec, is_dependency):
       address = Address.parse(dep_spec, relative_to=target.address.spec_path)
