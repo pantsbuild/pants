@@ -8,7 +8,7 @@ import argparse
 import pkg_resources
 import requests
 
-from twitter.acquire_google import reality
+from twitter.plans.to.acquire.google import reality
 import yaml
 
 

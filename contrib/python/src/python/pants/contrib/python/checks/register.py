@@ -5,12 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.python.checks.tasks.checkstyle.checker import PythonCheckStyleTask
+from pants.contrib.python.checks.tasks.isort.python_isort import IsortPythonTask
 from pants.contrib.python.checks.tasks.python_eval import PythonEval
 
 
 def register_goals():
   task(name='python-eval', action=PythonEval).install('compile')
   task(name='pythonstyle', action=PythonCheckStyleTask).install('compile')
+
+  Goal.register('format', 'Format targets.')
+  task(name='isort', action=IsortPythonTask).install('format')
