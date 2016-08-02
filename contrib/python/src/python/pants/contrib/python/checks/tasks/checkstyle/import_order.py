@@ -92,7 +92,7 @@ class ImportOrder(CheckstylePlugin):
     the path in cls.STANDARD_LIB_PATH. Hence this function checks for both.
 
     :param module: a module
-    :return: True is module is on interpreter's stdlib path.
+    :return: True if module is on interpreter's stdlib path. False otherwise.
     """
     module_file_real_path = os.path.realpath(module.__file__)
     if module_file_real_path.startswith(cls.STANDARD_LIB_PATH):
