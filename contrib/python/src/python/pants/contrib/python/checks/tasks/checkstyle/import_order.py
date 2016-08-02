@@ -87,15 +87,17 @@ class ImportOrder(CheckstylePlugin):
   @classmethod
   def is_module_on_std_lib_path(cls, module):
     """
-    Sometimes .py is a symlinked to the python interpreter, but .pyc
-    is generated next to it. Hence this function checks for both.
+    Sometimes .py files are symlinked to the real python files, such as the case of virtual
+    env. However the .pyc files are created under the virtual env directory rather than
+    the path in cls.STANDARD_LIB_PATH. Hence this function checks for both.
+
     :param module: a module
     :return: True is module is on interpreter's stdlib path.
     """
     module_file_real_path = os.path.realpath(module.__file__)
     if module_file_real_path.startswith(cls.STANDARD_LIB_PATH):
       return True
-    elif os.path.splitext(module_file_real_path.endswith)[1] == '.pyc':
+    elif os.path.splitext(module_file_real_path)[1] == '.pyc':
       py_file_real_path = os.path.realpath(os.path.splitext(module_file_real_path)[0] + '.py')
       return py_file_real_path.startswith(cls.STANDARD_LIB_PATH)
     return False
