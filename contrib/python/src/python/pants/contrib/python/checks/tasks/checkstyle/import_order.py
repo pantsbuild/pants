@@ -64,6 +64,21 @@ class ImportOrder(CheckstylePlugin):
 
   @classmethod
   def classify_import(cls, node, name):
+    def is_module_on_std_lib_path(module):
+      """
+      Sometimes .py is a symlinked to the python interpreter, but .pyc
+      is generated next to it. Hence this function checks for both.
+      :param module: a module
+      :return: True is module is on interpreter's stdlib path.
+      """
+      module_file_real_path = os.path.realpath(module.__file__)
+      if module_file_real_path.startswith(cls.STANDARD_LIB_PATH):
+        return True
+      elif module_file_real_path.endswith('.pyc'):
+        py_file_real_path = os.path.realpath(os.path.splitext(module_file_real_path)[0] + '.py')
+        return py_file_real_path.startswith(cls.STANDARD_LIB_PATH)
+      return False
+
     if name == '' or (isinstance(node, ast.ImportFrom) and node.level > 0):
       return ImportType.PACKAGE
     if name.startswith('twitter.'):
@@ -74,8 +89,7 @@ class ImportOrder(CheckstylePlugin):
       module = __import__(name)
     except ImportError:
       return ImportType.THIRD_PARTY
-    if (not hasattr(module, '__file__') or
-          os.path.realpath(module.__file__).startswith(cls.STANDARD_LIB_PATH)):
+    if not hasattr(module, '__file__') or is_module_on_std_lib_path(module):
       return ImportType.STDLIB
     # Assume anything we can't classify is third-party
     return ImportType.THIRD_PARTY
