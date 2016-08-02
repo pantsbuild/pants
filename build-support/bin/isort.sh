@@ -34,7 +34,7 @@ do
 done
 
 REQUIREMENTS=(
-  "isort==3.9.6"
+  "isort==4.2.5"
 )
 
 VENV_DIR="build-support/isort.venv"
