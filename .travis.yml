@@ -1,8 +1,13 @@
-# Enables support for a docker container-based build
-# which should provide faster startup times and beefier
-# "machines". This is also required in order to use the
-# cache configured below.
-sudo: false
+# sudo required for jdk_switcher and bad openjdk6 removal on trusty image
+# in before_install step, and not for any other purpose.
+sudo: required
+
+dist: trusty
+
+language: python
+
+python:
+  - "2.7.11"
 
 # These are needed to run the Android SDK tools.
 addons:
@@ -11,6 +16,7 @@ addons:
     - lib32stdc++6
     - lib32z1
     - lib32z1-dev
+    - oracle-java6-installer
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
@@ -46,10 +52,12 @@ cache:
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
-language: python
-
-python:
-  - "2.7"
+before_install:
+  # Remove bad openjdk6 from trusty image, so
+  # Pants will pick up oraclejdk6 from `packages` above.
+  - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+  - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+  - jdk_switcher use oraclejdk8
 
 install:
   - pip --quiet install coveralls
@@ -80,14 +88,17 @@ env:
     - CI_FLAGS="-fkmsrjlpn -i 5/6 'Python integration tests for pants - shard 6'"
 
 
-before_script: |
-  ./build-support/bin/ci-sync.sh
-  ./build-support/bin/install-android-sdk.sh
+before_script:
+  - ./build-support/bin/ci-sync.sh
+  - ./build-support/bin/install-android-sdk.sh
 
-script: |
-  uname -a
-  java -version
-  ./build-support/bin/ci.sh -x ${CI_FLAGS}
+script:
+  - uname -a
+  - java -version
+  - echo $JAVA_HOME
+  # Check if JAVA_HOME is symlinked to the real home
+  - ls -l $JAVA_HOME
+  - ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
 # for now which is enabled even with no `notifications` config.
