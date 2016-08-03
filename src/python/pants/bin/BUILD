@@ -8,6 +8,7 @@ python_library(
                                  'plugin_resolver.py']),
   dependencies=[
     '3rdparty/python:ansicolors',
+    '3rdparty/python:isort',
     '3rdparty/python:setproctitle',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
