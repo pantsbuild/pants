@@ -15,6 +15,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
+from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.setup_py import SetupPy
@@ -48,3 +49,4 @@ def register_goals():
   task(name='py', action=PythonRun).install('run')
   task(name='py', action=PythonRepl).install('repl')
   task(name='setup-py', action=SetupPy).install()
+  task(name='isort', action=IsortPythonTask).install('fmt')
