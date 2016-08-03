@@ -49,6 +49,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target',
       'testprojects/tests/java/org/pantsbuild/testproject/empty:',
       'testprojects/tests/python/pants/dummies:failing_target',
+      'testprojects/src/python/isort/python:bad-order',
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
