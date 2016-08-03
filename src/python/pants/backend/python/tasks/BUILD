@@ -8,6 +8,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:coverage',
+    '3rdparty/python:isort',
     '3rdparty/python:pex',
     '3rdparty/python:pytest',
     '3rdparty/python:pytest-cov',
