@@ -13,7 +13,7 @@ from pants.option.custom_types import file_option
 
 
 class IsortPythonTask(PythonTask):
-  """Add additonal steps to OSS PythonCheckStyleTask."""
+  """Task to provide autoformat with python isort module."""
 
   _PYTHON_SOURCE_EXTENSION = '.py'
 
@@ -27,17 +27,17 @@ class IsortPythonTask(PythonTask):
     register('--skip', type=bool, default=False,
              help='If enabled, skip isort task.')
     register('--config-file', fingerprint=True, type=file_option, default='./.isort.cfg',
-             help='Specify isort config file.')
+             help='Specify path to isort config file.')
 
   def execute(self):
     """Run isort on all found source python files."""
     if self.options.skip:
       return
 
-    for source in self.calculate_sources(self.context.targets()):
+    for source in self._calculate_sources(self.context.targets()):
       isort.SortImports(file_path=source, settings_path=self.options.config_file)
 
-  def calculate_sources(self, targets):
+  def _calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""
     sources = set()
     for target in targets:
