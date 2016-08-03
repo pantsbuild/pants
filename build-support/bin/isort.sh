@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-
+# TODO: Replace this script with ./pants fmt.isort ...
+# https://github.com/pantsbuild/pants/issues/3748
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd ${REPO_ROOT}
 
