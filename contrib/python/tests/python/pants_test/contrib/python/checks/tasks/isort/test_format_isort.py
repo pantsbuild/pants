@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import subprocess
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
