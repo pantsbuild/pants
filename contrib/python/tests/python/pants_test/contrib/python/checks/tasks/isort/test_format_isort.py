@@ -38,4 +38,4 @@ class IntegrationTests(PantsRunIntegrationTest):
 
   def tearDown(self):
     # tests change code, so they need to be reset.
-    subprocess.check_call(['git', 'co', '--', self.TEST_DIR])
+    subprocess.check_call(['git', 'checkout', '--', self.TEST_DIR])
