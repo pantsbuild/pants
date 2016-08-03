@@ -4,6 +4,7 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
+    'contrib/python/src/python/pants/contrib/python/checks/tasks/isort:isort',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',
     'contrib/python/src/python/pants/contrib/python/checks/tasks:python',
     'src/python/pants/goal:task_registrar',
