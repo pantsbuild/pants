@@ -17,5 +17,5 @@ def register_goals():
   task(name='python-eval', action=PythonEval).install('compile')
   task(name='pythonstyle', action=PythonCheckStyleTask).install('compile')
 
-  Goal.register('format', 'Format targets.')
-  task(name='isort', action=IsortPythonTask).install('format')
+  Goal.register('fmt', 'Autoformat source code..')
+  task(name='isort', action=IsortPythonTask).install('fmt')
