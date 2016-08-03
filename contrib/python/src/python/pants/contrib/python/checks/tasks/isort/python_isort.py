@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 
 import isort
-
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.option.custom_types import file_option
 

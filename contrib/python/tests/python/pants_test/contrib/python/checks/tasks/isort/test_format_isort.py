@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+
 
 TEST_DIR = 'testprojects/src/python/isort/python'
 

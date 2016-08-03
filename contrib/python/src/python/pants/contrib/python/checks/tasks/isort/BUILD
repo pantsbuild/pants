@@ -3,7 +3,7 @@
 
 python_library(
   name='isort',
-  sources=globs('*.py'),
+  sources=['python_isort.py'],
   dependencies=[
     '3rdparty/python:isort',
     'src/python/pants/backend/python/tasks:python',
