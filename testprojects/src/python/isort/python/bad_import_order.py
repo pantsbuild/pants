@@ -1,8 +1,8 @@
+from __future__ import (with_statement, division, absolute_import, generators, nested_scopes, print_function,
+                        unicode_literals)
 from twitter.common.contextutil import temporary_file_path
 import os
 import logging
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
 from urlparse import urljoin
 import argparse
 import pkg_resources
