@@ -175,6 +175,7 @@ python_library(
     ':objects',
     ':scheduler',
     '3rdparty/python:lmdb',
+    '3rdparty/python:cffi',
     'src/python/pants/util:dirutil'
   ]
 )
