@@ -32,8 +32,10 @@ class LegacyAddressMapper(AddressMapper):
 
   def is_declaring_file(self, address, file_path):
     # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
-    # considered the one that declared it. We could call into the engine to ask for the file that
-    # declared the address.
+    # considered the one that declared it. That's ok though, because the spec path should be enough
+    # information for debugging most of the time.
+    #
+    # We could call into the engine to ask for the file that declared the address.
     return (os.path.dirname(file_path) == address.spec_path and
             BuildFile._is_buildfile_name(os.path.basename(file_path)))
 
