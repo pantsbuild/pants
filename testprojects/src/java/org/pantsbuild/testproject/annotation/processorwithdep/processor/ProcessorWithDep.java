@@ -3,12 +3,10 @@
 
 package org.pantsbuild.testproject.annotation.processorwithdep.processor;
 
-import org.pantsbuild.testproject.annotation.processorwithdep.hellomaker.HelloMaker;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.Collections;
 import java.util.Set;
@@ -24,6 +22,7 @@ import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
+import org.pantsbuild.testproject.annotation.processorwithdep.hellomaker.HelloMaker;
 
 /**
  * A sample implementation of an annotation processor which creates a "Hello World" class.
@@ -32,10 +31,9 @@ public class ProcessorWithDep extends AbstractProcessor {
   TypeSpec unused = TypeSpec.enumBuilder("PantsProblemCauser")
       .addEnumConstant("BAR")
       .build();
-  private ProcessingEnvironment processingEnvironment = null;
   private Elements elementUtils;
 
-  private void writeHelloWorld(String packageName, String classPrefix) throws IOException{
+  private void writeHelloWorld(String packageName, String classPrefix) throws IOException {
     MethodSpec main = MethodSpec.methodBuilder("main")
         .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
         .returns(void.class)
@@ -49,18 +47,17 @@ public class ProcessorWithDep extends AbstractProcessor {
         .addMethod(main)
         .build();
 
-    JavaFile javaFile = JavaFile.builder(packageName, helloWorld)
-        .build();
+    JavaFile javaFile = JavaFile.builder(packageName, helloWorld).build();
 
-    JavaFileObject f = processingEnvironment.getFiler().createSourceFile(
+    JavaFileObject f = processingEnv.getFiler().createSourceFile(
         String.format("%s.%s", packageName, className));
     Writer w = f.openWriter();
     javaFile.writeTo(w);
     w.close();
   }
 
-  @Override public void init(ProcessingEnvironment processingEnvironment) {
-    this.processingEnvironment = processingEnvironment;
+  @Override public synchronized void init(ProcessingEnvironment processingEnvironment) {
+    super.init(processingEnvironment);
     this.elementUtils = processingEnvironment.getElementUtils();
     // Make a reference to the 3rdparty library in the initialization of the annotation processor
     // to tickle a bug in pants
@@ -77,39 +74,30 @@ public class ProcessorWithDep extends AbstractProcessor {
     return SourceVersion.latest();
   }
 
-  @Override public boolean process(Set<? extends TypeElement> annotations,
-      RoundEnvironment roundEnv) {
-    if (roundEnv.processingOver()) {
+  @Override
+  public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+    if (roundEnv.errorRaised() || roundEnv.processingOver()) {
       return false;
     }
 
-    PrintWriter writer = null;
-
     try {
-      for (TypeElement appAnnotation : annotations) {
-        Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(appAnnotation);
-        Set<TypeElement> elements = ElementFilter.typesIn(annotatedElements);
-        for (Element elem : elements) {
-          if (!(elem instanceof TypeElement))
-            continue;
-          TypeElement typeElem = (TypeElement) elem;
-          String packageName = elementUtils.getPackageOf(typeElem).getQualifiedName().toString();
-          String typeName = typeElem.getSimpleName().toString();
+      for (TypeElement annotation : annotations) {
+        Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(annotation);
+        Set<TypeElement> typeElements = ElementFilter.typesIn(annotatedElements);
+        for (TypeElement typeElement : typeElements) {
+          String packageName = elementUtils.getPackageOf(typeElement).getQualifiedName().toString();
+          String typeName = typeElement.getSimpleName().toString();
           writeHelloWorld(packageName, typeName);
         }
       }
     } catch (IOException ex) {
       log(Kind.ERROR, "Problem writing source file.", ex);
       throw new RuntimeException(ex);
-    } finally {
-      if (writer != null) {
-        writer.close();
-      }
     }
     return true;
   }
 
   private void log(Diagnostic.Kind category, String message, Object... args) {
-    processingEnvironment.getMessager().printMessage(category, String.format(message, args));
+    processingEnv.getMessager().printMessage(category, String.format(message, args));
   }
 }

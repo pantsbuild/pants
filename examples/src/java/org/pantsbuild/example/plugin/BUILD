@@ -6,6 +6,7 @@ javac_plugin(
   sources = ['SimpleJavacPlugin.java'],
   dependencies = [],
   classname = 'org.pantsbuild.example.plugin.SimpleJavacPlugin',
+  scope='compile',
 )
 
 java_library(

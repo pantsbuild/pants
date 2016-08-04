@@ -19,27 +19,35 @@ def void ansiColor(Closure<Void> wrapped) {
 def Closure<Void> ciShNodeSpawner(String os, String flags) {
   return { ->
     node(os) {
-      ansiColor {
-        // Avoid failing on transient git issues.
-        retry(3) {
-          checkout scm
+      /* If a shard takes longer than an hour, something
+       * is almost certainly wrong and we should release the resources.
+       */
+      timeout(time: 1, unit: 'HOURS') {
+        ansiColor {
+          // Avoid failing on transient git issues.
+          retry(3) {
+            checkout scm
+          }
+
+          /*
+           * Work around various concurrency issues associated with tools that use paths under the
+           * HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
+           * use of them would support concurrent usage robustly, at which point this hack could be
+           * removed.
+           */
+          env.HOME = "${pwd()}/.home"
+
+          // For c/c++ contrib plugin tests.
+          env.CXX = "g++"
+
+          // Tune pants options for unattended runs on slave machines.
+          env.PANTS_CONFIG_OVERRIDE = "['pants.jenkins.ini']"
+
+          sh("""
+            ./build-support/ci/print_node_info.sh
+            ./build-support/bin/ci.sh ${flags}
+            """)
         }
-
-        /*
-         * Work around various concurrency issues associated with tools that use paths under the
-         * HOME dir for their caches (currently pants, pex, ivy)  Ideally these tools or pants
-         * use of them would support concurrent usage robustly, at which point this hack could be
-         * removed.
-         */
-        env.HOME = "${pwd()}/.home"
-
-        // For c/c++ contrib plugin tests.
-        env.CXX = "g++"
-
-        sh("""
-          ./build-support/ci/print_node_info.sh
-          ./build-support/bin/ci.sh ${flags}
-          """)
       }
     }
   }

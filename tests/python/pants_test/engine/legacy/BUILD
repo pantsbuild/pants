@@ -2,6 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name = 'bundle_integration',
+  sources = ['test_bundle_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test'
+  ],
+  tags = {'integration'}
+)
+
+python_tests(
   name = 'dependencies_integration',
   sources = ['test_dependencies_integration.py'],
   dependencies = [
@@ -15,7 +24,7 @@ python_tests(
   name = 'filemap_integration',
   sources = ['test_filemap_integration.py'],
   dependencies = [
-    'src/python/pants/base:file_system_project_tree',
+    'src/python/pants/base:project_tree',
     'tests/python/pants_test:int-test'
   ],
   tags = {'integration'},
@@ -23,11 +32,12 @@ python_tests(
 )
 
 python_tests(
-  name = 'graph_invalidation',
-  sources = ['test_graph_invalidation.py'],
+  name = 'graph',
+  sources = ['test_graph.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/bin'
+    'src/python/pants/bin',
+    'src/python/pants/build_graph',
   ]
 )
 

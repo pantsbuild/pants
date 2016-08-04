@@ -14,7 +14,7 @@ import org.junit.Test;
 public class XmlReportTest {
   @Test
   public void testXmlPasses() {
-    System.out.println("Test output");;
+    System.out.println("Test output");
     Assert.assertTrue(true);
   }
 

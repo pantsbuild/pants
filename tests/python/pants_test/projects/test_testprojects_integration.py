@@ -35,10 +35,9 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files',
       'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:fatal',
       'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
-      'testprojects/src/java/org/pantsbuild/testproject/junit/beforeclassexception:tests',
+      'testprojects/src/java/org/pantsbuild/testproject/junit/earlyexit:tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/failing/tests/org/pantsbuild/tmp/tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/mixed/tests/org/pantsbuild/tmp/tests',
-      'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests',
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
@@ -53,6 +52,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
+      'testprojects/tests/java/org/pantsbuild/testproject/htmlreport:htmlreport',
       'testprojects/tests/java/org/pantsbuild/testproject/parallel.*',
     ]
 
@@ -82,5 +82,5 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
                           timeout_targets + deliberately_conflicting_targets)
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
                        targets_to_exclude)
-    pants_run = self.pants_test(['testprojects::'] + exclude_opts)
+    pants_run = self.pants_test(['testprojects::', '--jvm-platform-default-platform=java6'] + exclude_opts)
     self.assert_success(pants_run)

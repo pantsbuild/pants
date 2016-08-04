@@ -10,7 +10,7 @@ from collections import namedtuple
 
 from six.moves import range
 
-from pants.base.build_environment import get_buildroot
+from pants.base.project_tree_factory import get_project_tree
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
@@ -58,14 +58,12 @@ class SourceRoots(object):
     self._options = source_root_config.get_options()
 
   def add_source_root(self, path, langs=tuple()):
-    """Add the specified fixed source root.
+    """Add the specified fixed source root, which must be relative to the buildroot.
 
     Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
     unknown structure.  Tests should prefer to use dirs that match our source root patterns
     instead of explicitly setting source roots here.
     """
-    if os.path.isabs(path):
-      path = os.path.relpath(path, get_buildroot())
     self._trie.add_fixed(path, langs)
 
   def find(self, target):
@@ -79,12 +77,10 @@ class SourceRoots(object):
   def find_by_path(self, path):
     """Find the source root for the given path, or None.
 
-    :param path: Find the source root for this path.
+    :param path: Find the source root for this path, relative to the buildroot.
     :return: A SourceRoot instance, or None if the path is not located under a source root
              and `unmatched==fail`.
     """
-    if os.path.isabs(path):
-      path = os.path.relpath(path, get_buildroot())
     matched = self._trie.find(path)
     if matched:
       return matched
@@ -104,29 +100,20 @@ class SourceRoots(object):
     However we don't descend into source roots, once found, so this should be fast in practice.
     Note: Does not follow symlinks.
     """
-    buildroot = get_buildroot()
-    # Note: If we support other SCMs in the future, add their metadata dirs here if relevant.
-    ignore = {'.git'}.union({os.path.relpath(self._options[k], buildroot) for k in
-                            ['pants_workdir', 'pants_supportdir', 'pants_distdir']})
+    project_tree = get_project_tree(self._options)
 
     fixed_roots = set()
-    for fixed in self._options.source_roots, self._options.test_roots:
-      if fixed:
-        for root, langs in fixed.items():
-          if os.path.exists(os.path.join(buildroot, root)):
-            yield self._source_root_factory.create(root, langs)
-        fixed_roots.update(fixed.keys())
+    for root, langs in self._trie.fixed():
+      if project_tree.exists(root):
+        yield self._source_root_factory.create(root, langs)
+      fixed_roots.add(root)
 
-    for dirpath, dirnames, _ in os.walk(buildroot, topdown=True):
-      relpath = os.path.relpath(dirpath, buildroot)
-      if relpath in ignore:
-        del dirnames[:]  # Don't descend into ignored dirs.
-      else:
-        match = self._trie.find(relpath)
-        if match:
-          if not any(fixed_root.startswith(relpath) for fixed_root in fixed_roots):
-            yield match  # Found a source root not a prefix of any fixed roots.
-          del dirnames[:]  # Don't continue to walk into it.
+    for relpath, dirnames, _ in project_tree.walk('', topdown=True):
+      match = self._trie.find(relpath)
+      if match:
+        if not any(fixed_root.startswith(relpath) for fixed_root in fixed_roots):
+          yield match  # Found a source root not a prefix of any fixed roots.
+        del dirnames[:]  # Don't continue to walk into it.
 
 
 class SourceRootConfig(Subsystem):
@@ -306,6 +293,17 @@ class SourceRootTrie(object):
       self.children[key] = child
       return child
 
+    def subpatterns(self):
+      if self.children:
+        for key, child in self.children.items():
+          for sp, langs in child.subpatterns():
+            if sp:
+              yield os.path.join(key, sp), langs
+            else:
+              yield key, langs
+      else:
+        yield '', self.langs
+
   def __init__(self, source_root_factory):
     self._source_root_factory = source_root_factory
     self._root = SourceRootTrie.Node()
@@ -314,9 +312,16 @@ class SourceRootTrie(object):
     """Add a pattern to the trie."""
     self._do_add_pattern(pattern, tuple())
 
-  def add_fixed(self, path, langs=None):
+  def add_fixed(self, path, langs):
     """Add a fixed source root to the trie."""
     self._do_add_pattern(os.path.join('^', path), tuple(langs))
+
+  def fixed(self):
+    """Returns a list of just the fixed source roots in the trie."""
+    for key, child in self._root.children.items():
+      if key == '^':
+        return list(child.subpatterns())
+    return []
 
   def _do_add_pattern(self, pattern, langs):
     keys = pattern.split(os.path.sep)

@@ -28,10 +28,15 @@ import static org.junit.Assert.assertTrue;
  * </p>
  */
 public class ParallelMethodsDefaultParallelTest1 {
-  private static final int NUM_CONCURRENT_TESTS = 4;
+  private static final int NUM_CONCURRENT_TESTS = 2;
   private static final int WAIT_TIMEOUT_MS = 3000;
-  private static CountDownLatch latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
+  private static volatile CountDownLatch latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
   private static final AtomicInteger numRunning = new AtomicInteger(0);
+
+  public static void reset() {
+    latch = new CountDownLatch(NUM_CONCURRENT_TESTS);
+    numRunning.set(0);
+  }
 
   @Test
   public void pmdptest11() throws Exception {
@@ -45,9 +50,9 @@ public class ParallelMethodsDefaultParallelTest1 {
 
   static void awaitLatch(String methodName) throws Exception {
     // NB(zundel): this test currently doesn't ensure that both classes run all methods in
-    // parallel, it only ensures that at least two methods get started and that no more than
-    // 2 methods run at a time. A better test would show that methods are run in parallel
-    // in each class.
+    // parallel, but the classes run serially, it only ensures that at least two methods get
+    // started and that no more than 2 methods run at a time. A better test would show that
+    // methods are run in parallel in each class.
 
     TestRegistry.registerTestCall(methodName);
     latch.countDown();
@@ -57,7 +62,9 @@ public class ParallelMethodsDefaultParallelTest1 {
     numRunning.incrementAndGet();
     Thread.sleep(WAIT_TIMEOUT_MS);
     // Make sure no more than 2 tests have been started concurrently
-    assertTrue(numRunning.get() <= NUM_CONCURRENT_TESTS);
+    int running = numRunning.get();
+    assertTrue(String.format("Expected <= %d got %d", NUM_CONCURRENT_TESTS, running),
+        running <= NUM_CONCURRENT_TESTS);
     numRunning.decrementAndGet();
   }
 }

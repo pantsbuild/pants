@@ -13,7 +13,7 @@ import subprocess
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
-from pants.binaries import binary_util
+from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -140,7 +140,10 @@ class JvmdocGen(JvmTask):
         result, gendir = create_jvmdoc(command, gendir)
         self._handle_create_jvmdoc_result(targets, result, command)
     if self.open:
-      binary_util.ui_open(os.path.join(gendir, 'index.html'))
+      try:
+        desktop.ui_open(os.path.join(gendir, 'index.html'))
+      except desktop.OpenError as e:
+        raise TaskError(e)
 
   def _generate_individual(self, targets, create_jvmdoc_command):
     jobs = {}

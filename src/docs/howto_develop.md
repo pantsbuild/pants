@@ -30,7 +30,7 @@ You may hit an error with version mismatch:
 
     :::bash
     ...
-    Exception message: Version mismatch: Requested version was 1.0.0, our version is 1.1.0-pre0.
+    Exception message: Version mismatch: Requested version was 1.1.0, our version is 1.2.0-dev0.
 
 If so, you can add a `PANTS_VERSION` environment variable like so:
 
@@ -38,7 +38,7 @@ If so, you can add a `PANTS_VERSION` environment variable like so:
     (other repo) $ PANTS_PLUGINS="[]" \
       PANTS_PYTHONPATH="['/path/to/pants/repo/contrib/python/src/python']" \
       PANTS_BACKEND_PACKAGES="['pants.contrib.python.checks']" \
-      PANTS_VERSION=1.1.0-pre0 \
+      PANTS_VERSION=1.2.0-dev0 \
       /path/to/pants/repo/pants compile ::
 
 Here the environment variables are used to make sure any pants plugins your other repo uses will
@@ -97,7 +97,7 @@ You'll need to setup some files one-time in your own repo:
       dependencies=[
         ':pantsbuild.pants',
         # List any other pants backend local or remote deps here, ie:
-        # ':pantsbuild.pants.contrib.spindle' or 'src/python/your/pants/plugin'
+        # ':pantsbuild.pants.contrib.go' or 'src/python/your/pants/plugin'
       ]
     )
 

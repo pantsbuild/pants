@@ -22,12 +22,13 @@ import org.pantsbuild.tools.junit.impl.ConsoleRunnerImpl;
 @RunWith(Parameterized.class)
 public abstract class ConsoleRunnerTestBase {
   private static final String DEFAULT_CONCURRENCY_FLAG = "-default-concurrency";
+  private static final String DEFAULT_PARALLEL_FLAG = "-default-parallel";
   private static final String USE_EXPERIMENTAL_RUNNER_FLAG = "-use-experimental-runner";
   private static final String PARALLEL_THREADS_FLAG = "-parallel-threads";
 
   private static final String DEFAULT_TEST_PACKGE = "org.pantsbuild.tools.junit.lib.";
 
-  private TestParameters parameters;
+  protected TestParameters parameters;
 
   protected enum TestParameters {
     LEGACY_SERIAL(false, null),
@@ -81,14 +82,14 @@ public abstract class ConsoleRunnerTestBase {
   @Before
   public void setUp() {
     ConsoleRunnerImpl.setCallSystemExitOnFinish(false);
-    ConsoleRunnerImpl.setExitStatus(0);
+    ConsoleRunnerImpl.addTestListener(null);
     TestRegistry.reset();
   }
 
   @After
   public void tearDown() {
     ConsoleRunnerImpl.setCallSystemExitOnFinish(true);
-    ConsoleRunnerImpl.setExitStatus(0);
+    ConsoleRunnerImpl.addTestListener(null);
   }
 
   /**
@@ -107,8 +108,11 @@ public abstract class ConsoleRunnerTestBase {
 
     // Tack on extra parameters from the Parameterized runner
     if (!testArgs.contains(DEFAULT_CONCURRENCY_FLAG) && parameters.defaultConcurrency != null) {
-      testArgs.add(DEFAULT_CONCURRENCY_FLAG);
-      testArgs.add(parameters.defaultConcurrency.name());
+      if (!testArgs.contains(DEFAULT_CONCURRENCY_FLAG)
+          && !testArgs.contains(DEFAULT_PARALLEL_FLAG)) {
+        testArgs.add(DEFAULT_CONCURRENCY_FLAG);
+        testArgs.add(parameters.defaultConcurrency.name());
+      }
       if (!testArgs.contains(PARALLEL_THREADS_FLAG)) {
         testArgs.add(PARALLEL_THREADS_FLAG);
         testArgs.add("8");

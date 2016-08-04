@@ -250,7 +250,7 @@ class Context(object):
     # initialized somewhere, making it now unsafe to replace targets. Thus callers of this method
     # must know what they're doing!
     #
-    # TODO(John Sirois): This currently has 0 uses (outside ContextTest) in pantsbuild/pants and
+    # TODO(John Sirois): This currently has only 1 use (outside ContextTest) in pantsbuild/pants and
     # only 1 remaining known use case in the Foursquare codebase that will be able to go away with
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
@@ -264,14 +264,15 @@ class Context(object):
 
     :API: public
     """
-    target_base = os.path.join(get_buildroot(), target_base or address.spec_path)
-    if not os.path.exists(target_base):
-      os.makedirs(target_base)
+    rel_target_base = target_base or address.spec_path
+    abs_target_base = os.path.join(get_buildroot(), rel_target_base)
+    if not os.path.exists(abs_target_base):
+      os.makedirs(abs_target_base)
       # TODO: Adding source roots on the fly like this is yucky, but hopefully this
       # method will go away entirely under the new engine. It's primarily used for injecting
       # synthetic codegen targets, and that isn't how codegen will work in the future.
-    if not self.source_roots.find_by_path(target_base):
-      self.source_roots.add_source_root(target_base)
+    if not self.source_roots.find_by_path(rel_target_base):
+      self.source_roots.add_source_root(rel_target_base)
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
 

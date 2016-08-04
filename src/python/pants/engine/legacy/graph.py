@@ -6,15 +6,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from hashlib import sha1
 
-from twitter.common.collections import maybe_list
+from twitter.common.collections import OrderedSet, maybe_list
 
+from pants.backend.jvm.targets.jvm_app import BundleProps, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
-from pants.engine.fs import Files, FilesContent, PathGlobs
+from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, TaskNode, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
@@ -45,9 +45,17 @@ class LegacyBuildGraph(BuildGraph):
     """
     self._scheduler = scheduler
     self._graph = scheduler.product_graph
-    self._target_types = symbol_table_cls.aliases().target_types
+    self._target_types = self._get_target_types(symbol_table_cls)
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
+
+  def _get_target_types(self, symbol_table_cls):
+    aliases = symbol_table_cls.aliases()
+    target_types = dict(aliases.target_types)
+    for alias, factory in aliases.target_macro_factories.items():
+      target_type, = factory.target_types
+      target_types[alias] = target_type
+    return target_types
 
   def _index(self, roots):
     """Index from the given roots into the storage provided by the base class.
@@ -79,7 +87,7 @@ class LegacyBuildGraph(BuildGraph):
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
-    deps_to_inject = set()
+    deps_to_inject = OrderedSet()
     addresses_to_inject = set()
     def inject(target, dep_spec, is_dependency):
       address = Address.parse(dep_spec, relative_to=target.address.spec_path)
@@ -127,7 +135,10 @@ class LegacyBuildGraph(BuildGraph):
       # Pop dependencies, which were already consumed during construction.
       kwargs = target_adaptor.kwargs()
       kwargs.pop('dependencies')
+
       # Instantiate.
+      if target_cls is JvmApp:
+        return self._instantiate_jvm_app(kwargs)
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
       raise
@@ -135,6 +146,15 @@ class LegacyBuildGraph(BuildGraph):
       raise TargetDefinitionException(
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
+
+  def _instantiate_jvm_app(self, kwargs):
+    """For JvmApp target, convert BundleAdaptor to BundleProps."""
+    kwargs['bundles'] = [
+      BundleProps.create_bundle_props(bundle.kwargs()['fileset'])
+      for bundle in kwargs['bundles']
+    ]
+
+    return JvmApp(build_graph=self, **kwargs)
 
   def inject_synthetic_target(self,
                               address,
@@ -212,36 +232,41 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
   return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
 
 
-def _eager_fileset_with_spec(spec_path, filespecs, source_files_content, excluded_source_files):
+def _eager_fileset_with_spec(spec_path, filespecs, source_files_digest, excluded_source_files):
   excluded = {f.path for f in excluded_source_files.dependencies}
-  file_hashes = {fast_relpath(fc.path, spec_path): sha1(fc.content).digest()
-                 for fc in source_files_content.dependencies
-                 if fc.path not in excluded}
-  return EagerFilesetWithSpec(spec_path, filespecs, file_hashes)
+  file_tuples = [(fast_relpath(fd.path, spec_path), fd.digest)
+                 for fd in source_files_digest.dependencies
+                 if fd.path not in excluded]
+  # NB: In order to preserve declared ordering, we record a list of matched files
+  # independent of the file hash dict.
+  return EagerFilesetWithSpec(spec_path,
+                              filespecs,
+                              files=tuple(f for f, _ in file_tuples),
+                              file_hashes=dict(file_tuples))
 
 
-def hydrate_sources(sources_field, source_files_content, excluded_source_files):
-  """Given a SourcesField and FilesContent for its path_globs, create an EagerFilesetWithSpec."""
+def hydrate_sources(sources_field, source_files_digest, excluded_source_files):
+  """Given a SourcesField and FilesDigest for its path_globs, create an EagerFilesetWithSpec."""
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
-                                               source_files_content,
+                                               source_files_digest,
                                                excluded_source_files)
-  return HydratedField('sources', fileset_with_spec)
+  return HydratedField(sources_field.arg, fileset_with_spec)
 
 
-def hydrate_bundles(bundles_field, files_content_list, excluded_files_list):
-  """Given a BundlesField and FilesContent for each of its filesets create a list of BundleAdaptors."""
+def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
+  """Given a BundlesField and FilesDigest for each of its filesets create a list of BundleAdaptors."""
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
-               files_content_list,
+               files_digest_list,
                excluded_files_list)
-  for bundle, filespecs, files_content, excluded_files in zipped:
+  for bundle, filespecs, files_digest, excluded_files in zipped:
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
     kwargs['fileset'] = _eager_fileset_with_spec(spec_path,
                                                  filespecs,
-                                                 files_content,
+                                                 files_digest,
                                                  excluded_files)
     bundles.append(BundleAdaptor(**kwargs))
   return HydratedField('bundles', bundles)
@@ -259,12 +284,12 @@ def create_legacy_graph_tasks():
      reify_legacy_graph),
     (HydratedField,
      [Select(SourcesField),
-      SelectProjection(FilesContent, PathGlobs, ('path_globs',), SourcesField),
+      SelectProjection(FilesDigest, PathGlobs, ('path_globs',), SourcesField),
       SelectProjection(Files, PathGlobs, ('excluded_path_globs',), SourcesField)],
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),
-      SelectDependencies(FilesContent, BundlesField, 'path_globs_list'),
+      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list'),
       SelectDependencies(Files, BundlesField, 'excluded_path_globs_list')],
      hydrate_bundles),
   ]

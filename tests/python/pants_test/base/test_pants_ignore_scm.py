@@ -19,7 +19,7 @@ class ScmPantsIgnoreTest(unittest.TestCase, PantsIgnoreTestBase):
   Special test cases can be defined here.
   """
 
-  def mk_project_tree(self, build_root, ignore_patterns=[]):
+  def mk_project_tree(self, build_root, ignore_patterns=None):
     return ScmProjectTree(build_root, Git(worktree=build_root), 'HEAD', ignore_patterns)
 
   def setUp(self):

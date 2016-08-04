@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from contextlib import closing
 
-from pants.engine.fs import Dir, File
+from pants.base.project_tree import Dir, File
 from pants.engine.scheduler import StepRequest, StepResult
 from pants.engine.storage import Cache, InvalidKeyError, Key, Lmdb, Storage
 

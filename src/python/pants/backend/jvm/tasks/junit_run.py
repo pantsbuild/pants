@@ -13,6 +13,7 @@ from collections import defaultdict
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
@@ -23,14 +24,15 @@ from pants.backend.jvm.tasks.coverage.base import Coverage
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura, CoberturaTaskSettings
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries import binary_util
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util import desktop
 from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
 from pants.util.strutil import pluralize
@@ -107,10 +109,14 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                   'such a target will raise an error during the test run.')
     register('--use-experimental-runner', type=bool, advanced=True,
              help='Use experimental junit-runner logic for more options for parallelism.')
+    register('--html-report', type=bool,
+             help='If true, generate an html summary report of tests that were run.')
+    register('--open', type=bool,
+             help='Attempt to open the html summary report in a browser (implies --html-report)')
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.9'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.13'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
@@ -171,6 +177,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     self._strict_jvm_version = options.strict_jvm_version
     self._args = copy.copy(self.args)
     self._failure_summary = options.failure_summary
+    self._open = options.open
+    self._html_report = self._open or options.html_report
 
     if options.output_mode == 'ALL':
       self._args.append('-output-mode=ALL')
@@ -409,7 +417,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           args = remove_arg(args, '-parallel-threads', has_param=True)
           args += ['-parallel-threads', str(threads)]
 
-        with binary_util.safe_args(batch, self.get_options()) as batch_tests:
+        with argfile.safe_args(batch, self.get_options()) as batch_tests:
           self.context.log.debug('CWD = {}'.format(workdir))
           self.context.log.debug('platform = {}'.format(platform))
           with environment_as(**dict(target_env_vars)):
@@ -551,6 +559,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       if self._coverage:
         self._coverage.report(
           targets, tests_and_targets.keys(), self.execute_java_for_coverage, tests_failed_exception=exception)
+      if self._html_report:
+        html_file_path = JUnitHtmlReport().report(self.workdir, os.path.join(self.workdir, 'reports'))
+        if self._open:
+          desktop.ui_open(html_file_path)
 
     try:
       self._run_tests(tests_and_targets)

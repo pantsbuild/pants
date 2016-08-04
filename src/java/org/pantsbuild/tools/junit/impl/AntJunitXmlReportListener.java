@@ -378,6 +378,24 @@ class AntJunitXmlReportListener extends RunListener {
   }
 
   @Override
+  public void testAssumptionFailure(Failure failure) {
+    Description description = failure.getDescription();
+    if (!description.isTest()) {
+      return;
+    }
+
+    TestSuite suite = getTestSuiteFor(description);
+    if (suite != null) {
+      suite.incrementSkipped();
+    }
+
+    TestCase testCase = getTestCaseFor(description);
+    if (testCase != null) {
+      testCase.setSkipped(true);
+    }
+  }
+
+  @Override
   public void testFailure(Failure failure) throws java.lang.Exception {
     Description description = failure.getDescription();
     boolean isFailure = Util.isAssertionFailure(failure);
@@ -562,7 +580,7 @@ class AntJunitXmlReportListener extends RunListener {
    * actually gets run.
    *
    * Situations where this happens:
-   *   - testFailure() gets passed Desription.TEST_MECHANISM
+   *   - testFailure() gets passed Description.TEST_MECHANISM
    *   - Class initialization fails and the Description passed to testFailure() may only have a
    *   string description.
    *

@@ -15,6 +15,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:mustache',
+    'src/python/pants/base:project_tree',
     'src/python/pants/base:run_info',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',

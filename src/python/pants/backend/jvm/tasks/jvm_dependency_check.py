@@ -14,9 +14,10 @@ from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyze
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
+from pants.task.task import Task
 
 
-class JvmDependencyCheck(JvmDependencyAnalyzer):
+class JvmDependencyCheck(Task):
   """Checks true dependencies of a JVM target and ensures that they are consistent with BUILD files."""
 
   @classmethod
@@ -49,6 +50,19 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
                   'This is a very strict check. For example, generated code will often '
                   'legitimately have BUILD dependencies that are unused in practice.')
 
+  @classmethod
+  def skip(cls, options):
+    """Return true if the task should be entirely skipped, and thus have no product requirements."""
+    values = [options.missing_deps, options.missing_direct_deps, options.unnecessary_deps]
+    return all(v == 'off' for v in values)
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JvmDependencyCheck, cls).prepare(options, round_manager)
+    if not cls.skip(options):
+      round_manager.require_data('runtime_classpath')
+      round_manager.require_data('product_deps_by_src')
+
   def __init__(self, *args, **kwargs):
     super(JvmDependencyCheck, self).__init__(*args, **kwargs)
 
@@ -61,11 +75,6 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
     self._check_missing_direct_deps = munge_flag('missing_direct_deps')
     self._check_unnecessary_deps = munge_flag('unnecessary_deps')
     self._target_whitelist = self.get_options().missing_deps_whitelist
-
-  @classmethod
-  def skip(cls, options):
-    values = [options.missing_deps, options.missing_direct_deps, options.unnecessary_deps]
-    return all(v == 'off' for v in values)
 
   @property
   def cache_target_dirs(self):
@@ -164,10 +173,13 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
 
     All paths in the input and output are absolute.
     """
+    analyzer = JvmDependencyAnalyzer(get_buildroot(),
+                                     self.context.products.get_data('runtime_classpath'),
+                                     self.context.products.get_data('product_deps_by_src'))
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
-      return (dep not in self.bootstrap_jar_classfiles
+      return (dep not in analyzer.bootstrap_jar_classfiles
               and not dep.startswith(DistributionLocator.cached().real_home))
 
     def target_or_java_dep_in_targets(target, targets):
@@ -186,18 +198,19 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
     # TODO: If recomputing these every time becomes a performance issue, memoize for
     # already-seen targets and incrementally compute for new targets not seen in a previous
     # partition, in this or a previous chunk.
-    transitive_deps_by_target = self._compute_transitive_deps_by_target()
+    transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(self.context.targets())
 
     # Find deps that are actual but not specified.
     missing_file_deps = OrderedSet()  # (src, src).
     missing_tgt_deps_map = defaultdict(list)  # (tgt, tgt) -> a list of (src, src) as evidence.
     missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
 
+    targets_by_file = analyzer.targets_by_file(self.context.targets())
     buildroot = get_buildroot()
     abs_srcs = [os.path.join(buildroot, src) for src in src_tgt.sources_relative_to_buildroot()]
     for src in abs_srcs:
       for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
-        actual_dep_tgts = self.targets_by_file.get(actual_dep)
+        actual_dep_tgts = targets_by_file.get(actual_dep)
         # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
         # to be in our declared deps to be OK.
         if actual_dep_tgts is None:

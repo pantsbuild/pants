@@ -19,6 +19,7 @@ from pants.core_tasks.reporting_server_run import ReportingServerRun
 from pants.core_tasks.roots import ListRoots
 from pants.core_tasks.run_prep_command import (RunBinaryPrepCommand, RunCompilePrepCommand,
                                                RunTestPrepCommand)
+from pants.core_tasks.substitute_aliased_targets import SubstituteAliasedTargets
 from pants.core_tasks.targets_help import TargetsHelp
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
@@ -90,3 +91,7 @@ def register_goals():
 
   # Handle sources that aren't loose files in the repo.
   task(name='deferred-sources', action=DeferredSourcesMapper).install()
+
+  # Processing aliased targets has to occur very early.
+  task(name='substitute-aliased-targets', action=SubstituteAliasedTargets).install('bootstrap',
+                                                                                   first=True)

@@ -13,6 +13,17 @@ python_tests(
 )
 
 python_tests(
+  name = 'deferred_sources_mapper_integration',
+  sources = ['test_deferred_sources_mapper_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'list_goals',
   sources = ['test_list_goals.py'],
   dependencies = [
@@ -23,14 +34,14 @@ python_tests(
 )
 
 python_tests(
-    name = 'prep_command_integration',
-    sources = ['test_prep_command_integration.py'],
-    dependencies = [
-        'src/python/pants/util:contextutil',
-        'src/python/pants/util:dirutil',
-        'tests/python/pants_test:int-test',
-    ],
-    tags = {'integration'},
+  name = 'prep_command_integration',
+  sources = ['test_prep_command_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -57,6 +68,15 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
   ],
+)
+
+python_tests(
+  name = 'substitute_target_aliases_integration',
+  sources = ['test_substitute_target_aliases_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

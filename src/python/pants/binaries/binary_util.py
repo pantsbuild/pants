@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import posixpath
-import subprocess
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
@@ -22,17 +22,17 @@ from pants.util.osutil import get_os_id
 
 
 _DEFAULT_PATH_BY_ID = {
-  ('linux', 'x86_64'): ['linux', 'x86_64'],
-  ('linux', 'amd64'): ['linux', 'x86_64'],
-  ('linux', 'i386'): ['linux', 'i386'],
-  ('linux', 'i686'): ['linux', 'i386'],
-  ('darwin', '9'): ['mac', '10.5'],
-  ('darwin', '10'): ['mac', '10.6'],
-  ('darwin', '11'): ['mac', '10.7'],
-  ('darwin', '12'): ['mac', '10.8'],
-  ('darwin', '13'): ['mac', '10.9'],
-  ('darwin', '14'): ['mac', '10.10'],
-  ('darwin', '15'): ['mac', '10.11'],
+  ('linux', 'x86_64'): ('linux', 'x86_64'),
+  ('linux', 'amd64'): ('linux', 'x86_64'),
+  ('linux', 'i386'): ('linux', 'i386'),
+  ('linux', 'i686'): ('linux', 'i386'),
+  ('darwin', '9'): ('mac', '10.5'),
+  ('darwin', '10'): ('mac', '10.6'),
+  ('darwin', '11'): ('mac', '10.7'),
+  ('darwin', '12'): ('mac', '10.8'),
+  ('darwin', '13'): ('mac', '10.9'),
+  ('darwin', '14'): ('mac', '10.10'),
+  ('darwin', '15'): ('mac', '10.11'),
 }
 
 
@@ -60,7 +60,7 @@ class BinaryUtil(object):
       register('--fetch-timeout-secs', type=int, default=30, advanced=True,
                help='Timeout in seconds for url reads when fetching binary tools from the '
                     'repos specified by --baseurls')
-      register("--path-by-id", type=dict, advanced=True,
+      register('--path-by-id', type=dict, advanced=True,
                help='Maps output of uname for a machine to a binary search path.  e.g. '
                '{ ("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux", "arm32"] }')
 
@@ -100,22 +100,16 @@ class BinaryUtil(object):
     :returns: Base path used to select the binary file.
     """
     uname_func = uname_func or os.uname
-
-    sysname, _, release, _, machine = uname_func()
-    try:
-      os_id = get_os_id(uname_func=uname_func)
-    except KeyError:
-      os_id = None
-    if os_id is None:
-      raise self.MissingMachineInfo("Pants has no binaries for {}".format(sysname))
+    os_id = get_os_id(uname_func=uname_func)
+    if not os_id:
+      raise self.MissingMachineInfo('Pants has no binaries for {}'.format(' '.join(uname_func())))
 
     try:
       middle_path = self._path_by_id[os_id]
     except KeyError:
-      raise self.MissingMachineInfo(
-        "Update --binaries-path-by-id to find binaries for {sysname} {machine} {release}.".format(
-          sysname=sysname, release=release, machine=machine))
-    return os.path.join(supportdir, *(middle_path + [version, name]))
+      raise self.MissingMachineInfo('Update --binaries-path-by-id to find binaries for {!r}'
+                                    .format(os_id))
+    return os.path.join(supportdir, *(middle_path + (version, name)))
 
   def __init__(self, baseurls, timeout_secs, bootstrapdir, path_by_id=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
@@ -136,7 +130,7 @@ class BinaryUtil(object):
     self._pants_bootstrapdir = bootstrapdir
     self._path_by_id = _DEFAULT_PATH_BY_ID.copy()
     if path_by_id:
-      self._path_by_id.update(path_by_id)
+      self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
   @contextmanager
   def _select_binary_stream(self, name, binary_path, fetcher=None):
@@ -155,12 +149,12 @@ class BinaryUtil(object):
           'No urls are defined for the --pants-support-baseurls option.')
     downloaded_successfully = False
     accumulated_errors = []
-    for baseurl in OrderedSet(self._baseurls):  # Wrap in OrderedSet because duplicates are wasteful.
+    for baseurl in OrderedSet(self._baseurls):  # De-dup URLS: we only want to try each URL once.
       url = posixpath.join(baseurl, binary_path)
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
         with temporary_file() as dest:
-          fetcher = fetcher or Fetcher()
+          fetcher = fetcher or Fetcher(get_buildroot())
           fetcher.download(url, listener=Fetcher.ProgressListener(), path_or_fd=dest)
           logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
           downloaded_successfully = True
@@ -215,80 +209,3 @@ class BinaryUtil(object):
     logger.debug('Selected {binary} binary bootstrapped to: {path}'
                  .format(binary=name, path=bootstrapped_binary_path))
     return bootstrapped_binary_path
-
-
-@contextmanager
-def safe_args(args,
-              options,
-              max_args=None,
-              argfile=None,
-              delimiter='\n',
-              quoter=None,
-              delete=True):
-  """Yields args if there are less than a limit otherwise writes args to an argfile and yields an
-  argument list with one argument formed from the path of the argfile.
-
-  :param args: The args to work with.
-  :param OptionValueContainer options: scoped options object for this task
-  :param max_args: The maximum number of args to let though without writing an argfile.  If not
-    specified then the maximum will be loaded from the --max-subprocess-args option.
-  :param argfile: The file to write args to when there are too many; defaults to a temporary file.
-  :param delimiter: The delimiter to insert between args written to the argfile, defaults to '\n'
-  :param quoter: A function that can take the argfile path and return a single argument value;
-    defaults to: <code>lambda f: '@' + f<code>
-  :param delete: If True deletes any arg files created upon exit from this context; defaults to
-    True.
-  """
-  max_args = max_args or options.max_subprocess_args
-  if len(args) > max_args:
-    def create_argfile(f):
-      f.write(delimiter.join(args))
-      f.close()
-      return [quoter(f.name) if quoter else '@{}'.format(f.name)]
-
-    if argfile:
-      try:
-        with safe_open(argfile, 'w') as fp:
-          yield create_argfile(fp)
-      finally:
-        if delete and os.path.exists(argfile):
-          os.unlink(argfile)
-    else:
-      with temporary_file(cleanup=delete) as fp:
-        yield create_argfile(fp)
-  else:
-    yield args
-
-
-def _mac_open(files):
-  subprocess.call(['open'] + list(files))
-
-
-def _linux_open(files):
-  cmd = "xdg-open"
-  if not _cmd_exists(cmd):
-    raise TaskError("The program '{}' isn't in your PATH. Please install and re-run this "
-                    "goal.".format(cmd))
-  for f in list(files):
-    subprocess.call([cmd, f])
-
-
-# From: http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
-def _cmd_exists(cmd):
-  return subprocess.call(["/usr/bin/which", cmd], shell=False, stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE) == 0
-
-_OPENER_BY_OS = {
-  'darwin': _mac_open,
-  'linux': _linux_open
-}
-
-
-def ui_open(*files):
-  """Attempts to open the given files using the preferred native viewer or editor."""
-  if files:
-    osname = os.uname()[0].lower()
-    if not osname in _OPENER_BY_OS:
-      print('Sorry, open currently not supported for ' + osname)
-    else:
-      _OPENER_BY_OS[osname](files)

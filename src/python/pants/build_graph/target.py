@@ -20,6 +20,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
 from pants.build_graph.address import Address, Addresses
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.source.payload_fields import DeferredSourcesField, SourcesField
@@ -129,6 +130,14 @@ class Target(AbstractTarget):
 
   :API: public
   """
+
+
+  class RecursiveDepthError(AddressLookupError):
+    """Raised when there are too many recursive calls to calculate the fingerprint."""
+    pass
+
+
+  _MAX_RECURSION_DEPTH=300
 
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses
@@ -444,7 +453,7 @@ class Target(AbstractTarget):
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
-  def transitive_invalidation_hash(self, fingerprint_strategy=None):
+  def transitive_invalidation_hash(self, fingerprint_strategy=None, depth=0):
     """
     :API: public
 
@@ -455,15 +464,25 @@ class Target(AbstractTarget):
       did not contribute to the fingerprint, according to the provided FingerprintStrategy.
     :rtype: string
     """
+    if depth > self._MAX_RECURSION_DEPTH:
+      # NB(zundel) without this catch, we'll eventually hit the python stack limit
+      # RuntimeError: maximum recursion depth exceeded while calling a Python object
+      raise self.RecursiveDepthError("Max depth of {} exceeded.".format(self._MAX_RECURSION_DEPTH))
+
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
     if fingerprint_strategy not in self._cached_transitive_fingerprint_map:
       hasher = sha1()
 
       def dep_hash_iter():
         for dep in self.dependencies:
-          dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy)
-          if dep_hash is not None:
-            yield dep_hash
+          try:
+            dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth+1)
+            if dep_hash is not None:
+              yield dep_hash
+          except self.RecursiveDepthError as e:
+            raise self.RecursiveDepthError("{message}\n  referenced from {spec}"
+                                           .format(message=e, spec=dep.address.spec))
+
       dep_hashes = sorted(list(dep_hash_iter()))
       for dep_hash in dep_hashes:
         hasher.update(dep_hash)
@@ -731,15 +750,23 @@ class Target(AbstractTarget):
     if isinstance(sources, Addresses):
       # Currently, this is only created by the result of from_target() which takes a single argument
       if len(sources.addresses) != 1:
+        key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
+        spec_section = " to '{}'".format(address.spec) if address else ""
         raise self.WrongNumberOfAddresses(
-          "Expected a single address to from_target() as argument to {spec}"
-          .format(spec=address.spec))
+          "Expected {key_arg_section}a single address to from_target() as argument{spec_section}"
+          .format(key_arg_section=key_arg_section, spec_section=spec_section))
       referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
     elif sources is None:
       sources = FilesetWithSpec.empty(sources_rel_path)
-    elif not isinstance(sources, FilesetWithSpec):
+    elif isinstance(sources, FilesetWithSpec):
+      pass
+    elif isinstance(sources, (set, list, tuple)):
       # Received a literal sources list: convert to a FilesetWithSpec via Files.
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
+    else:
+      key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
+      raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
+                                            .format(key_arg_section, type(sources)))
 
     return SourcesField(sources=sources)

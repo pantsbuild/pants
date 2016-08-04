@@ -294,6 +294,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     artifact_write_callback=self.maybe_write_artifact)
 
   @property
+  def create_target_dirs(self):
+    """Whether to create a results_dir per VersionedTarget in the workdir of the Task.
+
+    This defaults to the value of `self.cache_target_dirs` (as caching them requires
+    creating them), but may be overridden independently to create the dirs without caching
+    them.
+
+    :API: public
+    """
+    return self.cache_target_dirs or False
+
+  @property
   def cache_target_dirs(self):
     """Whether to cache files in VersionedTarget's results_dir after exiting an invalidated block.
 
@@ -446,7 +458,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def _maybe_create_results_dirs(self, vts):
     """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
-    if self.cache_target_dirs:
+    if self.create_target_dirs:
       for vt in vts:
         vt.create_results_dir(self.workdir, allow_incremental=self.incremental)
 

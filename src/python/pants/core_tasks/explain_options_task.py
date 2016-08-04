@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
+
 from colors import black, blue, cyan, green, magenta, red, white
 
 from pants.base.revision import Revision
@@ -34,6 +36,8 @@ class ExplainOptionsTask(ConsoleTask):
              help='Only show values that overrode defaults.')
     register('--skip-inherited', type=bool, default=True,
              help='Do not show inherited options, unless their values differ from their parents.')
+    register('--output-format', choices=['text', 'json'], default='text',
+             help='Specify the format options will be printed.')
 
   def _scope_filter(self, scope):
     pattern = self.get_options().scope
@@ -62,7 +66,12 @@ class ExplainOptionsTask(ConsoleTask):
     if rank == RankedValue.FLAG: return magenta
     return black
 
-  def _format_scope(self, scope, option):
+  def _format_scope(self, scope, option, no_color=False):
+    if no_color:
+      return '{scope}{option}'.format(
+        scope='{}.'.format(scope) if scope else '',
+        option=option,
+      )
     scope_color = cyan if self.get_options().colors else lambda x: x
     option_color = blue if self.get_options().colors else lambda x: x
     return '{scope}{option}'.format(
@@ -73,13 +82,20 @@ class ExplainOptionsTask(ConsoleTask):
   def _format_record(self, record):
     value_color = green if self.get_options().colors else lambda x: x
     rank_color = self._rank_color(record.rank)
-    return '{value} {rank}'.format(
-      value=value_color(str(record.value)),
-      rank=rank_color('(from {rank}{details})'.format(
-        rank=RankedValue.get_rank_name(record.rank),
-        details=' {}'.format(record.details) if record.details else '',
-      )),
+    simple_value = str(record.value)
+    formatted_value = value_color(simple_value)
+    simple_rank = RankedValue.get_rank_name(record.rank)
+    formatted_rank = '(from {rank}{details})'.format(
+      rank=simple_rank,
+      details=rank_color(' {}'.format(record.details)) if record.details else '',
     )
+    if self.is_json():
+      return simple_value.replace('\n', ''), simple_rank
+    elif self.is_text():
+      return '{value} {rank}'.format(
+        value=formatted_value,
+        rank=formatted_rank,
+      )
 
   def _show_history(self, history):
     for record in reversed(list(history)[:-1]):
@@ -103,8 +119,16 @@ class ExplainOptionsTask(ConsoleTask):
     except AttributeError:
       return None, None
 
+  def is_json(self):
+    return self.get_options().output_format == 'json'
+
+  def is_text(self):
+    return self.get_options().output_format == 'text'
+
   def console_output(self, targets):
     self._force_option_parsing()
+    if self.is_json():
+      output_map = {}
     for scope, options in sorted(self.context.options.tracker.option_history_by_scope.items()):
       if not self._scope_filter(scope):
         continue
@@ -123,8 +147,22 @@ class ExplainOptionsTask(ConsoleTask):
           parent_scope, parent_value = self._get_parent_scope_option(scope, option)
           if parent_scope is not None and parent_value == history.latest.value:
             continue
-        yield '{} = {}'.format(self._format_scope(scope, option),
-                               self._format_record(history.latest))
+        if self.is_json():
+          opt_vals = self._format_record(history.latest)
+          scope_key = self._format_scope(scope, option, True)
+          inner_map = dict(value=opt_vals[0], source=opt_vals[1])
+          output_map[scope_key] = inner_map
+        elif self.is_text():
+          yield '{} = {}'.format(self._format_scope(scope, option),
+                                 self._format_record(history.latest))
         if self.get_options().show_history:
+          history_list = []
           for line in self._show_history(history):
-            yield line
+            if self.is_text():
+              yield line
+            elif self.is_json():
+              history_list.append(line.strip())
+          if self.is_json():
+            inner_map["history"] = history_list
+    if self.is_json():
+      yield json.dumps(output_map, indent=2, sort_keys=True)

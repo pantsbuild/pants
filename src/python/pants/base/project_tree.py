@@ -7,8 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 
+import six
 from pathspec.gitignore import GitIgnorePattern
 from pathspec.pathspec import PathSpec
 
@@ -33,7 +34,8 @@ class ProjectTree(AbstractClass):
 
   def __init__(self, build_root, ignore_patterns=None):
     if not os.path.isabs(build_root):
-      raise self.InvalidBuildRootError('ProjectTree build_root {} must be an absolute path.'.format(build_root))
+      raise self.InvalidBuildRootError(
+          'ProjectTree build_root {} must be an absolute path.'.format(build_root))
     self.build_root = os.path.realpath(build_root)
     logger.debug('ProjectTree ignore_patterns: %s', ignore_patterns)
     self.ignore = PathSpec.from_lines(GitIgnorePattern, ignore_patterns if ignore_patterns else [])
@@ -43,8 +45,8 @@ class ProjectTree(AbstractClass):
     """Returns a list of paths in path that match glob."""
 
   @abstractmethod
-  def _listdir_raw(self, relpath):
-    """Return the names of paths in the given directory."""
+  def _scandir_raw(self, relpath):
+    """Return Stats relative to the root for items in the given directory."""
 
   @abstractmethod
   def _isdir_raw(self, relpath):
@@ -67,12 +69,11 @@ class ProjectTree(AbstractClass):
     """Execute `readlink` for the given path, which may result in a relative path."""
 
   @abstractmethod
-  def _lstat_raw(self, relpath):
-    """Without following symlinks, returns a PTStat object for the path, or None."""
-
-  @abstractmethod
   def _walk_raw(self, relpath, topdown=True):
-    """Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path."""
+    """Walk the file tree rooted at `path`.
+
+    Works like os.walk but returned root value is relative path.
+    """
 
   def glob1(self, dir_relpath, glob):
     """Returns a list of paths in path that match glob and are not ignored."""
@@ -80,15 +81,15 @@ class ProjectTree(AbstractClass):
       return []
 
     matched_files = self._glob1_raw(dir_relpath, glob)
-    return self.filter_ignored(matched_files, dir_relpath)
+    prefix = self._relpath_no_dot(dir_relpath)
+    return self._filter_ignored(matched_files, selector=lambda p: os.path.join(prefix, p))
 
-  def listdir(self, relpath):
-    """Return the names of paths which are in the given directory and not ignored."""
+  def scandir(self, relpath):
+    """Return paths relative to the root, which are in the given directory and not ignored."""
     if self.isignored(relpath, directory=True):
       self._raise_access_ignored(relpath)
 
-    names = self._listdir_raw(relpath)
-    return self.filter_ignored(names, relpath)
+    return self._filter_ignored(self._scandir_raw(relpath), selector=lambda e: e.path)
 
   def isdir(self, relpath):
     """Returns True if path is a directory and is not ignored."""
@@ -111,8 +112,8 @@ class ProjectTree(AbstractClass):
     return self._exists_raw(relpath)
 
   def content(self, file_relpath):
-    """
-    Returns the content for file at path. Raises exception if path is ignored.
+    """Returns the content for file at path. Raises exception if path is ignored.
+
     Raises exception if path is ignored.
     """
     if self.isignored(file_relpath):
@@ -121,27 +122,18 @@ class ProjectTree(AbstractClass):
     return self._content_raw(file_relpath)
 
   def relative_readlink(self, relpath):
-    """
-    Execute `readlink` for the given path, which may result in a relative path.
+    """Execute `readlink` for the given path, which may result in a relative path.
+
     Raises exception if path is ignored.
     """
     if self.isignored(self._append_slash_if_dir_path(relpath)):
       self._raise_access_ignored(relpath)
     return self._relative_readlink_raw(relpath)
 
-  def lstat(self, relpath):
-    """
-    Without following symlinks, returns a PTStat object for the path, or None
-    Raises exception if path is ignored.
-    """
-    if self.isignored(self._append_slash_if_dir_path(relpath)):
-      self._raise_access_ignored(relpath)
-
-    return self._lstat_raw(relpath)
-
   def walk(self, relpath, topdown=True):
-    """
-    Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path.
+    """Walk the file tree rooted at `path`.
+
+    Works like os.walk but returned root value is relative path.
     Ignored paths will not be returned.
     """
     for root, dirs, files in self._walk_raw(relpath, topdown):
@@ -175,17 +167,18 @@ class ProjectTree(AbstractClass):
     match_result = list(self.ignore.match_files([relpath]))
     return len(match_result) > 0
 
-  def filter_ignored(self, path_list, prefix=''):
-    """Takes a list of paths and filters out ignored ones."""
-    prefix = self._relpath_no_dot(prefix)
-    prefixed_path_list = [self._append_slash_if_dir_path(os.path.join(prefix, item)) for item in path_list]
-    ignored_paths = list(self.ignore.match_files(prefixed_path_list))
-    if len(ignored_paths) == 0:
-      return path_list
+  def _filter_ignored(self, entries, selector=None):
+    """Given an opaque entry list, filter any ignored entries.
 
-    return [fast_relpath(f, prefix).rstrip('/') for f in
-            [path for path in prefixed_path_list if path not in ignored_paths]
-            ]
+    :param entries: A list or generator that produces entries to filter.
+    :param selector: A function that computes a path for an entry relative to the root of the
+      ProjectTree, or None to use identity.
+    """
+    selector = selector or (lambda x: x)
+    prefixed_entries = [(self._append_slash_if_dir_path(selector(entry)), entry)
+                          for entry in entries]
+    ignored_paths = set(self.ignore.match_files(path for path, _ in prefixed_entries))
+    return [entry for path, entry in prefixed_entries if path not in ignored_paths]
 
   def _relpath_no_dot(self, relpath):
     return relpath.lstrip('./') if relpath != '.' else ''
@@ -206,13 +199,34 @@ class ProjectTree(AbstractClass):
     return relpath
 
 
-class PTStat(datatype('PTStat', ['ftype'])):
-  """A simple 'Stat' facade that can be implemented uniformly across SCM and posix backends.
+class Stat(AbstractClass):
+  """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
 
-  :param ftype: Either 'file', 'dir', or 'link'.
+  Note that in order to preserve these invariants, end-user functions should never directly
+  instantiate Stat instances.
   """
 
+  @abstractproperty
+  def path(self):
+    """:returns: The string path for this Stat."""
 
-PTSTAT_FILE = PTStat('file')
-PTSTAT_DIR  = PTStat('dir')
-PTSTAT_LINK = PTStat('link')
+
+class File(datatype('File', ['path']), Stat):
+  """A file."""
+
+  def __new__(cls, path):
+    return super(File, cls).__new__(cls, six.text_type(path))
+
+
+class Dir(datatype('Dir', ['path']), Stat):
+  """A directory."""
+
+  def __new__(cls, path):
+    return super(Dir, cls).__new__(cls, six.text_type(path))
+
+
+class Link(datatype('Link', ['path']), Stat):
+  """A symbolic link."""
+
+  def __new__(cls, path):
+    return super(Link, cls).__new__(cls, six.text_type(path))

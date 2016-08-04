@@ -67,13 +67,19 @@ class Scopes(object):
   """Default scope constants."""
 
   DEFAULT = Scope('DEFAULT')
+  # The `FORCED` scope is equivalent to DEFAULT, but additionally declares that a dep
+  # might not be detected as used at compile time, and should thus always be considered
+  # to have been used at compile time.
+  FORCED = Scope('FORCED')
   COMPILE = Scope('COMPILE')
   RUNTIME = Scope('RUNTIME')
   TEST = Scope('TEST')
 
-  JVM_COMPILE_SCOPES = DEFAULT | COMPILE
-  JVM_RUNTIME_SCOPES = DEFAULT | RUNTIME
-  JVM_TEST_SCOPES = DEFAULT | RUNTIME | TEST
+  DEFAULT_OR_FORCED = DEFAULT | FORCED
+
+  JVM_COMPILE_SCOPES = DEFAULT_OR_FORCED | COMPILE
+  JVM_RUNTIME_SCOPES = DEFAULT_OR_FORCED | RUNTIME
+  JVM_TEST_SCOPES = DEFAULT_OR_FORCED | RUNTIME | TEST
 
 
 class ScopedDependencyFactory(object):

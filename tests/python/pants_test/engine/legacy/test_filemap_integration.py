@@ -42,6 +42,16 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
   def test_testprojects(self):
     self.do_command('filemap', 'testprojects::', success=True, enable_v2_engine=True)
 
+  def test_python_sources(self):
+    run = self.do_command('filemap',
+                          'testprojects/src/python/sources',
+                          success=True,
+                          enable_v2_engine=True)
+    self.assertIn('testprojects/src/python/sources/sources.py', run.stdout_data)
+    # FIXME: The synthetic target that is created to expose the `resources=globs` arg does not show
+    # up in filemap, because it is synthetic. see https://github.com/pantsbuild/pants/issues/3563
+    #self.assertIn('testprojects/src/python/sources/sources.txt', run.stdout_data)
+
   def test_exclude_invalid_string(self):
     build_path = os.path.join(self.PATH_PREFIX, 'BUILD.invalid')
     build_content = '''python_library(name='exclude_strings_disallowed',
@@ -82,15 +92,11 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
 
   def test_exclude_zglobs(self):
     test_out = self._extract_exclude_output('exclude_zglobs')
-    # TODO: ZGlobs.to_filespecs does not match files in the current directory when a pattern
-    # starts with `**`; see: https://github.com/pantsbuild/pants/issues/3413
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'ab.py', 'aabb.py', 'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
                       test_out)
 
   def test_exclude_composite(self):
     test_out = self._extract_exclude_output('exclude_composite')
-    # TODO: ZGlobs.to_filespecs does not match files in the current directory when a pattern
-    # starts with `**`; see: https://github.com/pantsbuild/pants/issues/3413
     self.assertEquals(self.TEST_EXCLUDE_FILES -
-                      {'aaa.py', 'dir1/a.py', 'dir1/dirdir1/a.py'},
+                      {'a.py', 'aaa.py', 'dir1/a.py', 'dir1/dirdir1/a.py'},
                       test_out)

@@ -52,17 +52,6 @@ function pkg_buildgen_install_test() {
   python -c "from pants.contrib.buildgen.build_file_manipulator import *"
 }
 
-PKG_SPINDLE=(
-  "pantsbuild.pants.contrib.spindle"
-  "//contrib/spindle/src/python/pants/contrib/spindle:plugin"
-  "pkg_spindle_install_test"
-)
-function pkg_spindle_install_test() {
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.spindle==$(local_version)']" \
-    --explain gen | grep "spindle" &> /dev/null
-}
-
 PKG_GO=(
   "pantsbuild.pants.contrib.go"
   "//contrib/go/src/python/pants/contrib/go:plugin"
@@ -126,7 +115,6 @@ CONTRIB_PACKAGES=(
   PKG_ANDROID
   PKG_SCROOGE
   PKG_BUILDGEN
-  PKG_SPINDLE
   PKG_GO
   PKG_NODE
   PKG_PYTHON_CHECKS

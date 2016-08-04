@@ -146,6 +146,11 @@ class GoThriftGen(SimpleCodegenTask):
   def execute_codegen(self, target, target_workdir):
     self._generate_thrift(target, target_workdir)
 
+  @property
+  def _copy_target_attributes(self):
+    """Override `_copy_target_attributes` to exclude `provides`."""
+    return [a for a in super(GoThriftGen, self)._copy_target_attributes if a != 'provides']
+
   def synthetic_target_dir(self, target, target_workdir):
     all_sources = list(target.sources_relative_to_buildroot())
     source = all_sources[0]

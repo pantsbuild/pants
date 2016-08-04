@@ -15,6 +15,7 @@ from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
+from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_method, memoized_property
@@ -60,7 +61,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 2)]
+    return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 3)]
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
@@ -83,8 +84,10 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     for category, depspecs in depmap.items():
       dependencies = deps[category]
       for depspec in depspecs:
+        dep_address = Address.parse(depspec)
         try:
-          dependencies.update(self.context.resolve(depspec))
+          self.context.build_graph.maybe_inject_address_closure(dep_address)
+          dependencies.add(self.context.build_graph.get_target(dep_address))
         except AddressLookupError as e:
           raise AddressLookupError('{}\n  referenced from {} scope'.format(e, self.options_scope))
     return deps
