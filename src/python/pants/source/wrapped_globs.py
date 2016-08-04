@@ -14,6 +14,7 @@ from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
+from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -172,7 +173,7 @@ class FilesetRelPathWrapper(AbstractClass):
 
     files_calculator = cls._file_calculator(root, patterns, kwargs, excludes)
 
-    rel_root = os.path.relpath(root, buildroot)
+    rel_root = fast_relpath(root, buildroot)
     if rel_root == '.':
       rel_root = ''
     filespec = cls.to_filespec(patterns, root=rel_root, excludes=excludes)

@@ -40,7 +40,9 @@ class SourceMapperTest(object):
   def owner(self, owner, f):
     self.assertEqual(set(owner), set(i.spec for i in self.get_mapper().target_addresses_for_source(f)))
 
-  def test_target_address_for_source_only_yields_one_address_when_multiple_conditions_match(self):
+  def test_target_address_for_source_yields_unique_addresses(self):
+    # NB If the mapper returns more than one copy of an address, it may cause other code to do
+    #    unnecessary work.
     self.add_to_build_file('path', dedent('''
     java_library(name='target',
                  sources=['BUILD'],

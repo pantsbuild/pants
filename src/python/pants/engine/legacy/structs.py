@@ -209,7 +209,7 @@ class BaseGlobs(Locatable, AbstractClass):
     """The corresponding `wrapped_globs` class for this BaseGlobs."""
 
   def __init__(self, *patterns, **kwargs):
-    raw_spec_path = kwargs.pop('spec_path', '')
+    raw_spec_path = kwargs.pop('spec_path')
     self._file_globs = self.legacy_globs_class.to_filespec(patterns).get('globs', [])
     raw_excludes = kwargs.pop('exclude', [])
     self._excluded_file_globs = self._filespec_for_excludes(raw_excludes, raw_spec_path).get('globs', [])
@@ -230,8 +230,9 @@ class BaseGlobs(Locatable, AbstractClass):
   @property
   def filespecs(self):
     """Return a filespecs dict representing both globs and excludes."""
-    return {'globs': self._file_globs, 'exclude': self._exclude_filespecs()}
+    return {'globs': self._file_globs, 'exclude': self._exclude_filespecs}
 
+  @property
   def _exclude_filespecs(self):
     if self._excluded_file_globs:
       return [{'globs': self._excluded_file_globs}]
