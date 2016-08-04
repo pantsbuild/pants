@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class GoalRunnerFactory(object):
-  def __init__(self, root_dir, options, build_config, run_tracker, reporting, build_graph=None,
+  def __init__(self, root_dir, options, build_config, run_tracker, reporting, daemon_build_graph=None,
                exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
@@ -46,7 +46,7 @@ class GoalRunnerFactory(object):
     :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
-    :param BuildGraph build_graph: A BuildGraph instance (for graph reuse, optional).
+    :param BuildGraph daemon_build_graph: A BuildGraph instance (for graph reuse, optional).
     :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
     """
     self._root_dir = root_dir
@@ -74,27 +74,21 @@ class GoalRunnerFactory(object):
                                                 self._global_options.enable_v2_engine,
                                                 self._global_options.pants_ignore,
                                                 build_ignore_patterns,
-                                                build_graph)
+                                                daemon_build_graph)
 
-  def _select_buildgraph_and_address_mapper(self, use_engine, path_ignore_patterns, build_ignore_patterns, cached_buildgraph=None):
+  def _select_buildgraph_and_address_mapper(self, use_engine, path_ignore_patterns, build_ignore_patterns, daemon_buildgraph=None):
     """Selects a BuildGraph and AddressMapper to use then constructs them and returns them.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
-    :param LegacyBuildGraph cached_buildgraph: A cached graph to reuse, if available.
+    :param LegacyBuildGraph daemon_buildgraph: A cached graph to reuse, if available.
     :returns a tuple of the graph and the address mapper.
     """
-
-    if cached_buildgraph is not None:
-      if use_engine and not isinstance(cached_buildgraph, LegacyBuildGraph):
-        raise TypeError('Expected {} to be a {}'.format(cached_buildgraph, LegacyBuildGraph.__name__))
-      if not use_engine and not isinstance(cached_buildgraph, MutableBuildGraph):
-        raise TypeError('Expected {} to be a {}'.format(cached_buildgraph, MutableBuildGraph.__name__))
-
-      if use_engine:
-        return cached_buildgraph, LegacyAddressMapper(cached_buildgraph, self._root_dir)
+    if daemon_buildgraph is not None:
+      if isinstance(daemon_buildgraph, LegacyBuildGraph):
+        return daemon_buildgraph, LegacyAddressMapper(daemon_buildgraph, self._root_dir)
       else:
-        return cached_buildgraph, cached_buildgraph._address_mapper
+        return daemon_buildgraph, daemon_buildgraph._address_mapper
     elif use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
