@@ -85,6 +85,9 @@ class GoalRunnerFactory(object):
     :returns a tuple of the graph and the address mapper.
     """
     if daemon_buildgraph is not None:
+      # NB: The daemon may provide a buildgraph. In that case, we ignore the use_engine option,
+      #     since using the engine is implied by using the daemon. However, it is possible for the
+      #     daemon to pass a non-engine backed build graph instance, so we fall back to that.
       if isinstance(daemon_buildgraph, LegacyBuildGraph):
         return daemon_buildgraph, LegacyAddressMapper(daemon_buildgraph, self._root_dir)
       else:
