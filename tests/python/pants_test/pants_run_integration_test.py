@@ -18,7 +18,7 @@ from colors import strip_color
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
@@ -54,6 +54,16 @@ def ensure_cached(expected_num_artifacts=None):
           self.assertEqual(num_artifacts, expected_num_artifacts)
     return wrapper
   return decorator
+
+
+def ensure_engine(f):
+  """A decorator for running an integration test with and without the v2 engine enabled via
+  temporary environment variables."""
+  def wrapper(self, *args, **kwargs):
+    for env_var_value in ('false', 'true'):
+      with environment_as(PANTS_ENABLE_V2_ENGINE=env_var_value):
+        f(self, *args, **kwargs)
+  return wrapper
 
 
 class PantsRunIntegrationTest(unittest.TestCase):
@@ -213,40 +223,40 @@ class PantsRunIntegrationTest(unittest.TestCase):
     bundle_jar_name = bundle_jar_name or bundle_name
     bundle_options = bundle_options or []
     bundle_options = ['bundle.jvm'] + bundle_options + ['--archive=zip', target]
-    pants_run = self.run_pants(bundle_options)
-    self.assert_success(pants_run)
+    with self.pants_results(bundle_options) as pants_run:
+      self.assert_success(pants_run)
 
-    self.assertTrue(check_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
-                                   library_jars_are_symlinks))
-    # TODO(John Sirois): We need a zip here to suck in external library classpath elements
-    # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
-    # contextmanager that yields its results while the tmpdir workdir is still active and change
-    # this test back to using an un-archived bundle.
-    with temporary_dir() as workdir:
-      ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
-      if expected_bundle_content:
-        self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
-      if expected_bundle_jar_content:
-        with temporary_dir() as check_bundle_jar_dir:
-          bundle_jar = os.path.join(workdir, '{bundle_jar_name}.jar'
-                                    .format(bundle_jar_name=bundle_jar_name))
-          ZIP.extract(bundle_jar, check_bundle_jar_dir)
-          self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
+      self.assertTrue(check_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
+                                     library_jars_are_symlinks))
+      # TODO(John Sirois): We need a zip here to suck in external library classpath elements
+      # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
+      # contextmanager that yields its results while the tmpdir workdir is still active and change
+      # this test back to using an un-archived bundle.
+      with temporary_dir() as workdir:
+        ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
+        if expected_bundle_content:
+          self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
+        if expected_bundle_jar_content:
+          with temporary_dir() as check_bundle_jar_dir:
+            bundle_jar = os.path.join(workdir, '{bundle_jar_name}.jar'
+                                      .format(bundle_jar_name=bundle_jar_name))
+            ZIP.extract(bundle_jar, check_bundle_jar_dir)
+            self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
 
-      optional_args = []
-      if args:
-        optional_args = args
-      java_run = subprocess.Popen(['java',
-                                   '-jar',
-                                   '{bundle_jar_name}.jar'.format(bundle_jar_name=bundle_jar_name)]
-                                  + optional_args,
-                                  stdout=subprocess.PIPE,
-                                  cwd=workdir)
+        optional_args = []
+        if args:
+          optional_args = args
+        java_run = subprocess.Popen(['java',
+                                     '-jar',
+                                     '{bundle_jar_name}.jar'.format(bundle_jar_name=bundle_jar_name)]
+                                    + optional_args,
+                                    stdout=subprocess.PIPE,
+                                    cwd=workdir)
 
-      stdout, _ = java_run.communicate()
-    java_returncode = java_run.returncode
-    self.assertEquals(java_returncode, 0)
-    return stdout
+        stdout, _ = java_run.communicate()
+      java_returncode = java_run.returncode
+      self.assertEquals(java_returncode, 0)
+      return stdout
 
   def assert_success(self, pants_run, msg=None):
     self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=True, msg=msg)

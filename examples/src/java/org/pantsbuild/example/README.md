@@ -396,8 +396,10 @@ To use such an archive, put it where you want it, unpack it, and run:
     Hello, Resource World!
     $
 
-Omit Parts from Binary
+Omitting or Shading the Contents of a Binary
 ----------------------
+
+### Omitting
 
 Sometimes you want to leave some files out of your binary.
 
@@ -437,8 +439,7 @@ After building our `hello` example, if we check the binary jar's contents, there
     org/pantsbuild/example/hello/world.txt
     $
 
-Shading
--------
+### Shading
 
 Sometimes you have dependencies that have conflicting package or class names. This typically occurs
 in the following scenario: Your jvm_binary depends on a 3rdparty library A (rev 1.0), and a 3rdparty
@@ -500,6 +501,86 @@ and try running
     :::bash
     ./pants binary testprojects/src/java/org/pantsbuild/testproject/shading
     jar -tf dist/shading.jar
+
+
+Target Scopes
+-------------
+
+### Overview
+
+Pants supports marking targets with a `scope` value which the JVM backend will use to filter
+dependency subgraphs at compiletime and runtime. Scopes are also used for unused dependency
+detection: only `default` scoped targets are eligible to be considered as "unused" deps.
+
+### Correspondence with other build systems
+
+Scopes in pants are similar to scopes in other build systems, with the fundamental difference
+that they apply to targets (the "nodes" of the build graph), rather than to dependency "edges".
+The reason that Pants differs in this regard is that, in a monorepo, it is strongly encouraged
+to make changes to your dependency targets (which benefits all consumers) rather than to work
+around an issue in a dependency by making a local change to your target.
+
+### Scope values
+
+Pants' built in scopes are:
+
+* `default`: The "default" scope when a scope is not specified on a target. `default` targets are
+  included on classpaths at both compiletime and runtime, and are the only targets eligible for
+  unused dep detection.
+* `compile`: Indicates that a target is only used at compiletime, and should not be included
+  in runtime binaries or bundles. javac annotation processors or scalac macros are good examples
+  of compiletime-only dependencies.
+* `runtime`: Indicates that a target is only used at runtime, and should not be presented to the
+  compiler. Targets which are only used via JVM reflection are good examples of runtime-only
+  dependencies.
+* `forced` _(available from pants 1.1.0)_: The `forced` scope is equivalent to the `default` scope, but additionally indicates
+  that a target is not eligible to be considered an "unused" dependency. It is sometimes necessary
+  to mark a target `forced` due to false positives in the static analysis used for unused
+  dependency detection; if possible, you should always prefer to mark a target `runtime` or
+  `compile` if that more accurately describes their usage.
+
+### Setting target scopes
+
+To set the scope of a target, you should generally prefer to pass the `scope` parameter for
+that target:
+
+    :::python
+    java_library(name='lib',
+      ..,
+      scope='runtime',
+    )
+
+If the scope of a target is not matched for a particular context, the entire subgraph represented
+by the dependency will be pruned. This means that if a dependency 'B' of a target 'A' is marked
+`compile` (for example), the dependency targets of 'B' will only be included at compiletime (unless
+'A' has other dependency paths to those targets).
+
+One effect of this behavior is that you can introduce intermediate aliases to "re-scope" a target
+when consumers need to use it in multiple ways:
+
+    :::python
+    # An alias of `:lib` which consumers can use to indicate that they only need it at compile time.
+    target(name='lib-compile',
+      dependencies=[':lib'],
+      scope='compile',
+    )
+
+    java_library(name='lib',
+      ..,
+      scope='default',
+    )
+
+Finally, for cases where only a few consumers need to "re-scope" a particular target, it is possible
+to change the scope of a single edge locally to a consumer via the `scoped` macro (which, under the
+hood, uses the previous technique of creating an intermediate alias):
+
+    :::python
+    java_library(name='lib',
+      dependencies=[
+        scoped('src/java/the/best/lib', scope='compile'),
+        'src/scala/some/other/lib',
+      ],
+    )
 
 Dependency Hygiene
 ------------------

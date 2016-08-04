@@ -188,8 +188,11 @@ class SimpleCodegenTask(Task):
 
   @property
   def _copy_target_attributes(self):
-    """Return a list of attributes to be copied from the target to derived synthetic targets."""
-    return []
+    """Return a list of attributes to be copied from the target to derived synthetic targets.
+
+    By default, propagates the provides, scope, and tags attributes.
+    """
+    return ['provides', 'tags', 'scope']
 
   def synthetic_target_dir(self, target, target_workdir):
     """

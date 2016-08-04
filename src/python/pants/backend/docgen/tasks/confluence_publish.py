@@ -12,13 +12,13 @@ from twitter.common.confluence import Confluence, ConfluenceError
 
 from pants.backend.docgen.targets.doc import Page
 from pants.base.exceptions import TaskError
-from pants.binaries import binary_util
 from pants.task.task import Task
+from pants.util import desktop
 from pants.util.dirutil import safe_open
 
 
-# TODO: Rethink this. We shouldn't require subclassing this. Instead, the wiki identity should come from options.
-# However if we decide against that, we should rename this ConfluencePublishBase.
+# TODO: Rethink this. We shouldn't require subclassing this. Instead, the wiki identity should come
+# from options. However if we decide against that, we should rename this ConfluencePublishBase.
 class ConfluencePublish(Task):
   """A task to publish Page targets to Confluence wikis."""
 
@@ -90,7 +90,10 @@ class ConfluencePublish(Task):
           self.context.log.info('Published {} to {}'.format(page, url))
 
     if self.open and urls:
-      binary_util.ui_open(*urls)
+      try:
+        desktop.ui_open(*urls)
+      except desktop.OpenError as e:
+        raise TaskError(e)
 
   def publish_page(self, address, space, title, content, parent=None):
     body = textwrap.dedent('''

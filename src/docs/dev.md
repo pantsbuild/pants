@@ -29,3 +29,4 @@ how to get your change committed.
     + [[Release Strategy|pants('src/docs:release_strategy')]]
     + [[Deprecation Policy|pants('src/docs:deprecation_policy')]]
 + [[Updating the Docs|pants('src/docs:docs')]]
++ [[Pants Committers|pants('src/docs:committers')]]

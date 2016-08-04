@@ -92,15 +92,11 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
 
   def test_exclude_zglobs(self):
     test_out = self._extract_exclude_output('exclude_zglobs')
-    # TODO: ZGlobs.to_filespecs does not match files in the current directory when a pattern
-    # starts with `**`; see: https://github.com/pantsbuild/pants/issues/3413
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
+    self.assertEquals(self.TEST_EXCLUDE_FILES - {'ab.py', 'aabb.py', 'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
                       test_out)
 
   def test_exclude_composite(self):
     test_out = self._extract_exclude_output('exclude_composite')
-    # TODO: ZGlobs.to_filespecs does not match files in the current directory when a pattern
-    # starts with `**`; see: https://github.com/pantsbuild/pants/issues/3413
     self.assertEquals(self.TEST_EXCLUDE_FILES -
-                      {'aaa.py', 'dir1/a.py', 'dir1/dirdir1/a.py'},
+                      {'a.py', 'aaa.py', 'dir1/a.py', 'dir1/dirdir1/a.py'},
                       test_out)

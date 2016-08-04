@@ -10,7 +10,7 @@ import org.junit.Test;
 public class HtmlReportTest {
   @Test
   public void testPasses() {
-    System.out.println("Test output");;
+    System.out.println("Test output");
     Assert.assertTrue(true);
   }
 

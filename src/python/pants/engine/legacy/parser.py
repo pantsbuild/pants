@@ -51,7 +51,7 @@ class LegacyPythonCallbacksParser(Parser):
       def __call__(self, *args, **kwargs):
         name = kwargs.get('name')
         if name and self._serializable:
-          kwargs['type_alias'] = self._type_alias
+          kwargs.setdefault('type_alias', self._type_alias)
           obj = self._object_type(**kwargs)
           cls._objects.append(obj)
           return obj

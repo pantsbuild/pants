@@ -24,6 +24,7 @@ python_library(
     'jvm_prep_command.py',
     'jvm_target.py',
     'managed_jar_dependencies.py',
+    'tools_jar.py',
     'unpacked_jars.py',
   ],
   dependencies = [
@@ -34,7 +35,6 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
@@ -59,9 +59,10 @@ python_library(
     'java_tests.py',
   ],
   dependencies = [
-    ':jvm',
     '3rdparty/python:six',
+    ':jvm',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
   ],
 )
 

@@ -29,6 +29,7 @@ python_library(
   dependencies=[
     ':node_resolver_base',
     '3rdparty/python:six',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/fs',
     'src/python/pants/subsystem',

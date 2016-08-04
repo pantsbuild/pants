@@ -25,7 +25,6 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
@@ -56,7 +55,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.8'
+  DEFAULT_EXPORT_VERSION = '1.0.9'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -173,6 +172,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
     else:
       classpath_products = None
 
+    target_roots_set = set(self.context.target_roots)
+
     def process_target(current_target):
       """
       :type current_target:pants.build_graph.target.Target
@@ -209,6 +210,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
       info['transitive'] = current_target.transitive
       info['scope'] = str(current_target.scope)
+      info['is_target_root'] = current_target in target_roots_set
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
@@ -288,12 +290,6 @@ class ExportTask(IvyTaskMixin, PythonTask):
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
     }
-    jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
-    if jvm_distributions:
-      deprecated_conditional(lambda: True, '1.1.1',
-                             'jvm_distributions is deprecated in favor of '
-                             'preferred_jvm_distributions.')
-      graph_info['jvm_distributions'] = jvm_distributions
 
     # `jvm_distributions` are static distribution settings from config,
     # `preferred_jvm_distributions` are distributions that pants actually uses for the

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<testsuite name="org.pantsbuild.PassingTest" errors="0" failures="0" skipped="0" tests="4" time="4.76">
+  <properties>
+    <property name="java.specification.version" value="1.8"/>
+    <property name="java.vm.specification.version" value="1.8"/>
+  </properties>
+  <testcase classname="org.pantsbuild.PassingTest" name="testOne" time="0.01" />
+  <testcase classname="org.pantsbuild.PassingTest" name="testTwo" time="0.34" />
+  <testcase classname="org.pantsbuild.PassingTest" name="testThree" time="0.1234" />
+  <testcase classname="org.pantsbuild.PassingTest" name="testFour" time="4.56" />
+  <system-out>This is sample output</system-out>
+  <system-err></system-err>
+</testsuite>

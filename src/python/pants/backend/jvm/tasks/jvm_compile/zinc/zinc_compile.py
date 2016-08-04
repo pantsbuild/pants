@@ -28,7 +28,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.java.distribution.distribution import Distribution, DistributionLocator
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_method, memoized_property
@@ -154,6 +154,7 @@ class BaseZincCompile(JvmCompile):
     # ...also, as of sbt 0.13.9, it is significantly slower for cold builds.
     register('--name-hashing', advanced=True, type=bool, fingerprint=True,
              help='Use zinc name hashing.')
+
     register('--whitelisted-args', advanced=True, type=dict,
              default={
                '-S.*': False,
@@ -178,6 +179,14 @@ class BaseZincCompile(JvmCompile):
              help='When set, the results of incremental compiles will be written to the cache. '
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
+
+    # Javac plugins can access basically all of the compiler internals, so we don't shade anything.
+    # Hence the unspecified main= argument. This tool is optional, hence the empty classpath list.
+    cls.register_jvm_tool(register,
+                          'javac',
+                          classpath=[],
+                          help='Java compiler to use.  If unspecified, we use the compiler '
+                               'embedded in the Java distribution we run Zinc on.')
 
     cls.register_jvm_tool(register,
                           'zinc',
@@ -242,13 +251,6 @@ class BaseZincCompile(JvmCompile):
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
-    try:
-      # Zinc uses com.sun.tools.javac.Main for in-process java compilation.
-      # If not present Zinc attempts to spawn an external javac, but we want to keep
-      # everything in our selected distribution, so we don't allow it to do that.
-      self._tools_jar = self.dist.find_libs(['tools.jar'])
-    except Distribution.Error as e:
-      raise TaskError(e)
 
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
@@ -268,9 +270,14 @@ class BaseZincCompile(JvmCompile):
                          get_buildroot(), self.get_options().pants_workdir)
 
   def zinc_classpath(self):
-    return self.tool_classpath('zinc') + self._tools_jar
+    return self.tool_classpath('zinc')
 
-  def compiler_classpath(self):
+  def javac_classpath(self):
+    # Note that if this classpath is empty then Zinc will use the javac from
+    # the JDK it was invoked with.
+    return self.tool_classpath('javac')
+
+  def scalac_classpath(self):
     return ScalaPlatform.global_instance().compiler_classpath(self.context.products)
 
   def extra_compile_time_classpath_elements(self):
@@ -328,7 +335,7 @@ class BaseZincCompile(JvmCompile):
 
     zinc_args.extend(['-compiler-interface', self.tool_jar('compiler-interface')])
     zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
-    zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
+    zinc_args.extend(['-scala-path', ':'.join(self.scalac_classpath())])
 
     zinc_args.extend(self.javac_plugin_args(javac_plugins_to_exclude))
     zinc_args.extend(self.scalac_plugin_args)
@@ -344,7 +351,19 @@ class BaseZincCompile(JvmCompile):
     else:
       zinc_args.extend(self.get_options().fatal_warnings_disabled_args)
 
-    jvm_options = list(self._jvm_options)
+    jvm_options = []
+
+    if self.javac_classpath():
+      # Make the custom javac classpath the first thing on the bootclasspath, to ensure that
+      # it's the one javax.tools.ToolProvider.getSystemJavaCompiler() loads.
+      # It will probably be loaded even on the regular classpath: If not found on the bootclasspath,
+      # getSystemJavaCompiler() constructs a classloader that loads from the JDK's tools.jar.
+      # That classloader will first delegate to its parent classloader, which will search the
+      # regular classpath.  However it's harder to guarantee that our javac will preceed any others
+      # on the classpath, so it's safer to prefix it to the bootclasspath.
+      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(self.javac_classpath()))])
+
+    jvm_options.extend(self._jvm_options)
 
     zinc_args.extend(sources)
 

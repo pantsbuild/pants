@@ -19,7 +19,7 @@ class Selector(AbstractClass):
     """Return true if this Selector is optional. It may result in a `None` match."""
 
 
-class Select(datatype('Subject', ['product', 'optional']), Selector):
+class Select(datatype('Select', ['product', 'optional']), Selector):
   """Selects the given Product for the Subject provided to the constructor.
 
   If optional=True and no matching product can be produced, will return None.
@@ -27,6 +27,11 @@ class Select(datatype('Subject', ['product', 'optional']), Selector):
 
   def __new__(cls, product, optional=False):
     return super(Select, cls).__new__(cls, product, optional)
+
+  def __repr__(self):
+    return '{}({}{})'.format(type(self).__name__,
+                             self.product.__name__,
+                             ', optional=True' if self.optional else '')
 
 
 class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
@@ -38,19 +43,30 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   """
   optional = False
 
+  def __repr__(self):
+    return '{}({}, {})'.format(type(self).__name__,
+                             self.product.__name__,
+                             repr(self.variant_key))
 
-class SelectDependencies(datatype('Dependencies', ['product', 'deps_product', 'field']), Selector):
+
+class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'field']), Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
-  The dependencies declared on `deps_product` (in the optional `field` parameter, which defaults
+  The dependencies declared on `dep_product` (in the optional `field` parameter, which defaults
   to 'dependencies' when not specified) will be provided to the requesting task in the
   order they were declared.
   """
 
-  def __new__(cls, product, deps_product, field=None):
-    return super(SelectDependencies, cls).__new__(cls, product, deps_product, field)
+  def __new__(cls, product, dep_product, field=None):
+    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field)
 
   optional = False
+
+  def __repr__(self):
+    return '{}({}, {}{})'.format(type(self).__name__,
+                             self.product.__name__,
+                             self.dep_product.__name__,
+                             ', {}'.format(repr(self.field)) if self.field else '')
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
@@ -64,10 +80,20 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
   """
   optional = False
 
+  def __repr__(self):
+    return '{}({}, {}, {}, {})'.format(type(self).__name__,
+                             self.product.__name__,
+                             self.projected_subject.__name__,
+                             repr(self.fields),
+                             self.input_product.__name__)
+
 
 class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
   optional = False
+
+  def __repr__(self):
+    return '{}({}, {})'.format(type(self).__name__, repr(self.subject), self.product.__name__)
 
 
 class Collection(object):

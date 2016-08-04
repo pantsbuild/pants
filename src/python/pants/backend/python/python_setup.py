@@ -25,7 +25,7 @@ class PythonSetup(Subsystem):
              help='The interpreter requirement string for this python environment.')
     register('--setuptools-version', advanced=True, default='5.4.1',
              help='The setuptools version for this python environment.')
-    register('--wheel-version', advanced=True, default='0.24.0',
+    register('--wheel-version', advanced=True, default='0.29.0',
              help='The wheel version for this python environment.')
     register('--platforms', advanced=True, type=list, default=['current'],
              help='The wheel version for this python environment.')

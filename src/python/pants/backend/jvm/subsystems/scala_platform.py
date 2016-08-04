@@ -195,7 +195,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       synthetic_address = Address.parse('//:{}-synthetic'.format(key))
       if not buildgraph.contains_address(synthetic_address):
         jars = [create_jardep_func(self.version)]
-        buildgraph.inject_synthetic_target(synthetic_address, JarLibrary, jars=jars)
+        buildgraph.inject_synthetic_target(synthetic_address, JarLibrary, jars=jars, scope='forced')
       elif not buildgraph.get_target(synthetic_address).is_synthetic:
         raise buildgraph.ManualSyntheticTargetError(synthetic_address)
       return buildgraph.get_target(synthetic_address).address.spec

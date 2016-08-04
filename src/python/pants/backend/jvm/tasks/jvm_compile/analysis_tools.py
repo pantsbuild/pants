@@ -13,11 +13,6 @@ from pants.util.contextutil import temporary_dir
 
 class AnalysisTools(object):
   """Analysis manipulation methods required by JvmCompile."""
-  # Note: The value string isn't the same as the symbolic name for legacy reasons:
-  # We changed the name of the var, but didn't want to invalidate all cached artifacts just
-  # for that reason.
-  # TODO: If some future change requires us to invalidate all cached artifacts for some good reason
-  # (by bumping GLOBAL_CACHE_KEY_GEN_VERSION), we can use that opportunity to change this string.
   _PANTS_BUILDROOT_PLACEHOLDER = b'/_PANTS_BUILDROOT_PLACEHOLDER'
   _PANTS_WORKDIR_PLACEHOLDER = b'/_PANTS_WORKDIR_PLACEHOLDER'
 

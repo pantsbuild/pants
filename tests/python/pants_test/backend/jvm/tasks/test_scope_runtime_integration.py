@@ -84,34 +84,34 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
   def test_runtime_bundle_contents(self):
     spec = self._spec('runtime-pass')
     with temporary_dir() as distdir:
-      run = self.run_pants([
+      with self.pants_results([
         '--pants-distdir={}'.format(distdir),
         '--no-java-strict-deps',
         'bundle',
         spec,
-      ])
-      self.assert_success(run)
-      bundle_dir = os.path.join(distdir, '{}-bundle'.format(re.sub(r'[:/]', '.', spec)))
-      binary = os.path.join(bundle_dir, 'runtime-pass.jar')
-      self.assertTrue(os.path.exists(binary))
-      self.assertTrue(any(name.startswith('3rdparty.gson')
-                          for name in os.listdir(os.path.join(bundle_dir, 'libs'))))
+      ]) as run:
+        self.assert_success(run)
+        bundle_dir = os.path.join(distdir, '{}-bundle'.format(re.sub(r'[:/]', '.', spec)))
+        binary = os.path.join(bundle_dir, 'runtime-pass.jar')
+        self.assertTrue(os.path.exists(binary))
+        self.assertTrue(any(name.startswith('3rdparty.gson')
+                            for name in os.listdir(os.path.join(bundle_dir, 'libs'))))
 
   def test_compile_bundle_contents(self):
     spec = self._spec('compile-pass')
     with temporary_dir() as distdir:
-      run = self.run_pants([
+      with self.pants_results([
         '--pants-distdir={}'.format(distdir),
         '--no-java-strict-deps',
         'bundle',
         spec,
-      ])
-      self.assert_success(run)
-      bundle_dir = os.path.join(distdir, '{}-bundle'.format(re.sub(r'[:/]', '.', spec)))
-      binary = os.path.join(bundle_dir, 'compile-pass.jar')
-      self.assertTrue(os.path.exists(binary))
-      self.assertFalse(any(name.startswith('3rdparty.gson')
-                           for name in os.listdir(os.path.join(bundle_dir, 'libs'))))
+      ]) as run:
+        self.assert_success(run)
+        bundle_dir = os.path.join(distdir, '{}-bundle'.format(re.sub(r'[:/]', '.', spec)))
+        binary = os.path.join(bundle_dir, 'compile-pass.jar')
+        self.assertTrue(os.path.exists(binary))
+        self.assertFalse(any(name.startswith('3rdparty.gson')
+                             for name in os.listdir(os.path.join(bundle_dir, 'libs'))))
 
 
 class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):

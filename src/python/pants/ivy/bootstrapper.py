@@ -10,6 +10,7 @@ import logging
 import os
 import shutil
 
+from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy import Ivy
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.net.http.fetcher import Fetcher
@@ -139,7 +140,7 @@ class Bootstrapper(object):
     options = self._ivy_subsystem.get_options()
     if not os.path.exists(bootstrap_jar_path):
       with temporary_file() as bootstrap_jar:
-        fetcher = Fetcher()
+        fetcher = Fetcher(get_buildroot())
         checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
         try:
           logger.info('\nDownloading {}'.format(options.bootstrap_jar_url))

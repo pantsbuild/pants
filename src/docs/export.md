@@ -168,6 +168,10 @@ The following is an abbreviated export file from a command in the pants repo:
 
 # Export Format Changes
 
+## 1.0.9
+
+Added 'is_target_root' field to target
+
 ## 1.0.8
 
 Conditionally added 'transitive' and 'scope' fields to target

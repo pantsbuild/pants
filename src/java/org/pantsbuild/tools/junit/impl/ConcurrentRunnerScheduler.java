@@ -3,24 +3,22 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.LinkedList;
 import java.util.Queue;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 import org.junit.runners.model.RunnerScheduler;
 import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
 
 public class ConcurrentRunnerScheduler implements RunnerScheduler {
-  private final CompletionService<Void> completionService;
-  private final Queue<Future<Void>> concurrentTasks;
+  private final ExecutorService executor;
   private final Queue<Runnable> serialTasks;
   private final Concurrency defaultConcurrency;
 
@@ -45,16 +43,14 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
         .setDaemon(true)
         .setNameFormat("concurrent-junit-runner-%d")
         .build();
-    completionService = new ExecutorCompletionService<Void>(
-        Executors.newFixedThreadPool(numThreads, threadFactory));
-    concurrentTasks = new LinkedList<Future<Void>>();
+    executor = Executors.newFixedThreadPool(numThreads, threadFactory);
     serialTasks = new LinkedList<Runnable>();
   }
 
   @Override
   public void schedule(Runnable childStatement) {
     if (shouldMethodsRunParallel()) {
-      concurrentTasks.offer(completionService.submit(childStatement, null));
+      executor.submit(childStatement);
     } else {
       serialTasks.offer(childStatement);
     }
@@ -66,7 +62,7 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
    */
   public void schedule(Runnable childStatement, Class<?> clazz) {
     if (shouldClassRunParallel(clazz)) {
-      concurrentTasks.offer(completionService.submit(childStatement, null));
+      executor.submit(childStatement);
     } else {
       serialTasks.offer(childStatement);
     }
@@ -85,25 +81,20 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
 
   @Override
   public void finished() {
+    executor.shutdown();
     try {
       // Wait for all concurrent tasks to finish.
-      while (!concurrentTasks.isEmpty()) {
-        concurrentTasks.poll().get();
-      }
+      executor.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+
       // Then run all serial tasks in serial.
       for (Runnable task : serialTasks) {
         task.run();
       }
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
-    } catch (ExecutionException e) {
-      // This should not normally happen since junit statements trap and record errors and failures.
-      throw Throwables.propagate(e.getCause());
     } finally {
       // In case of error, cancel all in-flight concurrent tasks
-      while (!concurrentTasks.isEmpty()) {
-        concurrentTasks.poll().cancel(true);
-      }
+      executor.shutdownNow();
     }
   }
 }

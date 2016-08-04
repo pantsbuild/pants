@@ -14,6 +14,6 @@ class SpecException extends Exception {
   }
 
   private static String formatMessage(String spec, String message) {
-    return String.format("FATAL: Error parsing spec %s: %s",spec, message);
+    return String.format("FATAL: Error parsing spec '%s': %s",spec, message);
   }
 }

@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import errno
 import os
+import subprocess
+import sys
 from contextlib import contextmanager
 
 import mock
@@ -175,6 +177,14 @@ class TestProcessManager(BaseTest):
   def test_get_subprocess_output(self):
     test_str = '333'
     self.assertEqual(self.pm.get_subprocess_output(['echo', '-n', test_str]), test_str)
+
+  def test_get_subprocess_output_interleaved(self):
+    cmd_payload = 'import sys; ' + 'sys.stderr.write("9"); sys.stdout.write("3"); ' * 3
+    cmd = [sys.executable, '-c', cmd_payload]
+
+    self.assertEqual(self.pm.get_subprocess_output(cmd), '333')
+    self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), '939393')
+    self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), '939393')
 
   def test_get_subprocess_output_oserror_exception(self):
     with self.assertRaises(self.pm.ExecutionError):

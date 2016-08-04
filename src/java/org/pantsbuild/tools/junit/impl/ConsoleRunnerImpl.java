@@ -12,6 +12,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -36,6 +37,8 @@ import org.junit.runner.Result;
 import org.junit.runner.Runner;
 import org.junit.runner.manipulation.Filter;
 import org.junit.runner.notification.Failure;
+import org.junit.runner.notification.RunListener;
+import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.model.InitializationError;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -43,6 +46,8 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
+import org.pantsbuild.junit.annotations.TestParallel;
+import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
 import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
 
@@ -53,7 +58,7 @@ public class ConsoleRunnerImpl {
   /** Should be set to false for unit testing via {@link #setCallSystemExitOnFinish} */
   private static boolean callSystemExitOnFinish = true;
   /** Intended to be used in unit testing this class */
-  private static int exitStatus;
+  private static RunListener testListener = null;
 
   /**
    * A stream that allows its underlying output to be swapped.
@@ -197,7 +202,7 @@ public class ConsoleRunnerImpl {
    * A run listener that suiteCaptures the output and error streams for each test class
    * and makes the content of these available.
    */
-  static class StreamCapturingListener extends ForwardingListener implements StreamSource {
+  static class StreamCapturingListener extends RunListener implements StreamSource {
     private final Map<Class<?>, StreamCapture> suiteCaptures = Maps.newHashMap();
     private final Map<Description, InMemoryStreamCapture> caseCaptures = Maps.newHashMap();
 
@@ -315,6 +320,47 @@ public class ConsoleRunnerImpl {
     }
   }
 
+  /**
+   * A run listener that will stop the test run after the first test failure.
+   */
+  public class FailFastListener extends RunListener {
+    private final RunNotifier runNotifier;
+    private final Result result = new Result();
+
+    public FailFastListener(RunNotifier runNotifier) {
+      this.runNotifier = runNotifier;
+      this.runNotifier.addListener(result.createListener());
+    }
+
+    @Override
+    public void testFailure(Failure failure) throws Exception {
+      runNotifier.fireTestFinished(failure.getDescription());
+      runNotifier.fireTestRunFinished(result);
+      runNotifier.pleaseStop();
+    }
+  }
+
+  /**
+   * A runner that wraps the original test runner so we can add a listener
+   * to stop the tests after the first test failure.
+   */
+  public class FailFastRunner extends Runner {
+    private final Runner wrappedRunner;
+
+    public FailFastRunner(Runner wrappedRunner) {
+      this.wrappedRunner = wrappedRunner;
+    }
+
+    @Override public Description getDescription() {
+      return wrappedRunner.getDescription();
+    }
+
+    @Override public void run(RunNotifier notifier) {
+      notifier.addListener(new FailFastListener(notifier));
+      wrappedRunner.run(notifier);
+    }
+  }
+
   enum OutputMode {
     ALL, FAILURE_ONLY, NONE
   }
@@ -373,42 +419,36 @@ public class ConsoleRunnerImpl {
     System.setErr(new PrintStream(swappableErr));
 
     JUnitCore core = new JUnitCore();
-    final AbortableListener abortableListener = new AbortableListener(failFast) {
-      @Override protected void abort(Result failureResult) {
-        exit(failureResult.getFailureCount());
-      }
-    };
-    core.addListener(abortableListener);
 
-    if (xmlReport) {
-      if (!outdir.exists()) {
-        if (!outdir.mkdirs()) {
-          throw new IllegalStateException("Failed to create output directory: " + outdir);
-        }
-      }
-      StreamCapturingListener streamCapturingListener =
-          new StreamCapturingListener(outdir, outputMode, swappableOut, swappableErr);
-      abortableListener.addListener(streamCapturingListener);
-
-      AntJunitXmlReportListener xmlReportListener =
-          new AntJunitXmlReportListener(outdir, streamCapturingListener);
-      abortableListener.addListener(xmlReportListener);
+    if (testListener != null) {
+      core.addListener(testListener);
     }
 
-    // TODO: Register all listeners to core instead of to abortableListener because
-    // abortableListener gets removed when one of the listener throws exceptions in
-    // RunNotifier.java. Other listeners should not get removed.
+    if (!outdir.exists() && !outdir.mkdirs()) {
+      throw new IllegalStateException("Failed to create output directory: " + outdir);
+    }
+
+    StreamCapturingListener streamCapturingListener =
+        new StreamCapturingListener(outdir, outputMode, swappableOut, swappableErr);
+    core.addListener(streamCapturingListener);
+
+    if (xmlReport) {
+      core.addListener(new AntJunitXmlReportListener(outdir, streamCapturingListener));
+    }
+
     if (perTestTimer) {
-      abortableListener.addListener(new PerTestConsoleListener(swappableOut.getOriginal()));
+      core.addListener(new PerTestConsoleListener(swappableOut.getOriginal()));
     } else {
       core.addListener(new ConsoleListener(swappableOut.getOriginal()));
     }
 
+    ShutdownListener shutdownListener = new ShutdownListener(swappableOut.getOriginal());
+    core.addListener(shutdownListener);
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
-    final Thread abnormalExitHook =
-        createAbnormalExitHook(abortableListener, swappableOut.getOriginal());
-    Runtime.getRuntime().addShutdownHook(abnormalExitHook);
+    final Thread unexpectedExitHook =
+        createUnexpectedExitHook(shutdownListener, swappableOut.getOriginal());
+    Runtime.getRuntime().addShutdownHook(unexpectedExitHook);
 
     int failures = 0;
     try {
@@ -428,7 +468,7 @@ public class ConsoleRunnerImpl {
     } finally {
       // If we're exiting via a thrown exception, we'll get a better message by letting it
       // propagate than by halt()ing.
-      Runtime.getRuntime().removeShutdownHook(abnormalExitHook);
+      Runtime.getRuntime().removeShutdownHook(unexpectedExitHook);
     }
     exit(failures);
   }
@@ -436,24 +476,23 @@ public class ConsoleRunnerImpl {
   /**
    * Returns a thread that records a system exit to the listener, and then halts(1).
    */
-  private Thread createAbnormalExitHook(final AbortableListener listener, final PrintStream out) {
-    Thread abnormalExitHook = new Thread() {
+  private Thread createUnexpectedExitHook(final ShutdownListener listener, final PrintStream out) {
+    return new Thread() {
       @Override public void run() {
         try {
-          listener.abort(new UnknownError("Abnormal VM exit - test crashed."));
+          listener.unexpectedShutdown();
           // We want to trap and log no matter why abort failed for a better end user message.
         } catch (Exception e) {
           out.println(e);
           e.printStackTrace(out);
         }
-        // This error might be a call to `System.exit(0)`, which we definitely do
+        // This error might be a call to `System.exit(0)` in a test, which we definitely do
         // not want to go unnoticed.
-        out.println("FATAL: VM exiting uncleanly.");
+        out.println("FATAL: VM exiting unexpectedly.");
         out.flush();
         Runtime.getRuntime().halt(1);
       }
     };
-    return abnormalExitHook;
   }
 
   private int runExperimental(List<Spec> parsedTests, JUnitCore core)
@@ -497,14 +536,23 @@ public class ConsoleRunnerImpl {
     }
 
     if (this.parallelThreads > 1) {
-      ConcurrentCompositeRequestRunner request = new ConcurrentCompositeRequestRunner(
+      ConcurrentCompositeRequestRunner concurrentRunner = new ConcurrentCompositeRequestRunner(
           requests, this.defaultConcurrency, this.parallelThreads);
-      return core.run(request).getFailureCount();
+      if (failFast) {
+        return core.run(new FailFastRunner(concurrentRunner)).getFailureCount();
+      } else {
+        return core.run(concurrentRunner).getFailureCount();
+      }
     }
 
     int failures = 0;
+    Result result;
     for (Request request : requests) {
-      Result result = core.run(request);
+      if (failFast) {
+        result = core.run(new FailFastRunner(request.getRunner()));
+      } else {
+        result = core.run(request);
+      }
       failures += result.getFailureCount();
     }
     return failures;
@@ -568,13 +616,14 @@ public class ConsoleRunnerImpl {
       return false;
     }
 
-    return this.defaultConcurrency.shouldRunMethodsParallel();
-  }
+    // TestSerial and TestParallel take precedence over the default concurrency command
+    // line parameter
+    if (clazz.isAnnotationPresent(TestSerial.class)
+        || clazz.isAnnotationPresent(TestParallel.class)) {
+      return false;
+    }
 
-  // Loads classes without initializing them.  We just need the type, annotations and method
-  // signatures, none of which requires initialization.
-  private Class<?> loadClass(String name) throws ClassNotFoundException {
-    return Class.forName(name, /* initialize = */ false, getClass().getClassLoader());
+    return this.defaultConcurrency.shouldRunMethodsParallel();
   }
 
   /**
@@ -775,8 +824,9 @@ public class ConsoleRunnerImpl {
             options.numTestShards,
             options.numRetries,
             options.useExperimentalRunner,
-            System.out,
-            System.err);
+            // NB: Buffering helps speedup output-heavy tests.
+            new PrintStream(new BufferedOutputStream(System.out), true),
+            new PrintStream(new BufferedOutputStream(System.err), true));
 
     List<String> tests = Lists.newArrayList();
     for (String test : options.tests) {
@@ -816,10 +866,8 @@ public class ConsoleRunnerImpl {
   }
 
   private static void exit(int code) {
-    exitStatus = code;
     if (callSystemExitOnFinish) {
       // We're a main - its fine to exit.
-      // SUPPRESS CHECKSTYLE RegexpSinglelineJava
       System.exit(code);
     } else {
       if (code != 0) {
@@ -830,15 +878,11 @@ public class ConsoleRunnerImpl {
 
   // ---------------------------- For testing only ---------------------------------
 
-  public static void setCallSystemExitOnFinish(boolean v) {
-    callSystemExitOnFinish = v;
+  public static void setCallSystemExitOnFinish(boolean exitOnFinish) {
+    callSystemExitOnFinish = exitOnFinish;
   }
 
-  static int getExitStatus() {
-    return exitStatus;
-  }
-
-  public static void setExitStatus(int v) {
-    exitStatus = v;
+  public static void addTestListener(RunListener listener) {
+    testListener = listener;
   }
 }

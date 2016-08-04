@@ -16,59 +16,62 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_protobuf_normal(self):
-    pants_run = self.run_pants(['bundle.jvm',
-                                '--deployjar',
-                                'examples/src/java/org/pantsbuild/example/protobuf/distance'])
-    self.assert_success(pants_run)
-    out_path = os.path.join(get_buildroot(), 'dist',
-                            ('examples.src.java.org.pantsbuild.example.protobuf.distance'
-                             '.distance-bundle'))
-    java_run = subprocess.Popen(['java', '-cp', 'protobuf-example.jar',
-                                 'org.pantsbuild.example.protobuf.distance.ExampleProtobuf'],
-                                stdout=subprocess.PIPE,
-                                cwd=out_path)
-    java_retcode = java_run.wait()
-    java_out = java_run.stdout.read()
-    self.assertEquals(java_retcode, 0)
-    self.assertIn("parsec", java_out)
+    with self.pants_results(['bundle.jvm',
+                              '--deployjar',
+                              'examples/src/java/org/pantsbuild/example/protobuf/distance']
+                            ) as pants_run:
+      self.assert_success(pants_run)
+      out_path = os.path.join(get_buildroot(), 'dist',
+                              ('examples.src.java.org.pantsbuild.example.protobuf.distance'
+                               '.distance-bundle'))
+      java_run = subprocess.Popen(['java', '-cp', 'protobuf-example.jar',
+                                   'org.pantsbuild.example.protobuf.distance.ExampleProtobuf'],
+                                  stdout=subprocess.PIPE,
+                                  cwd=out_path)
+      java_retcode = java_run.wait()
+      java_out = java_run.stdout.read()
+      self.assertEquals(java_retcode, 0)
+      self.assertIn("parsec", java_out)
 
   def test_bundle_protobuf_imports(self):
-    pants_run = self.run_pants(['bundle.jvm',
-                                '--deployjar',
-                                'examples/src/java/org/pantsbuild/example/protobuf/imports'])
-    self.assert_success(pants_run)
-    out_path = os.path.join(get_buildroot(), 'dist',
-                            ('examples.src.java.org.pantsbuild.example.protobuf.imports'
-                             '.imports-bundle'))
-    java_run = subprocess.Popen(['java', '-cp', 'protobuf-imports-example.jar',
-                                 'org.pantsbuild.example.protobuf.imports.ExampleProtobufImports'],
-                                stdout=subprocess.PIPE,
-                                cwd=out_path)
-    java_retcode = java_run.wait()
-    java_out = java_run.stdout.read()
-    self.assertEquals(java_retcode, 0)
-    self.assertIn("very test", java_out)
+    with self.pants_results(['bundle.jvm',
+                         '--deployjar',
+                         'examples/src/java/org/pantsbuild/example/protobuf/imports']
+                        ) as pants_run:
+      self.assert_success(pants_run)
+      out_path = os.path.join(get_buildroot(), 'dist',
+                              ('examples.src.java.org.pantsbuild.example.protobuf.imports'
+                               '.imports-bundle'))
+      java_run = subprocess.Popen(['java', '-cp', 'protobuf-imports-example.jar',
+                                   'org.pantsbuild.example.protobuf.imports.ExampleProtobufImports'],
+                                  stdout=subprocess.PIPE,
+                                  cwd=out_path)
+      java_retcode = java_run.wait()
+      java_out = java_run.stdout.read()
+      self.assertEquals(java_retcode, 0)
+      self.assertIn("very test", java_out)
 
   def test_bundle_protobuf_unpacked_jars(self):
-    pants_run = self.run_pants(['bundle.jvm',
-                                '--deployjar',
-                                'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars'])
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal bundle run expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
-    out_path = os.path.join(get_buildroot(), 'dist',
-                            ('examples.src.java.org.pantsbuild.example.protobuf.unpacked_jars'
-                             '.unpacked_jars-bundle'))
-    args = ['java', '-cp', 'protobuf-unpacked-jars-example.jar',
-            'org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive']
-    java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
-    java_retcode = java_run.wait()
-    java_out = java_run.stdout.read()
-    self.assertEquals(java_retcode, 0)
-    self.assertIn("Message is: Hello World!", java_out)
+    with self.pants_results(['bundle.jvm',
+                         '--deployjar',
+                         'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars']
+                        ) as pants_run:
+      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
+                        "goal bundle run expected success, got {0}\n"
+                        "got stderr:\n{1}\n"
+                        "got stdout:\n{2}\n".format(pants_run.returncode,
+                                                    pants_run.stderr_data,
+                                                    pants_run.stdout_data))
+      out_path = os.path.join(get_buildroot(), 'dist',
+                              ('examples.src.java.org.pantsbuild.example.protobuf.unpacked_jars'
+                               '.unpacked_jars-bundle'))
+      args = ['java', '-cp', 'protobuf-unpacked-jars-example.jar',
+              'org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive']
+      java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
+      java_retcode = java_run.wait()
+      java_out = java_run.stdout.read()
+      self.assertEquals(java_retcode, 0)
+      self.assertIn("Message is: Hello World!", java_out)
 
   def test_source_ordering(self):
     # force a compile to happen, we count on compile output in this test
