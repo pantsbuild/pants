@@ -58,7 +58,8 @@ class FilesetWithSpec(AbstractClass):
   def _validate_globs_in_filespec(self, filespec, rel_root):
     for glob in filespec['globs']:
       if not glob.startswith(rel_root):
-        raise ValueError('expected globs to be relative to buildroot! {!r}'.format(glob))
+        raise ValueError('expected glob filespec: {!r}'
+                         ' to start with its root path: {!r}!'.format(glob, rel_root))
     excludes = filespec.get('excludes')
     if excludes:
       for exclude_filespec in excludes:

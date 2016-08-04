@@ -41,26 +41,28 @@ class ProtobufGenTest(TaskTestBase):
     """
     # place a .proto file in a place outside of where the BUILD file is defined
     extracted_source_path = os.path.join(self.build_root, 'extracted', 'src', 'proto')
-    sample_proto_path = os.path.join(extracted_source_path, 'sample-package', 'sample.proto')
-    self.create_file(sample_proto_path, dedent("""
+    sample_proto_path = os.path.join('sample-package', 'sample.proto')
+    self.create_file(os.path.join(extracted_source_path, sample_proto_path), dedent("""
           package com.example;
           message sample {}
         """))
     self.add_to_build_file('sample', dedent("""
         jar_library(name='jar',
           jars=[jar('org.example', 'jar', '0.0.1')]
-        )""").format(sample_proto_path=sample_proto_path))
+        )"""))
     self.add_to_build_file('sample', dedent("""
         java_protobuf_library(name='sample',
           sources=from_target(':jar'),
-        )""").format(sample_proto_path=sample_proto_path))
+        )"""))
     target = self.target('sample:sample')
     target.payload.sources.populate([sample_proto_path], extracted_source_path)
     context = self.context(target_roots=[target])
     task = self.create_task(context=context)
     sources_by_base = task._calculate_sources(target)
     self.assertEquals(['extracted/src/proto'], sources_by_base.keys())
-    self.assertEquals(OrderedSet([sample_proto_path]), sources_by_base['extracted/src/proto'])
+    self.assertEquals(
+      OrderedSet([os.path.join('extracted/src/proto', sample_proto_path)]),
+      sources_by_base['extracted/src/proto'])
 
   def test_default_javadeps(self):
     self.create_file(relpath='test_proto/test.proto', contents=dedent("""
