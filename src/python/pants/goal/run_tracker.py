@@ -159,10 +159,12 @@ class RunTracker(Subsystem):
 
   def setup_logging(self):
     handler = LogHandler(self)
-    handler.setLevel("DEBUG") # The report ensures the right level,
-                              # so we want all to pass through to it.
+    # The report ensures the right level,
+    # so we want all to pass through to it.
+    handler.setLevel("DEBUG")
+
+    # Replace the bootstrap console logger with our logging handler.
     logger = logging.getLogger(None)
-    # replace the bootstrap console logger
     for old_handler in logger.handlers:
       if type(old_handler) is logging.StreamHandler:
         logger.removeHandler(old_handler)
