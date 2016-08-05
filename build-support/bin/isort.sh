@@ -3,7 +3,6 @@
 # https://github.com/pantsbuild/pants/issues/3748
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd ${REPO_ROOT}
-set -v
 source build-support/common.sh
 
 function usage() {

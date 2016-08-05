@@ -45,7 +45,10 @@ class IsortPythonTask(PythonTask):
     if self.options.passthrough_args is not None:
       cmd = [isort_script] + self.options.passthrough_args.split(' ')
       logging.info(cmd)
-      subprocess.check_call(cmd)
+      try:
+        subprocess.check_call(cmd)
+      except subprocess.CalledProcessError as e:
+        logging.error(e)
 
     else:
       sources = self._calculate_sources(self.context.targets())
