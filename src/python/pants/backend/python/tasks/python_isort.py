@@ -10,6 +10,7 @@ import os
 import subprocess
 
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import file_option
 
@@ -27,7 +28,7 @@ class IsortPythonTask(PythonTask):
   def register_options(cls, register):
     super(IsortPythonTask, cls).register_options(register)
     register('--skip', type=bool, default=False,
-             help='If enabled, skip isort task.')
+             help='If true, skip isort task.')
     register('--config-file', fingerprint=True, type=file_option, default='./.isort.cfg',
              help='Specify path to isort config file.')
     register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
@@ -43,32 +44,18 @@ class IsortPythonTask(PythonTask):
     isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
 
     if self.options.passthrough_args is not None:
-      cmd = ' '.join([isort_script, self.options.passthrough_args]
-      logging.info(cmd)
-      try:
-        subprocess.check_call(cmd, shell=True)
-      except subprocess.CalledProcessError as e:
-        logging.error(e)
-
+      cmd = ' '.join([isort_script, self.options.passthrough_args])
     else:
       sources = self._calculate_sources(self.context.targets())
+      cmd = ' '.join([isort_script,
+                      '--settings-path={}'.format(self.options.config_file),
+                      ' '.join(sources)])
 
-      cmd = [isort_script,
-             '--settings-path={}'.format(self.options.config_file),
-             ' '.join(sources),
-             ]
-      logging.info(cmd)
-      subprocess.check_call(cmd)
-
-      # with self.context.new_workunit(name='cloc',
-      #                                labels=[WorkUnitLabel.TOOL],
-      #                                cmd=' '.join(cmd)) as workunit:
-      #   result = subprocess.call(cmd,
-      #                            stdout=workunit.output('stdout'),
-      #                            stderr=workunit.output('stderr'))
-
-      # if result != 0:
-      #   raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
+    logging.info(cmd)
+    try:
+      subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as e:
+      raise TaskError(e)
 
   def _calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""
@@ -79,7 +66,3 @@ class IsortPythonTask(PythonTask):
         if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
       )
     return sources
-
-# if __name__ == '__main__':
-#   sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
-#   sys.exit(main())
