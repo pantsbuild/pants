@@ -30,7 +30,7 @@ class ScalaFmt(NailgunTask):
                           classpath=[
                           JarDependency(org='com.geirsson',
                                         name='scalafmt-cli_2.11',
-                                        rev='0.2.0')
+                                        rev='0.2.11')
                           ])
 
   def execute(self):
