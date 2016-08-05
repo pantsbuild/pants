@@ -36,6 +36,7 @@ python_library(
     ':run_jvm_prep_command',
     ':scala_repl',
     ':scaladoc_gen',
+    ':scalafmt',
     ':scalastyle',
     ':unpack_jars',
     'src/python/pants/backend/jvm/tasks/jvm_compile:all',
