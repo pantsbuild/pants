@@ -32,8 +32,9 @@ class IsortPythonTask(PythonTask):
     register('--config-file', fingerprint=True, type=file_option, default='./.isort.cfg',
              help='Specify path to isort config file.')
     register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
+    register('--check-only', type=bool, default=False, help='Only checks and does not apply change.')
     register('--passthrough-args', fingerprint=True, default=None,
-             help='Once specified, any other option passed to isort binary will be ignored. '
+             help='Once specified, any other option specified for isort binary will be ignored. '
                   'Reference: https://github.com/timothycrosley/isort/blob/develop/isort/main.py')
 
   def execute(self):
@@ -45,17 +46,24 @@ class IsortPythonTask(PythonTask):
 
     if self.options.passthrough_args is not None:
       cmd = ' '.join([isort_script, self.options.passthrough_args])
+      logging.info(cmd)
+      try:
+        subprocess.check_call(cmd, shell=True)
+      except subprocess.CalledProcessError as e:
+        raise TaskError(e)
     else:
       sources = self._calculate_sources(self.context.targets())
-      cmd = ' '.join([isort_script,
-                      '--settings-path={}'.format(self.options.config_file),
-                      ' '.join(sources)])
+      if sources:
+        cmd = ' '.join([isort_script,
+                        '--check-only' if self.options.check_only else '',
+                        '--settings-path={}'.format(self.options.config_file),
+                        ' '.join(sources)])
+        logging.info(cmd)
+        try:
+          subprocess.check_call(cmd, shell=True)
+        except subprocess.CalledProcessError as e:
+          raise TaskError(e)
 
-    logging.info(cmd)
-    try:
-      subprocess.check_call(cmd, shell=True)
-    except subprocess.CalledProcessError as e:
-      raise TaskError(e)
 
   def _calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""
