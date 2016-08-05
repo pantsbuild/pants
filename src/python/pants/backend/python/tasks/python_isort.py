@@ -43,10 +43,10 @@ class IsortPythonTask(PythonTask):
     isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
 
     if self.options.passthrough_args is not None:
-      cmd = [isort_script] + self.options.passthrough_args.split(' ')
+      cmd = ' '.join([isort_script, self.options.passthrough_args]
       logging.info(cmd)
       try:
-        subprocess.check_call(cmd)
+        subprocess.check_call(cmd, shell=True)
       except subprocess.CalledProcessError as e:
         logging.error(e)
 
