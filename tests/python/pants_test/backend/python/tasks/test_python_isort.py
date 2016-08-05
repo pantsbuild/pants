@@ -25,7 +25,7 @@ class IntegrationTests(PantsRunIntegrationTest):
     self.assert_failure(initial_test)
 
     # call fmt.isort to format the files.
-    format_run = self.run_pants(['fmt.isort', '--config-file=.isort.cfg', target])
+    format_run = self.run_pants(['fmt.isort', '--settings-path=.isort.cfg', target])
     self.assert_success(format_run)
 
     # final test should pass because files have been formatted.

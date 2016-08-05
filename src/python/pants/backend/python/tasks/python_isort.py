@@ -29,7 +29,7 @@ class IsortPythonTask(PythonTask):
     super(IsortPythonTask, cls).register_options(register)
     register('--skip', type=bool, default=False,
              help='If true, skip isort task.')
-    register('--config-file', fingerprint=True, type=file_option, default='./.isort.cfg',
+    register('--settings-path', fingerprint=True, type=file_option, default='./.isort.cfg',
              help='Specify path to isort config file.')
     register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
     register('--check-only', type=bool, default=False, help='Only checks and does not apply change.')
@@ -54,16 +54,15 @@ class IsortPythonTask(PythonTask):
     else:
       sources = self._calculate_sources(self.context.targets())
       if sources:
-        cmd = ' '.join([isort_script,
-                        '--check-only' if self.options.check_only else '',
-                        '--settings-path={}'.format(self.options.config_file),
-                        ' '.join(sources)])
-        logging.info(cmd)
+        cmd_list = [isort_script,
+                    '--check-only' if self.options.check_only else '',
+                    '--settings-path={}'.format(self.options.settings_path),
+                    ' '.join(sources)]
+        logging.info(' '.join(cmd_list))
         try:
-          subprocess.check_call(cmd, shell=True)
+          subprocess.check_call(cmd_list)
         except subprocess.CalledProcessError as e:
           raise TaskError(e)
-
 
   def _calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""
