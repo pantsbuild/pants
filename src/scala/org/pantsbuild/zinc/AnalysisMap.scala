@@ -2,29 +2,14 @@
  * Copyright (C) 2015 Pants project contributors (see CONTRIBUTORS.md).
  * Licensed under the Apache License, Version 2.0 (see LICENSE).
  */
-
 package org.pantsbuild.zinc
 
-import java.io.{
-  File,
-  IOException
-}
+import java.io.{File, IOException}
 
-import sbt.{
-  CompileSetup,
-  Logger
-}
-import sbt.inc.{
-  Analysis,
-  AnalysisStore,
-  FileBasedStore,
-  Locate
-}
+import sbt.{CompileSetup, Logger}
+import sbt.inc.{Analysis, AnalysisStore, FileBasedStore, Locate}
 
-import org.pantsbuild.zinc.cache.{
-  Cache,
-  FileFPrint
-}
+import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
 import org.pantsbuild.zinc.cache.Cache.Implicits
 
 /**
@@ -38,11 +23,12 @@ import org.pantsbuild.zinc.cache.Cache.Implicits
  * the appropriate classpath entry, it will use `getAnalysis` to fetch the API for that class.
  */
 case class AnalysisMap private[AnalysisMap] (
-  // a map of classpath entries to cache file fingerprints, excluding the current compile destination
-  analysisLocations: Map[File, FileFPrint],
-  // log
-  log: Logger
+    // a map of classpath entries to cache file fingerprints, excluding the current compile destination
+    analysisLocations: Map[File, FileFPrint],
+    // log
+    log: Logger
 ) {
+
   /**
    * An implementation of definesClass that will use analysis for an input directory to determine
    * whether it defines a particular class.
@@ -56,8 +42,8 @@ case class AnalysisMap private[AnalysisMap] (
       // strongly hold the classNames, and transform them to ensure that they are unlinked from
       // the remainder of the analysis
       analysis.relations.classes.reverseMap.keys.toList.toSet
-    }.map { classes =>
-      (s: String) => classes(s)
+    }.map { classes => (s: String) =>
+      classes(s)
     }.getOrElse {
       // no analysis: return a function that will scan instead
       Locate.definesClass(classpathEntry)
@@ -72,6 +58,7 @@ case class AnalysisMap private[AnalysisMap] (
 }
 
 object AnalysisMap {
+
   /**
    * Static cache for compile analyses. Values must be Options because in get() we don't yet
    * know if, on a cache miss, the underlying file will yield a valid Analysis.
@@ -80,27 +67,29 @@ object AnalysisMap {
     Cache[FileFPrint, Option[(Analysis, CompileSetup)]](Setup.Defaults.analysisCacheLimit)
 
   def create(
-    // a map of classpath entries to cache file locations, excluding the current compile destination
-    analysisLocations: Map[File, File],
-    // log
-    log: Logger
+      // a map of classpath entries to cache file locations, excluding the current compile destination
+      analysisLocations: Map[File, File],
+      // log
+      log: Logger
   ): AnalysisMap =
     AnalysisMap(
-      // create fingerprints for all inputs at startup
-      analysisLocations.flatMap {
-        case (classpathEntry, cacheFile) => FileFPrint.fprint(cacheFile).map(classpathEntry -> _)
-      },
-      log
+        // create fingerprints for all inputs at startup
+        analysisLocations.flatMap {
+          case (classpathEntry, cacheFile) => FileFPrint.fprint(cacheFile).map(classpathEntry -> _)
+        },
+        log
     )
 
   private def get(cacheFPrint: FileFPrint): Option[Analysis] =
-    analysisCache.getOrElseUpdate(cacheFPrint) {
-      // re-fingerprint the file on miss, to ensure that analysis hasn't changed since we started
-      if (!FileFPrint.fprint(cacheFPrint.file).exists(_ == cacheFPrint)) {
-        throw new IOException(s"Analysis at $cacheFPrint has changed since startup!")
+    analysisCache
+      .getOrElseUpdate(cacheFPrint) {
+        // re-fingerprint the file on miss, to ensure that analysis hasn't changed since we started
+        if (!FileFPrint.fprint(cacheFPrint.file).exists(_ == cacheFPrint)) {
+          throw new IOException(s"Analysis at $cacheFPrint has changed since startup!")
+        }
+        FileBasedStore(cacheFPrint.file).get
       }
-      FileBasedStore(cacheFPrint.file).get
-    }.map(_._1)
+      .map(_._1)
 
   /**
    * Create an analysis store backed by analysisCache.

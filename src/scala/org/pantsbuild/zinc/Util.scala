@@ -1,11 +1,10 @@
 /**
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
-
 package org.pantsbuild.zinc
 
 import java.io.File
-import sbt.{ Hash, IO }
+import sbt.{Hash, IO}
 
 object Util {
   //
@@ -73,14 +72,16 @@ object Util {
    * Normalise file map in relation to actual current working directory.
    */
   def normaliseMap(cwd: Option[File])(mapped: Map[File, File]): Map[File, File] = {
-    if (cwd.isDefined) mapped map { case (l, r) => (normalise(cwd)(l), normalise(cwd)(r)) } else mapped
+    if (cwd.isDefined) mapped map { case (l, r) => (normalise(cwd)(l), normalise(cwd)(r)) } else
+      mapped
   }
 
   /**
    * Normalise file sequence map in relation to actual current working directory.
    */
   def normaliseSeqMap(cwd: Option[File])(mapped: Map[Seq[File], File]): Map[Seq[File], File] = {
-    if (cwd.isDefined) mapped map { case (l, r) => (normaliseSeq(cwd)(l), normalise(cwd)(r)) } else mapped
+    if (cwd.isDefined) mapped map { case (l, r) => (normaliseSeq(cwd)(l), normalise(cwd)(r)) } else
+      mapped
   }
 
   /**
@@ -122,7 +123,9 @@ object Util {
    */
   def intProperty(name: String, default: Int): Int = {
     val value = System.getProperty(name)
-    if (value ne null) try value.toInt catch { case _: Exception => default } else default
+    if (value ne null)
+      try value.toInt
+      catch { case _: Exception => default } else default
   }
 
   /**
@@ -141,12 +144,16 @@ object Util {
   /**
    * Create an option file from system property.
    */
-  def optFileProperty(name: String): Option[File] = Option(System.getProperty(name, null)).map(new File(_))
+  def optFileProperty(name: String): Option[File] =
+    Option(System.getProperty(name, null)).map(new File(_))
 
   /**
    * Get a property from a properties file resource in the classloader.
    */
-  def propertyFromResource(resource: String, property: String, classLoader: ClassLoader): Option[String] = {
+  def propertyFromResource(
+      resource: String,
+      property: String,
+      classLoader: ClassLoader): Option[String] = {
     val props = propertiesFromResource(resource, classLoader)
     Option(props.getProperty(property))
   }
@@ -157,9 +164,9 @@ object Util {
   def propertiesFromResource(resource: String, classLoader: ClassLoader): java.util.Properties = {
     val props = new java.util.Properties
     val stream = classLoader.getResourceAsStream(resource)
-    try { props.load(stream) }
-    catch { case e: Exception => }
-    finally { if (stream ne null) stream.close }
+    try { props.load(stream) } catch { case e: Exception => } finally {
+      if (stream ne null) stream.close
+    }
     props
   }
 
@@ -192,7 +199,7 @@ object Util {
           case "h" => 60 * 60 * 1000
           case "m" => 60 * 1000
           case "s" => 1000
-          case _   => 0
+          case _ => 0
         }
         try { length.toLong * multiplier } catch { case _: Exception => default }
       case _ => default
@@ -207,7 +214,7 @@ object Util {
    * Resettable timer.
    */
   class Alarm(delay: Long)(body: => Unit) {
-    import java.util.{ Timer, TimerTask }
+    import java.util.{Timer, TimerTask}
 
     private[this] var timer: Timer = _
     private[this] var task: TimerTask = _
@@ -246,7 +253,9 @@ object Util {
       case t: Traversable[_] if t.isEmpty => out(prefix + "{}")
       case t: Traversable[_] =>
         out(prefix + "{")
-        t foreach { a => show(a, output, "", level + 1) }
+        t foreach { a =>
+          show(a, output, "", level + 1)
+        }
         out("}")
       case any => out(prefix + any.toString)
     }
