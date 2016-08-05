@@ -38,7 +38,10 @@ class IsortPythonTask(PythonTask):
                   'Reference: https://github.com/timothycrosley/isort/blob/develop/isort/main.py')
 
   def execute(self):
-    """Run isort on all found source python files."""
+    """Run isort on source python files.
+
+    isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort
+    """
     if self.options.skip:
       return
 
