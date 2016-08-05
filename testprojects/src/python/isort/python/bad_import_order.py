@@ -1,12 +1,12 @@
 from __future__ import (with_statement, division, absolute_import, generators, nested_scopes, print_function,
                         unicode_literals)
-from twitter.common.contextutil import temporary_file_path
 import os
 import logging
-from urlparse import urljoin
 import argparse
 import pkg_resources
 import requests
+from urlparse import urljoin
+from twitter.common.contextutil import temporary_file_path
 
 from twitter.plans.to.acquire.google import reality
 import yaml
