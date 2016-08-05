@@ -3,7 +3,7 @@
 # https://github.com/pantsbuild/pants/issues/3748
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd ${REPO_ROOT}
-
+set -v
 source build-support/common.sh
 
 function usage() {
@@ -92,6 +92,7 @@ from isort.hooks import git_hook
 sys.exit(git_hook(strict=True))
 EOF
 else
-  isort ${isort_args[@]} --recursive src tests pants-plugins contrib examples testprojects
+  args="${isort_args[@]} --recursive src tests pants-plugins contrib examples testprojects"
+  ./pants fmt.isort --fmt-isort-passthrough-args="$args"
 fi
 

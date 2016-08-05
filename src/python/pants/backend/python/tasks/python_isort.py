@@ -31,7 +31,7 @@ class IsortPythonTask(PythonTask):
     register('--config-file', fingerprint=True, type=file_option, default='./.isort.cfg',
              help='Specify path to isort config file.')
     register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
-    register('--passthourgh-args', fingerprint=True, type=file_option, default=None,
+    register('--passthrough-args', fingerprint=True, default=None,
              help='Once specified, any other option passed to isort binary will be ignored. '
                   'Reference: https://github.com/timothycrosley/isort/blob/develop/isort/main.py')
 
@@ -42,8 +42,8 @@ class IsortPythonTask(PythonTask):
 
     isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
 
-    if self.options.passthourgh_args is not None:
-      cmd = [isort_script, self.options.passthourgh_args]
+    if self.options.passthrough_args is not None:
+      cmd = [isort_script] + self.options.passthrough_args.split(' ')
       logging.info(cmd)
       subprocess.check_call(cmd)
 
