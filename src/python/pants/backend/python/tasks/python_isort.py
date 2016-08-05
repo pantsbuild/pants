@@ -30,34 +30,39 @@ class IsortPythonTask(PythonTask):
              help='If enabled, skip isort task.')
     register('--config-file', fingerprint=True, type=file_option, default='./.isort.cfg',
              help='Specify path to isort config file.')
+    register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
+    register('--passthourgh-args', fingerprint=True, type=file_option, default=None,
+             help='Once specified, any other option passed to isort binary will be ignored. '
+                  'Reference: https://github.com/timothycrosley/isort/blob/develop/isort/main.py')
 
   def execute(self):
     """Run isort on all found source python files."""
     if self.options.skip:
       return
 
-    logging.info("hello")
-    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', '4.2.5', 'isort.pex')
-    # See http://cloc.sourceforge.net/#options for cloc cmd-line options.
+    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
 
-
-
-    #
-    for source in self._calculate_sources(self.context.targets()):
-      cmd = [isort_script, source
-             # '--skip-uniqueness',
-             # '--ignored={}'.format(ignored_file),
-             # '--list-file={}'.format(list_file),
-             # '--report-file={}'.format(report_file)
-             ]
+    if self.options.passthourgh_args is not None:
+      cmd = [isort_script, self.options.passthourgh_args]
+      logging.info(cmd)
       subprocess.check_call(cmd)
 
-        # with self.context.new_workunit(name='cloc',
-        #                                labels=[WorkUnitLabel.TOOL],
-        #                                cmd=' '.join(cmd)) as workunit:
-        #   result = subprocess.call(cmd,
-        #                            stdout=workunit.output('stdout'),
-        #                            stderr=workunit.output('stderr'))
+    else:
+      sources = self._calculate_sources(self.context.targets())
+
+      cmd = [isort_script,
+             '--settings-path={}'.format(self.options.config_file),
+             ' '.join(sources),
+             ]
+      logging.info(cmd)
+      subprocess.check_call(cmd)
+
+      # with self.context.new_workunit(name='cloc',
+      #                                labels=[WorkUnitLabel.TOOL],
+      #                                cmd=' '.join(cmd)) as workunit:
+      #   result = subprocess.call(cmd,
+      #                            stdout=workunit.output('stdout'),
+      #                            stderr=workunit.output('stderr'))
 
       # if result != 0:
       #   raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
