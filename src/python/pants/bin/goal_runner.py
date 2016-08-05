@@ -90,7 +90,8 @@ class GoalRunnerFactory(object):
     elif use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
-      graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns)
+      graph_helper = EngineInitializer.setup_legacy_graph(
+        path_ignore_patterns=path_ignore_patterns, build_address_mapper=self._address_mapper)
       return graph_helper.create_graph(root_specs)
     else:
       return MutableBuildGraph(self._address_mapper)

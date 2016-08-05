@@ -85,7 +85,8 @@ class EngineInitializer(object):
     return spec_roots
 
   @staticmethod
-  def setup_legacy_graph(path_ignore_patterns, symbol_table_cls=None):
+  def setup_legacy_graph(path_ignore_patterns, symbol_table_cls=None, build_address_mapper=None):
+
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
@@ -109,7 +110,7 @@ class EngineInitializer(object):
     tasks = (
       create_legacy_graph_tasks() +
       create_fs_tasks() +
-      create_graph_tasks(address_mapper, symbol_table_cls)
+      create_graph_tasks(address_mapper, symbol_table_cls, build_address_mapper)
     )
 
     scheduler = LocalScheduler(dict(), tasks, project_tree)

@@ -14,6 +14,7 @@ import six
 from pants.base.project_tree import Dir, File
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
+from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
@@ -131,13 +132,13 @@ def resolve_unhydrated_struct(address_family, address):
   return UnhydratedStruct(address, struct, dependencies)
 
 
-def hydrate_struct(unhydrated_struct, dependencies):
+def hydrate_struct(unhydrated_struct, dependencies, build_address_mapper):
   """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
 
   Note that this relies on the guarantee that DependenciesNode provides dependencies in the
   order they were requested.
   """
-  address = unhydrated_struct.address
+  address, _ = build_address_mapper.resolve(unhydrated_struct.address)
   struct = unhydrated_struct.struct
 
   def maybe_consume(outer_key, value):
@@ -242,7 +243,7 @@ def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
 
 
-def create_graph_tasks(address_mapper, symbol_table_cls):
+def create_graph_tasks(address_mapper, symbol_table_cls, build_address_mapper):
   """Creates tasks used to parse Structs from BUILD files.
 
   :param address_mapper_key: The subject key for an AddressMapper instance.
@@ -252,7 +253,9 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Support for resolving Structs from Addresses
     (Struct,
      [Select(UnhydratedStruct),
-      SelectDependencies(Struct, UnhydratedStruct)],
+      SelectDependencies(Struct, UnhydratedStruct),
+      SelectLiteral(build_address_mapper, BuildFileAddressMapper),
+      ],
      hydrate_struct),
     (UnhydratedStruct,
      [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
