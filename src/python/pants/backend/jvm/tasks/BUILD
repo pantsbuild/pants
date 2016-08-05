@@ -608,6 +608,15 @@ python_library(
 )
 
 python_library(
+  name = 'scalafmt',
+  sources = ['scalafmt.py'],
+  dependencies = [
+    'src/python/pants/base:exceptions',
+    'src/python/pants/task',
+  ],
+)
+
+python_library(
   name = 'unpack_jars',
   sources = ['unpack_jars.py'],
   dependencies = [

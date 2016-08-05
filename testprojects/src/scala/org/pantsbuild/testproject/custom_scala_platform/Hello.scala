@@ -3,7 +3,6 @@
 
 package org.pantsbuild.testproject.custom_scala_platform
 
-
 object Hello {
   def main(args: Array[String]): Unit = {
     println("Hello")
