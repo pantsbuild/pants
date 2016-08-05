@@ -47,25 +47,26 @@ class IsortPythonTask(PythonTask):
 
     isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
 
+    cmd = None
     if self.options.passthrough_args is not None:
       cmd = ' '.join([isort_script, self.options.passthrough_args])
-      logging.info(cmd)
-      try:
-        subprocess.check_call(cmd, shell=True)
-      except subprocess.CalledProcessError as e:
-        raise TaskError(e)
     else:
       sources = self._calculate_sources(self.context.targets())
       if sources:
-        cmd_list = [isort_script,
-                    '--check-only' if self.options.check_only else '',
-                    '--settings-path={}'.format(self.options.settings_path),
-                    ' '.join(sources)]
-        logging.info(' '.join(cmd_list))
-        try:
-          subprocess.check_call(cmd_list)
-        except subprocess.CalledProcessError as e:
-          raise TaskError(e)
+        cmd = ' '.join([isort_script,
+                        '--check-only' if self.options.check_only else '',
+                        '--settings-path={}'.format(self.options.settings_path),
+                        ' '.join(sources)])
+
+    if cmd is None:
+      logging.debug("Noop isort.")
+      return
+
+    logging.debug(cmd)
+    try:
+      subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as e:
+      raise TaskError(e)
 
   def _calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""
