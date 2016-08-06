@@ -13,7 +13,7 @@ from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class IntegrationTests(PantsRunIntegrationTest):
+class PythonIsortIntegrationTest(PantsRunIntegrationTest):
   TEST_DIR = 'testprojects/src/python/isort/python'
 
   CONFIG = dedent("""
