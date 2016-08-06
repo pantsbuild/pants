@@ -10,6 +10,7 @@ import os
 import subprocess
 
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import file_option
@@ -56,7 +57,7 @@ class IsortPythonTask(PythonTask):
         cmd = ' '.join([isort_script,
                         '--check-only' if self.options.check_only else '',
                         '--settings-path={}'.format(self.options.settings_path),
-                        ' '.join(sources)])
+                        ' '.join(os.path.join(get_buildroot(), source) for source in sources)])
 
     if cmd is None:
       logging.debug("Noop isort.")
