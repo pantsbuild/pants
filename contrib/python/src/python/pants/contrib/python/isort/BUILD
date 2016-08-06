@@ -3,6 +3,5 @@ python_binary(
   source='isort.py',
   dependencies=[
     'contrib/python/3rdparty:isort',
-    '3rdparty/python:setuptools'
   ],
 )
