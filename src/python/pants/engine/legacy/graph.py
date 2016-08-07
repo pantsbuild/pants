@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from twitter.common.collections import maybe_list
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.jvm.targets.jvm_app import BundleProps, JvmApp
 from pants.base.exceptions import TargetDefinitionException
@@ -45,12 +45,17 @@ class LegacyBuildGraph(BuildGraph):
     """
     self._scheduler = scheduler
     self._graph = scheduler.product_graph
-    self._target_types = dict(symbol_table_cls.aliases().target_types)
-    for alias, factory in symbol_table_cls.aliases().target_macro_factories.items():
-      target_type, = factory.target_types
-      self._target_types[alias] = target_type
+    self._target_types = self._get_target_types(symbol_table_cls)
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
+
+  def _get_target_types(self, symbol_table_cls):
+    aliases = symbol_table_cls.aliases()
+    target_types = dict(aliases.target_types)
+    for alias, factory in aliases.target_macro_factories.items():
+      target_type, = factory.target_types
+      target_types[alias] = target_type
+    return target_types
 
   def _index(self, roots):
     """Index from the given roots into the storage provided by the base class.
@@ -82,7 +87,7 @@ class LegacyBuildGraph(BuildGraph):
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
-    deps_to_inject = set()
+    deps_to_inject = OrderedSet()
     addresses_to_inject = set()
     def inject(target, dep_spec, is_dependency):
       address = Address.parse(dep_spec, relative_to=target.address.spec_path)

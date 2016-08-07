@@ -106,6 +106,7 @@ python_library(
     ':analysis_parser',
     ':analysis_tools',
     ':jvm_compile',
+    'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:java',

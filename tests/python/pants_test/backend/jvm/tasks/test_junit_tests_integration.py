@@ -103,39 +103,15 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
-  def test_junit_test_output_flag(self):
-    def run_test(output_mode):
-      args = ['test.junit', '--no-test-junit-fail-fast']
-      if output_mode is not None:
-        args.append('--output-mode=' + output_mode)
-      args.append('testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests')
-      return self.run_pants(args)
-
-    run_with_all_output = run_test('ALL')
-    self.assertIn('Failure output', run_with_all_output.stdout_data)
-    self.assertIn('Success output', run_with_all_output.stdout_data)
-
-    run_with_failure_only_output = run_test('FAILURE_ONLY')
-    self.assertIn('Failure output', run_with_failure_only_output.stdout_data)
-    self.assertNotIn('Success output', run_with_failure_only_output.stdout_data)
-
-    run_with_none_output = run_test('NONE')
-    self.assertNotIn('Failure output', run_with_none_output.stdout_data)
-    self.assertNotIn('Success output', run_with_none_output.stdout_data)
-
-    run_with_default_output = run_test(None)
-    self.assertNotIn('Failure output', run_with_default_output.stdout_data)
-    self.assertNotIn('Success output', run_with_default_output.stdout_data)
-
-  def test_junit_before_class_exception(self):
-    for output_mode in ['ALL', 'FAILURE_ONLY', 'NONE']:
-      run_result = self.run_pants([
-        'test.junit', '--no-test-junit-fail-fast',
-        '--output-mode=' + output_mode,
-        'testprojects/src/java/org/pantsbuild/testproject/junit/beforeclassexception:tests'
-      ])
-      self.assertTrue('Test mechanism' not in run_result.stdout_data,
-                      'Test mechanism exception in case of ' + output_mode + ' output mode.')
+  def test_junit_test_early_exit(self):
+    pants_run = self.run_pants([
+      'test',
+      'testprojects/src/java/org/pantsbuild/testproject/junit/earlyexit:tests',
+    ])
+    self.assert_failure(pants_run)
+    self.assertIn('java.lang.UnknownError: Abnormal VM exit - test crashed.', pants_run.stdout_data)
+    self.assertIn('Tests run: 0,  Failures: 1', pants_run.stdout_data)
+    self.assertIn('FATAL: VM exiting unexpectedly.', pants_run.stdout_data)
 
   def test_junit_test_target_cwd(self):
     pants_run = self.run_pants([

@@ -20,6 +20,7 @@ python_tests(
   sources=['test_zinc_compile_integration.py'],
   dependencies=[
     'src/python/pants/build_graph',
+    'tests/python/pants_test/backend/jvm/tasks:missing_jvm_check',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   tags = {'integration'},
@@ -58,6 +59,7 @@ python_tests(
     ':jvm_platform_integration_mixin',
   ],
   tags = {'integration'},
+  timeout=240,
 )
 
 python_tests(

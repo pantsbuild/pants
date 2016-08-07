@@ -143,6 +143,26 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
     self.assert_walk(Dirs, ['**/*'], ['a', 'c.ln', 'd.ln', 'a/b', 'd.ln/b'])
     self.assert_walk(Dirs, ['*/*/*'], [])
 
+  def test_remove_duplicates(self):
+    self.assert_walk(Files, ['*', '**'], ['4.txt',
+                                          'a/3.txt',
+                                          'a/4.txt.ln',
+                                          'a/b/1.txt',
+                                          'a/b/2',
+                                          'c.ln/1.txt',
+                                          'c.ln/2',
+                                          'd.ln/3.txt',
+                                          'd.ln/4.txt.ln',
+                                          'd.ln/b/1.txt',
+                                          'd.ln/b/2'])
+    self.assert_walk(Files, ['**/*.txt', 'a/b/1.txt', '4.txt'], ['4.txt',
+                                                                 'a/3.txt',
+                                                                 'c.ln/1.txt',
+                                                                 'd.ln/3.txt',
+                                                                 'a/b/1.txt',
+                                                                 'd.ln/b/1.txt'])
+    self.assert_walk(Dirs, ['*', '**'], ['a', 'c.ln', 'd.ln', 'a/b', 'd.ln/b'])
+
   def test_files_content_literal(self):
     self.assert_content(['4.txt', 'a/4.txt.ln'], {'4.txt': 'four\n', 'a/4.txt.ln': 'four\n'})
 
@@ -231,3 +251,7 @@ class GitFSTest(unittest.TestCase, FSTestBase):
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
   def test_walk_recursive_trailing_doublestar(self):
     super(GitFSTest, self).test_walk_recursive_trailing_doublestar()
+
+  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
+  def test_remove_duplicates(self):
+    super(GitFSTest, self).test_remove_duplicates()

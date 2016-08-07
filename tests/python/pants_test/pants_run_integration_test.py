@@ -18,7 +18,7 @@ from colors import strip_color
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
@@ -54,6 +54,16 @@ def ensure_cached(expected_num_artifacts=None):
           self.assertEqual(num_artifacts, expected_num_artifacts)
     return wrapper
   return decorator
+
+
+def ensure_engine(f):
+  """A decorator for running an integration test with and without the v2 engine enabled via
+  temporary environment variables."""
+  def wrapper(self, *args, **kwargs):
+    for env_var_value in ('false', 'true'):
+      with environment_as(PANTS_ENABLE_V2_ENGINE=env_var_value):
+        f(self, *args, **kwargs)
+  return wrapper
 
 
 class PantsRunIntegrationTest(unittest.TestCase):
