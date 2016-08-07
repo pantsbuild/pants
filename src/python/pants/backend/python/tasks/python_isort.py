@@ -51,8 +51,7 @@ class IsortPythonTask(PythonTask):
       sources = list(self._calculate_sources(self.context.targets()))
       args = [isort_script] + self.get_passthru_args() + sources
 
-    # cmd = ' '.join(args)
-    # logging.debug(cmd)
+    logging.debug(' '.join(args))
     try:
       subprocess.check_call(args)
     except subprocess.CalledProcessError as e:
