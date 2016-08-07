@@ -5,38 +5,42 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import math
+import unittest
 
-import mox
+import mock
 
 from pants.base.hash_utils import Sharder, hash_all, hash_file
 from pants.util.contextutil import temporary_file
 
 
-class TestHashUtils(mox.MoxTestBase):
-
-  def setUp(self):
-    super(TestHashUtils, self).setUp()
-    self.digest = self.mox.CreateMockAnything()
+class TestHashUtils(unittest.TestCase):
 
   def test_hash_all(self):
-    self.digest.update('jake')
-    self.digest.update('jones')
-    self.digest.hexdigest().AndReturn('42')
-    self.mox.ReplayAll()
+    digest = mock.Mock(spec=hashlib.md5())
+    digest.hexdigest.return_value = '42'
 
-    self.assertEqual('42', hash_all(['jake', 'jones'], digest=self.digest))
+    self.assertEqual('42', hash_all(['jake', 'jones'], digest=digest))
+
+    self.assertEqual([mock.call.update('jake'),
+                      mock.call.update('jones'),
+                      mock.call.hexdigest()],
+                     digest.method_calls)
 
   def test_hash_file(self):
-    self.digest.update('jake jones')
-    self.digest.hexdigest().AndReturn('1137')
-    self.mox.ReplayAll()
+    digest = mock.Mock(spec=hashlib.md5())
+    digest.hexdigest.return_value = '1137'
 
     with temporary_file() as fd:
       fd.write('jake jones')
       fd.close()
 
-      self.assertEqual('1137', hash_file(fd.name, digest=self.digest))
+      self.assertEqual('1137', hash_file(fd.name, digest=digest))
+
+      self.assertEqual([mock.call.update('jake jones'),
+                        mock.call.hexdigest()],
+                       digest.method_calls)
 
   def test_compute_shard(self):
     # Spot-check a couple of values, to make sure compute_shard doesn't do something

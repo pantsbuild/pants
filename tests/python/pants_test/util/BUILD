@@ -25,7 +25,6 @@ python_tests(
   sources = ['test_dirutil.py'],
   coverage = ['pants.util.dirutil'],
   dependencies = [
-    '3rdparty/python:mox',
     '3rdparty/python:mock',
     '3rdparty/python:pytest',
     'src/python/pants/util:dirutil',

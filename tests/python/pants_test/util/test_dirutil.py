@@ -5,15 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import atexit
 import errno
 import os
-import tempfile
 import time
 import unittest
 
 import mock
-import mox
 import six
 
 from pants.util import dirutil
@@ -27,12 +24,8 @@ from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, f
 class DirutilTest(unittest.TestCase):
 
   def setUp(self):
-    self._mox = mox.Mox()
     # Ensure we start in a clean state.
     _mkdtemp_unregister_cleaner()
-
-  def tearDown(self):
-    self._mox.UnsetStubs()
 
   def test_fast_relpath(self):
     def assertRelpath(expected, path, start):
@@ -54,26 +47,26 @@ class DirutilTest(unittest.TestCase):
     with self.assertRaises(ValueError):
       fast_relpath('/a/baseball', '/a/b')
 
-  def test_mkdtemp_setup_teardown(self):
+  @mock.patch('atexit.register')
+  @mock.patch('os.getpid')
+  @mock.patch('pants.util.dirutil.safe_rmtree')
+  @mock.patch('tempfile.mkdtemp')
+  def test_mkdtemp_setup_teardown(self,
+                                  tempfile_mkdtemp,
+                                  dirutil_safe_rmtree,
+                                  os_getpid,
+                                  atexit_register):
     def faux_cleaner():
       pass
 
     DIR1, DIR2 = 'fake_dir1__does_not_exist', 'fake_dir2__does_not_exist'
-    self._mox.StubOutWithMock(atexit, 'register')
-    self._mox.StubOutWithMock(os, 'getpid')
-    self._mox.StubOutWithMock(tempfile, 'mkdtemp')
-    self._mox.StubOutWithMock(dirutil, 'safe_rmtree')
-    atexit.register(faux_cleaner)  # Ensure only called once.
-    tempfile.mkdtemp(dir='1').AndReturn(DIR1)
-    tempfile.mkdtemp(dir='2').AndReturn(DIR2)
-    os.getpid().MultipleTimes().AndReturn('unicorn')
-    dirutil.safe_rmtree(DIR1)
-    dirutil.safe_rmtree(DIR2)
+
     # Make sure other "pids" are not cleaned.
     dirutil._MKDTEMP_DIRS['fluffypants'].add('yoyo')
 
+    tempfile_mkdtemp.side_effect = (DIR1, DIR2)
+    os_getpid.return_value = 'unicorn'
     try:
-      self._mox.ReplayAll()
       self.assertEquals(DIR1, dirutil.safe_mkdtemp(dir='1', cleaner=faux_cleaner))
       self.assertEquals(DIR2, dirutil.safe_mkdtemp(dir='2', cleaner=faux_cleaner))
       self.assertIn('unicorn', dirutil._MKDTEMP_DIRS)
@@ -86,7 +79,10 @@ class DirutilTest(unittest.TestCase):
       dirutil._MKDTEMP_DIRS.pop('fluffypants', None)
       dirutil._mkdtemp_unregister_cleaner()
 
-    self._mox.VerifyAll()
+    atexit_register.assert_called_once_with(faux_cleaner)
+    self.assertTrue(os_getpid.called)
+    self.assertEqual([mock.call(dir='1'), mock.call(dir='2')], tempfile_mkdtemp.mock_calls)
+    self.assertEqual([mock.call(DIR1), mock.call(DIR2)], dirutil_safe_rmtree.mock_calls)
 
   def test_safe_walk(self):
     """Test that directory names are correctly represented as unicode strings"""
