@@ -27,6 +27,7 @@ python_library(
   sources = ['java.py'],
   dependencies = [
     ':zinc_language_mixin',
+    'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/subsystem',
