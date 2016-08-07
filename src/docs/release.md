@@ -112,11 +112,8 @@ the release manager may also need to do a release from a stable branch.*
     2. In your release branch: Edit the version number in `src/python/pants/version.py`
     3. Update `src/python/pants/notes/*.rst` to reflect the changes for this week.  For example if
        you were releasing 1.2.0rc1 you would need to create `src/python/pants/notes/1.2.x.rst`.
-    4. Bring the CONTRIBUTORS roster (from the stable branch) in
-       [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
-        up to date by running `build-support/bin/contributors.sh`.
-    5. Cherry pick changes to branch specific notes back to master.
-    6. Create a review for changes in the stable branch and indicate the stable
+    4. Cherry pick changes to branch specific notes back to master.
+    5. Create a review for changes in the stable branch and indicate the stable
        branch name in the branch field.
 
 Dry Run (Optional)
