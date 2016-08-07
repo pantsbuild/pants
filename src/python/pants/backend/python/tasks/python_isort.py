@@ -13,6 +13,7 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
+from pants.contrib.python.checks.tasks.python_eval import PythonEval
 from pants.option.custom_types import file_option
 
 
@@ -30,13 +31,7 @@ class IsortPythonTask(PythonTask):
     super(IsortPythonTask, cls).register_options(register)
     register('--skip', type=bool, default=False,
              help='If true, skip isort task.')
-    register('--settings-path', fingerprint=True, type=file_option, default='./.isort.cfg',
-             help='Specify path to isort config file.')
     register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
-    register('--check-only', type=bool, default=False, help='Only checks and does not apply change.')
-    register('--passthrough-args', fingerprint=True, default=None,
-             help='Once specified, any other option specified for isort binary will be ignored. '
-                  'Reference: https://github.com/timothycrosley/isort/blob/develop/isort/main.py')
 
   def execute(self):
     """Run isort on source python files.
@@ -48,33 +43,35 @@ class IsortPythonTask(PythonTask):
 
     isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
 
-    cmd = None
-    if self.options.passthrough_args is not None:
-      cmd = ' '.join([isort_script, self.options.passthrough_args])
+    # If neither targets nor passthru are specified, isort ::
+    if not self.context.target_roots and not self.get_passthru_args():
+      sources = self._calculate_sources()
+      args = [isort_script] + [os.path.join(get_buildroot(), source) for source in sources]
     else:
       sources = self._calculate_sources(self.context.targets())
-      if sources:
-        cmd = ' '.join([isort_script,
-                        '--check-only' if self.options.check_only else '',
-                        '--settings-path={}'.format(self.options.settings_path),
-                        ' '.join(os.path.join(get_buildroot(), source) for source in sources)])
+      args = [isort_script] + self.get_passthru_args() + [os.path.join(get_buildroot(), source) for source in sources]
 
-    if cmd is None:
-      logging.debug("Noop isort.")
-      return
-
+    cmd = ' '.join(args)
     logging.debug(cmd)
     try:
       subprocess.check_call(cmd, shell=True)
     except subprocess.CalledProcessError as e:
       raise TaskError(e)
 
-  def _calculate_sources(self, targets):
+  def _calculate_sources(self, targets=None):
     """Generate a set of source files from the given targets."""
+    if targets is None:
+      targets = self.context.scan().targets(predicate=lambda tgt: not tgt.is_synthetic)
+
+    python_eval_targets = filter(PythonEval.is_evalable, targets)
     sources = set()
-    for target in targets:
+    for target in python_eval_targets:
       sources.update(
         source for source in target.sources_relative_to_buildroot()
         if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
       )
     return sources
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return True
