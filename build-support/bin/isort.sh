@@ -49,7 +49,6 @@ from isort.hooks import git_hook
 sys.exit(git_hook(strict=True))
 EOF
 else
-  args="${isort_args[@]} --recursive src tests pants-plugins contrib examples testprojects"
-  ./pants fmt.isort --fmt-isort-passthrough-args="$args"
+  ./pants fmt.isort -- ${isort_args[@]} --recursive src tests pants-plugins contrib examples testprojects
 fi
 

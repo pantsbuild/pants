@@ -45,16 +45,16 @@ class IsortPythonTask(PythonTask):
 
     # If neither targets nor passthru are specified, isort ::
     if not self.context.target_roots and not self.get_passthru_args():
-      sources = self._calculate_sources()
-      args = [isort_script] + [os.path.join(get_buildroot(), source) for source in sources]
+      sources = list(self._calculate_sources())
+      args = [isort_script] + sources
     else:
-      sources = self._calculate_sources(self.context.targets())
-      args = [isort_script] + self.get_passthru_args() + [os.path.join(get_buildroot(), source) for source in sources]
+      sources = list(self._calculate_sources(self.context.targets()))
+      args = [isort_script] + self.get_passthru_args() + sources
 
-    cmd = ' '.join(args)
-    logging.debug(cmd)
+    # cmd = ' '.join(args)
+    # logging.debug(cmd)
     try:
-      subprocess.check_call(cmd, shell=True)
+      subprocess.check_call(args)
     except subprocess.CalledProcessError as e:
       raise TaskError(e)
 
