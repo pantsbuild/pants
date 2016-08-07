@@ -101,4 +101,4 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
     return self._javac_spec
 
   def javac_classpath(self, products):
-    self.tool_classpath_from_products(products, 'javac', self.options_scope)
+    return self.tool_classpath_from_products(products, 'javac', self.options_scope)
