@@ -16,7 +16,7 @@ from pants.util.contextutil import temporary_file
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class PythonIsortIntegrationTest(PythonTaskTestBase):
+class PythonIsortTest(PythonTaskTestBase):
   BAD_IMPORT_ORDER = dedent("""
   from __future__ import (with_statement, division, absolute_import, generators, nested_scopes, print_function,
                           unicode_literals)
