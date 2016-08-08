@@ -156,22 +156,21 @@ class RunTracker(Subsystem):
     self._aborted = False
 
   def setup_logging(self):
-    handler = LogHandler(self)
-    # The report ensures the right level,
-    # so we want all messages to pass through to it.
-    handler.setLevel('DEBUG')
-
     # Replace the StreamHandler added to the root logger by pants before full options
     # parsing with the new logging handler.
     logger = logging.getLogger(None)
-    if len(logger.handlers) != 1 or not isinstance(logger.handlers[0], logging.StreamHandler):
-      # Printing here since loggers are in an odd state.
-      print('WARN: Expected to remove only one StreamHandler from root logger. Removing: {!r}'
-            .format(logger.handlers))
+    if not (len(logger.handlers) == 1 and isinstance(logger.handlers[0], logging.StreamHandler)):
+      print('WARN: Expected to remove only one StreamHandler from root logger. Not replacing '
+            'existing handlers: {!r}'.format(logger.handlers))
+      return
 
     for old_handler in logger.handlers:
       logger.removeHandler(old_handler)
 
+    handler = LogHandler(self)
+    # The report ensures the right level,
+    # so we want all messages to pass through to it.
+    handler.setLevel('DEBUG')
     logger.addHandler(handler)
 
   def register_thread(self, parent_workunit):

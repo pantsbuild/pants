@@ -58,7 +58,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   if log_dir:
     safe_mkdir(log_dir)
 
-    log_file = os.path.join(log_dir, 'pants.log')
+    log_file = os.path.join(log_dir, log_name or 'pants.log')
     file_handler = _setup_file_handler(level, log_file)
     logger.addHandler(file_handler)
 
