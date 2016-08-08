@@ -17,7 +17,6 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 
 
 class PythonIsortIntegrationTest(PythonTaskTestBase):
-
   BAD_IMPORT_ORDER = dedent("""
   from __future__ import (with_statement, division, absolute_import, generators, nested_scopes, print_function,
                           unicode_literals)
@@ -87,38 +86,38 @@ class PythonIsortIntegrationTest(PythonTaskTestBase):
   def test_isort_single_target(self):
     isort_task = self._create_task(target_roots=[self.a_library])
     isort_task.execute()
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/a_1.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/a_2.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/b/b.py'), self.BAD_IMPORT_ORDER)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'), self.BAD_IMPORT_ORDER)
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_1.py'))
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_2.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/b/b.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'))
 
   # No target or passthru specified, should behave as ./pants fmt.isort ::,
   # so every py file in a python target should be sorted.
   def test_isort_no_target_no_passthru(self):
     isort_task = self._create_task(target_roots=[])
     isort_task.execute()
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/a_1.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/a_2.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/b/b.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'), self.BAD_IMPORT_ORDER)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/c/c.py'), self.RESULT_B)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/r/r.py'), self.BAD_IMPORT_ORDER)
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_1.py'))
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_2.py'))
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/b/b.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'))
+    self.assertSortedWithConfigB(os.path.join(self.build_root, 'src/python/c/c.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/r/r.py'))
 
   def test_isort_passthru_no_target(self):
     isort_task = self._create_task(target_roots=[], passthru_args=['--recursive', '.'])
     isort_task.execute()
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/a_1.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/a_2.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/b/b.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'), self.RESULT_A)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/c/c.py'), self.RESULT_B)
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/r/r.py'), self.RESULT_B)
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_1.py'))
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_2.py'))
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/b/b.py'))
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'))
+    self.assertSortedWithConfigB(os.path.join(self.build_root, 'src/python/c/c.py'))
+    self.assertSortedWithConfigB(os.path.join(self.build_root, 'src/python/r/r.py'))
 
   # Resources should not be touched. Hence noop isort.
   def test_isort_isortable_target(self):
     isort_task = self._create_task(target_roots=[self.d_resources])
     isort_task.execute()
-    self._assertFileContent(os.path.join(self.build_root, 'src/python/r/r.py'), self.BAD_IMPORT_ORDER)
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/r/r.py'))
 
   def test_isort_check_only(self):
     isort_task = self._create_task(target_roots=[self.a_library], passthru_args=['--check-only'])
@@ -139,6 +138,17 @@ class PythonIsortIntegrationTest(PythonTaskTestBase):
     with open(path, 'w') as f:
       f.write(content)
 
-  def _assertFileContent(self, path, content):
+  def assertSortedWithConfigA(self, path):
     with open(path) as f:
-      self.assertEqual(content, f.read())
+      self.assertEqual(self.RESULT_A, f.read(),
+                       '{} should be sorted with CONFIG_A, but is not.'.format(path))
+
+  def assertSortedWithConfigB(self, path):
+    with open(path) as f:
+      self.assertEqual(self.RESULT_B, f.read(),
+                       '{} should be sorted with CONFIG_B, but is not.'.format(path))
+
+  def assertNotSorted(self, path):
+    with open(path) as f:
+      self.assertEqual(self.BAD_IMPORT_ORDER, f.read(),
+                       '{} should not be sorted, but is.'.format(path))
