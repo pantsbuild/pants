@@ -176,7 +176,7 @@ class BaseGlobs(Locatable, AbstractClass):
     `sources` may be None, a list/tuple/set, a string or a BaseGlobs instance.
     """
     if sources is None:
-      return Files()
+      return Files(spec_path=spec_path)
     elif isinstance(sources, BaseGlobs):
       return sources
     elif isinstance(sources, string_types):

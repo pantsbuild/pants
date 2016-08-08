@@ -13,12 +13,12 @@ from pants.engine.legacy.structs import Files
 class StructTest(unittest.TestCase):
 
   def test_filespec_with_excludes(self):
-    files = Files()
+    files = Files(spec_path='')
     self.assertEqual({'exclude':[], 'globs':[]}, files.filespecs)
-    files = Files(exclude=['*.md'])
+    files = Files(exclude=['*.md'], spec_path='')
     self.assertEqual({'exclude':[{u'globs': [u'*.md']}], 'globs':[]}, files.filespecs)
 
   def test_excludes_of_wrong_type(self):
     with self.assertRaises(ValueError) as cm:
-      Files(exclude='*.md')
+      Files(exclude='*.md', spec_path='')
     self.assertEqual('Excludes of type `unicode` are not supported: got "*.md"', str(cm.exception))
