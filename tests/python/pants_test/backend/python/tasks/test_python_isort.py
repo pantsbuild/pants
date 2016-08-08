@@ -6,8 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
-import sys
 from textwrap import dedent
 
 from pytest import fail
