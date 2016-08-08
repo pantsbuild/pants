@@ -21,6 +21,11 @@ class ConsolidateBundleClasspath(JvmBinaryTask):
   def implementation_version(cls):
     return super(ConsolidateBundleClasspath, cls).implementation_version() + [('ConsolidateBundleClasspath', 1)]
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ConsolidateBundleClasspath, cls).prepare(options, round_manager)
+    round_manager.require_data('runtime_classpath')
+
   @property
   def cache_target_dirs(self):
     return True
@@ -32,16 +37,19 @@ class ConsolidateBundleClasspath(JvmBinaryTask):
   def execute(self):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
+
+    # Clone the runtime_classpath to the bundle_classpath.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
+    bundle_classpath = self.context.products.get_data('bundle_classpath', runtime_classpath.copy)
 
     # TODO (from mateor) The consolidate classpath is something that we could do earlier in the
     # pipeline and it would be nice to just add those unpacked classed to a product and get the
     # consolidated classpath for free.
     targets_to_consolidate = self.find_consolidate_classpath_candidates(
-      runtime_classpath,
+      bundle_classpath,
       self.context.targets(**self._target_closure_kwargs),
     )
-    self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
+    self.consolidate_classpath(targets_to_consolidate, bundle_classpath)
 
   def consolidate_classpath(self, targets, classpath_products):
     """Convert loose directories in classpath_products into jars. """
