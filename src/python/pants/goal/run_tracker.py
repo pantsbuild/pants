@@ -38,6 +38,7 @@ class LogHandler(Handler):
   def emit(self, record):
     self._run_tracker.log(Report.log_level_from_string(record.levelname), record.getMessage())
 
+
 class RunTracker(Subsystem):
   """Tracks and times the execution of a pants run.
 
@@ -154,20 +155,23 @@ class RunTracker(Subsystem):
 
     self._aborted = False
 
-  def log_handler(self):
-    return LogHandler(self)
-
   def setup_logging(self):
     handler = LogHandler(self)
     # The report ensures the right level,
-    # so we want all to pass through to it.
-    handler.setLevel("DEBUG")
+    # so we want all messages to pass through to it.
+    handler.setLevel('DEBUG')
 
-    # Replace the bootstrap console logger with our logging handler.
+    # Replace the StreamHandler added to the root logger by pants before full options
+    # parsing with the new logging handler.
     logger = logging.getLogger(None)
+    if len(logger.handlers) != 1 or not isinstance(logger.handlers[0], logging.StreamHandler):
+      # Printing here since loggers are in an odd state.
+      print('WARN: Expected to remove only one StreamHandler from root logger. Removing: {!r}'
+            .format(logger.handlers))
+
     for old_handler in logger.handlers:
-      if type(old_handler) is logging.StreamHandler:
-        logger.removeHandler(old_handler)
+      logger.removeHandler(old_handler)
+
     logger.addHandler(handler)
 
   def register_thread(self, parent_workunit):
