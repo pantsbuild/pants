@@ -30,7 +30,7 @@ class PythonEval(PythonTask):
   _EVAL_TEMPLATE_PATH = os.path.join('templates', 'python_eval', 'eval.py.mustache')
 
   @staticmethod
-  def is_evalable(target):
+  def _is_evalable(target):
     return isinstance(target, (PythonLibrary, PythonBinary))
 
   @classmethod
@@ -49,7 +49,7 @@ class PythonEval(PythonTask):
       return
 
     targets = self.context.targets() if self.get_options().closure else self.context.target_roots
-    with self.invalidated(filter(self.is_evalable, targets),
+    with self.invalidated(filter(self._is_evalable, targets),
                           topological_order=True) as invalidation_check:
       compiled = self._compile_targets(invalidation_check.invalid_vts)
       return compiled  # Collected and returned for tests
