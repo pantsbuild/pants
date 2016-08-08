@@ -4,4 +4,5 @@
 package org.pantsbuild.example.hello.styleissue;
 
 // A program designed to deliberately fail a scalastyle check
-class StyleIssue {}
+class StyleIssue {
+}
