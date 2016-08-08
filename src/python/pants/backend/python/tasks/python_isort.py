@@ -15,6 +15,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel
 from pants.binaries.binary_util import BinaryUtil
 
 
@@ -34,7 +35,7 @@ class IsortPythonTask(PythonTask):
              help='If true, skip isort task.')
     register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
 
-  def execute(self):
+  def execute(self, test_output_file=None):
     """Run isort on source python files.
 
     isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort
@@ -57,10 +58,11 @@ class IsortPythonTask(PythonTask):
 
     cmd = [isort_script] + args
     logging.debug(' '.join(cmd))
+
     try:
-      subprocess.check_call(cmd, cwd=get_buildroot())
+      subprocess.check_call(cmd, cwd=get_buildroot(), stderr=test_output_file, stdout=test_output_file)
     except subprocess.CalledProcessError as e:
-      raise TaskError(e)
+      raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), e.returncode))
 
   def _calculate_sources(self, targets=None):
     """Generate a set of source files from the given targets."""
