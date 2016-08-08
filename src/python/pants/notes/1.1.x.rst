@@ -3,6 +3,40 @@
 
 This document describes releases from the ``1.1.x`` ``stable`` branch.
 
+1.1.0-rc9 (07/22/2016)
+----------------------
+
+Third release candidate for release 1.1.0. Remove bad
+deprecation warning.
+
+Bugfixes
+~~~~~~~~
+
+* Fix JUnit -fail-fast, add test for early exit hook and remove unused code
+  `RB #4060 <https://rbcommons.com/s/twitter/r/4060>`_
+  `RB #4081 <https://rbcommons.com/s/twitter/r/4081>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Update junit-runner to version 1.0.13
+  `RB #4102 <https://rbcommons.com/s/twitter/r/4102>`_
+  `RB #4101 <https://rbcommons.com/s/twitter/r/4101>`_
+  `RB #4091 <https://rbcommons.com/s/twitter/r/4091>`_
+  `RB #4081 <https://rbcommons.com/s/twitter/r/4081>`_
+  `RB #4107 <https://rbcommons.com/s/twitter/r/4107>`_
+
+* Enable autoFlush for JUnit printstream so we get output as the tests run
+  `RB #4101 <https://rbcommons.com/s/twitter/r/4101>`_
+  `RB #4102 <https://rbcommons.com/s/twitter/r/4102>`_
+
+* Buffer the ConsoleRunner's use of stdio.
+  `RB #4101 <https://rbcommons.com/s/twitter/r/4101>`_
+
+* [1.1.x\] Clean up export deprecation warning on 1.1.x branch
+  `RB #4110 <https://rbcommons.com/s/twitter/r/4110>`_
+
+* Print a message for cycles in the graph when computing the target fingerprint
+  `RB #4087 <https://rbcommons.com/s/twitter/r/4087>`_
 
 1.1.0-rc8 (07/15/2016)
 ----------------------

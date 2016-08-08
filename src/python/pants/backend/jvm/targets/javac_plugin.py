@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.tools_jar import ToolsJar
 from pants.build_graph.address import Address
@@ -12,6 +13,17 @@ from pants.build_graph.address import Address
 
 class JavacPlugin(JavaLibrary):
   """A Java compiler plugin."""
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JavacPlugin, cls).subsystem_dependencies() + (Java,)
+
+  @classmethod
+  def _tools_jar_spec(cls, buildgraph):
+    synthetic_address = Address.parse('//:tools-jar-synthetic')
+    if not buildgraph.contains_address(synthetic_address):
+      buildgraph.inject_synthetic_target(synthetic_address, ToolsJar)
+    return synthetic_address.spec
 
   def __init__(self, classname=None, plugin=None, *args, **kwargs):
 
@@ -31,11 +43,8 @@ class JavacPlugin(JavaLibrary):
   def traversable_dependency_specs(self):
     for spec in super(JavacPlugin, self).traversable_dependency_specs:
       yield spec
-    yield self._tools_jar_spec(self._build_graph)
-
-  @classmethod
-  def _tools_jar_spec(cls, buildgraph):
-    synthetic_address = Address.parse('//:tools-jar-synthetic')
-    if not buildgraph.contains_address(synthetic_address):
-      buildgraph.inject_synthetic_target(synthetic_address, ToolsJar)
-    return synthetic_address.spec
+    javac_spec = Java.global_javac_spec(self._build_graph)
+    if javac_spec is None:
+      yield self._tools_jar_spec(self._build_graph)
+    else:
+      yield javac_spec
