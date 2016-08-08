@@ -9,12 +9,13 @@ import logging
 import os
 import subprocess
 
+from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
-from pants.contrib.python.checks.tasks.python_eval import PythonEval
-from pants.option.custom_types import file_option
 
 
 class IsortPythonTask(PythonTask):
@@ -45,15 +46,19 @@ class IsortPythonTask(PythonTask):
 
     # If neither targets nor passthru are specified, isort ::
     if not self.context.target_roots and not self.get_passthru_args():
-      sources = list(self._calculate_sources())
-      args = [isort_script] + sources
+      args = list(self._calculate_sources())
     else:
       sources = list(self._calculate_sources(self.context.targets()))
-      args = [isort_script] + self.get_passthru_args() + sources
+      args = self.get_passthru_args() + sources
 
-    logging.debug(' '.join(args))
+    if len(args) == 0:
+      logging.debug("Noop isort")
+      return
+
+    cmd = [isort_script] + args
+    logging.debug(' '.join(cmd))
     try:
-      subprocess.check_call(args)
+      subprocess.check_call(cmd, cwd=get_buildroot())
     except subprocess.CalledProcessError as e:
       raise TaskError(e)
 
@@ -62,7 +67,7 @@ class IsortPythonTask(PythonTask):
     if targets is None:
       targets = self.context.scan().targets(predicate=lambda tgt: not tgt.is_synthetic)
 
-    python_eval_targets = filter(PythonEval.is_evalable, targets)
+    python_eval_targets = filter(self.is_isortable, targets)
     sources = set()
     for target in python_eval_targets:
       sources.update(
@@ -74,3 +79,7 @@ class IsortPythonTask(PythonTask):
   @classmethod
   def supports_passthru_args(cls):
     return True
+
+  @staticmethod
+  def is_isortable(target):
+    return isinstance(target, (PythonLibrary, PythonBinary, PythonTests))

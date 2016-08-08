@@ -85,12 +85,13 @@ python_tests(
 )
 
 python_tests(
-  name='isort_integration',
+  name='python_isort_task',
   sources=['test_python_isort.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+    'tests/python/pants_test:base_test',
   ],
-  tags = {'integration'},
 )
 
 python_tests(

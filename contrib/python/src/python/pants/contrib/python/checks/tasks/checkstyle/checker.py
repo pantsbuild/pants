@@ -164,7 +164,7 @@ class PythonCheckStyleTask(PythonTask):
     if failure_count > 0 and self.options.fail:
       raise TaskError(
         '{} Python Style issues found. For import order related issues, please try '
-        '`./pants fmt.isort --settings-path=<isort config> <targets>`'.format(failure_count))
+        '`./pants fmt.isort <targets>`'.format(failure_count))
     return failure_count
 
   def execute(self):
