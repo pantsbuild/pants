@@ -21,7 +21,6 @@ class ConsolidateBundleClasspath(JvmBinaryTask):
   def implementation_version(cls):
     return super(ConsolidateBundleClasspath, cls).implementation_version() + [('ConsolidateBundleClasspath', 1)]
 
-
   @property
   def cache_target_dirs(self):
     return True

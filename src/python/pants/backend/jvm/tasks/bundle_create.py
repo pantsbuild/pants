@@ -56,7 +56,6 @@ class BundleCreate(JvmBinaryTask):
   def implementation_version(cls):
     return super(BundleCreate, cls).implementation_version() + [('BundleCreate', 1)]
 
-
   @classmethod
   def prepare(cls, options, round_manager):
     super(BundleCreate, cls).prepare(options, round_manager)
