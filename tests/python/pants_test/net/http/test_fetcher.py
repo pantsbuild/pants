@@ -24,12 +24,10 @@ from pants.util.dirutil import safe_open, touch
 
 class FetcherTest(unittest.TestCase):
   def setUp(self):
-    super(FetcherTest, self).setUp()
-
     self.requests = mock.Mock(spec=requests.Session)
     self.response = mock.Mock(spec=requests.Response)
     self.fetcher = Fetcher('/unused/root/dir', requests_api=self.requests)
-    self.listener = mock.Mock(spec=Fetcher.Listener)
+    self.listener = mock.create_autospec(Fetcher.Listener, spec_set=True)
 
   def status_call(self, status_code, content_length=None):
     return mock.call.status(status_code, content_length=content_length)
@@ -223,11 +221,11 @@ class FetcherTest(unittest.TestCase):
                          chunk_size_bytes=1024,
                          timeout_secs=60)
 
-    self.assertEqual(404, e.exception.response_code)
-    self.requests.get.expect_called_once_with('http://foo', allow_redirects=True, stream=True,
-                                              timeout=60)
-    self.listener.status.expect_called_once_with(404)
-    self.response.close.expect_called_once_with()
+      self.assertEqual(404, e.exception.response_code)
+      self.requests.get.expect_called_once_with('http://foo', allow_redirects=True, stream=True,
+                                                timeout=60)
+      self.listener.status.expect_called_once_with(404)
+      self.response.close.expect_called_once_with()
 
   def test_iter_content_error(self):
     self.requests.get.return_value = self.response
@@ -241,11 +239,11 @@ class FetcherTest(unittest.TestCase):
                          chunk_size_bytes=1024,
                          timeout_secs=60)
 
-    self.requests.get.expect_called_once_with('http://foo', allow_redirects=True, stream=True,
-                                              timeout=60)
-    self.response.iter_content.expect_called_once_with(chunk_size=1024)
-    self.listener.status.expect_called_once_with(200, content_length=None)
-    self.response.close.expect_called_once_with()
+      self.requests.get.expect_called_once_with('http://foo', allow_redirects=True, stream=True,
+                                                timeout=60)
+      self.response.iter_content.expect_called_once_with(chunk_size=1024)
+      self.listener.status.expect_called_once_with(200, content_length=None)
+      self.response.close.expect_called_once_with()
 
   def expect_download(self, path_or_fd=None):
     with self.expect_get('http://1',
