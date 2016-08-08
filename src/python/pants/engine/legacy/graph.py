@@ -238,11 +238,15 @@ def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_
                  for fd in source_files_digest.dependencies
                  if fd.path not in excluded]
 
-  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path,
-                                                                filespec.get('excludes', None))
+  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
+  if filespec.has_key('exclude'):
+    relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
+                                            for e in filespec['exclude']]
+
   # NB: In order to preserve declared ordering, we record a list of matched files
   # independent of the file hash dict.
-  return EagerFilesetWithSpec(spec_path, relpath_adjusted_filespec,
+  return EagerFilesetWithSpec(spec_path,
+                              relpath_adjusted_filespec,
                               files=tuple(f for f, _ in file_tuples),
                               file_hashes=dict(file_tuples))
 

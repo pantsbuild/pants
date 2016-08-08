@@ -11,12 +11,13 @@ from abc import abstractmethod
 
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
 
 
-class AddressMapper(object):
+class AddressMapper(AbstractClass):
   """Maps specs into valid addresses and their associated addressables."""
 
   class AddressNotInBuildFile(AddressLookupError):
