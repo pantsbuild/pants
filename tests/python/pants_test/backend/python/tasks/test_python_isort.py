@@ -124,7 +124,6 @@ class PythonIsortIntegrationTest(PythonTaskTestBase):
     with temporary_file() as f:
       try:
         isort_task.execute(test_output_file=f)
-        pass
       except TaskError:
         with open(f.name) as x:
           output = x.read()
