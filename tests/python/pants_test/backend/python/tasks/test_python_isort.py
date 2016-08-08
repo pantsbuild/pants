@@ -117,7 +117,7 @@ class PythonIsortIntegrationTest(PythonTaskTestBase):
     self._assertFileContent(os.path.join(self.build_root, 'src/python/r/r.py'), self.RESULT_B)
 
   # Resources should not be touched. Hence noop isort.
-  def test_isort_evalable_target(self):
+  def test_isort_isortable_target(self):
     isort_task = self._create_task(target_roots=[self.d_resources])
     isort_task.execute()
     self._assertFileContent(os.path.join(self.build_root, 'src/python/r/r.py'), self.BAD_IMPORT_ORDER)

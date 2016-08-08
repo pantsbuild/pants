@@ -15,7 +15,6 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnitLabel
 from pants.binaries.binary_util import BinaryUtil
 
 
