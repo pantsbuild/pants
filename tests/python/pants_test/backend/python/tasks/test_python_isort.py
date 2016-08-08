@@ -57,7 +57,7 @@ class PythonIsortTest(PythonTaskTestBase):
     return IsortPythonTask
 
   def setUp(self):
-    super(PythonIsortIntegrationTest, self).setUp()
+    super(PythonIsortTest, self).setUp()
     self._create_graph()
 
   def _create_graph(self):
