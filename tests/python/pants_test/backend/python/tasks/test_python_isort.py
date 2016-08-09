@@ -77,7 +77,6 @@ class PythonIsortTest(PythonTaskTestBase):
     self.d_resources = self.create_resources('src/python/r', 'r', 'r.py')
     self.create_file('src/python/r/r.py', self.BAD_IMPORT_ORDER)
 
-
   def _create_task(self, target_roots, options=None, passthru_args=None):
     if options:
       self.set_options(**options)
