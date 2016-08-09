@@ -19,7 +19,16 @@ from pants.binaries.binary_util import BinaryUtil
 
 
 class IsortPythonTask(PythonTask):
-  """Task to provide autoformat with python isort module."""
+  """Autoformats Python source files with isort.
+
+  isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort
+
+  Behavior:
+  1. `./pants fmt.isort <targets>` will sort the files only related to specified targets, but the way of finding the config(s) is vanilla.
+  2. Additional arguments can be passed as passthru. e.g. `./pants fmt.isort <targets> -- --check-only`
+  3. `./pants fmt.isort -- <args, e.g. "--recursive .">` means both the files to be sorted and the way of finding the config(s) are vanilla.
+  4. `./pants fmt.isort` means `./pants fmt.isort ::` and NOT the entire repo directory which could include files not in any target.
+  """
 
   _PYTHON_SOURCE_EXTENSION = '.py'
 
@@ -35,10 +44,7 @@ class IsortPythonTask(PythonTask):
     register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
 
   def execute(self, test_output_file=None):
-    """Run isort on source python files.
 
-    isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort
-    """
     if self.options.skip:
       return
 
@@ -46,7 +52,10 @@ class IsortPythonTask(PythonTask):
 
     # If neither targets nor passthru are specified, isort ::
     if not self.context.target_roots and not self.get_passthru_args():
-      args = list(self._calculate_sources())
+      sources = list(self._calculate_sources(
+        self.context.scan().targets(predicate=lambda tgt: not tgt.is_synthetic)
+      ))
+      args = sources
     else:
       sources = list(self._calculate_sources(self.context.targets()))
       args = self.get_passthru_args() + sources
@@ -65,9 +74,6 @@ class IsortPythonTask(PythonTask):
 
   def _calculate_sources(self, targets=None):
     """Generate a set of source files from the given targets."""
-    if targets is None:
-      targets = self.context.scan().targets(predicate=lambda tgt: not tgt.is_synthetic)
-
     python_eval_targets = filter(self.is_isortable, targets)
     sources = set()
     for target in python_eval_targets:

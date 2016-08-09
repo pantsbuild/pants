@@ -62,21 +62,21 @@ class PythonIsortTest(PythonTaskTestBase):
 
   def _create_graph(self):
     self.reset_build_graph()
-    # super(AbcTest, self).context()
     self.a_library = self.create_python_library('src/python/a', 'a',
                                                 {'a_1.py': self.BAD_IMPORT_ORDER,
                                                  'a_2.py': self.BAD_IMPORT_ORDER})
-    self._write_to_file(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'), self.BAD_IMPORT_ORDER)
-    self._write_to_file(os.path.join(self.build_root, 'src/python/a/.isort.cfg'), self.CONFIG_A)
+    self.create_file('src/python/a/not_in_a_target.py', self.BAD_IMPORT_ORDER)
+    self.create_file('src/python/a/.isort.cfg', self.CONFIG_A)
 
     self.b_library = self.create_python_library('src/python/a/b', 'b', {'b.py': self.BAD_IMPORT_ORDER})
 
     self.c_library = self.create_python_library('src/python/c', 'c', {'c.py': self.BAD_IMPORT_ORDER})
 
-    self._write_to_file(os.path.join(self.build_root, 'src/.isort.cfg'), self.CONFIG_B)
+    self.create_file('src/.isort.cfg', self.CONFIG_B)
 
     self.d_resources = self.create_resources('src/python/r', 'r', 'r.py')
-    self._write_to_file(os.path.join(self.build_root, 'src/python/r/r.py'), self.BAD_IMPORT_ORDER)
+    self.create_file('src/python/r/r.py', self.BAD_IMPORT_ORDER)
+
 
   def _create_task(self, target_roots, options=None, passthru_args=None):
     if options:
@@ -113,7 +113,7 @@ class PythonIsortTest(PythonTaskTestBase):
     self.assertSortedWithConfigB(os.path.join(self.build_root, 'src/python/c/c.py'))
     self.assertSortedWithConfigB(os.path.join(self.build_root, 'src/python/r/r.py'))
 
-  # Resources should not be touched. Hence noop isort.
+  # Resources should not be touched, hence noop isort.
   def test_isort_isortable_target(self):
     isort_task = self._create_task(target_roots=[self.d_resources])
     isort_task.execute()
@@ -131,11 +131,6 @@ class PythonIsortTest(PythonTaskTestBase):
           self.assertIn("a_2.py Imports are incorrectly sorted.", output)
       else:
         fail("--check-only test for {} is supposed to fail, but passed.".format(self.a_library))
-
-  @staticmethod
-  def _write_to_file(path, content):
-    with open(path, 'w') as f:
-      f.write(content)
 
   def assertSortedWithConfigA(self, path):
     with open(path) as f:
