@@ -58,7 +58,7 @@ class ProtobufGenTest(TaskTestBase):
     target.payload.sources.populate([sample_proto_path], extracted_source_path)
     context = self.context(target_roots=[target])
     task = self.create_task(context=context)
-    sources_by_base = task._calculate_isortable_python_sources(target)
+    sources_by_base = task._calculate_sources(target)
     self.assertEquals(['extracted/src/proto'], sources_by_base.keys())
     self.assertEquals(OrderedSet([sample_proto_path]), sources_by_base['extracted/src/proto'])
 
@@ -93,7 +93,7 @@ class ProtobufGenTest(TaskTestBase):
     target = self.target('proto-lib:proto-target')
     context = self.context(target_roots=[target])
     task = self.create_task(context)
-    result = task._calculate_isortable_python_sources(target)
+    result = task._calculate_sources(target)
     self.assertEquals(1, len(result.keys()))
     self.assertEquals(OrderedSet(['proto-lib/foo.proto']), result['proto-lib'])
 
@@ -106,6 +106,6 @@ class ProtobufGenTest(TaskTestBase):
     target = self.target('project/src/main/proto/proto-lib:proto-target')
     context = self.context(target_roots=[target])
     task = self.create_task(context)
-    result = task._calculate_isortable_python_sources(target)
+    result = task._calculate_sources(target)
     self.assertEquals(1, len(result.keys()))
     self.assertEquals(OrderedSet(['project/src/main/proto/proto-lib/foo.proto']), result['project/src/main/proto'])
