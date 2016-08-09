@@ -10,6 +10,8 @@ import os
 from collections import defaultdict
 from multiprocessing import cpu_count
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -407,11 +409,9 @@ class JvmCompile(NailgunTaskBase):
 
       # Build any invalid targets (which will register products in the background).
       if invalidation_check.invalid_vts:
-        invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
         self.do_compile(
           invalidation_check,
           compile_contexts,
-          invalid_targets,
           self.extra_compile_time_classpath_elements(),
         )
 
@@ -426,11 +426,11 @@ class JvmCompile(NailgunTaskBase):
   def do_compile(self,
                  invalidation_check,
                  compile_contexts,
-                 invalid_targets,
                  extra_compile_time_classpath_elements):
     """Executes compilations for the invalid targets contained in a single chunk."""
-    assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
 
+    invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
+    assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
 
     # This ensures the workunit for the worker pool is set before attempting to compile.
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
@@ -754,12 +754,11 @@ class JvmCompile(NailgunTaskBase):
     invalid_target_set = set(invalid_targets)
     for ivts in invalid_vts:
       # Invalidated targets are a subset of relevant targets: get the context for this one.
-      compile_target = ivts.targets[0]
+      compile_target = ivts.target
       compile_context = compile_contexts[compile_target]
-      compile_target_closure = compile_target.closure()
-
-      # dependencies of the current target which are invalid for this chunk
-      invalid_dependencies = (compile_target_closure & invalid_target_set) - [compile_target]
+      invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
+                                                                        compile_contexts,
+                                                                        invalid_target_set)
 
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
                       functools.partial(work_for_vts, ivts, compile_context),
@@ -770,6 +769,24 @@ class JvmCompile(NailgunTaskBase):
                       on_success=ivts.update,
                       on_failure=ivts.force_invalidate))
     return jobs
+
+  def _collect_invalid_compile_dependencies(self, compile_target, compile_contexts, invalid_target_set):
+    # Collects just the direct invalid compile dependencies, traversing non-compile targets.
+    invalid_dependencies = OrderedSet()
+
+    def work(target):
+      pass
+
+    def predicate(target):
+      if target in compile_contexts and target is not compile_target:
+        if target in invalid_target_set:
+          invalid_dependencies.add(target)
+        return False
+      else:
+        return True
+
+    compile_target.walk(work, predicate)
+    return invalid_dependencies
 
   def _create_context_jar(self, compile_context):
     """Jar up the compile_context to its output jar location.

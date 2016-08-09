@@ -6,13 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import BaseHTTPServer
+import hashlib
 import os
 import SocketServer
 import unittest
 from contextlib import closing, contextmanager
 from threading import Thread
 
-import mox
+import mock
 import requests
 from six import StringIO
 
@@ -21,40 +22,36 @@ from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_open, touch
 
 
-# TODO(John Sirois): Replace mox with mock
-class FetcherTest(mox.MoxTestBase):
+class FetcherTest(unittest.TestCase):
   def setUp(self):
-    super(FetcherTest, self).setUp()
-
-    self.requests = self.mox.CreateMockAnything()
-    self.response = self.mox.CreateMock(requests.Response)
+    self.requests = mock.Mock(spec=requests.Session)
+    self.response = mock.Mock(spec=requests.Response)
     self.fetcher = Fetcher('/unused/root/dir', requests_api=self.requests)
-    self.listener = self.mox.CreateMock(Fetcher.Listener)
+    self.listener = mock.create_autospec(Fetcher.Listener, spec_set=True)
 
-  def expect_get(self, url, chunk_size_bytes, timeout_secs, listener=True):
-    self.requests.get(url, allow_redirects=True, stream=True,
-                      timeout=timeout_secs).AndReturn(self.response)
-    self.response.status_code = 200
-    self.response.headers = {'content-length': '11'}
-    if listener:
-      self.listener.status(200, content_length=11)
+  def status_call(self, status_code, content_length=None):
+    return mock.call.status(status_code, content_length=content_length)
 
-    chunks = ['0123456789', 'a']
-    self.response.iter_content(chunk_size=chunk_size_bytes).AndReturn(chunks)
-    return chunks
+  def ok_call(self, chunks):
+    return self.status_call(200, content_length=sum(len(c) for c in chunks))
+
+  def assert_listener_calls(self, expected_listener_calls, chunks, expect_finished=True):
+    expected_listener_calls.extend(mock.call.recv_chunk(chunk) for chunk in chunks)
+    if expect_finished:
+      expected_listener_calls.append(mock.call.finished())
+    self.assertEqual(expected_listener_calls, self.listener.method_calls)
 
   def assert_local_file_fetch(self, url_prefix=''):
     chunks = ['0123456789', 'a']
-    self.listener.status(200, content_length=sum(len(c) for c in chunks))
     with temporary_file() as fp:
       for chunk in chunks:
         fp.write(chunk)
-        self.listener.recv_chunk(chunk)
       fp.close()
-      self.listener.finished()
-      self.mox.ReplayAll()
 
       self.fetcher.fetch(url_prefix + fp.name, self.listener, chunk_size_bytes=10)
+
+      self.assert_listener_calls([self.ok_call(chunks)], chunks)
+      self.requests.assert_not_called()
 
   def test_file_path(self):
     self.assert_local_file_fetch()
@@ -96,71 +93,85 @@ class FetcherTest(mox.MoxTestBase):
       with self.assertRaises(self.fetcher.PermanentError):
         self.fetcher.fetch(no_perms, self.listener)
 
-  def test_get(self):
-    for chunk in self.expect_get('http://bar', chunk_size_bytes=1024, timeout_secs=60):
-      self.listener.recv_chunk(chunk)
-    self.listener.finished()
-    self.response.close()
-
-    self.mox.ReplayAll()
-
-    self.fetcher.fetch('http://bar',
-                       self.listener,
-                       chunk_size_bytes=1024,
-                       timeout_secs=60)
-
-  def test_checksum_listener(self):
-    digest = self.mox.CreateMockAnything()
-    for chunk in self.expect_get('http://baz', chunk_size_bytes=1, timeout_secs=37):
-      self.listener.recv_chunk(chunk)
-      digest.update(chunk)
-
-    self.listener.finished()
-    digest.hexdigest().AndReturn('42')
-
-    self.response.close()
-
-    self.mox.ReplayAll()
-
-    checksum_listener = Fetcher.ChecksumListener(digest=digest)
-    self.fetcher.fetch('http://baz',
-                       checksum_listener.wrap(self.listener),
-                       chunk_size_bytes=1,
-                       timeout_secs=37)
-    self.assertEqual('42', checksum_listener.checksum)
-
-  def test_download_listener(self):
-    downloaded = ''
-    for chunk in self.expect_get('http://foo', chunk_size_bytes=1048576, timeout_secs=3600):
-      self.listener.recv_chunk(chunk)
-      downloaded += chunk
-
-    self.listener.finished()
-    self.response.close()
-
-    self.mox.ReplayAll()
-
-    with closing(StringIO()) as fp:
-      self.fetcher.fetch('http://foo',
-                         Fetcher.DownloadListener(fp).wrap(self.listener),
-                         chunk_size_bytes=1024 * 1024,
-                         timeout_secs=60 * 60)
-      self.assertEqual(downloaded, fp.getvalue())
-
-  def test_size_mismatch(self):
-    self.requests.get('http://foo', allow_redirects=True, stream=True,
-                      timeout=60).AndReturn(self.response)
+  @contextmanager
+  def expect_get(self, url, chunk_size_bytes, timeout_secs, listener=True):
+    chunks = ['0123456789', 'a']
+    self.requests.get.return_value = self.response
     self.response.status_code = 200
     self.response.headers = {'content-length': '11'}
-    self.listener.status(200, content_length=11)
+    self.response.iter_content.return_value = chunks
 
-    self.response.iter_content(chunk_size=1024).AndReturn(['a', 'b'])
-    self.listener.recv_chunk('a')
-    self.listener.recv_chunk('b')
+    yield chunks, [self.ok_call(chunks)] if listener else []
 
-    self.response.close()
+    self.requests.get.expect_called_once_with(url, allow_redirects=True, stream=True,
+                                              timeout=timeout_secs)
+    self.response.iter_content.expect_called_once_with(chunk_size=chunk_size_bytes)
 
-    self.mox.ReplayAll()
+  def test_get(self):
+    with self.expect_get('http://bar',
+                         chunk_size_bytes=1024,
+                         timeout_secs=60) as (chunks, expected_listener_calls):
+
+      self.fetcher.fetch('http://bar',
+                         self.listener,
+                         chunk_size_bytes=1024,
+                         timeout_secs=60)
+
+      self.assert_listener_calls(expected_listener_calls, chunks)
+      self.response.close.expect_called_once_with()
+
+  def test_checksum_listener(self):
+    digest = mock.Mock(spec=hashlib.md5())
+    digest.hexdigest.return_value = '42'
+    checksum_listener = Fetcher.ChecksumListener(digest=digest)
+
+    with self.expect_get('http://baz',
+                         chunk_size_bytes=1,
+                         timeout_secs=37) as (chunks, expected_listener_calls):
+
+      self.fetcher.fetch('http://baz',
+                         checksum_listener.wrap(self.listener),
+                         chunk_size_bytes=1,
+                         timeout_secs=37)
+
+    self.assertEqual('42', checksum_listener.checksum)
+
+    def expected_digest_calls():
+      for chunk in chunks:
+        yield mock.call.update(chunk)
+      yield mock.call.hexdigest()
+
+    self.assertEqual(list(expected_digest_calls()), digest.method_calls)
+
+    self.assert_listener_calls(expected_listener_calls, chunks)
+    self.response.close.assert_called_once_with()
+
+  def concat_chunks(self, chunks):
+    return reduce(lambda acc, c: acc + c, chunks, '')
+
+  def test_download_listener(self):
+    with self.expect_get('http://foo',
+                         chunk_size_bytes=1048576,
+                         timeout_secs=3600) as (chunks, expected_listener_calls):
+
+      with closing(StringIO()) as fp:
+        self.fetcher.fetch('http://foo',
+                           Fetcher.DownloadListener(fp).wrap(self.listener),
+                           chunk_size_bytes=1024 * 1024,
+                           timeout_secs=60 * 60)
+
+        downloaded = self.concat_chunks(chunks)
+        self.assertEqual(downloaded, fp.getvalue())
+
+    self.assert_listener_calls(expected_listener_calls, chunks)
+    self.response.close.assert_called_once_with()
+
+  def test_size_mismatch(self):
+    self.requests.get.return_value = self.response
+    self.response.status_code = 200
+    self.response.headers = {'content-length': '11'}
+    chunks = ['a', 'b']
+    self.response.iter_content.return_value = chunks
 
     with self.assertRaises(self.fetcher.Error):
       self.fetcher.fetch('http://foo',
@@ -168,59 +179,59 @@ class FetcherTest(mox.MoxTestBase):
                          chunk_size_bytes=1024,
                          timeout_secs=60)
 
-  def test_get_error_transient(self):
-    self.requests.get('http://foo', allow_redirects=True, stream=True,
-                      timeout=60).AndRaise(requests.ConnectionError)
+    self.requests.get.assert_called_once_with('http://foo', allow_redirects=True, stream=True,
+                                              timeout=60)
+    self.response.iter_content.assert_called_once_with(chunk_size=1024)
+    self.assert_listener_calls([self.status_call(200, content_length=11)], chunks,
+                               expect_finished=False)
+    self.response.close.assert_called_once_with()
 
-    self.mox.ReplayAll()
+  def test_get_error_transient(self):
+    self.requests.get.side_effect = requests.ConnectionError
 
     with self.assertRaises(self.fetcher.TransientError):
       self.fetcher.fetch('http://foo',
                          self.listener,
                          chunk_size_bytes=1024,
                          timeout_secs=60)
+
+    self.requests.get.assert_called_once_with('http://foo', allow_redirects=True, stream=True,
+                                              timeout=60)
 
   def test_get_error_permanent(self):
-    self.requests.get('http://foo', allow_redirects=True, stream=True,
-                      timeout=60).AndRaise(requests.TooManyRedirects)
-
-    self.mox.ReplayAll()
+    self.requests.get.side_effect = requests.TooManyRedirects
 
     with self.assertRaises(self.fetcher.PermanentError) as e:
       self.fetcher.fetch('http://foo',
                          self.listener,
                          chunk_size_bytes=1024,
                          timeout_secs=60)
+
     self.assertTrue(e.exception.response_code is None)
+    self.requests.get.assert_called_once_with('http://foo', allow_redirects=True, stream=True,
+                                              timeout=60)
 
   def test_http_error(self):
-    self.requests.get('http://foo', allow_redirects=True, stream=True,
-                      timeout=60).AndReturn(self.response)
+    self.requests.get.return_value = self.response
     self.response.status_code = 404
-    self.listener.status(404)
-
-    self.response.close()
-
-    self.mox.ReplayAll()
 
     with self.assertRaises(self.fetcher.PermanentError) as e:
       self.fetcher.fetch('http://foo',
                          self.listener,
                          chunk_size_bytes=1024,
                          timeout_secs=60)
-    self.assertEqual(404, e.exception.response_code)
+
+      self.assertEqual(404, e.exception.response_code)
+      self.requests.get.expect_called_once_with('http://foo', allow_redirects=True, stream=True,
+                                                timeout=60)
+      self.listener.status.expect_called_once_with(404)
+      self.response.close.expect_called_once_with()
 
   def test_iter_content_error(self):
-    self.requests.get('http://foo', allow_redirects=True, stream=True,
-                      timeout=60).AndReturn(self.response)
+    self.requests.get.return_value = self.response
     self.response.status_code = 200
     self.response.headers = {}
-    self.listener.status(200, content_length=None)
-
-    self.response.iter_content(chunk_size=1024).AndRaise(requests.Timeout)
-    self.response.close()
-
-    self.mox.ReplayAll()
+    self.response.iter_content.side_effect = requests.Timeout
 
     with self.assertRaises(self.fetcher.TransientError):
       self.fetcher.fetch('http://foo',
@@ -228,19 +239,26 @@ class FetcherTest(mox.MoxTestBase):
                          chunk_size_bytes=1024,
                          timeout_secs=60)
 
+      self.requests.get.expect_called_once_with('http://foo', allow_redirects=True, stream=True,
+                                                timeout=60)
+      self.response.iter_content.expect_called_once_with(chunk_size=1024)
+      self.listener.status.expect_called_once_with(200, content_length=None)
+      self.response.close.expect_called_once_with()
+
   def expect_download(self, path_or_fd=None):
-    downloaded = ''
-    for chunk in self.expect_get('http://1', chunk_size_bytes=13, timeout_secs=13, listener=False):
-      downloaded += chunk
-    self.response.close()
+    with self.expect_get('http://1',
+                         chunk_size_bytes=13,
+                         timeout_secs=13,
+                         listener=False) as (chunks, expected_listener_calls):
 
-    self.mox.ReplayAll()
+      path = self.fetcher.download('http://1',
+                                   path_or_fd=path_or_fd,
+                                   chunk_size_bytes=13,
+                                   timeout_secs=13)
 
-    path = self.fetcher.download('http://1',
-                                 path_or_fd=path_or_fd,
-                                 chunk_size_bytes=13,
-                                 timeout_secs=13)
-    return downloaded, path
+      self.response.close.expect_called_once_with()
+      downloaded = self.concat_chunks(chunks)
+      return downloaded, path
 
   def test_download(self):
     downloaded, path = self.expect_download()

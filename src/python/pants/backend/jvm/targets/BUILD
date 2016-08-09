@@ -61,6 +61,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     ':jvm',
+    'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
   ],

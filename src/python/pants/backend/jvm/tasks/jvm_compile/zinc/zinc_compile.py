@@ -12,6 +12,7 @@ import textwrap
 from contextlib import closing
 from xml.etree import ElementTree
 
+from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
@@ -180,14 +181,6 @@ class BaseZincCompile(JvmCompile):
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
-    # Javac plugins can access basically all of the compiler internals, so we don't shade anything.
-    # Hence the unspecified main= argument. This tool is optional, hence the empty classpath list.
-    cls.register_jvm_tool(register,
-                          'javac',
-                          classpath=[],
-                          help='Java compiler to use.  If unspecified, we use the compiler '
-                               'embedded in the Java distribution we run Zinc on.')
-
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
@@ -273,9 +266,9 @@ class BaseZincCompile(JvmCompile):
     return self.tool_classpath('zinc')
 
   def javac_classpath(self):
-    # Note that if this classpath is empty then Zinc will use the javac from
+    # Note that if this classpath is empty then Zinc will automatically use the javac from
     # the JDK it was invoked with.
-    return self.tool_classpath('javac')
+    return Java.global_javac_classpath(self.context.products)
 
   def scalac_classpath(self):
     return ScalaPlatform.global_instance().compiler_classpath(self.context.products)

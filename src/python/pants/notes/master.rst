@@ -4,6 +4,34 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.2.0-dev3 (8/7/2016)
+---------------------
+
+Unscheduled extra unstable release.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Move the custom javac option to the Java subsystem.
+  `RB #4141 <https://rbcommons.com/s/twitter/r/4141>`_
+
+
+1.2.0-dev2 (8/5/2016)
+---------------------
+
+Regularly scheduled unstable release.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade travis ci to use jdk 8
+  `RB #4127 <https://rbcommons.com/s/twitter/r/4127>`_
+
+* Additional checks for module type determination.
+  `RB #4131 <https://rbcommons.com/s/twitter/r/4131>`_
+
+
 1.2.0-dev1 (7/30/2016)
 ----------------------
 
