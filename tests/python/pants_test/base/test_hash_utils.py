@@ -9,8 +9,6 @@ import hashlib
 import math
 import unittest
 
-import mock
-
 from pants.base.hash_utils import Sharder, hash_all, hash_file
 from pants.util.contextutil import temporary_file
 
@@ -18,29 +16,19 @@ from pants.util.contextutil import temporary_file
 class TestHashUtils(unittest.TestCase):
 
   def test_hash_all(self):
-    digest = mock.Mock(spec=hashlib.md5())
-    digest.hexdigest.return_value = '42'
-
-    self.assertEqual('42', hash_all(['jake', 'jones'], digest=digest))
-
-    self.assertEqual([mock.call.update('jake'),
-                      mock.call.update('jones'),
-                      mock.call.hexdigest()],
-                     digest.method_calls)
+    expected_hash = hashlib.md5()
+    expected_hash.update('jakejones')
+    self.assertEqual(expected_hash.hexdigest(), hash_all(['jake', 'jones'], digest=hashlib.md5()))
 
   def test_hash_file(self):
-    digest = mock.Mock(spec=hashlib.md5())
-    digest.hexdigest.return_value = '1137'
+    expected_hash = hashlib.md5()
+    expected_hash.update('jake jones')
 
     with temporary_file() as fd:
       fd.write('jake jones')
       fd.close()
 
-      self.assertEqual('1137', hash_file(fd.name, digest=digest))
-
-      self.assertEqual([mock.call.update('jake jones'),
-                        mock.call.hexdigest()],
-                       digest.method_calls)
+      self.assertEqual(expected_hash.hexdigest(), hash_file(fd.name, digest=hashlib.md5()))
 
   def test_compute_shard(self):
     # Spot-check a couple of values, to make sure compute_shard doesn't do something

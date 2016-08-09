@@ -134,10 +134,8 @@ python_tests(
   name = 'hash_utils',
   sources = ['test_hash_utils.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/base:hash_utils',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
   ]
 )
 

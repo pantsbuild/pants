@@ -21,6 +21,10 @@ from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, f
                                 safe_rm_oldest_items_in_dir, safe_rmtree, touch)
 
 
+def strict_patch(target, **kwargs):
+  return mock.patch(target, autospec=True, spec_set=True, **kwargs)
+
+
 class DirutilTest(unittest.TestCase):
 
   def setUp(self):
@@ -47,10 +51,10 @@ class DirutilTest(unittest.TestCase):
     with self.assertRaises(ValueError):
       fast_relpath('/a/baseball', '/a/b')
 
-  @mock.patch('atexit.register')
-  @mock.patch('os.getpid')
-  @mock.patch('pants.util.dirutil.safe_rmtree')
-  @mock.patch('tempfile.mkdtemp')
+  @strict_patch('atexit.register')
+  @strict_patch('os.getpid')
+  @strict_patch('pants.util.dirutil.safe_rmtree')
+  @strict_patch('tempfile.mkdtemp')
   def test_mkdtemp_setup_teardown(self,
                                   tempfile_mkdtemp,
                                   dirutil_safe_rmtree,
