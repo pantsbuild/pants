@@ -76,7 +76,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     """As a separate prep step because to test different option settings, this needs to rerun
     after context is re-created.
     """
-    classpath_products = self.ensure_classpath_products(task_context)
+    classpath_products = self.ensure_bundle_classpath_products(task_context)
     classpath_products.add_jars_for_targets(targets=[self.jar_lib],
                                             conf='default',
                                             resolved_jars=[self.jar_artifact,
@@ -117,7 +117,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self.task_context = self.context(target_roots=[self.app_target])
     missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
                                                 materialize=False)
-    classpath_products = self.ensure_classpath_products(self.task_context)
+    classpath_products = self.ensure_bundle_classpath_products(self.task_context)
     classpath_products.add_jars_for_targets(targets=[self.binary_target],
                                             conf='default',
                                             resolved_jars=[missing_jar_artifact])

@@ -64,4 +64,18 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
     :returns: The classpath products associated with the given `context`
     :rtype: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
     """
-    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
+    return context.products.get_data('runtime_classpath',
+                                     init_func=ClasspathProducts.init_func(self.pants_workdir))
+
+  def ensure_bundle_classpath_products(self, context):
+    """Gets or creates the classpath products expected by `JvmBinaryTask`.
+
+    :API: public
+
+    :param context: The pants run context to get/create/associate classpath products with.
+    :type context: :class:`pants.goal.context.Context`
+    :returns: The classpath products associated with the given `context`
+    :rtype: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
+    """
+    runtime_classpath = self.ensure_classpath_products(context)
+    return context.products.get_data('bundle_classpath', runtime_classpath.copy)
