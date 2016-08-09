@@ -315,7 +315,7 @@ function tag_release() {
 
 function publish_docs_if_master() {
   branch=$(get_branch)
-  if [[ $branch =~ "^master$" ]]; then
+  if [[ "${branch}" == "master" ]]; then
     ${ROOT}/build-support/bin/publish_docs.sh -p -y
   else
     echo "Skipping docsite publishing on non-master branch (${branch})."
