@@ -183,9 +183,9 @@ class BundleCreate(JvmBinaryTask):
     lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
     if not app.deployjar:
       os.mkdir(lib_dir)
-      runtime_classpath = self.context.products.get_data('runtime_classpath')
+      bundle_classpath = self.context.products.get_data('bundle_classpath')
       classpath.update(ClasspathUtil.create_canonical_classpath(
-        runtime_classpath,
+        bundle_classpath,
         app.target.closure(bfs=True, **self._target_closure_kwargs),
         lib_dir,
         internal_classpath_only=False,
