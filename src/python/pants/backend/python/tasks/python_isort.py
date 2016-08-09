@@ -72,7 +72,7 @@ class IsortPythonTask(PythonTask):
     except subprocess.CalledProcessError as e:
       raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), e.returncode))
 
-  def _calculate_isortable_python_sources(self, targets=None):
+  def _calculate_isortable_python_sources(self, targets):
     """Generate a set of source files from the given targets."""
     python_eval_targets = filter(self.is_non_synthetic_python_target, targets)
     sources = set()
