@@ -21,7 +21,8 @@ from pants.binaries.binary_util import BinaryUtil
 class IsortPythonTask(PythonTask):
   """Autoformats Python source files with isort.
 
-  isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort
+  isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort, then uploaded to
+  https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
 
   Behavior:
   1. `./pants fmt.isort <targets>` will sort the files only related to specified targets, but the way of finding the config(s) is vanilla.
@@ -53,11 +54,11 @@ class IsortPythonTask(PythonTask):
     # If neither targets nor passthru are specified, isort ::
     if not self.context.target_roots and not self.get_passthru_args():
       targets = self.context.scan().targets()
-      sources = self._calculate_isortable_python_sources(targets)
-      args = sources
     else:
-      sources = self._calculate_isortable_python_sources(self.context.targets())
-      args = self.get_passthru_args() + sources
+      targets = self.context.targets()
+
+    sources = self._calculate_isortable_python_sources(targets)
+    args = self.get_passthru_args() + sources
 
     if len(args) == 0:
       logging.debug("Noop isort")
