@@ -52,12 +52,11 @@ class IsortPythonTask(PythonTask):
 
     # If neither targets nor passthru are specified, isort ::
     if not self.context.target_roots and not self.get_passthru_args():
-      sources = list(self._calculate_sources(
-        self.context.scan().targets(predicate=lambda tgt: not tgt.is_synthetic)
-      ))
+      targets = self.context.scan().targets()
+      sources = self._calculate_isortable_python_sources(targets)
       args = sources
     else:
-      sources = list(self._calculate_sources(self.context.targets()))
+      sources = self._calculate_isortable_python_sources(self.context.targets())
       args = self.get_passthru_args() + sources
 
     if len(args) == 0:
@@ -72,21 +71,21 @@ class IsortPythonTask(PythonTask):
     except subprocess.CalledProcessError as e:
       raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), e.returncode))
 
-  def _calculate_sources(self, targets=None):
+  def _calculate_isortable_python_sources(self, targets=None):
     """Generate a set of source files from the given targets."""
-    python_eval_targets = filter(self.is_isortable, targets)
+    python_eval_targets = filter(self.is_non_synthetic_python_target, targets)
     sources = set()
     for target in python_eval_targets:
       sources.update(
         source for source in target.sources_relative_to_buildroot()
         if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
       )
-    return sources
+    return list(sources)
+
+  @staticmethod
+  def is_non_synthetic_python_target(target):
+    return not target.is_synthetic and isinstance(target, (PythonLibrary, PythonBinary, PythonTests))
 
   @classmethod
   def supports_passthru_args(cls):
     return True
-
-  @staticmethod
-  def is_isortable(target):
-    return isinstance(target, (PythonLibrary, PythonBinary, PythonTests))
