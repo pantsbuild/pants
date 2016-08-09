@@ -86,23 +86,21 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
     self.add_to_runtime_classpath(task_context, self.binary_target,
                                   {'Foo.class': '', 'foo.txt': '', 'foo/file': ''})
-
-  def test_jvm_bundle_products(self):
-    """Test default setting outputs bundle products using `target.id`."""
-    self.app_target = self._create_target()
-    self.task_context = self.context(target_roots=[self.app_target])
-    self._setup_classpath(self.task_context)
-    self.execute(self.task_context)
-    self._check_bundle_products('foo.foo-app', check_symlink=True)
-
-  def test_jvm_bundle_use_basename_prefix(self):
-    """Test override default setting outputs bundle products using basename."""
-    self.app_target = self._create_target()
-    self.set_options(use_basename_prefix=True)
-    self.task_context = self.context(target_roots=[self.app_target])
-    self._setup_classpath(self.task_context)
-    self.execute(self.task_context)
-    self._check_bundle_products('foo.foo-app', check_symlink=True, symlink_name_prefix='FooApp')
+  # def test_jvm_bundle_products(self):
+  #   """Test default setting outputs bundle products using `target.id`."""
+  #   self.app_target = self._create_target()
+  #   self.task_context = self.context(target_roots=[self.app_target])
+  #   self._setup_classpath(self.task_context)
+  #   self.execute(self.task_context)
+  #   self._check_bundle_products('foo.foo-app', check_symlink=True)
+  # def test_jvm_bundle_use_basename_prefix(self):
+  #   """Test override default setting outputs bundle products using basename."""
+  #   self.app_target = self._create_target()
+  #   self.set_options(use_basename_prefix=True)
+  #   self.task_context = self.context(target_roots=[self.app_target])
+  #   self._setup_classpath(self.task_context)
+  #   self.execute(self.task_context)
+  #   self._check_bundle_products('foo.foo-app', check_symlink=True, symlink_name_prefix='FooApp')
 
   def test_bundle_non_app_target(self):
     """Test bundle does not apply to a non jvm_app/jvm_binary target."""
@@ -181,6 +179,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     bundle_root = self._check_products(products, bundle_fullname)
     self.assertTrue(os.path.isdir(bundle_root))
 
+    # import pdb; pdb.set_trace()
     self.assertEqual(sorted(['foo-binary.jar',
                              'libs/foo.foo-binary-0.jar',
                              'libs/3rdparty.jvm.org.example.foo-0.jar',
