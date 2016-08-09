@@ -93,6 +93,10 @@ class EngineInitializer(object):
                                       usually taken from the `--pants-ignore` global option.
     :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
                                          None to use the default.
+
+    :param BuildFileAddressMapper build_address_mapper: A BuildFileAddressMapper to use for 
+                                                        BuildFileAddress resolution, or None to
+                                                        use the default. 
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 
