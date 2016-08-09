@@ -82,5 +82,5 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
                           timeout_targets + deliberately_conflicting_targets)
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
                        targets_to_exclude)
-    pants_run = self.pants_test(['testprojects::'] + exclude_opts)
+    pants_run = self.pants_test(['testprojects::', '--jvm-platform-default-platform=java6'] + exclude_opts)
     self.assert_success(pants_run)

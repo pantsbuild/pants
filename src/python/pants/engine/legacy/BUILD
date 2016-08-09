@@ -36,6 +36,7 @@ python_library(
     ':parser',
     ':structs',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:parse_context',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine:graph',

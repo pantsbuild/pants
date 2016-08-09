@@ -183,7 +183,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       with self.temporary_cachedir() as cachedir:
         pants_run = self.run_test_compile(
             workdir, cachedir, 'examples/src/java/org/pantsbuild/example/hello/main',
-            extra_args=['--compile-zinc-javac=testprojects/3rdparty/javactool:custom_javactool_for_testing'],
+            extra_args=['--java-javac=testprojects/3rdparty/javactool:custom_javactool_for_testing'],
             clean_all=True
         )
         self.assertNotEquals(0, pants_run.returncode)  # Our custom javactool always fails.

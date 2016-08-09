@@ -76,19 +76,45 @@ Although the build and publish are automated, the version bumping, changelog edi
 and CONTRIBUTORS management are not. Changelog edits and CONTRIBUTOR updates always
 occur in master, while version changes generally only occur in the relevant release branch.
 
-1. In your release branch: Edit the version number in `src/python/pants/version.py`
-2. When a `stable` branch is cut update `src/python/pants/notes/*.rst` and
-  `src/python/pants/notes/master.rst` on the master branch to reflect changes captured in the stable
-  branch.  For `dev` releases only update master.rst.  Future `stable` changes will be cherry-picked
-  to the stable branch so master and stable will diverge, only requiring the branch specific notes
-  to be updated.  You can run `./build-support/bin/release-changelog-helper.sh`
-  to get a head-start creating the relevant changelog entries.
-3. In master and the release branch if needed: Bring the CONTRIBUTORS roster in
-[CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
-up to date by running `build-support/bin/contributors.sh`.
+Releasing from different release branches
+-----------------------------------------
+Every week we do a release from master.  In most cases we will use the `dev` naming convention
+detailed in [Release Strategy](http://pantsbuild.github.io/release_strategy.html). When we are
+ready to create a new stable branch we will release under the `rc` naming convention instead of
+`dev`.  For example releases in master should look similar to the following: 1.1.0dev0, 1.1.0dev1,
+1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. *In addition to a release from master
+the release manager may also need to do a release from a stable branch.*
 
-Finally, send these three changes out for review. If you are releasing from master, this will
-be one review; if you are releasing from a stable branch, it will be two reviews.
+* ###Preparation for the release from the master branch
+    1. Edit the version number in `src/python/pants/version.py`
+    2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week.
+    3. If this release is also a release candidate then:
+         * Update the corresponding notes file for that release. <br/>
+           _For example if you were releasing `1.2.0rc0` you would need to
+           create `src/python/pants/notes/1.2.x.rst`._
+         * Add the file to pants.ini in the branch_notes section.
+         * Add the new notes file to `src/docs/docsite.json`.
+         * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
+       For addtional information on generating documenation see the
+       [docs reference](http://pantsbuild.github.io/docs#generating-the-site)
+    4. Bring the CONTRIBUTORS roster (from master) in
+       [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
+       up to date by running `build-support/bin/contributors.sh`.
+    5. If creating the release candidate create the stable branch from the commit you use to do the
+       release.  For example if you were releasing `1.2.0rc0`, create the branch `1.2.x` from your
+       release commit.
+    6. Create a review for changes in the master branch and indicate `master` in the branch field.
+
+* ###Preparation for the release from the stable branch
+  See [Release Strategy](http://pantsbuild.github.io/release_strategy.html) for more details about
+  whether a release is needed from a stable branch.
+    1. Cherry pick changes that have been identified in the [backport proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
+    2. In your release branch: Edit the version number in `src/python/pants/version.py`
+    3. Update `src/python/pants/notes/*.rst` to reflect the changes for this week.  For example if
+       you were releasing 1.2.0rc1 you would need to create `src/python/pants/notes/1.2.x.rst`.
+    4. Cherry pick changes to branch specific notes back to master.
+    5. Create a review for changes in the stable branch and indicate the stable
+       branch name in the branch field.
 
 Dry Run (Optional)
 ------------------

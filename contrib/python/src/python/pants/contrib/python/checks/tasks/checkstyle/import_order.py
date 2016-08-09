@@ -74,8 +74,7 @@ class ImportOrder(CheckstylePlugin):
       module = __import__(name)
     except ImportError:
       return ImportType.THIRD_PARTY
-    if (not hasattr(module, '__file__') or
-          os.path.realpath(module.__file__).startswith(cls.STANDARD_LIB_PATH)):
+    if not hasattr(module, '__file__') or cls.is_module_on_std_lib_path(module):
       return ImportType.STDLIB
     # Assume anything we can't classify is third-party
     return ImportType.THIRD_PARTY
@@ -84,6 +83,24 @@ class ImportOrder(CheckstylePlugin):
   def classify_import_node(cls, node):
     return set(cls.classify_import(node, module_name)
                for module_name in cls.extract_import_modules(node))
+
+  @classmethod
+  def is_module_on_std_lib_path(cls, module):
+    """
+    Sometimes .py files are symlinked to the real python files, such as the case of virtual
+    env. However the .pyc files are created under the virtual env directory rather than
+    the path in cls.STANDARD_LIB_PATH. Hence this function checks for both.
+
+    :param module: a module
+    :return: True if module is on interpreter's stdlib path. False otherwise.
+    """
+    module_file_real_path = os.path.realpath(module.__file__)
+    if module_file_real_path.startswith(cls.STANDARD_LIB_PATH):
+      return True
+    elif os.path.splitext(module_file_real_path)[1] == '.pyc':
+      py_file_real_path = os.path.realpath(os.path.splitext(module_file_real_path)[0] + '.py')
+      return py_file_real_path.startswith(cls.STANDARD_LIB_PATH)
+    return False
 
   def import_errors(self, node):
     errors = []

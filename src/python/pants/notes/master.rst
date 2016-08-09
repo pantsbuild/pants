@@ -4,6 +4,153 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.2.0-dev3 (8/7/2016)
+---------------------
+
+Unscheduled extra unstable release.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Move the custom javac option to the Java subsystem.
+  `RB #4141 <https://rbcommons.com/s/twitter/r/4141>`_
+
+
+1.2.0-dev2 (8/5/2016)
+---------------------
+
+Regularly scheduled unstable release.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade travis ci to use jdk 8
+  `RB #4127 <https://rbcommons.com/s/twitter/r/4127>`_
+
+* Additional checks for module type determination.
+  `RB #4131 <https://rbcommons.com/s/twitter/r/4131>`_
+
+
+1.2.0-dev1 (7/30/2016)
+----------------------
+
+Regularly scheduled unstable release.
+
+New Features
+~~~~~~~~~~~~
+
+* Allow specification of an alternate javac location.
+  `RB #4124 <https://rbcommons.com/s/twitter/r/4124>`_
+
+* Add support to Fetcher for `file:` URLs.
+  `RB #4099 <https://rbcommons.com/s/twitter/r/4099>`_
+
+* JSON output format for Pants options
+  `RB #4113 <https://rbcommons.com/s/twitter/r/4113>`_
+
+
+API Changes
+~~~~~~~~~~~
+
+
+Bugfixes
+~~~~~~~~
+
+* Avoid clobbering `type_alias` kwarg in the `Registrar` if already explicitly set.
+  `RB #4106 <https://rbcommons.com/s/twitter/r/4106>`_
+
+* Fix JUnit -fail-fast, add test for early exit hook and remove unused code
+  `RB #4060 <https://rbcommons.com/s/twitter/r/4060>`_
+  `RB #4081 <https://rbcommons.com/s/twitter/r/4081>`_
+
+* Fixup the 1.1.x notes, which were not being rendered on the site, and contained rendering errors.
+  `RB #4098 <https://rbcommons.com/s/twitter/r/4098>`_
+
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Ensure target `resources=` ordering is respected in the v2 engine.
+  `RB #4128 <https://rbcommons.com/s/twitter/r/4128>`_
+
+* [engine] Pass selectors to select nodes; Use selectors in error messages
+  `RB #4031 <https://rbcommons.com/s/twitter/r/4031>`_
+
+* Remove Duplicates in File System tasks in v2 Engine
+  `RB #4096 <https://rbcommons.com/s/twitter/r/4096>`_
+
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A custom version of com.sun.tools.javac.api.JavacTool.
+  `RB #4122 <https://rbcommons.com/s/twitter/r/4122>`_
+
+* Time out Jenkins shards after 60 minutes.
+  `RB #4082 <https://rbcommons.com/s/twitter/r/4082>`_
+
+* Eliminate file listing ordering assumptions.
+  `RB #4121 <https://rbcommons.com/s/twitter/r/4121>`_
+
+* Upgrade the pants bootstrap venv to 15.0.2.
+  `RB #4120 <https://rbcommons.com/s/twitter/r/4120>`_
+
+* Bump default wheel version to latest.
+  `RB #4116 <https://rbcommons.com/s/twitter/r/4116>`_
+
+* Remove warnings from the release process.
+  `RB #4119 <https://rbcommons.com/s/twitter/r/4119>`_
+
+* Upgrade default go to 1.6.3.
+  `RB #4115 <https://rbcommons.com/s/twitter/r/4115>`_
+
+* Added a page on policies for pants committers
+  `RB #4105 <https://rbcommons.com/s/twitter/r/4105>`_
+
+* Cleanup `BinaryUtil`.
+  `RB #4108 <https://rbcommons.com/s/twitter/r/4108>`_
+
+* Update junit-runner to version 1.0.13
+  `RB #4102 <https://rbcommons.com/s/twitter/r/4102>`_
+  `RB #4101 <https://rbcommons.com/s/twitter/r/4101>`_
+  `RB #4091 <https://rbcommons.com/s/twitter/r/4091>`_
+  `RB #4081 <https://rbcommons.com/s/twitter/r/4081>`_
+  `RB #4107 <https://rbcommons.com/s/twitter/r/4107>`_
+
+* Enable autoFlush for JUnit printstream so we get output as the tests run
+  `RB #4101 <https://rbcommons.com/s/twitter/r/4101>`_
+  `RB #4102 <https://rbcommons.com/s/twitter/r/4102>`_
+
+* Print a message for cycles in the graph when computing the target fingerprint
+  `RB #4087 <https://rbcommons.com/s/twitter/r/4087>`_
+
+* Pin remaining core-sensitive options.
+  `RB #4100 <https://rbcommons.com/s/twitter/r/4100>`_
+  `RB #4104 <https://rbcommons.com/s/twitter/r/4104>`_
+
+* Set the encoding for javac in pantsbuild/pants
+  `Issue #3702 <https://github.com/pantsbuild/pants/issues/3702>`_
+  `RB #4103 <https://rbcommons.com/s/twitter/r/4103>`_
+
+* Customize pants settings for Jenkins.
+  `RB #4101 <https://rbcommons.com/s/twitter/r/4101>`_
+  `RB #4100 <https://rbcommons.com/s/twitter/r/4100>`_
+
+* Buffer the ConsoleRunner's use of stdio.
+  `RB #4101 <https://rbcommons.com/s/twitter/r/4101>`_
+
+* Extract `safe_args` to a jvm backend module.
+  `RB #4090 <https://rbcommons.com/s/twitter/r/4090>`_
+
+* Move `ui_open` into its own `util` module.
+  `RB #4089 <https://rbcommons.com/s/twitter/r/4089>`_
+
+* Simplify `ConcurrentRunnerScheduler` & cleanup.
+  `RB #4091 <https://rbcommons.com/s/twitter/r/4091>`_
+
+
 1.2.0-dev0 (7/18/2016)
 ----------------------
 
@@ -5717,7 +5864,6 @@ Bugfixes
   `RB #1903 <https://rbcommons.com/s/twitter/r/1903>`_
 
 * Avoid reparsing analysis repeatedly
-  `RB #, <https://rbcommons.com/s/twitter/r/1898/,>`_
   `RB #1938 <https://rbcommons.com/s/twitter/r/1938>`_
 
 API Changes

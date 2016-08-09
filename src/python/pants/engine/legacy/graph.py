@@ -7,10 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from twitter.common.collections import maybe_list
+from twitter.common.collections import OrderedSet, maybe_list
 
-from pants.backend.jvm.targets.jvm_app import BundleProps, JvmApp
+from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -87,7 +88,7 @@ class LegacyBuildGraph(BuildGraph):
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
-    deps_to_inject = set()
+    deps_to_inject = OrderedSet()
     addresses_to_inject = set()
     def inject(target, dep_spec, is_dependency):
       address = Address.parse(dep_spec, relative_to=target.address.spec_path)
@@ -149,8 +150,10 @@ class LegacyBuildGraph(BuildGraph):
 
   def _instantiate_jvm_app(self, kwargs):
     """For JvmApp target, convert BundleAdaptor to BundleProps."""
+    parse_context = ParseContext(kwargs['address'].spec_path, dict())
+    bundleprops_factory = Bundle(parse_context)
     kwargs['bundles'] = [
-      BundleProps.create_bundle_props(bundle.kwargs()['fileset'])
+      bundleprops_factory.create_bundle_props(bundle)
       for bundle in kwargs['bundles']
     ]
 

@@ -173,8 +173,8 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object.
     :return a target spec:
     """
-    return ScalaPlatform.global_instance()._library_target_spec(buildgraph, 'scalac',
-                                                                cls._create_compiler_jardep)
+    return cls.global_instance()._library_target_spec(buildgraph, 'scalac',
+                                                      cls._create_compiler_jardep)
 
   @classmethod
   def runtime_library_target_spec(cls, buildgraph):
@@ -185,8 +185,8 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object.
     :return a target spec:
     """
-    return ScalaPlatform.global_instance()._library_target_spec(buildgraph, 'scala-library',
-                                                                cls._create_runtime_jardep)
+    return cls.global_instance()._library_target_spec(buildgraph, 'scala-library',
+                                                      cls._create_runtime_jardep)
 
   def _library_target_spec(self, buildgraph, key, create_jardep_func):
     if self.version == 'custom':

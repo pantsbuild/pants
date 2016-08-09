@@ -16,8 +16,9 @@ The release manager is responsible for:
 These release types and responsibilities are described below.
 
 ## Release Cadence
-The release manager for a particular week decides whether to cut `stable` or `dev` releases (or
-both!) based on the following criteria:
+The release manager for a particular week decides whether to cut `stable` release.  A `dev` release
+or `rc` release from master should happen every week. Stable branches will be created based on the
+following criteria:
 
 1. Decide whether to create a _new_ `stable` branch:
     * If it has been approximately [[three months|pants('src/docs:deprecation_policy')]] since the
@@ -33,8 +34,9 @@ determine whether any existing `stable` branches need new release candidates by 
 sheet. If there are requests "sufficient" to justify `patch` releases for existing `stable` branches, the
 release manager should cut release candidates for those branches.
 
-In other words, for a given week: _one of either_ a `dev` release or a new `stable` branch are
-created, and additionally, `patch` releases for existing `stable` branches _might_ be created.
+In other words, for a given week: _one of either_ a `dev` or `rc` release will be created from
+master.  A new `stable` branch may be created, and additionally, `patch` releases for
+existing `stable` branches _might_ be created.
 
 ## Release Types
 
@@ -47,7 +49,8 @@ in the gaps between the (generally more time consuming) `stable` releases.
 `stable` release candidates generally happen every two weeks, provided that there are enough user
 facing changes to warrant a new `stable` release. Of those two weeks, five business days are allocated
 to bugfixing and testing by pants contributors on a release candidate announcement thread (described
-below).
+below).  If any changes are needed to the stable release based on feedback a new `rc` release will
+be created for the stable branch.
 
 #### `major` and `minor` stable branches
 The decision to create a `major` or a `minor` stable branch is based on consensus on
