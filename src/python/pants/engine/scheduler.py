@@ -12,7 +12,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
@@ -646,7 +646,7 @@ class LocalScheduler(object):
     def roots():
       for subject in subjects:
         for product in products:
-          if type(subject) in [Address, PathGlobs]:
+          if type(subject) in [Address, BuildFileAddress, PathGlobs]:
             yield SelectNode(subject, None, Select(product))
           elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
             yield DependenciesNode(subject, None, SelectDependencies(product, Addresses))
