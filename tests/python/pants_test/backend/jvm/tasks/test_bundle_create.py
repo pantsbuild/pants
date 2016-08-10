@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -16,7 +17,7 @@ from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.classpath_util import MissingClasspathEntryError
 from pants.build_graph.resources import Resources
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_file_dump
+from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
 
@@ -26,9 +27,37 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   def task_type(cls):
     return BundleCreate
 
+  def add_consolidated_bundle(self, context, tgt, files_dict):
+    """Add a bundle to the classpath as if it has been consolidated already.
+    """
+    bundle_classpath = context.products.get_data(
+      'bundle_classpath', 
+      init_func=ClasspathProducts.init_func(self.pants_workdir)
+    )
+    # Create a temporary directory under the target id, then dump all files.
+    target_dir = os.path.join(self.test_workdir, tgt.id)
+    safe_mkdir(target_dir)
+    entry_path = safe_mkdtemp(dir=target_dir)
+    classpath_dir = safe_mkdtemp(dir=target_dir)
+    for rel_path, content in files_dict.items():
+      safe_file_dump(os.path.join(entry_path, rel_path), content)
+    
+    # Create Jar to mimic consolidate classpath behavior
+    jarpath = os.path.join(classpath_dir, 'output-0.jar')
+    with self.task.open_jar(jarpath, overwrite=True, compressed=False) as jar:
+      jar.write(entry_path)
+    bundle_classpath.add_for_target(tgt, [('default', jarpath)])
+
+  def get_runtime_classpath(self, context):
+    """
+    :API: public
+    """
+    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
+
   def setUp(self):
     """Prepare targets, context, runtime classpath. """
     super(TestBundleCreate, self).setUp()
+    self.task = self.prepare_execute(self.context())
 
     self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
     self.zip_artifact = self.create_artifact(org='org.pantsbuild', name='bar', rev='2.0.0',
@@ -84,23 +113,25 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                                            self.bundle_artifact,
                                                            self.tar_gz_artifact])
 
-    self.add_to_runtime_classpath(task_context, self.binary_target,
+    self.add_consolidated_bundle(task_context, self.binary_target,
                                   {'Foo.class': '', 'foo.txt': '', 'foo/file': ''})
-  # def test_jvm_bundle_products(self):
-  #   """Test default setting outputs bundle products using `target.id`."""
-  #   self.app_target = self._create_target()
-  #   self.task_context = self.context(target_roots=[self.app_target])
-  #   self._setup_classpath(self.task_context)
-  #   self.execute(self.task_context)
-  #   self._check_bundle_products('foo.foo-app', check_symlink=True)
-  # def test_jvm_bundle_use_basename_prefix(self):
-  #   """Test override default setting outputs bundle products using basename."""
-  #   self.app_target = self._create_target()
-  #   self.set_options(use_basename_prefix=True)
-  #   self.task_context = self.context(target_roots=[self.app_target])
-  #   self._setup_classpath(self.task_context)
-  #   self.execute(self.task_context)
-  #   self._check_bundle_products('foo.foo-app', check_symlink=True, symlink_name_prefix='FooApp')
+
+  def test_jvm_bundle_products(self):
+    """Test default setting outputs bundle products using `target.id`."""
+    self.app_target = self._create_target()
+    self.task_context = self.context(target_roots=[self.app_target])
+    self._setup_classpath(self.task_context)
+    self.execute(self.task_context)
+    self._check_bundle_products('foo.foo-app', check_symlink=True)
+
+  def test_jvm_bundle_use_basename_prefix(self):
+    """Test override default setting outputs bundle products using basename."""
+    self.app_target = self._create_target()
+    self.set_options(use_basename_prefix=True)
+    self.task_context = self.context(target_roots=[self.app_target])
+    self._setup_classpath(self.task_context)
+    self.execute(self.task_context)
+    self._check_bundle_products('foo.foo-app', check_symlink=True, symlink_name_prefix='FooApp')
 
   def test_bundle_non_app_target(self):
     """Test bundle does not apply to a non jvm_app/jvm_binary target."""
@@ -179,7 +210,6 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     bundle_root = self._check_products(products, bundle_fullname)
     self.assertTrue(os.path.isdir(bundle_root))
 
-    # import pdb; pdb.set_trace()
     self.assertEqual(sorted(['foo-binary.jar',
                              'libs/foo.foo-binary-0.jar',
                              'libs/3rdparty.jvm.org.example.foo-0.jar',

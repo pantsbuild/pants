@@ -123,6 +123,29 @@ class BundleCreate(JvmBinaryTask):
       app.target, os.path.dirname(path)).append(os.path.basename(path))
     self.context.log.debug('created {}'.format(os.path.relpath(path, get_buildroot())))
 
+  def get_linenumber(self):
+    from inspect import currentframe
+    cf = currentframe()
+    return cf.f_back.f_lineno
+
+  def iter_files(self):
+    """Returns an iterator over the files found under the given `dir_path`.
+
+    :API: public
+
+    :param string dir_path: The path of the directory tree to scan for files.
+    :returns: An iterator of the relative paths of files found under `dir_path`.
+    :rtype: :class:`collections.Iterator` of string
+    """
+    bundle_root = os.path.join(
+      self.get_options().pants_workdir,
+      'pants_backend_jvm_tasks_bundle_create_BundleCreate/f7708621b991/foo.foo-app/current/foo.foo-app-bundle'
+    )
+    if os.path.exists(bundle_root):
+      for root_dir, _, files in os.walk(bundle_root):
+        for f in files:
+          yield os.path.relpath(os.path.join(root_dir, f), bundle_root)
+
   def execute(self):
     targets_to_bundle = self.context.targets(self.App.is_app)
 
