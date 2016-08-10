@@ -5,38 +5,30 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import math
-
-import mox
+import unittest
 
 from pants.base.hash_utils import Sharder, hash_all, hash_file
 from pants.util.contextutil import temporary_file
 
 
-class TestHashUtils(mox.MoxTestBase):
-
-  def setUp(self):
-    super(TestHashUtils, self).setUp()
-    self.digest = self.mox.CreateMockAnything()
+class TestHashUtils(unittest.TestCase):
 
   def test_hash_all(self):
-    self.digest.update('jake')
-    self.digest.update('jones')
-    self.digest.hexdigest().AndReturn('42')
-    self.mox.ReplayAll()
-
-    self.assertEqual('42', hash_all(['jake', 'jones'], digest=self.digest))
+    expected_hash = hashlib.md5()
+    expected_hash.update('jakejones')
+    self.assertEqual(expected_hash.hexdigest(), hash_all(['jake', 'jones'], digest=hashlib.md5()))
 
   def test_hash_file(self):
-    self.digest.update('jake jones')
-    self.digest.hexdigest().AndReturn('1137')
-    self.mox.ReplayAll()
+    expected_hash = hashlib.md5()
+    expected_hash.update('jake jones')
 
     with temporary_file() as fd:
       fd.write('jake jones')
       fd.close()
 
-      self.assertEqual('1137', hash_file(fd.name, digest=self.digest))
+      self.assertEqual(expected_hash.hexdigest(), hash_file(fd.name, digest=hashlib.md5()))
 
   def test_compute_shard(self):
     # Spot-check a couple of values, to make sure compute_shard doesn't do something

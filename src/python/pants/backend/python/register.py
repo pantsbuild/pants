@@ -15,10 +15,12 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
+from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
@@ -29,6 +31,7 @@ def build_file_aliases():
       'python_library': PythonLibrary,
       'python_requirement_library': PythonRequirementLibrary,
       'python_tests': PythonTests,
+      'resources': Resources,
     },
     objects={
       'python_requirement': PythonRequirement,
@@ -48,3 +51,4 @@ def register_goals():
   task(name='py', action=PythonRun).install('run')
   task(name='py', action=PythonRepl).install('repl')
   task(name='setup-py', action=SetupPy).install()
+  task(name='isort', action=IsortPythonTask).install('fmt')
