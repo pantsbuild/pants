@@ -87,7 +87,7 @@ class GoalRunnerFactory(object):
     """
     if cached_buildgraph is not None:
       return cached_buildgraph
-    elif use_engine:
+    elif True: #use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
       graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns)
