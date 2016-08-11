@@ -84,6 +84,13 @@ class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
 
 
+class Runnable(datatype('Runnable', ['func', 'args']), State):
+  """Indicates that the Node is ready to run with the given closure.
+
+  The return value of the Runnable will become the final state of the Node.
+  """
+
+
 class Waiting(datatype('Waiting', ['dependencies']), State):
   """Indicates that a Node is waiting for some/all of the dependencies to become available.
 
@@ -408,10 +415,8 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     # If any clause was still waiting on dependencies, indicate it; else execute.
     if dependencies:
       return Waiting(dependencies)
-    try:
-      return Return(self.func(*dep_values))
-    except Exception as e:
-      return Throw(e)
+    # Ready to run!
+    return Runnable(self.func, tuple(dep_values))
 
   def __repr__(self):
     return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}' \
@@ -456,20 +461,17 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       yield Dir(dirname(f))
 
   def step(self, step_context):
-    try:
-      if self.product is DirectoryListing:
-        return Return(scan_directory(step_context.project_tree, self.subject))
-      elif self.product is FileContent:
-        return Return(file_content(step_context.project_tree, self.subject))
-      elif self.product is FileDigest:
-        return Return(file_digest(step_context.project_tree, self.subject))
-      elif self.product is ReadLink:
-        return Return(read_link(step_context.project_tree, self.subject))
-      else:
-        # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
-        raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
-    except Exception as e:
-      return Throw(e)
+    if self.product is DirectoryListing:
+      return Runnable(scan_directory, (step_context.project_tree, self.subject))
+    elif self.product is FileContent:
+      return Runnable(file_content, (step_context.project_tree, self.subject))
+    elif self.product is FileDigest:
+      return Runnable(file_digest, (step_context.project_tree, self.subject))
+    elif self.product is ReadLink:
+      return Runnable(read_link, (step_context.project_tree, self.subject))
+    else:
+      # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
+      raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
 
 
 class StepContext(object):

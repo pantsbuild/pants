@@ -178,31 +178,32 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
       if type(snapshot_subjects_state) is not Return:
         return snapshot_subjects_state
 
-    # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
-    with temporary_dir(cleanup=False) as sandbox_dir:
-      if process_request.snapshot_subjects:
-        snapshots_and_subjects = zip(snapshot_subjects_state.value, process_request.snapshot_subjects)
-        for snapshot, subject in snapshots_and_subjects:
-          _extract_snapshot(step_context, snapshot, sandbox_dir, subject)
+    def func():
+      # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
+      with temporary_dir(cleanup=False) as sandbox_dir:
+        if process_request.snapshot_subjects:
+          snapshots_and_subjects = zip(snapshot_subjects_state.value, process_request.snapshot_subjects)
+          for snapshot, subject in snapshots_and_subjects:
+            _extract_snapshot(step_context, snapshot, sandbox_dir, subject)
 
-      # All of the snapshots have been checked out now.
-      if process_request.directories_to_create:
-        for d in process_request.directories_to_create:
-          safe_mkdir(os.path.join(sandbox_dir, d))
+        # All of the snapshots have been checked out now.
+        if process_request.directories_to_create:
+          for d in process_request.directories_to_create:
+            safe_mkdir(os.path.join(sandbox_dir, d))
 
-      popen = self._run_command(binary_value, sandbox_dir, process_request)
+        popen = self._run_command(binary_value, sandbox_dir, process_request)
 
-      process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
-      if process_result.exit_code != 0:
-        return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(binary_value,
-                                                                                      process_result.exit_code)))
+        process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
+        if process_result.exit_code != 0:
+          return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(binary_value,
+                                                                                        process_result.exit_code)))
 
-      try:
-        converted_output = self.snapshotted_process.output_conversion(process_result, sandbox_dir)
-      except Exception as e:
-        return Throw(e)
+        try:
+          converted_output = self.snapshotted_process.output_conversion(process_result, sandbox_dir)
+        except Exception as e:
+          return Throw(e)
 
-    return Return(converted_output)
+    return Runnable(func, tuple())
 
   def _run_command(self, binary_value, sandbox_dir, process_request):
     command = binary_value.prefix_of_command() + tuple(process_request.args)

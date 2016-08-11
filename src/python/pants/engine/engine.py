@@ -22,6 +22,7 @@ from pants.engine.storage import Cache, Storage
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
+from pants.engine.nodes import (Return, Throw)
 
 
 try:
@@ -115,7 +116,7 @@ class Engine(AbstractClass):
   def _should_cache(self, step_request):
     return step_request.node.is_cacheable
 
-  def _maybe_cache_get(self, step_request):
+  def _maybe_cache_get(self, node_entry, runnable):
     """If caching is enabled for the given StepRequest, create a keyed request and perform a lookup.
 
     The sole purpose of a keyed request is to get a stable cache key, so we can sort
@@ -123,10 +124,10 @@ class Engine(AbstractClass):
 
     :returns: A tuple of a keyed StepRequest and result, either of which may be None.
     """
-    if not self._should_cache(step_request):
+    if not self._should_cache(node_entry):
       return None, None
-    keyed_request = self._storage.key_for_request(step_request)
-    return keyed_request, self._cache.get(keyed_request)
+    key = self._storage.key_for_request(runnable)
+    return key, self._cache.get(key)
 
   def _maybe_cache_put(self, keyed_request, step_result):
     if keyed_request is not None:
@@ -147,14 +148,20 @@ class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
   def reduce(self, execution_request):
-    node_builder = self._scheduler.node_builder()
-    for step_batch in self._scheduler.schedule(execution_request):
-      for step, promise in step_batch:
-        keyed_request, result = self._maybe_cache_get(step)
+    generator = self._scheduler.schedule(execution_request)
+    runnable_batch = next(generator)
+    while True:
+      completed = []
+      for entry, runnable in runnable_batch:
+        keyed_request, result = self._maybe_cache_get(entry, runnable)
         if result is None:
-          result = step(node_builder)
+          try:
+            result = Return(runnable.func(*runnable.args))
+          except Exception as e:
+            result = Throw(e)
         self._maybe_cache_put(keyed_request, result)
-        promise.success(result)
+        completed.append((entry, result))
+      runnable_batch = generator.send(completed)
 
 
 def _try_pickle(obj):
@@ -238,7 +245,7 @@ class ThreadHybridEngine(ConcurrentEngine):
     self._pending = set()  # Keep track of futures so we can cleanup at the end.
     self._processed_queue = Queue()
     self._async_nodes = threaded_node_types
-    self._node_builder = scheduler.node_builder()
+    self._node_builder = scheduler.node_builder
     self._state = (self._node_builder, storage)
     self._pool = ThreadPoolExecutor(max_workers=self._pool_size)
     self._debug = debug
@@ -425,7 +432,7 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
 
     self._processed_queue = Queue()
-    self.node_builder = scheduler.node_builder()
+    self.node_builder = scheduler.node_builder
     process_initializer = functools.partial(self._initializer, self.node_builder, self._storage)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug

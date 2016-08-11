@@ -20,7 +20,6 @@ import lmdb
 import six
 
 from pants.engine.objects import Closable, SerializationError
-from pants.engine.scheduler import StepRequest, StepResult
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
