@@ -101,6 +101,9 @@ class EagerFilesetWithSpec(FilesetWithSpec):
   def file_hash(self, path):
     return self._file_hashes[path]
 
+  def __repr__(self):
+    return 'EagerFilesetWithSpec(rel_root={!r}, files={!r})'.format(self.rel_root, self.files)
+
 
 class LazyFilesetWithSpec(FilesetWithSpec):
   def __init__(self, rel_root, filespec, files_calculator):
