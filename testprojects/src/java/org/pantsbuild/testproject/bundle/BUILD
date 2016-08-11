@@ -9,6 +9,24 @@ jvm_app(name='bundle',
   ]
 )
 
+jvm_app(name='mapper',
+  binary=':bundle-bin',
+  bundles=[
+    bundle(
+      mapper=DirectoryReMapper('testprojects/src/java/org/pantsbuild/testproject/bundle/a/b', 'bundle_files'),
+      fileset=globs('a/b/*')),
+  ]
+)
+
+jvm_app(name='relative_to',
+  binary=':bundle-bin',
+  bundles=[
+    bundle(
+      relative_to='a',
+      fileset=globs('a/b/*')),
+  ]
+)
+
 # The binary, the "runnable" part:
 
 jvm_binary(name = 'bundle-bin',

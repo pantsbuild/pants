@@ -86,13 +86,6 @@ class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset']))
     # Leave out fileset from hash calculation since it may not be hashable.
     return hash((self.rel_path, self.mapper))
 
-  @classmethod
-  def create_bundle_props(cls, file_set):
-    if not isinstance(file_set, FilesetWithSpec):
-      raise TypeError('The file_set must be a FilesetWithSpec, given {}.'.format(file_set))
-    mapper = RelativeToMapper(os.path.join(get_buildroot(), file_set.rel_root))
-    return cls(file_set.rel_root, mapper, file_set.files)
-
 
 class Bundle(object):
   """A set of files to include in an application bundle.
@@ -163,6 +156,13 @@ class Bundle(object):
       mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), real_rel_path))
 
     return BundleProps(real_rel_path, mapper, fileset)
+
+  def create_bundle_props(self, bundle):
+    rel_path = getattr(bundle, 'rel_path', None)
+    mapper = getattr(bundle, 'mapper', None)
+    relative_to = getattr(bundle, 'relative_to', None)
+    fileset = getattr(bundle, 'fileset', None)
+    return self(rel_path, mapper, relative_to, fileset)
 
 
 class BundleField(tuple, PayloadField):

@@ -162,7 +162,9 @@ class PythonCheckStyleTask(PythonTask):
       failure_count += self.check_file(filename)
 
     if failure_count > 0 and self.options.fail:
-      raise TaskError('{} Python Style issues found'.format(failure_count), exit_code=1)
+      raise TaskError(
+        '{} Python Style issues found. For import order related issues, please try '
+        '`./pants fmt.isort <targets>`'.format(failure_count))
     return failure_count
 
   def execute(self):
