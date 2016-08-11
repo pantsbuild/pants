@@ -99,7 +99,8 @@ class GoalRunnerFactory(object):
       graph = graph_helper.create_graph(root_specs)
       return graph, LegacyAddressMapper(graph, self._root_dir)
     else:
-      address_mapper = BuildFileAddressMapper(self._build_file_parser, get_project_tree(self._global_options),
+      address_mapper = BuildFileAddressMapper(self._build_file_parser,
+                                              get_project_tree(self._global_options),
                                               build_ignore_patterns,
                                               exclude_target_regexps=self._global_options.exclude_target_regexp)
       return MutableBuildGraph(address_mapper), address_mapper
