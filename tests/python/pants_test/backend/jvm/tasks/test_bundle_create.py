@@ -30,8 +30,8 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   def add_consolidated_bundle(self, context, tgt, files_dict):
     """Add a bundle to the classpath as if it has been consolidated already.
     """
-    bundle_classpath = context.products.get_data(
-      'bundle_classpath', 
+    consolidated_classpath = context.products.get_data(
+      'consolidated_classpath',
       init_func=ClasspathProducts.init_func(self.pants_workdir)
     )
     # Create a temporary directory under the target id, then dump all files.
@@ -41,12 +41,12 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     classpath_dir = safe_mkdtemp(dir=target_dir)
     for rel_path, content in files_dict.items():
       safe_file_dump(os.path.join(entry_path, rel_path), content)
-    
+
     # Create Jar to mimic consolidate classpath behavior
     jarpath = os.path.join(classpath_dir, 'output-0.jar')
     with self.task.open_jar(jarpath, overwrite=True, compressed=False) as jar:
       jar.write(entry_path)
-    bundle_classpath.add_for_target(tgt, [('default', jarpath)])
+    consolidated_classpath.add_for_target(tgt, [('default', jarpath)])
 
   def get_runtime_classpath(self, context):
     """
@@ -105,7 +105,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     """As a separate prep step because to test different option settings, this needs to rerun
     after context is re-created.
     """
-    classpath_products = self.ensure_bundle_classpath_products(task_context)
+    classpath_products = self.ensure_consolidated_classpath_products(task_context)
     classpath_products.add_jars_for_targets(targets=[self.jar_lib],
                                             conf='default',
                                             resolved_jars=[self.jar_artifact,
@@ -148,7 +148,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self.task_context = self.context(target_roots=[self.app_target])
     missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
                                                 materialize=False)
-    classpath_products = self.ensure_bundle_classpath_products(self.task_context)
+    classpath_products = self.ensure_consolidated_classpath_products(self.task_context)
     classpath_products.add_jars_for_targets(targets=[self.binary_target],
                                             conf='default',
                                             resolved_jars=[missing_jar_artifact])

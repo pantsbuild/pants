@@ -67,7 +67,7 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
     return context.products.get_data('runtime_classpath',
                                      init_func=ClasspathProducts.init_func(self.pants_workdir))
 
-  def ensure_bundle_classpath_products(self, context):
+  def ensure_consolidated_classpath_products(self, context):
     """Gets or creates the classpath products expected by `JvmBinaryTask`.
 
     :API: public
@@ -78,4 +78,4 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
     :rtype: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
     """
     runtime_classpath = self.ensure_classpath_products(context)
-    return context.products.get_data('bundle_classpath', runtime_classpath.copy)
+    return context.products.get_data('consolidated_classpath', runtime_classpath.copy)

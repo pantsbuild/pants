@@ -12,18 +12,18 @@ from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.build_graph.target_scopes import Scopes
 
 
-class ConsolidateBundleClasspath(JvmBinaryTask):
+class ConsolidatedClasspath(JvmBinaryTask):
   # Directory for both internal and external libraries.
   LIBS_DIR = 'libs'
   _target_closure_kwargs = dict(include_scopes=Scopes.JVM_RUNTIME_SCOPES, respect_intransitive=True)
 
   @classmethod
   def implementation_version(cls):
-    return super(ConsolidateBundleClasspath, cls).implementation_version() + [('ConsolidateBundleClasspath', 1)]
+    return super(ConsolidatedClasspath, cls).implementation_version() + [('ConsolidatedClasspath', 1)]
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ConsolidateBundleClasspath, cls).prepare(options, round_manager)
+    super(ConsolidatedClasspath, cls).prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
   @property
@@ -32,24 +32,25 @@ class ConsolidateBundleClasspath(JvmBinaryTask):
 
   @classmethod
   def product_types(cls):
-    return ['bundle_classpath']
+    return ['consolidated_classpath']
 
   def execute(self):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
 
-    # Clone the runtime_classpath to the bundle_classpath.
+    # Clone the runtime_classpath to the consolidated_classpath.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    bundle_classpath = self.context.products.get_data('bundle_classpath', runtime_classpath.copy)
+    consolidated_classpath = self.context.products.get_data(
+      'consolidated_classpath', runtime_classpath.copy)
 
     # TODO (from mateor) The consolidate classpath is something that we could do earlier in the
     # pipeline and it would be nice to just add those unpacked classed to a product and get the
     # consolidated classpath for free.
     targets_to_consolidate = self.find_consolidate_classpath_candidates(
-      bundle_classpath,
+      consolidated_classpath,
       self.context.targets(**self._target_closure_kwargs),
     )
-    self.consolidate_classpath(targets_to_consolidate, bundle_classpath)
+    self.consolidate_classpath(targets_to_consolidate, consolidated_classpath)
 
   def consolidate_classpath(self, targets, classpath_products):
     """Convert loose directories in classpath_products into jars. """

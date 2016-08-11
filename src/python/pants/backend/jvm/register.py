@@ -37,7 +37,7 @@ from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
-from pants.backend.jvm.tasks.consolidate_bundle_classpath import ConsolidateBundleClasspath
+from pants.backend.jvm.tasks.consolidate_classpath import ConsolidatedClasspath
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
@@ -168,7 +168,7 @@ def register_goals():
   task(name='jvm', action=BinaryCreate).install('binary')
   detect_duplicates.install('binary')
 
-  task(name='consolidate-classpath', action=ConsolidateBundleClasspath).install('bundle')
+  task(name='consolidate-classpath', action=ConsolidatedClasspath).install('bundle')
   task(name='jvm', action=BundleCreate).install('bundle')
   detect_duplicates.install('bundle')
 

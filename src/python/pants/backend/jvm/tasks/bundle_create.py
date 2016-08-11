@@ -59,7 +59,7 @@ class BundleCreate(JvmBinaryTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(BundleCreate, cls).prepare(options, round_manager)
-    round_manager.require_data('bundle_classpath')
+    round_manager.require_data('consolidated_classpath')
 
   @classmethod
   def product_types(cls):
@@ -183,9 +183,9 @@ class BundleCreate(JvmBinaryTask):
     lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
     if not app.deployjar:
       os.mkdir(lib_dir)
-      bundle_classpath = self.context.products.get_data('bundle_classpath')
+      consolidated_classpath = self.context.products.get_data('consolidated_classpath')
       classpath.update(ClasspathUtil.create_canonical_classpath(
-        bundle_classpath,
+        consolidated_classpath,
         app.target.closure(bfs=True, **self._target_closure_kwargs),
         lib_dir,
         internal_classpath_only=False,
