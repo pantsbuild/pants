@@ -53,7 +53,8 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
       # Make sure the emitted BUILD under .pants.d is not ignored.
       config = {
         'GLOBAL': {
-          'ignore_patterns': []
+          'ignore_patterns': [],
+          'pants_ignore': []
         }
       }
       pants_run = self.run_pants_with_workdir([goal] + prep_commands_specs, workdir, config=config)
