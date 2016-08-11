@@ -19,7 +19,7 @@ from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, TaskNode, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
-from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
 
@@ -235,15 +235,21 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
   return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
 
 
-def _eager_fileset_with_spec(spec_path, filespecs, source_files_digest, excluded_source_files):
+def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):
   excluded = {f.path for f in excluded_source_files.dependencies}
   file_tuples = [(fast_relpath(fd.path, spec_path), fd.digest)
                  for fd in source_files_digest.dependencies
                  if fd.path not in excluded]
+
+  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
+  if filespec.has_key('exclude'):
+    relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
+                                            for e in filespec['exclude']]
+
   # NB: In order to preserve declared ordering, we record a list of matched files
   # independent of the file hash dict.
   return EagerFilesetWithSpec(spec_path,
-                              filespecs,
+                              relpath_adjusted_filespec,
                               files=tuple(f for f, _ in file_tuples),
                               file_hashes=dict(file_tuples))
 
