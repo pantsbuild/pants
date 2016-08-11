@@ -13,7 +13,7 @@ from abc import abstractproperty
 from hashlib import sha1
 
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.nodes import Node, Noop, Return, State, Throw, Waiting, Runnable
+from pants.engine.nodes import Node, Noop, Return, Runnable, State, Throw, Waiting
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir

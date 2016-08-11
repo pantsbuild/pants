@@ -16,7 +16,6 @@ from pants.build_graph.address import Address
 from pants.engine.engine import (LocalMultiprocessEngine, LocalSerialEngine, SerializationError,
                                  ThreadHybridEngine)
 from pants.engine.nodes import FilesystemNode, Return, SelectNode
-from pants.engine.scheduler import Promise
 from pants.engine.selectors import Select
 from pants.engine.storage import Cache, Storage
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
@@ -103,7 +102,8 @@ class EngineTest(unittest.TestCase):
     result_cache2.result.return_value = (2, 'cache 2')
     result_cache.result.return_value = (1, 'cache 1')
     result_step.result.return_value = (1, 'step 1')
-    promise = create_autospec(Promise)
+    # TODO
+    promise = create_autospec('TODO')
 
     in_flight = {1: promise, 2: promise}
     with self.hybrid_engine(pool_size=2) as engine:

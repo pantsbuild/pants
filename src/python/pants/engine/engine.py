@@ -16,13 +16,13 @@ from concurrent.futures import ThreadPoolExecutor
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
+from pants.engine.nodes import Return, Throw
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulPool
 from pants.engine.storage import Cache, Storage
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants.engine.nodes import (Return, Throw)
 
 
 try:

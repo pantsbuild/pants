@@ -9,8 +9,12 @@ import unittest
 from contextlib import closing
 
 from pants.base.project_tree import Dir, File
-from pants.engine.scheduler import StepRequest, StepResult
+from pants.engine.nodes import Runnable
 from pants.engine.storage import Cache, InvalidKeyError, Key, Lmdb, Storage
+
+
+def _runnable(an_arg):
+  return an_arg
 
 
 class StorageTest(unittest.TestCase):
@@ -24,13 +28,8 @@ class StorageTest(unittest.TestCase):
 
   def setUp(self):
     self.storage = Storage.create()
-    self.result = StepResult(state='something')
-    self.request = StepRequest(step_id=123,
-                               node='some node',
-                               dependencies={'some dep': 'some state',
-                                             'another dep': 'another state'},
-                               inline_nodes=False,
-                               project_tree='some project tree')
+    self.result = 'something'
+    self.request = Runnable(func=_runnable, args=('this is an arg',))
 
   def test_lmdb_key_value_store(self):
     lmdb = Lmdb.create()[0]
@@ -117,13 +116,8 @@ class CacheTest(unittest.TestCase):
     """Setup cache as well as request and result."""
     self.storage = Storage.create()
     self.cache = Cache.create(storage=self.storage)
-    request = StepRequest(step_id=123,
-                          node='some node',
-                          dependencies={'some dep': 'some state',
-                                        'another dep': 'another state'},
-                          inline_nodes=False,
-                          project_tree='some project tree')
-    self.result = StepResult(state='something')
+    request = Runnable(func=_runnable, args=('this is an arg',))
+    self.result = 'something'
     self.keyed_request = self.storage.key_for_request(request)
 
   def test_cache(self):
