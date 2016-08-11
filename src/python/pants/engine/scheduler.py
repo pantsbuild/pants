@@ -17,7 +17,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return, SelectNode,
-                                State, StepContext, TaskNode, Throw, Waiting, Runnable)
+                                StepContext, TaskNode, Throw, Waiting, Runnable)
 from pants.engine.objects import Closable
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
@@ -65,7 +65,7 @@ class ProductGraph(object):
         # It's important not to allow state changes on completed Nodes, because that invariant
         # is used in cycle detection to avoid walking into completed Nodes.
         raise CompletedNodeException('Node {} is already completed with:\n  {}'
-                                    .format(node, entry.state))
+                                    .format(self.node, self.state))
 
     def set_state(self, state):
       self.validate_not_complete()
@@ -671,6 +671,7 @@ class LocalScheduler(object):
           # Finished.
           break
         completed = yield runnable
+        yield
         scheduling_iterations += 1
 
         # Finalize any Runnables that completed in the previous round.

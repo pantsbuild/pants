@@ -126,7 +126,7 @@ class Engine(AbstractClass):
     """
     if not self._should_cache(node_entry):
       return None, None
-    key = self._storage.key_for_request(runnable)
+    key = self._storage.puts(runnable)
     return key, self._cache.get(key)
 
   def _maybe_cache_put(self, keyed_request, step_result):
@@ -149,8 +149,7 @@ class LocalSerialEngine(Engine):
 
   def reduce(self, execution_request):
     generator = self._scheduler.schedule(execution_request)
-    runnable_batch = next(generator)
-    while True:
+    for runnable_batch in generator:
       completed = []
       for entry, runnable in runnable_batch:
         keyed_request, result = self._maybe_cache_get(entry, runnable)
@@ -161,7 +160,7 @@ class LocalSerialEngine(Engine):
             result = Throw(e)
         self._maybe_cache_put(keyed_request, result)
         completed.append((entry, result))
-      runnable_batch = generator.send(completed)
+      generator.send(completed)
 
 
 def _try_pickle(obj):

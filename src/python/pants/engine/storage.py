@@ -257,56 +257,6 @@ class Storage(Closable):
                        .format(key_type, value_type))
     return value
 
-  def key_for_request(self, step_request):
-    """Make keys for the dependency nodes as well as their states in step_request.
-
-    step_request.node isn't keyed is only for convenience because it is used
-    in a subsequent is_cacheable check.
-
-    TODO: It is supremely odd that this creates a StepRequest.
-    """
-    dependencies = {}
-    for dep, state in step_request.dependencies.items():
-      dependencies[self._to_key(dep)] = self._to_key(state)
-    return StepRequest(step_request.step_id,
-                       step_request.node,
-                       dependencies,
-                       step_request.inline_nodes,
-                       step_request.project_tree)
-
-  def key_for_result(self, step_result):
-    """Make key for result state."""
-    return StepResult(state=self._to_key(step_result.state))
-
-  def resolve_request(self, step_request):
-    """Resolve keys in step_request.
-
-    TODO: It is supremely odd that this creates a StepRequest.
-    """
-    dependencies = {}
-    for dep, state in step_request.dependencies.items():
-      dependencies[self._from_key(dep)] = self._from_key(state)
-
-    return StepRequest(step_request.step_id,
-                       step_request.node,
-                       dependencies,
-                       step_request.inline_nodes,
-                       step_request.project_tree)
-
-  def resolve_result(self, step_result):
-    """Resolve state key in step_result."""
-    return StepResult(state=self._from_key(step_result.state))
-
-  def _to_key(self, obj):
-    if isinstance(obj, Key):
-      return obj
-    return self.put(obj)
-
-  def _from_key(self, obj):
-    if isinstance(obj, Key):
-      return self.get(obj)
-    return obj
-
 
 class Cache(Closable):
   """Cache StepResult for a given StepRequest.

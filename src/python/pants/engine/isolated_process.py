@@ -13,7 +13,7 @@ from abc import abstractproperty
 from hashlib import sha1
 
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.nodes import Node, Noop, Return, State, Throw, Waiting
+from pants.engine.nodes import Node, Noop, Return, State, Throw, Waiting, Runnable
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir
@@ -198,10 +198,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
           return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(binary_value,
                                                                                         process_result.exit_code)))
 
-        try:
-          converted_output = self.snapshotted_process.output_conversion(process_result, sandbox_dir)
-        except Exception as e:
-          return Throw(e)
+        return self.snapshotted_process.output_conversion(process_result, sandbox_dir)
 
     return Runnable(func, tuple())
 
