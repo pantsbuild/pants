@@ -131,7 +131,7 @@ class JvmAppAdaptor(TargetAdaptor):
       field_adaptors = super(JvmAppAdaptor, self).field_adaptors
       if getattr(self, 'bundles', None) is None:
         return field_adaptors
-      # Construct a field for the `bundles` argument.
+
       bundles_field = self._construct_bundles_field()
       return field_adaptors + (bundles_field,)
 
