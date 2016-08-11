@@ -198,16 +198,6 @@ class Storage(Closable):
 
     return key
 
-  def puts(self, objs):
-    """Save objects to storage in bulk.
-
-    Keys are returned as a list, ordering is preserved.
-    """
-    keys = []
-    for obj in objs:
-      keys.append(self.put(obj))
-    return keys
-
   def get(self, key):
     """Given a key, return its deserialized content.
 
@@ -259,11 +249,7 @@ class Storage(Closable):
 
 
 class Cache(Closable):
-  """Cache StepResult for a given StepRequest.
-
-  NB: since Subjects in Nodes can be anything, comparison among them are usually N/A,
-  both cache get and put are for a keyed `StepRequest`.
-  """
+  """Cache the State resulting from a given Runnable."""
 
   @classmethod
   def create(cls, storage=None, cache_stats=None):
@@ -282,21 +268,26 @@ class Cache(Closable):
     self._storage = storage
     self._cache_stats = cache_stats
 
-  def get(self, step_request):
-    """Get the cached StepResult for a given StepRequest."""
-    result_key = self._storage.get_mapping(self._storage.put(self._keyable_fields(step_request)))
+  def get(self, runnable):
+    """Get the request key and hopefully a cached result for a given Runnable."""
+    request_key = self._key(runnable)
+    result_key = self._storage.get_mapping(request_key)
     if result_key is None:
       self._cache_stats.add_miss()
-      return None
+      return request_key, None
 
     self._cache_stats.add_hit()
-    return self._storage.get(result_key)
+    return request_key, self._storage.get(result_key)
 
-  def put(self, step_request, step_result):
-    """Save the StepResult for a given StepResult."""
-    request_key = self._storage.put(self._keyable_fields(step_request))
-    result_key = self._storage.put(step_result)
+  def put(self, request_key, result):
+    """Save the State for a given Runnable."""
+    result_key = self._storage.put(result)
     return self._storage.add_mapping(from_key=request_key, to_key=result_key)
+
+  def _key(self, runnable):
+    """Put the components of the Runnable individually in storage, then put the aggregate."""
+    components = tuple(self._storage.put(r).digest for r in ((runnable.func,) + runnable.args))
+    return self._storage.put(components)
 
   def get_stats(self):
     return self._cache_stats
@@ -311,17 +302,6 @@ class Cache(Closable):
                         type_=None, string=None)
       request = self._storage.get(request_key)
       yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
-
-  def _keyable_fields(self, step_request):
-    """Return fields for the purpose of computing the cache key of this step request.
-
-    Some special handling is needed to compute cache key for step request.
-    First step_id should be dropped, because it's only an identifier not part
-    of the input for execution. We also want to sort the dependencies map by
-    keys, i.e, node_keys, to eliminate non-determinism.
-    """
-    sorted_deps = sorted(step_request.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
-    return (step_request.node, sorted_deps, step_request.project_tree)
 
   def close(self):
     self._storage.close()

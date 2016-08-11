@@ -117,21 +117,20 @@ class Engine(AbstractClass):
     return step_request.node.is_cacheable
 
   def _maybe_cache_get(self, node_entry, runnable):
-    """If caching is enabled for the given StepRequest, create a keyed request and perform a lookup.
+    """If caching is enabled for the given Entry, create a key and perform a lookup.
 
     The sole purpose of a keyed request is to get a stable cache key, so we can sort
     keyed_request.dependencies by keys as opposed to requiring dep nodes to support compare.
 
-    :returns: A tuple of a keyed StepRequest and result, either of which may be None.
+    :returns: A tuple of a key and result, either of which may be None.
     """
     if not self._should_cache(node_entry):
       return None, None
-    key = self._storage.puts(runnable)
-    return key, self._cache.get(key)
+    return self._cache.get(runnable)
 
-  def _maybe_cache_put(self, keyed_request, step_result):
-    if keyed_request is not None:
-      self._cache.put(keyed_request, step_result)
+  def _maybe_cache_put(self, key, result):
+    if key is not None:
+      self._cache.put(key, result)
 
   @abstractmethod
   def reduce(self, execution_request):
@@ -152,13 +151,13 @@ class LocalSerialEngine(Engine):
     for runnable_batch in generator:
       completed = []
       for entry, runnable in runnable_batch:
-        keyed_request, result = self._maybe_cache_get(entry, runnable)
+        key, result = self._maybe_cache_get(entry, runnable)
         if result is None:
           try:
             result = Return(runnable.func(*runnable.args))
           except Exception as e:
             result = Throw(e)
-        self._maybe_cache_put(keyed_request, result)
+        self._maybe_cache_put(key, result)
         completed.append((entry, result))
       generator.send(completed)
 

@@ -56,10 +56,48 @@ def _snapshot_path(snapshot, archive_root):
   return tar_location
 
 
-def _extract_snapshot(step_context, snapshot, sandbox_dir, subject):
-  with open_tar(_snapshot_path(snapshot, step_context.snapshot_archive_root), errorlevel=1) as tar:
+def _extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir, subject):
+  with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
     tar.extractall(sandbox_dir)
   logger.debug('extracted {} snapshot to {}'.format(subject, sandbox_dir))
+
+
+def _run_command(binary, sandbox_dir, process_request):
+  command = binary.prefix_of_command() + tuple(process_request.args)
+  logger.debug('Running command: "{}" in {}'.format(command, sandbox_dir))
+  popen = subprocess.Popen(command,
+                            stderr=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            cwd=sandbox_dir)
+  # TODO At some point, we may want to replace this blocking wait with a timed one that returns
+  # some kind of in progress state.
+  popen.wait()
+  logger.debug('Done running command in {}'.format(sandbox_dir))
+  return popen
+
+
+def _execute(process):
+  process_request = process.request
+  # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
+  with temporary_dir(cleanup=False) as sandbox_dir:
+    if process_request.snapshot_subjects:
+      snapshots_and_subjects = zip(process.snapshot_subjects_values, process_request.snapshot_subjects)
+      for snapshot, subject in snapshots_and_subjects:
+        _extract_snapshot(process.snapshot_archive_root, snapshot, sandbox_dir, subject)
+
+    # All of the snapshots have been checked out now.
+    if process_request.directories_to_create:
+      for d in process_request.directories_to_create:
+        safe_mkdir(os.path.join(sandbox_dir, d))
+
+    popen = _run_command(process.binary, sandbox_dir, process_request)
+
+    process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
+    if process_result.exit_code != 0:
+      return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(process.binary,
+                                                                                    process_result.exit_code)))
+
+    return process.output_conversion(process_result, sandbox_dir)
 
 
 class Snapshot(datatype('Snapshot', ['fingerprint'])):
@@ -106,6 +144,14 @@ class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
 
 class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', 'stderr', 'exit_code'])):
   """Contains the stdout, stderr and exit code from executing a process."""
+
+
+class _Process(datatype('_Process', ['snapshot_archive_root',
+                                     'request',
+                                     'binary',
+                                     'snapshot_subjects_values',
+                                     'output_conversion'])):
+  """All (pickleable) arguments for the execution of a sandboxed process."""
 
 
 class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'snapshotted_process']), Node):
@@ -158,16 +204,14 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     if waiting_nodes:
       return Waiting(waiting_nodes)
 
-    # Now that we've returned on waiting, we can assume that the binary has a value, and that we're ready to do input
-    # conversion.
-    binary_value = binary_state.value
-
+    # Now that we've returned on waiting, we can assume that relevant inputs have values.
     try:
       process_request = self.snapshotted_process.input_conversion(*input_values)
     except Exception as e:
       return Throw(e)
 
     # Request snapshots for the snapshot_subjects from the process request.
+    snapshot_subjects_value = []
     if process_request.snapshot_subjects:
       snapshot_subjects_node = step_context.select_node(SelectDependencies(Snapshot,
                                                                            SnapshottedProcessRequest,
@@ -177,43 +221,15 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
       snapshot_subjects_state = step_context.get(snapshot_subjects_node)
       if type(snapshot_subjects_state) is not Return:
         return snapshot_subjects_state
+      snapshot_subjects_value = snapshot_subjects_state.value
 
-    def func():
-      # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
-      with temporary_dir(cleanup=False) as sandbox_dir:
-        if process_request.snapshot_subjects:
-          snapshots_and_subjects = zip(snapshot_subjects_state.value, process_request.snapshot_subjects)
-          for snapshot, subject in snapshots_and_subjects:
-            _extract_snapshot(step_context, snapshot, sandbox_dir, subject)
-
-        # All of the snapshots have been checked out now.
-        if process_request.directories_to_create:
-          for d in process_request.directories_to_create:
-            safe_mkdir(os.path.join(sandbox_dir, d))
-
-        popen = self._run_command(binary_value, sandbox_dir, process_request)
-
-        process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
-        if process_result.exit_code != 0:
-          return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(binary_value,
-                                                                                        process_result.exit_code)))
-
-        return self.snapshotted_process.output_conversion(process_result, sandbox_dir)
-
-    return Runnable(func, tuple())
-
-  def _run_command(self, binary_value, sandbox_dir, process_request):
-    command = binary_value.prefix_of_command() + tuple(process_request.args)
-    logger.debug('Running command: "{}" in {}'.format(command, sandbox_dir))
-    popen = subprocess.Popen(command,
-                             stderr=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             cwd=sandbox_dir)
-    # TODO At some point, we may want to replace this blocking wait with a timed one that returns
-    # some kind of in progress state.
-    popen.wait()
-    logger.debug('Done running command in {}'.format(sandbox_dir))
-    return popen
+    # Ready to run.
+    execution = _Process(step_context.snapshot_archive_root,
+                         process_request,
+                         binary_state.value,
+                         snapshot_subjects_value,
+                         self.snapshotted_process.output_conversion)
+    return Runnable(_execute, (execution,))
 
 
 class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
