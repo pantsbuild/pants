@@ -62,17 +62,17 @@ class PayloadTest(BaseTest):
   def test_passes_lazy_fileset_with_spec_through(self):
     self.create_file('foo/a.txt', 'a_contents')
 
-    fileset = LazyFilesetWithSpec('foo', 'a.txt', lambda: ['a.txt'])
+    fileset = LazyFilesetWithSpec('foo', {'globs':['foo/a.txt']}, lambda: ['foo/a.txt'])
     sf = SourcesField(sources=fileset)
 
     self.assertIs(fileset, sf.sources)
-    self.assertEqual(['a.txt'], list(sf.source_paths))
+    self.assertEqual(['foo/a.txt'], list(sf.source_paths))
 
   def test_passes_eager_fileset_with_spec_through(self):
     self.create_file('foo/a.txt', 'a_contents')
 
-    fileset = EagerFilesetWithSpec('foo', {'globs': 'a.txt'}, ['a.txt'], {'a.txt': b'12345'})
+    fileset = EagerFilesetWithSpec('foo', {'globs': ['foo/a.txt']}, ['foo/a.txt'], {'foo/a.txt': b'12345'})
     sf = SourcesField(sources=fileset)
 
     self.assertIs(fileset, sf.sources)
-    self.assertEqual(['a.txt'], list(sf.source_paths))
+    self.assertEqual(['foo/a.txt'], list(sf.source_paths))

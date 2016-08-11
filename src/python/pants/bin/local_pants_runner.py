@@ -18,18 +18,18 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 class LocalPantsRunner(object):
   """Handles a single pants invocation running in the process-local context."""
 
-  def __init__(self, exiter, args, env, build_graph=None, options_bootstrapper=None):
+  def __init__(self, exiter, args, env, daemon_build_graph=None, options_bootstrapper=None):
     """
     :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
-    :param BuildGraph build_graph: A BuildGraph instance for graph reuse (optional).
+    :param BuildGraph daemon_build_graph: A BuildGraph instance for graph reuse (optional).
     :param OptionsBootstrapper options_bootstrapper: An optional existing OptionsBootstrapper.
     """
     self._exiter = exiter
     self._args = args
     self._env = env
-    self._build_graph = build_graph
+    self._daemon_build_graph = daemon_build_graph
     self._options_bootstrapper = options_bootstrapper
     self._profile_path = self._env.get('PANTS_PROFILE')
 
@@ -89,7 +89,7 @@ class LocalPantsRunner(object):
                                        build_config,
                                        run_tracker,
                                        reporting,
-                                       self._build_graph,
+                                       self._daemon_build_graph,
                                        self._exiter).setup()
 
       result = goal_runner.run()
