@@ -171,7 +171,7 @@ class LegacyBuildGraph(BuildGraph):
 
   def _instantiate_remote_sources(self, kwargs):
     """For RemoteSources target, convert "dest" field to its real target type."""
-    kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']._type_alias],))
+    kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']],))
     return RemoteSources(build_graph=self, **kwargs)
 
   def inject_synthetic_target(self,

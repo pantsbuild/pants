@@ -157,6 +157,16 @@ class JvmAppAdaptor(TargetAdaptor):
                         excluded_path_globs_list)
 
 
+class RemoteSourcesAdaptor(TargetAdaptor):
+  def __init__(self, dest=None, **kwargs):
+    """
+    :param  bundles: A list of `BundleAdaptor` objects
+    """
+    if not isinstance(dest, string_types):
+      dest = dest._type_alias
+    super(RemoteSourcesAdaptor, self).__init__(dest=dest, **kwargs)
+
+
 class PythonTargetAdaptor(TargetAdaptor):
   @property
   def field_adaptors(self):
