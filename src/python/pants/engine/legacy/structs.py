@@ -131,22 +131,30 @@ class JvmAppAdaptor(TargetAdaptor):
       field_adaptors = super(JvmAppAdaptor, self).field_adaptors
       if getattr(self, 'bundles', None) is None:
         return field_adaptors
-      # Construct a field for the `bundles` argument.
-      filespecs_list = []
-      path_globs_list = []
-      excluded_path_globs_list = []
-      for bundle in self.bundles:
-        base_globs = BaseGlobs.from_sources_field(bundle.fileset, self.address.spec_path)
-        filespecs_list.append(base_globs.filespecs)
-        path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-        path_globs_list.append(path_globs)
-        excluded_path_globs_list.append(excluded_path_globs)
-      bundles_field = BundlesField(self.address,
-                                   self.bundles,
-                                   filespecs_list,
-                                   path_globs_list,
-                                   excluded_path_globs_list)
+
+      bundles_field = self._construct_bundles_field()
       return field_adaptors + (bundles_field,)
+
+  def _construct_bundles_field(self):
+    filespecs_list = []
+    path_globs_list = []
+    excluded_path_globs_list = []
+    for bundle in self.bundles:
+      # NB: if a bundle has a rel_path, then the rel_root of the resulting file globs must be
+      # set to that rel_path.
+      rel_root = getattr(bundle, 'rel_path', self.address.spec_path)
+
+      base_globs = BaseGlobs.from_sources_field(bundle.fileset, rel_root)
+      path_globs, excluded_path_globs = base_globs.to_path_globs(rel_root)
+
+      filespecs_list.append(base_globs.filespecs)
+      path_globs_list.append(path_globs)
+      excluded_path_globs_list.append(excluded_path_globs)
+    return BundlesField(self.address,
+                        self.bundles,
+                        filespecs_list,
+                        path_globs_list,
+                        excluded_path_globs_list)
 
 
 class PythonTargetAdaptor(TargetAdaptor):
