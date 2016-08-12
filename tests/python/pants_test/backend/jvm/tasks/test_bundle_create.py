@@ -48,12 +48,6 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
       jar.write(entry_path)
     consolidated_classpath.add_for_target(tgt, [('default', jarpath)])
 
-  def get_runtime_classpath(self, context):
-    """
-    :API: public
-    """
-    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
-
   def setUp(self):
     """Prepare targets, context, runtime classpath. """
     super(TestBundleCreate, self).setUp()
