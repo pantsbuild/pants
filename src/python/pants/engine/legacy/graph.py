@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+from collections import namedtuple
 
 from twitter.common.collections import OrderedSet, maybe_list
 
@@ -15,6 +16,7 @@ from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, TaskNode, Throw
@@ -140,6 +142,8 @@ class LegacyBuildGraph(BuildGraph):
       # Instantiate.
       if target_cls is JvmApp:
         return self._instantiate_jvm_app(kwargs)
+      elif target_cls is RemoteSources:
+        return self._instantiate_remote_sources(kwargs)
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
       raise
@@ -158,6 +162,11 @@ class LegacyBuildGraph(BuildGraph):
     ]
 
     return JvmApp(build_graph=self, **kwargs)
+
+  def _instantiate_remote_sources(self, kwargs):
+    DestWrapper = namedtuple('DestWrapper', ['target_types'])
+    kwargs['dest'] = DestWrapper((self._target_types[kwargs['dest']._type_alias],))
+    return RemoteSources(build_graph=self, **kwargs)
 
   def inject_synthetic_target(self,
                               address,
