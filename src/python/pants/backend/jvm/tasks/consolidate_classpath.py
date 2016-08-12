@@ -43,9 +43,6 @@ class ConsolidatedClasspath(JvmBinaryTask):
     consolidated_classpath = self.context.products.get_data(
       'consolidated_classpath', runtime_classpath.copy)
 
-    # TODO (from mateor) The consolidate classpath is something that we could do earlier in the
-    # pipeline and it would be nice to just add those unpacked classed to a product and get the
-    # consolidated classpath for free.
     targets_to_consolidate = self.find_consolidate_classpath_candidates(
       consolidated_classpath,
       self.context.targets(**self._target_closure_kwargs),

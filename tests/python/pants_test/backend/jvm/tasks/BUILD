@@ -96,6 +96,22 @@ python_tests(
 )
 
 python_tests(
+  name = 'consolidate_classpath',
+  sources = ['test_consolidate_classpath.py'],
+  dependencies = [
+    ':jvm_binary_task_test_base',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:bundle_create',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
   name = 'checkstyle',
   sources = ['test_checkstyle.py'],
   dependencies = [
