@@ -507,7 +507,6 @@ class LocalScheduler(object):
     self._product_graph = ProductGraph()
     self._product_graph_lock = graph_lock or threading.RLock()
     self._inline_nodes = inline_nodes
-    self._step_id = 0
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -630,7 +629,7 @@ class LocalScheduler(object):
       candidates = deque(self._product_graph.ensure_entry(r) for r in execution_request.roots)
 
       # Yield nodes that are Runnable, and then compute new ones.
-      scheduling_iterations = 0
+      runnable_count, scheduling_iterations = 0, 0
       start_time = time.time()
       while True:
         # Drain the candidate list to create Runnables for the Engine.
@@ -672,6 +671,7 @@ class LocalScheduler(object):
           break
         completed = yield runnable
         yield
+        runnable_count += len(runnable)
         scheduling_iterations += 1
 
         # Finalize any Runnables that completed in the previous round.
@@ -682,11 +682,11 @@ class LocalScheduler(object):
           candidates.extend(d for d in node_entry.dependents)
 
       logger.debug(
-        'ran %s scheduling iterations in %f seconds. '
-        'there have been %s total steps for %s total nodes.',
+        'ran %s scheduling iterations and %s runnables in %f seconds. '
+        'there are %s total nodes.',
         scheduling_iterations,
+        runnable_count,
         time.time() - start_time,
-        self._step_id,
         len(self._product_graph)
       )
 

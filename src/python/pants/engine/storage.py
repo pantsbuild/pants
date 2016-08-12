@@ -304,7 +304,8 @@ class Cache(Closable):
       yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
 
   def close(self):
-    self._storage.close()
+    # NB: This is a facade above a Storage instance, which is always closed independently.
+    pass
 
 
 class CacheStats(Counter):

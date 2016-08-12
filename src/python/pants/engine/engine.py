@@ -14,14 +14,12 @@ from collections import OrderedDict
 from Queue import Queue
 
 from concurrent.futures import ThreadPoolExecutor
-from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulPool
 from pants.engine.storage import Cache, Storage
-from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -324,23 +322,14 @@ class ThreadHybridEngine(ConcurrentEngine):
     super(ThreadHybridEngine, self).close()
 
 
-def _process_initializer(node_builder, storage):
-  """Another pickle-able top-level function that provides multi-processes' initial states.
-
-  States are returned as a tuple. States are `Closable` so they can be cleaned up once
-  processes are done.
-  """
-  return node_builder, Storage.clone(storage)
-
-
-def _execute_step(cache_save, debug, process_state, step):
+def _execute_step(debug, process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
   """
-  storage, = process_state
-  step_id, runnable = step
+  storage, cache = process_state
+  step_id, cache_key, runnable = step
 
 
   # TODO! need to move back to storing all content and then retrieving it from Storage here.
@@ -351,8 +340,8 @@ def _execute_step(cache_save, debug, process_state, step):
       result = Throw(e)
     if debug:
       _try_pickle(result)
-    # TODO!: restore
-    # cache_save(step_id, result)
+    if cache_key is not None:
+      cache.put(cache_key, result)
     return result
 
   try:
@@ -370,7 +359,8 @@ def _process_initializer(storage):
   States are returned as a tuple. States are `Closable` so they can be cleaned up once
   processes are done.
   """
-  return (Storage.clone(storage),)
+  storage = Storage.clone(storage)
+  return (storage, Cache.create(storage=storage))
 
 
 class LocalMultiprocessEngine(ConcurrentEngine):
@@ -394,7 +384,7 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 
-    execute_step = functools.partial(_execute_step, self._maybe_cache_put, debug)
+    execute_step = functools.partial(_execute_step, debug)
 
     self._processed_queue = Queue()
     self.node_builder = scheduler.node_builder
@@ -403,9 +393,10 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     self._debug = debug
     self._pool.start()
 
-  def _submit(self, step_id, runnable):
-    _try_pickle(runnable)
-    self._pool.submit((step_id, runnable))
+  def _submit(self, step_id, cache_key, runnable):
+    entry = (step_id, cache_key, runnable)
+    _try_pickle(entry)
+    self._pool.submit(entry)
 
   def close(self):
     self._pool.close()
@@ -420,14 +411,14 @@ class LocalMultiprocessEngine(ConcurrentEngine):
       if step in in_flight:
         raise InFlightException('{} is already in_flight!'.format(step))
 
-      key, result = self._maybe_cache_get(step, runnable)
+      cache_key, result = self._maybe_cache_get(step, runnable)
       if result is not None:
         # Skip in_flight on cache hit.
-        completed.add((step, result))
+        completed.append((step, result))
       else:
         step_id = id(step)
         in_flight[step_id] = step
-        self._submit(step_id, runnable)
+        self._submit(step_id, cache_key, runnable)
         submitted += 1
 
     return submitted, completed

@@ -139,7 +139,6 @@ class EngineInitializer(object):
      symbol_table_cls,
      build_graph_cls) = cls.setup_legacy_graph(path_ignore_patterns, symbol_table_cls=symbol_table_cls)
 
-    engine.start()
     try:
       graph = build_graph_cls(scheduler, engine, symbol_table_cls)
       addresses = tuple(graph.inject_specs_closure(spec_roots))

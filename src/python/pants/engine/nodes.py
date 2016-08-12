@@ -388,7 +388,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
   executing the function, and provides a satisfied argument per clause entry to the function.
   """
 
-  is_cacheable = False
+  is_cacheable = True
   is_inlineable = False
 
   def step(self, step_context):
