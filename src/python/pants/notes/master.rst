@@ -5,6 +5,52 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.2.0-dev4 (8/12/2016)
+----------------------
+
+Regularly scheduled unstable release.
+
+New Features
+~~~~~~~~~~~~
+
+* Introduce fmt goal, isort subgoal
+  `RB #4134 <https://rbcommons.com/s/twitter/r/4134>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix GitTest control of git `user.email`.
+  `RB #4146 <https://rbcommons.com/s/twitter/r/4146>`_
+
+* Restore publishing of the docsite during releases
+  `RB #4140 <https://rbcommons.com/s/twitter/r/4140>`_
+
+* Fix BundleAdaptor to BundleProps Conversion
+  `RB #4057 <https://rbcommons.com/s/twitter/r/4057>`_
+  `RB #4129 <https://rbcommons.com/s/twitter/r/4129>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Fix bundle rel_path handling in engine
+  `RB #4150 <https://rbcommons.com/s/twitter/r/4150>`_
+
+* [engine] Fix running changed with v2 flag; Replace context address_mapper; Fix excludes filespecs in engine globs.
+
+  `RB #4114 <https://rbcommons.com/s/twitter/r/4114>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Eliminate use of mox in favor of mock.
+  `RB #4143 <https://rbcommons.com/s/twitter/r/4143>`_
+
+* Convert FetcherTest to use mock instead of mox.
+  `RB #4142 <https://rbcommons.com/s/twitter/r/4142>`_
+
+* [jvm-compile] narrow compile dependencies from full closure to just next nearest invalid compilation targets
+  `RB #4136 <https://rbcommons.com/s/twitter/r/4136>`_
+
 1.2.0-dev3 (8/7/2016)
 ---------------------
 
