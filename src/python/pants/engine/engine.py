@@ -336,12 +336,12 @@ def _execute_step(debug, process_state, step):
   def execute():
     try:
       result = Return(runnable.func(*runnable.args))
+      if debug:
+        _try_pickle(result)
+      if cache_key is not None:
+        cache.put(cache_key, result)
     except Exception as e:
       result = Throw(e)
-    if debug:
-      _try_pickle(result)
-    if cache_key is not None:
-      cache.put(cache_key, result)
     return result
 
   try:

@@ -12,7 +12,7 @@ from contextlib import closing, contextmanager
 from pants.build_graph.address import Address
 from pants.engine.engine import (LocalMultiprocessEngine, LocalSerialEngine, SerializationError,
                                  ThreadHybridEngine)
-from pants.engine.nodes import FilesystemNode, Return, SelectNode
+from pants.engine.nodes import FilesystemNode, Return, SelectNode, Throw
 from pants.engine.selectors import Select
 from pants.engine.storage import Cache, Storage
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
@@ -70,8 +70,13 @@ class EngineTest(unittest.TestCase):
     build_request = self.request(['unpickleable'], self.java)
 
     with self.multiprocessing_engine() as engine:
-      with self.assertRaises(SerializationError):
-        engine.execute(build_request)
+      result = engine.execute(build_request)
+      self.assertIsNone(result.error)
+
+      self.assertEquals(1, len(result.root_products))
+      root_product = result.root_products.values()[0]
+      self.assertEquals(Throw, type(root_product))
+      self.assertEquals(SerializationError, type(root_product.exc))
 
   def test_hybrid_engine_multi(self):
     with self.hybrid_engine(pool_size=2) as engine:
