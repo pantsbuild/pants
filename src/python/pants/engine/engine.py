@@ -146,9 +146,9 @@ class LocalSerialEngine(Engine):
         if result is None:
           try:
             result = Return(runnable.func(*runnable.args))
+            self._maybe_cache_put(key, result)
           except Exception as e:
             result = Throw(e)
-        self._maybe_cache_put(key, result)
         completed.append((entry, result))
       generator.send(completed)
 
@@ -269,9 +269,9 @@ class ThreadHybridEngine(ConcurrentEngine):
     if result is None:
       try:
         result = Return(runnable.func(*runnable.args))
+        self._maybe_cache_put(key, result)
       except Exception as e:
         result = Throw(e)
-    self._maybe_cache_put(key, result)
     return step, result
 
   def _processed_node_callback(self, finished_future):
