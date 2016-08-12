@@ -282,7 +282,7 @@ def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
   for bundle, filespecs, files_digest, excluded_files in zipped:
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
-    kwargs['fileset'] = _eager_fileset_with_spec(spec_path,
+    kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
                                                  filespecs,
                                                  files_digest,
                                                  excluded_files)

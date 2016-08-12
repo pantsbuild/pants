@@ -300,8 +300,20 @@ class BundleTest(BaseTest):
     spec_path = 'y'
     self.create_file(os.path.join(spec_path, 'z', 'somefile'))
     globs = _globs(spec_path)
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       _bundle(spec_path)(rel_path="config", fileset=globs('z/*'))
+    self.assertIn("Must not use a glob for 'fileset' with 'rel_path'.", str(cm.exception))
+
+  def test_allow_globs_when_rel_root_matches_rel_path(self):
+    # If a glob has the same rel_root as the rel_path, then
+    # it will correctly pick up the right files.
+    # We don't allow BUILD files to have declarations with this state.
+    # But filesets can be created this way via macros or pants internals.
+
+    self.create_file(os.path.join('y', 'z', 'somefile'))
+    bundle = _bundle('y')(rel_path="y/z", fileset=_globs('y/z')('*'))
+
+    self.assertEquals({'globs': [u'y/z/*']}, bundle.fileset.filespec)
 
   def test_rel_path_overrides_context_rel_path_for_explicit_path(self):
     spec_path = 'y'
