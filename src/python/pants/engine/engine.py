@@ -10,6 +10,7 @@ import logging
 import multiprocessing
 import traceback
 from abc import abstractmethod
+from collections import OrderedDict
 from Queue import Queue
 
 from concurrent.futures import ThreadPoolExecutor
@@ -99,10 +100,6 @@ class Engine(AbstractClass):
     except TaskError as e:
       return self.Result.failure(e)
 
-  def start(self):
-    """Start up this engine instance, creating any resources it needs."""
-    pass
-
   def close(self):
     """Shutdown this engine instance, releasing resources it was using."""
     self._storage.close()
@@ -112,10 +109,6 @@ class Engine(AbstractClass):
     """Returns cache stats for the engine."""
     return self._cache.get_stats()
 
-  @memoized_method
-  def _should_cache(self, step_request):
-    return step_request.node.is_cacheable
-
   def _maybe_cache_get(self, node_entry, runnable):
     """If caching is enabled for the given Entry, create a key and perform a lookup.
 
@@ -124,7 +117,7 @@ class Engine(AbstractClass):
 
     :returns: A tuple of a key and result, either of which may be None.
     """
-    if not self._should_cache(node_entry):
+    if not node_entry.node.is_cacheable:
       return None, None
     return self._cache.get(runnable)
 
@@ -179,13 +172,20 @@ class ConcurrentEngine(Engine):
     # 2. Whenever the pool is not saturated, submit currently pending work.
 
     # Step instances which have not been submitted yet.
-    pending_submission = OrderedSet()
+    pending_submission = OrderedDict()
     in_flight = dict()  # Dict from step id to a Promise for Steps that have been submitted.
 
-    submit_until = functools.partial(self._submit_until, pending_submission, in_flight)
-    await_one = functools.partial(self._await_one, in_flight)
+    def submit_until(completed, n):
+      submitted, local_completed = self._submit_until(pending_submission, in_flight, n)
+      completed.extend(local_completed)
+      return submitted
 
-    for step_batch in self._scheduler.schedule(execution_request):
+    def await_one(completed):
+      completed.append(self._await_one(in_flight))
+
+    generator = self._scheduler.schedule(execution_request)
+    for step_batch in generator:
+      completed = []
       if not step_batch:
         # A batch should only be empty if all dependency work is currently blocked/running.
         if not in_flight and not pending_submission:
@@ -194,25 +194,29 @@ class ConcurrentEngine(Engine):
       else:
         # Submit and wait for work for as long as we're able to keep the pool saturated.
         pending_submission.update(step_batch)
-        while submit_until(self._pool_size) > 0:
-          await_one()
+        while submit_until(completed, self._pool_size) > 0:
+          await_one(completed)
       # Await at least one entry per scheduling loop.
-      submit_until(0)
+      submit_until(completed, 0)
       if in_flight:
-        await_one()
+        await_one(completed)
 
-    # Consume all steps.
-    while pending_submission or in_flight:
-      submit_until(self._pool_size)
-      await_one()
+      # Indicate which items have completed.
+      generator.send(completed)
+
+    if pending_submission or in_flight:
+      raise AssertionError('Engine loop completed with items: {}, {}'.format(pending_submission, in_flight))
 
   @abstractmethod
   def _submit_until(self, pending_submission, in_flight, n):
-    """Submit pending while there's capacity, and more than `n` items in pending_submission."""
+    """Submit pending while there's capacity, and more than `n` items in pending_submission.
+
+    Returns a tuple of entries running in the background, and entries that completed immediately.
+    """
 
   @abstractmethod
   def _await_one(self, in_flight):
-    """Await one completed step, and remove it from in_flight."""
+    """Await one completed step, remove it from in_flight, and return it."""
 
 
 class ThreadHybridEngine(ConcurrentEngine):
@@ -253,62 +257,24 @@ class ThreadHybridEngine(ConcurrentEngine):
     return isinstance(node, self._async_nodes)
 
   def _maybe_cache_step(self, step_request):
-    if self._should_cache(step_request):
+    if step_request.node.is_cacheable:
       return step_request.step_id, self._cache.get(step_request)
     else:
       return step_request.step_id, None
 
-  def _execute_step(self, step, cache_save=None, debug=False):
+  def _execute_step(self, step, runnable):
     """A function to help support local step execution.
 
-    Executes the Step for the given node builder and storage, and returns a tuple of step id and
-    result or exception.
-
-    :param callable cache_save: Callable used to save cache results. If None skip saving to cache.
-    :param bool debug: Determines if we do extra debugging steps.
     :param step: Step to be executed.
     """
-    node_builder, storage = self._state
-    step_id = step.step_id
-
-    def execute():
-      resolved_request = storage.resolve_request(step)
-      result = resolved_request(node_builder)
-      if debug:
-        _try_pickle(result)
-      if cache_save:
-        keyed_result = storage.key_for_result(result)
-        cache_save(step, keyed_result)
-      return result
-
-    try:
-      return step_id, execute()
-    except Exception as e:
-      # Trap any exception raised by the execution node that bubbles up, and
-      # pass this back to our main thread for handling.
-      logger.warn(traceback.format_exc())
-      return step_id, e
-
-  def _deferred_step(self, step, should_cache):
-    """Create a callable to process a step that is able to be passed to the thread pool
-
-    Deferred method returns (step_id, result) so that it can be processed later.
-    """
-    cache_save = self._self._cache.put if should_cache else None
-    return functools.partial(self._execute_step, step, cache_save = cache_save)
-
-  def _deferred_cache(self, step):
-    """Create a callable to fetch cache that is able to be passed to the thread pool
-
-    Deferred method returns result without corresponding step id
-    """
-    def strip_step_id():
-      # Discard keyed_result
-      _, result = self._maybe_cache_get(step)
-      resolved_result = None if result is None else self._storage.resolve_result(result)
-      return step.step_id, resolved_result
-
-    return strip_step_id
+    key, result = self._maybe_cache_get(step, runnable)
+    if result is None:
+      try:
+        result = Return(runnable.func(*runnable.args))
+      except Exception as e:
+        result = Throw(e)
+    self._maybe_cache_put(key, result)
+    return step, result
 
   def _processed_node_callback(self, finished_future):
     self._processed_queue.put(finished_future)
@@ -318,50 +284,37 @@ class ThreadHybridEngine(ConcurrentEngine):
     """Submit pending while there's capacity, and more than `n` items in pending_submission."""
     to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
     submitted = 0
+    completed = []
     for _ in range(to_submit):
-      step, promise = pending_submission.pop(last=False)
+      step, runnable = pending_submission.popitem(last=False)
       if self._is_async_node(step.node):
-        if step.step_id in in_flight:
+        # Run in a future.
+        if step in in_flight:
           raise InFlightException('{} is already in_flight!'.format(step))
 
-        in_flight[step.step_id] = promise
-
-        should_cache = self._should_cache(step)
-        futures = [self._pool.submit(self._deferred_step(step, should_cache))]
-
-        if should_cache:
-          cache_future = self._pool.submit(self.deferred_cache(step))
-          futures.append(cache_future)
-
-        for f in futures:
-          self._pending.add(f)
-          f.add_done_callback(self._processed_node_callback)
+        future = self._pool.submit(functools.partial(self._execute_step, step, runnable))
+        in_flight[step] = future
+        self._pending.add(future)
+        future.add_done_callback(self._processed_node_callback)
 
         submitted += 1
 
       else:
-        keyed_request, result = self._maybe_cache_get(step)
-        if result is None:
-          result = step(self._node_builder)
-          self._maybe_cache_put(keyed_request, result)
-        promise.success(result)
+        # Run inline.
+        completed.append(self._execute_step(step, runnable))
 
-    return submitted
+    return submitted, completed
 
   def _await_one(self, in_flight):
     """Await one completed step, and remove it from in_flight."""
     if not in_flight:
       raise InFlightException('Awaited an empty pool!')
 
-    # Drop silently None results (these are cache misses).
-    # Also drop steps that have already been handled.
-    step_id = None
-    result = None
-    while not result or (step_id not in in_flight):
-      step_id, result = self._processed_queue.get().result()
+    entry, result = self._processed_queue.get().result()
     if isinstance(result, Exception):
       raise result
-    in_flight.pop(step_id).success(result)
+    in_flight.pop(entry)
+    return entry, result
 
   def close(self):
     """Cleanup thread pool."""
@@ -386,16 +339,21 @@ def _execute_step(cache_save, debug, process_state, step):
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
   """
-  node_builder, storage = process_state
-  step_id = step.step_id
+  storage, = process_state
+  step_id, runnable = step
 
+
+  # TODO! need to move back to storing all content and then retrieving it from Storage here.
   def execute():
-    resolved_request = storage.resolve_request(step)
-    result = resolved_request(node_builder)
+    try:
+      result = Return(runnable.func(*runnable.args))
+    except Exception as e:
+      result = Throw(e)
     if debug:
       _try_pickle(result)
-    cache_save(step, result)
-    return storage.key_for_result(result)
+    # TODO!: restore
+    # cache_save(step_id, result)
+    return result
 
   try:
     return step_id, execute()
@@ -406,10 +364,19 @@ def _execute_step(cache_save, debug, process_state, step):
     return step_id, e
 
 
+def _process_initializer(storage):
+  """Another picklable top-level function that provides multi-processes' initial states.
+
+  States are returned as a tuple. States are `Closable` so they can be cleaned up once
+  processes are done.
+  """
+  return (Storage.clone(storage),)
+
+
 class LocalMultiprocessEngine(ConcurrentEngine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, scheduler, storage, cache=None, pool_size=None, debug=True):
+  def __init__(self, scheduler, storage=None, cache=None, pool_size=None, debug=True):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
@@ -431,56 +398,39 @@ class LocalMultiprocessEngine(ConcurrentEngine):
 
     self._processed_queue = Queue()
     self.node_builder = scheduler.node_builder
-    process_initializer = functools.partial(self._initializer, self.node_builder, self._storage)
+    process_initializer = functools.partial(_process_initializer, self._storage)
     self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
-
-  @property
-  def _initializer(self):
-    return _process_initializer
-
-  def _submit(self, step):
-    _try_pickle(step)
-    self._pool.submit(step)
-
-  def start(self):
     self._pool.start()
+
+  def _submit(self, step_id, runnable):
+    _try_pickle(runnable)
+    self._pool.submit((step_id, runnable))
 
   def close(self):
     self._pool.close()
-
-  def _is_async_node(self, node):
-    return True
 
   def _submit_until(self, pending_submission, in_flight, n):
     """Submit pending while there's capacity, and more than `n` items pending_submission."""
     to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
     submitted = 0
+    completed = []
     for _ in range(to_submit):
-      step, promise = pending_submission.pop(last=False)
+      step, runnable = pending_submission.popitem(last=False)
+      if step in in_flight:
+        raise InFlightException('{} is already in_flight!'.format(step))
 
-      if self._is_async_node(step.node):
-        if step.step_id in in_flight:
-          raise InFlightException('{} is already in_flight!'.format(step))
-
-        step = self._storage.key_for_request(step)
-        result = self._maybe_cache_get(step)
-        if result is not None:
-          # Skip in_flight on cache hit.
-          promise.success(result)
-        else:
-          in_flight[step.step_id] = promise
-          self._submit(step)
-          submitted += 1
+      key, result = self._maybe_cache_get(step, runnable)
+      if result is not None:
+        # Skip in_flight on cache hit.
+        completed.add((step, result))
       else:
-        keyed_request = self._storage.key_for_request(step)
-        result = self._maybe_cache_get(keyed_request)
-        if result is None:
-          result = step(self.node_builder)
-          self._maybe_cache_put(keyed_request, result)
-        promise.success(result)
+        step_id = id(step)
+        in_flight[step_id] = step
+        self._submit(step_id, runnable)
+        submitted += 1
 
-    return submitted
+    return submitted, completed
 
   def _await_one(self, in_flight):
     """Await one completed step, and remove it from in_flight."""
@@ -489,8 +439,7 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     step_id, result = self._pool.await_one_result()
     if isinstance(result, Exception):
       raise result
-    result = self._storage.resolve_result(result)
     if step_id not in in_flight:
       raise InFlightException(
         'Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
-    in_flight.pop(step_id).success(result)
+    return in_flight.pop(step_id), result
