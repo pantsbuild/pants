@@ -27,11 +27,13 @@ from pants.util.objects import datatype
 
 logger = logging.getLogger(__name__)
 
+
 class _DestWrapper(datatype('DestWrapper', ['target_types'])):
   """A wrapper for dest field of RemoteSources target.
 
   This is only used when instantiating RemoteSources target.
   """
+
 
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
