@@ -8,6 +8,7 @@ python_library(
     ':binary_create',
     ':bootstrap_jvm_tools',
     ':bundle_create',
+    ':consolidate_classpath',
     ':check_published_deps',
     ':checkstyle',
     ':detect_duplicates',
