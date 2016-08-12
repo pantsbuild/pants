@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 
 class PrepCommandIntegrationTest(PantsRunIntegrationTest):
@@ -53,25 +53,29 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
       # Make sure the emitted BUILD under .pants.d is not ignored.
       config = {
         'GLOBAL': {
-          'ignore_patterns': []
+          'ignore_patterns': [],
+          'pants_ignore': []
         }
       }
       pants_run = self.run_pants_with_workdir([goal] + prep_commands_specs, workdir, config=config)
       self.assert_success(pants_run)
       yield workdir
 
+  @ensure_engine
   def test_prep_command_in_compile(self):
     with self._execute_pants('compile') as workdir:
       self._assert_goal_ran(workdir, 'compile')
       self._assert_goal_did_not_run(workdir, 'test')
       self._assert_goal_did_not_run(workdir, 'binary')
 
+  @ensure_engine
   def test_prep_command_in_test(self):
     with self._execute_pants('test') as workdir:
       self._assert_goal_ran(workdir, 'compile')
       self._assert_goal_ran(workdir, 'test')
       self._assert_goal_did_not_run(workdir, 'binary')
 
+  @ensure_engine
   def test_prep_command_in_binary(self):
     with self._execute_pants('binary') as workdir:
       self._assert_goal_ran(workdir, 'compile')
