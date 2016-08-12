@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
@@ -27,6 +29,26 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
     super(TestConsolidateClasspath, self).setUp()
     self.task = self.prepare_execute(self.context())
 
+    self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
+    self.zip_artifact = self.create_artifact(org='org.pantsbuild', name='bar', rev='2.0.0',
+                                             ext='zip')
+    self.bundle_artifact = self.create_artifact(org='org.apache', name='baz', rev='3.0.0',
+                                                classifier='tests')
+    self.tar_gz_artifact = self.create_artifact(org='org.gnu', name='gary', rev='4.0.0',
+                                                ext='tar.gz')
+
+    self.jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
+                                    target_type=JarLibrary,
+                                    jars=[JarDependency(org='org.example', name='foo', rev='1.0.0'),
+                                          JarDependency(org='org.pantsbuild',
+                                                        name='bar',
+                                                        rev='2.0.0',
+                                                        ext='zip'),
+                                          JarDependency(org='org.apache', name='baz', rev='3.0.0',
+                                                        classifier='tests'),
+                                          JarDependency(org='org.gnu', name='gary', rev='4.0.0',
+                                                        ext='tar.gz')])
+
     safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content')
     self.resources_target = self.make_target('//resources:foo-resources', Resources,
                                              sources=['foo/file'])
@@ -37,7 +59,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',
                                           target_type=JvmBinary,
-                                          dependencies=[self.java_lib_target],
+                                          dependencies=[self.java_lib_target, self.jar_lib],
                                           resources=[self.resources_target.address.spec])
 
     self.dist_root = os.path.join(self.build_root, 'dist')
@@ -68,3 +90,11 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
       sorted(['output-0.jar', 'Foo.class', 'foo.txt', 'file']),
       sorted(found_files)
     )
+
+    # Confirm that we haven't destroyed deps.
+    expected_deps = set(['org.apache-baz-3.0.0-tests.jar',
+                         'org.example-foo-1.0.0.jar',
+                         'org.gnu-gary-4.0.0.tar.gz',
+                         'org.pantsbuild-bar-2.0.0.zip'])
+    found = set(os.listdir(self.pants_workdir))
+    self.assertTrue(expected_deps - found == set())
