@@ -142,10 +142,7 @@ class JvmAppAdaptor(TargetAdaptor):
     for bundle in self.bundles:
       # NB: if a bundle has a rel_path, then the rel_root of the resulting file globs must be
       # set to that rel_path.
-      if getattr(bundle, 'rel_path', None):
-        rel_root = bundle.rel_path
-      else:
-        rel_root = self.address.spec_path
+      rel_root = getattr(bundle, 'rel_path', self.address.spec_path)
 
       base_globs = BaseGlobs.from_sources_field(bundle.fileset, rel_root)
       path_globs, excluded_path_globs = base_globs.to_path_globs(rel_root)
@@ -153,9 +150,11 @@ class JvmAppAdaptor(TargetAdaptor):
       filespecs_list.append(base_globs.filespecs)
       path_globs_list.append(path_globs)
       excluded_path_globs_list.append(excluded_path_globs)
-    bundles_field = BundlesField(self.address, self.bundles, filespecs_list, path_globs_list,
-      excluded_path_globs_list)
-    return bundles_field
+    return BundlesField(self.address,
+                        self.bundles,
+                        filespecs_list,
+                        path_globs_list,
+                        excluded_path_globs_list)
 
 
 class PythonTargetAdaptor(TargetAdaptor):
