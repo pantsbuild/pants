@@ -47,7 +47,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
 
   def __new__(cls, product, variant_key):
     if not isinstance(variant_key, six.string_types):
-      raise ValueError('variant_key must be a string but was {}'.format(variant_key))
+      raise ValueError('Expected variant_key to be a string, but was {!r}'.format(variant_key))
     return super(SelectVariant, cls).__new__(cls, product, variant_key)
 
   def __repr__(self):

@@ -38,7 +38,6 @@ class SelectorsTest(unittest.TestCase):
   def assert_repr(self, expected, selector):
     self.assertEqual(expected, repr(selector))
 
-
   def test_select_variant_requires_string_key(self):
     with self.assertRaises(ValueError):
       SelectVariant(AClass, None)
