@@ -11,7 +11,7 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 
 class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
@@ -79,11 +79,13 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
     )
     return pants_run
 
+  @ensure_engine
   def test_deferred_sources_gen_successfully(self):
     with self.temporary_workdir() as workdir:
       pants_run = self._configured_pants_run(['gen', self._emit_targets(workdir)[0]], workdir)
       self.assert_success(pants_run)
 
+  @ensure_engine
   def test_deferred_sources_export_successfully(self):
     with self.temporary_workdir() as workdir:
       proto7, proto8 = self._emit_targets(workdir)

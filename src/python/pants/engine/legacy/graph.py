@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from collections import namedtuple
 
 from twitter.common.collections import OrderedSet, maybe_list
 
@@ -28,6 +27,11 @@ from pants.util.objects import datatype
 
 logger = logging.getLogger(__name__)
 
+class _DestWrapper(datatype('DestWrapper', ['target_types'])):
+  """A wrapper for dest field of RemoteSources target.
+
+  This is only used when instantiating RemoteSources target.
+  """
 
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
@@ -164,8 +168,8 @@ class LegacyBuildGraph(BuildGraph):
     return JvmApp(build_graph=self, **kwargs)
 
   def _instantiate_remote_sources(self, kwargs):
-    DestWrapper = namedtuple('DestWrapper', ['target_types'])
-    kwargs['dest'] = DestWrapper((self._target_types[kwargs['dest']._type_alias],))
+    """For RemoteSources target, convert "dest" field to its real target type."""
+    kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']._type_alias],))
     return RemoteSources(build_graph=self, **kwargs)
 
   def inject_synthetic_target(self,
