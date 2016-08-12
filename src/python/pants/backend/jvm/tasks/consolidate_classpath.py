@@ -12,7 +12,7 @@ from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.build_graph.target_scopes import Scopes
 
 
-class ConsolidatedClasspath(JvmBinaryTask):
+class ConsolidateClasspath(JvmBinaryTask):
   """Convert loose directories in classpath_products into jars. """
   # Directory for both internal and external libraries.
   LIBS_DIR = 'libs'
@@ -20,11 +20,11 @@ class ConsolidatedClasspath(JvmBinaryTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(ConsolidatedClasspath, cls).implementation_version() + [('ConsolidatedClasspath', 1)]
+    return super(ConsolidateClasspath, cls).implementation_version() + [('ConsolidateClasspath', 1)]
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ConsolidatedClasspath, cls).prepare(options, round_manager)
+    super(ConsolidateClasspath, cls).prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
   @property

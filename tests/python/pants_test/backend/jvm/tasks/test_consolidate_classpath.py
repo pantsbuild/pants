@@ -10,7 +10,7 @@ import os
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.tasks.consolidate_classpath import ConsolidatedClasspath
+from pants.backend.jvm.tasks.consolidate_classpath import ConsolidateClasspath
 from pants.build_graph.resources import Resources
 from pants.util.dirutil import safe_file_dump
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
@@ -20,7 +20,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return ConsolidatedClasspath
+    return ConsolidateClasspath
 
   def setUp(self):
     """Prepare targets, context, runtime classpath. """
@@ -61,7 +61,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
     self.execute(self.task_context)
     task_dir = os.path.join(
       self.pants_workdir,
-      'pants_backend_jvm_tasks_consolidate_classpath_ConsolidatedClasspath'
+      'pants_backend_jvm_tasks_consolidate_classpath_ConsolidateClasspath'
     )
     found_files = [os.path.basename(f) for f in self.iter_files(task_dir)]
     self.assertEquals(
