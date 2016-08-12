@@ -12,7 +12,7 @@ from pants.base.payload import Payload
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants.source.wrapped_globs import Globs, RGlobs
+from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec, RGlobs
 from pants_test.base_test import BaseTest
 
 
@@ -222,3 +222,14 @@ class FilesetRelPathWrapperTest(BaseTest):
                            'dummy_target(name="w", sources=rglobs("*.java", follow_links=False))')
     graph = self.context().scan()
     assert ['foo.java'] == list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
+
+
+class FilesetWithSpecTest(BaseTest):
+
+  def test_lazy_fileset_with_spec_fails_if_filespec_not_prefixed_by_relroot(self):
+    with self.assertRaises(ValueError):
+      LazyFilesetWithSpec('foo', {'globs':['notfoo/a.txt']}, lambda: ['foo/a.txt'])
+
+  def test_eager_fileset_with_spec_fails_if_filespec_not_prefixed_by_relroot(self):
+    with self.assertRaises(ValueError):
+      EagerFilesetWithSpec('foo', {'globs':['notfoo/a.txt']}, files=['files'], file_hashes={})

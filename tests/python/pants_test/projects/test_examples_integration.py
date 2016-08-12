@@ -5,10 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants_test.pants_run_integration_test import ensure_engine
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
 
 
 class ExamplesIntegrationTest(ProjectIntegrationTest):
+
+  @ensure_engine
   def tests_examples(self):
     # TODO: Remove the --exclude-target-regexp once we're on Java 8 everywhere.
     pants_run = self.pants_test(['examples::',

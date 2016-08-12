@@ -111,7 +111,7 @@ class DeferredSourcesField(SourcesField):
     """Call this method to set the list of files represented by the target.
 
     Intended to be invoked by the DeferredSourcesMapper task.
-    :param list sources: strings representing absolute paths of files to be included in the source set
+    :param list sources: strings representing paths of files to be included in the source set
     :param string rel_path: common prefix for files.
     """
     if self._populated:

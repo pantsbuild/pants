@@ -60,7 +60,7 @@ class Noop(datatype('Noop', ['format_string', 'args']), State):
 
   @staticmethod
   def cycle(src, dst):
-    return Noop('Edge would cause a cycle: {} -> {}.', src, dst)
+    return Noop('Cycle detected! Edge would cause a cycle: {} -> {}.', src, dst)
 
   def __new__(cls, format_string, *args):
     return super(Noop, cls).__new__(cls, format_string, args)
