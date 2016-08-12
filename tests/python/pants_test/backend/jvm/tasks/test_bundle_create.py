@@ -42,7 +42,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     for rel_path, content in files_dict.items():
       safe_file_dump(os.path.join(entry_path, rel_path), content)
 
-    # Create Jar to mimic consolidate classpath behavior
+    # Create Jar to mimic consolidate classpath behavior.
     jarpath = os.path.join(classpath_dir, 'output-0.jar')
     with self.task.open_jar(jarpath, overwrite=True, compressed=False) as jar:
       jar.write(entry_path)
