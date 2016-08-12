@@ -42,13 +42,6 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
 
     self.dist_root = os.path.join(self.build_root, 'dist')
 
-  def _create_target(self, **kwargs):
-    return self.make_target(spec='//foo:foo-app',
-                            target_type=JvmApp,
-                            basename='FooApp',
-                            dependencies=[self.binary_target],
-                            **kwargs)
-
   def _setup_classpath(self, task_context):
     """As a separate prep step because to test different option settings, this needs to rerun
     after context is re-created.
@@ -59,14 +52,13 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
 
   def test_consolidate_classpath(self):
     """Test default setting outputs bundle products using `target.id`."""
-    self.app_target = self._create_target()
+    self.app_target = self.make_target(spec='//foo:foo-app',
+                                       target_type=JvmApp,
+                                       basename='FooApp',
+                                       dependencies=[self.binary_target])
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
-    self._check_jarfile()
-
-  def _check_jarfile(self):
-    """Check to make sure that consolidate classpath properly creates the jar file"""
     task_dir = os.path.join(
       self.pants_workdir,
       'pants_backend_jvm_tasks_consolidate_classpath_ConsolidatedClasspath'

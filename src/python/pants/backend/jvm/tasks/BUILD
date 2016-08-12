@@ -57,7 +57,17 @@ python_library(
 
 python_library(
   name = 'binary_create',
-  sources = ['binary_create.py', 'consolidate_classpath.py'],
+  sources = ['binary_create.py'],
+  dependencies = [
+    ':jvm_binary_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'consolidate_classpath',
+  sources = ['consolidate_classpath.py'],
   dependencies = [
     ':jvm_binary_task',
     'src/python/pants/base:build_environment',
