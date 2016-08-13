@@ -14,9 +14,11 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import PathGlobs
 from pants.engine.storage import Storage
+from pants.engine.subsystem.native import Native
 from pants.util import desktop
 from pants.util.contextutil import temporary_file_path
 from pants_test.engine.examples.planners import setup_json_scheduler
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 def visualize_execution_graph(scheduler, request):
@@ -31,16 +33,17 @@ def visualize_execution_graph(scheduler, request):
 
 
 def visualize_build_request(build_root, goals, subjects):
-  scheduler = setup_json_scheduler(build_root)
+  with subsystem_instance(Native.Factory) as native_factory:
+    scheduler = setup_json_scheduler(build_root, native_factory.create())
 
-  execution_request = scheduler.build_request(goals, subjects)
-  # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
-  engine = LocalSerialEngine(scheduler, Storage.create())
-  try:
-    engine.reduce(execution_request)
-    visualize_execution_graph(scheduler, execution_request)
-  finally:
-    engine.close()
+    execution_request = scheduler.build_request(goals, subjects)
+    # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
+    engine = LocalSerialEngine(scheduler, Storage.create())
+    try:
+      engine.reduce(execution_request)
+      visualize_execution_graph(scheduler, execution_request)
+    finally:
+      engine.close()
 
 
 def pop_build_root_and_goals(description, args):

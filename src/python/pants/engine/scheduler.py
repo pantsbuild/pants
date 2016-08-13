@@ -17,8 +17,8 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.graph import Graph
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
-from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Runnable,
-                                SelectNode, StepContext, TaskNode, Waiting)
+from pants.engine.nodes import (DependenciesNode, FilesystemNode, Noop, Runnable, SelectNode,
+                                StepContext, TaskNode, Waiting)
 from pants.engine.objects import Closable
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.objects import datatype

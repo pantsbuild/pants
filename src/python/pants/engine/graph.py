@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import deque
 
-from pants.engine.nodes import Node, Noop, Return, SelectNode, State, TaskNode, Throw, Waiting
+from pants.engine.nodes import Node, Noop, Return, SelectNode, TaskNode, Throw, Waiting
 
 
 class CompletedNodeException(ValueError):

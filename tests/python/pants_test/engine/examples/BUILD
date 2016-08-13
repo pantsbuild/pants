@@ -67,9 +67,11 @@ python_library(
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
+    'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
