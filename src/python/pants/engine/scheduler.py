@@ -113,6 +113,7 @@ class ProductGraph(object):
             'Cannot complete {} with {} while it has an incomplete dep:\n  {}'
               .format(entry, state, dep.node))
 
+    entry.coroutine = None
     entry.set_state(state)
 
   def add_dependencies(self, node, waiting_state):
@@ -128,12 +129,21 @@ class ProductGraph(object):
 
     Returns True if a cycle would be created by adding an edge from src->dest.
     """
-    # We disallow adding new edges outbound from completed Nodes, and no completed Node can have
-    # a path to an uncompleted Node. Thus, we can truncate our search for cycles at any completed
-    # Node.
-    is_not_completed = lambda e: e.state is None
-    for entry in self._walk_entries([dest], entry_predicate=is_not_completed):
-      if entry is src:
+    if len(src.dependents) < len(dest.dependencies):
+      # Search backward from src.
+      begin, end = src, dest
+      dependents = True
+      predicate = lambda _: True
+    else:
+      # Search forward from dest.
+      begin, end = dest, src
+      dependents = False
+      # We disallow adding new edges outbound from completed Nodes, and no completed Node can have
+      # a path to an uncompleted Node. Thus, we can truncate our search for cycles at any completed
+      # Node.
+      predicate = lambda e: not e.is_complete
+    for entry in self._walk_entries([begin], entry_predicate=predicate, dependents=dependents):
+      if entry is end:
         return True
     return False
 
@@ -169,7 +179,7 @@ class ProductGraph(object):
   def completed_nodes(self):
     """In linear time, yields the states of any Nodes which have completed."""
     for node, entry in self._nodes.items():
-      if entry.state is not None:
+      if entry.is_complete:
         yield node, entry.state
 
   def dependents(self):
