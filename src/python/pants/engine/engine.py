@@ -329,20 +329,20 @@ def _execute_step(debug, process_state, step):
   to the cache.
   """
   storage, cache = process_state
-  step_id, cache_key, runnable = step
+  step_id, runnable_key, is_cacheable = step
 
-
-  # TODO! need to move back to storing all content and then retrieving it from Storage here.
   def execute():
     try:
+      runnable = storage.get_state(runnable_key)
       result = Return(runnable.func(*runnable.args))
       if debug:
         _try_pickle(result)
-      if cache_key is not None:
-        cache.put(cache_key, result)
+      result_key = storage.put_state(result)
+      if is_cacheable:
+        cache.put(runnable_key, result)
     except Exception as e:
-      result = Throw(e)
-    return result
+      result_key = storage.put_state(Throw(e))
+    return result_key
 
   try:
     return step_id, execute()
@@ -364,7 +364,13 @@ def _process_initializer(storage):
 
 
 class LocalMultiprocessEngine(ConcurrentEngine):
-  """An engine that runs tasks locally and in parallel when possible using a process pool."""
+  """An engine that runs tasks locally and in parallel when possible using a process pool.
+
+  This implementation stores all process inputs in Storage and executes cache lookups before
+  submitting a task to another process. This use of Storage means that only a Key for the
+  Runnable is sent (directly) across process boundaries, and avoids sending the same data across
+  process boundaries repeatedly.
+  """
 
   def __init__(self, scheduler, storage=None, cache=None, pool_size=None, debug=True):
     """
@@ -393,9 +399,10 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     self._debug = debug
     self._pool.start()
 
-  def _submit(self, step_id, cache_key, runnable):
-    entry = (step_id, cache_key, runnable)
-    _try_pickle(entry)
+  def _submit(self, step_id, runnable_key, is_cacheable):
+    entry = (step_id, runnable_key, is_cacheable)
+    if self._debug:
+      _try_pickle(entry)
     self._pool.submit(entry)
 
   def close(self):
@@ -411,14 +418,18 @@ class LocalMultiprocessEngine(ConcurrentEngine):
       if step in in_flight:
         raise InFlightException('{} is already in_flight!'.format(step))
 
-      cache_key, result = self._maybe_cache_get(step, runnable)
+      # We eagerly compute a key for the Runnable, because it allows us to avoid sending the same
+      # data across process boundaries repeatedly.
+      runnable_key = self._storage.put_state(runnable)
+      is_cacheable = step.node.is_cacheable
+      result = self._cache.get_for_key(runnable_key) if step.node.is_cacheable else None
       if result is not None:
         # Skip in_flight on cache hit.
         completed.append((step, result))
       else:
         step_id = id(step)
         in_flight[step_id] = step
-        self._submit(step_id, cache_key, runnable)
+        self._submit(step_id, runnable_key, is_cacheable)
         submitted += 1
 
     return submitted, completed
@@ -427,10 +438,10 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     """Await one completed step, and remove it from in_flight."""
     if not in_flight:
       raise InFlightException('Awaited an empty pool!')
-    step_id, result = self._pool.await_one_result()
-    if isinstance(result, Exception):
-      raise result
+    step_id, result_key = self._pool.await_one_result()
+    if isinstance(result_key, Exception):
+      raise result_key
     if step_id not in in_flight:
       raise InFlightException(
         'Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
-    return in_flight.pop(step_id), result
+    return in_flight.pop(step_id), self._storage.get_state(result_key)

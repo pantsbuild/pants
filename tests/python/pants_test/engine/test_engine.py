@@ -38,7 +38,7 @@ class EngineTest(unittest.TestCase):
 
   @contextmanager
   def multiprocessing_engine(self, pool_size=None):
-    storage = Storage.create(debug=True, in_memory=False)
+    storage = Storage.create(in_memory=False)
     cache = Cache.create(storage=storage)
     with closing(LocalMultiprocessEngine(self.scheduler, storage, cache,
                                          pool_size=pool_size, debug=True)) as e:
@@ -47,7 +47,7 @@ class EngineTest(unittest.TestCase):
   @contextmanager
   def hybrid_engine(self, pool_size=None):
     async_nodes = (FilesystemNode,)
-    storage = Storage.create(debug=True, in_memory=False)
+    storage = Storage.create(in_memory=True)
     cache = Cache.create(storage=storage)
     with closing(ThreadHybridEngine(self.scheduler, storage,
                                     threaded_node_types=async_nodes, cache=cache,

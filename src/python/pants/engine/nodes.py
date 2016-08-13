@@ -51,6 +51,35 @@ class State(object):
   def raise_unrecognized(cls, state):
     raise ValueError('Unrecognized Node State: {}'.format(state))
 
+  @staticmethod
+  def from_components(components):
+    """Given the components of a State, construct the State."""
+    cls, remainder = components[0], components[1:]
+    return cls._from_components(remainder)
+
+  def to_components(self):
+    """Return a flat tuple containing individual pickleable components of the State.
+
+    TODO: Consider https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-external-objects
+    for this usecase?
+    """
+    return (type(self),) + self._to_components()
+
+  @classmethod
+  def _from_components(cls, components):
+    """Given the components of a State, construct the State.
+
+    Default implementation assumes that `self` extends tuple.
+    """
+    return cls(*components)
+
+  def _to_components(self):
+    """Return all components of the State as a flat tuple.
+
+    Default implementation assumes that `self` extends tuple.
+    """
+    return self
+
 
 class Noop(datatype('Noop', ['format_string', 'args']), State):
   """Indicates that a Node did not have the inputs which would be needed for it to execute.
@@ -64,6 +93,10 @@ class Noop(datatype('Noop', ['format_string', 'args']), State):
 
   def __new__(cls, format_string, *args):
     return super(Noop, cls).__new__(cls, format_string, args)
+
+  @classmethod
+  def _from_components(cls, components):
+    return cls(components[0], *components[1])
 
   @property
   def msg(self):
@@ -79,6 +112,13 @@ class Noop(datatype('Noop', ['format_string', 'args']), State):
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
 
+  @classmethod
+  def _from_components(cls, components):
+    return cls(components[0])
+
+  def _to_components(self):
+    return (self.value,)
+
 
 class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
@@ -88,7 +128,17 @@ class Runnable(datatype('Runnable', ['func', 'args']), State):
   """Indicates that the Node is ready to run with the given closure.
 
   The return value of the Runnable will become the final state of the Node.
+
+  Overrides _to_components and _from_components to flatten the function arguments as independent
+  pickleable values.
   """
+
+  @classmethod
+  def _from_components(cls, components):
+    return cls(components[0], components[1:])
+
+  def _to_components(self):
+    return (self.func,) + self.args
 
 
 class Waiting(datatype('Waiting', ['dependencies']), State):

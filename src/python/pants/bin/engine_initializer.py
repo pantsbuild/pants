@@ -115,7 +115,7 @@ class EngineInitializer(object):
     )
 
     scheduler = LocalScheduler(dict(), tasks, project_tree)
-    engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
+    engine = LocalSerialEngine(scheduler, Storage.create())
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
 
