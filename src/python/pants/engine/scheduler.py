@@ -116,10 +116,36 @@ class ProductGraph(object):
     entry.coroutine = None
     entry.set_state(state)
 
-  def add_dependencies(self, node, waiting_state):
-    entry = self.ensure_entry(node)
-    entry.set_state(waiting_state)
-    self._add_dependencies(entry, waiting_state.dependencies)
+  def add_dependencies(self, node, dependencies):
+    """Adds dependency edges from the given src Node to the given dependency Nodes.
+
+    Executes cycle detection: if adding one of the given dependencies would create
+    a cycle, then the _source_ Node is marked as a Noop with an error indicating the
+    cycle path, and the dependencies are not introduced.
+    """
+    node_entry = self.ensure_entry(node)
+
+    # Add deps. Any deps which would cause a cycle are added to cyclic_dependencies instead,
+    # and ignored except for the purposes of Step execution.
+    waiting_for = []
+    for dependency in dependencies:
+      dependency_entry = self.ensure_entry(dependency)
+
+      if dependency_entry in node_entry.dependencies:
+        # Already declared.
+        waiting_for.append(dependency_entry)
+      elif self._detect_cycle(node_entry, dependency_entry):
+        # Cyclic dependency: immediately satisfy with a Noop.
+        waiting_for.append(Noop.cycle(node_entry.node, dependency_entry.node))
+        node_entry.cyclic_dependencies.add(dependency)
+      else:
+        # Live Node; waiting for a value.
+        waiting_for.append(dependency_entry)
+        node_entry.dependencies.add(dependency_entry)
+        dependency_entry.dependents.add(node_entry)
+
+    # Set the Waiting list for the entry.
+    node_entry.set_state(Waiting(waiting_for))
 
   def _detect_cycle(self, src, dest):
     """Detect whether adding an edge from src to dest would create a cycle.
@@ -160,27 +186,6 @@ class ProductGraph(object):
       self._validator(node)
       self._nodes[node] = entry = self.Entry(node)
     return entry
-
-  def _add_dependencies(self, node_entry, dependencies):
-    """Adds dependency edges from the given src Node to the given dependency Nodes.
-
-    Executes cycle detection: if adding one of the given dependencies would create
-    a cycle, then the _source_ Node is marked as a Noop with an error indicating the
-    cycle path, and the dependencies are not introduced.
-    """
-
-    # Add deps. Any deps which would cause a cycle are added to cyclic_dependencies instead,
-    # and ignored except for the purposes of Step execution.
-    for dependency in dependencies:
-      dependency_entry = self.ensure_entry(dependency)
-      if dependency_entry in node_entry.dependencies:
-        continue
-
-      if self._detect_cycle(node_entry, dependency_entry):
-        node_entry.cyclic_dependencies.add(dependency)
-      else:
-        node_entry.dependencies.add(dependency_entry)
-        dependency_entry.dependents.add(node_entry)
 
   def completed_nodes(self):
     """In linear time, yields the states of any Nodes which have completed."""
@@ -539,30 +544,27 @@ class LocalScheduler(object):
     If the currently declared dependencies of a Node are not yet available, returns None. If
     they are available, runs a Step and returns the resulting State.
     """
-    # See whether all dependencies the Node is currently blocking for are available.
-    if any(not dep_entry.is_complete for dep_entry in node_entry.dependencies):
-      return None
-
-    node_entry.validate_not_complete()
-
-    # Collect all dependencies that have been declared.
-    # TODO: this can likely be optimized to avoid the dict.
-    all_deps = dict()
-    for dep_entry in node_entry.dependencies:
-      all_deps[dep_entry.node] = dep_entry.state
-    # Additionally, include Noops for any dependencies that were cyclic.
-    for dep in node_entry.cyclic_dependencies:
-      all_deps[dep] = Noop.cycle(node_entry.node, dep)
-
-    # Filter deps to exactly what the coroutine is currently Waiting for.
-    deps = [all_deps[dep] for dep in node_entry.state.dependencies]
-
     # Initialize the coroutine if this is the first time it is running.
     if node_entry.coroutine is None:
+      node_entry.validate_not_complete()
       node_entry.coroutine = node_entry.node.step(self._step_context)
       return node_entry.coroutine.send(None)
-    else:
-      return node_entry.coroutine.send(deps)
+
+    # Else, confirm that all deps the coroutine is currently Waiting for are ready
+    deps = []
+    for dep in node_entry.state.dependencies:
+      if type(dep) is Noop:
+        # Dep was cyclic.
+        deps.add(dep)
+      elif dep.is_complete:
+        # Dep is ready.
+        deps.append(dep.state)
+      else:
+        # An explicitly waited dep isn't ready.
+        return None
+
+    # Ready to run!
+    return node_entry.coroutine.send(deps)
 
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
@@ -667,7 +669,7 @@ class LocalScheduler(object):
             outstanding.add(node_entry)
           elif type(state) is Waiting:
             # Waiting on dependencies.
-            self._product_graph.add_dependencies(node_entry.node, state)
+            self._product_graph.add_dependencies(node_entry.node, state.dependencies)
             incomplete_deps = [d for d in node_entry.dependencies if not d.is_complete]
             if incomplete_deps:
               # Mark incomplete deps as candidates for Steps.

@@ -9,8 +9,6 @@ import os
 from abc import abstractmethod, abstractproperty
 from os.path import dirname
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
