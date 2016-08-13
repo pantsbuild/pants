@@ -46,7 +46,11 @@ class ConflictingProducersError(Exception):
     super(ConflictingProducersError, self).__init__(message)
 
 
-class State(object):
+class State(AbstractClass):
+  @abstractproperty
+  def type_id(cls):
+    """An enum value for the 'type' of a State."""
+
   @classmethod
   def raise_unrecognized(cls, state):
     raise ValueError('Unrecognized Node State: {}'.format(state))
@@ -86,6 +90,7 @@ class Noop(datatype('Noop', ['format_string', 'args']), State):
 
   Because Noops are very common but rarely displayed, they are formatted lazily.
   """
+  type_id = 0
 
   @staticmethod
   def cycle(src, dst):
@@ -111,6 +116,7 @@ class Noop(datatype('Noop', ['format_string', 'args']), State):
 
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
+  type_id = 1
 
   @classmethod
   def _from_components(cls, components):
@@ -122,6 +128,7 @@ class Return(datatype('Return', ['value']), State):
 
 class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
+  type_id = 2
 
 
 class Runnable(datatype('Runnable', ['func', 'args']), State):
@@ -147,6 +154,7 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   Some Nodes will return different dependency Nodes based on where they are in their lifecycle,
   but all returned dependencies are recorded for the lifetime of a Node.
   """
+  type_id = 3
 
 
 class Node(AbstractClass):

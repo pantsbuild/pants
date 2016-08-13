@@ -15,8 +15,8 @@ import pytest
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
+from pants.engine.build_files import UnhydratedStruct, create_graph_tasks
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, ResolveError, UnaddressableObjectError)
 from pants.engine.nodes import Throw

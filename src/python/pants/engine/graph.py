@@ -5,297 +5,322 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
-from fnmatch import fnmatch
-from os.path import basename, dirname, join
+from collections import deque
 
-import six
-
-from pants.base.project_tree import Dir, File
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants.build_graph.address import Address
-from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
-from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
-from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
-from pants.engine.struct import Struct
-from pants.util.objects import datatype
+from pants.engine.nodes import Node, Noop, Return, SelectNode, State, TaskNode, Throw, Waiting
 
 
-class ResolvedTypeMismatchError(ResolveError):
-  """Indicates a resolved object was not of the expected type."""
+class CompletedNodeException(ValueError):
+  """Indicates an attempt to change a Node that is already completed."""
 
 
-def _key_func(entry):
-  key, value = entry
-  return key
+class IncompleteDependencyException(ValueError):
+  """Indicates an attempt to complete a Node that has incomplete dependencies."""
 
 
-class BuildDirs(datatype('BuildDirs', ['dependencies'])):
-  """A list of Stat objects for directories containing build files."""
+class Graph(object):
+  """A graph of Nodes which produce a Product for a Subject."""
 
+  class Entry(object):
+    """An entry representing a Node in the Graph.
 
-class BuildFiles(datatype('BuildFiles', ['files'])):
-  """A list of Paths that are known to match a build file pattern."""
+    Equality for this object is intentionally `identity` for efficiency purposes: structural
+    equality can be implemented by comparing the result of the `structure` method.
+    """
+    __slots__ = ('node', 'state')
 
+    def __init__(self, node):
+      self.node = node
+      # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
+      self.state = None
 
-def filter_buildfile_paths(address_mapper, directory_listing):
-  if not directory_listing.exists:
-    raise ResolveError('Directory "{}" does not exist.'.format(directory_listing.directory.path))
+    @property
+    def is_complete(self):
+      return self.state is not None
 
-  build_pattern = address_mapper.build_pattern
-  def match(stat):
-    return type(stat) is File and fnmatch(basename(stat.path), build_pattern)
-  build_files = tuple(Path(stat.path, stat)
-                      for stat in directory_listing.dependencies if match(stat))
-  return BuildFiles(build_files)
+    def structure(self):
+      return (self.node, self.state)
 
+  def __init__(self, native, validator=None):
+    self._validator = validator or Node.validate_node
+    # A dict of Node->Entry, and a dict of id(Entry)->Node
+    self._nodes = dict()
+    self._node_ids = dict()
+    # A native underlying graph.
+    self._native = native
+    self._graph = native.gc(native.lib.graph_create(Waiting.type_id), native.lib.graph_destroy)
 
-def parse_address_family(address_mapper, path, build_files_content):
-  """Given the contents of the build files in one directory, return an AddressFamily.
+  def __len__(self):
+    return self._native.lib.len(self._graph)
 
-  The AddressFamily may be empty, but it will not be None.
-  """
-  if not build_files_content.dependencies:
-    raise ResolveError('Directory "{}" does not contain build files.'.format(path))
-  address_maps = []
-  for filepath, filecontent in build_files_content.dependencies:
-    address_maps.append(AddressMap.parse(filepath,
-                                         filecontent,
-                                         address_mapper.symbol_table_cls,
-                                         address_mapper.parser_cls))
-  return AddressFamily.create(path.path, address_maps)
+  def state(self, node):
+    entry = self._nodes.get(node, None)
+    if not entry:
+      return None
+    return entry.state
 
+  def add_dependencies(self, node_entry, dependencies):
+    """Adds the given dependencies for the given entry, which must be in the Waiting state."""
+    deps = [id(self.ensure_entry(d)) for d in dependencies]
+    self._native.lib.add_dependencies(self._graph, id(node_entry), deps, len(deps))
 
-class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'dependencies'])):
-  """A product type that holds a Struct which has not yet been hydrated.
+  def ensure_entry(self, node):
+    """Returns the Entry for the given Node, creating it if it does not already exist."""
+    entry = self._nodes.get(node, None)
+    if not entry:
+      self._validator(node)
+      entry = self.Entry(node)
+      self._nodes[node] = entry
+      self._node_ids[id(entry)] = entry
+    return entry
 
-  A Struct counts as "hydrated" when all of its members (which are not themselves dependencies
-  lists) have been resolved from the graph. This means that hyrating a struct is eager in terms
-  of inline addressable fields, but lazy in terms of the complete graph walk represented by
-  the `dependencies` field of StructWithDeps.
-  """
+  def _entry_for_id(self, node_id):
+    """Returns the Entry for the given node id, which must exist"""
+    return self._node_ids[node_id]
 
-  def __eq__(self, other):
-    if type(self) != type(other):
-      return NotImplemented
-    return self.struct == other.struct
+  def completed_nodes(self):
+    """In linear time, yields the states of any Nodes which have completed."""
+    for node, entry in self._nodes.items():
+      if entry.state is not None:
+        yield node, entry.state
 
-  def __ne__(self, other):
-    return not (self == other)
+  def dependents(self):
+    """In linear time, yields the dependents lists for all Nodes."""
+    for node, entry in self._nodes.items():
+      yield node, [d.node for d in entry.dependents]
 
-  def __hash__(self):
-    return hash(self.struct)
+  def dependencies(self):
+    """In linear time, yields the dependencies lists for all Nodes."""
+    for node, entry in self._nodes.items():
+      yield node, [d.node for d in entry.dependencies]
 
+  def cyclic_dependencies(self):
+    """In linear time, yields the cyclic_dependencies lists for all Nodes."""
+    for node, entry in self._nodes.items():
+      yield node, entry.cyclic_dependencies
 
-def _raise_did_you_mean(address_family, name):
-  possibilities = '\n  '.join(str(a) for a in address_family.addressables)
-  raise ResolveError('A Struct was not found in namespace {} for name "{}". '
-                     'Did you mean one of?:\n  {}'.format(address_family.namespace, name, possibilities))
+  def dependents_of(self, node):
+    entry = self._nodes.get(node, None)
+    if entry:
+      for d in entry.dependents:
+        yield d.node
 
+  def _dependency_entries_of(self, node):
+    entry = self._nodes.get(node, None)
+    if entry:
+      for d in entry.dependencies:
+        yield d
 
-def resolve_unhydrated_struct(address_family, address):
-  """Given an Address and its AddressFamily, resolve an UnhydratedStruct.
+  def dependencies_of(self, node):
+    for d in self._dependency_entries_of(node):
+      yield d.node
 
-  Recursively collects any embedded addressables within the Struct, but will not walk into a
-  dependencies field, since those are requested explicitly by tasks using SelectDependencies.
-  """
+  def cyclic_dependencies_of(self, node):
+    entry = self._nodes.get(node, None)
+    if not entry:
+      return set()
+    return entry.cyclic_dependencies
 
-  struct = address_family.addressables.get(address)
-  if not struct:
-    _raise_did_you_mean(address_family, address.target_name)
+  def invalidate(self, predicate=None):
+    """Invalidate nodes and their subgraph of dependents given a predicate.
 
-  dependencies = []
-  def maybe_append(outer_key, value):
-    if isinstance(value, six.string_types):
-      if outer_key != 'dependencies':
-        dependencies.append(Address.parse(value, relative_to=address.spec_path))
-    elif isinstance(value, Struct):
-      collect_dependencies(value)
+    :param func predicate: A predicate that matches Node objects for all nodes in the graph.
+    """
+    def _sever_dependents(entry):
+      for associated_entry in entry.dependencies:
+        associated_entry.dependents.discard(entry)
 
-  def collect_dependencies(item):
-    for key, value in sorted(item._asdict().items(), key=_key_func):
-      if not AddressableDescriptor.is_addressable(item, key):
+    def _delete_node(entry):
+      actual_entry = self._nodes.pop(entry.node)
+      self._node_ids.pop(id(actual_entry))
+      assert entry is actual_entry
+
+    def all_predicate(node, state): return True
+    predicate = predicate or all_predicate
+
+    invalidated_root_entries = list(entry for entry in self._nodes.values()
+                                    if predicate(entry.node, entry.state))
+    invalidated_root_ids = [id(e) for e in invalidated_root_entries]
+    native_invalidated = self._native.lib.invalidate(self._graph,
+                                                     invalidated_root_ids,
+                                                     len(invalidated_root_ids))
+    invalidated_entries = list(entry for entry in self._walk_entries(invalidated_root_entries,
+                                                                     lambda _: True,
+                                                                     dependents=True))
+
+    # Sever dependee->dependent relationships in the graph for all given invalidated nodes.
+    for entry in invalidated_entries:
+      _sever_dependents(entry)
+
+    # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
+    for entry in invalidated_entries:
+      _delete_node(entry)
+
+    invalidated_count = len(invalidated_entries)
+    assert native_invalidated == invalidated_count
+    return invalidated_count
+
+  def walk(self, roots, predicate=None, dependents=False):
+    """Yields Nodes and their States depth-first in pre-order, starting from the given roots.
+
+    Each node entry is a tuple of (Node, State).
+
+    The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
+    that don't match it. The default predicate eliminates all `Noop` subgraphs.
+    """
+    def _default_entry_predicate(entry):
+      return type(entry.state) is not Noop
+    def _entry_predicate(entry):
+      return predicate(entry.node, entry.state)
+    entry_predicate = _entry_predicate if predicate else _default_entry_predicate
+
+    root_entries = []
+    for root in roots:
+      entry = self._nodes.get(root, None)
+      if entry:
+        root_entries.append(entry)
+
+    for entry in self._walk_entries(root_entries, entry_predicate, dependents=dependents):
+      yield (entry.node, entry.state)
+
+  def _walk_entries(self, root_entries, entry_predicate, dependents=False):
+    stack = deque(root_entries)
+    walked = set()
+    while stack:
+      entry = stack.pop()
+      if entry in walked:
         continue
-      if isinstance(value, collections.MutableMapping):
-        for _, v in sorted(value.items(), key=_key_func):
-          maybe_append(key, v)
-      elif isinstance(value, collections.MutableSequence):
-        for v in value:
-          maybe_append(key, v)
-      else:
-        maybe_append(key, value)
-
-  collect_dependencies(struct)
-  return UnhydratedStruct(address, struct, dependencies)
-
-
-def hydrate_struct(unhydrated_struct, dependencies):
-  """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
-
-  Note that this relies on the guarantee that DependenciesNode provides dependencies in the
-  order they were requested.
-  """
-  address = unhydrated_struct.address
-  struct = unhydrated_struct.struct
-
-  def maybe_consume(outer_key, value):
-    if isinstance(value, six.string_types):
-      if outer_key == 'dependencies':
-        # Don't recurse into the dependencies field of a Struct, since those will be explicitly
-        # requested by tasks. But do ensure that their addresses are absolute, since we're
-        # about to lose the context in which they were declared.
-        value = Address.parse(value, relative_to=address.spec_path)
-      else:
-        value = dependencies[maybe_consume.idx]
-        maybe_consume.idx += 1
-    elif isinstance(value, Struct):
-      value = consume_dependencies(value)
-    return value
-  # NB: Some pythons throw an UnboundLocalError for `idx` if it is a simple local variable.
-  maybe_consume.idx = 0
-
-  # 'zip' the previously-requested dependencies back together as struct fields.
-  def consume_dependencies(item, args=None):
-    hydrated_args = args or {}
-    for key, value in sorted(item._asdict().items(), key=_key_func):
-      if not AddressableDescriptor.is_addressable(item, key):
-        hydrated_args[key] = value
+      walked.add(entry)
+      if not entry_predicate(entry):
         continue
+      stack.extend(entry.dependents if dependents else entry.dependencies)
 
-      if isinstance(value, collections.MutableMapping):
-        container_type = type(value)
-        hydrated_args[key] = container_type((k, maybe_consume(key, v))
-                                            for k, v in sorted(value.items(), key=_key_func))
-      elif isinstance(value, collections.MutableSequence):
-        container_type = type(value)
-        hydrated_args[key] = container_type(maybe_consume(key, v) for v in value)
+      yield entry
+
+  def execution(self, root_entries):
+    roots = [id(r) for r in root_entries]
+    execution = self._native.gc(self._native.lib.execution_create(roots, len(roots)),
+                                self._native.lib.execution_destroy)
+    return execution
+
+  def execution_next(self, execution, waiting_entries, completed_entries):
+    # Prepare arrays for each input.
+    waiting = [id(e) for e in waiting_entries]
+    completed = [id(e) for e in completed_entries]
+    states = [e.state.type_id for e in completed_entries]
+
+    # Convert the output Steps to a list of tuples of Node, dependencies, cyclic_dependencies.
+    raw_steps = self._native.lib.execution_next(self._graph,
+                                                execution,
+                                                waiting, len(waiting),
+                                                completed, len(completed),
+                                                states, len(states))
+    def entries(ptr, count):
+      return [self._entry_for_id(ptr[i]) for i in range(0, count)]
+
+    for step in self._native.unpack(raw_steps[0].steps_ptr, raw_steps[0].steps_len):
+      yield (
+        self._entry_for_id(step.node),
+        entries(step.dependencies_ptr, step.dependencies_len),
+        entries(step.cyclic_dependencies_ptr, step.cyclic_dependencies_len),
+      )
+
+  def trace(self, root):
+    """Yields a stringified 'stacktrace' starting from the given failed root.
+
+    TODO: This could use polish. In particular, the `__str__` representations of Nodes and
+    States are probably not sufficient for user output.
+    """
+
+    traced = set()
+
+    def is_bottom(entry):
+      return type(entry.state) in (Noop, Return) or entry in traced
+
+    def is_one_level_above_bottom(parent_entry):
+      return all(is_bottom(child_entry) for child_entry in parent_entry.dependencies)
+
+    def _format(level, entry, state):
+      output = '{}Computing {} for {}'.format('  ' * level,
+                                              entry.node.product.__name__,
+                                              entry.node.subject)
+      if is_one_level_above_bottom(entry):
+        output += '\n{}{}'.format('  ' * (level + 1), state)
+
+      return output
+
+    def _trace(entry, level):
+      if is_bottom(entry):
+        return
+      traced.add(entry)
+      yield _format(level, entry, entry.state)
+      for dep in entry.cyclic_dependencies:
+        yield _format(level, entry, Noop.cycle(entry.node, dep))
+      for dep_entry in entry.dependencies:
+        for l in _trace(dep_entry, level+1):
+          yield l
+
+    for line in _trace(self._nodes[root], 1):
+      yield line
+
+  def visualize(self, roots):
+    """Visualize a graph walk by generating graphviz `dot` output.
+
+    :param iterable roots: An iterable of the root nodes to begin the graph walk from.
+    """
+    viz_colors = {}
+    viz_color_scheme = 'set312'  # NB: There are only 12 colors in `set312`.
+    viz_max_colors = 12
+
+    def format_color(node, node_state):
+      if type(node_state) is Throw:
+        return 'tomato'
+      elif type(node_state) is Noop:
+        return 'white'
+      return viz_colors.setdefault(node.product, (len(viz_colors) % viz_max_colors) + 1)
+
+    def format_type(node):
+      return node.func.__name__ if type(node) is TaskNode else type(node).__name__
+
+    def format_subject(node):
+      if node.variants:
+        return '({})@{}'.format(node.subject,
+                                ','.join('{}={}'.format(k, v) for k, v in node.variants))
       else:
-        hydrated_args[key] = maybe_consume(key, value)
-    return _hydrate(type(item), address.spec_path, **hydrated_args)
+        return '({})'.format(node.subject)
 
-  return consume_dependencies(struct, args={'address': address})
+    def format_product(node):
+      if type(node) is SelectNode and node.variant_key:
+        return '{}@{}'.format(node.product.__name__, node.variant_key)
+      return node.product.__name__
 
+    def format_node(node, state):
+      return '{}:{}:{} == {}'.format(format_product(node),
+                                     format_subject(node),
+                                     format_type(node),
+                                     str(state).replace('"', '\\"'))
 
-def _hydrate(item_type, spec_path, **kwargs):
-  # If the item will be Locatable, inject the spec_path.
-  if issubclass(item_type, Locatable):
-    kwargs['spec_path'] = spec_path
+    def format_edge(src_str, dest_str, cyclic):
+      style = " [style=dashed]" if cyclic else ""
+      return '    "{}" -> "{}"{}'.format(node_str, format_node(dep, dep_state), style)
 
-  try:
-    item = item_type(**kwargs)
-  except TypeConstraintError as e:
-    raise ResolvedTypeMismatchError(e)
+    yield 'digraph plans {'
+    yield '  node[colorscheme={}];'.format(viz_color_scheme)
+    yield '  concentrate=true;'
+    yield '  rankdir=LR;'
 
-  # Let factories replace the hydrated object.
-  if isinstance(item, SerializableFactory):
-    item = item.create()
+    predicate = lambda n, s: type(s) is not Noop
 
-  # Finally make sure objects that can self-validate get a chance to do so.
-  if isinstance(item, Validatable):
-    item.validate()
+    for (node, node_state) in self.walk(roots, predicate=predicate):
+      node_str = format_node(node, node_state)
 
-  return item
+      yield '  "{}" [style=filled, fillcolor={}];'.format(node_str, format_color(node, node_state))
 
+      for cyclic, adjacencies in ((False, self.dependencies_of), (True, self.cyclic_dependencies_of)):
+        for dep in adjacencies(node):
+          dep_state = self.state(dep)
+          if not predicate(dep, dep_state):
+            continue
+          yield format_edge(node_str, format_node(dep, dep_state), cyclic)
 
-def identity(v):
-  return v
-
-
-def address_from_address_family(address_family, single_address):
-  """Given an AddressFamily and a SingleAddress, return an Addresses object containing the Address.
-
-  Raises an exception if the SingleAddress does not match an existing Address.
-  """
-  name = single_address.name
-  if name is None:
-    name = basename(single_address.directory)
-  if name not in address_family.objects_by_name:
-    _raise_did_you_mean(address_family, single_address.name)
-  return Addresses(tuple([Address(address_family.namespace, name)]))
-
-
-def addresses_from_address_family(address_family):
-  """Given an AddressFamily, return an Addresses objects containing all of its `addressables`."""
-  return Addresses(tuple(address_family.addressables.keys()))
-
-
-def addresses_from_address_families(address_families):
-  """Given a list of AddressFamilies, return an Addresses object containing all addressables."""
-  return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
-
-
-def filter_build_dirs(build_files):
-  """Given Files matching a build pattern, return their parent directories as BuildDirs."""
-  dirnames = set(dirname(f.stat.path) for f in build_files.dependencies)
-  return BuildDirs(tuple(Dir(d) for d in dirnames))
-
-
-def descendant_addresses_to_globs(address_mapper, descendant_addresses):
-  """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
-  
-  This allows us to limit our AddressFamily requests to directories that contain build files.
-  """
-
-  pattern = address_mapper.build_pattern
-  return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
-
-
-def create_graph_tasks(address_mapper, symbol_table_cls):
-  """Creates tasks used to parse Structs from BUILD files.
-
-  :param address_mapper_key: The subject key for an AddressMapper instance.
-  :param symbol_table_cls: A SymbolTable class to provide symbols for Address lookups.
-  """
-  return [
-    # Support for resolving Structs from Addresses
-    (Struct,
-     [Select(UnhydratedStruct),
-      SelectDependencies(Struct, UnhydratedStruct)],
-     hydrate_struct),
-    (UnhydratedStruct,
-     [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
-      Select(Address)],
-     resolve_unhydrated_struct),
-  ] + [
-    # BUILD file parsing.
-    (AddressFamily,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(Dir),
-      SelectProjection(FilesContent, Files, ('files',), BuildFiles)],
-     parse_address_family),
-    (BuildFiles,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(DirectoryListing)],
-     filter_buildfile_paths),
-  ] + [
-    # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
-    # define that lookup for each literal product.
-    (product,
-     [Select(Struct)],
-     identity)
-    for product in symbol_table_cls.table().values() if product is not Struct
-  ] + [
-    # Simple spec handling.
-    (Addresses,
-     [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
-      Select(SingleAddress)],
-     address_from_address_family),
-    (Addresses,
-     [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
-     addresses_from_address_family),
-  ] + [
-    # Recursive spec handling: locate directories that contain build files, and request
-    # AddressFamilies for each of them.
-    (Addresses,
-     [SelectDependencies(AddressFamily, BuildDirs)],
-     addresses_from_address_families),
-    (BuildDirs,
-     [Select(Files)],
-     filter_build_dirs),
-    (PathGlobs,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(DescendantAddresses)],
-     descendant_addresses_to_globs),
-  ]
+    yield '}'

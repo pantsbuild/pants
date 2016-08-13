@@ -1,0 +1,7 @@
+[project]
+version = "0.0.1"
+name = "graph"
+authors = [ "Stu Hood <stuhood@gmail.com>" ]
+
+[lib]
+crate-type = ["dylib"]

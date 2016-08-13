@@ -16,6 +16,8 @@ from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
+from pants.engine.subsystem.native import Native
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 # Macro that adds the specified tag.
@@ -41,42 +43,41 @@ class TaggingSymbolTable(LegacySymbolTable):
 
 
 class GraphInvalidationTest(unittest.TestCase):
-  def _make_setup_args(self, specs, symbol_table_cls=None):
+  def _make_setup_args(self, specs, **kwargs):
     options = mock.Mock()
     options.target_specs = specs
-    return dict(options=options, symbol_table_cls=symbol_table_cls)
+    kwargs['options'] = options
+    return kwargs
 
   @contextmanager
   def open_scheduler(self, specs, symbol_table_cls=None):
-    kwargs = self._make_setup_args(specs, symbol_table_cls=symbol_table_cls)
-    with EngineInitializer.open_legacy_graph(**kwargs) as triple:
-      yield triple
-
-  @contextmanager
-  def open_pg(self, specs):
-    with self.open_scheduler(specs) as (_, _, scheduler):
-      yield scheduler.product_graph
+    with subsystem_instance(Native.Factory) as native_factory:
+      kwargs = self._make_setup_args(specs,
+                                     native=native_factory.create(),
+                                     symbol_table_cls=symbol_table_cls)
+      with EngineInitializer.open_legacy_graph(**kwargs) as triple:
+        yield triple
 
   def test_invalidate_fsnode(self):
-    with self.open_pg(['3rdparty/python::']) as product_graph:
-      initial_node_count = len(product_graph)
+    with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):
+      initial_node_count = len(scheduler.product_graph)
       self.assertGreater(initial_node_count, 0)
 
-      invalidated_count = product_graph.invalidate_files(['3rdparty/python/BUILD'])
+      invalidated_count = scheduler.invalidate_files(['3rdparty/python/BUILD'])
       self.assertGreater(invalidated_count, 0)
-      self.assertLess(len(product_graph), initial_node_count)
+      self.assertLess(len(scheduler.product_graph), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
-    with self.open_pg(['3rdparty::']) as product_graph:
-      node_count = len(product_graph)
+    with self.open_scheduler(['3rdparty::']) as (_, _, scheduler):
+      node_count = len(scheduler.product_graph)
       self.assertGreater(node_count, 0)
 
       # Invalidate the '3rdparty/python' DirectoryListing, and then the `3rdparty` DirectoryListing.
       # by "touching" random files.
       for filename in ('3rdparty/python/BUILD', '3rdparty/CHANGED_RANDOM_FILE'):
-        invalidated_count = product_graph.invalidate_files([filename])
+        invalidated_count = scheduler.invalidate_files([filename])
         self.assertGreater(invalidated_count, 0)
-        node_count, last_node_count = len(product_graph), node_count
+        node_count, last_node_count = len(scheduler.product_graph), node_count
         self.assertLess(node_count, last_node_count)
 
   def test_sources_ordering(self):

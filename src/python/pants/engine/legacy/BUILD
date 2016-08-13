@@ -49,7 +49,7 @@ python_library(
     'src/python/pants/base:parse_context',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'src/python/pants/engine:graph',
+    'src/python/pants/engine:build_files',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:selectors',
     'src/python/pants/source',

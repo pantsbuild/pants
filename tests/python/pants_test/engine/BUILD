@@ -52,6 +52,18 @@ python_tests(
   ]
 )
 
+python_tests(
+  name='graph',
+  sources=['test_graph.py'],
+  coverage=['pants.engine.graph'],
+  dependencies=[
+    'src/python/pants/build_graph',
+    'tests/python/pants_test/engine/examples:planners',
+    'src/python/pants/engine:engine',
+    'src/python/pants/engine:graph',
+  ]
+)
+
 
 python_tests(
   name='isolated_process',
@@ -110,13 +122,13 @@ python_tests(
 )
 
 python_tests(
-  name='graph',
-  sources=['test_graph.py'],
+  name='build_files',
+  sources=['test_build_files.py'],
   dependencies=[
     ':scheduler_test_base',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:build_files',
     'src/python/pants/engine:engine',
-    'src/python/pants/engine:graph',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:storage',
@@ -162,9 +174,11 @@ python_tests(
   coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
   dependencies=[
     'src/python/pants/build_graph',
-    'tests/python/pants_test/engine/examples:planners',
+    'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
+    'tests/python/pants_test/engine/examples:planners',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
@@ -173,12 +187,14 @@ python_tests(
   sources=['scheduler_test_base.py'],
   dependencies=[
     'src/python/pants/base:project_tree',
+    'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:engine',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:storage',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
