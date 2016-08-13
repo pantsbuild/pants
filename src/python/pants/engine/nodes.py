@@ -456,9 +456,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       # Additionally, since the FS event service does not send invalidation events
       # for the root directory, treat any changed file in the root as an invalidation
       # of the root's listing.
-      print(dirname(f))
       if dirname(f) in ('.', ''):
-        print('>>>')
         yield Dir('')
 
   def step(self, step_context):

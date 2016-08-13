@@ -44,7 +44,7 @@ class GraphInvalidationTest(unittest.TestCase):
       self.assertLess(len(product_graph), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
-    with self.open_pg(['3rdparty/::']) as product_graph:
+    with self.open_pg(['//:', '3rdparty/::']) as product_graph:
       node_count = len(product_graph)
       self.assertGreater(node_count, 0)
 
@@ -52,7 +52,6 @@ class GraphInvalidationTest(unittest.TestCase):
       # and then the root DirectoryListing by "touching" files/dirs.
       for filename in ('3rdparty/python/BUILD', '3rdparty/python', 'non_existing_file'):
         invalidated_count = product_graph.invalidate_files([filename])
-        print(len(product_graph))
         self.assertGreater(invalidated_count,
                            0,
                            'File {} did not invalidate any Nodes.'.format(filename))
