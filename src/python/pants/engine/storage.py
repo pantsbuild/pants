@@ -152,6 +152,7 @@ class Storage(Closable):
     self._contents = contents
     self._key_mappings = key_mappings
     self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
+    self._memo = dict()
 
   def put(self, obj):
     """Serialize and hash something pickleable, returning a unique key to retrieve it later.
@@ -167,10 +168,12 @@ class Storage(Closable):
         pickler.fast = 1
         pickler.dump(obj)
         blob = buf.getvalue()
+
         # Hash the blob and store it if it does not exist.
         key = Key.create(blob)
-
-        self._contents.put(key.digest, blob)
+        if key not in self._memo:
+          self._memo[key] = obj
+          self._contents.put(key.digest, blob)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
@@ -188,6 +191,9 @@ class Storage(Closable):
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
 
+    obj = self._memo.get(key)
+    if obj is not None:
+      return obj
     return self._contents.get(key.digest, _unpickle)
 
   def put_state(self, state):
