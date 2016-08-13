@@ -42,12 +42,16 @@ class ProductGraph(object):
     Equality for this object is intentionally `identity` for efficiency purposes: structural
     equality can be implemented by comparing the result of the `structure` method.
     """
-    __slots__ = ('node', 'state', 'dependencies', 'dependents', 'cyclic_dependencies')
+    __slots__ = ('node', 'state', 'coroutine', 'dependencies', 'dependents', 'cyclic_dependencies')
 
     def __init__(self, node):
       self.node = node
-      # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
-      self.state = None
+      # The current state of the Node: while a Node is between executions and before it
+      # has completed, this will be a Waiting state containing the next requested
+      # dependecies.
+      self.state = Waiting([])
+      # The coroutine for this Node. Before and after a Node executes, this will be None.
+      self.coroutine = None
       # Sets of dependency/dependent Entry objects.
       self.dependencies = set()
       self.dependents = set()
@@ -58,7 +62,7 @@ class ProductGraph(object):
 
     @property
     def is_complete(self):
-      return self.state is not None
+      return type(self.state) is not Waiting
 
     def validate_not_complete(self):
       if self.is_complete:
@@ -69,15 +73,6 @@ class ProductGraph(object):
 
     def set_state(self, state):
       self.validate_not_complete()
-
-      # Validate that a completed Node depends only on other completed Nodes.
-      for dep in self.dependencies:
-        if not dep.is_complete:
-          raise IncompleteDependencyException(
-              'Cannot complete {} with {} while it has an incomplete dep:\n  {}'
-                .format(self, state, dep.node))
-
-      # Finally, set.
       self.state = state
 
     def structure(self):
@@ -110,12 +105,20 @@ class ProductGraph(object):
     if type(state) not in [Return, Throw, Noop]:
       raise ValueError('A Node may only be completed with a final State. Got: {}'.format(state))
     entry = self.ensure_entry(node)
+
+    # Validate that a completed Node depends only on other completed Nodes.
+    for dep in entry.dependencies:
+      if not dep.is_complete:
+        raise IncompleteDependencyException(
+            'Cannot complete {} with {} while it has an incomplete dep:\n  {}'
+              .format(entry, state, dep.node))
+
     entry.set_state(state)
 
-  def add_dependencies(self, node, dependencies):
+  def add_dependencies(self, node, waiting_state):
     entry = self.ensure_entry(node)
-    entry.validate_not_complete()
-    self._add_dependencies(entry, dependencies)
+    entry.set_state(waiting_state)
+    self._add_dependencies(entry, waiting_state.dependencies)
 
   def _detect_cycle(self, src, dest):
     """Detect whether adding an edge from src to dest would create a cycle.
@@ -483,7 +486,6 @@ class LocalScheduler(object):
                tasks,
                project_tree,
                graph_lock=None,
-               inline_nodes=True,
                graph_validator=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
@@ -493,20 +495,16 @@ class LocalScheduler(object):
     :param project_tree: An instance of ProjectTree for the current build root.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
                        instance. Defaults to creating a new threading.RLock().
-    :param inline_nodes: Whether to inline execution of `inlineable` Nodes. This improves
-                         performance, but can make debugging more difficult because the entire
-                         execution history is not recorded in the ProductGraph.
     :param graph_validator: A validator that runs over the entire graph after every scheduling
                             attempt. Very expensive, very experimental.
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
-    self._node_builder = NodeBuilder.create(tasks)
 
     self._graph_validator = graph_validator
     self._product_graph = ProductGraph()
     self._product_graph_lock = graph_lock or threading.RLock()
-    self._inline_nodes = inline_nodes
+    self._step_context = StepContext(NodeBuilder.create(tasks), self._project_tree)
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -525,30 +523,30 @@ class LocalScheduler(object):
     If the currently declared dependencies of a Node are not yet available, returns None. If
     they are available, runs a Step and returns the resulting State.
     """
-    # See whether all of the dependencies for the node are available.
+    # See whether all dependencies the Node is currently blocking for are available.
     if any(not dep_entry.is_complete for dep_entry in node_entry.dependencies):
       return None
 
-    # Collect the deps.
-    deps = dict()
+    node_entry.validate_not_complete()
+
+    # Collect all dependencies that have been declared.
+    # TODO: this can likely be optimized to avoid the dict.
+    all_deps = dict()
     for dep_entry in node_entry.dependencies:
-      deps[dep_entry.node] = dep_entry.state
+      all_deps[dep_entry.node] = dep_entry.state
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in node_entry.cyclic_dependencies:
-      deps[dep] = Noop.cycle(node_entry.node, dep)
+      all_deps[dep] = Noop.cycle(node_entry.node, dep)
 
-    # Run.
-    step_context = StepContext(self.node_builder, self._project_tree, deps, self._inline_nodes)
-    return node_entry.node.step(step_context)
+    # Filter deps to exactly what the coroutine is currently Waiting for.
+    deps = [all_deps[dep] for dep in node_entry.state.dependencies]
 
-  @property
-  def node_builder(self):
-    """Return the NodeBuilder instance for this Scheduler.
-
-    A NodeBuilder is a relatively heavyweight object (since it contains an index of all
-    registered tasks), so it should be used for the execution of multiple Steps.
-    """
-    return self._node_builder
+    # Initialize the coroutine if this is the first time it is running.
+    if node_entry.coroutine is None:
+      node_entry.coroutine = node_entry.node.step(self._step_context)
+      return node_entry.coroutine.send(None)
+    else:
+      return node_entry.coroutine.send(deps)
 
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
@@ -632,18 +630,18 @@ class LocalScheduler(object):
       runnable_count, scheduling_iterations = 0, 0
       start_time = time.time()
       while True:
-        # Drain the candidate list to create Runnables for the Engine.
+        # Drain the candidate stack to create Runnables for the Engine.
         runnable = []
         while candidates:
-          node_entry = candidates.popleft()
+          node_entry = candidates.pop()
           if node_entry.is_complete or node_entry in outstanding:
-            # Node has already completed, or is runnable
+            # Node has already completed, or is Runnable.
             continue
-          # Create a step if all dependencies are available; otherwise, can assume they are
-          # outstanding, and will cause this Node to become a candidate again later.
+          # Run steps as long as dependencies are available; otherwise, can assume they
+          # are outstanding, and will cause this Node to become a candidate again later.
           state = self._attempt_run_step(node_entry)
           if state is None:
-            # No state change.
+            # Wasn't ready to run.
             continue
 
           # The Node's state is changing due to this Step.
@@ -653,7 +651,7 @@ class LocalScheduler(object):
             outstanding.add(node_entry)
           elif type(state) is Waiting:
             # Waiting on dependencies.
-            self._product_graph.add_dependencies(node_entry.node, state.dependencies)
+            self._product_graph.add_dependencies(node_entry.node, state)
             incomplete_deps = [d for d in node_entry.dependencies if not d.is_complete]
             if incomplete_deps:
               # Mark incomplete deps as candidates for Steps.
