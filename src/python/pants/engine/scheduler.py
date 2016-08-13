@@ -129,20 +129,26 @@ class ProductGraph(object):
 
     Returns True if a cycle would be created by adding an edge from src->dest.
     """
-    if len(src.dependents) < len(dest.dependencies):
+    # Attempt to minimize the number of entries visited by searching in the direction
+    # with the fewest edges.
+    if not dest.dependencies:
+      # The common case: no outbound edges, so no cycles.
+      return False
+    elif len(src.dependents) < len(dest.dependencies):
       # Search backward from src.
-      begin, end = src, dest
+      roots, end = src.dependents, dest
       dependents = True
       predicate = lambda _: True
     else:
       # Search forward from dest.
-      begin, end = dest, src
+      roots, end = dest.dependencies, src
       dependents = False
       # We disallow adding new edges outbound from completed Nodes, and no completed Node can have
       # a path to an uncompleted Node. Thus, we can truncate our search for cycles at any completed
       # Node.
       predicate = lambda e: not e.is_complete
-    for entry in self._walk_entries([begin], entry_predicate=predicate, dependents=dependents):
+
+    for entry in self._walk_entries(roots, entry_predicate=predicate, dependents=dependents):
       if entry is end:
         return True
     return False
