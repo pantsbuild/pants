@@ -5,7 +5,7 @@ python_tests(
   name = 'http',
   sources = globs('*.py'),
   dependencies = [
-    '3rdparty/python:mox',
+    '3rdparty/python:mock',
     '3rdparty/python:requests',
     '3rdparty/python:six',
     'src/python/pants/net',

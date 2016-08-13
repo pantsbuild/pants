@@ -7,23 +7,32 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from twitter.common.collections import maybe_list
+from twitter.common.collections import OrderedSet, maybe_list
 
-from pants.backend.jvm.targets.jvm_app import BundleProps, JvmApp
+from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, TaskNode, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
-from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
+
+
+class _DestWrapper(datatype('DestWrapper', ['target_types'])):
+  """A wrapper for dest field of RemoteSources target.
+
+  This is only used when instantiating RemoteSources target.
+  """
 
 
 class LegacyBuildGraph(BuildGraph):
@@ -87,7 +96,7 @@ class LegacyBuildGraph(BuildGraph):
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
-    deps_to_inject = set()
+    deps_to_inject = OrderedSet()
     addresses_to_inject = set()
     def inject(target, dep_spec, is_dependency):
       address = Address.parse(dep_spec, relative_to=target.address.spec_path)
@@ -139,6 +148,8 @@ class LegacyBuildGraph(BuildGraph):
       # Instantiate.
       if target_cls is JvmApp:
         return self._instantiate_jvm_app(kwargs)
+      elif target_cls is RemoteSources:
+        return self._instantiate_remote_sources(kwargs)
       return target_cls(build_graph=self, **kwargs)
     except TargetDefinitionException:
       raise
@@ -149,12 +160,19 @@ class LegacyBuildGraph(BuildGraph):
 
   def _instantiate_jvm_app(self, kwargs):
     """For JvmApp target, convert BundleAdaptor to BundleProps."""
+    parse_context = ParseContext(kwargs['address'].spec_path, dict())
+    bundleprops_factory = Bundle(parse_context)
     kwargs['bundles'] = [
-      BundleProps.create_bundle_props(bundle.kwargs()['fileset'])
+      bundleprops_factory.create_bundle_props(bundle)
       for bundle in kwargs['bundles']
     ]
 
     return JvmApp(build_graph=self, **kwargs)
+
+  def _instantiate_remote_sources(self, kwargs):
+    """For RemoteSources target, convert "dest" field to its real target type."""
+    kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']._type_alias],))
+    return RemoteSources(build_graph=self, **kwargs)
 
   def inject_synthetic_target(self,
                               address,
@@ -232,15 +250,21 @@ def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
   return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
 
 
-def _eager_fileset_with_spec(spec_path, filespecs, source_files_digest, excluded_source_files):
+def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):
   excluded = {f.path for f in excluded_source_files.dependencies}
   file_tuples = [(fast_relpath(fd.path, spec_path), fd.digest)
                  for fd in source_files_digest.dependencies
                  if fd.path not in excluded]
+
+  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
+  if filespec.has_key('exclude'):
+    relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
+                                            for e in filespec['exclude']]
+
   # NB: In order to preserve declared ordering, we record a list of matched files
   # independent of the file hash dict.
   return EagerFilesetWithSpec(spec_path,
-                              filespecs,
+                              relpath_adjusted_filespec,
                               files=tuple(f for f, _ in file_tuples),
                               file_hashes=dict(file_tuples))
 
@@ -264,7 +288,7 @@ def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
   for bundle, filespecs, files_digest, excluded_files in zipped:
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
-    kwargs['fileset'] = _eager_fileset_with_spec(spec_path,
+    kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
                                                  filespecs,
                                                  files_digest,
                                                  excluded_files)

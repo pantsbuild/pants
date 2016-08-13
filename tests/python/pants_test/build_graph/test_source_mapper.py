@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from textwrap import dedent
+
 # TODO: Create a dummy target type in this test and remove this dep.
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -37,6 +39,22 @@ class SourceMapperTest(object):
 
   def owner(self, owner, f):
     self.assertEqual(set(owner), set(i.spec for i in self.get_mapper().target_addresses_for_source(f)))
+
+  def test_target_address_for_source_yields_unique_addresses(self):
+    # NB If the mapper returns more than one copy of an address, it may cause other code to do
+    #    unnecessary work.
+    self.add_to_build_file('path', dedent('''
+    java_library(name='target',
+                 sources=['BUILD'],
+                 resources=[':buildholder']
+    )
+    java_library(name='buildholder',
+                 sources=['BUILD']
+    )
+    '''))
+
+    self.assertEquals(['path:target', 'path:buildholder'],
+                      list(a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')))
 
   def test_joint_ownership(self):
     # A simple target with two sources.

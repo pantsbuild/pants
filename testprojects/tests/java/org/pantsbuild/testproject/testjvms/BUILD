@@ -40,6 +40,7 @@ junit_tests(name='eight-test-platform',
 )
 
 java_library(name='base',
+  platform='java6',
   sources=['TestBase.java'],
   dependencies=['3rdparty:junit'],
 )

@@ -7,11 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 
 class BuildGraphIntegrationTest(PantsRunIntegrationTest):
 
+  @ensure_engine
   def test_cycle(self):
     prefix = 'testprojects/src/java/org/pantsbuild/testproject'
     with self.file_renamed(os.path.join(prefix, 'cycle1'), 'TEST_BUILD', 'BUILD'):

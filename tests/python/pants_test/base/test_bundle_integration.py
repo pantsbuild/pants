@@ -10,7 +10,7 @@ import subprocess
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 
 class Bundles(object):
@@ -133,3 +133,14 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
         ],
         set(Bundles.all_bundles) - {Bundles.there_was_a_duck, Bundles.once_upon_a_time},
     )
+
+  @ensure_engine
+  def test_bundle_resource_ordering(self):
+    """Ensures that `resources=` ordering is respected."""
+    pants_run = self.run_pants(
+      ['-q',
+       'run',
+       'testprojects/src/java/org/pantsbuild/testproject/bundle:bundle-resource-ordering']
+    )
+    self.assert_success(pants_run)
+    self.assertEquals(pants_run.stdout_data, 'Hello world from Foo\n\n')

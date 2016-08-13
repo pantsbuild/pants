@@ -85,6 +85,16 @@ python_tests(
 )
 
 python_tests(
+  name='python_isort_task',
+  sources=['test_python_isort.py'],
+  dependencies=[
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+    'tests/python/pants_test:base_test',
+  ],
+)
+
+python_tests(
   name='setup_py',
   sources=['test_setup_py.py'],
   dependencies=[
