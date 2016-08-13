@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import abstractmethod, abstractproperty
+from os.path import dirname
 
 from twitter.common.collections import OrderedSet
 
-from os.path import dirname
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
