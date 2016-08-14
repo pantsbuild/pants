@@ -119,12 +119,7 @@ impl Graph {
    * Returns true if a cycle would be created by adding an edge from src->dst.
    */
   fn detect_cycle(&self, src: Node, dst: Node) -> bool {
-    for node in self.walk(&vec![dst], { |entry| !self.is_complete_entry(entry) }, false) {
-      if node == src {
-        return true;
-      }
-    }
-    return false;
+    self.walk(&vec![dst], { |entry| !self.is_complete_entry(entry) }, false).any(|node| node == src)
   }
 
   /**
