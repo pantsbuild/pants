@@ -160,13 +160,11 @@ class IdeaPluginGen(ConsoleTask):
   def execute(self):
     jvm_target_num = len(filter(lambda x: isinstance(x, JvmTarget), self.context.target_roots))
     python_target_num = len(filter(lambda x: isinstance(x, PythonTarget), self.context.target_roots))
-
-    ide_file = self.generate_project()
-
     if python_target_num > jvm_target_num:
       logging.warn("This is a python project. "
                    "Please make sure to select the proper python interpreter as the project SDK.")
 
+    ide_file = self.generate_project()
     if ide_file and self.get_options().open:
       open_with = self.get_options().open_with
       if open_with:
