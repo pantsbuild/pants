@@ -270,8 +270,8 @@ impl Execution {
     for &node in changed {
       match graph.nodes.get(&node) {
         Some(entry) if graph.is_complete(node) => {
-          // Mark any ready dependents of the Node as candidates.
-          candidates.extend(entry.dependents.iter().filter(|&d| graph.is_ready(*d)));
+          // Mark any dependents of the Node as candidates.
+          candidates.extend(&entry.dependents);
         },
         Some(entry) => {
           // If all dependencies of the Node are completed, the Node itself is a candidate.
@@ -301,14 +301,20 @@ impl Execution {
     self.ready.extend(
       candidates.iter()
         .map(|n| *n)
-        .map(|node| {
-          let entry = graph.ensure_entry(node);
-          RawStep {
-            node: node,
-            dependencies_ptr: entry.dependencies.as_mut_ptr(),
-            dependencies_len: entry.dependencies.len() as u64,
-            cyclic_dependencies_ptr: entry.cyclic_dependencies.as_mut_ptr(),
-            cyclic_dependencies_len: entry.cyclic_dependencies.len() as u64,
+        .filter_map(|node| {
+          if graph.is_ready(node) {
+            let entry = graph.ensure_entry(node);
+            Some(
+              RawStep {
+                node: node,
+                dependencies_ptr: entry.dependencies.as_mut_ptr(),
+                dependencies_len: entry.dependencies.len() as u64,
+                cyclic_dependencies_ptr: entry.cyclic_dependencies.as_mut_ptr(),
+                cyclic_dependencies_len: entry.cyclic_dependencies.len() as u64,
+              }
+            )
+          } else {
+            None
           }
         })
     );
