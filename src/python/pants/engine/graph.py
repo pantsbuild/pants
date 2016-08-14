@@ -31,19 +31,13 @@ class Graph(object):
 
     def __init__(self, node):
       self.node = node
-      # The current state of the Node: while a Node is between executions and before it
-      # has completed, this will be a Waiting state containing the next requested
-      # dependecies.
-      self.state = Waiting(tuple())
+      # The state of the Node, if it has completed.
+      self.state = None
       # The coroutine for this Node. Before and after a Node executes, this will be None.
       self.coroutine = None
 
-    @property
-    def is_complete(self):
-      return self.state is not None
-
     def structure(self):
-      return (self.node, self.state)
+      return (self.node, self.state, self.coroutine)
 
   def __init__(self, native, validator=None):
     self._validator = validator or Node.validate_node
