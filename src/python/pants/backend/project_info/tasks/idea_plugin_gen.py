@@ -54,10 +54,6 @@ class IdeaPluginGen(ConsoleTask):
   existing skeleton project into a Pants project as if user is importing these targets.
   """
 
-  # @classmethod
-  # def prepare(cls, options, round_manager):
-  #   super(IvyTaskMixin, cls).prepare(options, round_manager)
-
   @classmethod
   def register_options(cls, register):
     super(IdeaPluginGen, cls).register_options(register)
@@ -113,9 +109,7 @@ class IdeaPluginGen(ConsoleTask):
     return re.sub('[^0-9a-zA-Z:_]+', '.', '__'.join(target_specs))
 
   # TODO: https://github.com/pantsbuild/pants/issues/3198
-  # trim it down or refactor together with IdeaGen
   def generate_project(self):
-
     java_language_level = None
     for target in self.context.targets():
       if isinstance(target, JvmTarget):
