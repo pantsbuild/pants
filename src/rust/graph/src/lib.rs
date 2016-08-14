@@ -1,7 +1,9 @@
+mod core;
+mod nodes;
+
 use std::collections::{HashMap, HashSet, VecDeque};
 
-pub type Node = u64;
-pub type StateType = u8;
+use nodes::{Node, State};
 
 /**
  * An Entry and its adjacencies.
@@ -11,7 +13,7 @@ pub type StateType = u8;
  */
 pub struct Entry {
   node: Node,
-  state: StateType,
+  state: State,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: HashSet<Node>,
   dependents: HashSet<Node>,
@@ -25,12 +27,12 @@ pub struct Entry {
  * A DAG (enforced on mutation) of Entries.
  */
 pub struct Graph {
-  empty_state: StateType,
+  empty_state: State,
   nodes: HashMap<Node,Entry>,
 }
 
 impl Graph {
-  fn new(empty_state: StateType) -> Graph {
+  fn new(empty_state: State) -> Graph {
     Graph {
       empty_state: empty_state,
       nodes: HashMap::new()
@@ -77,7 +79,7 @@ impl Graph {
     )
   }
 
-  fn complete(&mut self, node: Node, state: StateType) {
+  fn complete(&mut self, node: Node, state: State) {
     assert!(
       self.is_ready(node),
       "Node {} is already completed, or has incomplete deps.",
@@ -337,114 +339,10 @@ impl Execution {
   }
 }
 
-/** TODO: Make the next four functions generic in the type being operated on? */
-
-fn with_execution<F,T>(execution_ptr: *mut Execution, mut f: F) -> T
-    where F: FnMut(&mut Execution)->T {
-  let mut execution = unsafe { Box::from_raw(execution_ptr) };
-  let t = f(&mut execution);
-  std::mem::forget(execution);
-  t
-}
-
 fn with_raw_steps<F,T>(raw_steps_ptr: *mut RawSteps, mut f: F) -> T
     where F: FnMut(&mut RawSteps)->T {
   let mut raw_steps = unsafe { Box::from_raw(raw_steps_ptr) };
   let t = f(&mut raw_steps);
   std::mem::forget(raw_steps);
   t
-}
-
-fn with_graph<F,T>(graph_ptr: *mut Graph, f: F) -> T
-    where F: Fn(&mut Graph)->T {
-  let mut graph = unsafe { Box::from_raw(graph_ptr) };
-  let t = f(&mut graph);
-  std::mem::forget(graph);
-  t
-}
-
-fn with_nodes<F,T>(nodes_ptr: *mut Node, nodes_len: usize, mut f: F) -> T
-    where F: FnMut(&Vec<Node>)->T {
-  let nodes = unsafe { Vec::from_raw_parts(nodes_ptr, nodes_len, nodes_len) };
-  let t = f(&nodes);
-  std::mem::forget(nodes);
-  t
-}
-
-#[no_mangle]
-pub extern fn graph_create(empty_state: StateType) -> *const Graph {
-  // allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  Box::into_raw(Box::new(Graph::new(empty_state)))
-}
-
-#[no_mangle]
-pub extern fn graph_destroy(graph_ptr: *mut Graph) {
-  // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
-  // to be destroyed at the end of this function.
-  let _ = unsafe { Box::from_raw(graph_ptr) };
-}
-
-#[no_mangle]
-pub extern fn len(graph_ptr: *mut Graph) -> u64 {
-  with_graph(graph_ptr, |graph| {
-    graph.len()
-  })
-}
-
-#[no_mangle]
-pub extern fn complete(graph_ptr: *mut Graph, node: Node, state: StateType) {
-  with_graph(graph_ptr, |graph| {
-    graph.complete(node, state);
-  })
-}
-
-#[no_mangle]
-pub extern fn await(graph_ptr: *mut Graph, src: Node, dsts_ptr: *mut Node, dsts_len: u64) {
-  with_graph(graph_ptr, |graph| {
-    with_nodes(dsts_ptr, dsts_len as usize, |dsts| {
-      graph.await(src, dsts);
-    })
-  })
-}
-
-#[no_mangle]
-pub extern fn invalidate(graph_ptr: *mut Graph, roots_ptr: *mut Node, roots_len: u64) -> u64 {
-  with_graph(graph_ptr, |graph| {
-    with_nodes(roots_ptr, roots_len as usize, |roots| {
-      graph.invalidate(roots) as u64
-    })
-  })
-}
-
-#[no_mangle]
-pub extern fn execution_create() -> *const Execution {
-  // create on the heap, and return a raw pointer to the boxed value.
-  Box::into_raw(Box::new(Execution::new()))
-}
-
-#[no_mangle]
-pub extern fn execution_next(
-  graph_ptr: *mut Graph,
-  execution_ptr: *mut Execution,
-  changed_ptr: *mut Node,
-  changed_len: u64,
-) -> *const RawSteps {
-  with_graph(graph_ptr, |graph| {
-    with_execution(execution_ptr, |execution| {
-      with_nodes(changed_ptr, changed_len as usize, |changed| {
-        execution.next(graph, changed);
-        execution.ready_raw
-      })
-    })
-  })
-}
-
-#[no_mangle]
-pub extern fn execution_destroy(execution_ptr: *mut Execution) {
-  // convert the raw pointers back to Boxes (without `forget`ing them) in order to cause them
-  // to be destroyed at the end of this function.
-  unsafe {
-    let execution = Box::from_raw(execution_ptr);
-    let _ = Box::from_raw(execution.ready_raw);
-  };
 }
