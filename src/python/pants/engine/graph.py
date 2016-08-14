@@ -27,12 +27,16 @@ class Graph(object):
     Equality for this object is intentionally `identity` for efficiency purposes: structural
     equality can be implemented by comparing the result of the `structure` method.
     """
-    __slots__ = ('node', 'state')
+    __slots__ = ('node', 'state', 'coroutine')
 
     def __init__(self, node):
       self.node = node
-      # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
-      self.state = None
+      # The current state of the Node: while a Node is between executions and before it
+      # has completed, this will be a Waiting state containing the next requested
+      # dependecies.
+      self.state = Waiting(tuple())
+      # The coroutine for this Node. Before and after a Node executes, this will be None.
+      self.coroutine = None
 
     @property
     def is_complete(self):
@@ -59,15 +63,16 @@ class Graph(object):
       return None
     return entry.state
 
-  def complete_node(self, node_entry, state):
+  def complete(self, node_entry, state):
     """Completes the given entry with the given state."""
-    self._native.lib.complete_node(self._graph, id(node_entry), state.type_id)
+    self._native.lib.complete(self._graph, id(node_entry), state.type_id)
     node_entry.state = state
+    node_entry.coroutine = None
 
-  def add_dependencies(self, node_entry, dependencies):
-    """Adds the given dependencies for the given entry, which must be in the Waiting state."""
+  def await(self, node_entry, dependencies):
+    """Set the entry (which must be in the Waiting state) as awaiting the given dependencies."""
     deps = [id(self.ensure_entry(d)) for d in dependencies]
-    self._native.lib.add_dependencies(self._graph, id(node_entry), deps, len(deps))
+    self._native.lib.await(self._graph, id(node_entry), deps, len(deps))
 
   def ensure_entry(self, node):
     """Returns the Entry for the given Node, creating it if it does not already exist."""
@@ -99,11 +104,6 @@ class Graph(object):
     for node, entry in self._nodes.items():
       yield node, [d.node for d in entry.dependencies]
 
-  def cyclic_dependencies(self):
-    """In linear time, yields the cyclic_dependencies lists for all Nodes."""
-    for node, entry in self._nodes.items():
-      yield node, entry.cyclic_dependencies
-
   def dependents_of(self, node):
     entry = self._nodes.get(node, None)
     if entry:
@@ -119,12 +119,6 @@ class Graph(object):
   def dependencies_of(self, node):
     for d in self._dependency_entries_of(node):
       yield d.node
-
-  def cyclic_dependencies_of(self, node):
-    entry = self._nodes.get(node, None)
-    if not entry:
-      return set()
-    return entry.cyclic_dependencies
 
   def invalidate(self, predicate=None):
     """Invalidate nodes and their subgraph of dependents given a predicate.
@@ -212,15 +206,18 @@ class Graph(object):
     raw_steps = self._native.lib.execution_next(self._graph,
                                                 execution,
                                                 changed, len(changed))
-    def entries(ptr, count):
-      return [self._entry_for_id(ptr[i]) for i in range(0, count)]
 
+    # For each Node, collecting the dependency states, some of which will be cyclic. 
     for step in self._native.unpack(raw_steps[0].steps_ptr, raw_steps[0].steps_len):
-      yield (
-        self._entry_for_id(step.node),
-        entries(step.dependencies_ptr, step.dependencies_len),
-        [d.node for d in entries(step.cyclic_dependencies_ptr, step.cyclic_dependencies_len)],
-      )
+      node_entry = self._entry_for_id(step.node)
+      states = []
+      for i in range(0, step.awaiting_len):
+        dep_entry = self._entry_for_id(step.awaiting_ptr[i])
+        if step.awaiting_cyclic_ptr[i]:
+          states.append(Noop.cycle(node_entry.node, dep_entry.node))
+        else:
+          states.append(dep_entry.state)
+      yield (node_entry, states)
 
   def trace(self, root):
     """Yields a stringified 'stacktrace' starting from the given failed root.

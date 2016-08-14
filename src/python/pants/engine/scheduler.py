@@ -122,7 +122,6 @@ class LocalScheduler(object):
                project_tree,
                native,
                graph_lock=None,
-               inline_nodes=True,
                graph_validator=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
@@ -133,20 +132,16 @@ class LocalScheduler(object):
     :param native: An instance of engine.subsystem.native.Native.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
                        instance. Defaults to creating a new threading.RLock().
-    :param inline_nodes: Whether to inline execution of `inlineable` Nodes. This improves
-                         performance, but can make debugging more difficult because the entire
-                         execution history is not recorded in the product Graph.
     :param graph_validator: A validator that runs over the entire graph after every scheduling
                             attempt. Very expensive, very experimental.
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
-    self._node_builder = NodeBuilder.create(tasks)
 
     self._graph_validator = graph_validator
     self._product_graph = Graph(native)
     self._product_graph_lock = graph_lock or threading.RLock()
-    self._inline_nodes = inline_nodes
+    self._step_context = StepContext(NodeBuilder.create(tasks), self._project_tree)
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -159,33 +154,20 @@ class LocalScheduler(object):
         fh.write(line)
         fh.write('\n')
 
-  def _run_step(self, node_entry, dependencies, cyclic_dependencies):
+  def _run_step(self, node_entry, dep_states):
     """Attempt to run a Step with the currently available dependencies of the given Node.
 
     If the currently declared dependencies of a Node are not yet available, returns None. If
     they are available, runs a Step and returns the resulting State.
     """
-
-    # Expose states for declared dependencies.
-    deps = dict()
-    for dep_entry in dependencies:
-      deps[dep_entry.node] = dep_entry.state
-    # Additionally, include Noops for any dependencies that were cyclic.
-    for dep in cyclic_dependencies:
-      deps[dep] = Noop.cycle(node_entry.node, dep)
-
-    # Run.
-    step_context = StepContext(self.node_builder, self._project_tree, deps, self._inline_nodes)
-    return node_entry.node.step(step_context)
-
-  @property
-  def node_builder(self):
-    """Return the NodeBuilder instance for this Scheduler.
-
-    A NodeBuilder is a relatively heavyweight object (since it contains an index of all
-    registered tasks), so it should be used for the execution of multiple Steps.
-    """
-    return self._node_builder
+    # Initialize the coroutine if this is the first time it is running.
+    if node_entry.coroutine is None:
+      if dep_states:
+        raise ValueError('{} has not run yet, and should not have dependencies!'.format(node_entry))
+      node_entry.coroutine = node_entry.node.step(self._step_context)
+      return node_entry.coroutine.send(None)
+    else:
+      return node_entry.coroutine.send(dep_states)
 
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
@@ -281,32 +263,33 @@ class LocalScheduler(object):
         for node_entry, state in completed_runnable:
           # Complete the Node and mark any of its dependents as candidates for Steps.
           outstanding_runnable.discard(node_entry)
-          self._product_graph.complete_node(node_entry, state)
+          self._product_graph.complete(node_entry, state)
           changed.append(node_entry)
 
-        # Drain the candidate list to create Runnables for the Engine.
+        # Drain the candidate set to create Runnables for the Engine.
         while changed:
           steps = list(self._product_graph.execution_next(execution, changed))
           changed = []
-          for node_entry, deps, cyclic_deps in steps:
+          for node_entry, dep_states in steps:
             if node_entry in outstanding_runnable:
               # Node is still a candidate, but is currently running.
+              # TODO: could avoid unpacking in this case.
               continue
 
             # Run the step
             step_count += 1
-            state = self._run_step(node_entry, deps, cyclic_deps)
+            state = self._run_step(node_entry, dep_states)
             if type(state) is Runnable:
               # The Node is ready to run in the Engine.
               runnable.append((node_entry, state))
               outstanding_runnable.add(node_entry)
             elif type(state) is Waiting:
               # Waiting on dependencies.
-              self._product_graph.add_dependencies(node_entry, state.dependencies)
+              self._product_graph.await(node_entry, state.dependencies)
               changed.append(node_entry)
             else:
               # The Node has completed statically.
-              self._product_graph.complete_node(node_entry, state)
+              self._product_graph.complete(node_entry, state)
               changed.append(node_entry)
 
         if not runnable and not outstanding_runnable:

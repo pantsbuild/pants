@@ -62,10 +62,10 @@ class Native(object):
 
           typedef struct {
             Node node;
-            Node*    dependencies_ptr;
-            uint64_t dependencies_len;
-            Node*    cyclic_dependencies_ptr;
-            uint64_t cyclic_dependencies_len;
+            Node*    awaiting_ptr;
+            uint64_t awaiting_len;
+            bool*    awaiting_cyclic_ptr;
+            uint64_t awaiting_cyclic_len;
           } RawStep;
 
           typedef struct {
@@ -77,8 +77,8 @@ class Native(object):
           void graph_destroy(struct Graph*);
 
           uint64_t len(struct Graph*);
-          void complete_node(struct Graph*, Node, StateType);
-          void add_dependencies(struct Graph*, Node, Node*, uint64_t);
+          void complete(struct Graph*, Node, StateType);
+          void await(struct Graph*, Node, Node*, uint64_t);
           uint64_t invalidate(struct Graph*, Node*, uint64_t);
 
           struct Execution* execution_create();

@@ -12,9 +12,13 @@ pub type StateType = u8;
 pub struct Entry {
   node: Node,
   state: StateType,
-  dependencies: Vec<Node>,
+  // Sets of all Nodes which have ever been awaited by this Node.
+  dependencies: HashSet<Node>,
   dependents: HashSet<Node>,
-  cyclic_dependencies: Vec<Node>,
+  // Vec of Nodes which are currently being awaited by this Node, with a corresponding
+  // boolean array to indicate whether the awaited value was cyclic.
+  awaiting: Vec<Node>,
+  awaiting_cyclic: Vec<bool>,
 }
 
 /**
@@ -65,20 +69,24 @@ impl Graph {
       Entry {
         node: node,
         state: empty_state,
-        dependencies: Vec::new(),
+        dependencies: HashSet::new(),
         dependents: HashSet::new(),
-        cyclic_dependencies: Vec::new(),
+        awaiting: Vec::new(),
+        awaiting_cyclic: Vec::new(),
       }
     )
   }
 
-  fn complete_node(&mut self, node: Node, state: StateType) {
+  fn complete(&mut self, node: Node, state: StateType) {
     assert!(
       self.is_ready(node),
       "Node {} is already completed, or has incomplete deps.",
       node,
     );
-    self.ensure_entry(node).state = state;
+    let mut entry = self.ensure_entry(node);
+    entry.state = state;
+    entry.awaiting.clear();
+    entry.awaiting_cyclic.clear();
   }
 
   /**
@@ -86,31 +94,29 @@ impl Graph {
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  fn add_dependencies(&mut self, src: Node, dsts: &Vec<Node>) {
+  fn await(&mut self, src: Node, dsts: &Vec<Node>) {
     let empty_state = self.empty_state;
-    let (state, dependencies) = {
-      let entry = self.ensure_entry(src);
-      (entry.state, entry.dependencies.iter().map(|&n| n).collect::<HashSet<Node>>())
-    };
     assert!(
-      state == empty_state,
+      self.ensure_entry(src).state == empty_state,
       "Node {} is already completed, and may not have new dependencies added: {:?}",
       src,
       dsts,
     );
 
+    // Determine whether each awaited dep is cyclic, and record the non-cyclic ones.
+    let mut was_cyclic = Vec::new();
     for &dst in dsts {
-      if dependencies.contains(&dst) {
-        continue;
-      }
-
-      if self.detect_cycle(src, dst) {
-        self.ensure_entry(src).cyclic_dependencies.push(dst);
-      } else {
-        self.ensure_entry(src).dependencies.push(dst);
+      let cyclic = self.detect_cycle(src, dst);
+      was_cyclic.push(cyclic);
+      if !cyclic {
+        self.ensure_entry(src).dependencies.insert(dst);
         self.ensure_entry(dst).dependents.insert(src);
       }
     }
+
+    // Then record the awaited set.
+    self.ensure_entry(src).awaiting = dsts.clone();
+    self.ensure_entry(src).awaiting_cyclic = was_cyclic;
   }
 
   /**
@@ -210,10 +216,10 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
 #[allow(dead_code)]
 pub struct RawStep {
   node: Node,
-  dependencies_ptr: *mut Node,
-  dependencies_len: u64,
-  cyclic_dependencies_ptr: *mut Node,
-  cyclic_dependencies_len: u64,
+  awaiting_ptr: *mut Node,
+  awaiting_len: u64,
+  awaiting_cyclic_ptr: *mut bool,
+  awaiting_cyclic_len: u64,
 }
 
 pub struct RawSteps {
@@ -302,10 +308,10 @@ impl Execution {
             Some(
               RawStep {
                 node: node,
-                dependencies_ptr: entry.dependencies.as_mut_ptr(),
-                dependencies_len: entry.dependencies.len() as u64,
-                cyclic_dependencies_ptr: entry.cyclic_dependencies.as_mut_ptr(),
-                cyclic_dependencies_len: entry.cyclic_dependencies.len() as u64,
+                awaiting_ptr: entry.awaiting.as_mut_ptr(),
+                awaiting_len: entry.awaiting.len() as u64,
+                awaiting_cyclic_ptr: entry.awaiting_cyclic.as_mut_ptr(),
+                awaiting_cyclic_len: entry.awaiting_cyclic.len() as u64,
               }
             )
           } else {
@@ -375,17 +381,17 @@ pub extern fn len(graph_ptr: *mut Graph) -> u64 {
 }
 
 #[no_mangle]
-pub extern fn complete_node(graph_ptr: *mut Graph, node: Node, state: StateType) {
+pub extern fn complete(graph_ptr: *mut Graph, node: Node, state: StateType) {
   with_graph(graph_ptr, |graph| {
-    graph.complete_node(node, state);
+    graph.complete(node, state);
   })
 }
 
 #[no_mangle]
-pub extern fn add_dependencies(graph_ptr: *mut Graph, src: Node, dsts_ptr: *mut Node, dsts_len: u64) {
+pub extern fn await(graph_ptr: *mut Graph, src: Node, dsts_ptr: *mut Node, dsts_len: u64) {
   with_graph(graph_ptr, |graph| {
     with_nodes(dsts_ptr, dsts_len as usize, |dsts| {
-      graph.add_dependencies(src, dsts);
+      graph.await(src, dsts);
     })
   })
 }
