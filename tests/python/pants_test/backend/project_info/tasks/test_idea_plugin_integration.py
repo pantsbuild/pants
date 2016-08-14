@@ -9,6 +9,7 @@ import json
 import os
 from xml.dom import minidom
 
+from pants.backend.project_info.tasks.idea_plugin_gen import IdeaPluginGen
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_file
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -21,7 +22,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
   def _do_check(self, project_dir_path, expected_project_path, expected_targets):
     """Check to see that the project contains the expected source folders."""
 
-    iws_file = os.path.join(project_dir_path, 'project.iws')
+    iws_file = os.path.join(project_dir_path, '{}.iws'.format(IdeaPluginGen.get_project_name(expected_targets)))
     self.assertTrue(os.path.exists(iws_file))
     dom = minidom.parse(iws_file)
     self.assertEqual(1, len(dom.getElementsByTagName("project")))
@@ -83,3 +84,13 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     project_path = 'examples/src/scala/org/pantsbuild/example/hello'
 
     self._run_and_check(project_path, [target_a, target_b])
+
+  def test_idea_plugin_project_name(self):
+    self.assertEqual(
+      'examples.src.scala.org.pantsbuild.example.hello:__testprojects.src.python.antlr::',
+      IdeaPluginGen.get_project_name([
+          'examples/src/scala/org/pantsbuild/example/hello:',
+          'testprojects/src/python/antlr::'
+        ]
+      )
+    )
