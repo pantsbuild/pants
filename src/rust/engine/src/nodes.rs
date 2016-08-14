@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use core::{Key, Selector, TypeId};
+use core::{Key, Selector, TypeId, Variants};
 
 // TODO: coroutines as iterators probably.
 pub type Step = bool;
 
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub enum State<'a> {
   Waiting {
     dependencies: Vec<&'a Node>,
@@ -24,15 +25,56 @@ pub enum State<'a> {
   },
 }
 
-pub trait Node {
-  fn subject(&self) -> Key;
-  fn product(&self) -> TypeId;
-  fn variants(&self) -> HashMap<String, String>;
-  fn step(&self) -> Step;
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub enum Node {
+  Select {
+    subject: Key,
+    variants: Variants,
+    selector: Selector,
+  },
+  SelectVariant {
+    subject: Key,
+    variants: Variants,
+    selector: Selector,
+  },
+  Dependencies {
+    subject: Key,
+    variants: Variants,
+    selector: Selector,
+  },
+  Projection {
+    subject: Key,
+    variants: Variants,
+    selector: Selector,
+  },
+  Task {
+    subject: Key,
+    product: TypeId,
+    variants: Variants,
+    func: Key,
+    clause: Vec<Selector>,
+  },
+  Filesystem {
+    subject: Key,
+    product: TypeId,
+    variants: Variants,
+  },
 }
 
-struct SelectNode {
-  subject: Key,
-  variants: HashMap<String, String>,
-  selector: Selector,
+impl Node {
+  /*
+  fn subject(&self) -> Key {
+    match self {
+
+    }
+  }
+
+  fn product(&self) -> TypeId {
+    self.selector.product
+  }
+
+  fn variants(&self) -> Variants {
+    self.variants
+  }
+  */
 }

@@ -11,9 +11,9 @@ use nodes::{Node, State};
  * The dependencies and cyclic_dependencies sets are stored as vectors in order to expose
  * them more easily via the C API, but they should never contain dupes.
  */
-pub struct Entry {
+pub struct Entry<'a> {
   node: Node,
-  state: State,
+  state: State<'a>,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: HashSet<Node>,
   dependents: HashSet<Node>,
@@ -26,15 +26,13 @@ pub struct Entry {
 /**
  * A DAG (enforced on mutation) of Entries.
  */
-pub struct Graph {
-  empty_state: State,
-  nodes: HashMap<Node,Entry>,
+pub struct Graph<'a> {
+  nodes: HashMap<Node, Entry<'a>>,
 }
 
-impl Graph {
-  fn new(empty_state: State) -> Graph {
+impl<'a> Graph<'a> {
+  fn new() -> Graph<'a> {
     Graph {
-      empty_state: empty_state,
       nodes: HashMap::new()
     }
   }
@@ -44,11 +42,14 @@ impl Graph {
   }
 
   fn is_complete(&self, node: Node) -> bool {
-    self.nodes.get(&node).map(|e| e.state != self.empty_state).unwrap_or(false)
+    self.nodes.get(&node).map(|e| self.is_complete_entry(e)).unwrap_or(false)
   }
 
   fn is_complete_entry(&self, entry: &Entry) -> bool {
-    entry.state != self.empty_state
+    match entry.state {
+      Waiting => true,
+      _ => false,
+    }
   }
 
   /**
@@ -66,11 +67,10 @@ impl Graph {
   }
 
   fn ensure_entry(&mut self, node: Node) -> &mut Entry {
-    let empty_state = self.empty_state;
     self.nodes.entry(node).or_insert_with(||
       Entry {
         node: node,
-        state: empty_state,
+        state: State::Waiting { dependencies: Vec::new() },
         dependencies: HashSet::new(),
         dependents: HashSet::new(),
         awaiting: Vec::new(),
@@ -82,7 +82,7 @@ impl Graph {
   fn complete(&mut self, node: Node, state: State) {
     assert!(
       self.is_ready(node),
-      "Node {} is already completed, or has incomplete deps.",
+      "Node {:?} is already completed, or has incomplete deps.",
       node,
     );
     let mut entry = self.ensure_entry(node);
@@ -97,10 +97,9 @@ impl Graph {
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
   fn await(&mut self, src: Node, dsts: &Vec<Node>) {
-    let empty_state = self.empty_state;
     assert!(
-      self.ensure_entry(src).state == empty_state,
-      "Node {} is already completed, and may not have new dependencies added: {:?}",
+      !self.is_complete(src),
+      "Node {:?} is already completed, and may not have new dependencies added: {:?}",
       src,
       dsts,
     );
@@ -188,7 +187,7 @@ impl Graph {
  * has the same lifetime as the Graph itself.
  */
 struct Walk<'a, P: Fn(&Entry)->bool> {
-  graph: &'a Graph,
+  graph: &'a Graph<'a>,
   dependents: bool,
   deque: VecDeque<Node>,
   walked: HashSet<Node>,
