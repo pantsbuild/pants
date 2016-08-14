@@ -77,16 +77,13 @@ class Native(object):
           void graph_destroy(struct Graph*);
 
           uint64_t len(struct Graph*);
+          void complete_node(struct Graph*, Node, StateType);
           void add_dependencies(struct Graph*, Node, Node*, uint64_t);
           uint64_t invalidate(struct Graph*, Node*, uint64_t);
 
-          struct Execution* execution_create(Node*, uint64_t);
+          struct Execution* execution_create();
           void execution_destroy(struct Execution*);
-          RawSteps* execution_next(struct Graph*,
-                                  struct Execution*,
-                                  Node*, uint64_t,
-                                  Node*, uint64_t,
-                                  StateType*, uint64_t);
+          RawSteps* execution_next(struct Graph*, struct Execution*, Node*, uint64_t);
           '''
         )
     return self._ffi_field

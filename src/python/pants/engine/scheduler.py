@@ -265,54 +265,55 @@ class LocalScheduler(object):
 
     with self._product_graph_lock:
       # A set of Node entries for executing Runnables.
-      outstanding_runnables = set()
-      completed_runnables = []
+      outstanding_runnable = set()
+      completed_runnable = []
       # Node entries that might need to have Steps created (after any outstanding Step returns).
-      execution = self._product_graph.execution([self._product_graph.ensure_entry(r) for r in execution_request.roots])
+      execution = self._product_graph.execution()
+      changed = [self._product_graph.ensure_entry(r) for r in execution_request.roots]
 
       # Yield nodes that are Runnable, and then compute new ones.
       runnable_count, scheduling_iterations = 0, 0
       start_time = time.time()
       while True:
-        waiting = []
-        completed = []
+        runnable = []
 
         # Finalize any Runnables that completed in the previous round.
-        for node_entry, state in completed_runnables:
+        for node_entry, state in completed_runnable:
           # Complete the Node and mark any of its dependents as candidates for Steps.
-          outstanding_runnables.discard(node_entry)
-          node_entry.state = state
-          completed.append(node_entry)
+          outstanding_runnable.discard(node_entry)
+          self._product_graph.complete_node(node_entry, state)
+          changed.append(node_entry)
 
         # Drain the candidate list to create Runnables for the Engine.
-        steps = self._product_graph.execution_next(execution, waiting, completed)
-        runnables = []
-        for node_entry, deps, cyclic_deps in steps:
-          if node_entry in outstanding_runnables:
-            # Node is still a candidate, but is currently running.
-            continue
+        while changed:
+          steps = list(self._product_graph.execution_next(execution, changed))
+          changed = []
+          for node_entry, deps, cyclic_deps in steps:
+            if node_entry in outstanding_runnable:
+              # Node is still a candidate, but is currently running.
+              continue
 
-          # Run the step
-          state = self._run_step(node_entry, deps, cyclic_deps)
-          if type(state) is Runnable:
-            # The Node is ready to run in the Engine.
-            runnables.append((node_entry, state))
-            outstanding_runnables.add(node_entry)
-          elif type(state) is Waiting:
-            # Waiting on dependencies.
-            self._product_graph.add_dependencies(node_entry.node, state.dependencies)
-            waiting.append(node_entry)
-          else:
-            # The Node has completed statically.
-            node_entry.state = state
-            completed.append(node_entry)
+            # Run the step
+            state = self._run_step(node_entry, deps, cyclic_deps)
+            if type(state) is Runnable:
+              # The Node is ready to run in the Engine.
+              runnable.append((node_entry, state))
+              outstanding_runnable.add(node_entry)
+            elif type(state) is Waiting:
+              # Waiting on dependencies.
+              self._product_graph.add_dependencies(node_entry, state.dependencies)
+              changed.append(node_entry)
+            else:
+              # The Node has completed statically.
+              self._product_graph.complete_node(node_entry, state)
+              changed.append(node_entry)
 
-        if not runnables and not outstanding_runnables:
+        if not runnable and not outstanding_runnable:
           # Finished.
           break
-        completed_runnables = yield runnables
+        completed_runnable = yield runnable
         yield
-        runnable_count += len(runnables)
+        runnable_count += len(runnable)
         scheduling_iterations += 1
 
       logger.debug(

@@ -42,7 +42,7 @@ impl Graph {
   }
 
   fn is_complete_entry(&self, entry: &Entry) -> bool {
-    entry.state == self.empty_state
+    entry.state != self.empty_state
   }
 
   /**
@@ -70,6 +70,15 @@ impl Graph {
         cyclic_dependencies: Vec::new(),
       }
     )
+  }
+
+  fn complete_node(&mut self, node: Node, state: StateType) {
+    assert!(
+      self.is_ready(node),
+      "Node {} is already completed, or has incomplete deps.",
+      node,
+    );
+    self.ensure_entry(node).state = state;
   }
 
   /**
@@ -221,7 +230,6 @@ pub struct RawSteps {
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
 pub struct Execution {
-  candidates: HashSet<Node>,
   ready: Vec<RawStep>,
   ready_raw: *mut RawSteps,
 }
@@ -230,10 +238,9 @@ impl Execution {
   /**
    * Begins an Execution from the given root Nodes.
    */
-  fn new(roots: &Vec<Node>) -> Execution {
+  fn new() -> Execution {
     let mut execution =
       Execution {
-        candidates: roots.iter().map(|n| *n).collect(),
         ready: Vec::new(),
         ready_raw:
           Box::into_raw(
@@ -256,35 +263,16 @@ impl Execution {
   /**
    * Continues execution after the waiting Nodes given Nodes have completed with the given states.
    */
-  fn next(
-    &mut self,
-    graph: &mut Graph,
-    waiting: &Vec<Node>,
-    completed: &Vec<Node>,
-    completed_states: &Vec<StateType>
-  ) {
-    assert!(
-      completed.len() == completed_states.len(),
-      "The completed Node and State vectors did not have the same length: {} vs {}",
-      completed.len(),
-      completed_states.len()
-    );
+  fn next(&mut self, graph: &mut Graph, changed: &Vec<Node>) {
+    let mut candidates: HashSet<Node> = HashSet::new();
 
-    // Complete any completed Nodes and mark their dependents as candidates.
-    for (&node, &state) in completed.iter().zip(completed_states.iter()) {
-      assert!(
-        graph.is_ready(node),
-        "Node {} is already completed, or has incomplete deps.",
-        node,
-      );
-      let entry = graph.ensure_entry(node);
-      self.candidates.extend(&entry.dependents);
-      entry.state = state;
-    }
-
-    // Mark the dependencies of any waiting Nodes as candidates.
-    for &node in waiting {
+    // For each changed node, determine whether its dependents or itself are a candidate.
+    for &node in changed {
       match graph.nodes.get(&node) {
+        Some(entry) if graph.is_complete(node) => {
+          // Mark any ready dependents of the Node as candidates.
+          candidates.extend(entry.dependents.iter().filter(|&d| graph.is_ready(*d)));
+        },
         Some(entry) => {
           // If all dependencies of the Node are completed, the Node itself is a candidate.
           let incomplete_deps: Vec<Node> =
@@ -295,37 +283,34 @@ impl Execution {
               .collect();
           if incomplete_deps.len() > 0 {
             // Mark incomplete deps as candidates for steps.
-            self.candidates.extend(incomplete_deps);
+            candidates.extend(incomplete_deps);
           } else {
             // All deps are already completed: mark this Node as a candidate for another step.
-            self.candidates.insert(node);
+            candidates.insert(node);
           }
         },
         _ => {
           // Node has no deps yet: mark as a candidate for another step.
-          self.candidates.insert(node);
+          candidates.insert(node);
         },
       };
     }
 
-    // Move all ready candidates to the ready set.
-    let (ready_candidates, next_candidates) =
-      self.candidates.iter().map(|c| *c).partition(|&c| graph.is_ready(c));
-    self.candidates = next_candidates;
-
-    // Create a new set of steps in the raw ready struct.
+    // Create a set of steps for any ready candidates in the raw ready struct.
     self.ready.clear();
     self.ready.extend(
-      ready_candidates.iter().map(|&node| {
-        let entry = graph.ensure_entry(node);
-        RawStep {
-          node: node,
-          dependencies_ptr: entry.dependencies.as_mut_ptr(),
-          dependencies_len: entry.dependencies.len() as u64,
-          cyclic_dependencies_ptr: entry.cyclic_dependencies.as_mut_ptr(),
-          cyclic_dependencies_len: entry.cyclic_dependencies.len() as u64,
-        }
-      })
+      candidates.iter()
+        .map(|n| *n)
+        .map(|node| {
+          let entry = graph.ensure_entry(node);
+          RawStep {
+            node: node,
+            dependencies_ptr: entry.dependencies.as_mut_ptr(),
+            dependencies_len: entry.dependencies.len() as u64,
+            cyclic_dependencies_ptr: entry.cyclic_dependencies.as_mut_ptr(),
+            cyclic_dependencies_len: entry.cyclic_dependencies.len() as u64,
+          }
+        })
     );
     with_raw_steps(self.ready_raw, |rr| {
       rr.steps_ptr = self.ready.as_mut_ptr();
@@ -368,19 +353,10 @@ fn with_nodes<F,T>(nodes_ptr: *mut Node, nodes_len: usize, mut f: F) -> T
   t
 }
 
-fn with_states<F,T>(states_ptr: *mut StateType, states_len: usize, mut f: F) -> T
-    where F: FnMut(&Vec<StateType>)->T {
-  let states = unsafe { Vec::from_raw_parts(states_ptr, states_len, states_len) };
-  let t = f(&states);
-  std::mem::forget(states);
-  t
-}
-
 #[no_mangle]
 pub extern fn graph_create(empty_state: StateType) -> *const Graph {
   // allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  let raw = Box::into_raw(Box::new(Graph::new(empty_state)));
-  raw
+  Box::into_raw(Box::new(Graph::new(empty_state)))
 }
 
 #[no_mangle]
@@ -394,6 +370,13 @@ pub extern fn graph_destroy(graph_ptr: *mut Graph) {
 pub extern fn len(graph_ptr: *mut Graph) -> u64 {
   with_graph(graph_ptr, |graph| {
     graph.len()
+  })
+}
+
+#[no_mangle]
+pub extern fn complete_node(graph_ptr: *mut Graph, node: Node, state: StateType) {
+  with_graph(graph_ptr, |graph| {
+    graph.complete_node(node, state);
   })
 }
 
@@ -416,33 +399,23 @@ pub extern fn invalidate(graph_ptr: *mut Graph, roots_ptr: *mut Node, roots_len:
 }
 
 #[no_mangle]
-pub extern fn execution_create(roots_ptr: *mut Node, roots_len: u64) -> *const Execution {
-  with_nodes(roots_ptr, roots_len as usize, |roots| {
-    // create on the heap, and return a raw pointer to the boxed value.
-    Box::into_raw(Box::new(Execution::new(roots)))
-  })
+pub extern fn execution_create() -> *const Execution {
+  // create on the heap, and return a raw pointer to the boxed value.
+  Box::into_raw(Box::new(Execution::new()))
 }
 
 #[no_mangle]
 pub extern fn execution_next(
   graph_ptr: *mut Graph,
   execution_ptr: *mut Execution,
-  waiting_ptr: *mut Node,
-  waiting_len: u64,
-  completed_ptr: *mut Node,
-  completed_len: u64,
-  states_ptr: *mut StateType,
-  states_len: u64,
+  changed_ptr: *mut Node,
+  changed_len: u64,
 ) -> *const RawSteps {
   with_graph(graph_ptr, |graph| {
     with_execution(execution_ptr, |execution| {
-      with_nodes(waiting_ptr, waiting_len as usize, |waiting| {
-        with_nodes(completed_ptr, completed_len as usize, |completed| {
-          with_states(states_ptr, states_len as usize, |states| {
-            execution.next(graph, waiting, completed, states);
-            execution.ready_raw
-          })
-        })
+      with_nodes(changed_ptr, changed_len as usize, |changed| {
+        execution.next(graph, changed);
+        execution.ready_raw
       })
     })
   })

@@ -59,6 +59,11 @@ class Graph(object):
       return None
     return entry.state
 
+  def complete_node(self, node_entry, state):
+    """Completes the given entry with the given state."""
+    self._native.lib.complete_node(self._graph, id(node_entry), state.type_id)
+    node_entry.state = state
+
   def add_dependencies(self, node_entry, dependencies):
     """Adds the given dependencies for the given entry, which must be in the Waiting state."""
     deps = [id(self.ensure_entry(d)) for d in dependencies]
@@ -197,24 +202,16 @@ class Graph(object):
 
       yield entry
 
-  def execution(self, root_entries):
-    roots = [id(r) for r in root_entries]
-    execution = self._native.gc(self._native.lib.execution_create(roots, len(roots)),
-                                self._native.lib.execution_destroy)
-    return execution
+  def execution(self):
+    return self._native.gc(self._native.lib.execution_create(),
+                           self._native.lib.execution_destroy)
 
-  def execution_next(self, execution, waiting_entries, completed_entries):
-    # Prepare arrays for each input.
-    waiting = [id(e) for e in waiting_entries]
-    completed = [id(e) for e in completed_entries]
-    states = [e.state.type_id for e in completed_entries]
-
+  def execution_next(self, execution, changed_entries):
     # Convert the output Steps to a list of tuples of Node, dependencies, cyclic_dependencies.
+    changed = [id(e) for e in changed_entries]
     raw_steps = self._native.lib.execution_next(self._graph,
                                                 execution,
-                                                waiting, len(waiting),
-                                                completed, len(completed),
-                                                states, len(states))
+                                                changed, len(changed))
     def entries(ptr, count):
       return [self._entry_for_id(ptr[i]) for i in range(0, count)]
 
