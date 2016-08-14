@@ -39,8 +39,7 @@ class Graph(object):
     def structure(self):
       return (self.node, self.state, self.coroutine)
 
-  def __init__(self, native, validator=None):
-    self._validator = validator or Node.validate_node
+  def __init__(self, native):
     # A dict of Node->Entry, and a dict of id(Entry)->Node
     self._nodes = dict()
     self._node_ids = dict()
@@ -72,7 +71,6 @@ class Graph(object):
     """Returns the Entry for the given Node, creating it if it does not already exist."""
     entry = self._nodes.get(node, None)
     if not entry:
-      self._validator(node)
       entry = self.Entry(node)
       self._nodes[node] = entry
       self._node_ids[id(entry)] = entry

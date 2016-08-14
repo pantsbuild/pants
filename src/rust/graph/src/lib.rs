@@ -109,14 +109,25 @@ impl Graph {
       let cyclic = self.detect_cycle(src, dst);
       was_cyclic.push(cyclic);
       if !cyclic {
-        self.ensure_entry(src).dependencies.insert(dst);
         self.ensure_entry(dst).dependents.insert(src);
       }
     }
 
-    // Then record the awaited set.
-    self.ensure_entry(src).awaiting = dsts.clone();
-    self.ensure_entry(src).awaiting_cyclic = was_cyclic;
+    // Finally, borrow the src and add all non-cyclic deps.
+    let entry = self.ensure_entry(src);
+    entry.dependencies.extend(dsts.iter().zip(was_cyclic.iter())
+      .filter_map(|(dst, &cyclic)| {
+        if !cyclic {
+          Some(dst)
+        } else {
+          None
+        }
+      })
+    );
+
+    // Then record the complete awaited set.
+    entry.awaiting = dsts.clone();
+    entry.awaiting_cyclic = was_cyclic;
   }
 
   /**
