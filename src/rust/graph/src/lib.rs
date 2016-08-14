@@ -281,7 +281,7 @@ impl Execution {
     // For each changed node, determine whether its dependents or itself are a candidate.
     for &node in changed {
       match graph.nodes.get(&node) {
-        Some(entry) if graph.is_complete(node) => {
+        Some(entry) if graph.is_complete_entry(entry) => {
           // Mark any dependents of the Node as candidates.
           candidates.extend(&entry.dependents);
         },
