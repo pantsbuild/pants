@@ -1,6 +1,6 @@
 [project]
 version = "0.0.1"
-name = "graph"
+name = "engine"
 authors = [ "Stu Hood <stuhood@gmail.com>" ]
 
 [lib]

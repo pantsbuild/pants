@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use core::{Key, TypeId};
+use core::{Key, Selector, TypeId};
 
 // TODO: coroutines as iterators probably.
 pub type Step = bool;
 
-pub enum State {
+pub enum State<'a> {
   Waiting {
-    dependencies: Vec<Node>,
+    dependencies: Vec<&'a Node>,
   },
   Noop {
     msg: Key,
@@ -32,5 +32,7 @@ pub trait Node {
 }
 
 struct SelectNode {
-  
+  subject: Key,
+  variants: HashMap<String, String>,
+  selector: Selector,
 }
