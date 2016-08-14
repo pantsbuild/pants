@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import logging
 import os
 import pkgutil
 import re
@@ -13,6 +14,7 @@ import shutil
 import subprocess
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -174,7 +176,14 @@ class IdeaPluginGen(ConsoleTask):
       return output.name
 
   def execute(self):
+    jvm_target_num = len(filter(lambda x: isinstance(x, JvmTarget), self.context.target_roots))
+    python_target_num = len(filter(lambda x: isinstance(x, PythonTarget), self.context.target_roots))
+
     ide_file = self.generate_project()
+
+    if python_target_num > jvm_target_num:
+      logging.warn("This is a python project. "
+                   "Please make sure to select the proper python interpreter as the project SDK.")
 
     if ide_file and self.get_options().open:
       open_with = self.get_options().open_with
