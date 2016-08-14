@@ -27,7 +27,7 @@ from pants.util.dirutil import safe_mkdir
 _TEMPLATE_BASEDIR = 'templates/idea'
 
 # Follow `export.py` for versioning strategy.
-IDEA_PLUGIN_VERSION = '0.0.1'
+IDEA_PLUGIN_VERSION = '0.0.2'
 
 
 class IdeaPluginGen(ConsoleTask):
@@ -70,7 +70,6 @@ class IdeaPluginGen(ConsoleTask):
     register('--java-jdk-name', default=None,
              help='Sets the jdk used to compile the project\'s java sources. If unset the default '
                   'jdk name for the --java-language-level is used')
-
     register('--java-language-level', type=int, default=8,
              help='Sets the java language and jdk used to compile the project\'s java sources.')
 
@@ -110,14 +109,6 @@ class IdeaPluginGen(ConsoleTask):
 
   # TODO: https://github.com/pantsbuild/pants/issues/3198
   def generate_project(self):
-    java_language_level = None
-    for target in self.context.targets():
-      if isinstance(target, JvmTarget):
-        if java_language_level is None or java_language_level < target.platform.source_level:
-          java_language_level = target.platform.source_level
-    if java_language_level is not None:
-      java_language_level = 'JDK_{0}_{1}'.format(*java_language_level.components[:2])
-
     outdir = os.path.abspath(self.intellij_output_dir)
     if not os.path.exists(outdir):
       os.makedirs(outdir)
@@ -132,10 +123,7 @@ class IdeaPluginGen(ConsoleTask):
         jdk=self.java_jdk,
         language_level='JDK_1_{}'.format(self.java_language_level)
       ),
-      resource_extensions=None,
       debug_port=self.get_options().debug_port,
-      extra_components=[],
-      java_language_level=java_language_level,
     )
 
     if not self.context.options.target_specs:

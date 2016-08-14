@@ -9,7 +9,7 @@ import json
 import os
 from xml.dom import minidom
 
-from pants.backend.project_info.tasks.idea_plugin_gen import IdeaPluginGen
+from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION, IdeaPluginGen
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_file
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -45,7 +45,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     self.assertEqual(os.path.join(get_buildroot(), expected_project_path), actual_project_path)
 
     self.assertEqual('pants_idea_plugin_version', actual_properties[2].getAttribute('name'))
-    self.assertEqual('0.0.1', actual_properties[2].getAttribute('value'))
+    self.assertEqual(IDEA_PLUGIN_VERSION, actual_properties[2].getAttribute('value'))
 
   def _get_project_dir(self, output_file):
     with open(output_file, 'r') as result:

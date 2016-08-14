@@ -162,6 +162,7 @@ python_library(
   dependencies = [
     ':ide_gen',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
