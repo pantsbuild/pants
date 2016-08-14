@@ -6,9 +6,9 @@ use core::{Key, Selector, TypeId, Variants};
 pub type Step = bool;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-pub enum State<'a> {
+pub enum State {
   Waiting {
-    dependencies: Vec<&'a Node>,
+    dependencies: Vec<Node>,
   },
   Noop {
     msg: Key,

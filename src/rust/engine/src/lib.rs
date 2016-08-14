@@ -5,70 +5,94 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use nodes::{Node, State};
 
+type EntryId = u64;
+
 /**
  * An Entry and its adjacencies.
  *
  * The dependencies and cyclic_dependencies sets are stored as vectors in order to expose
  * them more easily via the C API, but they should never contain dupes.
  */
-pub struct Entry<'a> {
+pub struct Entry {
+  id: EntryId,
   node: Node,
-  state: State<'a>,
+  state: State,
   // Sets of all Nodes which have ever been awaited by this Node.
-  dependencies: HashSet<Node>,
-  dependents: HashSet<Node>,
+  dependencies: HashSet<EntryId>,
+  dependents: HashSet<EntryId>,
   // Vec of Nodes which are currently being awaited by this Node, with a corresponding
   // boolean array to indicate whether the awaited value was cyclic.
-  awaiting: Vec<Node>,
+  awaiting: Vec<EntryId>,
   awaiting_cyclic: Vec<bool>,
+}
+
+impl Entry {
+  fn is_complete(&self) -> bool {
+    match self.state {
+      Waiting => true,
+      _ => false,
+    }
+  }
 }
 
 /**
  * A DAG (enforced on mutation) of Entries.
  */
-pub struct Graph<'a> {
-  nodes: HashMap<Node, Entry<'a>>,
+pub struct Graph {
+  id_generator: EntryId,
+  nodes: HashMap<Node, EntryId>,
+  entries: HashMap<EntryId, Entry>,
 }
 
-impl<'a> Graph<'a> {
-  fn new() -> Graph<'a> {
+impl Graph {
+  fn new() -> Graph {
     Graph {
-      nodes: HashMap::new()
+      id_generator: 0,
+      nodes: HashMap::new(),
+      entries: HashMap::new(),
     }
   }
 
   fn len(&self) -> u64 {
-    self.nodes.len() as u64
+    self.entries.len() as u64
   }
 
-  fn is_complete(&self, node: Node) -> bool {
-    self.nodes.get(&node).map(|e| self.is_complete_entry(e)).unwrap_or(false)
+  fn is_complete(&self, node: &Node) -> bool {
+    self.entry(node).map(|entry| entry.is_complete()).unwrap_or(false)
   }
 
-  fn is_complete_entry(&self, entry: &Entry) -> bool {
-    match entry.state {
-      Waiting => true,
-      _ => false,
-    }
+  fn is_complete_entry(&self, id: EntryId) -> bool {
+    self.entries.get(&id).map(|entry| entry.is_complete()).unwrap_or(false)
   }
 
   /**
    * A Node is 'ready' (to run) when it is not complete, but all of its dependencies
    * are complete.
    */
-  fn is_ready(&self, node: Node) -> bool {
+  fn is_ready(&self, node: &Node) -> bool {
     (!self.is_complete(node)) && (
-      self.nodes.get(&node).map(|e| {
+      self.entry(node).map(|e| {
           e.dependencies
             .iter()
-            .all(|d| { self.is_complete(*d) })
+            .all(|d| { self.is_complete_entry(*d) })
         }).unwrap_or(true)
     )
   }
 
+  fn entry(&self, node: &Node) -> Option<&Entry> {
+    self.nodes.get(node).and_then(|id| self.entries.get(id))
+  }
+
   fn ensure_entry(&mut self, node: Node) -> &mut Entry {
-    self.nodes.entry(node).or_insert_with(||
+    let entry_id =
+      self.nodes.entry(node).or_insert_with(|| {
+        self.id_generator += 1;
+        self.id_generator
+      }).clone();
+
+    self.entries.entry(entry_id).or_insert_with(||
       Entry {
+        id: entry_id,
         node: node,
         state: State::Waiting { dependencies: Vec::new() },
         dependencies: HashSet::new(),
@@ -81,7 +105,7 @@ impl<'a> Graph<'a> {
 
   fn complete(&mut self, node: Node, state: State) {
     assert!(
-      self.is_ready(node),
+      self.is_ready(&node),
       "Node {:?} is already completed, or has incomplete deps.",
       node,
     );
@@ -95,7 +119,6 @@ impl<'a> Graph<'a> {
    * Adds the given dst Nodes as dependencies of the src Node.
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
-   */
   fn await(&mut self, src: Node, dsts: &Vec<Node>) {
     assert!(
       !self.is_complete(src),
@@ -130,25 +153,34 @@ impl<'a> Graph<'a> {
     entry.awaiting = dsts.clone();
     entry.awaiting_cyclic = was_cyclic;
   }
+   */
 
   /**
    * Detect whether adding an edge from src to dst would create a cycle.
    *
    * Returns true if a cycle would be created by adding an edge from src->dst.
    */
-  fn detect_cycle(&self, src: Node, dst: Node) -> bool {
-    self.walk(&vec![dst], { |entry| !self.is_complete_entry(entry) }, false).any(|node| node == src)
+  fn detect_cycle(&self, src: &Node, dst: &Node) -> bool {
+    let entries = self.entry(dst).and_then(|d| self.entry(src).map(|s| (s, d)));
+    if let Some((src_entry, dst_entry)) = entries {
+      // Search for an existing path from dst ('s dependencies) to src.
+      let roots = dst_entry.dependencies.into_iter().collect();
+      self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src_entry.id)
+    } else {
+      // Either src or dst does not already exist... no cycle possible.
+      false
+    }
   }
 
   /**
    * Begins a topological Walk from the given roots.
    */
-  fn walk<P>(&self, roots: &Vec<Node>, predicate: P, dependents: bool) -> Walk<P>
+  fn walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> Walk<P>
       where P: Fn(&Entry)->bool {
     Walk {
       graph: self,
       dependents: dependents,
-      deque: roots.iter().map(|&x| x).collect(),
+      deque: roots,
       walked: HashSet::new(),
       predicate: predicate,
     }
@@ -159,26 +191,30 @@ impl<'a> Graph<'a> {
    */
   fn invalidate(&mut self, roots: &Vec<Node>) -> usize {
     // eagerly collect all Nodes before we begin mutating anything.
-    let nodes: Vec<Node> = self.walk(roots, { |_| true }, true).collect();
+    let entries: Vec<&Entry> = {
+      let root_ids = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
+      self.walk(root_ids, { |_| true }, true).collect()
+    };
 
-    for node in &nodes {
+    for entry in &entries {
       // remove the roots from their dependencies' dependents lists.
       // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
       // I can't figure out how to iterate over one immutable Entry while mutating a different
       // mutable Entry... so I clone() here. Perhaps this is completely sane, because what's to say
       // they're not the same Entry after all? But regardless, less efficient than it could be.
-      for dependency in self.ensure_entry(*node).dependencies.clone() {
-        match self.nodes.get_mut(&dependency) {
-          Some(entry) => { entry.dependents.remove(node); () },
+      for dep_id in entry.dependencies.clone() {
+        match self.entries.get_mut(&dep_id) {
+          Some(entry) => { entry.dependents.remove(&entry.id); () },
           _ => {},
         }
       }
 
       // delete each Node
-      self.nodes.remove(node);
+      self.nodes.remove(&entry.node);
+      self.entries.remove(&entry.id);
     }
 
-    nodes.len()
+    entries.len()
   }
 }
 
@@ -187,31 +223,31 @@ impl<'a> Graph<'a> {
  * has the same lifetime as the Graph itself.
  */
 struct Walk<'a, P: Fn(&Entry)->bool> {
-  graph: &'a Graph<'a>,
+  graph: &'a Graph,
   dependents: bool,
-  deque: VecDeque<Node>,
-  walked: HashSet<Node>,
+  deque: VecDeque<EntryId>,
+  walked: HashSet<EntryId>,
   predicate: P,
 }
 
 impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
-  type Item = Node;
+  type Item = &'a Entry;
 
-  fn next(&mut self) -> Option<Node> {
-    while let Some(node) = self.deque.pop_front() {
-      if self.walked.contains(&node) {
+  fn next(&mut self) -> Option<&'a Entry> {
+    while let Some(id) = self.deque.pop_front() {
+      if self.walked.contains(&id) {
         continue;
       }
-      self.walked.insert(node);
+      self.walked.insert(id);
 
-      match self.graph.nodes.get(&node) {
+      match self.graph.entries.get(&id) {
         Some(entry) if (self.predicate)(entry) => {
           if self.dependents {
             self.deque.extend(&entry.dependents);
           } else {
             self.deque.extend(&entry.dependencies);
           }
-          return Some(entry.node);
+          return Some(entry);
         }
         _ => {},
       }
@@ -281,8 +317,8 @@ impl Execution {
 
     // For each changed node, determine whether its dependents or itself are a candidate.
     for &node in changed {
-      match graph.nodes.get(&node) {
-        Some(entry) if graph.is_complete_entry(entry) => {
+      match graph.entry(&node) {
+        Some(entry) if entry.is_complete() => {
           // Mark any dependents of the Node as candidates.
           candidates.extend(&entry.dependents);
         },
