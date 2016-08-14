@@ -16,8 +16,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
-  RESOURCE = 'java-resource'
-  TEST_RESOURCE = 'java-test-resource'
 
   def _do_check(self, project_dir_path, expected_project_path, expected_targets):
     """Check to see that the project contains the expected source folders."""
