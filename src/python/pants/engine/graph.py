@@ -219,7 +219,7 @@ class Graph(object):
       yield (
         self._entry_for_id(step.node),
         entries(step.dependencies_ptr, step.dependencies_len),
-        entries(step.cyclic_dependencies_ptr, step.cyclic_dependencies_len),
+        [d.node for d in entries(step.cyclic_dependencies_ptr, step.cyclic_dependencies_len)],
       )
 
   def trace(self, root):

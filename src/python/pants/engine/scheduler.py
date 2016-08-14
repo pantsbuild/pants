@@ -272,7 +272,7 @@ class LocalScheduler(object):
       changed = [self._product_graph.ensure_entry(r) for r in execution_request.roots]
 
       # Yield nodes that are Runnable, and then compute new ones.
-      runnable_count, scheduling_iterations = 0, 0
+      step_count, runnable_count, scheduling_iterations = 0, 0, 0
       start_time = time.time()
       while True:
         runnable = []
@@ -294,6 +294,7 @@ class LocalScheduler(object):
               continue
 
             # Run the step
+            step_count += 1
             state = self._run_step(node_entry, deps, cyclic_deps)
             if type(state) is Runnable:
               # The Node is ready to run in the Engine.
@@ -317,10 +318,11 @@ class LocalScheduler(object):
         scheduling_iterations += 1
 
       logger.debug(
-        'ran %s scheduling iterations and %s runnables in %f seconds. '
+        'ran %s scheduling iterations, %s runnables, and %s steps in %f seconds. '
         'there are %s total nodes.',
         scheduling_iterations,
         runnable_count,
+        step_count,
         time.time() - start_time,
         len(self._product_graph)
       )
