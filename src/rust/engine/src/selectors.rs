@@ -41,3 +41,12 @@ pub enum Selector {
   SelectProjection(SelectProjection),
   SelectLiteral(SelectLiteral),
 }
+
+impl Selector {
+  pub fn optional(&self) -> bool {
+    match *self {
+      Selector::Select(select) => select.optional,
+      _ => false,
+    }
+  }
+}

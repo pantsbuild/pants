@@ -102,7 +102,7 @@ impl Step for Task {
         Some(&Complete::Return(value)) =>
           dep_values.push(value),
         Some(&Complete::Noop(_)) =>
-          if selector.optional {
+          if selector.optional() {
             dep_values.push(context.none_key());
           } else {
             return State::Complete(
