@@ -25,13 +25,12 @@ pub enum Complete {
   Throw(String),
 }
 
-struct StepContext {
-  deps: HashMap<Node, Complete>,
-  tasks: Tasks,
-  none_key: Key,
+pub struct StepContext<'g,'t> {
+  deps: HashMap<&'g Node, Complete>,
+  tasks: &'t Tasks,
 }
 
-impl StepContext {
+impl<'g,'t> StepContext<'g,'t> {
   /**
    * Create Nodes for each Task that might be able to compute the given product for the
    * given subject and variants.
@@ -43,19 +42,16 @@ impl StepContext {
   fn gen_nodes(&self, subject: Key, product: TypeId, variants: Variants) -> Vec<Node> {
     self.tasks.get(&product)
       .iter()
-      .flat_map(|&tasks| {
-        tasks.iter()
-          .map(|task| {
-            Node::Task(
-              Task {
-                subject: subject,
-                product: product,
-                variants: variants,
-                func: task.func(),
-                clause: task.input_clause(),
-              }
-            )
-          })
+      .map(|task| {
+        Node::Task(
+          Task {
+            subject: subject,
+            product: product,
+            variants: variants,
+            func: task.func(),
+            clause: task.input_clause(),
+          }
+        )
       })
       .collect()
   }
@@ -64,8 +60,8 @@ impl StepContext {
     self.deps.get(&node)
   }
 
-  fn none_key(&self) -> Key {
-    self.none_key.clone()
+  fn none_key(&self) -> &Key {
+    self.tasks.none_key()
   }
 }
 
@@ -73,46 +69,46 @@ impl StepContext {
  * Defines executing a single step for the given context.
  */
 trait Step {
-  fn step(&self, context: &StepContext) -> State;
+  fn step(&self, context: StepContext) -> State;
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-struct Select {
+pub struct Select {
   subject: Key,
   variants: Variants,
   selector: selectors::Select,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-struct SelectLiteral {
+pub struct SelectLiteral {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectLiteral,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-struct SelectVariant {
+pub struct SelectVariant {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectVariant,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-struct SelectDependencies {
+pub struct SelectDependencies {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectDependencies,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-struct SelectProjection {
+pub struct SelectProjection {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectProjection,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-struct Task {
+pub struct Task {
   subject: Key,
   product: TypeId,
   variants: Variants,
@@ -121,7 +117,7 @@ struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: &StepContext) -> State {
+  fn step(&self, context: StepContext) -> State {
     // Compute dependencies for the Node, or determine whether it is a Noop.
     let dependencies = Vec::new();
     let dep_values = Vec::new();
@@ -133,7 +129,7 @@ impl Step for Task {
           dep_values.push(value),
         Some(&Complete::Noop(_)) =>
           if selector.optional() {
-            dep_values.push(context.none_key());
+            dep_values.push(context.none_key().clone());
           } else {
             return State::Complete(
               Complete::Noop(format!("Was missing (at least) input for {:?}.", selector))
@@ -162,7 +158,7 @@ impl Step for Task {
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-struct Filesystem {
+pub struct Filesystem {
   subject: Key,
   product: TypeId,
   variants: Variants,
@@ -179,7 +175,7 @@ pub enum Node {
   Filesystem(Filesystem),
 }
 
-pub impl Node {
+impl Node {
   pub fn create(selector: Selector, subject: Key, variants: Variants) -> Node {
     match selector {
       Selector::Select(s) =>
@@ -216,9 +212,15 @@ pub impl Node {
     }
   }
 
-  fn step(&self, context: &StepContext) -> State {
+  pub fn step(&self, deps: HashMap<&Node, Complete>, tasks: &Tasks) -> State {
+    let context =
+      StepContext {
+        deps: deps,
+        tasks: tasks,
+      };
     match *self {
       Node::Task(n) => n.step(context),
+      n => panic!("TODO! Need to implement step for: {:?}", n),
     }
   }
 }

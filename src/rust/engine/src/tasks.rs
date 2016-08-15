@@ -2,7 +2,7 @@ use core::{Key, TypeId, Variants};
 use selectors::{Selector, Select, SelectDependencies, SelectVariant, SelectLiteral, SelectProjection};
 use std::collections::{HashMap, HashSet};
 
-struct Task {
+pub struct Task {
   output_type: TypeId,
   input_clause: Vec<Selector>,
   func: Key,
@@ -21,7 +21,21 @@ impl Task {
 /**
  * Tasks able to produce each type.
  */
-pub type Tasks = HashMap<TypeId, Vec<Task>>;
+pub struct Tasks {
+  tasks: HashMap<TypeId, Vec<Task>>,
+  none_key: Key,
+}
+
+impl Tasks {
+  pub fn get(&self, type_id: &TypeId) -> &Vec<Task> {
+    self.tasks.get(type_id).unwrap_or(&Vec::new())
+  }
+
+  pub fn none_key(&self) -> &Key {
+    &self.none_key
+  }
+}
+
 
 /**
  * Defines a stateful lifecycle for defining tasks via the C api. Call in order:
@@ -36,13 +50,16 @@ pub struct TasksBuilder {
   tasks: HashMap<TypeId, Vec<Task>>,
   // Used during the construction of the tasks map via the C api.
   preparing: Option<Task>,
+  // A Key representing the python `None` value.
+  none_key: Key,
 }
 
-pub impl TasksBuilder {
-  pub fn new() -> TasksBuilder {
+impl TasksBuilder {
+  pub fn new(none_key: Key) -> TasksBuilder {
     TasksBuilder {
       tasks: HashMap::new(),
       preparing: None,
+      none_key: none_key,
     }
   }
 
@@ -111,6 +128,9 @@ pub impl TasksBuilder {
   }
 
   pub fn build(self) -> Tasks {
-    self.tasks
+    Tasks {
+      tasks: self.tasks,
+      none_key: self.none_key,
+    }
   }
 }

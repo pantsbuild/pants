@@ -2,35 +2,35 @@ use core::{Key, TypeId};
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct Select {
-  product: TypeId,
-  optional: bool,
+  pub product: TypeId,
+  pub optional: bool,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct SelectVariant {
-  product: TypeId,
-  variant_key: String,
+  pub product: TypeId,
+  pub variant_key: String,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct SelectDependencies {
-  product: TypeId,
-  dep_product: TypeId,
-  field: String,
+  pub product: TypeId,
+  pub dep_product: TypeId,
+  pub field: String,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
-  product: TypeId,
-  projected_subject: TypeId,
-  fields: Vec<String>,
-  input_product: TypeId,
+  pub product: TypeId,
+  pub projected_subject: TypeId,
+  pub fields: Vec<String>,
+  pub input_product: TypeId,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct SelectLiteral {
   pub subject: Key,
-  product: TypeId,
+  pub product: TypeId,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]

@@ -31,6 +31,10 @@ impl Entry {
     &self.node
   }
 
+  pub fn state(&self) -> &Option<Complete> {
+    &self.state
+  }
+
   pub fn dependencies(&self) -> &HashSet<EntryId> {
     &self.dependencies
   }
@@ -97,7 +101,7 @@ impl<'a> Graph<'a> {
   pub fn entry_for_id(&mut self, id: EntryId) -> &mut Entry {
     self.entries.get_mut(&id).unwrap_or_else(|| {
       panic!("No Entry exists for {}!", id);
-    });
+    })
   }
 
   pub fn ensure_entry(&'a mut self, node: Node) -> &mut Entry {
@@ -153,6 +157,8 @@ impl<'a> Graph<'a> {
       was_cyclic.push(cyclic);
       if !cyclic {
         self.ensure_entry(dst).dependents.insert(src.id());
+      } else {
+        panic!("TODO! cyclic deps not dealt with yet");
       }
     }
 
@@ -194,7 +200,7 @@ impl<'a> Graph<'a> {
   /**
    * Begins a topological Walk from the given roots.
    */
-  pub fn walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> Walk<P>
+  fn walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> Walk<P>
       where P: Fn(&Entry)->bool {
     Walk {
       graph: self,

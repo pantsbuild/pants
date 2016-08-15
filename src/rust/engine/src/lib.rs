@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use core::{Key, TypeId};
 use graph::{Entry, EntryId, Graph};
-use nodes::{Complete, Node, Runnable, State};
+use nodes::{Complete, Node, Runnable, State, StepContext};
 use selectors::{Selector, Select, SelectDependencies, SelectVariant, SelectLiteral, SelectProjection};
 use tasks::Tasks;
 
@@ -79,7 +79,29 @@ impl<'g,'t> Execution<'g,'t> {
     self.candidates.push_back(entry.id());
   }
 
+  /**
+   * Attempt to run a Step with the currently available dependencies of the given Node.
+   *
+   * If the currently declared dependencies of the Entry are not yet available, returns None. If
+   * they are available, runs a Step and returns the resulting State.
+   */
   fn attempt_step(&self, entry: &Entry) -> Option<State> {
+    let dep_entries: Vec<&Entry> =
+      entry.dependencies().iter()
+        .map(|&d| &*self.graph.entry_for_id(d))
+        .collect();
+    if dep_entries.iter().any(|d| !d.is_complete()) {
+      return None;
+    }
+
+    let mut deps: HashMap<&Node, Complete> =
+      dep_entries.iter()
+        .filter_map(|e| {
+          e.state().map(|s| (e.node(), s))
+        })
+        .collect();
+
+    Some(entry.node().step(deps, self.tasks))
   }
 
   /**
@@ -89,7 +111,7 @@ impl<'g,'t> Execution<'g,'t> {
     // Mark any completed entries as such, and clear the ready list.
     for (id, state) in completed {
       self.outstanding.remove(&id);
-      self.candidates.push_back(id);
+      self.candidates.extend(self.graph.entry_for_id(id).dependents());
       self.graph.complete(id, state);
     }
     self.ready.clear();
@@ -108,8 +130,13 @@ impl<'g,'t> Execution<'g,'t> {
 
       // Attempt to run a step for the Node.
       match self.attempt_step(entry) {
-        Some(State::Complete(s)) =>
+        Some(State::Runnable(s)) => {
           // Mark any dependents of the Node as candidates.
+          self.ready.push((entry.id(), s));
+          self.outstanding.insert(entry.id());
+        },
+        Some(State::Complete(s)) =>
+          // Node completed statically; mark any dependents of the Node as candidates.
           self.candidates.extend(entry.dependents()),
         Some(State::Waiting(w)) => {
           // Add the new dependencies.
@@ -132,6 +159,7 @@ impl<'g,'t> Execution<'g,'t> {
             self.candidates.push_front(entry.id());
           }
         },
+        None => continue,
       }
     }
   }
