@@ -38,14 +38,14 @@ impl Entry {
 /**
  * A DAG (enforced on mutation) of Entries.
  */
-pub struct Graph {
+pub struct Graph<'a> {
   id_generator: EntryId,
-  nodes: HashMap<Node, EntryId>,
+  nodes: HashMap<&'a Node, EntryId>,
   entries: HashMap<EntryId, Entry>,
 }
 
-impl Graph {
-  fn new() -> Graph {
+impl<'a> Graph<'a> {
+  fn new() -> Graph<'a> {
     Graph {
       id_generator: 0,
       nodes: HashMap::new(),
@@ -85,9 +85,9 @@ impl Graph {
     self.nodes.get(node).and_then(|id| self.entries.get(id))
   }
 
-  fn ensure_entry(&mut self, node: Node) -> &mut Entry {
+  fn ensure_entry(&'a mut self, node: Node) -> &mut Entry {
     let entry_id =
-      self.nodes.entry(node).or_insert_with(|| {
+      self.nodes.entry(&node).or_insert_with(|| {
         self.id_generator += 1;
         self.id_generator
       }).clone();
@@ -105,7 +105,7 @@ impl Graph {
     )
   }
 
-  fn complete(&mut self, node: Node, state: State) {
+  fn complete(&'a mut self, node: Node, state: State) {
     assert!(
       self.is_ready(&node),
       "Node {:?} is already completed, or has incomplete deps.",
@@ -121,41 +121,45 @@ impl Graph {
    * Adds the given dst Nodes as dependencies of the src Node.
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
-  fn await(&mut self, src: Node, dsts: &Vec<Node>) {
+   */
+  fn await(&'a mut self, src: Node, dsts: Vec<Node>) {
     assert!(
-      !self.is_complete(src),
+      !self.is_complete(&src),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
       src,
       dsts,
     );
+    let src_id = self.ensure_entry(src).id;
 
     // Determine whether each awaited dep is cyclic, and record the non-cyclic ones.
     let mut was_cyclic = Vec::new();
-    for &dst in dsts {
-      let cyclic = self.detect_cycle(src, dst);
+    for dst in dsts {
+      let cyclic = self.detect_cycle(&src, &dst);
       was_cyclic.push(cyclic);
       if !cyclic {
-        self.ensure_entry(dst).dependents.insert(src);
+        self.ensure_entry(dst).dependents.insert(src_id);
       }
     }
 
     // Finally, borrow the src and add all non-cyclic deps.
+    let dst_entries: Vec<&Entry> = dsts.iter().filter_map(|d| self.entry(d)).collect();
     let entry = self.ensure_entry(src);
-    entry.dependencies.extend(dsts.iter().zip(was_cyclic.iter())
-      .filter_map(|(dst, &cyclic)| {
-        if !cyclic {
-          Some(dst)
-        } else {
-          None
-        }
-      })
+    entry.dependencies.extend(
+      dst_entries.iter().zip(was_cyclic.iter())
+        .filter_map(|(dst, &cyclic)| {
+          if !cyclic {
+            Some(dst)
+          } else {
+            None
+          }
+        })
+        .map(|dst| dst.id)
     );
 
     // Then record the complete awaited set.
-    entry.awaiting = dsts.clone();
+    entry.awaiting = dst_entries.iter().map(|dst| dst.id).collect();
     entry.awaiting_cyclic = was_cyclic;
   }
-   */
 
   /**
    * Detect whether adding an edge from src to dst would create a cycle.
@@ -225,7 +229,7 @@ impl Graph {
  * has the same lifetime as the Graph itself.
  */
 struct Walk<'a, P: Fn(&Entry)->bool> {
-  graph: &'a Graph,
+  graph: &'a Graph<'a>,
   dependents: bool,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId>,
@@ -278,7 +282,7 @@ impl<'a> Execution<'a> {
   /**
    * Continues execution after the given Nodes have changed.
    */
-  fn next(&mut self, graph: &'a mut Graph, changed: &Vec<Node>) {
+  fn next(&mut self, graph: &'a mut Graph<'a>, changed: &Vec<Node>) {
     let mut candidates: HashSet<EntryId> = HashSet::new();
 
     // For each changed node, determine whether its dependents or itself are a candidate.
