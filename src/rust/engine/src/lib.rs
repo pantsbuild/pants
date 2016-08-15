@@ -1,9 +1,12 @@
 mod core;
 mod nodes;
+mod selectors;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use nodes::{Node, State};
+use core::{Key, TypeId};
+use nodes::{Node, State, Runnable};
+use selectors::{Selector, Select, SelectDependencies};
 
 type EntryId = u64;
 
@@ -265,24 +268,56 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
-pub struct Execution<'a> {
-  ready: Vec<&'a Entry>,
+pub struct Execution {
+  // Roots of the Execution, in the order they were declared.
+  roots: Vec<Node>,
+  // Currently ready Runnables.
+  // TODO: make Runnables!
+  ready: Vec<Runnable>,
 }
 
-impl<'a> Execution<'a> {
+impl Execution {
   /**
    * Begins an Execution from the given root Nodes.
    */
-  fn new() -> Execution<'a> {
+  fn new() -> Execution {
     Execution {
+      roots: Vec::new(),
       ready: Vec::new(),
     }
+  }
+
+  fn add_root_node_select(&mut self, subject: Key, product: TypeId) {
+    self.roots.push(
+      Node::create(
+        Selector::Select(Select { product: product, optional: false }),
+        subject,
+        Vec::new(),
+      )
+    );
+  }
+
+  fn add_root_node_select_dependencies(
+    &mut self,
+    subject: Key,
+    product: TypeId,
+    dep_product: TypeId,
+    field: String
+  ) {
+    self.roots.push(
+      Node::create(
+        Selector::SelectDependencies(
+          SelectDependencies { product: product, dep_product: dep_product, field: field }),
+        subject,
+        Vec::new(),
+      )
+    );
   }
 
   /**
    * Continues execution after the given Nodes have changed.
    */
-  fn next(&mut self, graph: &'a mut Graph<'a>, changed: &Vec<Node>) {
+  fn next(&mut self, graph: &mut Graph, changed: &Vec<Node>) {
     let mut candidates: HashSet<EntryId> = HashSet::new();
 
     // For each changed node, determine whether its dependents or itself are a candidate.
