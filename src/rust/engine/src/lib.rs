@@ -29,7 +29,7 @@ pub struct Entry {
 impl Entry {
   fn is_complete(&self) -> bool {
     match self.state {
-      Waiting => true,
+      State::Waiting { dependencies: _ } => true,
       _ => false,
     }
   }
@@ -70,12 +70,14 @@ impl Graph {
    * are complete.
    */
   fn is_ready(&self, node: &Node) -> bool {
-    (!self.is_complete(node)) && (
-      self.entry(node).map(|e| {
-          e.dependencies
-            .iter()
-            .all(|d| { self.is_complete_entry(*d) })
-        }).unwrap_or(true)
+    self.entry(node).map(|e| self.is_ready_entry(e)).unwrap_or(true)
+  }
+
+  fn is_ready_entry(&self, entry: &Entry) -> bool {
+    !entry.is_complete() && (
+      entry.dependencies.iter()
+        .filter_map(|d| self.entries.get(d))
+        .all(|d| { d.is_complete() })
     )
   }
 
@@ -257,63 +259,27 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
 }
 
 /**
- * Primitive structs to allow a list of steps to be directly exposed to python.
- *
- * NB: This is marked `allow(dead_code)` because it's only used in the C API.
- */
-#[allow(dead_code)]
-pub struct RawStep {
-  node: Node,
-  awaiting_ptr: *mut Node,
-  awaiting_len: u64,
-  awaiting_cyclic_ptr: *mut bool,
-  awaiting_cyclic_len: u64,
-}
-
-pub struct RawSteps {
-  steps_ptr: *mut RawStep,
-  steps_len: u64,
-}
-
-/**
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
-pub struct Execution {
-  ready: Vec<RawStep>,
-  ready_raw: *mut RawSteps,
+pub struct Execution<'a> {
+  ready: Vec<&'a Entry>,
 }
 
-impl Execution {
+impl<'a> Execution<'a> {
   /**
    * Begins an Execution from the given root Nodes.
    */
-  fn new() -> Execution {
-    let mut execution =
-      Execution {
-        ready: Vec::new(),
-        ready_raw:
-          Box::into_raw(
-            Box::new(
-              RawSteps {
-                steps_ptr: Vec::new().as_mut_ptr(),
-                steps_len: 0,
-              }
-            )
-          ),
-      };
-    // replace the soon-to-be-invalid nodes_ptr with a live pointer.
-    // TODO: determine the syntax for instantiating and using the Vec inline above.
-    with_raw_steps(execution.ready_raw, |rr| {
-      rr.steps_ptr = execution.ready.as_mut_ptr()
-    });
-    execution
+  fn new() -> Execution<'a> {
+    Execution {
+      ready: Vec::new(),
+    }
   }
 
   /**
-   * Continues execution after the waiting Nodes given Nodes have completed with the given states.
+   * Continues execution after the given Nodes have changed.
    */
-  fn next(&mut self, graph: &mut Graph, changed: &Vec<Node>) {
-    let mut candidates: HashSet<Node> = HashSet::new();
+  fn next(&mut self, graph: &'a mut Graph, changed: &Vec<Node>) {
+    let mut candidates: HashSet<EntryId> = HashSet::new();
 
     // For each changed node, determine whether its dependents or itself are a candidate.
     for &node in changed {
@@ -324,60 +290,38 @@ impl Execution {
         },
         Some(entry) => {
           // If all dependencies of the Node are completed, the Node itself is a candidate.
-          let incomplete_deps: Vec<Node> =
-            entry.dependencies
-              .iter()
-              .map(|d| *d)
-              .filter(|&d| { !graph.is_complete(d) })
+          let incomplete_deps: Vec<EntryId> =
+            entry.dependencies.iter()
+              .filter_map(|d| graph.entries.get(d))
+              .filter(|e| !e.is_complete())
+              .map(|e| e.id)
               .collect();
           if incomplete_deps.len() > 0 {
             // Mark incomplete deps as candidates for steps.
             candidates.extend(incomplete_deps);
           } else {
             // All deps are already completed: mark this Node as a candidate for another step.
-            candidates.insert(node);
+            candidates.insert(entry.id);
           }
         },
         _ => {
-          // Node has no deps yet: mark as a candidate for another step.
-          candidates.insert(node);
+          // Node has no deps yet: initialize it and mark it as a candidate.
+          candidates.insert(graph.ensure_entry(node).id);
         },
       };
     }
 
-    // Create a set of steps for any ready candidates in the raw ready struct.
-    self.ready.clear();
-    self.ready.extend(
+    // Record the ready candidate entries.
+    self.ready =
       candidates.iter()
-        .map(|n| *n)
-        .filter_map(|node| {
-          if graph.is_ready(node) {
-            let entry = graph.ensure_entry(node);
-            Some(
-              RawStep {
-                node: node,
-                awaiting_ptr: entry.awaiting.as_mut_ptr(),
-                awaiting_len: entry.awaiting.len() as u64,
-                awaiting_cyclic_ptr: entry.awaiting_cyclic.as_mut_ptr(),
-                awaiting_cyclic_len: entry.awaiting_cyclic.len() as u64,
-              }
-            )
+        .filter_map(|id| graph.entries.get(id))
+        .filter_map(|entry| {
+          if graph.is_ready_entry(entry) {
+            Some(entry)
           } else {
             None
           }
         })
-    );
-    with_raw_steps(self.ready_raw, |rr| {
-      rr.steps_ptr = self.ready.as_mut_ptr();
-      rr.steps_len = self.ready.len() as u64;
-    });
+        .collect();
   }
-}
-
-fn with_raw_steps<F,T>(raw_steps_ptr: *mut RawSteps, mut f: F) -> T
-    where F: FnMut(&mut RawSteps)->T {
-  let mut raw_steps = unsafe { Box::from_raw(raw_steps_ptr) };
-  let t = f(&mut raw_steps);
-  std::mem::forget(raw_steps);
-  t
 }
