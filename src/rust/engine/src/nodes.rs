@@ -31,80 +31,101 @@ pub enum State {
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
+struct Select {
+  subject: Key,
+  variants: Variants,
+  selector: selectors::Select,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+struct SelectLiteral {
+  subject: Key,
+  variants: Variants,
+  selector: selectors::SelectLiteral,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+struct SelectVariant {
+  subject: Key,
+  variants: Variants,
+  selector: selectors::SelectVariant,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+struct SelectDependencies {
+  subject: Key,
+  variants: Variants,
+  selector: selectors::SelectDependencies,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+struct SelectProjection {
+  subject: Key,
+  variants: Variants,
+  selector: selectors::SelectProjection,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+struct Task {
+  subject: Key,
+  product: TypeId,
+  variants: Variants,
+  func: Key,
+  clause: Vec<selectors::Selector>,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+struct Filesystem {
+  subject: Key,
+  product: TypeId,
+  variants: Variants,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub enum Node {
-  Select {
-    subject: Key,
-    variants: Variants,
-    selector: selectors::Select,
-  },
-  SelectLiteral {
-    subject: Key,
-    variants: Variants,
-    selector: selectors::SelectLiteral,
-  },
-  SelectVariant {
-    subject: Key,
-    variants: Variants,
-    selector: selectors::SelectVariant,
-  },
-  Dependencies {
-    subject: Key,
-    variants: Variants,
-    selector: selectors::SelectDependencies,
-  },
-  Projection {
-    subject: Key,
-    variants: Variants,
-    selector: selectors::SelectProjection,
-  },
-  Task {
-    subject: Key,
-    product: TypeId,
-    variants: Variants,
-    func: Key,
-    clause: Vec<selectors::Selector>,
-  },
-  Filesystem {
-    subject: Key,
-    product: TypeId,
-    variants: Variants,
-  },
+  Select(Select),
+  SelectLiteral(SelectLiteral),
+  SelectVariant(SelectVariant),
+  SelectDependencies(SelectDependencies),
+  SelectProjection(SelectProjection),
+  Task(Task),
+  Filesystem(Filesystem),
 }
 
 pub impl Node {
   pub fn create(selector: Selector, subject: Key, variants: Variants) -> Node {
     match selector {
       Selector::Select(s) =>
-        Node::Select {
+        Node::Select(Select {
           subject: subject,
           variants: variants,
           selector: s,
-        },
+        }),
       Selector::SelectVariant(s) =>
-        Node::SelectVariant {
+        Node::SelectVariant(SelectVariant {
           subject: subject,
           variants: variants,
           selector: s,
-        },
+        }),
       Selector::SelectLiteral(s) =>
         // Intentionally ignores subject parameter to provide a literal subject.
-        Node::SelectLiteral {
+        Node::SelectLiteral(SelectLiteral {
           subject: s.subject,
           variants: variants,
           selector: s,
-        },
+        }),
       Selector::SelectDependencies(s) =>
-        Node::Dependencies {
+        Node::SelectDependencies(SelectDependencies {
           subject: subject,
           variants: variants,
           selector: s,
-        },
+        }),
       Selector::SelectProjection(s) =>
-        Node::Projection {
+        Node::SelectProjection(SelectProjection {
           subject: subject,
           variants: variants,
           selector: s,
-        },
+        }),
     }
   }
 }
