@@ -8,7 +8,7 @@ pub type TypeId = u64;
 
 pub type Variants = Vec<(String,String)>;
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Key {
   digest: Digest,
   // TODO

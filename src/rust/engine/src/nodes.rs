@@ -4,9 +4,6 @@ use core::{Key, TypeId, Variants};
 use selectors;
 use selectors::Selector;
 
-// TODO: coroutines as iterators probably.
-pub type Step = bool;
-
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct Runnable {
   func: Key,
@@ -15,19 +12,38 @@ pub struct Runnable {
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum State {
-  Waiting {
-    dependencies: Vec<Node>,
-  },
-  Noop {
-    msg: Key,
-  },
-  Return {
-    value: Key,
-  },
-  Throw {
-    exc: Key,
-  },
+  Waiting(Vec<Node>),
+  Complete(Complete),
   Runnable(Runnable),
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub enum Complete {
+  Noop(String),
+  Return(Key),
+  Throw(String),
+}
+
+struct StepContext {
+  deps: HashMap<Node, Complete>,
+  none_key: Key,
+}
+
+impl StepContext {
+  fn get(&self, node: Node) -> Option<&Complete> {
+    self.deps.get(&node)
+  }
+
+  fn none_key(&self) -> Key {
+    self.none_key.clone()
+  }
+}
+
+/**
+ * Defines executing a single step for the given context.
+ */
+trait Step {
+  fn step(&self, context: &StepContext) -> State;
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -74,6 +90,47 @@ struct Task {
   clause: Vec<selectors::Selector>,
 }
 
+impl Step for Task {
+  fn step(&self, context: &StepContext) -> State {
+    // Compute dependencies for the Node, or determine whether it is a Noop.
+    let dependencies = Vec::new();
+    let dep_values = Vec::new();
+    for selector in self.clause {
+      let dep_node = context.tasks.create(selector, self.subject, self.variants);
+      let dep_state = context.get(dep_node);
+      match dep_state {
+        Some(&Complete::Return(value)) =>
+          dep_values.push(value),
+        Some(&Complete::Noop(_)) =>
+          if selector.optional {
+            dep_values.push(context.none_key());
+          } else {
+            return State::Complete(
+              Complete::Noop(format!("Was missing (at least) input for {:?}.", selector))
+            );
+          },
+        Some(&Complete::Throw(msg)) => {
+          // NB: propagate thrown exception directly.
+          return State::Complete(Complete::Throw(msg));
+        }
+        None =>
+          dependencies.push(dep_node),
+      }
+    }
+
+    if !dependencies.is_empty() {
+      // A clause was still waiting on dependencies.
+      State::Waiting(dependencies)
+    } else {
+      // Ready to run!
+      State::Runnable(Runnable {
+        func: self.func,
+        args: dep_values,
+      })
+    }
+  }
+}
+
 #[derive(Debug, Eq, Hash, PartialEq)]
 struct Filesystem {
   subject: Key,
@@ -108,7 +165,7 @@ pub impl Node {
           selector: s,
         }),
       Selector::SelectLiteral(s) =>
-        // Intentionally ignores subject parameter to provide a literal subject.
+        // NB: Intentionally ignores subject parameter to provide a literal subject.
         Node::SelectLiteral(SelectLiteral {
           subject: s.subject,
           variants: variants,

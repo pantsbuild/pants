@@ -37,7 +37,7 @@ impl Entry {
 
   pub fn is_complete(&self) -> bool {
     match self.state {
-      State::Waiting { dependencies: _ } => true,
+      State::Waiting(_) => true,
       _ => false,
     }
   }
@@ -108,7 +108,7 @@ impl<'a> Graph<'a> {
       Entry {
         id: entry_id,
         node: node,
-        state: State::Waiting { dependencies: Vec::new() },
+        state: State::Waiting(Vec::new()),
         dependencies: HashSet::new(),
         dependents: HashSet::new(),
         awaiting: Vec::new(),
