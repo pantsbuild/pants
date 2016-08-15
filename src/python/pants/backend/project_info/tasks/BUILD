@@ -144,6 +144,7 @@ python_library(
     ':idea_resources',
   ],
   dependencies = [
+    ':ide_gen',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
@@ -159,7 +160,6 @@ python_library(
     ':idea_resources',
   ],
   dependencies = [
-    ':ide_gen',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
