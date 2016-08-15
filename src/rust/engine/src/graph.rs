@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use nodes::{Node, State};
+use nodes::{Node, Complete};
 
 pub type EntryId = u64;
 
@@ -12,7 +12,7 @@ pub type EntryId = u64;
 pub struct Entry {
   id: EntryId,
   node: Node,
-  state: State,
+  state: Option<Complete>,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: HashSet<EntryId>,
   dependents: HashSet<EntryId>,
@@ -27,6 +27,10 @@ impl Entry {
     self.id
   }
 
+  pub fn node(&self) -> &Node {
+    &self.node
+  }
+
   pub fn dependencies(&self) -> &HashSet<EntryId> {
     &self.dependencies
   }
@@ -36,10 +40,7 @@ impl Entry {
   }
 
   pub fn is_complete(&self) -> bool {
-    match self.state {
-      State::Waiting(_) => true,
-      _ => false,
-    }
+    self.state.is_some()
   }
 }
 
@@ -90,11 +91,13 @@ impl<'a> Graph<'a> {
   }
 
   pub fn entry(&self, node: &Node) -> Option<&Entry> {
-    self.nodes.get(node).and_then(|id| self.entries.get(id))
+    self.nodes.get(node).map(|&id| &*self.entry_for_id(id))
   }
 
-  pub fn entry_for_id(&self, id: EntryId) -> Option<&Entry> {
-    self.entries.get(&id)
+  pub fn entry_for_id(&mut self, id: EntryId) -> &mut Entry {
+    self.entries.get_mut(&id).unwrap_or_else(|| {
+      panic!("No Entry exists for {}!", id);
+    });
   }
 
   pub fn ensure_entry(&'a mut self, node: Node) -> &mut Entry {
@@ -108,7 +111,7 @@ impl<'a> Graph<'a> {
       Entry {
         id: entry_id,
         node: node,
-        state: State::Waiting(Vec::new()),
+        state: None,
         dependencies: HashSet::new(),
         dependents: HashSet::new(),
         awaiting: Vec::new(),
@@ -117,14 +120,15 @@ impl<'a> Graph<'a> {
     )
   }
 
-  pub fn complete(&'a mut self, node: Node, state: State) {
+  pub fn complete(&'a mut self, id: EntryId, state: Complete) {
+    let entry = self.entry_for_id(id);
     assert!(
-      self.is_ready(&node),
+      self.is_ready_entry(entry),
       "Node {:?} is already completed, or has incomplete deps.",
-      node,
+      entry.node,
     );
-    let mut entry = self.ensure_entry(node);
-    entry.state = state;
+
+    entry.state = Some(state);
     entry.awaiting.clear();
     entry.awaiting_cyclic.clear();
   }
@@ -134,14 +138,13 @@ impl<'a> Graph<'a> {
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  pub fn await(&'a mut self, src: Node, dsts: Vec<Node>) {
+  pub fn add_dependencies(&'a mut self, src: &mut Entry, dsts: Vec<Node>) {
     assert!(
-      !self.is_complete(&src),
+      !src.is_complete(),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
-      src,
+      src.node(),
       dsts,
     );
-    let src_id = self.ensure_entry(src).id;
 
     // Determine whether each awaited dep is cyclic, and record the non-cyclic ones.
     let mut was_cyclic = Vec::new();
@@ -149,14 +152,13 @@ impl<'a> Graph<'a> {
       let cyclic = self.detect_cycle(&src, &dst);
       was_cyclic.push(cyclic);
       if !cyclic {
-        self.ensure_entry(dst).dependents.insert(src_id);
+        self.ensure_entry(dst).dependents.insert(src.id());
       }
     }
 
-    // Finally, borrow the src and add all non-cyclic deps.
+    // Finally, add all non-cyclic deps.
     let dst_entries: Vec<&Entry> = dsts.iter().filter_map(|d| self.entry(d)).collect();
-    let entry = self.ensure_entry(src);
-    entry.dependencies.extend(
+    src.dependencies.extend(
       dst_entries.iter().zip(was_cyclic.iter())
         .filter_map(|(dst, &cyclic)| {
           if !cyclic {
@@ -169,8 +171,8 @@ impl<'a> Graph<'a> {
     );
 
     // Then record the complete awaited set.
-    entry.awaiting = dst_entries.iter().map(|dst| dst.id).collect();
-    entry.awaiting_cyclic = was_cyclic;
+    src.awaiting = dst_entries.iter().map(|dst| dst.id).collect();
+    src.awaiting_cyclic = was_cyclic;
   }
 
   /**
@@ -178,14 +180,13 @@ impl<'a> Graph<'a> {
    *
    * Returns true if a cycle would be created by adding an edge from src->dst.
    */
-  fn detect_cycle(&self, src: &Node, dst: &Node) -> bool {
-    let entries = self.entry(dst).and_then(|d| self.entry(src).map(|s| (s, d)));
-    if let Some((src_entry, dst_entry)) = entries {
+  fn detect_cycle(&self, src: &Entry, dst_node: &Node) -> bool {
+    if let Some(dst) = self.entry(dst_node) {
       // Search for an existing path from dst ('s dependencies) to src.
-      let roots = dst_entry.dependencies.into_iter().collect();
-      self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src_entry.id)
+      let roots = dst.dependencies.into_iter().collect();
+      self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src.id)
     } else {
-      // Either src or dst does not already exist... no cycle possible.
+      // dst does not already exist... no cycle possible.
       false
     }
   }
