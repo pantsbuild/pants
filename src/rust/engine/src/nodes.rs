@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use core::{Key, TypeId, Variants};
 use selectors;
 use selectors::Selector;
+use tasks::Tasks;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct Runnable {
@@ -26,10 +27,39 @@ pub enum Complete {
 
 struct StepContext {
   deps: HashMap<Node, Complete>,
+  tasks: Tasks,
   none_key: Key,
 }
 
 impl StepContext {
+  /**
+   * Create Nodes for each Task that might be able to compute the given product for the
+   * given subject and variants.
+   *
+   * (analogous to NodeBuilder.gen_nodes)
+   *
+   * TODO: intrinsics
+   */
+  fn gen_nodes(&self, subject: Key, product: TypeId, variants: Variants) -> Vec<Node> {
+    self.tasks.get(&product)
+      .iter()
+      .flat_map(|&tasks| {
+        tasks.iter()
+          .map(|task| {
+            Node::Task(
+              Task {
+                subject: subject,
+                product: product,
+                variants: variants,
+                func: task.func(),
+                clause: task.input_clause(),
+              }
+            )
+          })
+      })
+      .collect()
+  }
+
   fn get(&self, node: Node) -> Option<&Complete> {
     self.deps.get(&node)
   }
@@ -96,7 +126,7 @@ impl Step for Task {
     let dependencies = Vec::new();
     let dep_values = Vec::new();
     for selector in self.clause {
-      let dep_node = context.tasks.create(selector, self.subject, self.variants);
+      let dep_node = Node::create(selector, self.subject, self.variants);
       let dep_state = context.get(dep_node);
       match dep_state {
         Some(&Complete::Return(value)) =>
@@ -183,6 +213,12 @@ pub impl Node {
           variants: variants,
           selector: s,
         }),
+    }
+  }
+
+  fn step(&self, context: &StepContext) -> State {
+    match *self {
+      Node::Task(n) => n.step(context),
     }
   }
 }
