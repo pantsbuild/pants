@@ -30,7 +30,7 @@ class DatatypeTest(unittest.TestCase):
 
   def test_repr(self):
     bar = datatype('Bar', ['val', 'zal'])
-    self.assertEqual('Bar(val=1, zal=1)',repr(bar(1, 1)))
+    self.assertEqual('Bar(val=1, zal=1)', repr(bar(1, 1)))
 
     class Foo(datatype('F', ['val']), AbsClass):
       pass
@@ -59,3 +59,13 @@ class DatatypeTest(unittest.TestCase):
     bar = datatype('Bar', ['val'], is_iterable=True)
 
     self.assertEqual(bar(1), copy.deepcopy(bar(1)))
+
+  def test_as_dict_non_iterable(self):
+    bar = datatype('Bar', ['val'])
+
+    self.assertEqual({'val': 1}, bar(1)._asdict())
+
+  def test_replace_non_iterable(self):
+    bar = datatype('Bar', ['val', 'zal'])
+
+    self.assertEqual(bar(1, 3), bar(1, 2)._replace(zal=3))
