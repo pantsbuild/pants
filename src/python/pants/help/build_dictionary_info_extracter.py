@@ -116,26 +116,33 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def _get_args_for_target_type(cls, target_type):
+    args = {} # name: info.
+
     # Target.__init__ has several args that are passed to it by TargetAddressable and not by
     # the BUILD file author, so we can't naively inspect it.  Instead we special-case its
     # true BUILD-file-facing arguments here.
     for arg in cls.basic_target_args:
-      yield arg
+      args[arg.name] = arg # Don't yield yet; subclass might supply a better description.
 
     # Non-BUILD-file-facing Target.__init__ args that some Target subclasses capture in their
     # own __init__ for various reasons.
     ignore_args = {'address', 'payload'}
 
-    # Now look at the MRO, in reverse (so we see the more 'common' args first.
+    # Now look at the MRO, in reverse (so we see the more 'common' args first).
+    # If we see info for an arg, it's more specific than whatever description we have so far,
+    # so clobber its entry in the args dict.
     methods_seen = set()  # Ensure we only look at each __init__ method once.
     for _type in reversed([t for t in target_type.mro() if issubclass(t, Target)]):
       if (inspect.ismethod(_type.__init__) and
           _type.__init__ not in methods_seen and
           _type.__init__ != Target.__init__):
         for arg in cls._get_function_args(_type.__init__):
-          if arg.name not in ignore_args:
-            yield arg
+          args[arg.name] = arg
         methods_seen.add(_type.__init__)
+
+    for arg_name, arg in args.items():
+      if not arg_name in ignore_args:
+        yield arg
 
   @classmethod
   def get_function_args(cls, func):
