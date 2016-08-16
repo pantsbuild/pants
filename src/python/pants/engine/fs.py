@@ -63,7 +63,7 @@ class FilteredPaths(datatype('FilteredPaths', ['paths'])):
   """A wrapper around a Paths object that has been filtered by some pattern."""
 
 
-class FileContent(datatype('FileContent', ['path', 'content'])):
+class FileContent(datatype('FileContent', ['path', 'content'], is_iterable=True)):
   """The content of a file, or None if it did not exist."""
 
   def __repr__(self):
