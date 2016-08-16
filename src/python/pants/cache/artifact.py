@@ -96,7 +96,7 @@ class TarballArtifact(Artifact):
     # but decompression times are much faster.
     mode = 'w:gz'
 
-    tar_kwargs = {'dereference': True, 'errorlevel': 2, 'compresslevel': self._compression}
+    tar_kwargs = {'errorlevel': 2, 'compresslevel': self._compression}
 
     with open_tar(self._tarfile, mode, **tar_kwargs) as tarout:
       for path in paths or ():
