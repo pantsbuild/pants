@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
 import unittest
 
 from pants.util.objects import datatype
@@ -46,3 +47,15 @@ class DatatypeTest(unittest.TestCase):
   def test_iterable_when_is_iterable(self):
     bar = datatype('Bar', ['val'], is_iterable=True)
     self.assertEqual([1], [x for x in bar(1)])
+
+  def test_deep_copy_non_iterable(self):
+    # deep copy calls into __getnewargs__, which namedtuple defines as implicitly using __iter__.
+
+    bar = datatype('Bar', ['val'])
+
+    self.assertEqual(bar(1), copy.deepcopy(bar(1)))
+
+  def test_deep_copy_iterable(self):
+    bar = datatype('Bar', ['val'], is_iterable=True)
+
+    self.assertEqual(bar(1), copy.deepcopy(bar(1)))

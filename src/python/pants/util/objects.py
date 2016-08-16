@@ -31,4 +31,8 @@ def datatype(*args, **kwargs):
     if not is_iterable:
       def __iter__(self):
         raise TypeError("'{}' object is not iterable".format(type(self).__name__))
+
+      def __getnewargs__(self):
+        'Return self as a plain tuple.  Used by copy and pickle.'
+        return tuple(super(DataType, self).__iter__())
   return DataType
