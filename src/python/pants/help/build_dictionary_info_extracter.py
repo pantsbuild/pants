@@ -66,7 +66,17 @@ class BuildDictionaryInfoExtracter(object):
         details = details[1:]
       while details and not details[-1].strip():
         details.pop()
-      return description, details
+
+      recording = True
+      details_without_params = []
+      for detail_line in details:
+        if ":param" in detail_line:
+          recording = False
+        if not detail_line.strip():
+          recording = True
+        if recording:
+          details_without_params.append(detail_line)
+      return description, details_without_params
 
   @classmethod
   @memoized_method
