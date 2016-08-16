@@ -40,11 +40,11 @@ class BuildDictionaryInfoExtracter(object):
   ADD_DESCR = '<Add description>'
 
   basic_target_args = [
-    FunctionArg('name', '', False, None),
     FunctionArg('dependencies', '', True, []),
     FunctionArg('description', '', True, None),
-    FunctionArg('tags', '', True, None),
+    FunctionArg('name', '', False, None),
     FunctionArg('no_cache', '', True, False),
+    FunctionArg('tags', '', True, None),
   ]
 
   @classmethod
@@ -140,9 +140,9 @@ class BuildDictionaryInfoExtracter(object):
           args[arg.name] = arg
         methods_seen.add(_type.__init__)
 
-    for arg_name, arg in args.items():
+    for arg_name in sorted(args.keys()):
       if not arg_name in ignore_args:
-        yield arg
+        yield args[arg_name]
 
   @classmethod
   def get_function_args(cls, func):
