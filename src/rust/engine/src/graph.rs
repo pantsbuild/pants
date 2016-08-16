@@ -78,8 +78,8 @@ impl<'a> Graph<'a> {
     self.entries.get(&id).map(|entry| entry.is_complete()).unwrap_or(false)
   }
 
-  fn is_ready(&self, node: &Node) -> bool {
-    self.entry(node).map(|e| self.is_ready_entry(e)).unwrap_or(true)
+  fn is_ready(&self, id: EntryId) -> bool {
+    self.is_ready_entry(self.entry_for_id(id))
   }
 
   /**
@@ -95,43 +95,59 @@ impl<'a> Graph<'a> {
   }
 
   pub fn entry(&self, node: &Node) -> Option<&Entry> {
-    self.nodes.get(node).map(|&id| &*self.entry_for_id(id))
+    self.nodes.get(node).map(|&id| self.entry_for_id(id))
   }
 
-  pub fn entry_for_id(&mut self, id: EntryId) -> &mut Entry {
+  pub fn entry_for_id(&self, id: EntryId) -> &Entry {
+    self.entries.get(&id).unwrap_or_else(|| {
+      panic!("No Entry exists for {}!", id);
+    })
+  }
+
+  pub fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
     self.entries.get_mut(&id).unwrap_or_else(|| {
       panic!("No Entry exists for {}!", id);
     })
   }
 
-  pub fn ensure_entry(&'a mut self, node: Node) -> &mut Entry {
-    let entry_id =
-      self.nodes.entry(&node).or_insert_with(|| {
-        self.id_generator += 1;
-        self.id_generator
-      }).clone();
+  pub fn ensure_entry(&'a mut self, node: Node) -> EntryId {
+    // To take ownership of the Node in a created Entry, we double check its
+    // existence while generating an id.
+    let (id, preexisting) = {
+      let preexisting_id = self.nodes.get(&node);
+      let id = preexisting_id.unwrap_or(&self.id_generator).clone();
+      (id, preexisting_id.is_some())
+    };
 
-    self.entries.entry(entry_id).or_insert_with(||
-      Entry {
-        id: entry_id,
-        node: node,
-        state: None,
-        dependencies: HashSet::new(),
-        dependents: HashSet::new(),
-        awaiting: Vec::new(),
-        awaiting_cyclic: Vec::new(),
-      }
-    )
+    // Update the Nodes map if needed.
+    if !preexisting {
+      self.entries.insert(
+        id,
+        Entry {
+          id: id,
+          node: node,
+          state: None,
+          dependencies: HashSet::new(),
+          dependents: HashSet::new(),
+          awaiting: Vec::new(),
+          awaiting_cyclic: Vec::new(),
+        }
+      );
+      self.nodes.insert(&self.entries.get(&id).unwrap().node, id);
+      self.id_generator += 1;
+    }
+
+    id
   }
 
   pub fn complete(&'a mut self, id: EntryId, state: Complete) {
-    let entry = self.entry_for_id(id);
     assert!(
-      self.is_ready_entry(entry),
+      self.is_ready(id),
       "Node {:?} is already completed, or has incomplete deps.",
-      entry.node,
+      self.entry_for_id(id).node,
     );
 
+    let entry = self.entry_for_id_mut(id);
     entry.state = Some(state);
     entry.awaiting.clear();
     entry.awaiting_cyclic.clear();
@@ -156,7 +172,8 @@ impl<'a> Graph<'a> {
       let cyclic = self.detect_cycle(&src, &dst);
       was_cyclic.push(cyclic);
       if !cyclic {
-        self.ensure_entry(dst).dependents.insert(src.id());
+        let dst_id = self.ensure_entry(dst);
+        self.entry_for_id_mut(dst_id).dependents.insert(src.id());
       } else {
         panic!("TODO! cyclic deps not dealt with yet");
       }

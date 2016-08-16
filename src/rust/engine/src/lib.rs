@@ -74,7 +74,8 @@ impl<'g,'t> Execution<'g,'t> {
   }
 
   fn add_root(&mut self, node: Node) {
-    let entry = self.graph.ensure_entry(node);
+    let id = self.graph.ensure_entry(node);
+    let entry = self.graph.entry_for_id(id);
     self.roots.push(entry.node());
     self.candidates.push_back(entry.id());
   }
@@ -122,7 +123,7 @@ impl<'g,'t> Execution<'g,'t> {
         // Already running.
         continue;
       }
-      let entry = self.graph.entry_for_id(candidate_id);
+      let entry = self.graph.entry_for_id_mut(candidate_id);
       if entry.is_complete() {
         // Already complete.
         continue;
@@ -142,12 +143,10 @@ impl<'g,'t> Execution<'g,'t> {
           // Add the new dependencies.
           self.graph.add_dependencies(entry, w);
           // If all dependencies of the Node are completed, the Node is still a candidate.
-          let dep_entries: Vec<&Entry> =
+          let graph = self.graph;
+          let mut incomplete_deps =
             entry.dependencies().iter()
-              .map(|&d| &*self.graph.entry_for_id(d))
-              .collect();
-          let incomplete_deps =
-            dep_entries.iter()
+              .map(|&d| graph.entry_for_id(d))
               .filter(|e| !e.is_complete())
               .map(|e| e.id());
           if let Some(first) = incomplete_deps.next() {
