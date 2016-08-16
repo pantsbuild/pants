@@ -84,6 +84,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'objects',
+  sources = ['test_objects.py'],
+  coverage = ['pants.util.objects'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:objects',
+  ]
+)
+
+python_tests(
   name = 'osutil',
   sources = ['test_osutil.py'],
   dependencies = [
