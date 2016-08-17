@@ -44,6 +44,10 @@ impl Entry {
     &self.dependents
   }
 
+  pub fn cyclic_dependencies(&self) -> &HashSet<EntryId> {
+    &self.cyclic_dependencies
+  }
+
   pub fn is_complete(&self) -> bool {
     self.state.is_some()
   }

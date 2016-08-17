@@ -93,21 +93,27 @@ impl<'g,'t> Execution<'g,'t> {
 
     let dep_entries: Vec<&Entry> =
       entry.dependencies().iter()
-        .map(|&d| &*self.graph.entry_for_id(d))
+        .map(|&d| self.graph.entry_for_id(d))
         .collect();
     if dep_entries.iter().any(|d| !d.is_complete()) {
       // Dep is not complete.
       return None;
     }
 
-    // All deps are complete: run!
-    let deps: HashMap<&Node, &Complete> =
+    // All deps are complete: gather them.
+    let cyclic = Complete::Noop("Dep would be cyclic.".to_string());
+    let mut dep_map: HashMap<&Node, &Complete> =
       dep_entries.iter()
         .filter_map(|e| {
           e.state().map(|s| (e.node(), s))
         })
         .collect();
-    Some(entry.node().step(deps, self.tasks))
+    for &id in entry.cyclic_dependencies() {
+      dep_map.insert(self.graph.entry_for_id(id).node(), &cyclic);
+    }
+
+    // And finally, run!
+    Some(entry.node().step(dep_map, self.tasks))
   }
 
   /**
