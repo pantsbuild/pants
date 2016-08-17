@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use core::{Key, TypeId, Variants};
+use core::{Key, TypeId, Field, Variants};
 use selectors;
 use selectors::Selector;
 use tasks::Tasks;
@@ -81,15 +81,15 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   fn field_name(&self, item: &Key) -> Key {
-    self.project(item, self.tasks.key_name())
+    self.project(item, self.tasks.field_name())
   }
 
   fn field_variants(&self, item: &Key) -> Key {
-    self.project(item, self.tasks.key_variants())
+    self.project(item, self.tasks.field_variants())
   }
 
   fn field_products(&self, item: &Key) -> Vec<Key> {
-    self.project_multi(item, self.tasks.key_products())
+    self.project_multi(item, self.tasks.field_products())
   }
 
   /**
@@ -109,14 +109,14 @@ impl<'g,'t> StepContext<'g,'t> {
   /**
    * Calls back to Python to project a field.
    */
-  fn project(&self, item: &Key, field: &Key) -> Key {
+  fn project(&self, item: &Key, field: &Field) -> Key {
     panic!("TODO: not implemented!");
   }
 
   /**
    * Calls back to Python to project a field representing a collection.
    */
-  fn project_multi(&self, item: &Key, field: &Key) -> Vec<Key> {
+  fn project_multi(&self, item: &Key, field: &Field) -> Vec<Key> {
     panic!("TODO: not implemented!");
   }
 }
@@ -395,6 +395,59 @@ pub struct SelectProjection {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectProjection,
+}
+
+impl Step for SelectProjection {
+  fn step(&self, context: StepContext) -> State {
+    // Request the product we need to compute the subject.
+    let input_node =
+      Node::create(
+        Selector::Select(
+          selectors::Select { product: self.selector.input_product, optional: false }
+        ),
+        self.subject.clone(),
+        self.variants.clone()
+      );
+    let dep_product =
+      match context.get(&input_node) {
+        Some(&Complete::Return(ref value)) =>
+          value,
+        Some(&Complete::Noop(_)) =>
+          return State::Complete(
+            Complete::Noop(format!("Could not compute {:?} to project its field.", input_node))
+          ),
+        Some(&Complete::Throw(ref msg)) =>
+          return State::Complete(Complete::Throw(msg.clone())),
+        None =>
+          return State::Waiting(vec![input_node]),
+      };
+
+    // The input product is available: use it to construct the new Subject.
+    let projected_subject = context.project(dep_product, &self.selector.field);
+
+    // When the output product is available, return it.
+    let output_node =
+      Node::create(
+        Selector::Select(
+          selectors::Select { product: self.selector.product, optional: false }
+        ),
+        projected_subject,
+        self.variants.clone()
+      );
+    match context.get(&output_node) {
+      Some(&Complete::Return(ref value)) =>
+        return State::Complete(Complete::Return(value.clone())),
+      Some(&Complete::Noop(_)) =>
+        return State::Complete(
+          Complete::Throw(format!("No source of projected dependency {:?}", output_node))
+        ),
+      Some(&Complete::Throw(ref msg)) =>
+        // NB: propagate thrown exception directly.
+        return State::Complete(Complete::Throw(msg.clone())),
+      None =>
+        return State::Waiting(vec![output_node]),
+    }
+  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

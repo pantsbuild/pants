@@ -1,4 +1,4 @@
-use core::{Key, TypeId};
+use core::{Key, TypeId, Field};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -16,14 +16,14 @@ pub struct SelectVariant {
 pub struct SelectDependencies {
   pub product: TypeId,
   pub dep_product: TypeId,
-  pub field: String,
+  pub field: Field,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
   pub product: TypeId,
   pub projected_subject: TypeId,
-  pub fields: Vec<String>,
+  pub field: Field,
   pub input_product: TypeId,
 }
 

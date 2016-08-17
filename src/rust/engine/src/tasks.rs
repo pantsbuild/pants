@@ -1,4 +1,4 @@
-use core::{Key, TypeId};
+use core::{Key, TypeId, Field};
 use selectors::{Selector, Select, SelectDependencies, SelectVariant, SelectLiteral, SelectProjection};
 use std::collections::HashMap;
 
@@ -25,9 +25,9 @@ impl Task {
 pub struct Tasks {
   tasks: HashMap<TypeId, Vec<Task>>,
   key_none: Key,
-  key_name: Key,
-  key_products: Key,
-  key_variants: Key,
+  field_name: Field,
+  field_products: Field,
+  field_variants: Field,
   type_address: TypeId,
   type_has_products: TypeId,
   type_has_variants: TypeId,
@@ -42,16 +42,16 @@ impl Tasks {
     &self.key_none
   }
 
-  pub fn key_name(&self) -> &Key {
-    &self.key_name
+  pub fn field_name(&self) -> &Field {
+    &self.field_name
   }
 
-  pub fn key_products(&self) -> &Key {
-    &self.key_products
+  pub fn field_products(&self) -> &Field {
+    &self.field_products
   }
 
-  pub fn key_variants(&self) -> &Key {
-    &self.key_variants
+  pub fn field_variants(&self) -> &Field {
+    &self.field_variants
   }
 
   pub fn type_address(&self) -> TypeId {
@@ -86,9 +86,9 @@ pub struct TasksBuilder {
 impl TasksBuilder {
   pub fn new(
     key_none: Key,
-    key_name: Key,
-    key_products: Key,
-    key_variants: Key,
+    field_name: Field,
+    field_products: Field,
+    field_variants: Field,
     type_address: TypeId,
     type_has_products: TypeId,
     type_has_variants: TypeId,
@@ -97,9 +97,9 @@ impl TasksBuilder {
       tasks: Tasks {
         tasks: HashMap::new(),
         key_none: key_none,
-        key_name: key_name,
-        key_products: key_products,
-        key_variants: key_variants,
+        field_name: field_name,
+        field_products: field_products,
+        field_variants: field_variants,
         type_address: type_address,
         type_has_products: type_has_products,
         type_has_variants: type_has_variants,
@@ -136,15 +136,15 @@ impl TasksBuilder {
     ));
   }
 
-  pub fn add_select_dependencies(&mut self, product: TypeId, dep_product: TypeId, field: String) {
+  pub fn add_select_dependencies(&mut self, product: TypeId, dep_product: TypeId, field: Field) {
     self.clause(Selector::SelectDependencies(
       SelectDependencies { product: product, dep_product: dep_product, field: field }
     ));
   }
 
-  pub fn add_select_projection(&mut self, product: TypeId, projected_subject: TypeId, fields: Vec<String>, input_product: TypeId) {
+  pub fn add_select_projection(&mut self, product: TypeId, projected_subject: TypeId, field: Field, input_product: TypeId) {
     self.clause(Selector::SelectProjection(
-      SelectProjection { product: product, projected_subject: projected_subject, fields: fields, input_product: input_product }
+      SelectProjection { product: product, projected_subject: projected_subject, field: field, input_product: input_product }
     ));
   }
 

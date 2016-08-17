@@ -3,7 +3,10 @@ pub type Digest = Vec<u8>;
 // TODO: representing python types?
 pub type TypeId = u64;
 
-// TODO: on the python side this is string->string; but to allow for equality checks
+// The name of a field.
+pub type Field = String;
+
+// On the python side this is string->string; but to allow for equality checks
 // without a roundtrip to python, we keep them encoded here.
 pub type Variants = Vec<(Key, Key)>;
 
