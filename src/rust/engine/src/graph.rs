@@ -181,7 +181,7 @@ impl Graph {
         .partition(|&dst_id| self.detect_cycle(src_id, dst_id));
     
     // Add the source as a dependent of each non-cyclic dep.
-    for dep in deps {
+    for &dep in &deps {
       self.entry_for_id_mut(dep).dependents.insert(src_id);
     }
 
@@ -198,7 +198,7 @@ impl Graph {
    */
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
     // Search for an existing path from dst to src.
-    let roots = VecDeque::new();
+    let mut roots = VecDeque::new();
     roots.push_back(dst_id);
     self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src_id)
   }
