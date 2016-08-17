@@ -125,7 +125,7 @@ impl Step for Task {
     let dependencies = Vec::new();
     let dep_values = Vec::new();
     for selector in self.clause {
-      let dep_node = Node::create(selector, self.subject, self.variants);
+      let dep_node = Node::create(selector.clone(), self.subject, self.variants);
       match context.get(&dep_node) {
         Some(&Complete::Return(value)) =>
           dep_values.push(value),
@@ -195,7 +195,7 @@ impl Node {
       Selector::SelectLiteral(s) =>
         // NB: Intentionally ignores subject parameter to provide a literal subject.
         Node::SelectLiteral(SelectLiteral {
-          subject: s.subject,
+          subject: s.subject.clone(),
           variants: variants,
           selector: s,
         }),
@@ -220,8 +220,8 @@ impl Node {
         deps: deps,
         tasks: tasks,
       };
-    match *self {
-      Node::Task(n) => n.step(context),
+    match self {
+      &Node::Task(ref n) => n.step(context),
       n => panic!("TODO! Need to implement step for: {:?}", n),
     }
   }
