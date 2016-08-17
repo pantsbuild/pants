@@ -4,12 +4,7 @@ use core::{Key, TypeId, Field};
 pub struct Select {
   pub product: TypeId,
   pub optional: bool,
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectVariant {
-  pub product: TypeId,
-  pub variant_key: String,
+  pub variant_key: Option<Key>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -36,13 +31,22 @@ pub struct SelectLiteral {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Selector {
   Select(Select),
-  SelectVariant(SelectVariant),
   SelectDependencies(SelectDependencies),
   SelectProjection(SelectProjection),
   SelectLiteral(SelectLiteral),
 }
 
 impl Selector {
+  pub fn select(product: TypeId) -> Selector {
+    Selector::Select(
+      Select {
+        product: product,
+        optional: false,
+        variant_key: None,
+      }
+    )
+  }
+
   pub fn optional(&self) -> bool {
     match self {
       &Selector::Select(ref select) => select.optional,

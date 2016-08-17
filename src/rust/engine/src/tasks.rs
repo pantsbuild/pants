@@ -1,5 +1,5 @@
 use core::{Key, TypeId, Field};
-use selectors::{Selector, Select, SelectDependencies, SelectVariant, SelectLiteral, SelectProjection};
+use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
 use std::collections::HashMap;
 
 pub struct Task {
@@ -124,15 +124,9 @@ impl TasksBuilder {
       );
   }
 
-  pub fn add_select(&mut self, product: TypeId, optional: bool) {
+  pub fn add_select(&mut self, product: TypeId, optional: bool, variant_key: Option<Key>) {
     self.clause(Selector::Select(
-      Select { product: product, optional: optional }
-    ));
-  }
-
-  pub fn add_select_variant(&mut self, product: TypeId, variant_key: String) {
-    self.clause(Selector::SelectVariant(
-      SelectVariant { product: product, variant_key: variant_key }
+      Select { product: product, optional: optional, variant_key: variant_key }
     ));
   }
 

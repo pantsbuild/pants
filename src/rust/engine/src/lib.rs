@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use core::{Key, TypeId};
 use graph::{Entry, EntryId, Graph};
 use nodes::{Complete, Node, Runnable, State};
-use selectors::{Selector, Select, SelectDependencies};
+use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 
 /**
@@ -47,13 +47,7 @@ impl<'g,'t> Execution<'g,'t> {
   }
 
   pub fn add_root_node_select(&mut self, subject: Key, product: TypeId) {
-    self.add_root(
-      Node::create(
-        Selector::Select(Select { product: product, optional: false }),
-        subject,
-        Vec::new(),
-      )
-    );
+    self.add_root(Node::create(Selector::select(product), subject, Vec::new()));
   }
 
   pub fn add_root_node_select_dependencies(

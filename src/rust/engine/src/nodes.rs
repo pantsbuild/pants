@@ -133,9 +133,8 @@ trait Step {
  *
  * A Select can be satisfied by multiple sources, but fails if multiple sources produce a value. The
  * 'variants' field represents variant configuration that is propagated to dependencies. When
- * a task needs to consume a product as configured by the variants map, it uses the SelectVariant
- * selector, which introduces the 'variant' value to restrict the names of values selected by a
- * SelectNode.
+ * a task needs to consume a product as configured by the variants map, it can pass variant_key,
+ * which matches a 'variant' value to restrict the names of values selected by a SelectNode.
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -145,10 +144,6 @@ pub struct Select {
 }
 
 impl Select {
-  fn variant_key(&self) -> Option<&Key> {
-    panic!("TODO: not implemented");
-  }
-
   fn product(&self) -> TypeId {
     self.selector.product
   }
@@ -210,9 +205,7 @@ impl Step for Select {
         self.product() != context.type_has_variants() {
         let variants_node =
           Node::create(
-            Selector::Select(
-              selectors::Select { product: context.type_has_variants(), optional: false }
-            ),
+            Selector::select(context.type_has_variants()),
             self.subject.clone(),
             self.variants.clone(),
           );
@@ -232,8 +225,8 @@ impl Step for Select {
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
     let variant_value: Option<&Key> =
-      match self.variant_key() {
-        Some(variant_key) => {
+      match self.selector.variant_key {
+        Some(ref variant_key) => {
           let variant_value: Option<&Key> =
             variants.iter()
               .find(|&&(ref k, _)| k == variant_key)
@@ -241,7 +234,7 @@ impl Step for Select {
           if variant_value.is_none() {
             return State::Complete(
               Complete::Noop(
-                format!("Variant key {:?} was not configured in variants.", self.variant_key())
+                format!("Variant key {:?} was not configured in variants.", self.selector.variant_key)
               )
             )
           }
@@ -311,13 +304,6 @@ impl Step for SelectLiteral {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectVariant {
-  subject: Key,
-  variants: Variants,
-  selector: selectors::SelectVariant,
-}
-
 /**
  * A Node that selects the given Product for each of the items in `field` on `dep_product`.
  *
@@ -345,9 +331,7 @@ impl Step for SelectDependencies {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
-        Selector::Select(
-          selectors::Select { product: self.selector.dep_product, optional: false }
-        ),
+        Selector::select(self.selector.dep_product),
         self.subject.clone(),
         self.variants.clone()
       );
@@ -402,9 +386,7 @@ impl Step for SelectProjection {
     // Request the product we need to compute the subject.
     let input_node =
       Node::create(
-        Selector::Select(
-          selectors::Select { product: self.selector.input_product, optional: false }
-        ),
+        Selector::select(self.selector.input_product),
         self.subject.clone(),
         self.variants.clone()
       );
@@ -428,9 +410,7 @@ impl Step for SelectProjection {
     // When the output product is available, return it.
     let output_node =
       Node::create(
-        Selector::Select(
-          selectors::Select { product: self.selector.product, optional: false }
-        ),
+        Selector::select(self.selector.product),
         projected_subject,
         self.variants.clone()
       );
@@ -514,7 +494,6 @@ pub struct Filesystem {
 pub enum Node {
   Select(Select),
   SelectLiteral(SelectLiteral),
-  SelectVariant(SelectVariant),
   SelectDependencies(SelectDependencies),
   SelectProjection(SelectProjection),
   Task(Task),
@@ -526,12 +505,6 @@ impl Node {
     match selector {
       Selector::Select(s) =>
         Node::Select(Select {
-          subject: subject,
-          variants: variants,
-          selector: s,
-        }),
-      Selector::SelectVariant(s) =>
-        Node::SelectVariant(SelectVariant {
           subject: subject,
           variants: variants,
           selector: s,
@@ -568,8 +541,10 @@ impl Node {
       &Node::Select(ref n) => n.step(context),
       &Node::SelectDependencies(ref n) => n.step(context),
       &Node::SelectLiteral(ref n) => n.step(context),
+      &Node::SelectProjection(ref n) => n.step(context),
       &Node::Task(ref n) => n.step(context),
-      n => panic!("TODO! Need to implement step for: {:?}", n),
+      &Node::Filesystem(ref n) => 
+        panic!("TODO! Need to implement step for: {:?}", n),
     }
   }
 }
