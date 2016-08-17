@@ -72,42 +72,42 @@ trait Step {
   fn step(&self, context: StepContext) -> State;
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   subject: Key,
   variants: Variants,
   selector: selectors::Select,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectLiteral {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectLiteral,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectVariant {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectVariant,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectDependencies {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectDependencies,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectProjection,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   subject: Key,
   product: TypeId,
@@ -157,14 +157,14 @@ impl Step for Task {
   }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Filesystem {
   subject: Key,
   product: TypeId,
   variants: Variants,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Node {
   Select(Select),
   SelectLiteral(SelectLiteral),

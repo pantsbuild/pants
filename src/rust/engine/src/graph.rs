@@ -11,6 +11,9 @@ pub type EntryId = u64;
  */
 pub struct Entry {
   id: EntryId,
+  // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
+  // nice to avoid keeping two copies of each Node, but tracking references between the two
+  // maps is painful.
   node: Node,
   state: Option<Complete>,
   // Sets of all Nodes which have ever been awaited by this Node.
@@ -48,17 +51,20 @@ impl Entry {
   }
 }
 
+type Nodes = HashMap<Node, EntryId>;
+type Entries = HashMap<EntryId, Entry>;
+
 /**
  * A DAG (enforced on mutation) of Entries.
  */
-pub struct Graph<'a> {
+pub struct Graph {
   id_generator: EntryId,
-  nodes: HashMap<&'a Node, EntryId>,
-  entries: HashMap<EntryId, Entry>,
+  nodes: Nodes,
+  entries: Entries,
 }
 
-impl<'a> Graph<'a> {
-  fn new() -> Graph<'a> {
+impl Graph {
+  fn new() -> Graph {
     Graph {
       id_generator: 0,
       nodes: HashMap::new(),
@@ -66,8 +72,8 @@ impl<'a> Graph<'a> {
     }
   }
 
-  fn len(&self) -> u64 {
-    self.entries.len() as u64
+  fn len(&self) -> usize {
+    self.entries.len()
   }
 
   fn is_complete(&self, node: &Node) -> bool {
@@ -110,42 +116,45 @@ impl<'a> Graph<'a> {
     })
   }
 
-  pub fn ensure_entry(&'a mut self, node: Node) -> EntryId {
-    // To take ownership of the Node in a created Entry, we double check its
-    // existence while generating an id.
-    let (id, preexisting) = {
-      let preexisting_id = self.nodes.get(&node);
-      let id = preexisting_id.unwrap_or(&self.id_generator).clone();
-      (id, preexisting_id.is_some())
-    };
-
-    // Update the Nodes map if needed.
-    if !preexisting {
-      self.entries.insert(
-        id,
-        Entry {
-          id: id,
-          node: node,
-          state: None,
-          dependencies: HashSet::new(),
-          dependents: HashSet::new(),
-          awaiting: Vec::new(),
-          awaiting_cyclic: Vec::new(),
-        }
-      );
-      self.nodes.insert(&self.entries.get(&id).unwrap().node, id);
-      self.id_generator += 1;
-    }
-
-    id
+  pub fn ensure_entry(&mut self, node: Node) -> &Entry {
+    Graph::ensure_entry_internal(
+      &mut self.entries,
+      &mut self.nodes,
+      &mut self.id_generator,
+      node
+    )
   }
 
-  pub fn complete(&'a mut self, id: EntryId, state: Complete) {
-    assert!(
-      self.is_ready(id),
-      "Node {:?} is already completed, or has incomplete deps.",
-      self.entry_for_id(id).node,
-    );
+  fn ensure_entry_internal<'a>(
+    entries: &'a mut Entries,
+    nodes: &mut Nodes,
+    id_generator: &mut EntryId,
+    node: Node
+  ) -> &'a Entry {
+    // See TODO on Entry.
+    let entry_node = node.clone();
+    let id =
+      nodes.entry(node).or_insert_with(|| {
+        *id_generator += 1;
+        *id_generator
+      }).clone();
+
+    // Update the Nodes map if needed.
+    entries.entry(id).or_insert_with(||
+      Entry {
+        id: id,
+        node: entry_node,
+        state: None,
+        dependencies: HashSet::new(),
+        dependents: HashSet::new(),
+        awaiting: Vec::new(),
+        awaiting_cyclic: Vec::new(),
+      }
+    )
+  }
+
+  pub fn complete(&mut self, id: EntryId, state: Complete) {
+    assert!(self.is_ready(id), "Node {:?} is already completed, or has incomplete deps.", id);
 
     let entry = self.entry_for_id_mut(id);
     entry.state = Some(state);
@@ -158,11 +167,11 @@ impl<'a> Graph<'a> {
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  pub fn add_dependencies(&'a mut self, src: &mut Entry, dsts: Vec<Node>) {
+  pub fn add_dependencies(&mut self, src: &mut Entry, dsts: Vec<Node>) {
     assert!(
       !src.is_complete(),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
-      src.node(),
+      src.id(),
       dsts,
     );
 
@@ -172,8 +181,7 @@ impl<'a> Graph<'a> {
       let cyclic = self.detect_cycle(&src, &dst);
       was_cyclic.push(cyclic);
       if !cyclic {
-        let dst_id = self.ensure_entry(dst);
-        self.entry_for_id_mut(dst_id).dependents.insert(src.id());
+        self.ensure_entry(dst).dependents.insert(src.id());
       } else {
         panic!("TODO! cyclic deps not dealt with yet");
       }
@@ -232,14 +240,15 @@ impl<'a> Graph<'a> {
    * Removes the given invalidation roots and their transitive dependents from the Graph.
    */
   pub fn invalidate(&mut self, roots: &Vec<Node>) -> usize {
-    // eagerly collect all Nodes before we begin mutating anything.
+    // Eagerly collect all entries that will be deleted before we begin mutating anything.
     let entries: Vec<&Entry> = {
       let root_ids = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
       self.walk(root_ids, { |_| true }, true).collect()
     };
+    let ids: HashSet<EntryId> = entries.iter().map(|e| e.id().clone()).collect();
 
     for entry in &entries {
-      // remove the roots from their dependencies' dependents lists.
+      // Remove the roots from their dependencies' dependents lists.
       // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
       // I can't figure out how to iterate over one immutable Entry while mutating a different
       // mutable Entry... so I clone() here. Perhaps this is completely sane, because what's to say
@@ -251,10 +260,14 @@ impl<'a> Graph<'a> {
         }
       }
 
-      // delete each Node
-      self.nodes.remove(&entry.node);
       self.entries.remove(&entry.id);
     }
+
+    // Filter the Nodes to delete any with matching keys.
+    self.nodes =
+      self.nodes.into_iter()
+        .filter(|&(_, id)| ids.contains(&id))
+        .collect();
 
     entries.len()
   }
@@ -265,7 +278,7 @@ impl<'a> Graph<'a> {
  * has the same lifetime as the Graph itself.
  */
 struct Walk<'a, P: Fn(&Entry)->bool> {
-  graph: &'a Graph<'a>,
+  graph: &'a Graph,
   dependents: bool,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId>,

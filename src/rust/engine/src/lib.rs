@@ -17,10 +17,10 @@ use tasks::Tasks;
  */
 pub struct Execution<'g,'t> {
   // TODO: Graph and Tasks should both be references.
-  graph: &'g Graph<'g>,
+  graph: &'g Graph,
   tasks: &'t Tasks,
   // Initial set of roots for the execution.
-  roots: Vec<&'g Node>,
+  roots: Vec<Node>,
   // Candidates for Execution, in the order they were declared.
   candidates: VecDeque<EntryId>,
   // Currently ready Runnables.
@@ -74,9 +74,8 @@ impl<'g,'t> Execution<'g,'t> {
   }
 
   fn add_root(&mut self, node: Node) {
-    let id = self.graph.ensure_entry(node);
-    let entry = self.graph.entry_for_id(id);
-    self.roots.push(entry.node());
+    self.roots.push(node.clone());
+    let entry = self.graph.ensure_entry(node);
     self.candidates.push_back(entry.id());
   }
 
@@ -98,8 +97,8 @@ impl<'g,'t> Execution<'g,'t> {
     let mut deps: HashMap<&Node, Complete> =
       dep_entries.iter()
         .filter_map(|e| {
-          e.state().map(|s| (e.node(), s))
-        })
+            e.state().map(|s| (e.node(), s))
+            })
         .collect();
 
     Some(entry.node().step(deps, self.tasks))
