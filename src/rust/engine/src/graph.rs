@@ -34,8 +34,8 @@ impl Entry {
     &self.node
   }
 
-  pub fn state(&self) -> &Option<Complete> {
-    &self.state
+  pub fn state(&self) -> Option<&Complete> {
+    self.state.as_ref()
   }
 
   pub fn dependencies(&self) -> &HashSet<EntryId> {

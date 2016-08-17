@@ -26,7 +26,7 @@ pub enum Complete {
 }
 
 pub struct StepContext<'g,'t> {
-  deps: HashMap<&'g Node, Complete>,
+  deps: HashMap<&'g Node, &'g Complete>,
   tasks: &'t Tasks,
 }
 
@@ -56,8 +56,8 @@ impl<'g,'t> StepContext<'g,'t> {
       .collect()
   }
 
-  fn get(&self, node: Node) -> Option<&Complete> {
-    self.deps.get(&node)
+  fn get(&self, node: &Node) -> Option<&Complete> {
+    self.deps.get(node).map(|c| *c)
   }
 
   fn none_key(&self) -> &Key {
@@ -123,8 +123,7 @@ impl Step for Task {
     let dep_values = Vec::new();
     for selector in self.clause {
       let dep_node = Node::create(selector, self.subject, self.variants);
-      let dep_state = context.get(dep_node);
-      match dep_state {
+      match context.get(&dep_node) {
         Some(&Complete::Return(value)) =>
           dep_values.push(value),
         Some(&Complete::Noop(_)) =>
@@ -212,7 +211,7 @@ impl Node {
     }
   }
 
-  pub fn step(&self, deps: HashMap<&Node, Complete>, tasks: &Tasks) -> State {
+  pub fn step(&self, deps: HashMap<&Node, &Complete>, tasks: &Tasks) -> State {
     let context =
       StepContext {
         deps: deps,

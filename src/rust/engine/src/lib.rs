@@ -94,7 +94,7 @@ impl<'g,'t> Execution<'g,'t> {
       return None;
     }
 
-    let mut deps: HashMap<&Node, Complete> =
+    let deps: HashMap<&Node, &Complete> =
       dep_entries.iter()
         .filter_map(|e| {
           e.state().map(|s| (e.node(), s))
