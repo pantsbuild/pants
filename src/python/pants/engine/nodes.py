@@ -16,8 +16,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
 from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
                              file_digest, read_link, scan_directory)
-from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant)
+from pants.engine.selectors import Select, SelectVariant
 from pants.engine.struct import HasProducts, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -181,26 +180,31 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
   def step(self, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
-    variants = self.variants
-    if type(self.subject) is Address and self.product is not Variants:
-      variants_node = step_context.select_node(Select(Variants), self.subject, self.variants)
+    select_variants = Select(Variants)
+    if type(self.subject) is Address and self.selector is not select_variants:
+      variants_node = step_context.select_node(select_variants, self.subject, self.variants)
       dep_state = step_context.get(variants_node)
-      if type(dep_state) is Waiting:
+      if type(dep_state) in {Waiting, Throw}:
         return dep_state
       elif type(dep_state) is Return:
         # A subject's variants are overridden by any dependent's requested variants, so
         # we merge them left to right here.
-        variants = Variants.merge(dep_state.value.default.items(), variants)
+        variants = Variants.merge(dep_state.value.default.items(), self.variants)
+      else:
+        variants = self.variants
+    else:
+      variants = self.variants
 
     # If there is a variant_key, see whether it has been configured.
-    variant_value = None
-    if self.variant_key:
+    if type(self.selector) is SelectVariant:
       variant_values = [value for key, value in variants
-                        if key == self.variant_key] if variants else None
+        if key == self.variant_key] if variants else None
       if not variant_values:
         # Select cannot be satisfied: no variant configured for this key.
         return Noop('Variant key {} was not configured in variants {}', self.variant_key, variants)
       variant_value = variant_values[0]
+    else:
+      variant_value = None
 
     # If the Subject "is a" or "has a" Product, then we're done.
     literal_value = self._select_literal(self.subject, variant_value)
@@ -271,6 +275,10 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
 
   def _dependency_nodes(self, step_context, dep_product):
     for dependency in getattr(dep_product, self.field or 'dependencies'):
+      if type(dependency) not in self.selector.field_types:
+        #logger.warn('warn unexpected type: {} for : {}'.format(type(dependency), self.selector))
+        print('warn unexpected type: {} for : {}'.format(type(dependency), self.selector))
+
       variants = self.variants
       if isinstance(dependency, Address):
         # If a subject has literal variants for particular dependencies, they win over all else.
@@ -285,7 +293,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
     if type(dep_product_state) in (Throw, Waiting):
       return dep_product_state
     elif type(dep_product_state) is Noop:
-      return Noop('Could not compute {} to determine dependencies.', dep_product_node)
+      return Noop('Could not compute {} to determine dependencies. orig {}', dep_product_node, dep_product_state)
     elif type(dep_product_state) is not Return:
       State.raise_unrecognized(dep_product_state)
 
@@ -338,32 +346,33 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
   def step(self, step_context):
     # Request the product we need to compute the subject.
     input_node = step_context.select_node(Select(self.input_product), self.subject, self.variants)
+
     input_state = step_context.get(input_node)
-    if type(input_state) in (Throw, Waiting):
+    input_state_type = type(input_state)
+    if input_state_type in (Throw, Waiting):
       return input_state
-    elif type(input_state) is Noop:
+    elif input_state_type is Noop:
       return Noop('Could not compute {} in order to project its fields.', input_node)
-    elif type(input_state) is not Return:
+    elif input_state_type is not Return:
       State.raise_unrecognized(input_state)
 
     # The input product is available: use it to construct the new Subject.
     input_product = input_state.value
-    values = []
-    for field in self.fields:
-      values.append(getattr(input_product, field))
+    values = [getattr(input_product, field) for field in self.fields]
 
+    projected_subject_type = self.selector.projected_subject
     # If there was only one projected field and it is already of the correct type, project it.
     try:
-      if len(values) == 1 and type(values[0]) is self.projected_subject:
+      if len(values) == 1 and type(values[0]) is projected_subject_type:
         projected_subject = values[0]
       else:
-        projected_subject = self.projected_subject(*values)
+        projected_subject = projected_subject_type(*values)
     except Exception as e:
       return Throw(ValueError('Fields {} of {} could not be projected as {}: {}'.format(
-                   self.fields, input_product, self.projected_subject, e)))
+                   self.fields, input_product, projected_subject_type, e)))
 
     # When the output node is available, return its result.
-    output_node = step_context.select_node(Select(self.product), projected_subject, self.variants)
+    output_node = step_context.select_node(Select(self.selector.product), projected_subject, self.variants)
     output_state = step_context.get(output_node)
     if type(output_state) in (Return, Throw, Waiting):
       return output_state
@@ -373,7 +382,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
       raise State.raise_unrecognized(output_state)
 
 
-class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', 'clause']), Node):
+class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', 'clause']), Node):
   """A Node representing execution of a non-blocking python function.
 
   All dependencies of the function are declared ahead of time in the dependency `clause` of the
@@ -409,7 +418,22 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     if dependencies:
       return Waiting(dependencies)
     try:
-      return Return(self.func(*dep_values))
+      result = self.func(*dep_values)
+      if (result and type(result) == self.product) or result is None:
+        return Return(result)
+      elif isinstance(result, self.product):
+        #print('WARN result is a subtype. expected {}, but was {}'.format(self.product.__name__, type(func).__name__))
+        return Return(result)
+      else:
+        #if ignore_failures:
+        #  return Return(result)
+        error = ValueError('result of {} was not a {}, instead was {}'.format(self.func.__name__, self.product, type(result).__name__))
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        print(error)
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        return Throw(error)
     except Exception as e:
       return Throw(e)
 
@@ -514,15 +538,4 @@ class StepContext(object):
     This method is decoupled from Selector classes in order to allow the `selector` package to not
     need a dependency on the `nodes` package.
     """
-    selector_type = type(selector)
-    if selector_type in [Select, SelectVariant]:
-      return SelectNode(subject, variants, selector)
-    elif selector_type is SelectLiteral:
-      # NB: Intentionally ignores subject parameter to provide a literal subject.
-      return SelectNode(selector.subject, variants, selector)
-    elif selector_type is SelectDependencies:
-      return DependenciesNode(subject, variants, selector)
-    elif selector_type is SelectProjection:
-      return ProjectionNode(subject, variants, selector)
-    else:
-      raise ValueError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
+    return self._node_builder.select_node(selector, subject, variants)

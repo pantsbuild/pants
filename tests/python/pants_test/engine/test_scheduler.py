@@ -16,7 +16,7 @@ from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                 Throw, Waiting)
 from pants.engine.scheduler import (CompletedNodeException, IncompleteDependencyException,
-                                    ProductGraph)
+                                    NodeBuilder, ProductGraph, RulesetValidator)
 from pants.engine.selectors import Select, SelectDependencies, SelectVariant
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
@@ -51,9 +51,11 @@ class SchedulerTest(unittest.TestCase):
     node_type = SelectNode
 
     variants = tuple(variants.items()) if variants else None
-    self.assertEqual({node_type(subject, variants, selector) for subject in subjects},
-                     {node for node, _ in walk
-                      if node.product == selector.product and isinstance(node, node_type) and node.variants == variants})
+    self.assertEqual(list({node_type(subject, variants, selector) for subject in subjects}),
+      list({node for node, _ in walk
+                      if isinstance(node, node_type) and
+                         node.selector == selector and
+                         node.variants == variants}))
 
   def build_and_walk(self, build_request):
     """Build and then walk the given build_request, returning the walked graph as a list."""
@@ -225,7 +227,10 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec, None, SelectDependencies(Address, Addresses)), root)
+    self.assertEqual(DependenciesNode(spec,
+                                      None,
+                                      SelectDependencies(Address, Addresses, field_types=(Address,))),
+                     root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that a few expected addresses are in the list.
@@ -242,7 +247,10 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec, None, SelectDependencies(Address, Addresses)), root)
+    self.assertEqual(DependenciesNode(spec,
+                                      None,
+                                      SelectDependencies(Address, Addresses, field_types=(Address,))),
+                     root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that an expected address is in the list.
@@ -408,3 +416,35 @@ class ProductGraphTest(unittest.TestCase):
             associated_entry.node in before_nodes,
             'node:\n{}\nis still associated with:\n{}\nin {}'.format(node, associated_entry.node, entry)
           )
+
+
+class RulesetValidatorTest(unittest.TestCase):
+  def test_ruleset_with_missing_product_type(self):
+    class A(object):
+      pass
+    class B(object):
+      pass
+    def noop(*args):
+      pass
+
+    validator = RulesetValidator(NodeBuilder.create([(A, (Select(B),), noop)]),
+      goal_to_product={'something': A},
+      root_subject_types=tuple())
+    with self.assertRaises(ValueError):
+      validator.validate()
+
+      # products that are not used
+      # selectors of different types that cannot be provided
+      # maybe this needs to be a separate type.
+      # :/
+      #def test_ruleset_with_no_usage_of_product_type(self):
+      #  class A(object):
+      #    pass
+      #  class B(object):
+      #    pass
+      #  def noop(*args):
+      #    pass
+      #
+      #  with self.assertRaises(ValueError):
+      #    RulesetValidator(NodeBuilder.create([(A, (Select(B),), noop)]), None, None)
+      #

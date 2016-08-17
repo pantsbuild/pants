@@ -16,10 +16,11 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
-from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return, SelectNode,
-                                State, StepContext, TaskNode, Throw, Waiting)
+from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, ProjectionNode,
+                                Return, SelectNode, State, StepContext, TaskNode, Throw, Waiting)
 from pants.engine.objects import Closable
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
+                                    SelectVariant)
 from pants.util.objects import datatype
 
 
@@ -426,7 +427,7 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
                                                          'output_conversion'])):
   """A task type for defining execution of snapshotted processes."""
 
-  def as_node(self, subject, product_type, variants):
+  def as_node(self, subject, variants):
     return ProcessExecutionNode(subject, variants, self)
 
   @property
@@ -441,8 +442,150 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
 class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type'])):
   """A set-friendly curried TaskNode constructor."""
 
-  def as_node(self, subject, product_type, variants):
-    return TaskNode(subject, product_type, variants, self.task_func, self.input_selects)
+  def as_node(self, subject, variants):
+    return TaskNode(subject, variants, self.product_type, self.task_func, self.input_selects)
+
+
+class RulesetValidator(object):
+
+  def __init__(self, node_builder, goal_to_product, root_subject_types):
+    self._root_subject_types = root_subject_types
+    self._node_builder = node_builder
+    self._goal_to_product = goal_to_product
+    print(goal_to_product)
+
+  def validate(self):
+    self._validate_task_rules(intrinsics=self._node_builder._intrinsics,
+                              serializable_tasks=self._node_builder._tasks,
+                              root_subject_types=self._root_subject_types
+    )
+
+  @classmethod
+  def _validate_task_rules(cls, intrinsics, serializable_tasks, root_subject_types):
+
+    # List provided product types
+    # - lhs of tasks
+    # - root subject types
+    # - dependency subject types
+    # - projected subject types
+    # - dependency field types
+    # - select-literal value
+
+    # consumed product types
+    # - Select#product
+    # - SelectVariant#product
+    # - SelectDependencies#product
+    # - SelectDependencies#dep_product
+    # - SelectProjection#input_product
+    # - SelectProjection#product
+    # - SelectLiteral#product
+
+    # validations:
+    #   assert all provided types are consumed by selects (might not be necessary)
+    #   assert all consumed product types are provided
+
+    # assert that there aren't any duplicate (product, input selects)
+
+    # really, the type constrains are based on tuples, because graphs are constructed as tuples
+    # so select projections set the type of the subject for the product type in the tuple
+
+    available_product_types = set(serializable_tasks.keys())
+    available_product_types.update(prd_t for sbj_t, prd_t in intrinsics.keys())
+    #root_subject_types =
+      #[Address,
+    #  PathGlobs, SingleAddress, SiblingAddresses, DescendantAddresses]
+
+    projected_subject_types = set()
+    dependency_subject_types = set()
+    for rules_of_type_x in serializable_tasks.values():
+      for rule in rules_of_type_x:
+        for select in rule.input_selects:
+          if type(select) is SelectProjection:
+            projected_subject_types.add(select.projected_subject)
+          elif type(select) is SelectDependencies:
+            dependency_subject_types.update(select.field_types)
+
+    type_collections = {
+      'product types': available_product_types,
+      'root subject types': root_subject_types,
+      'projected subject typos': projected_subject_types,
+      'dependency subject types': dependency_subject_types
+    }
+    all_errors = []
+    all_warnings = []
+    for rules_of_type_x in serializable_tasks.values():
+      for rule in rules_of_type_x:
+        rule_errors = []
+        rule_warnings = []
+        for select in rule.input_selects:
+          if type(select) is Select:
+            selection_products = [select.product]
+          elif type(select) is SelectDependencies:
+            selection_products = [select.dep_product, select.product]
+          elif type(select) is SelectProjection:
+            selection_products = [select.input_product, select.product]
+          elif type(select) is SelectVariant:
+            selection_products = [select.product]
+          else:
+            selection_products = []
+
+          for selection_product in selection_products:
+            err_msg, warn_msg = cls._validate_product_is_provided(rule,
+                                                                  select,
+                                                                  selection_product,
+                                                                  type_collections)
+            if err_msg:
+              rule_errors.append(err_msg)
+            if warn_msg:
+              rule_warnings.append(warn_msg)
+
+        all_errors.extend(rule_errors)
+        all_warnings.extend(rule_warnings)
+
+    if all_warnings:
+      logger.warn('warning count {}'.format(len(all_warnings)))
+      logger.warn('Rules with warnings:\n  {}'.format('\n  '.join(all_warnings)))
+    if all_errors:
+      er_ct=len(all_errors)
+      logger.error('err ct {}'.format(er_ct))
+      #logger.error('warn ct {}'.format(warn_ct))
+      n__format = 'Invalid rules.\n  {}'.format('\n  '.join(all_errors))
+      raise ValueError(n__format)
+
+  @classmethod
+  def _validate_product_is_provided(cls, rule, select, selection_product, type_collections):
+    if all(selection_product not in coll for coll in type_collections.values()):
+
+      def superclass_of_selection(b):
+        return issubclass(selection_product, b)
+
+      def subclass_of_selection(b):
+        return issubclass(b, selection_product)
+
+      super_types_by_name = {name: filter(superclass_of_selection, types) for name, types in
+        type_collections.items()}
+      sub_types_by_name = {name: filter(subclass_of_selection, types) for name, types in
+        type_collections.items()}
+
+      if (all(len(b) == 0 for b in super_types_by_name.values()) and all(
+          len(b) == 0 for b in sub_types_by_name.values())):
+        # doesn't cover HasProducts relationships or projections since they have middle
+        # implicit types
+        err_msg = 'Rule entry with no possible fulfillment: {} There is no producer of {} ' \
+                  'or a super/subclass of ' \
+                  'it'.format(
+          rule, select)
+        return err_msg, None
+      else:
+
+        warn_msg = 'WARN Rule entry fulfilled through indirect means {} '.format(select)
+        for x in type_collections.keys():
+          if super_types_by_name.get(x):
+            warn_msg += '  has supertyped {} : {}'.format(x, super_types_by_name[x])
+          if sub_types_by_name.get(x):
+            warn_msg += '  has sub  typed {} : {}'.format(x, sub_types_by_name[x])
+        return None, warn_msg
+    return None, None
 
 
 class NodeBuilder(Closable):
@@ -468,10 +611,6 @@ class NodeBuilder(Closable):
     intrinsics.update(SnapshotNode.as_intrinsics())
     return cls(serializable_tasks, intrinsics)
 
-  @classmethod
-  def create_task_node(cls, subject, product_type, variants, task_func, clause):
-    return TaskNode(subject, product_type, variants, task_func, clause)
-
   def __init__(self, tasks, intrinsics):
     self._tasks = tasks
     self._intrinsics = intrinsics
@@ -484,7 +623,7 @@ class NodeBuilder(Closable):
     else:
       # Tasks that provide the requested product.
       for node_factory in self._lookup_tasks(product_type):
-        yield node_factory(subject, product_type, variants)
+        yield node_factory(subject, variants)
 
   def _lookup_tasks(self, product_type):
     for entry in self._tasks[product_type]:
@@ -492,6 +631,27 @@ class NodeBuilder(Closable):
 
   def _lookup_intrinsic(self, product_type, subject):
     return self._intrinsics.get((type(subject), product_type))
+
+  def select_node(self, selector, subject, variants):
+    """Constructs a Node for the given Selector and the given Subject/Variants.
+
+    This method is decoupled from Selector classes in order to allow the `selector` package to not
+    need a dependency on the `nodes` package.
+    """
+    selector_type = type(selector)
+    if selector_type is Select:
+      return SelectNode(subject, variants, selector)
+    if selector_type is SelectVariant:
+      return SelectNode(subject, variants, selector)
+    elif selector_type is SelectLiteral:
+      # NB: Intentionally ignores subject parameter to provide a literal subject.
+      return SelectNode(selector.subject, variants, selector)
+    elif selector_type is SelectDependencies:
+      return DependenciesNode(subject, variants, selector)
+    elif selector_type is SelectProjection:
+      return ProjectionNode(subject, variants, selector)
+    else:
+      raise ValueError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
 class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'inline_nodes', 'project_tree'])):
@@ -562,6 +722,18 @@ class LocalScheduler(object):
     self._product_graph_lock = graph_lock or threading.RLock()
     self._inline_nodes = inline_nodes
     self._step_id = 0
+
+    select_product = lambda product: Select(product)
+    select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address,))
+    self._root_selector_fns = {
+      Address: select_product,
+      PathGlobs: select_product,
+      SingleAddress: select_dep_addrs,
+      SiblingAddresses: select_dep_addrs,
+      DescendantAddresses: select_dep_addrs,
+    }
+
+    RulesetValidator(self._node_builder, goals, self._root_selector_fns.keys()).validate()
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -645,13 +817,12 @@ class LocalScheduler(object):
     # Determine the root Nodes for the products and subjects selected by the goals and specs.
     def roots():
       for subject in subjects:
+        selector_fn = self._root_selector_fns.get(type(subject), None)
+        if not selector_fn:
+          raise ValueError('Unsupported root subject type: {}'.format(subject))
+
         for product in products:
-          if type(subject) in [Address, PathGlobs]:
-            yield SelectNode(subject, None, Select(product))
-          elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
-            yield DependenciesNode(subject, None, SelectDependencies(product, Addresses))
-          else:
-            raise ValueError('Unsupported root subject type: {}'.format(subject))
+          yield self._node_builder.select_node(selector_fn(product), subject, None)
 
     return ExecutionRequest(tuple(roots()))
 

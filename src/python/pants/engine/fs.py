@@ -148,9 +148,13 @@ class PathGlob(AbstractClass):
       raise ValueError('Expected a Dir as the canonical_stat. Got: {}'.format(canonical_stat))
 
     parts = normpath(filespec).split(os_sep)
+
+    # TODO: nh: I think this PathRoot business is not used.
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
       # A request for the root path.
+      #raise Exception('got here somehow')
       return (PathRoot(),)
+
     elif cls._DOUBLE == parts[0]:
       parts = cls._prune_doublestar(parts)
 
@@ -377,7 +381,7 @@ def create_fs_tasks():
   return [
     # Glob execution.
     (Paths,
-     [SelectDependencies(Paths, PathGlobs)],
+     [SelectDependencies(Paths, PathGlobs, field_types=(PathWildcard, PathDirWildcard, PathRoot))],
      merge_paths),
     (Paths,
      [Select(PathRoot)],
@@ -398,11 +402,11 @@ def create_fs_tasks():
     # Link resolution.
     (Dirs,
      [Select(Paths),
-      SelectDependencies(Dirs, Paths, field='link_stats')],
+      SelectDependencies(Dirs, Paths, field='link_stats', field_types=(Link,))],
      resolve_dir_links),
     (Files,
      [Select(Paths),
-      SelectDependencies(Files, Paths, field='link_stats')],
+      SelectDependencies(Files, Paths, field='link_stats', field_types=tuple())],
      resolve_file_links),
     (Dirs,
      [SelectProjection(Dirs, PathGlobs, ('path_globs',), ReadLink)],
@@ -414,10 +418,10 @@ def create_fs_tasks():
     # File content.
     (FilesContent,
      [Select(Files),
-      SelectDependencies(FileContent, Files, field='stats')],
+      SelectDependencies(FileContent, Files, field='stats', field_types=(File,))],
      files_content),
     (FilesDigest,
      [Select(Files),
-      SelectDependencies(FileDigest, Files, field='stats')],
+      SelectDependencies(FileDigest, Files, field='stats', field_types=(File,))],
      files_digest),
   ]

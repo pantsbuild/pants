@@ -232,9 +232,17 @@ def filter_build_dirs(build_files):
   return BuildDirs(tuple(Dir(d) for d in dirnames))
 
 
+def maybe_cast_to(klass):
+  """Creates a function that is identity iff its parameter is an instance of the type klass"""
+  def cast_fn(obj):
+    if isinstance(obj, klass):
+      return obj
+  return cast_fn
+
+
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
-  
+
   This allows us to limit our AddressFamily requests to directories that contain build files.
   """
 
@@ -252,7 +260,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Support for resolving Structs from Addresses
     (Struct,
      [Select(UnhydratedStruct),
-      SelectDependencies(Struct, UnhydratedStruct)],
+      SelectDependencies(Struct, UnhydratedStruct, field_types=(Address,))],
      hydrate_struct),
     (UnhydratedStruct,
      [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
@@ -274,8 +282,14 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # define that lookup for each literal product.
     (product,
      [Select(Struct)],
-     identity)
-    for product in symbol_table_cls.table().values() if product is not Struct
+     maybe_cast_to(product)
+      # hypothesis: because this is identity, the tasks all have the same hash/id/eq
+      # when changed to cast_to, that was no longer true due to the closure.
+    #  identity
+    )
+    #for product in []
+    for product in set(symbol_table_cls.table().values()) if product is not Struct
+    #for product in symbol_table_cls.table().values() if product is not Struct and isinstance(product, Struct)
   ] + [
     # Simple spec handling.
     (Addresses,
@@ -289,7 +303,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Recursive spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     (Addresses,
-     [SelectDependencies(AddressFamily, BuildDirs)],
+     [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,))],
      addresses_from_address_families),
     (BuildDirs,
      [Select(Files)],

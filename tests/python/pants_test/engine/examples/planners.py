@@ -456,7 +456,7 @@ def setup_json_scheduler(build_root, inline_nodes=True):
       # scala dependency inference
       (ScalaSources,
        [Select(ScalaInferredDepsSources),
-        SelectDependencies(Address, ImportedJVMPackages)],
+        SelectDependencies(Address, ImportedJVMPackages, field_types=(JVMPackageName,))],
        reify_scala_sources),
       (ImportedJVMPackages,
        [SelectProjection(FilesContent, PathGlobs, ('path_globs',), ScalaInferredDepsSources)],
