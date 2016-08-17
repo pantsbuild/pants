@@ -44,8 +44,8 @@ pub enum Selector {
 
 impl Selector {
   pub fn optional(&self) -> bool {
-    match *self {
-      Selector::Select(select) => select.optional,
+    match self {
+      &Selector::Select(ref select) => select.optional,
       _ => false,
     }
   }

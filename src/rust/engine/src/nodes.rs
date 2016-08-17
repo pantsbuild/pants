@@ -40,22 +40,23 @@ impl<'g,'t> StepContext<'g,'t> {
    * TODO: intrinsics
    */
   fn gen_nodes(&self, subject: Key, product: TypeId, variants: Variants) -> Vec<Node> {
-    self.tasks.get(&product)
-      .iter()
-      .map(|task| {
-        Node::Task(
-          Task {
-            subject: subject,
-            product: product,
-            variants: variants,
-            // TODO: cloning out of the task struct is easier than tracking references from
-            // Nodes to Tasks... but should consider doing it if memory usage becomes an issue.
-            func: task.func().clone(),
-            clause: task.input_clause().clone(),
-          }
-        )
-      })
-      .collect()
+    self.tasks.get(&product).map(|tasks|
+      tasks.iter()
+        .map(|task| {
+          Node::Task(
+            Task {
+              subject: subject,
+              product: product,
+              variants: variants,
+              // TODO: cloning out of the task struct is easier than tracking references from
+              // Nodes to Tasks... but should consider doing it if memory usage becomes an issue.
+              func: task.func().clone(),
+              clause: task.input_clause().clone(),
+            }
+          )
+        })
+        .collect()
+    ).unwrap_or_else(|| Vec::new())
   }
 
   fn get(&self, node: &Node) -> Option<&Complete> {

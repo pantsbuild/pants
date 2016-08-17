@@ -27,8 +27,8 @@ pub struct Tasks {
 }
 
 impl Tasks {
-  pub fn get(&self, type_id: &TypeId) -> &Vec<Task> {
-    self.tasks.get(type_id).unwrap_or(&Vec::new())
+  pub fn get(&self, type_id: &TypeId) -> Option<&Vec<Task>> {
+    self.tasks.get(type_id)
   }
 
   pub fn none_key(&self) -> &Key {
@@ -110,7 +110,7 @@ impl TasksBuilder {
   }
 
   fn clause(&mut self, selector: Selector) {
-    self.preparing
+    self.preparing.as_mut()
       .expect("Must `begin()` a task creation before adding clauses!")
       .input_clause.push(selector);
   }
