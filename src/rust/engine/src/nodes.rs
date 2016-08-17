@@ -64,8 +64,8 @@ impl<'g,'t> StepContext<'g,'t> {
     self.deps.get(node).map(|c| *c)
   }
 
-  fn none_key(&self) -> &Key {
-    self.tasks.none_key()
+  fn key_none(&self) -> &Key {
+    self.tasks.key_none()
   }
 
   fn type_address(&self) -> TypeId {
@@ -80,12 +80,12 @@ impl<'g,'t> StepContext<'g,'t> {
     self.isinstance(item, self.tasks.type_has_products())
   }
 
-  fn field_name(&self, item: &Key) -> &Key {
-    self.project(item, self.tasks.name_field_key())
+  fn field_name(&self, item: &Key) -> Key {
+    self.project(item, self.tasks.key_name())
   }
 
   fn field_products(&self, item: &Key) -> Vec<Key> {
-    self.project_multi(item, self.tasks.products_field_key())
+    self.project_multi(item, self.tasks.key_products())
   }
 
   fn isinstance(&self, item: &Key, superclass: TypeId) -> bool {
@@ -124,17 +124,17 @@ impl Select {
     self.selector.product
   }
 
-  fn select_literal_single(
+  fn select_literal_single<'a>(
     &self,
     context: &StepContext,
-    candidate: &Key,
+    candidate: &'a Key,
     variant_value: Option<&Key>
-  ) -> Option<&Key> {
+  ) -> Option<&'a Key> {
     if !context.isinstance(candidate, self.selector.product) {
       return None;
     }
     match variant_value {
-      Some(vv) if context.field_name(candidate) != vv =>
+      Some(vv) if context.field_name(candidate) != *vv =>
         // There is a variant value, and it doesn't match.
         return None,
       _ =>
@@ -152,10 +152,10 @@ impl Select {
     context: &StepContext,
     candidate: &Key,
     variant_value: Option<&Key>
-  ) -> Option<&Key> {
+  ) -> Option<Key> {
     // Check whether the subject is-a instance of the product.
     if let Some(candidate) = self.select_literal_single(context, candidate, variant_value) {
-      return Some(candidate)
+      return Some(candidate.clone())
     }
 
     // Else, check whether it has-a instance of the product.
@@ -164,7 +164,7 @@ impl Select {
     if context.has_products(candidate) {
       for child in context.field_products(candidate) {
         if let Some(child) = self.select_literal_single(context, &child, variant_value) {
-          return Some(child);
+          return Some(child.clone());
         }
       }
     }
@@ -203,9 +203,8 @@ impl Step for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    match self.select_literal(&context, &self.subject, variant_value) {
-      Some(literal_value) =>
-        return State::Complete(Complete::Return(literal_value.clone())),
+    if let Some(literal_value) = self.select_literal(&context, &self.subject, variant_value) {
+      return State::Complete(Complete::Return(literal_value.clone()));
     }
 
     // Else, attempt to use a configured task to compute the value.
@@ -311,7 +310,7 @@ impl Step for Task {
           dep_values.push(&value),
         Some(&Complete::Noop(_)) =>
           if selector.optional() {
-            dep_values.push(context.none_key());
+            dep_values.push(context.key_none());
           } else {
             return State::Complete(
               Complete::Noop(format!("Was missing (at least) input for {:?}.", selector))

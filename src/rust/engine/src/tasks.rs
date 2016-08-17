@@ -19,11 +19,17 @@ impl Task {
 }
 
 /**
- * Tasks able to produce each type.
+ * Registry of tasks able to produce each type, along with a few fundamental python
+ * types that the engine must be aware of.
  */
 pub struct Tasks {
   tasks: HashMap<TypeId, Vec<Task>>,
-  none_key: Key,
+  key_none: Key,
+  key_name: Key,
+  key_products: Key,
+  type_address: TypeId,
+  type_has_products: TypeId,
+  type_variants: TypeId,
 }
 
 impl Tasks {
@@ -31,8 +37,28 @@ impl Tasks {
     self.tasks.get(type_id)
   }
 
-  pub fn none_key(&self) -> &Key {
-    &self.none_key
+  pub fn key_none(&self) -> &Key {
+    &self.key_none
+  }
+
+  pub fn key_name(&self) -> &Key {
+    &self.key_name
+  }
+
+  pub fn key_products(&self) -> &Key {
+    &self.key_products
+  }
+
+  pub fn type_address(&self) -> TypeId {
+    self.type_address
+  }
+
+  pub fn type_has_products(&self) -> TypeId {
+    self.type_has_products
+  }
+
+  pub fn type_variants(&self) -> TypeId {
+    self.type_variants
   }
 }
 
@@ -47,19 +73,31 @@ impl Tasks {
  */
 pub struct TasksBuilder {
   // Tasks able to produce each type.
-  tasks: HashMap<TypeId, Vec<Task>>,
+  tasks: Tasks,
   // Used during the construction of the tasks map via the C api.
   preparing: Option<Task>,
-  // A Key representing the python `None` value.
-  none_key: Key,
 }
 
 impl TasksBuilder {
-  pub fn new(none_key: Key) -> TasksBuilder {
+  pub fn new(
+    key_none: Key,
+    key_name: Key,
+    key_products: Key,
+    type_address: TypeId,
+    type_has_products: TypeId,
+    type_variants: TypeId,
+  ) -> TasksBuilder {
     TasksBuilder {
-      tasks: HashMap::new(),
+      tasks: Tasks {
+        tasks: HashMap::new(),
+        key_none: key_none,
+        key_name: key_name,
+        key_products: key_products,
+        type_address: type_address,
+        type_has_products: type_has_products,
+        type_variants: type_variants,
+      },
       preparing: None,
-      none_key: none_key,
     }
   }
 
@@ -124,13 +162,10 @@ impl TasksBuilder {
     // Move the task from `preparing` to the Tasks map
     let task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
 
-    self.tasks.entry(task.output_type).or_insert(Vec::new()).push(task);
+    self.tasks.tasks.entry(task.output_type).or_insert(Vec::new()).push(task);
   }
 
   pub fn build(self) -> Tasks {
-    Tasks {
-      tasks: self.tasks,
-      none_key: self.none_key,
-    }
+    self.tasks
   }
 }
