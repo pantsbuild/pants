@@ -19,15 +19,11 @@ pub enum State {
   Runnable(Runnable),
 }
 
-/**
- * NB: Throw uses reference-counted strings because we expect there to be a
- * a high degree of duplication when failures are propagated.
- */
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum Complete {
   Noop(String),
   Return(Key),
-  Throw(Rc<String>),
+  Throw(String),
 }
 
 pub struct StepContext<'g,'t> {
@@ -71,6 +67,38 @@ impl<'g,'t> StepContext<'g,'t> {
   fn none_key(&self) -> &Key {
     self.tasks.none_key()
   }
+
+  fn type_address(&self) -> TypeId {
+    self.tasks.type_address()
+  }
+
+  fn type_variants(&self) -> TypeId {
+    self.tasks.type_variants()
+  }
+
+  fn has_products(&self, item: &Key) -> bool {
+    self.isinstance(item, self.tasks.type_has_products())
+  }
+
+  fn field_name(&self, item: &Key) -> &Key {
+    self.project(item, self.tasks.name_field_key())
+  }
+
+  fn field_products(&self, item: &Key) -> Vec<Key> {
+    self.project_multi(item, self.tasks.products_field_key())
+  }
+
+  fn isinstance(&self, item: &Key, superclass: TypeId) -> bool {
+    panic!("TODO: not implemented!");
+  }
+
+  fn project(&self, item: &Key, field: &Key) -> Key {
+    panic!("TODO: not implemented!");
+  }
+
+  fn project_multi(&self, item: &Key, field: &Key) -> Vec<Key> {
+    panic!("TODO: not implemented!");
+  }
 }
 
 /**
@@ -85,6 +113,142 @@ pub struct Select {
   subject: Key,
   variants: Variants,
   selector: selectors::Select,
+}
+
+impl Select {
+  fn variant_key(&self) -> Option<&Key> {
+    panic!("TODO: not implemented");
+  }
+
+  fn product(&self) -> TypeId {
+    self.selector.product
+  }
+
+  fn select_literal_single(
+    &self,
+    context: &StepContext,
+    candidate: &Key,
+    variant_value: Option<&Key>
+  ) -> Option<&Key> {
+    if !context.isinstance(candidate, self.selector.product) {
+      return None;
+    }
+    match variant_value {
+      Some(vv) if context.field_name(candidate) != vv =>
+        // There is a variant value, and it doesn't match.
+        return None,
+      _ =>
+        return Some(candidate),
+    }
+  }
+
+  /**
+   * Looks for has-a or is-a relationships between the given value and the requested product.
+   *
+   * Returns the resulting product value, or None if no match was made.
+   */
+  fn select_literal(
+    &self,
+    context: &StepContext,
+    candidate: &Key,
+    variant_value: Option<&Key>
+  ) -> Option<&Key> {
+    // Check whether the subject is-a instance of the product.
+    if let Some(candidate) = self.select_literal_single(context, candidate, variant_value) {
+      return Some(candidate)
+    }
+
+    // Else, check whether it has-a instance of the product.
+    // TODO: returning only the first literal configuration of a given type/variant. Need to
+    // define mergeability for products.
+    if context.has_products(candidate) {
+      for child in context.field_products(candidate) {
+        if let Some(child) = self.select_literal_single(context, &child, variant_value) {
+          return Some(child);
+        }
+      }
+    }
+    return None;
+  }
+}
+
+impl Step for Select {
+
+  fn step(&self, context: StepContext) -> State {
+    // Request default Variants for the subject, so that if there are any we can propagate
+    // them to task nodes.
+    if self.subject.type_id() == context.type_address() &&
+       self.product() != context.type_variants() {
+      panic!("TODO: not implemented.");
+    }
+
+    // If there is a variant_key, see whether it has been configured; if not, no match.
+    let variant_value: Option<&Key> =
+      match self.variant_key() {
+        Some(&variant_key) => {
+          let variant_value: Option<&Key> =
+            self.variants.iter()
+              .find(|&&(k, _)| k == variant_key)
+              .map(|&(_, v)| &v);
+          if variant_value.is_none() {
+            return State::Complete(
+              Complete::Noop(
+                format!("Variant key {:?} was not configured in variants.", self.variant_key())
+              )
+            )
+          }
+          variant_value
+        },
+        None => None,
+      };
+
+    // If the Subject "is a" or "has a" Product, then we're done.
+    match self.select_literal(&context, &self.subject, variant_value) {
+      Some(literal_value) =>
+        return State::Complete(Complete::Return(literal_value.clone())),
+    }
+
+    // Else, attempt to use a configured task to compute the value.
+    let mut dependencies = Vec::new();
+    let mut matches: Vec<&Key> = Vec::new();
+    for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
+      match context.get(&dep_node) {
+        Some(&Complete::Return(ref value)) =>
+          matches.push(&value),
+        Some(&Complete::Noop(_)) =>
+          continue,
+        Some(&Complete::Throw(ref msg)) =>
+          // NB: propagate thrown exception directly.
+          return State::Complete(Complete::Throw(msg.clone())),
+        None =>
+          dependencies.push(dep_node),
+      }
+    }
+
+    // If any dependencies were unavailable, wait for them; otherwise, determine whether
+    // a value was successfully selected.
+    if !dependencies.is_empty() {
+      // A dependency has not run yet.
+      return State::Waiting(dependencies);
+    } else if matches.len() > 0 {
+      // TODO: Multiple successful tasks are not currently supported. We should allow for this
+      // by adding support for "mergeable" products. see:
+      //   https://github.com/pantsbuild/pants/issues/2526
+      return State::Complete(
+        Complete::Throw(format!("Conflicting values produced for this subject and type: {:?}", matches))
+      );
+    }
+
+    match matches.pop() {
+      Some(matched) =>
+        // Statically completed!
+        State::Complete(Complete::Return(matched.clone())),
+      None =>
+        State::Complete(
+          Complete::Noop(format!("No source of product {:?} for {:?}.", self.product(), self.subject))
+        ),
+    }
+  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -153,10 +317,9 @@ impl Step for Task {
               Complete::Noop(format!("Was missing (at least) input for {:?}.", selector))
             );
           },
-        Some(&Complete::Throw(ref msg)) => {
+        Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg.clone()));
-        }
+          return State::Complete(Complete::Throw(msg.clone())),
         None =>
           dependencies.push(dep_node),
       }
