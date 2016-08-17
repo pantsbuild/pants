@@ -75,8 +75,7 @@ impl<'g,'t> Execution<'g,'t> {
 
   fn add_root(&mut self, node: Node) {
     self.roots.push(node.clone());
-    let entry = self.graph.ensure_entry(node);
-    self.candidates.push_back(entry.id());
+    self.candidates.push_back(self.graph.ensure_entry(node));
   }
 
   /**
