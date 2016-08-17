@@ -222,33 +222,42 @@ impl Graph {
    */
   pub fn invalidate(&mut self, roots: &Vec<Node>) -> usize {
     // Eagerly collect all entries that will be deleted before we begin mutating anything.
-    let entries: Vec<&Entry> = {
+    let ids: HashSet<EntryId> = {
       let root_ids = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
-      self.walk(root_ids, { |_| true }, true).collect()
+      self.walk(root_ids, { |_| true }, true).map(|e| e.id()).collect()
     };
-    let ids: HashSet<EntryId> = entries.iter().map(|e| e.id().clone()).collect();
+    Graph::invalidate_internal(
+      &mut self.entries,
+      &mut self.nodes,
+      ids,
+    )
+  }
 
-    for entry in &entries {
-      // Remove the roots from their dependencies' dependents lists.
+  fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: HashSet<EntryId>) -> usize {
+
+    // Remove the roots from their dependencies' dependents lists.
+    for id in &ids {
       // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
       // I can't figure out how to iterate over one immutable Entry while mutating a different
       // mutable Entry... so I clone() here. Perhaps this is completely sane, because what's to say
       // they're not the same Entry after all? But regardless, less efficient than it could be.
-      for dep_id in entry.dependencies.clone() {
-        match self.entries.get_mut(&dep_id) {
+      let dep_ids = entries.get(id).map(|e| e.dependencies.clone()).unwrap_or(HashSet::new());
+      for dep_id in dep_ids {
+        match entries.get_mut(&dep_id) {
           Some(entry) => { entry.dependents.remove(&entry.id); () },
           _ => {},
         }
       }
 
-      self.entries.remove(&entry.id);
+      entries.remove(id);
     }
 
     // Filter the Nodes to delete any with matching keys.
-    self.nodes =
-      self.nodes.into_iter()
+    let filtered: Vec<(Node, EntryId)> =
+      nodes.drain()
         .filter(|&(_, id)| ids.contains(&id))
         .collect();
+    nodes.extend(filtered);
 
     entries.len()
   }
