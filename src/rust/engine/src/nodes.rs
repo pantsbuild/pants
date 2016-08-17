@@ -92,14 +92,30 @@ impl<'g,'t> StepContext<'g,'t> {
     self.project_multi(item, self.tasks.key_products())
   }
 
+  /**
+   * Stores a list of Keys, resulting in a Key for the list.
+   */
+  fn store_list(&self, items: Vec<&Key>) -> Key {
+    panic!("TODO: not implemented!");
+  }
+
+  /**
+   * Calls back to Python for an isinstance check.
+   */
   fn isinstance(&self, item: &Key, superclass: TypeId) -> bool {
     panic!("TODO: not implemented!");
   }
 
+  /**
+   * Calls back to Python to project a field.
+   */
   fn project(&self, item: &Key, field: &Key) -> Key {
     panic!("TODO: not implemented!");
   }
 
+  /**
+   * Calls back to Python to project a field representing a collection.
+   */
   fn project_multi(&self, item: &Key, field: &Key) -> Vec<Key> {
     panic!("TODO: not implemented!");
   }
@@ -112,6 +128,15 @@ trait Step {
   fn step(&self, context: StepContext) -> State;
 }
 
+/**
+ * A Node that selects a product for a subject.
+ *
+ * A Select can be satisfied by multiple sources, but fails if multiple sources produce a value. The
+ * 'variants' field represents variant configuration that is propagated to dependencies. When
+ * a task needs to consume a product as configured by the variants map, it uses the SelectVariant
+ * selector, which introduces the 'variant' value to restrict the names of values selected by a
+ * SelectNode.
+ */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   subject: Key,
@@ -293,11 +318,76 @@ pub struct SelectVariant {
   selector: selectors::SelectVariant,
 }
 
+/**
+ * A Node that selects the given Product for each of the items in `field` on `dep_product`.
+ *
+ * Begins by selecting the `dep_product` for the subject, and then selects a product for each
+ * member of a collection named `field` on the dep_product.
+ *
+ * The value produced by this Node guarantees that the order of the provided values matches the
+ * order of declaration in the list `field` of the `dep_product`.
+ */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectDependencies {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectDependencies,
+}
+
+impl SelectDependencies {
+  fn product(&self) -> TypeId {
+    self.selector.product
+  }
+}
+
+impl Step for SelectDependencies {
+  fn step(&self, context: StepContext) -> State {
+    // Request the product we need in order to request dependencies.
+    let dep_product_node =
+      Node::create(
+        Selector::Select(
+          selectors::Select { product: self.selector.dep_product, optional: false }
+        ),
+        self.subject.clone(),
+        self.variants.clone()
+      );
+    let dep_product_state =
+      match context.get(&dep_product_node) {
+        Some(&Complete::Return(ref value)) =>
+          value,
+        Some(&Complete::Noop(_)) =>
+          return State::Complete(
+            Complete::Noop(format!("Could not compute {:?} to determine deps.", dep_product_node))
+          ),
+        Some(&Complete::Throw(ref msg)) =>
+          return State::Complete(Complete::Throw(msg.clone())),
+        None =>
+          return State::Waiting(vec![dep_product_node]),
+      };
+
+    // The product and its dependency list are available.
+    let mut dependencies = Vec::new();
+    let mut dep_values: Vec<&Key> = Vec::new();
+    for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
+      match context.get(&dep_node) {
+        Some(&Complete::Return(ref value)) =>
+          dep_values.push(&value),
+        Some(&Complete::Noop(_)) =>
+          continue,
+        Some(&Complete::Throw(ref msg)) =>
+          // NB: propagate thrown exception directly.
+          return State::Complete(Complete::Throw(msg.clone())),
+        None =>
+          dependencies.push(dep_node),
+      }
+    }
+
+    if dependencies.len() > 0 {
+      State::Waiting(dependencies)
+    } else {
+      State::Complete(Complete::Return(context.store_list(dep_values)))
+    }
+  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -422,6 +512,8 @@ impl Node {
         tasks: tasks,
       };
     match self {
+      &Node::Select(ref n) => n.step(context),
+      &Node::SelectDependencies(ref n) => n.step(context),
       &Node::SelectLiteral(ref n) => n.step(context),
       &Node::Task(ref n) => n.step(context),
       n => panic!("TODO! Need to implement step for: {:?}", n),
