@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::rc::Rc;
 
 use core::{Key, TypeId, Variants};
@@ -55,7 +54,7 @@ impl<'g,'t> StepContext<'g,'t> {
               product: product,
               variants: variants.clone(),
               // TODO: cloning out of the task struct is easier than tracking references from
-              // Nodes to Tasks... but should consider doing it if memory usage becomes an issue.
+              // Nodes to Tasks... but should likely do it if memory usage becomes an issue.
               func: task.func().clone(),
               clause: task.input_clause().clone(),
             }
@@ -93,6 +92,12 @@ pub struct SelectLiteral {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectLiteral,
+}
+
+impl Step for SelectLiteral {
+  fn step(&self, _: StepContext) -> State {
+    State::Complete(Complete::Return(self.subject.clone()))
+  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -232,6 +237,7 @@ impl Node {
         tasks: tasks,
       };
     match self {
+      &Node::SelectLiteral(ref n) => n.step(context),
       &Node::Task(ref n) => n.step(context),
       n => panic!("TODO! Need to implement step for: {:?}", n),
     }

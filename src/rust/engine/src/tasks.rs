@@ -1,6 +1,6 @@
-use core::{Key, TypeId, Variants};
+use core::{Key, TypeId};
 use selectors::{Selector, Select, SelectDependencies, SelectVariant, SelectLiteral, SelectProjection};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub struct Task {
   output_type: TypeId,

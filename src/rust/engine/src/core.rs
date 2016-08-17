@@ -1,6 +1,3 @@
-use std::hash::{Hash, Hasher};
-use std::fmt;
-
 pub type Digest = Vec<u8>;
 
 // TODO: representing python types?

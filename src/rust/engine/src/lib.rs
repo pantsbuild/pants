@@ -8,8 +8,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use core::{Key, TypeId};
 use graph::{Entry, EntryId, Graph};
-use nodes::{Complete, Node, Runnable, State, StepContext};
-use selectors::{Selector, Select, SelectDependencies, SelectVariant, SelectLiteral, SelectProjection};
+use nodes::{Complete, Node, Runnable, State};
+use selectors::{Selector, Select, SelectDependencies};
 use tasks::Tasks;
 
 /**
@@ -142,7 +142,7 @@ impl<'g,'t> Execution<'g,'t> {
           self.ready.push((entry_id, s));
           self.outstanding.insert(entry_id);
         },
-        Some(State::Complete(s)) =>
+        Some(State::Complete(_)) =>
           // Node completed statically; mark any dependents of the Node as candidates.
           self.candidates.extend(self.graph.entry_for_id(entry_id).dependents()),
         Some(State::Waiting(w)) => {
