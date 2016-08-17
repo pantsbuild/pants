@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
+use std::rc::Rc;
 
 use core::{Key, TypeId, Variants};
 use selectors;
@@ -18,11 +20,15 @@ pub enum State {
   Runnable(Runnable),
 }
 
+/**
+ * NB: Throw uses reference-counted strings because we expect there to be a
+ * a high degree of duplication when failures are propagated.
+ */
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum Complete {
   Noop(String),
   Return(Key),
-  Throw(String),
+  Throw(Rc<String>),
 }
 
 pub struct StepContext<'g,'t> {
@@ -122,24 +128,29 @@ pub struct Task {
 impl Step for Task {
   fn step(&self, context: StepContext) -> State {
     // Compute dependencies for the Node, or determine whether it is a Noop.
-    let dependencies = Vec::new();
-    let dep_values = Vec::new();
+    let mut dependencies = Vec::new();
+    let mut dep_values: Vec<&Key> = Vec::new();
     for selector in self.clause {
-      let dep_node = Node::create(selector.clone(), self.subject, self.variants);
+      let dep_node =
+        Node::create(
+          selector.clone(),
+          self.subject.clone(),
+          self.variants.clone()
+        );
       match context.get(&dep_node) {
-        Some(&Complete::Return(value)) =>
-          dep_values.push(value),
+        Some(&Complete::Return(ref value)) =>
+          dep_values.push(&value),
         Some(&Complete::Noop(_)) =>
           if selector.optional() {
-            dep_values.push(context.none_key().clone());
+            dep_values.push(context.none_key());
           } else {
             return State::Complete(
               Complete::Noop(format!("Was missing (at least) input for {:?}.", selector))
             );
           },
-        Some(&Complete::Throw(msg)) => {
+        Some(&Complete::Throw(ref msg)) => {
           // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg));
+          return State::Complete(Complete::Throw(msg.clone()));
         }
         None =>
           dependencies.push(dep_node),
@@ -152,8 +163,8 @@ impl Step for Task {
     } else {
       // Ready to run!
       State::Runnable(Runnable {
-        func: self.func,
-        args: dep_values,
+        func: self.func.clone(),
+        args: dep_values.into_iter().map(|d| d.clone()).collect(),
       })
     }
   }
