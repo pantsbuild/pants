@@ -27,9 +27,10 @@ pub struct Tasks {
   key_none: Key,
   key_name: Key,
   key_products: Key,
+  key_variants: Key,
   type_address: TypeId,
   type_has_products: TypeId,
-  type_variants: TypeId,
+  type_has_variants: TypeId,
 }
 
 impl Tasks {
@@ -49,6 +50,10 @@ impl Tasks {
     &self.key_products
   }
 
+  pub fn key_variants(&self) -> &Key {
+    &self.key_variants
+  }
+
   pub fn type_address(&self) -> TypeId {
     self.type_address
   }
@@ -57,8 +62,8 @@ impl Tasks {
     self.type_has_products
   }
 
-  pub fn type_variants(&self) -> TypeId {
-    self.type_variants
+  pub fn type_has_variants(&self) -> TypeId {
+    self.type_has_variants
   }
 }
 
@@ -83,9 +88,10 @@ impl TasksBuilder {
     key_none: Key,
     key_name: Key,
     key_products: Key,
+    key_variants: Key,
     type_address: TypeId,
     type_has_products: TypeId,
-    type_variants: TypeId,
+    type_has_variants: TypeId,
   ) -> TasksBuilder {
     TasksBuilder {
       tasks: Tasks {
@@ -93,9 +99,10 @@ impl TasksBuilder {
         key_none: key_none,
         key_name: key_name,
         key_products: key_products,
+        key_variants: key_variants,
         type_address: type_address,
         type_has_products: type_has_products,
-        type_variants: type_variants,
+        type_has_variants: type_has_variants,
       },
       preparing: None,
     }

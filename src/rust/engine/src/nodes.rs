@@ -72,8 +72,8 @@ impl<'g,'t> StepContext<'g,'t> {
     self.tasks.type_address()
   }
 
-  fn type_variants(&self) -> TypeId {
-    self.tasks.type_variants()
+  fn type_has_variants(&self) -> TypeId {
+    self.tasks.type_has_variants()
   }
 
   fn has_products(&self, item: &Key) -> bool {
@@ -82,6 +82,10 @@ impl<'g,'t> StepContext<'g,'t> {
 
   fn field_name(&self, item: &Key) -> Key {
     self.project(item, self.tasks.key_name())
+  }
+
+  fn field_variants(&self, item: &Key) -> Key {
+    self.project(item, self.tasks.key_variants())
   }
 
   fn field_products(&self, item: &Key) -> Vec<Key> {
@@ -173,21 +177,40 @@ impl Select {
 }
 
 impl Step for Select {
-
   fn step(&self, context: StepContext) -> State {
     // Request default Variants for the subject, so that if there are any we can propagate
     // them to task nodes.
-    if self.subject.type_id() == context.type_address() &&
-       self.product() != context.type_variants() {
-      panic!("TODO: not implemented.");
-    }
+    let variants =
+      if self.subject.type_id() == context.type_address() &&
+        self.product() != context.type_has_variants() {
+        let variants_node =
+          Node::create(
+            Selector::Select(
+              selectors::Select { product: context.type_has_variants(), optional: false }
+            ),
+            self.subject.clone(),
+            self.variants.clone(),
+          );
+        match context.get(&variants_node) {
+          Some(&Complete::Return(ref value)) =>
+            panic!("TODO: merging variants is not yet implemented"),
+          Some(&Complete::Noop(_)) =>
+            &self.variants,
+          Some(&Complete::Throw(ref msg)) =>
+            return State::Complete(Complete::Throw(msg.clone())),
+          None =>
+            return State::Waiting(vec![variants_node]),
+        }
+      } else {
+        &self.variants
+      };
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
     let variant_value: Option<&Key> =
       match self.variant_key() {
         Some(variant_key) => {
           let variant_value: Option<&Key> =
-            self.variants.iter()
+            variants.iter()
               .find(|&&(ref k, _)| k == variant_key)
               .map(|&(_, ref v)| v);
           if variant_value.is_none() {
