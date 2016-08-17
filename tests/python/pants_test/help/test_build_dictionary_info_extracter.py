@@ -139,13 +139,13 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       def __init__(self, arg3, arg4=None, **kwargs):
         super(Target1, self).__init__(**kwargs)
 
-    self.assertEqual(BuildDictionaryInfoExtracter.basic_target_args + [
+    self.assertEqual(sorted(BuildDictionaryInfoExtracter.basic_target_args + [
                        FunctionArg('arg1', 'The first arg.', False, None),
                        FunctionArg('arg2', 'The second arg.', True, 42),
                        FunctionArg('arg3', '', False, None),
                        FunctionArg('arg4', '', True, None)
-                     ],
-                     BuildDictionaryInfoExtracter.get_args_for_target_type(Target3))
+                     ]),
+                     sorted(BuildDictionaryInfoExtracter.get_args_for_target_type(Target3)))
 
     # Check a trivial case.
     class Target4(Target):
