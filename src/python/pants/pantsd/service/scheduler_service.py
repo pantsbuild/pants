@@ -89,7 +89,7 @@ class SchedulerService(PantsService):
 
     :returns: A LegacyGraphHelper instance for graph construction.
     """
-    self._scheduler.execute_request(spec_roots)
+    self._graph_helper.prime_product_graph(spec_roots)
     return self._graph_helper
 
   def run(self):

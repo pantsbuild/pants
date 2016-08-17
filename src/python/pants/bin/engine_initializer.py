@@ -17,7 +17,7 @@ from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
+from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
 from pants.engine.mapper import AddressMapper
@@ -60,11 +60,20 @@ class LegacySymbolTable(SymbolTable):
 class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 'symbol_table_cls'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
-  def create_graph(self, spec_roots, build_root=None):
-    """Construct and return a BuildGraph given a set of input specs."""
+  def prime_product_graph(self, spec_roots):
+    """Prime the scheduler's `ProductGraph` for `LegacyTarget` products."""
+    request = self.scheduler.execution_request([LegacyTarget], spec_roots)
+    result = self.engine.execute(request)
+    if result.error:
+      raise result.error
+    return result
+
+  def create_build_graph(self, spec_roots, build_root=None):
+    """Construct and return a `BuildGraph` given a set of input specs."""
     graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
     with self.scheduler.locked():
-      for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
+      # Ensure the entire generator is unrolled.
+      for _ in graph.inject_specs_closure(spec_roots):
         pass
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
     address_mapper = LegacyAddressMapper(graph, build_root or get_buildroot())

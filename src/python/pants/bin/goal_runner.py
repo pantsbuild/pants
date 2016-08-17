@@ -93,7 +93,7 @@ class GoalRunnerFactory(object):
                                                                      build_root=self._root_dir)
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
       graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(path_ignore_patterns)
-      return graph_helper.create_graph(root_specs, self._root_dir)
+      return graph_helper.create_build_graph(root_specs, self._root_dir)
     else:
       address_mapper = BuildFileAddressMapper(
         self._build_file_parser,
