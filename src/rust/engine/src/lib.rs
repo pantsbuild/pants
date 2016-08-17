@@ -17,7 +17,7 @@ use tasks::Tasks;
  */
 pub struct Execution<'g,'t> {
   // TODO: Graph and Tasks should both be references.
-  graph: &'g Graph,
+  graph: &'g mut Graph,
   tasks: &'t Tasks,
   // Initial set of roots for the execution.
   roots: Vec<Node>,
@@ -35,7 +35,7 @@ impl<'g,'t> Execution<'g,'t> {
   /**
    * Begins an Execution with an initially empty set of roots and tasks.
    */
-  pub fn new(graph: &'g Graph, tasks: &'t Tasks) -> Execution<'g,'t> {
+  pub fn new(graph: &'g mut Graph, tasks: &'t Tasks) -> Execution<'g,'t> {
     Execution {
       graph: graph,
       tasks: tasks,
@@ -97,8 +97,8 @@ impl<'g,'t> Execution<'g,'t> {
     let mut deps: HashMap<&Node, Complete> =
       dep_entries.iter()
         .filter_map(|e| {
-            e.state().map(|s| (e.node(), s))
-            })
+          e.state().map(|s| (e.node(), s))
+        })
         .collect();
 
     Some(entry.node().step(deps, self.tasks))

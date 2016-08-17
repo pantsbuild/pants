@@ -116,7 +116,7 @@ impl Graph {
     })
   }
 
-  pub fn ensure_entry(&mut self, node: Node) -> &Entry {
+  pub fn ensure_entry(&mut self, node: Node) -> &mut Entry {
     Graph::ensure_entry_internal(
       &mut self.entries,
       &mut self.nodes,
@@ -130,7 +130,7 @@ impl Graph {
     nodes: &mut Nodes,
     id_generator: &mut EntryId,
     node: Node
-  ) -> &'a Entry {
+  ) -> &'a mut Entry {
     // See TODO on Entry.
     let entry_node = node.clone();
     let id =
@@ -214,7 +214,7 @@ impl Graph {
   fn detect_cycle(&self, src: &Entry, dst_node: &Node) -> bool {
     if let Some(dst) = self.entry(dst_node) {
       // Search for an existing path from dst ('s dependencies) to src.
-      let roots = dst.dependencies.into_iter().collect();
+      let roots = dst.dependencies.iter().map(|d| *d).collect();
       self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src.id)
     } else {
       // dst does not already exist... no cycle possible.
