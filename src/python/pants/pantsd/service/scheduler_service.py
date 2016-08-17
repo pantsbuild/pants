@@ -84,9 +84,13 @@ class SchedulerService(PantsService):
       self._handle_batch_event(files)
     self._event_queue.task_done()
 
-  def get_build_graph(self, spec_roots):
-    """Returns a legacy BuildGraph given a set of input specs."""
-    return self._graph_helper.create_graph(spec_roots)
+  def execute_request(self, spec_roots):
+    """Runs an execution request against the captive scheduler given a set of input specs.
+
+    :returns: A LegacyGraphHelper instance for graph construction.
+    """
+    self._scheduler.execute_request(spec_roots)
+    return self._graph_helper
 
   def run(self):
     """Main service entrypoint."""

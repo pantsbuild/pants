@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import select
+import sys
 import traceback
 from contextlib import contextmanager
 
@@ -51,7 +52,8 @@ class PailgunService(PantsService):
     # Constructs and returns a runnable PantsRunner.
     def runner_factory(sock, arguments, environment):
       exiter = self._exiter_class(sock)
-      build_graph = None
+      graph_helper = None
+      deferred_exc = None
 
       self._logger.debug('execution commandline: %s', arguments)
       if self._scheduler_service:
@@ -60,16 +62,18 @@ class PailgunService(PantsService):
         spec_roots = self._parse_commandline_to_spec_roots(args=arguments)
         self._logger.debug('parsed spec_roots: %s', spec_roots)
         try:
-          self._logger.debug('requesting BuildGraph from %s', self._scheduler_service)
+          self._logger.debug('running execution request against %s', self._scheduler_service)
           # N.B. This call is made in the pre-fork daemon context for reach and reuse of the
-          # resident scheduler for BuildGraph construction.
-          build_graph = self._scheduler_service.get_build_graph(spec_roots)
+          # resident scheduler.
+          graph_helper = self._scheduler_service.execute_request(spec_roots)
         except Exception:
+          deferred_exc = sys.exc_info()
           self._logger.warning(
-            'encountered exception during SchedulerService.get_build_graph():\n%s',
-            traceback.format_exc()
+            'encountered exception during SchedulerService.execute_request(), deferring:\n%s',
+            ''.join(traceback.format_exception(*deferred_exc))
           )
-      return self._runner_class(sock, exiter, arguments, environment, build_graph)
+
+      return self._runner_class(sock, exiter, arguments, environment, graph_helper, deferred_exc)
 
     @contextmanager
     def context_lock():

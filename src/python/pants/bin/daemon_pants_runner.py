@@ -61,20 +61,25 @@ class DaemonPantsRunner(ProcessManager):
   N.B. this class is primarily used by the PailgunService in pantsd.
   """
 
-  def __init__(self, socket, exiter, args, env, build_graph):
+  def __init__(self, socket, exiter, args, env, graph_helper, deferred_exception=None):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param Exiter exiter: The Exiter instance for this run.
     :param list args: The arguments (i.e. sys.argv) for this run.
     :param dict env: The environment (i.e. os.environ) for this run.
-    :param BuildGraph build_graph: A BuildGraph instance.
+    :param LegacyGraphHelper graph_helper: The LegacyGraphHelper instance to use for BuildGraph
+                                           construction. In the event of an exception, this will be
+                                           None.
+    :param Exception deferred_exception: A deferred exception from the daemon's graph construction.
+                                         If present, this will be raised in the client context.
     """
     super(DaemonPantsRunner, self).__init__(name=self._make_identity())
     self._socket = socket
     self._exiter = exiter
     self._args = args
     self._env = env
-    self._build_graph = build_graph
+    self._graph_helper = graph_helper
+    self._deferred_exception = deferred_exception
 
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
@@ -108,6 +113,18 @@ class DaemonPantsRunner(ProcessManager):
       raise KeyboardInterrupt('remote client sent control-c!')
     signal.signal(signal.SIGINT, handle_control_c)
 
+  def _raise_deferred_exc(self):
+    """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
+    if self._deferred_exception:
+      try:
+        # Expect `_deferred_exception` to be a 3-item tuple of the values returned by sys.exc_info().
+        # This permits use the 3-arg form of the `raise` statement to preserve the original traceback.
+        exc_type, exc_value, exc_traceback = self._deferred_exception
+        raise exc_type, exc_value, exc_traceback
+      except ValueError:
+        # If `_deferred_exception` isn't a 3-item tuple, treat it like a bare exception.
+        raise self._deferred_exception
+
   def run(self):
     """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
     self.daemonize(write_pid=False)
@@ -129,11 +146,15 @@ class DaemonPantsRunner(ProcessManager):
 
     # Invoke a Pants run with stdio redirected.
     with self._nailgunned_stdio(self._socket):
-      # Clean global state.
-      clean_global_runtime_state(reset_subsystem=True)
-
       try:
-        LocalPantsRunner(self._exiter, self._args, self._env, self._build_graph).run()
+        # Clean global state.
+        clean_global_runtime_state(reset_subsystem=True)
+
+        # Re-raise any deferred exceptions, if present.
+        self._raise_deferred_exc()
+
+        # Otherwise, conduct a normal run.
+        LocalPantsRunner(self._exiter, self._args, self._env, self._graph_helper).run()
       except KeyboardInterrupt:
         self._exiter.exit(1, msg='Interrupted by user.\n')
       except Exception:

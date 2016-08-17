@@ -16,6 +16,7 @@ from pants.bin.options_initializer import OptionsInitializer
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
+from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
@@ -56,21 +57,20 @@ class LegacySymbolTable(SymbolTable):
     return aliases
 
 
-class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler',
-                                                         'engine',
-                                                         'symbol_table_cls',
-                                                         'legacy_graph_cls'])):
+class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 'symbol_table_cls'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
-  def create_graph(self, spec_roots):
+  def create_graph(self, spec_roots, build_root=None):
     """Construct and return a BuildGraph given a set of input specs."""
-    graph = self.legacy_graph_cls(self.scheduler, self.engine, self.symbol_table_cls)
+    graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
     with self.scheduler.locked():
       for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
         pass
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
+    address_mapper = LegacyAddressMapper(graph, build_root or get_buildroot())
     logger.debug('build_graph is: %s', graph)
-    return graph
+    logger.debug('address_mapper is: %s', address_mapper)
+    return graph, address_mapper
 
 
 class EngineInitializer(object):
@@ -115,7 +115,7 @@ class EngineInitializer(object):
     scheduler = LocalScheduler(dict(), tasks, project_tree)
     engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
 
-    return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
+    return LegacyGraphHelper(scheduler, engine, symbol_table_cls)
 
   @classmethod
   @contextmanager
