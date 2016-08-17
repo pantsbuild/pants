@@ -48,8 +48,10 @@ impl<'g,'t> StepContext<'g,'t> {
             subject: subject,
             product: product,
             variants: variants,
-            func: task.func(),
-            clause: task.input_clause(),
+            // TODO: cloning out of the task struct is easier than tracking references from
+            // Nodes to Tasks... but should consider doing it if memory usage becomes an issue.
+            func: task.func().clone(),
+            clause: task.input_clause().clone(),
           }
         )
       })

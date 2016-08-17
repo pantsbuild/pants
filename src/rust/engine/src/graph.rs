@@ -167,7 +167,8 @@ impl Graph {
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  pub fn add_dependencies(&mut self, src: &mut Entry, dsts: Vec<Node>) {
+  pub fn add_dependencies(&mut self, src_id: EntryId, dsts: Vec<Node>) {
+    let src = self.entry_for_id_mut(src_id);
     assert!(
       !src.is_complete(),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",

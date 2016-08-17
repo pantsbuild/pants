@@ -9,12 +9,12 @@ pub struct Task {
 }
 
 impl Task {
-  pub fn func(&self) -> Key {
-    self.func
+  pub fn func(&self) -> &Key {
+    &self.func
   }
 
-  pub fn input_clause(&self) -> Vec<Selector> {
-    self.input_clause
+  pub fn input_clause(&self) -> &Vec<Selector> {
+    &self.input_clause
   }
 }
 

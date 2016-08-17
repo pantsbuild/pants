@@ -85,22 +85,29 @@ impl<'g,'t> Execution<'g,'t> {
    * If the currently declared dependencies of the Entry are not yet available, returns None. If
    * they are available, runs a Step and returns the resulting State.
    */
-  fn attempt_step(&self, entry: &Entry) -> Option<State> {
+  fn attempt_step(&self, id: EntryId) -> Option<State> {
+    let entry = self.graph.entry_for_id(id);
+    if entry.is_complete() {
+      // Already complete.
+      return None;
+    }
+
     let dep_entries: Vec<&Entry> =
       entry.dependencies().iter()
         .map(|&d| &*self.graph.entry_for_id(d))
         .collect();
     if dep_entries.iter().any(|d| !d.is_complete()) {
+      // Dep is not complete.
       return None;
     }
 
+    // All deps are complete: run!
     let deps: HashMap<&Node, &Complete> =
       dep_entries.iter()
         .filter_map(|e| {
           e.state().map(|s| (e.node(), s))
         })
         .collect();
-
     Some(entry.node().step(deps, self.tasks))
   }
 
@@ -117,34 +124,29 @@ impl<'g,'t> Execution<'g,'t> {
     self.ready.clear();
 
     // For each changed node, determine whether its dependents or itself are a candidate.
-    while let Some(candidate_id) = self.candidates.pop_front() {
-      if self.outstanding.contains(&candidate_id) {
+    while let Some(entry_id) = self.candidates.pop_front() {
+      if self.outstanding.contains(&entry_id) {
         // Already running.
-        continue;
-      }
-      let entry = self.graph.entry_for_id_mut(candidate_id);
-      if entry.is_complete() {
-        // Already complete.
         continue;
       }
 
       // Attempt to run a step for the Node.
-      match self.attempt_step(entry) {
+      match self.attempt_step(entry_id) {
         Some(State::Runnable(s)) => {
           // Mark any dependents of the Node as candidates.
-          self.ready.push((entry.id(), s));
-          self.outstanding.insert(entry.id());
+          self.ready.push((entry_id, s));
+          self.outstanding.insert(entry_id);
         },
         Some(State::Complete(s)) =>
           // Node completed statically; mark any dependents of the Node as candidates.
-          self.candidates.extend(entry.dependents()),
+          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents()),
         Some(State::Waiting(w)) => {
           // Add the new dependencies.
-          self.graph.add_dependencies(entry, w);
+          self.graph.add_dependencies(entry_id, w);
+          let ref graph = self.graph;
           // If all dependencies of the Node are completed, the Node is still a candidate.
-          let graph = self.graph;
           let mut incomplete_deps =
-            entry.dependencies().iter()
+            self.graph.entry_for_id(entry_id).dependencies().iter()
               .map(|&d| graph.entry_for_id(d))
               .filter(|e| !e.is_complete())
               .map(|e| e.id());
@@ -154,7 +156,7 @@ impl<'g,'t> Execution<'g,'t> {
             self.candidates.extend(incomplete_deps);
           } else {
             // All newly declared deps are already completed: still a candidate.
-            self.candidates.push_front(entry.id());
+            self.candidates.push_front(entry_id);
           }
         },
         None => continue,
