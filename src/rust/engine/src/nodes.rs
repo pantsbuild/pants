@@ -185,11 +185,11 @@ impl Step for Select {
     // If there is a variant_key, see whether it has been configured; if not, no match.
     let variant_value: Option<&Key> =
       match self.variant_key() {
-        Some(&variant_key) => {
+        Some(variant_key) => {
           let variant_value: Option<&Key> =
             self.variants.iter()
-              .find(|&&(k, _)| k == variant_key)
-              .map(|&(_, v)| &v);
+              .find(|&&(ref k, _)| k == variant_key)
+              .map(|&(_, ref v)| v);
           if variant_value.is_none() {
             return State::Complete(
               Complete::Noop(
