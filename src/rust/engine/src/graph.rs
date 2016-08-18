@@ -66,7 +66,7 @@ pub struct Graph {
 }
 
 impl Graph {
-  fn new() -> Graph {
+  pub fn new() -> Graph {
     Graph {
       id_generator: 0,
       nodes: HashMap::new(),
@@ -74,7 +74,7 @@ impl Graph {
     }
   }
 
-  fn len(&self) -> usize {
+  pub fn len(&self) -> usize {
     self.entries.len()
   }
 

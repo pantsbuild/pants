@@ -10,7 +10,6 @@ use tasks::Tasks;
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
 pub struct Execution<'g,'t> {
-  // TODO: Graph and Tasks should both be references.
   graph: &'g mut Graph,
   tasks: &'t Tasks,
   // Initial set of roots for the execution.
