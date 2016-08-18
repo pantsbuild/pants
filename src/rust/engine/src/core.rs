@@ -4,7 +4,7 @@ pub type Digest = Vec<u8>;
 pub type TypeId = u64;
 
 // The name of a field.
-pub type Field = String;
+pub type Field = Key;
 
 // On the python side this is string->string; but to allow for equality checks
 // without a roundtrip to python, we keep them encoded here.

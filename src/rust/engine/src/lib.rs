@@ -7,26 +7,29 @@ mod tasks;
 
 use std::ops::{Deref, DerefMut};
 
-use core::Key;
+use core::{Field, Key, TypeId};
 use nodes::{Complete, Runnable};
 use graph::{Graph, EntryId};
-use tasks::{Tasks, TasksBuilder};
+use tasks::Tasks;
 use execution::Execution;
 
-/**
- * A wrapper around Execution that exposes raw pointers for consumption by the caller.
- */
-pub struct RawExecution<'e> {
+pub struct Scheduler<'e> {
+  raw: RawExecution,
+  execution: Option<Execution<'e, 'e>>,
+  graph: Graph,
+  tasks: Tasks,
+}
+
+pub struct RawExecution {
   ready_ptr: *mut EntryId,
   ready_runnables_ptr: *mut Runnable,
   ready_len: u64,
   ready: Vec<EntryId>,
   ready_runnables: Vec<Runnable>,
-  execution: Execution<'e, 'e>,
 }
 
-impl<'e,> RawExecution<'e> {
-  fn new(execution: Execution<'e,'e>) -> RawExecution<'e> {
+impl RawExecution {
+  fn new() -> RawExecution {
     let mut raw =
       RawExecution {
         ready_ptr: Vec::new().as_mut_ptr(),
@@ -34,7 +37,6 @@ impl<'e,> RawExecution<'e> {
         ready_len: 0,
         ready: Vec::new(),
         ready_runnables: Vec::new(),
-        execution: execution,
       };
 
     // Yay, raw pointers! These would immediately be dangling if we didn't update them.
@@ -45,105 +47,86 @@ impl<'e,> RawExecution<'e> {
 }
 
 #[no_mangle]
-pub extern fn graph_create() -> *const Graph {
-  // allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  Box::into_raw(Box::new(Graph::new()))
+pub extern fn scheduler_create<'e>(
+  key_none: *mut Key,
+  field_name: *mut Field,
+  field_products: *mut Field,
+  field_variants: *mut Field,
+  type_address: TypeId,
+  type_has_products: TypeId,
+  type_has_variants: TypeId,
+) -> *const Scheduler<'e> {
+  // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
+  Box::into_raw(
+    Box::new(
+      Scheduler {
+        raw: RawExecution::new(),
+        execution: None,
+        graph: Graph::new(),
+        tasks: Tasks::new(
+          key_from_raw(key_none),
+          key_from_raw(field_name),
+          key_from_raw(field_products),
+          key_from_raw(field_variants),
+          type_address,
+          type_has_products,
+          type_has_variants,
+        ),
+      }
+    )
+  )
 }
 
 #[no_mangle]
-pub extern fn graph_destroy(graph_ptr: *mut Graph) {
+pub extern fn scheduler_destroy(scheduler_ptr: *mut Scheduler) {
   // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
   // to be destroyed at the end of this function.
-  let _ = unsafe { Box::from_raw(graph_ptr) };
+  let _ = unsafe { Box::from_raw(scheduler_ptr) };
 }
 
 #[no_mangle]
-pub extern fn len(graph_ptr: *mut Graph) -> u64 {
-  with_graph(graph_ptr, |graph| {
-    graph.len() as u64
+pub extern fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.graph.len() as u64
   })
 }
 
 #[no_mangle]
-pub extern fn execution_create<'e>(
-  graph_ptr: *mut Graph,
-  tasks_ptr: *mut Tasks
-) -> *const RawExecution<'e> {
-  let mut graph = unsafe { Box::from_raw(graph_ptr) };
-  let tasks = unsafe { Box::from_raw(tasks_ptr) };
-
-  // Create on the heap, and return a raw pointer to the boxed value.
-  let raw =
-    Box::into_raw(
-      Box::new(
-        RawExecution::new(Execution::new(graph.deref_mut(), tasks.deref()))
-      )
-    );
-
-  std::mem::forget(tasks);
-  std::mem::forget(graph);
-  raw
-}
-
-#[no_mangle]
 pub extern fn execution_next(
-  execution_ptr: *mut RawExecution,
+  scheduler_ptr: *mut Scheduler,
   completed_ptr: *mut EntryId,
   completed_states_ptr: *mut Complete,
   completed_len: u64,
 ) {
-  with_execution(execution_ptr, |raw| {
+  with_scheduler(scheduler_ptr, |scheduler| {
     with_vec(completed_ptr, completed_len as usize, |completed_ids| {
       with_vec(completed_states_ptr, completed_len as usize, |completed_states| {
-        let completed =
-          completed_ids.iter().zip(completed_states.iter())
-            .collect();
-
         // Execute steps and collect ready values.
+        let completed = completed_ids.iter().zip(completed_states.iter()).collect();
         let (ready, ready_runnables) =
-          raw.execution.next(completed).into_iter().unzip();
+          scheduler.execution.as_mut().map(|execution|{
+            execution.next(completed)
+          })
+          .unwrap_or(Vec::new())
+          .into_iter()
+          .unzip();
 
         // Store vectors of ready entries, and raw pointers to them.
-        raw.ready = ready;
-        raw.ready_runnables = ready_runnables;
-        raw.ready_ptr = raw.ready.as_mut_ptr();
-        raw.ready_runnables_ptr = raw.ready_runnables.as_mut_ptr();
-        raw.ready_len = raw.ready.len() as u64;
+        scheduler.raw.ready = ready;
+        scheduler.raw.ready_runnables = ready_runnables;
+        scheduler.raw.ready_ptr = scheduler.raw.ready.as_mut_ptr();
+        scheduler.raw.ready_runnables_ptr = scheduler.raw.ready_runnables.as_mut_ptr();
+        scheduler.raw.ready_len = scheduler.raw.ready.len() as u64;
       })
     })
   })
 }
 
-#[no_mangle]
-pub extern fn execution_destroy(execution_ptr: *mut RawExecution) {
-  // Convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
-  // to be destroyed at the end of this function.
-  unsafe {
-    let _ = Box::from_raw(execution_ptr);
-  };
-}
-
-fn with_execution<F,T>(execution_ptr: *mut RawExecution, mut f: F) -> T
-    where F: FnMut(&mut RawExecution)->T {
-  let mut execution = unsafe { Box::from_raw(execution_ptr) };
-  let t = f(&mut execution);
-  std::mem::forget(execution);
-  t
-}
-
-fn with_graph<F,T>(graph_ptr: *mut Graph, mut f: F) -> T
-    where F: FnMut(&mut Graph)->T {
-  let mut graph = unsafe { Box::from_raw(graph_ptr) };
-  let t = f(&mut graph);
-  std::mem::forget(graph);
-  t
-}
-
-fn with_tasks<F,T>(tasks_ptr: *mut Tasks, mut f: F) -> T
-    where F: FnMut(&mut Tasks)->T {
-  let mut tasks = unsafe { Box::from_raw(tasks_ptr) };
-  let t = f(&mut tasks);
-  std::mem::forget(tasks);
+fn with_scheduler<F,T>(scheduler_ptr: *mut Scheduler, mut f: F) -> T
+    where F: FnMut(&mut Scheduler)->T {
+  let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
+  let t = f(&mut scheduler);
+  std::mem::forget(scheduler);
   t
 }
 
@@ -153,4 +136,15 @@ fn with_vec<F,C,T>(c_ptr: *mut C, c_len: usize, mut f: F) -> T
   let output = f(&cs);
   std::mem::forget(cs);
   output
+}
+
+/**
+ * Clones the given key from a raw pointer.
+ */
+fn key_from_raw(k_ptr: *mut Key) -> Key {
+  let key = unsafe { Box::from_raw(k_ptr) };
+  let owned_key = (*key).clone();
+  // We don't own this heap allocation: forget about it.
+  std::mem::forget(key);
+  owned_key
 }

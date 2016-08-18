@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use core::{Key, TypeId};
+use core::{Field, Key, TypeId};
 use graph::{Entry, EntryId, Graph};
 use nodes::{Complete, Node, Runnable, State};
 use selectors::{Selector, SelectDependencies};
@@ -45,7 +45,7 @@ impl<'g,'t> Execution<'g,'t> {
     subject: Key,
     product: TypeId,
     dep_product: TypeId,
-    field: String
+    field: Field,
   ) {
     self.add_root(
       Node::create(

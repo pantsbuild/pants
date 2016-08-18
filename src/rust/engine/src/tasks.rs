@@ -31,9 +31,41 @@ pub struct Tasks {
   type_address: TypeId,
   type_has_products: TypeId,
   type_has_variants: TypeId,
+  // Used during the construction of the tasks map.
+  preparing: Option<Task>,
 }
 
+/**
+ * Defines a stateful lifecycle for defining tasks via the C api. Call in order:
+ *   1. task_gen() - once per task
+ *   2. add_*() - zero or more times per task to add input clauses
+ *   3. task_end() - once per task
+ *
+ * (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
+ */
 impl Tasks {
+  pub fn new(
+    key_none: Key,
+    field_name: Field,
+    field_products: Field,
+    field_variants: Field,
+    type_address: TypeId,
+    type_has_products: TypeId,
+    type_has_variants: TypeId,
+  ) -> Tasks {
+    Tasks {
+      tasks: HashMap::new(),
+      key_none: key_none,
+      field_name: field_name,
+      field_products: field_products,
+      field_variants: field_variants,
+      type_address: type_address,
+      type_has_products: type_has_products,
+      type_has_variants: type_has_variants,
+      preparing: None,
+    }
+  }
+
   pub fn get(&self, type_id: &TypeId) -> Option<&Vec<Task>> {
     self.tasks.get(type_id)
   }
@@ -65,48 +97,10 @@ impl Tasks {
   pub fn type_has_variants(&self) -> TypeId {
     self.type_has_variants
   }
-}
 
-
-/**
- * Defines a stateful lifecycle for defining tasks via the C api. Call in order:
- *   0. new() - once
- *   1. task_gen() - once per task
- *   2. add_*() - zero or more times per task to add input clauses
- *   3. task_end() - once per task
- *   4. build() - once to create the Tasks struct.
- */
-pub struct TasksBuilder {
-  // Tasks able to produce each type.
-  tasks: Tasks,
-  // Used during the construction of the tasks map via the C api.
-  preparing: Option<Task>,
-}
-
-impl TasksBuilder {
-  pub fn new(
-    key_none: Key,
-    field_name: Field,
-    field_products: Field,
-    field_variants: Field,
-    type_address: TypeId,
-    type_has_products: TypeId,
-    type_has_variants: TypeId,
-  ) -> TasksBuilder {
-    TasksBuilder {
-      tasks: Tasks {
-        tasks: HashMap::new(),
-        key_none: key_none,
-        field_name: field_name,
-        field_products: field_products,
-        field_variants: field_variants,
-        type_address: type_address,
-        type_has_products: type_has_products,
-        type_has_variants: type_has_variants,
-      },
-      preparing: None,
-    }
-  }
+  /**
+   * The following methods define the Task registration lifecycle.
+   */
 
   pub fn task_gen(&mut self, func: Key, output_type: TypeId) {
     assert!(
@@ -163,10 +157,6 @@ impl TasksBuilder {
     // Move the task from `preparing` to the Tasks map
     let task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
 
-    self.tasks.tasks.entry(task.output_type).or_insert(Vec::new()).push(task);
-  }
-
-  pub fn build(self) -> Tasks {
-    self.tasks
+    self.tasks.entry(task.output_type).or_insert(Vec::new()).push(task);
   }
 }
