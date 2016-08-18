@@ -59,8 +59,6 @@ impl<'g,'t> StepContext<'g,'t> {
               subject: subject.clone(),
               product: product.clone(),
               variants: variants.clone(),
-              // TODO: cloning out of the task struct is easier than tracking references from
-              // Nodes to Tasks... but should likely do it if memory usage becomes an issue.
               func: task.func().clone(),
               clause: task.input_clause().clone(),
             }
@@ -188,8 +186,8 @@ impl Select {
     variant_value: Option<&Key>
   ) -> Option<Key> {
     // Check whether the subject is-a instance of the product.
-    if let Some(candidate) = self.select_literal_single(context, candidate, variant_value) {
-      return Some(candidate.clone())
+    if let Some(&candidate) = self.select_literal_single(context, candidate, variant_value) {
+      return Some(candidate)
     }
 
     // Else, check whether it has-a instance of the product.
@@ -197,8 +195,8 @@ impl Select {
     // define mergeability for products.
     if context.has_products(candidate) {
       for child in context.field_products(candidate) {
-        if let Some(child) = self.select_literal_single(context, &child, variant_value) {
-          return Some(child.clone());
+        if let Some(&child) = self.select_literal_single(context, &child, variant_value) {
+          return Some(child);
         }
       }
     }
@@ -255,7 +253,7 @@ impl Step for Select {
 
     // If the Subject "is a" or "has a" Product, then we're done.
     if let Some(literal_value) = self.select_literal(&context, &self.subject, variant_value) {
-      return State::Complete(Complete::Return(literal_value.clone()));
+      return State::Complete(Complete::Return(literal_value));
     }
 
     // Else, attempt to use a configured task to compute the value.
@@ -290,9 +288,9 @@ impl Step for Select {
     }
 
     match matches.pop() {
-      Some(matched) =>
+      Some(&matched) =>
         // Statically completed!
-        State::Complete(Complete::Return(matched.clone())),
+        State::Complete(Complete::Return(matched)),
       None =>
         State::Complete(
           Complete::Noop(format!("No source of product {:?} for {:?}.", self.product(), self.subject))
@@ -310,7 +308,7 @@ pub struct SelectLiteral {
 
 impl Step for SelectLiteral {
   fn step(&self, _: StepContext) -> State {
-    State::Complete(Complete::Return(self.selector.subject.clone()))
+    State::Complete(Complete::Return(self.selector.subject))
   }
 }
 
@@ -341,8 +339,8 @@ impl Step for SelectDependencies {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
-        Selector::select(self.selector.dep_product.clone()),
-        self.subject.clone(),
+        Selector::select(self.selector.dep_product),
+        self.subject,
         self.variants.clone()
       );
     let dep_product_state =
@@ -396,8 +394,8 @@ impl Step for SelectProjection {
     // Request the product we need to compute the subject.
     let input_node =
       Node::create(
-        Selector::select(self.selector.input_product.clone()),
-        self.subject.clone(),
+        Selector::select(self.selector.input_product),
+        self.subject,
         self.variants.clone()
       );
     let dep_product =
@@ -420,13 +418,13 @@ impl Step for SelectProjection {
     // When the output product is available, return it.
     let output_node =
       Node::create(
-        Selector::select(self.selector.product.clone()),
+        Selector::select(self.selector.product),
         projected_subject,
         self.variants.clone()
       );
     match context.get(&output_node) {
-      Some(&Complete::Return(ref value)) =>
-        return State::Complete(Complete::Return(value.clone())),
+      Some(&Complete::Return(value)) =>
+        return State::Complete(Complete::Return(value)),
       Some(&Complete::Noop(_)) =>
         return State::Complete(
           Complete::Throw(format!("No source of projected dependency {:?}", output_node))
@@ -458,7 +456,7 @@ impl Step for Task {
       let dep_node =
         Node::create(
           selector.clone(),
-          self.subject.clone(),
+          self.subject,
           self.variants.clone()
         );
       match context.get(&dep_node) {
@@ -482,8 +480,8 @@ impl Step for Task {
     } else {
       // Ready to run!
       State::Runnable(Runnable {
-        func: self.func.clone(),
-        args: dep_values.into_iter().map(|d| d.clone()).collect(),
+        func: self.func,
+        args: dep_values.into_iter().map(|&d| d).collect(),
       })
     }
   }
@@ -518,7 +516,7 @@ impl Node {
       Selector::SelectLiteral(s) =>
         // NB: Intentionally ignores subject parameter to provide a literal subject.
         Node::SelectLiteral(SelectLiteral {
-          subject: s.subject.clone(),
+          subject: s.subject,
           variants: variants,
           selector: s,
         }),

@@ -98,15 +98,15 @@ class LocalScheduler(object):
     scheduler = native.lib.scheduler_create(self._key('name'),
                                             self._key('products'),
                                             self._key('default'),
-                                            self._digest(Address),
-                                            self._digest(HasProducts),
-                                            self._digest(Variants))
+                                            self._type_key(Address),
+                                            self._type_key(HasProducts),
+                                            self._type_key(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     # And register all provided tasks.
     for output_type, input_selects, func in tasks:
       self._native.lib.task_gen(self._scheduler,
-                                self._digest(func),
-                                id(type(output_type)))
+                                self._type_key(func),
+                                self._type_key(output_type))
       # FIXME!
       #for input_select in input_selects:
       #  self._native.lib.task_add_select_literal(self._scheduler,
@@ -114,12 +114,11 @@ class LocalScheduler(object):
       #                                           input_select.product)
       self._native.lib.task_end(self._scheduler)
 
-  def _digest(self, t):
-    return self._native.new('Digest*', self._storage.put(t).to_native())
+  def _type_key(self, t):
+    return self._storage.put(t).to_native()
 
   def _key(self, obj):
-    key = (self._storage.put(obj).to_native(), self._storage.put(type(obj)).to_native())
-    return self._native.new('Key*', key)
+    return (self._storage.put(obj).to_native(), self._storage.put(type(obj)).to_native())
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -210,15 +209,17 @@ class LocalScheduler(object):
     self._native.lib.execution_reset(self._scheduler)
     for subject, product in execution_request.roots:
       if type(subject) in [Address, PathGlobs]:
-        self._native.lib.execution_add_root_select(self._scheduler,
-                                                   self._key(subject),
-                                                   id(product))
+        self._native.lib.execution_add_root_select(
+            self._scheduler,
+            self._key(subject),
+            self._type_key(product))
       elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
-        self._native.lib.execution_add_root_select_dependencies(self._scheduler,
-                                                                self._key(subject),
-                                                                id(product),
-                                                                id(Addresses),
-                                                                self._key('dependencies'))
+        self._native.lib.execution_add_root_select_dependencies(
+            self._scheduler,
+            self._key(subject),
+            self._type_key(product),
+            self._type_key(Addresses),
+            self._key('dependencies'))
       else:
         raise ValueError('Unsupported root subject type: {}'.format(subject))
 

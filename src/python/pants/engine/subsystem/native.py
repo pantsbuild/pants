@@ -99,26 +99,26 @@ class Native(object):
           // ignore them because we never have collections of this type.
         } RawScheduler;
 
-        RawScheduler* scheduler_create(Field*,
-                                       Field*,
-                                       Field*,
-                                       TypeId*,
-                                       TypeId*,
-                                       TypeId*);
+        RawScheduler* scheduler_create(Field,
+                                       Field,
+                                       Field,
+                                       TypeId,
+                                       TypeId,
+                                       TypeId);
         void scheduler_destroy(RawScheduler*);
 
-        void task_gen(RawScheduler*, Key*, TypeId*);
+        void task_gen(RawScheduler*, Function, TypeId);
         void task_end(RawScheduler*);
 
         uint64_t graph_len(RawScheduler*);
 
         void execution_reset(RawScheduler*);
-        void execution_add_root_select(RawScheduler*, Key*, TypeId*);
+        void execution_add_root_select(RawScheduler*, Key, TypeId);
         void execution_add_root_select_dependencies(RawScheduler*,
-                                                    Key*,
-                                                    TypeId*,
-                                                    TypeId*,
-                                                    Field*);
+                                                    Key,
+                                                    TypeId,
+                                                    TypeId,
+                                                    Field);
         void execution_next(RawScheduler*,
                             EntryId*,
                             RawRunnable*,
