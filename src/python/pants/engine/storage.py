@@ -12,7 +12,7 @@ from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
 from contextlib import closing
-from hashlib import sha1
+from hashlib import sha256
 from struct import Struct as StdlibStruct
 
 import lmdb
@@ -49,8 +49,9 @@ class Key(object):
   __slots__ = ['_digest', '_hash']
 
   # The digest implementation used for Keys.
-  _DIGEST_IMPL = sha1
+  _DIGEST_IMPL = sha256
   _DIGEST_SIZE = _DIGEST_IMPL().digest_size
+  _DIGEST_HALF_SIZE = _DIGEST_SIZE // 2
 
   # A struct.Struct definition for grabbing the first 4 bytes off of a digest of
   # size DIGEST_SIZE, and discarding the rest.
@@ -61,7 +62,6 @@ class Key(object):
     """Given a blob, hash it to construct a Key.
 
     :param blob: Binary content to hash.
-    :param type_: Type of the object to be hashed.
     """
     return cls.create_from_digest(cls._DIGEST_IMPL(blob).digest())
 
@@ -82,6 +82,12 @@ class Key(object):
   @property
   def digest(self):
     return self._digest
+
+  def to_native(self):
+    """Returns this key in a format that CFFI can use for assignment to the Rust Key type."""
+    upper = self._digest[:self._DIGEST_HALF_SIZE]
+    lower = self._digest[self._DIGEST_HALF_SIZE:]
+    return (upper, lower)
 
   def __hash__(self):
     return self._hash
@@ -232,14 +238,6 @@ class Storage(Closable):
 
   def close(self):
     self._contents.close()
-
-  def _assert_type_matches(self, value, key_type):
-    """Ensure the type of deserialized object matches the type from key."""
-    value_type = type(value)
-    if key_type and value_type is not key_type:
-      raise ValueError('Mismatch types, key: {}, value: {}'
-                       .format(key_type, value_type))
-    return value
 
 
 class Cache(Closable):

@@ -129,9 +129,10 @@ class EngineInitializer(object):
       create_fs_tasks() +
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
-
-    scheduler = LocalScheduler(dict(), tasks, project_tree, native)
-    engine = LocalSerialEngine(scheduler, Storage.create())
+    
+    storage = Storage.create()
+    scheduler = LocalScheduler(dict(), tasks, storage, project_tree, native)
+    engine = LocalSerialEngine(scheduler, storage)
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
 

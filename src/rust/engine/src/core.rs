@@ -16,8 +16,6 @@ pub struct Key {
   digest_upper: [u8;32],
   digest_lower: [u8;32],
   type_id: TypeId,
-  // TODO
-  //value: *mut c_void,
 }
 
 impl Key {

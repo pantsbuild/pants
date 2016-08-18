@@ -22,6 +22,7 @@ from pants.engine.nodes import (DependenciesNode, FilesystemNode, Noop, Runnable
 from pants.engine.objects import Closable
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
+from pants.engine.struct import HasProducts, Variants
 
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ class LocalScheduler(object):
   def __init__(self,
                goals,
                tasks,
+               storage,
                project_tree,
                native,
                graph_lock=None,
@@ -88,13 +90,19 @@ class LocalScheduler(object):
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
-
+    self._storage = storage
     self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
 
     # Create the scheduler.
-    self._scheduler = native.gc(native.lib.scheduler_create(),
-                                native.lib.scheduler_destroy)
+    scheduler = native.lib.scheduler_create(self._key(None),
+                                            self._key('name'),
+                                            self._key('products'),
+                                            self._key('default'),
+                                            id(type(Address)),
+                                            id(type(HasProducts)),
+                                            id(type(Variants)))
+    self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     # And register all provided tasks.
     for output_type, input_selects, func in tasks:
       self._native.lib.task_gen(self._scheduler, func, output_type)
@@ -103,6 +111,11 @@ class LocalScheduler(object):
                                                  input_select.subject,
                                                  input_select.product)
       self._native.lib.task_end(self._scheduler)
+
+  def _key(self, obj):
+    key_parts = self._storage.put(obj).to_native()
+    # FIXME: type ids will not be stable across processes... work to do!
+    return self._native.new('struct Key*', key_parts + (id(type(obj)),))
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -114,21 +127,6 @@ class LocalScheduler(object):
       for line in self.product_graph.visualize(roots):
         fh.write(line)
         fh.write('\n')
-
-  def _run_step(self, node_entry, dep_states):
-    """Attempt to run a Step with the currently available dependencies of the given Node.
-
-    If the currently declared dependencies of a Node are not yet available, returns None. If
-    they are available, runs a Step and returns the resulting State.
-    """
-    # Initialize the coroutine if this is the first time it is running.
-    if node_entry.coroutine is None:
-      if dep_states:
-        raise ValueError('{} has not run yet, and should not have dependencies!'.format(node_entry))
-      node_entry.coroutine = node_entry.node.step(self._step_context)
-      return node_entry.coroutine.send(None)
-    else:
-      return node_entry.coroutine.send(dep_states)
 
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.

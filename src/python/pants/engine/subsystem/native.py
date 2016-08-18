@@ -48,40 +48,68 @@ class Native(object):
 
   @property
   def _ffi(self):
-    if self._ffi_field is None:
-      from cffi import FFI
+    if self._ffi_field is not None:
+      return self._ffi_field
 
-      self._ffi_field = FFI()
-      # TODO: This definition is coupled to callers: should memoize it there.
-      self._ffi_field.cdef(
-          '''
-          typedef uint64_t EntryId;
-          typedef uint8_t TypeId;
+    from cffi import FFI
 
-          typedef struct {
-            EntryId*    ready_ptr;
-            Complete*   ready_runnables_ptr;
-            uint64_t    ready_len;
-            // NB: there are more fields in this struct, but we can safely
-            // ignore them because we never have collections of this type.
-          } RawExecution;
+    self._ffi_field = FFI()
+    # TODO: This definition is coupled to callers: should memoize it there.
+    self._ffi_field.cdef(
+        '''
+        typedef uint64_t TypeId;
 
-          typedef struct {
-            RawExecution execution;
-            // NB: there are more fields in this struct, but we can safely
-            // ignore them because we never have collections of this type.
-          } RawScheduler;
+        typedef struct {
+          char digest_upper[32];
+          char digest_lower[32];
+          TypeId   type_id;
+        } Key;
 
-          struct RawScheduler* scheduler_create(StateType);
-          void scheduler_destroy(struct RawScheduler*);
+        typedef uint64_t EntryId;
+        typedef Key Field;
 
-          void execution_reset(struct RawScheduler*);
-          void execution_next(struct RawScheduler*,
-                              EntryId*,
-                              Runnable*,
-                              uint64_t);
-          '''
-        )
+        typedef struct {
+          struct Key* func;
+          struct Key* args_ptr;
+          uint64_t    args_len;
+        } RawRunnable;
+
+        typedef struct {
+          struct Key* func;
+          struct Key* args_ptr;
+          uint64_t    args_len;
+        } Complete;
+
+        typedef struct {
+          EntryId*              ready_ptr;
+          struct RawRunnable*   ready_runnables_ptr;
+          uint64_t              ready_len;
+          // NB: there are more fields in this struct, but we can safely
+          // ignore them because we never have collections of this type.
+        } RawExecution;
+
+        typedef struct {
+          RawExecution execution;
+          // NB: there are more fields in this struct, but we can safely
+          // ignore them because we never have collections of this type.
+        } RawScheduler;
+
+        struct RawScheduler* scheduler_create(struct Key*,
+                                              struct Field*,
+                                              struct Field*,
+                                              struct Field*,
+                                              TypeId,
+                                              TypeId,
+                                              TypeId);
+        void scheduler_destroy(struct RawScheduler*);
+
+        void execution_reset(struct RawScheduler*);
+        void execution_next(struct RawScheduler*,
+                            EntryId*,
+                            struct Runnable*,
+                            uint64_t);
+        '''
+      )
     return self._ffi_field
 
   @property
@@ -93,6 +121,9 @@ class Native(object):
                                               'native-engine')
       self._lib_field = self._ffi.dlopen(binary)
     return self._lib_field
+
+  def new(self, cdecl, init):
+    return self._ffi.new(cdecl, init)
 
   def gc(self, cdata, destructor):
     """Register a method to be called when `cdata` is garbage collected.

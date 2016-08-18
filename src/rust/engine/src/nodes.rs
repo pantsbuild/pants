@@ -310,7 +310,7 @@ pub struct SelectLiteral {
 
 impl Step for SelectLiteral {
   fn step(&self, _: StepContext) -> State {
-    State::Complete(Complete::Return(self.subject.clone()))
+    State::Complete(Complete::Return(self.selector.subject.clone()))
   }
 }
 
