@@ -177,12 +177,15 @@ impl Graph {
     );
 
     // Determine whether each awaited dep is cyclic.
+    // TODO: skip cycle detection for deps that are already valid.
     let (deps, cyclic_deps): (Vec<_>, Vec<_>) =
       dsts.into_iter()
         .map(|dst| self.ensure_entry(dst))
         .collect::<Vec<_>>()
         .into_iter()
-        .partition(|&dst_id| self.detect_cycle(src_id, dst_id));
+        .partition(|&dst_id| !self.detect_cycle(src_id, dst_id));
+
+    println!(">>> rust adding deps to {}: {:?} and {:?}", src_id, deps, cyclic_deps);
     
     // Add the source as a dependent of each non-cyclic dep.
     for &dep in &deps {

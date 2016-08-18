@@ -75,8 +75,6 @@ impl Scheduler {
    * they are available, runs a Step and returns the resulting State.
    */
   fn attempt_step(&self, id: EntryId) -> Option<State> {
-    println!(">>> rust considering step for {}", id);
-
     let entry = self.graph.entry_for_id(id);
     if entry.is_complete() {
       // Already complete.
@@ -141,6 +139,7 @@ impl Scheduler {
         },
         Some(State::Complete(s)) => {
           // Node completed statically; mark any dependents of the Node as candidates.
+          println!(">>> rust says {} is complete with {:?}", entry_id, s);
           self.graph.complete(entry_id, s);
           self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
         },
@@ -152,14 +151,19 @@ impl Scheduler {
           let mut incomplete_deps =
             self.graph.entry_for_id(entry_id).dependencies().iter()
               .map(|&d| graph.entry_for_id(d))
-              .filter(|e| !e.is_complete())
+              .filter(|e| {
+                println!(">>>  dep of {} is ready?: {}: {}", entry_id, e.id(), e.is_complete());
+                !e.is_complete()
+              })
               .map(|e| e.id());
           if let Some(first) = incomplete_deps.next() {
             // Mark incomplete deps as candidates for steps.
+            println!(">>> rust says {} at least is waiting for (at least): {}", entry_id, first);
             self.candidates.push_back(first);
             self.candidates.extend(incomplete_deps);
           } else {
             // All newly declared deps are already completed: still a candidate.
+            println!(">>> rust says all deps of {} are ready!", entry_id);
             self.candidates.push_front(entry_id);
           }
         },
