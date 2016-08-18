@@ -24,7 +24,7 @@ pub struct Scheduler {
 
 impl Scheduler {
   /**
-   * Begins an Scheduler with an initially empty set of roots and tasks.
+   * Creates a Scheduler with an initially empty set of roots.
    */
   pub fn new(graph: Graph, tasks: Tasks) -> Scheduler {
     Scheduler {
@@ -42,11 +42,11 @@ impl Scheduler {
     self.outstanding.clear();
   }
 
-  pub fn add_root_node_select(&mut self, subject: Key, product: TypeId) {
+  pub fn add_root_select(&mut self, subject: Key, product: TypeId) {
     self.add_root(Node::create(Selector::select(product), subject, Vec::new()));
   }
 
-  pub fn add_root_node_select_dependencies(
+  pub fn add_root_select_dependencies(
     &mut self,
     subject: Key,
     product: TypeId,

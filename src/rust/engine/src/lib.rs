@@ -113,6 +113,17 @@ pub extern fn execution_reset(scheduler_ptr: *mut RawScheduler) {
 }
 
 #[no_mangle]
+pub extern fn execution_add_root_select(
+  scheduler_ptr: *mut RawScheduler,
+  subject: *mut Key,
+  product: TypeId,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.add_root_select(key_from_raw(subject), product);
+  })
+}
+
+#[no_mangle]
 pub extern fn execution_next(
   scheduler_ptr: *mut RawScheduler,
   completed_ptr: *mut EntryId,
