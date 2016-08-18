@@ -16,8 +16,6 @@ pub struct Execution<'g,'t> {
   roots: Vec<Node>,
   // Candidates for Execution, in the order they were declared.
   candidates: VecDeque<EntryId>,
-  // Currently ready Runnables.
-  ready: Vec<(EntryId, Runnable)>,
   // Ready ids. This will always contain at least as many entries as the `ready` Vec. If
   // it contains more ids than the `ready` Vec, it is because entries that were previously
   // declared to be ready are still outstanding.
@@ -34,7 +32,6 @@ impl<'g,'t> Execution<'g,'t> {
       tasks: tasks,
       roots: Vec::new(),
       candidates: VecDeque::new(),
-      ready: Vec::new(),
       outstanding: HashSet::new(),
     }
   }
@@ -106,14 +103,15 @@ impl<'g,'t> Execution<'g,'t> {
   /**
    * Continues execution after the given runnables have completed execution.
    */
-  pub fn next(&mut self, completed: Vec<(EntryId, Complete)>) {
-    // Mark any completed entries as such, and clear the ready list.
-    for (id, state) in completed {
+  pub fn next(&mut self, completed: Vec<(&EntryId, &Complete)>) -> Vec<(EntryId, Runnable)> {
+    let mut ready = Vec::new();
+
+    // Mark any completed entries as such.
+    for (&id, &state) in completed {
       self.outstanding.remove(&id);
       self.candidates.extend(self.graph.entry_for_id(id).dependents());
       self.graph.complete(id, state);
     }
-    self.ready.clear();
 
     // For each changed node, determine whether its dependents or itself are a candidate.
     while let Some(entry_id) = self.candidates.pop_front() {
@@ -125,8 +123,8 @@ impl<'g,'t> Execution<'g,'t> {
       // Attempt to run a step for the Node.
       match self.attempt_step(entry_id) {
         Some(State::Runnable(s)) => {
-          // Mark any dependents of the Node as candidates.
-          self.ready.push((entry_id, s));
+          // The node is ready to run!
+          ready.push((entry_id, s));
           self.outstanding.insert(entry_id);
         },
         Some(State::Complete(_)) =>
@@ -154,5 +152,7 @@ impl<'g,'t> Execution<'g,'t> {
         None => continue,
       }
     }
+
+    ready
   }
 }
