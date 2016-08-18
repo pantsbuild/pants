@@ -59,13 +59,12 @@ class LegacySymbolTable(SymbolTable):
 class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 'symbol_table_cls'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
-  def prime_product_graph(self, spec_roots):
-    """Prime the scheduler's `ProductGraph` for `LegacyTarget` products."""
+  def warm_product_graph(self, spec_roots):
+    """Warm the scheduler's `ProductGraph` with `LegacyTarget` products."""
     request = self.scheduler.execution_request([LegacyTarget], spec_roots)
     result = self.engine.execute(request)
     if result.error:
       raise result.error
-    return result
 
   def create_build_graph(self, spec_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs."""
