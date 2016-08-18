@@ -55,35 +55,31 @@ class Native(object):
       # TODO: This definition is coupled to callers: should memoize it there.
       self._ffi_field.cdef(
           '''
-          struct Graph;
-          struct Execution;
-          typedef uint64_t Node;
-          typedef uint8_t StateType;
+          typedef uint64_t EntryId;
+          typedef uint8_t TypeId;
 
           typedef struct {
-            Node node;
-            Node*    awaiting_ptr;
-            uint64_t awaiting_len;
-            bool*    awaiting_cyclic_ptr;
-            uint64_t awaiting_cyclic_len;
-          } RawStep;
+            EntryId*    ready_ptr;
+            Complete*    ready_runnables_ptr;
+            uint64_t    ready_len;
+            // NB: there are more fields in this struct, but we can safely
+            // ignore them here since this struct is read-only.
+          } RawExecution;
 
           typedef struct {
-            RawStep* steps_ptr;
-            uint64_t steps_len;
-          } RawSteps;
+            RawExecution execution;
+            // NB: there are more fields in this struct, but we can safely
+            // ignore them here since this struct is read-only.
+          } RawScheduler;
 
-          struct Graph* graph_create(StateType);
-          void graph_destroy(struct Graph*);
+          struct RawScheduler* scheduler_create(StateType);
+          void scheduler_destroy(struct RawScheduler*);
 
-          uint64_t len(struct Graph*);
-          void complete(struct Graph*, Node, StateType);
-          void await(struct Graph*, Node, Node*, uint64_t);
-          uint64_t invalidate(struct Graph*, Node*, uint64_t);
-
-          struct Execution* execution_create();
-          void execution_destroy(struct Execution*);
-          RawSteps* execution_next(struct Graph*, struct Execution*, Node*, uint64_t);
+          void execution_reset(struct RawScheduler*);
+          void execution_next(struct RawScheduler*,
+                              EntryId*,
+                              Runnable*,
+                              uint64_t);
           '''
         )
     return self._ffi_field

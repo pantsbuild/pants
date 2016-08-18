@@ -95,7 +95,7 @@ class LocalScheduler(object):
     # Create the scheduler.
     self._scheduler = native.gc(native.lib.scheduler_create(),
                                 native.lib.scheduler_destroy)
-    # Add add all registered tasks.
+    # And register all provided tasks.
     for output_type, input_selects, func in tasks:
       self._native.lib.task_gen(self._scheduler, func, output_type)
       for input_select in input_selects:
