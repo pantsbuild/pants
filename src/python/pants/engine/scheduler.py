@@ -64,55 +64,6 @@ class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_t
     return TaskNode(subject, product_type, variants, self.task_func, self.input_selects)
 
 
-class NodeBuilder(Closable):
-  """Holds an index of tasks and intrinsics used to instantiate Nodes."""
-
-  @classmethod
-  def create(cls, task_entries):
-    """Creates a NodeBuilder with tasks indexed by their output type."""
-    serializable_tasks = defaultdict(set)
-    for entry in task_entries:
-      if isinstance(entry, (tuple, list)) and len(entry) == 3:
-        output_type, input_selects, task = entry
-        serializable_tasks[output_type].add(
-          TaskNodeFactory(tuple(input_selects), task, output_type)
-        )
-      elif isinstance(entry, SnapshottedProcess):
-        serializable_tasks[entry.output_product_type].add(entry)
-      else:
-        raise Exception("Unexpected type for entry {}".format(entry))
-
-    intrinsics = dict()
-    intrinsics.update(FilesystemNode.as_intrinsics())
-    intrinsics.update(SnapshotNode.as_intrinsics())
-    return cls(serializable_tasks, intrinsics)
-
-  @classmethod
-  def create_task_node(cls, subject, product_type, variants, task_func, clause):
-    return TaskNode(subject, product_type, variants, task_func, clause)
-
-  def __init__(self, tasks, intrinsics):
-    self._tasks = tasks
-    self._intrinsics = intrinsics
-
-  def gen_nodes(self, subject, product_type, variants):
-    # Intrinsics that provide the requested product for the current subject type.
-    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject)
-    if intrinsic_node_factory:
-      yield intrinsic_node_factory(subject, product_type, variants)
-    else:
-      # Tasks that provide the requested product.
-      for node_factory in self._lookup_tasks(product_type):
-        yield node_factory(subject, product_type, variants)
-
-  def _lookup_tasks(self, product_type):
-    for entry in self._tasks[product_type]:
-      yield entry.as_node
-
-  def _lookup_intrinsic(self, product_type, subject):
-    return self._intrinsics.get((type(subject), product_type))
-
-
 class LocalScheduler(object):
   """A scheduler that expands a product Graph by executing user defined tasks."""
 
@@ -138,10 +89,20 @@ class LocalScheduler(object):
     self._products_by_goal = goals
     self._project_tree = project_tree
 
-    self._graph_validator = graph_validator
-    self._product_graph = Graph(native)
+    self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
-    self._step_context = StepContext(NodeBuilder.create(tasks), self._project_tree)
+
+    # Create the scheduler.
+    self._scheduler = native.gc(native.lib.scheduler_create(),
+                                native.lib.scheduler_destroy)
+    # Add add all registered tasks.
+    for output_type, input_selects, func in tasks:
+      self._native.lib.task_gen(self._scheduler, func, output_type)
+      for input_select in input_selects:
+        self._native.lib.task_add_select_literal(self._scheduler,
+                                                 input_select.subject,
+                                                 input_select.product)
+      self._native.lib.task_end(self._scheduler)
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -237,6 +198,16 @@ class LocalScheduler(object):
 
       return self._product_graph.invalidate(predicate)
 
+  def _execution_next(self, completed):
+    # Run, then collect the outputs from the Scheduler's RawExecution struct.
+    self._native.lib.execution_next(self._scheduler, completed)
+    return zip(
+        self._native.unpack(self._scheduler.execution.ready_ptr,
+                            self._scheduler.execution.ready_len),
+        self._native.unpack(self._scheduler.execution.ready_runnables_ptr,
+                            self._scheduler.execution.ready_len)
+      )
+
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
 
@@ -246,56 +217,23 @@ class LocalScheduler(object):
     """
 
     with self._product_graph_lock:
-      # A set of Node entries for executing Runnables.
-      outstanding_runnable = set()
-      completed_runnable = []
-      # Node entries that might need to have Steps created (after any outstanding Step returns).
-      execution = self._product_graph.execution()
-      changed = [self._product_graph.ensure_entry(r) for r in execution_request.roots]
+      # Reset execution, then add any roots from the request.
+      self._native.lib.execution_reset(self._scheduler)
+      for r in execution_request.roots:
+        self._native.lib.execution_add_root_select(self._scheduler, r)
 
       # Yield nodes that are Runnable, and then compute new ones.
+      completed = []
+      outstanding_runnable = dict()
       step_count, runnable_count, scheduling_iterations = 0, 0, 0
       start_time = time.time()
       while True:
-        runnable = []
-
-        # Finalize any Runnables that completed in the previous round.
-        for node_entry, state in completed_runnable:
-          # Complete the Node and mark any of its dependents as candidates for Steps.
-          outstanding_runnable.discard(node_entry)
-          self._product_graph.complete(node_entry, state)
-          changed.append(node_entry)
-
-        # Drain the candidate set to create Runnables for the Engine.
-        while changed:
-          steps = list(self._product_graph.execution_next(execution, changed))
-          changed = []
-          for node_entry, dep_states in steps:
-            if node_entry in outstanding_runnable:
-              # Node is still a candidate, but is currently running.
-              # TODO: could avoid unpacking in this case.
-              continue
-
-            # Run the step
-            step_count += 1
-            state = self._run_step(node_entry, dep_states)
-            if type(state) is Runnable:
-              # The Node is ready to run in the Engine.
-              runnable.append((node_entry, state))
-              outstanding_runnable.add(node_entry)
-            elif type(state) is Waiting:
-              # Waiting on dependencies.
-              self._product_graph.await(node_entry, state.dependencies)
-              changed.append(node_entry)
-            else:
-              # The Node has completed statically.
-              self._product_graph.complete(node_entry, state)
-              changed.append(node_entry)
-
+        # Call the scheduler to create Runnables for the Engine.
+        runnable = self._execution_next(completed)
         if not runnable and not outstanding_runnable:
           # Finished.
           break
-        completed_runnable = yield runnable
+        completed = yield runnable
         yield
         runnable_count += len(runnable)
         scheduling_iterations += 1
