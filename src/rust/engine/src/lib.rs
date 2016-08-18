@@ -74,6 +74,8 @@ impl RawExecution {
     self.ready_ptr = self.ready.as_mut_ptr();
     self.runnables_ptr = self.raw_runnables.as_mut_ptr();
     self.len = self.ready.len() as u64;
+
+    println!(">>> rust has {} ready entries", self.len);
   }
 }
 
@@ -96,6 +98,7 @@ pub extern fn scheduler_create(
   type_has_variants: TypeId,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
+  println!(">>> rust creating scheduler.");
   Box::into_raw(
     Box::new(
       RawScheduler {
@@ -143,6 +146,24 @@ pub extern fn execution_add_root_select(
 }
 
 #[no_mangle]
+pub extern fn execution_add_root_select_dependencies(
+  scheduler_ptr: *mut RawScheduler,
+  subject: *mut Key,
+  product: TypeId,
+  dep_product: TypeId,
+  field: *mut Field,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.add_root_select_dependencies(
+      key_from_raw(subject),
+      product,
+      dep_product,
+      key_from_raw(field),
+    );
+  })
+}
+
+#[no_mangle]
 pub extern fn execution_next(
   scheduler_ptr: *mut RawScheduler,
   completed_ptr: *mut EntryId,
@@ -152,6 +173,7 @@ pub extern fn execution_next(
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(completed_ptr, completed_len as usize, |completed_ids| {
       with_vec(completed_states_ptr, completed_len as usize, |completed_states| {
+        println!(">>> rust continuing execution for {:?}", completed_ids);
         raw.next(completed_ids.iter().zip(completed_states.iter()).collect());
       })
     })

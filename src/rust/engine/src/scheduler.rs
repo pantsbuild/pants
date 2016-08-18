@@ -75,11 +75,15 @@ impl Scheduler {
    * they are available, runs a Step and returns the resulting State.
    */
   fn attempt_step(&self, id: EntryId) -> Option<State> {
+    println!(">>> rust considering step for {}", id);
+
     let entry = self.graph.entry_for_id(id);
     if entry.is_complete() {
       // Already complete.
       return None;
     }
+
+    println!(">>> rust attempting step for {}", id);
 
     let dep_entries: Vec<&Entry> =
       entry.dependencies().iter()
@@ -119,6 +123,8 @@ impl Scheduler {
       self.graph.complete(id, state.clone());
     }
 
+    println!(">>> rust has candidates: {:?}", self.candidates);
+
     // For each changed node, determine whether its dependents or itself are a candidate.
     while let Some(entry_id) = self.candidates.pop_front() {
       if self.outstanding.contains(&entry_id) {
@@ -133,9 +139,11 @@ impl Scheduler {
           ready.push((entry_id, s));
           self.outstanding.insert(entry_id);
         },
-        Some(State::Complete(_)) =>
+        Some(State::Complete(s)) => {
           // Node completed statically; mark any dependents of the Node as candidates.
-          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents()),
+          self.graph.complete(entry_id, s);
+          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
+        },
         Some(State::Waiting(w)) => {
           // Add the new dependencies.
           self.graph.add_dependencies(entry_id, w);

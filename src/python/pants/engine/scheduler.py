@@ -34,8 +34,8 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   To create an ExecutionRequest, see `LocalScheduler.build_request` (which performs goal
   translation) or `LocalScheduler.execution_request`.
 
-  :param roots: Root Nodes for this request.
-  :type roots: list of :class:`pants.engine.nodes.Node`
+  :param roots: Roots for this request.
+  :type roots: list of tuples of subject and product.
   """
 
 
@@ -99,23 +99,26 @@ class LocalScheduler(object):
                                             self._key('name'),
                                             self._key('products'),
                                             self._key('default'),
-                                            id(type(Address)),
-                                            id(type(HasProducts)),
-                                            id(type(Variants)))
+                                            id(Address),
+                                            id(HasProducts),
+                                            id(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     # And register all provided tasks.
     for output_type, input_selects, func in tasks:
-      self._native.lib.task_gen(self._scheduler, func, output_type)
-      for input_select in input_selects:
-        self._native.lib.task_add_select_literal(self._scheduler,
-                                                 input_select.subject,
-                                                 input_select.product)
+      self._native.lib.task_gen(self._scheduler,
+                                self._key(func),
+                                id(type(output_type)))
+      # FIXME!
+      #for input_select in input_selects:
+      #  self._native.lib.task_add_select_literal(self._scheduler,
+      #                                           input_select.subject,
+      #                                           input_select.product)
       self._native.lib.task_end(self._scheduler)
 
   def _key(self, obj):
     key_parts = self._storage.put(obj).to_native()
     # FIXME: type ids will not be stable across processes... work to do!
-    return self._native.new('struct Key*', key_parts + (id(type(obj)),))
+    return self._native.new('Key*', key_parts + (id(type(obj)),))
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -159,18 +162,7 @@ class LocalScheduler(object):
     :returns: An ExecutionRequest for the given products and subjects.
     """
 
-    # Determine the root Nodes for the products and subjects selected by the goals and specs.
-    def roots():
-      for subject in subjects:
-        for product in products:
-          if type(subject) in [Address, PathGlobs]:
-            yield SelectNode(subject, None, Select(product))
-          elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
-            yield DependenciesNode(subject, None, SelectDependencies(product, Addresses))
-          else:
-            raise ValueError('Unsupported root subject type: {}'.format(subject))
-
-    return ExecutionRequest(tuple(roots()))
+    return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
 
   @property
   def product_graph(self):
@@ -197,14 +189,37 @@ class LocalScheduler(object):
       return self._product_graph.invalidate(predicate)
 
   def _execution_next(self, completed):
+    # Unzip into two arrays.
+    ids = [i for i, _ in completed]
+    states = [c for _, c in completed]
     # Run, then collect the outputs from the Scheduler's RawExecution struct.
-    self._native.lib.execution_next(self._scheduler, completed)
+    self._native.lib.execution_next(self._scheduler,
+                                    ids,
+                                    states,
+                                    len(completed))
+    # Rezip into two arrays.
     return zip(
         self._native.unpack(self._scheduler.execution.ready_ptr,
                             self._scheduler.execution.ready_len),
         self._native.unpack(self._scheduler.execution.ready_runnables_ptr,
                             self._scheduler.execution.ready_len)
       )
+
+  def _execution_add_roots(self, execution_request):
+    self._native.lib.execution_reset(self._scheduler)
+    for subject, product in execution_request.roots:
+      if type(subject) in [Address, PathGlobs]:
+        self._native.lib.execution_add_root_select(self._scheduler,
+                                                   self._key(subject),
+                                                   id(product))
+      elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
+        self._native.lib.execution_add_root_select_dependencies(self._scheduler,
+                                                                self._key(subject),
+                                                                id(product),
+                                                                id(Addresses),
+                                                                self._key('dependencies'))
+      else:
+        raise ValueError('Unsupported root subject type: {}'.format(subject))
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -215,16 +230,14 @@ class LocalScheduler(object):
     """
 
     with self._product_graph_lock:
-      # Reset execution, then add any roots from the request.
-      self._native.lib.execution_reset(self._scheduler)
-      for r in execution_request.roots:
-        self._native.lib.execution_add_root_select(self._scheduler, r)
+      start_time = time.time()
+      # Reset execution, and add any roots from the request.
+      self._execution_add_roots(execution_request)
 
       # Yield nodes that are Runnable, and then compute new ones.
       completed = []
       outstanding_runnable = dict()
-      step_count, runnable_count, scheduling_iterations = 0, 0, 0
-      start_time = time.time()
+      runnable_count, scheduling_iterations = 0, 0
       while True:
         # Call the scheduler to create Runnables for the Engine.
         runnable = self._execution_next(completed)
@@ -237,14 +250,10 @@ class LocalScheduler(object):
         scheduling_iterations += 1
 
       logger.debug(
-        'ran %s scheduling iterations, %s runnables, and %s steps in %f seconds. '
+        'ran %s scheduling iterations and %s runnables in %f seconds. '
         'there are %s total nodes.',
         scheduling_iterations,
         runnable_count,
-        step_count,
         time.time() - start_time,
-        len(self._product_graph)
+        self._native.lib.graph_len(self._scheduler)
       )
-
-      if self._graph_validator is not None:
-        self._graph_validator.validate(self._product_graph)

@@ -60,8 +60,8 @@ class Native(object):
         typedef uint64_t TypeId;
 
         typedef struct {
-          char digest_upper[32];
-          char digest_lower[32];
+          char     digest_upper[32];
+          char     digest_lower[32];
           TypeId   type_id;
         } Key;
 
@@ -69,20 +69,20 @@ class Native(object):
         typedef Key Field;
 
         typedef struct {
-          struct Key* func;
-          struct Key* args_ptr;
+          Key*        func;
+          Key*        args_ptr;
           uint64_t    args_len;
         } RawRunnable;
 
         typedef struct {
-          struct Key* func;
-          struct Key* args_ptr;
+          Key*        func;
+          Key*        args_ptr;
           uint64_t    args_len;
         } Complete;
 
         typedef struct {
           EntryId*              ready_ptr;
-          struct RawRunnable*   ready_runnables_ptr;
+          RawRunnable*          ready_runnables_ptr;
           uint64_t              ready_len;
           // NB: there are more fields in this struct, but we can safely
           // ignore them because we never have collections of this type.
@@ -94,19 +94,30 @@ class Native(object):
           // ignore them because we never have collections of this type.
         } RawScheduler;
 
-        struct RawScheduler* scheduler_create(struct Key*,
-                                              struct Field*,
-                                              struct Field*,
-                                              struct Field*,
-                                              TypeId,
-                                              TypeId,
-                                              TypeId);
-        void scheduler_destroy(struct RawScheduler*);
+        RawScheduler* scheduler_create(Key*,
+                                       Field*,
+                                       Field*,
+                                       Field*,
+                                       TypeId,
+                                       TypeId,
+                                       TypeId);
+        void scheduler_destroy(RawScheduler*);
 
-        void execution_reset(struct RawScheduler*);
-        void execution_next(struct RawScheduler*,
+        void task_gen(RawScheduler*, Key*, TypeId);
+        void task_end(RawScheduler*);
+
+        uint64_t graph_len(RawScheduler*);
+
+        void execution_reset(RawScheduler*);
+        void execution_add_root_select(RawScheduler*, Key*, TypeId);
+        void execution_add_root_select_dependencies(RawScheduler*,
+                                                    Key*,
+                                                    TypeId,
+                                                    TypeId,
+                                                    Field*);
+        void execution_next(RawScheduler*,
                             EntryId*,
-                            struct Runnable*,
+                            RawRunnable*,
                             uint64_t);
         '''
       )
