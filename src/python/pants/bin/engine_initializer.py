@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 from collections import namedtuple
-from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -125,34 +124,3 @@ class EngineInitializer(object):
     engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls)
-
-  @classmethod
-  @contextmanager
-  def open_legacy_graph(cls, options=None, path_ignore_patterns=None, symbol_table_cls=None):
-    """A context manager that yields a usable, legacy LegacyBuildGraph by way of the v2 scheduler.
-
-    This is used primarily for testing and non-daemon runs.
-
-    :param Options options: An Options object to use for this run.
-    :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
-                                      usually taken from the `--pants-ignore` global option.
-                                      Defaults to: ['.*']
-    :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
-                                         None to use the default.
-    :yields: A tuple of (graph, addresses, scheduler).
-    """
-    path_ignore_patterns = path_ignore_patterns or ['.*']
-    spec_roots = cls.parse_commandline_to_spec_roots(options=options)
-    (scheduler,
-     engine,
-     symbol_table_cls,
-     build_graph_cls) = cls.setup_legacy_graph(path_ignore_patterns, symbol_table_cls=symbol_table_cls)
-
-    engine.start()
-    try:
-      graph = build_graph_cls(scheduler, engine, symbol_table_cls)
-      addresses = tuple(graph.inject_specs_closure(spec_roots))
-      yield graph, addresses, scheduler
-    finally:
-      logger.debug('engine cache stats: {}'.format(engine.cache_stats()))
-      engine.close()
