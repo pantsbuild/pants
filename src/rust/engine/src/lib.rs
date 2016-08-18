@@ -5,6 +5,8 @@ mod nodes;
 mod selectors;
 mod tasks;
 
+use std::ops::{Deref, DerefMut};
+
 use core::Key;
 use nodes::{Complete, Runnable};
 use graph::{Graph, EntryId};
@@ -14,7 +16,7 @@ use execution::Execution;
 /**
  * A wrapper around Execution that exposes raw pointers for consumption by the caller.
  */
-struct RawExecution<'e> {
+pub struct RawExecution<'e> {
   ready_ptr: *mut EntryId,
   ready_runnables_ptr: *mut Runnable,
   ready_len: u64,
@@ -67,15 +69,20 @@ pub extern fn execution_create<'e>(
   graph_ptr: *mut Graph,
   tasks_ptr: *mut Tasks
 ) -> *const RawExecution<'e> {
-  with_graph(graph_ptr, |graph| {
-    with_tasks(tasks_ptr, |tasks| {
-      let execution = Execution::new(graph, tasks);
-      // create on the heap, and return a raw pointer to the boxed value.
-      let boxed = Box::into_raw(Box::new(RawExecution::new(execution)));
-      std::mem::forget(execution);
-      boxed
-    })
-  })
+  let mut graph = unsafe { Box::from_raw(graph_ptr) };
+  let tasks = unsafe { Box::from_raw(tasks_ptr) };
+
+  // Create on the heap, and return a raw pointer to the boxed value.
+  let raw =
+    Box::into_raw(
+      Box::new(
+        RawExecution::new(Execution::new(graph.deref_mut(), tasks.deref()))
+      )
+    );
+
+  std::mem::forget(tasks);
+  std::mem::forget(graph);
+  raw
 }
 
 #[no_mangle]
@@ -109,7 +116,7 @@ pub extern fn execution_next(
 
 #[no_mangle]
 pub extern fn execution_destroy(execution_ptr: *mut RawExecution) {
-  // convert the raw pointers back to Boxes (without `forget`ing them) in order to cause them
+  // Convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
   // to be destroyed at the end of this function.
   unsafe {
     let _ = Box::from_raw(execution_ptr);
@@ -124,7 +131,7 @@ fn with_execution<F,T>(execution_ptr: *mut RawExecution, mut f: F) -> T
   t
 }
 
-fn with_graph<F,T>(graph_ptr: *mut Graph, f: F) -> T
+fn with_graph<F,T>(graph_ptr: *mut Graph, mut f: F) -> T
     where F: FnMut(&mut Graph)->T {
   let mut graph = unsafe { Box::from_raw(graph_ptr) };
   let t = f(&mut graph);
@@ -132,7 +139,7 @@ fn with_graph<F,T>(graph_ptr: *mut Graph, f: F) -> T
   t
 }
 
-fn with_tasks<F,T>(tasks_ptr: *mut Tasks, f: F) -> T
+fn with_tasks<F,T>(tasks_ptr: *mut Tasks, mut f: F) -> T
     where F: FnMut(&mut Tasks)->T {
   let mut tasks = unsafe { Box::from_raw(tasks_ptr) };
   let t = f(&mut tasks);

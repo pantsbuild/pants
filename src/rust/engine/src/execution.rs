@@ -107,10 +107,10 @@ impl<'g,'t> Execution<'g,'t> {
     let mut ready = Vec::new();
 
     // Mark any completed entries as such.
-    for (&id, &state) in completed {
+    for (&id, state) in completed {
       self.outstanding.remove(&id);
       self.candidates.extend(self.graph.entry_for_id(id).dependents());
-      self.graph.complete(id, state);
+      self.graph.complete(id, state.clone());
     }
 
     // For each changed node, determine whether its dependents or itself are a candidate.

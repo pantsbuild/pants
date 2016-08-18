@@ -6,20 +6,20 @@ use selectors;
 use selectors::Selector;
 use tasks::Tasks;
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Runnable {
   func: Key,
   args: Vec<Key>,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum State {
   Waiting(Vec<Node>),
   Complete(Complete),
   Runnable(Runnable),
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Complete {
   Noop(String),
   Return(Key),
