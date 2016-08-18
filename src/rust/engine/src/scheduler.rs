@@ -9,9 +9,9 @@ use tasks::Tasks;
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
-pub struct Scheduler<'g,'t> {
-  graph: &'g mut Graph,
-  tasks: &'t Tasks,
+pub struct Scheduler {
+  graph: Graph,
+  tasks: Tasks,
   // Initial set of roots for the execution.
   roots: Vec<Node>,
   // Candidates for Scheduler, in the order they were declared.
@@ -22,11 +22,11 @@ pub struct Scheduler<'g,'t> {
   outstanding: HashSet<EntryId>,
 }
 
-impl<'g,'t> Scheduler<'g,'t> {
+impl Scheduler {
   /**
    * Begins an Scheduler with an initially empty set of roots and tasks.
    */
-  pub fn new(graph: &'g mut Graph, tasks: &'t Tasks) -> Scheduler<'g,'t> {
+  pub fn new(graph: Graph, tasks: Tasks) -> Scheduler {
     Scheduler {
       graph: graph,
       tasks: tasks,
@@ -34,6 +34,10 @@ impl<'g,'t> Scheduler<'g,'t> {
       candidates: VecDeque::new(),
       outstanding: HashSet::new(),
     }
+  }
+
+  pub fn graph(&self) -> &Graph {
+    &self.graph
   }
 
   pub fn add_root_node_select(&mut self, subject: Key, product: TypeId) {
@@ -97,7 +101,7 @@ impl<'g,'t> Scheduler<'g,'t> {
     }
 
     // And finally, run!
-    Some(entry.node().step(dep_map, self.tasks))
+    Some(entry.node().step(dep_map, &self.tasks))
   }
 
   /**

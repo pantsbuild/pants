@@ -5,8 +5,6 @@ mod nodes;
 mod selectors;
 mod tasks;
 
-use std::ops::{Deref, DerefMut};
-
 use core::{Field, Key, TypeId};
 use nodes::{Complete, Runnable};
 use graph::{Graph, EntryId};
@@ -14,7 +12,7 @@ use tasks::Tasks;
 use scheduler::Scheduler;
 
 pub struct RawScheduler {
-  raw: RawExecution,
+  execution: RawExecution,
   scheduler: Scheduler,
 }
 
@@ -45,7 +43,7 @@ impl RawExecution {
 }
 
 #[no_mangle]
-pub extern fn scheduler_create<'e>(
+pub extern fn scheduler_create(
   key_none: *mut Key,
   field_name: *mut Field,
   field_products: *mut Field,
@@ -53,22 +51,23 @@ pub extern fn scheduler_create<'e>(
   type_address: TypeId,
   type_has_products: TypeId,
   type_has_variants: TypeId,
-) -> *const Scheduler {
+) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
-      Scheduler {
-        raw: RawExecution::new(),
-        execution: None,
-        graph: Graph::new(),
-        tasks: Tasks::new(
-          key_from_raw(key_none),
-          key_from_raw(field_name),
-          key_from_raw(field_products),
-          key_from_raw(field_variants),
-          type_address,
-          type_has_products,
-          type_has_variants,
+      RawScheduler {
+        execution: RawExecution::new(),
+        scheduler: Scheduler::new(
+          Graph::new(),
+          Tasks::new(
+            key_from_raw(key_none),
+            key_from_raw(field_name),
+            key_from_raw(field_products),
+            key_from_raw(field_variants),
+            type_address,
+            type_has_products,
+            type_has_variants,
+          ),
         ),
       }
     )
@@ -76,52 +75,46 @@ pub extern fn scheduler_create<'e>(
 }
 
 #[no_mangle]
-pub extern fn scheduler_destroy(scheduler_ptr: *mut Scheduler) {
+pub extern fn scheduler_destroy(scheduler_ptr: *mut RawScheduler) {
   // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
   // to be destroyed at the end of this function.
   let _ = unsafe { Box::from_raw(scheduler_ptr) };
 }
 
 #[no_mangle]
-pub extern fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.graph.len() as u64
-  })
-}
-
-#[no_mangle]
-pub extern fn execution_next(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn scheduler_next(
+  scheduler_ptr: *mut RawScheduler,
   completed_ptr: *mut EntryId,
   completed_states_ptr: *mut Complete,
   completed_len: u64,
 ) {
-  with_scheduler(scheduler_ptr, |scheduler| {
+  with_scheduler(scheduler_ptr, |raw| {
     with_vec(completed_ptr, completed_len as usize, |completed_ids| {
       with_vec(completed_states_ptr, completed_len as usize, |completed_states| {
         // Execute steps and collect ready values.
         let completed = completed_ids.iter().zip(completed_states.iter()).collect();
-        let (ready, ready_runnables) =
-          scheduler.execution.as_mut().map(|execution|{
-            execution.next(completed)
-          })
-          .unwrap_or(Vec::new())
-          .into_iter()
-          .unzip();
+        let (ready, ready_runnables) = raw.scheduler.next(completed).into_iter().unzip();
 
         // Store vectors of ready entries, and raw pointers to them.
-        scheduler.raw.ready = ready;
-        scheduler.raw.ready_runnables = ready_runnables;
-        scheduler.raw.ready_ptr = scheduler.raw.ready.as_mut_ptr();
-        scheduler.raw.ready_runnables_ptr = scheduler.raw.ready_runnables.as_mut_ptr();
-        scheduler.raw.ready_len = scheduler.raw.ready.len() as u64;
+        raw.execution.ready = ready;
+        raw.execution.ready_runnables = ready_runnables;
+        raw.execution.ready_ptr = raw.execution.ready.as_mut_ptr();
+        raw.execution.ready_runnables_ptr = raw.execution.ready_runnables.as_mut_ptr();
+        raw.execution.ready_len = raw.execution.ready.len() as u64;
       })
     })
   })
 }
 
-fn with_scheduler<F,T>(scheduler_ptr: *mut Scheduler, mut f: F) -> T
-    where F: FnMut(&mut Scheduler)->T {
+#[no_mangle]
+pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.graph().len() as u64
+  })
+}
+
+fn with_scheduler<F,T>(scheduler_ptr: *mut RawScheduler, mut f: F) -> T
+    where F: FnMut(&mut RawScheduler)->T {
   let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
   let t = f(&mut scheduler);
   std::mem::forget(scheduler);
