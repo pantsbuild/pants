@@ -113,7 +113,11 @@ impl<'g,'t> StepContext<'g,'t> {
    * Calls back to Python for an isinstance check.
    */
   fn isinstance(&self, item: &Key, superclass: TypeId) -> bool {
-    panic!("TODO: not implemented!");
+    if item.type_id() == superclass {
+      true
+    } else { 
+      panic!("TODO: not implemented!");
+    }
   }
 
   /**
