@@ -71,7 +71,7 @@ class DaemonPantsRunner(ProcessManager):
                                            construction. In the event of an exception, this will be
                                            None.
     :param Exception deferred_exception: A deferred exception from the daemon's graph construction.
-                                         If present, this will be raised in the client context.
+                                         If present, this will be re-raised in the client context.
     """
     super(DaemonPantsRunner, self).__init__(name=self._make_identity())
     self._socket = socket

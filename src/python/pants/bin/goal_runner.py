@@ -81,10 +81,10 @@ class GoalRunnerFactory(object):
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
-    :param list build_ignore_patterns: The legacy path ignore patterns (v1).
+    :param list build_ignore_patterns: The legacy path ignore patterns from `--ignore-patterns` (v1).
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
                                            if available. This would usually come from the daemon.
-    :returns: A tuple of the graph and the address mapper.
+    :returns: A tuple of (BuildGraph, AddressMapper).
     """
     # N.B. Use of the daemon implies use of the v2 engine.
     if graph_helper or use_engine:
