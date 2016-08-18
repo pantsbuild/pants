@@ -60,16 +60,16 @@ class Native(object):
 
           typedef struct {
             EntryId*    ready_ptr;
-            Complete*    ready_runnables_ptr;
+            Complete*   ready_runnables_ptr;
             uint64_t    ready_len;
             // NB: there are more fields in this struct, but we can safely
-            // ignore them here since this struct is read-only.
+            // ignore them because we never have collections of this type.
           } RawExecution;
 
           typedef struct {
             RawExecution execution;
             // NB: there are more fields in this struct, but we can safely
-            // ignore them here since this struct is read-only.
+            // ignore them because we never have collections of this type.
           } RawScheduler;
 
           struct RawScheduler* scheduler_create(StateType);

@@ -12,6 +12,16 @@ pub struct Runnable {
   args: Vec<Key>,
 }
 
+impl Runnable {
+  pub fn func(&self) -> &Key {
+    &self.func
+  }
+
+  pub fn args(&self) -> &Vec<Key> {
+    &self.args
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum State {
   Waiting(Vec<Node>),

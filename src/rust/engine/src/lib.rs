@@ -31,39 +31,58 @@ impl RawScheduler {
  * An unzipped, raw-pointer form of the return value of Scheduler.next().
  */
 pub struct RawExecution {
-  ready_ptr: *mut EntryId,
-  ready_runnables_ptr: *mut Runnable,
-  ready_len: u64,
+  ready_ptr: *const EntryId,
+  runnables_ptr: *const RawRunnable,
+  len: u64,
   ready: Vec<EntryId>,
-  ready_runnables: Vec<Runnable>,
+  runnables: Vec<Runnable>,
+  raw_runnables: Vec<RawRunnable>,
 }
 
 impl RawExecution {
   fn new() -> RawExecution {
-    let mut raw =
+    let mut execution =
       RawExecution {
-        ready_ptr: Vec::new().as_mut_ptr(),
-        ready_runnables_ptr: Vec::new().as_mut_ptr(),
-        ready_len: 0,
+        ready_ptr: Vec::new().as_ptr(),
+        runnables_ptr: Vec::new().as_ptr(),
+        len: 0,
         ready: Vec::new(),
-        ready_runnables: Vec::new(),
+        runnables: Vec::new(),
+        raw_runnables: Vec::new(),
       };
-
-    // Yay, raw pointers! These would immediately be dangling if we didn't update them.
-    raw.ready_ptr = raw.ready.as_mut_ptr();
-    raw.ready_runnables_ptr = raw.ready_runnables.as_mut_ptr();
-    raw
+    // Update immediately to make the pointers above (likely dangling!) valid.
+    execution.update(Vec::new());
+    execution
   }
 
   fn update(&mut self, ready_entries: Vec<(EntryId, Runnable)>) {
-    let (ready, ready_runnables) = ready_entries.into_iter().unzip();
-
+    let (ready, runnables) = ready_entries.into_iter().unzip();
     self.ready = ready;
-    self.ready_runnables = ready_runnables;
+    self.runnables = runnables;
+
+    self.raw_runnables =
+      self.runnables.iter()
+        .map(|runnable| {
+          RawRunnable {
+            func: runnable.func() as *const Key,
+            args_ptr: runnable.args().as_ptr(),
+            args_len: runnable.args().len() as u64,
+          }
+        })
+        .collect();
+
     self.ready_ptr = self.ready.as_mut_ptr();
-    self.ready_runnables_ptr = self.ready_runnables.as_mut_ptr();
-    self.ready_len = self.ready.len() as u64;
+    self.runnables_ptr = self.raw_runnables.as_mut_ptr();
+    self.len = self.ready.len() as u64;
   }
+}
+
+pub struct RawRunnable {
+  // Single Key.
+  func: *const Key,
+  // Array of args.
+  args_ptr: *const Key,
+  args_len: u64,
 }
 
 #[no_mangle]
