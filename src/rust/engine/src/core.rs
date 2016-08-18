@@ -1,5 +1,3 @@
-pub type Digest = Vec<u8>;
-
 // TODO: representing python types?
 pub type TypeId = u64;
 
@@ -12,7 +10,11 @@ pub type Variants = Vec<(Key, Key)>;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Key {
-  digest: Digest,
+  // The 64 byte digest is split in two because the derived traits above are only
+  // implemented for arrays up to length 32: see
+  //   https://doc.rust-lang.org/std/primitive.array.html
+  digest_upper: [u8;32],
+  digest_lower: [u8;32],
   type_id: TypeId,
   // TODO
   //value: *mut c_void,
