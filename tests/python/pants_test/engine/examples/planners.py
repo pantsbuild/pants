@@ -129,8 +129,8 @@ def extract_scala_imports(source_files_content):
   """A toy example of dependency inference. Would usually be a compiler plugin."""
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
-  for _, content in source_files_content.dependencies:
-    for line in content.splitlines():
+  for filecontent in source_files_content.dependencies:
+    for line in filecontent.content.splitlines():
       match = import_re.search(line)
       if match:
         packages.add(match.group(1).rsplit('.', 1)[0])

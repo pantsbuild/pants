@@ -13,8 +13,9 @@ def datatype(*args, **kwargs):
 
   :param is_iterable: If passed as True, then the resulting type will be iterable. False by default.
   """
-  is_iterable = kwargs.pop('is_iterable', False)
   class DataType(namedtuple(*args, **kwargs)):
+    __slots__ = ()
+
     def __eq__(self, other):
       if self is other:
         return True
@@ -28,26 +29,24 @@ def datatype(*args, **kwargs):
     def __ne__(self, other):
       return not (self == other)
 
-    if not is_iterable:
-      # NB: if a datatype is not iterable, then we need to override both __iter__ and all of the
-      # namedtuple methods that expect self to be iterable.
+    # NB: As datatype is not iterable, we need to override both __iter__ and all of the
+    # namedtuple methods that expect self to be iterable.
+    def __iter__(self):
+      raise TypeError("'{}' object is not iterable".format(type(self).__name__))
 
-      def __iter__(self):
-        raise TypeError("'{}' object is not iterable".format(type(self).__name__))
+    def _asdict(self):
+      '''Return a new OrderedDict which maps field names to their values'''
+      return OrderedDict(zip(self._fields, super(DataType, self).__iter__()))
 
-      def _asdict(self):
-        '''Return a new OrderedDict which maps field names to their values'''
-        return OrderedDict(zip(self._fields, super(DataType, self).__iter__()))
+    def _replace(_self, **kwds):
+      '''Return a new datatype object replacing specified fields with new values'''
+      result = _self._make(map(kwds.pop, _self._fields, super(DataType, _self).__iter__()))
+      if kwds:
+        raise ValueError('Got unexpected field names: %r' % kwds.keys())
+      return result
 
-      def _replace(_self, **kwds):
-        '''Return a new datatype object replacing specified fields with new values'''
-        result = _self._make(map(kwds.pop, _self._fields, super(DataType, _self).__iter__()))
-        if kwds:
-          raise ValueError('Got unexpected field names: %r' % kwds.keys())
-        return result
-
-      def __getnewargs__(self):
-        '''Return self as a plain tuple.  Used by copy and pickle.'''
-        return tuple(super(DataType, self).__iter__())
+    def __getnewargs__(self):
+      '''Return self as a plain tuple.  Used by copy and pickle.'''
+      return tuple(super(DataType, self).__iter__())
 
   return DataType
