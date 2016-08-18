@@ -1,5 +1,5 @@
 mod core;
-mod execution;
+mod scheduler;
 mod graph;
 mod nodes;
 mod selectors;
@@ -11,13 +11,11 @@ use core::{Field, Key, TypeId};
 use nodes::{Complete, Runnable};
 use graph::{Graph, EntryId};
 use tasks::Tasks;
-use execution::Execution;
+use scheduler::Scheduler;
 
-pub struct Scheduler<'e> {
+pub struct RawScheduler {
   raw: RawExecution,
-  execution: Option<Execution<'e, 'e>>,
-  graph: Graph,
-  tasks: Tasks,
+  scheduler: Scheduler,
 }
 
 pub struct RawExecution {
@@ -55,7 +53,7 @@ pub extern fn scheduler_create<'e>(
   type_address: TypeId,
   type_has_products: TypeId,
   type_has_variants: TypeId,
-) -> *const Scheduler<'e> {
+) -> *const Scheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(

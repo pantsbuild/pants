@@ -9,12 +9,12 @@ use tasks::Tasks;
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
-pub struct Execution<'g,'t> {
+pub struct Scheduler<'g,'t> {
   graph: &'g mut Graph,
   tasks: &'t Tasks,
   // Initial set of roots for the execution.
   roots: Vec<Node>,
-  // Candidates for Execution, in the order they were declared.
+  // Candidates for Scheduler, in the order they were declared.
   candidates: VecDeque<EntryId>,
   // Ready ids. This will always contain at least as many entries as the `ready` Vec. If
   // it contains more ids than the `ready` Vec, it is because entries that were previously
@@ -22,12 +22,12 @@ pub struct Execution<'g,'t> {
   outstanding: HashSet<EntryId>,
 }
 
-impl<'g,'t> Execution<'g,'t> {
+impl<'g,'t> Scheduler<'g,'t> {
   /**
-   * Begins an Execution with an initially empty set of roots and tasks.
+   * Begins an Scheduler with an initially empty set of roots and tasks.
    */
-  pub fn new(graph: &'g mut Graph, tasks: &'t Tasks) -> Execution<'g,'t> {
-    Execution {
+  pub fn new(graph: &'g mut Graph, tasks: &'t Tasks) -> Scheduler<'g,'t> {
+    Scheduler {
       graph: graph,
       tasks: tasks,
       roots: Vec::new(),
