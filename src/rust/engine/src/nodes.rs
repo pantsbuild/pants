@@ -1,19 +1,19 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use core::{Key, TypeId, Field, Variants};
+use core::{Field, Function, Key, TypeId, Variants};
 use selectors;
 use selectors::Selector;
 use tasks::Tasks;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Runnable {
-  func: Key,
+  func: Function,
   args: Vec<Key>,
 }
 
 impl Runnable {
-  pub fn func(&self) -> &Key {
+  pub fn func(&self) -> &Function {
     &self.func
   }
 
@@ -50,14 +50,14 @@ impl<'g,'t> StepContext<'g,'t> {
    *
    * TODO: intrinsics
    */
-  fn gen_nodes(&self, subject: &Key, product: TypeId, variants: &Variants) -> Vec<Node> {
+  fn gen_nodes(&self, subject: &Key, product: &TypeId, variants: &Variants) -> Vec<Node> {
     self.tasks.get(&product).map(|tasks|
       tasks.iter()
         .map(|task| {
           Node::Task(
             Task {
               subject: subject.clone(),
-              product: product,
+              product: product.clone(),
               variants: variants.clone(),
               // TODO: cloning out of the task struct is easier than tracking references from
               // Nodes to Tasks... but should likely do it if memory usage becomes an issue.
@@ -74,15 +74,11 @@ impl<'g,'t> StepContext<'g,'t> {
     self.deps.get(node).map(|c| *c)
   }
 
-  fn key_none(&self) -> &Key {
-    self.tasks.key_none()
-  }
-
-  fn type_address(&self) -> TypeId {
+  fn type_address(&self) -> &TypeId {
     self.tasks.type_address()
   }
 
-  fn type_has_variants(&self) -> TypeId {
+  fn type_has_variants(&self) -> &TypeId {
     self.tasks.type_has_variants()
   }
 
@@ -112,10 +108,10 @@ impl<'g,'t> StepContext<'g,'t> {
   /**
    * Calls back to Python for an isinstance check.
    */
-  fn isinstance(&self, item: &Key, superclass: TypeId) -> bool {
+  fn isinstance(&self, item: &Key, superclass: &TypeId) -> bool {
     if item.type_id() == superclass {
       true
-    } else { 
+    } else {
       panic!("TODO: not implemented!");
     }
   }
@@ -158,8 +154,8 @@ pub struct Select {
 }
 
 impl Select {
-  fn product(&self) -> TypeId {
-    self.selector.product
+  fn product(&self) -> &TypeId {
+    &self.selector.product
   }
 
   fn select_literal_single<'a>(
@@ -168,7 +164,7 @@ impl Select {
     candidate: &'a Key,
     variant_value: Option<&Key>
   ) -> Option<&'a Key> {
-    if !context.isinstance(candidate, self.selector.product) {
+    if !context.isinstance(candidate, &self.selector.product) {
       return None;
     }
     match variant_value {
@@ -219,7 +215,7 @@ impl Step for Select {
         self.product() != context.type_has_variants() {
         let variants_node =
           Node::create(
-            Selector::select(context.type_has_variants()),
+            Selector::select(context.type_has_variants().clone()),
             self.subject.clone(),
             self.variants.clone(),
           );
@@ -335,8 +331,8 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn product(&self) -> TypeId {
-    self.selector.product
+  fn product(&self) -> &TypeId {
+    &self.selector.product
   }
 }
 
@@ -345,7 +341,7 @@ impl Step for SelectDependencies {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
-        Selector::select(self.selector.dep_product),
+        Selector::select(self.selector.dep_product.clone()),
         self.subject.clone(),
         self.variants.clone()
       );
@@ -400,7 +396,7 @@ impl Step for SelectProjection {
     // Request the product we need to compute the subject.
     let input_node =
       Node::create(
-        Selector::select(self.selector.input_product),
+        Selector::select(self.selector.input_product.clone()),
         self.subject.clone(),
         self.variants.clone()
       );
@@ -424,7 +420,7 @@ impl Step for SelectProjection {
     // When the output product is available, return it.
     let output_node =
       Node::create(
-        Selector::select(self.selector.product),
+        Selector::select(self.selector.product.clone()),
         projected_subject,
         self.variants.clone()
       );
@@ -449,7 +445,7 @@ pub struct Task {
   subject: Key,
   product: TypeId,
   variants: Variants,
-  func: Key,
+  func: Function,
   clause: Vec<selectors::Selector>,
 }
 
@@ -469,13 +465,9 @@ impl Step for Task {
         Some(&Complete::Return(ref value)) =>
           dep_values.push(&value),
         Some(&Complete::Noop(_)) =>
-          if selector.optional() {
-            dep_values.push(context.key_none());
-          } else {
-            return State::Complete(
-              Complete::Noop(format!("Was missing (at least) input for {:?}.", selector))
-            );
-          },
+          return State::Complete(
+            Complete::Noop(format!("Was missing (at least) input for {:?}.", selector))
+          ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
           return State::Complete(Complete::Throw(msg.clone())),

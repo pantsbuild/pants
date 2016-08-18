@@ -5,7 +5,7 @@ mod nodes;
 mod selectors;
 mod tasks;
 
-use core::{Field, Key, TypeId};
+use core::{Field, Function, Key, TypeId};
 use nodes::{Complete, Runnable};
 use graph::{Graph, EntryId};
 use tasks::Tasks;
@@ -64,7 +64,7 @@ impl RawExecution {
       self.runnables.iter()
         .map(|runnable| {
           RawRunnable {
-            func: runnable.func() as *const Key,
+            func: runnable.func() as *const Function,
             args_ptr: runnable.args().as_ptr(),
             args_len: runnable.args().len() as u64,
           }
@@ -81,7 +81,7 @@ impl RawExecution {
 
 pub struct RawRunnable {
   // Single Key.
-  func: *const Key,
+  func: *const Function,
   // Array of args.
   args_ptr: *const Key,
   args_len: u64,
@@ -89,10 +89,9 @@ pub struct RawRunnable {
 
 #[no_mangle]
 pub extern fn scheduler_create(
-  key_none: *mut Key,
-  field_name: *mut Field,
-  field_products: *mut Field,
-  field_variants: *mut Field,
+  field_name: Field,
+  field_products: Field,
+  field_variants: Field,
   type_address: TypeId,
   type_has_products: TypeId,
   type_has_variants: TypeId,
@@ -106,10 +105,9 @@ pub extern fn scheduler_create(
         scheduler: Scheduler::new(
           Graph::new(),
           Tasks::new(
-            key_from_raw(key_none),
-            key_from_raw(field_name),
-            key_from_raw(field_products),
-            key_from_raw(field_variants),
+            field_name,
+            field_products,
+            field_variants,
             type_address,
             type_has_products,
             type_has_variants,
@@ -137,28 +135,28 @@ pub extern fn execution_reset(scheduler_ptr: *mut RawScheduler) {
 #[no_mangle]
 pub extern fn execution_add_root_select(
   scheduler_ptr: *mut RawScheduler,
-  subject: *mut Key,
+  subject: Key,
   product: TypeId,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.add_root_select(key_from_raw(subject), product);
+    raw.scheduler.add_root_select(subject, product);
   })
 }
 
 #[no_mangle]
 pub extern fn execution_add_root_select_dependencies(
   scheduler_ptr: *mut RawScheduler,
-  subject: *mut Key,
+  subject: Key,
   product: TypeId,
   dep_product: TypeId,
-  field: *mut Field,
+  field: Field,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.add_root_select_dependencies(
-      key_from_raw(subject),
+      subject,
       product,
       dep_product,
-      key_from_raw(field),
+      field,
     );
   })
 }
@@ -183,22 +181,22 @@ pub extern fn execution_next(
 #[no_mangle]
 pub extern fn task_gen(
   scheduler_ptr: *mut RawScheduler,
-  func: *mut Key,
+  func: Function,
   output_type: TypeId,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.task_gen(key_from_raw(func), output_type);
+    raw.scheduler.tasks.task_gen(func, output_type);
   })
 }
 
 #[no_mangle]
 pub extern fn task_add_select_literal(
   scheduler_ptr: *mut RawScheduler,
-  subject: *mut Key,
+  subject: Key,
   product: TypeId,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select_literal(key_from_raw(subject), product);
+    raw.scheduler.tasks.add_select_literal(subject, product);
   })
 }
 
@@ -230,15 +228,4 @@ fn with_vec<F,C,T>(c_ptr: *mut C, c_len: usize, mut f: F) -> T
   let output = f(&cs);
   std::mem::forget(cs);
   output
-}
-
-/**
- * Clones the given key from a raw pointer.
- */
-fn key_from_raw(k_ptr: *mut Key) -> Key {
-  let key = unsafe { Box::from_raw(k_ptr) };
-  let owned_key = (*key).clone();
-  // We don't own this heap allocation: forget about it.
-  std::mem::forget(key);
-  owned_key
 }

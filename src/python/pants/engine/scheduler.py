@@ -95,18 +95,17 @@ class LocalScheduler(object):
     self._product_graph_lock = graph_lock or threading.RLock()
 
     # Create the scheduler.
-    scheduler = native.lib.scheduler_create(self._key(None),
-                                            self._key('name'),
+    scheduler = native.lib.scheduler_create(self._key('name'),
                                             self._key('products'),
                                             self._key('default'),
-                                            id(Address),
-                                            id(HasProducts),
-                                            id(Variants))
+                                            self._digest(Address),
+                                            self._digest(HasProducts),
+                                            self._digest(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     # And register all provided tasks.
     for output_type, input_selects, func in tasks:
       self._native.lib.task_gen(self._scheduler,
-                                self._key(func),
+                                self._digest(func),
                                 id(type(output_type)))
       # FIXME!
       #for input_select in input_selects:
@@ -115,10 +114,12 @@ class LocalScheduler(object):
       #                                           input_select.product)
       self._native.lib.task_end(self._scheduler)
 
+  def _digest(self, t):
+    return self._native.new('Digest*', self._storage.put(t).to_native())
+
   def _key(self, obj):
-    key_parts = self._storage.put(obj).to_native()
-    # FIXME: type ids will not be stable across processes... work to do!
-    return self._native.new('Key*', key_parts + (id(type(obj)),))
+    key = (self._storage.put(obj).to_native(), self._storage.put(type(obj)).to_native())
+    return self._native.new('Key*', key)
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.

@@ -57,11 +57,16 @@ class Native(object):
     # TODO: This definition is coupled to callers: should memoize it there.
     self._ffi_field.cdef(
         '''
-        typedef uint64_t TypeId;
-
         typedef struct {
           char     digest_upper[32];
           char     digest_lower[32];
+        } Digest;
+
+        typedef Digest TypeId;
+        typedef Digest Function;
+
+        typedef struct {
+          Digest   digest;
           TypeId   type_id;
         } Key;
 
@@ -69,7 +74,7 @@ class Native(object):
         typedef Key Field;
 
         typedef struct {
-          Key*        func;
+          Function*   func;
           Key*        args_ptr;
           uint64_t    args_len;
         } RawRunnable;
@@ -94,26 +99,25 @@ class Native(object):
           // ignore them because we never have collections of this type.
         } RawScheduler;
 
-        RawScheduler* scheduler_create(Key*,
+        RawScheduler* scheduler_create(Field*,
                                        Field*,
                                        Field*,
-                                       Field*,
-                                       TypeId,
-                                       TypeId,
-                                       TypeId);
+                                       TypeId*,
+                                       TypeId*,
+                                       TypeId*);
         void scheduler_destroy(RawScheduler*);
 
-        void task_gen(RawScheduler*, Key*, TypeId);
+        void task_gen(RawScheduler*, Key*, TypeId*);
         void task_end(RawScheduler*);
 
         uint64_t graph_len(RawScheduler*);
 
         void execution_reset(RawScheduler*);
-        void execution_add_root_select(RawScheduler*, Key*, TypeId);
+        void execution_add_root_select(RawScheduler*, Key*, TypeId*);
         void execution_add_root_select_dependencies(RawScheduler*,
                                                     Key*,
-                                                    TypeId,
-                                                    TypeId,
+                                                    TypeId*,
+                                                    TypeId*,
                                                     Field*);
         void execution_next(RawScheduler*,
                             EntryId*,

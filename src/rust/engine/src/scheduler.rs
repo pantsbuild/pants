@@ -151,10 +151,7 @@ impl Scheduler {
           let mut incomplete_deps =
             self.graph.entry_for_id(entry_id).dependencies().iter()
               .map(|&d| graph.entry_for_id(d))
-              .filter(|e| {
-                println!(">>>  dep of {} is ready?: {}: {}", entry_id, e.id(), e.is_complete());
-                !e.is_complete()
-              })
+              .filter(|e| !e.is_complete())
               .map(|e| e.id());
           if let Some(first) = incomplete_deps.next() {
             // Mark incomplete deps as candidates for steps.

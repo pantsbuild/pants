@@ -3,7 +3,6 @@ use core::{Key, TypeId, Field};
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeId,
-  pub optional: bool,
   pub variant_key: Option<Key>,
 }
 
@@ -38,19 +37,11 @@ pub enum Selector {
 
 impl Selector {
   pub fn select(product: TypeId) -> Selector {
-    Selector::Select(
+    Selector::Select( 
       Select {
         product: product,
-        optional: false,
         variant_key: None,
       }
     )
-  }
-
-  pub fn optional(&self) -> bool {
-    match self {
-      &Selector::Select(ref select) => select.optional,
-      _ => false,
-    }
   }
 }

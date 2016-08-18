@@ -1,15 +1,15 @@
-use core::{Key, TypeId, Field};
+use core::{Field, Function, Key, TypeId};
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
 use std::collections::HashMap;
 
 pub struct Task {
   output_type: TypeId,
   input_clause: Vec<Selector>,
-  func: Key,
+  func: Function,
 }
 
 impl Task {
-  pub fn func(&self) -> &Key {
+  pub fn func(&self) -> &Function {
     &self.func
   }
 
@@ -24,7 +24,6 @@ impl Task {
  */
 pub struct Tasks {
   tasks: HashMap<TypeId, Vec<Task>>,
-  key_none: Key,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -45,7 +44,6 @@ pub struct Tasks {
  */
 impl Tasks {
   pub fn new(
-    key_none: Key,
     field_name: Field,
     field_products: Field,
     field_variants: Field,
@@ -55,7 +53,6 @@ impl Tasks {
   ) -> Tasks {
     Tasks {
       tasks: HashMap::new(),
-      key_none: key_none,
       field_name: field_name,
       field_products: field_products,
       field_variants: field_variants,
@@ -70,10 +67,6 @@ impl Tasks {
     self.tasks.get(type_id)
   }
 
-  pub fn key_none(&self) -> &Key {
-    &self.key_none
-  }
-
   pub fn field_name(&self) -> &Field {
     &self.field_name
   }
@@ -86,23 +79,23 @@ impl Tasks {
     &self.field_variants
   }
 
-  pub fn type_address(&self) -> TypeId {
-    self.type_address
+  pub fn type_address(&self) -> &TypeId {
+    &self.type_address
   }
 
-  pub fn type_has_products(&self) -> TypeId {
-    self.type_has_products
+  pub fn type_has_products(&self) -> &TypeId {
+    &self.type_has_products
   }
 
-  pub fn type_has_variants(&self) -> TypeId {
-    self.type_has_variants
+  pub fn type_has_variants(&self) -> &TypeId {
+    &self.type_has_variants
   }
 
   /**
    * The following methods define the Task registration lifecycle.
    */
 
-  pub fn task_gen(&mut self, func: Key, output_type: TypeId) {
+  pub fn task_gen(&mut self, func: Function, output_type: TypeId) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
@@ -118,9 +111,9 @@ impl Tasks {
       );
   }
 
-  pub fn add_select(&mut self, product: TypeId, optional: bool, variant_key: Option<Key>) {
+  pub fn add_select(&mut self, product: TypeId, variant_key: Option<Key>) {
     self.clause(Selector::Select(
-      Select { product: product, optional: optional, variant_key: variant_key }
+      Select { product: product, variant_key: variant_key }
     ));
   }
 
@@ -157,6 +150,6 @@ impl Tasks {
     // Move the task from `preparing` to the Tasks map
     let task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
 
-    self.tasks.entry(task.output_type).or_insert(Vec::new()).push(task);
+    self.tasks.entry(task.output_type.clone()).or_insert(Vec::new()).push(task);
   }
 }
