@@ -10,8 +10,8 @@ use tasks::Tasks;
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
 pub struct Scheduler {
-  graph: Graph,
-  tasks: Tasks,
+  pub graph: Graph,
+  pub tasks: Tasks,
   // Initial set of roots for the execution.
   roots: Vec<Node>,
   // Candidates for Scheduler, in the order they were declared.
@@ -36,8 +36,10 @@ impl Scheduler {
     }
   }
 
-  pub fn graph(&self) -> &Graph {
-    &self.graph
+  pub fn reset(&mut self) {
+    self.roots.clear();
+    self.candidates.clear();
+    self.outstanding.clear();
   }
 
   pub fn add_root_node_select(&mut self, subject: Key, product: TypeId) {

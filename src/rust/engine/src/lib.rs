@@ -16,6 +16,20 @@ pub struct RawScheduler {
   scheduler: Scheduler,
 }
 
+impl RawScheduler {
+  fn next(&mut self, completed: Vec<(&EntryId, &Complete)>) {
+    self.execution.update(self.scheduler.next(completed));
+  }
+
+  fn reset(&mut self) {
+    self.scheduler.reset();
+    self.execution.update(Vec::new());
+  }
+}
+
+/**
+ * An unzipped, raw-pointer form of the return value of Scheduler.next().
+ */
 pub struct RawExecution {
   ready_ptr: *mut EntryId,
   ready_runnables_ptr: *mut Runnable,
@@ -39,6 +53,16 @@ impl RawExecution {
     raw.ready_ptr = raw.ready.as_mut_ptr();
     raw.ready_runnables_ptr = raw.ready_runnables.as_mut_ptr();
     raw
+  }
+
+  fn update(&mut self, ready_entries: Vec<(EntryId, Runnable)>) {
+    let (ready, ready_runnables) = ready_entries.into_iter().unzip();
+
+    self.ready = ready;
+    self.ready_runnables = ready_runnables;
+    self.ready_ptr = self.ready.as_mut_ptr();
+    self.ready_runnables_ptr = self.ready_runnables.as_mut_ptr();
+    self.ready_len = self.ready.len() as u64;
   }
 }
 
@@ -82,7 +106,14 @@ pub extern fn scheduler_destroy(scheduler_ptr: *mut RawScheduler) {
 }
 
 #[no_mangle]
-pub extern fn scheduler_next(
+pub extern fn execution_reset(scheduler_ptr: *mut RawScheduler) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.reset();
+  })
+}
+
+#[no_mangle]
+pub extern fn execution_next(
   scheduler_ptr: *mut RawScheduler,
   completed_ptr: *mut EntryId,
   completed_states_ptr: *mut Complete,
@@ -91,25 +122,45 @@ pub extern fn scheduler_next(
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(completed_ptr, completed_len as usize, |completed_ids| {
       with_vec(completed_states_ptr, completed_len as usize, |completed_states| {
-        // Execute steps and collect ready values.
-        let completed = completed_ids.iter().zip(completed_states.iter()).collect();
-        let (ready, ready_runnables) = raw.scheduler.next(completed).into_iter().unzip();
-
-        // Store vectors of ready entries, and raw pointers to them.
-        raw.execution.ready = ready;
-        raw.execution.ready_runnables = ready_runnables;
-        raw.execution.ready_ptr = raw.execution.ready.as_mut_ptr();
-        raw.execution.ready_runnables_ptr = raw.execution.ready_runnables.as_mut_ptr();
-        raw.execution.ready_len = raw.execution.ready.len() as u64;
+        raw.next(completed_ids.iter().zip(completed_states.iter()).collect());
       })
     })
   })
 }
 
 #[no_mangle]
+pub extern fn task_gen(
+  scheduler_ptr: *mut RawScheduler,
+  func: *mut Key,
+  output_type: TypeId,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.task_gen(key_from_raw(func), output_type);
+  })
+}
+
+#[no_mangle]
+pub extern fn task_add_select_literal(
+  scheduler_ptr: *mut RawScheduler,
+  subject: *mut Key,
+  product: TypeId,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.add_select_literal(key_from_raw(subject), product);
+  })
+}
+
+#[no_mangle]
+pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.task_end();
+  })
+}
+
+#[no_mangle]
 pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.graph().len() as u64
+    raw.scheduler.graph.len() as u64
   })
 }
 
