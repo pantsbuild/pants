@@ -31,7 +31,8 @@ _FFI.cdef(
 
     typedef void StorageHandle;
 
-    typedef bool (*isinstance_extern)(StorageHandle*, Key*, TypeId*);
+    typedef bool (*extern_isinstance)(StorageHandle*, Key*, TypeId*);
+    typedef Key  (*extern_store_list)(StorageHandle*, Key*, uint64_t);
 
     typedef struct {
       Function*   func;
@@ -49,18 +50,19 @@ _FFI.cdef(
       EntryId*              ready_ptr;
       RawRunnable*          ready_runnables_ptr;
       uint64_t              ready_len;
-      // NB: there are more fields in this struct, but we can safely
+      // NB: there are more fields in this struct, but we can safely (?)
       // ignore them because we never have collections of this type.
     } RawExecution;
 
     typedef struct {
       RawExecution execution;
-      // NB: there are more fields in this struct, but we can safely
+      // NB: there are more fields in this struct, but we can safely (?)
       // ignore them because we never have collections of this type.
     } RawScheduler;
 
-    RawScheduler* scheduler_create(isinstance_extern,
-                                   StorageHandle*,
+    RawScheduler* scheduler_create(StorageHandle*,
+                                   extern_isinstance,
+                                   extern_store_list,
                                    Field,
                                    Field,
                                    Field,
@@ -88,7 +90,9 @@ _FFI.cdef(
                                                 Field);
     void execution_next(RawScheduler*,
                         EntryId*,
-                        RawRunnable*,
+                        Key*,
+                        uint64_t,
+                        EntryId*,
                         uint64_t);
     '''
   )
@@ -101,6 +105,18 @@ def extern_isinstance(storage_handle, key, type_id):
   typ = storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
   print(">>> extern_isinstance({}, {}) == {}".format(obj, typ, isinstance(obj, typ)))
   return isinstance(obj, typ)
+
+
+@_FFI.callback("Key(StorageHandle*, Key*, uint64_t)")
+def extern_store_list(storage_handle, keys_ptr, keys_len):
+  """Given storage, a Key for `obj`, and a TypeId for `type`, return isinstance(obj, type)."""
+  storage = _FFI.from_handle(storage_handle)
+  digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
+  key = storage.put_from_digests(digests)
+  print(">>> extern_store_list({}) == {}".format(len(digests), key))
+  # NB: not actually storing the digest of the type of KeyList here, since it is not
+  # supposed to be an exposed type. This effectively means that it is a "unique" type.
+  return ((key.digest,), (key.digest,))
 
 
 class Native(object):

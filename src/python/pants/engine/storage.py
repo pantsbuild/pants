@@ -22,6 +22,7 @@ from pants.engine.nodes import State
 from pants.engine.objects import Closable, SerializationError
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 def _unpickle(value):
@@ -97,6 +98,14 @@ class Key(object):
 
   def __str__(self):
     return repr(self)
+
+
+class KeyList(datatype('KeyList', ['keys'])):
+  """A private typed marker for a list of Keys.
+
+  KeyLists should never be created by user code, so they can be used to identify stored
+  values which are themselves lists of Keys (such as the result of a DependenciesNode.
+  """
 
 
 class InvalidKeyError(Exception):
@@ -182,6 +191,10 @@ class Storage(Closable):
 
     return key
 
+  def put_from_digests(self, digests):
+    print('$$$ store list of keys: {}'.format(len(digests)))
+    return self.put(KeyList([Key.create_from_digest(digest) for digest in digests]))
+
   def get(self, key):
     """Given a key, return its deserialized content.
 
@@ -192,9 +205,14 @@ class Storage(Closable):
       raise InvalidKeyError('Not a valid key: {!r}'.format(key))
 
     obj = self._memo.get(key)
-    if obj is not None:
-      return obj
-    return self._contents.get(key.digest, _unpickle)
+    if obj is None:
+      obj = self._contents.get(key.digest, _unpickle)
+    # If the stored object was a KeyList, recurse. Note: we don't have this convenience
+    # on the put_from_digests side, because the definition of the nesting should be explicit.
+    if type(obj) == KeyList:
+      obj = [self.get(inner) for inner in obj.keys]
+      print('$$$ found list of keys: {}'.format(obj))
+    return obj
 
   def get_from_digest(self, digest):
     return self.get(Key.create_from_digest(digest))

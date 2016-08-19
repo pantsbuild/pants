@@ -16,10 +16,10 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.graph import Graph
-from pants.engine.subsystem.native import extern_isinstance
+from pants.engine.subsystem.native import extern_isinstance, extern_store_list
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Noop, Runnable, SelectNode,
-                                StepContext, TaskNode, Waiting)
+                                StepContext, TaskNode, Waiting, Return, Throw)
 from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
@@ -98,8 +98,9 @@ class LocalScheduler(object):
 
     # Create the scheduler.
     self._storage_handle = native.new_handle(storage)
-    scheduler = native.lib.scheduler_create(extern_isinstance,
-                                            self._storage_handle,
+    scheduler = native.lib.scheduler_create(self._storage_handle,
+                                            extern_isinstance,
+                                            extern_store_list,
                                             self._to_key('name'),
                                             self._to_key('products'),
                                             self._to_key('default'),
@@ -234,14 +235,23 @@ class LocalScheduler(object):
 
   def _execution_next(self, completed):
     # Unzip into two arrays.
-    completed_ids = [i for i, _ in completed]
-    completed_states = [c for _, c in completed]
+    returns_ids, returns_states, throws_ids = [], [], []
+    for cid, c in completed:
+      if type(c) is Return:
+        returns_ids.append(cid)
+        returns_states.append(self._to_key(c.value))
+      elif type(c) is Throw:
+        throws_ids.append(cid)
+      else:
+        raise ValueError("Unexpected `Completed` state from Runnable execution: {}".format(c))
 
     # Run, then collect the outputs from the Scheduler's RawExecution struct.
     self._native.lib.execution_next(self._scheduler,
-                                    completed_ids,
-                                    completed_states,
-                                    len(completed))
+                                    returns_ids,
+                                    returns_states,
+                                    len(returns_ids),
+                                    throws_ids,
+                                    len(throws_ids))
     def runnable(raw):
       return Runnable(self._from_type_key(raw.func),
                       tuple(self._from_key(key)

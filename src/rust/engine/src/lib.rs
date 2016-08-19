@@ -1,17 +1,19 @@
 mod core;
-mod scheduler;
+mod externs;
 mod graph;
 mod nodes;
+mod scheduler;
 mod selectors;
 mod tasks;
 
 extern crate libc;
 
-use core::{Field, Function, IsInstanceExtern, IsInstanceFunction, Key, StorageExtern, TypeId};
-use nodes::{Complete, Runnable};
+use core::{Field, Function, Key, TypeId};
+use externs::{IsInstanceExtern, IsInstanceFunction, StorageExtern, StoreListExtern, StoreListFunction};
 use graph::{Graph, EntryId};
-use tasks::Tasks;
+use nodes::{Complete, Runnable};
 use scheduler::Scheduler;
+use tasks::Tasks;
 
 pub struct RawScheduler {
   execution: RawExecution,
@@ -19,7 +21,7 @@ pub struct RawScheduler {
 }
 
 impl RawScheduler {
-  fn next(&mut self, completed: Vec<(&EntryId, &Complete)>) {
+  fn next(&mut self, completed: Vec<(EntryId, Complete)>) {
     self.execution.update(self.scheduler.next(completed));
   }
 
@@ -91,8 +93,9 @@ pub struct RawRunnable {
 
 #[no_mangle]
 pub extern fn scheduler_create(
-  isinstance: IsInstanceExtern,
   storage: *const StorageExtern,
+  isinstance: IsInstanceExtern,
+  store_list: StoreListExtern,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -110,6 +113,7 @@ pub extern fn scheduler_create(
           Graph::new(),
           Tasks::new(
             IsInstanceFunction::new(isinstance, storage),
+            StoreListFunction::new(store_list, storage),
             field_name,
             field_products,
             field_variants,
@@ -169,15 +173,27 @@ pub extern fn execution_add_root_select_dependencies(
 #[no_mangle]
 pub extern fn execution_next(
   scheduler_ptr: *mut RawScheduler,
-  completed_ptr: *mut EntryId,
-  completed_states_ptr: *mut Complete,
-  completed_len: u64,
+  returns_ptr: *mut EntryId,
+  returns_states_ptr: *mut Key,
+  returns_len: u64,
+  throws_ptr: *mut EntryId,
+  // TODO: empty strings at the moment.
+  //throws_states_ptr: **mut CStr,
+  throws_len: u64,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
-    with_vec(completed_ptr, completed_len as usize, |completed_ids| {
-      with_vec(completed_states_ptr, completed_len as usize, |completed_states| {
-        println!(">>> rust continuing execution for {:?}", completed_ids);
-        raw.next(completed_ids.iter().zip(completed_states.iter()).collect());
+    with_vec(returns_ptr, returns_len as usize, |returns_ids| {
+      with_vec(returns_states_ptr, returns_len as usize, |returns_states| {
+        with_vec(throws_ptr, throws_len as usize, |throws_ids| {
+          let returns =
+            returns_ids.iter().zip(returns_states.iter())
+              .map(|(&id, key)| (id, Complete::Return(key.clone())));
+          let throws =
+            throws_ids.iter()
+              .map(|&id| (id, Complete::Throw(format!("{} failed!", id))));
+          println!(">>> rust continuing execution for {:?} and {:?}", returns_ids, throws_ids);
+          raw.next(returns.chain(throws).collect());
+        })
       })
     })
   })

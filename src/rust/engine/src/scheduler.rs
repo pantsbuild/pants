@@ -111,13 +111,14 @@ impl Scheduler {
   /**
    * Continues execution after the given runnables have completed execution.
    */
-  pub fn next(&mut self, completed: Vec<(&EntryId, &Complete)>) -> Vec<(EntryId, Runnable)> {
+  pub fn next(&mut self, completed: Vec<(EntryId, Complete)>) -> Vec<(EntryId, Runnable)> {
     let mut ready = Vec::new();
 
     // Mark any completed entries as such.
-    for (&id, state) in completed {
+    for (id, state) in completed {
       self.outstanding.remove(&id);
       self.candidates.extend(self.graph.entry_for_id(id).dependents());
+      println!(">>> rust completed {} with {:?}", id, state);
       self.graph.complete(id, state.clone());
     }
 

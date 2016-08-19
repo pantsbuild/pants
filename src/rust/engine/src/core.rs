@@ -31,26 +31,3 @@ impl Key {
     &self.type_id
   }
 }
-
-pub type StorageExtern = libc::c_void;
-
-pub type IsInstanceExtern =
-  extern "C" fn(*const StorageExtern, *const Key, *const TypeId) -> bool;
-
-pub struct IsInstanceFunction {
-  isinstance: IsInstanceExtern,
-  storage: *const StorageExtern,
-}
-
-impl IsInstanceFunction {
-  pub fn new(isinstance: IsInstanceExtern, storage: *const StorageExtern) -> IsInstanceFunction {
-    IsInstanceFunction {
-      isinstance: isinstance,
-      storage: storage,
-    }
-  }
-
-  pub fn isinstance(&self, key: &Key, type_id: &TypeId) -> bool {
-    (self.isinstance)(self.storage, key, type_id)
-  }
-}

@@ -100,7 +100,7 @@ impl<'g,'t> StepContext<'g,'t> {
    * Stores a list of Keys, resulting in a Key for the list.
    */
   fn store_list(&self, items: Vec<&Key>) -> Key {
-    panic!("TODO: not implemented!");
+    self.tasks.store_list(items)
   }
 
   /**
@@ -278,7 +278,7 @@ impl Step for Select {
     if !dependencies.is_empty() {
       // A dependency has not run yet.
       return State::Waiting(dependencies);
-    } else if matches.len() > 0 {
+    } else if matches.len() > 1 {
       // TODO: Multiple successful tasks are not currently supported. We should allow for this
       // by adding support for "mergeable" products. see:
       //   https://github.com/pantsbuild/pants/issues/2526

@@ -1,6 +1,8 @@
-use core::{Field, Function, IsInstanceFunction, Key, TypeId};
-use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
 use std::collections::HashMap;
+
+use core::{Field, Function, Key, TypeId};
+use externs::{IsInstanceFunction, StoreListFunction};
+use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
 
 pub struct Task {
   output_type: TypeId,
@@ -25,6 +27,7 @@ impl Task {
 pub struct Tasks {
   tasks: HashMap<TypeId, Vec<Task>>,
   isinstance: IsInstanceFunction,
+  store_list: StoreListFunction,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -46,6 +49,7 @@ pub struct Tasks {
 impl Tasks {
   pub fn new(
     isinstance: IsInstanceFunction,
+    store_list: StoreListFunction,
     field_name: Field,
     field_products: Field,
     field_variants: Field,
@@ -56,6 +60,7 @@ impl Tasks {
     Tasks {
       tasks: HashMap::new(),
       isinstance: isinstance,
+      store_list: store_list,
       field_name: field_name,
       field_products: field_products,
       field_variants: field_variants,
@@ -96,6 +101,10 @@ impl Tasks {
 
   pub fn isinstance(&self, key: &Key, type_id: &TypeId) -> bool {
     (self.isinstance).isinstance(key, type_id)
+  }
+
+  pub fn store_list(&self, keys: Vec<&Key>) -> Key {
+    (self.store_list).store_list(keys)
   }
 
   /**
