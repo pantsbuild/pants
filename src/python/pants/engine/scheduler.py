@@ -490,35 +490,13 @@ class RulesetValidator(object):
     self._validate_task_rules()
 
   def _validate_task_rules(self):
+    # Validate that
+    # - all products selected by tasks are produced by some task or intrinsic, or come from a root
+    #  subject type
+    # - all goal products are also produced
     intrinsics=self._node_builder._intrinsics
     serializable_tasks = self._node_builder._tasks
     root_subject_types = self._root_subject_types
-    # List provided product types
-    # - lhs of tasks
-    # - root subject types
-    # - dependency subject types
-    # - projected subject types
-    # - dependency field types
-    # - select-literal value
-
-    # consumed product types
-    # - Select#product
-    # - SelectVariant#product
-    # - SelectDependencies#product
-    # - SelectDependencies#dep_product
-    # - SelectProjection#input_product
-    # - SelectProjection#product
-    # - SelectLiteral#product
-
-    # validations:
-    #   assert all provided types are consumed by selects (might not be necessary)
-    #   assert all consumed product types are provided
-
-    # assert that there aren't any duplicate (product, input selects)
-
-    # really, the type constrains are based on tuples, because graphs are constructed as tuples
-    # so select projections set the type of the subject for the product type in the tuple
-
     task_and_intrinsic_product_types = set(serializable_tasks.keys())
     task_and_intrinsic_product_types.update(prd_t for sbj_t, prd_t in intrinsics.keys())
 
@@ -545,7 +523,8 @@ class RulesetValidator(object):
 
     for goal, goal_product in self._goal_to_product.items():
       if goal_product not in task_and_intrinsic_product_types:
-      #if any(p not in task_and_intrinsic_product_types for p in goal_product.products()):
+        # NB: We could also check goals of the Goal type to see if the products they request are also
+        # available.
         raise ValueError('missing product for goal {} {}'.format(goal, goal_product))
 
     all_errors.extend(selector_errors)
