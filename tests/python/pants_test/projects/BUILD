@@ -15,7 +15,6 @@ python_tests(
 
 python_tests(
   name='testprojects_integration',
-  timeout=600,
   sources=['test_testprojects_integration.py'],
   dependencies=[
     ':base',
@@ -23,7 +22,7 @@ python_tests(
     'tests/python/pants_test/testutils:mock_logger',
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout=600,
 )
 
 python_library(
