@@ -13,6 +13,7 @@ from os.path import join as os_path_join
 
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
 from pants.engine.fs import Dirs, Files, FilesContent, PathGlobs, create_fs_tasks
@@ -463,7 +464,7 @@ def setup_json_scheduler(build_root, inline_nodes=True):
        extract_scala_imports),
       (Address,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Dirs, field='stats')],
+        SelectDependencies(AddressFamily, Dirs, field='stats', field_types=(Dir,))],
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),
@@ -488,11 +489,11 @@ def setup_json_scheduler(build_root, inline_nodes=True):
        write_name_file),
       (Classpath,
        [Select(JavaSources),
-        SelectDependencies(Classpath, JavaSources)],
+        SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))], #NB, not sure these should allow Jar, but it is there. *shrugs*
        javac),
       (Classpath,
        [Select(ScalaSources),
-        SelectDependencies(Classpath, ScalaSources)],
+        SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))],
        scalac),
     ] + [
       # TODO

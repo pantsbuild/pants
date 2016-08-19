@@ -18,6 +18,7 @@ from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConst
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
+from pants.engine.scheduler import CoercionFactory
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
@@ -280,16 +281,8 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
     # define that lookup for each literal product.
-    (product,
-     [Select(Struct)],
-     maybe_cast_to(product)
-      # hypothesis: because this is identity, the tasks all have the same hash/id/eq
-      # when changed to cast_to, that was no longer true due to the closure.
-    #  identity
-    )
-    #for product in []
+    CoercionFactory(product, Struct)
     for product in set(symbol_table_cls.table().values()) if product is not Struct
-    #for product in symbol_table_cls.table().values() if product is not Struct and isinstance(product, Struct)
   ] + [
     # Simple spec handling.
     (Addresses,

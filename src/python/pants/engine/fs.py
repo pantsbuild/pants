@@ -406,7 +406,7 @@ def create_fs_tasks():
      resolve_dir_links),
     (Files,
      [Select(Paths),
-      SelectDependencies(Files, Paths, field='link_stats', field_types=tuple())],
+      SelectDependencies(Files, Paths, field='link_stats', field_types=(Link,))],
      resolve_file_links),
     (Dirs,
      [SelectProjection(Dirs, PathGlobs, ('path_globs',), ReadLink)],

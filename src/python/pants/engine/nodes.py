@@ -22,6 +22,27 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
+def collect_item_of_type(product, candidate, variant_value):
+  def items():
+    # Check whether the subject is-a instance of the product.
+    yield candidate
+    # Else, check whether it has-a instance of the product.
+    if isinstance(candidate, HasProducts):
+      for subject in candidate.products:
+        yield subject
+
+  # TODO: returning only the first literal configuration of a given type/variant. Need to
+  # define mergeability for products.
+  for item in items():
+
+    if not isinstance(item, product):
+      continue
+    if variant_value and not getattr(item, 'name', None) == variant_value:
+      continue
+    return item
+  return None
+
+
 class ConflictingProducersError(Exception):
   """Indicates that there was more than one source of a product for a given subject.
 
@@ -158,30 +179,13 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
 
     Returns the resulting product value, or None if no match was made.
     """
-
-    def items():
-      # Check whether the subject is-a instance of the product.
-      yield candidate
-      # Else, check whether it has-a instance of the product.
-      if isinstance(candidate, HasProducts):
-        for subject in candidate.products:
-          yield subject
-
-    # TODO: returning only the first literal configuration of a given type/variant. Need to
-    # define mergeability for products.
-    for item in items():
-      if not isinstance(item, self.product):
-        continue
-      if variant_value and not getattr(item, 'name', None) == variant_value:
-        continue
-      return item
-    return None
+    return collect_item_of_type(self.product, candidate, variant_value)
 
   def step(self, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
     select_variants = Select(Variants)
-    if type(self.subject) is Address and self.selector is not select_variants:
+    if type(self.subject) is Address and self.selector != select_variants:
       variants_node = step_context.select_node(select_variants, self.subject, self.variants)
       dep_state = step_context.get(variants_node)
       if type(dep_state) in {Waiting, Throw}:
@@ -397,7 +401,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', '
     # Compute dependencies for the Node, or determine whether it is a Noop.
     dependencies = []
     dep_values = []
-    for selector in self.clause:
+    for index, selector in enumerate(self.clause):
       dep_node = step_context.select_node(selector, self.subject, self.variants)
       dep_state = step_context.get(dep_node)
       if type(dep_state) is Waiting:
@@ -408,7 +412,10 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', '
         if selector.optional:
           dep_values.append(None)
         else:
-          return Noop('Was missing (at least) input for {}.', selector)
+          return Noop('Was missing (at least) input for {}.'
+          ' Waiting on: {}'
+          ' passed clauses {}'
+          ' collected vals: {}', selector, dependencies, self.clause[:index], dep_values)
       elif type(dep_state) is Throw:
         # NB: propagate thrown exception directly.
         return dep_state

@@ -17,7 +17,8 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, ProjectionNode,
-                                Return, SelectNode, State, StepContext, TaskNode, Throw, Waiting)
+                                Return, SelectNode, State, StepContext, TaskNode, Throw, Waiting,
+                                collect_item_of_type)
 from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
@@ -439,11 +440,43 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
     return self.input_selectors
 
 
+def coerce_fn(klass):
+  """Creates a function that returns the passed object iff it is of the type klass, or returns a product of the object if it has products of the right type."""
+  def cast_fn(obj):
+    return collect_item_of_type(klass, obj, None)
+  cast_fn.__name__ = str('coerce_to_{}'.format(klass.__name__))
+  return cast_fn
+
+
+class CoercionFactory(datatype('CoercionFactory', ['requested_type', 'available_type'])):
+
+  def __new__(cls, *args, **kwargs):
+    factory = super(CoercionFactory, cls).__new__(cls, *args, **kwargs)
+    factory.input_selects = (Select(factory.available_type),)
+    factory.func = coerce_fn(factory.requested_type)
+    return factory
+
+  @property
+  def output_product_type(self):
+    return self.requested_type
+
+  def as_node(self, subject, variants):
+    return TaskNode(subject, variants, self.requested_type, self.func, self.input_selects)
+
+
 class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type'])):
   """A set-friendly curried TaskNode constructor."""
 
   def as_node(self, subject, variants):
-    return TaskNode(subject, variants, self.product_type, self.task_func, self.input_selects)
+    return TaskNode(subject,
+      variants,
+      self.product_type,
+      self.task_func,
+      self.input_selects)
+
+  @property
+  def output_product_type(self):
+    return self.product_type
 
 
 class RulesetValidator(object):
@@ -452,7 +485,6 @@ class RulesetValidator(object):
     self._root_subject_types = root_subject_types
     self._node_builder = node_builder
     self._goal_to_product = goal_to_product
-    print(goal_to_product)
 
   def validate(self):
     self._validate_task_rules(intrinsics=self._node_builder._intrinsics,
@@ -596,13 +628,13 @@ class NodeBuilder(Closable):
     """Creates a NodeBuilder with tasks indexed by their output type."""
     serializable_tasks = defaultdict(set)
     for entry in task_entries:
-      if isinstance(entry, (tuple, list)) and len(entry) == 3:
+      if isinstance(entry, (SnapshottedProcess, CoercionFactory, TaskNodeFactory)):
+        serializable_tasks[entry.output_product_type].add(entry)
+      elif isinstance(entry, (tuple, list)) and len(entry) == 3:
         output_type, input_selects, task = entry
         serializable_tasks[output_type].add(
           TaskNodeFactory(tuple(input_selects), task, output_type)
         )
-      elif isinstance(entry, SnapshottedProcess):
-        serializable_tasks[entry.output_product_type].add(entry)
       else:
         raise Exception("Unexpected type for entry {}".format(entry))
 
