@@ -69,18 +69,25 @@ class GoalRunnerFactory(object):
     self._kill_nailguns = self._global_options.kill_nailguns
 
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    build_ignore_patterns = self._global_options.ignore_patterns or []
     self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
                                                 self._global_options.enable_v2_engine,
                                                 self._global_options.pants_ignore,
-                                                build_ignore_patterns,
+                                                self._global_options.ignore_patterns,
+                                                self._global_options.exclude_target_regexp,
                                                 daemon_build_graph)
 
-  def _select_buildgraph_and_address_mapper(self, use_engine, path_ignore_patterns, build_ignore_patterns, daemon_buildgraph=None):
+  def _select_buildgraph_and_address_mapper(self,
+                                            use_engine,
+                                            path_ignore_patterns,
+                                            build_ignore_patterns,
+                                            exclude_target_regexps,
+                                            daemon_buildgraph=None):
     """Selects a BuildGraph and AddressMapper to use then constructs them and returns them.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
+    :param list build_ignore_patterns: The build ignore patterns from '--ignore-patterns'.
+    :param list exclude_target_regexps: Regular expressions for targets to be excluded.
     :param LegacyBuildGraph daemon_buildgraph: A cached graph to reuse, if available.
     :returns a tuple of the graph and the address mapper.
     """
@@ -95,14 +102,16 @@ class GoalRunnerFactory(object):
     elif use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
-      graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns)
+      graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
+                                                          build_ignore_patterns=build_ignore_patterns,
+                                                          exlude_target_regexps=exclude_target_regexps)
       graph = graph_helper.create_graph(root_specs)
       return graph, LegacyAddressMapper(graph, self._root_dir)
     else:
       address_mapper = BuildFileAddressMapper(self._build_file_parser,
                                               get_project_tree(self._global_options),
                                               build_ignore_patterns,
-                                              exclude_target_regexps=self._global_options.exclude_target_regexp)
+                                              exclude_target_regexps=exclude_target_regexps)
       return MutableBuildGraph(address_mapper), address_mapper
 
   def _expand_goals(self, goals):

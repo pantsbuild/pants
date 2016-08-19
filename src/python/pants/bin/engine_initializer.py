@@ -85,7 +85,10 @@ class EngineInitializer(object):
     return spec_roots
 
   @staticmethod
-  def setup_legacy_graph(path_ignore_patterns, symbol_table_cls=None):
+  def setup_legacy_graph(path_ignore_patterns,
+                         symbol_table_cls=None,
+                         build_ignore_patterns=None,
+                         exlude_target_regexps=None):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
@@ -102,7 +105,9 @@ class EngineInitializer(object):
     # Register "literal" subjects required for these tasks.
     # TODO: Replace with `Subsystems`.
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                   parser_cls=LegacyPythonCallbacksParser)
+                                   parser_cls=LegacyPythonCallbacksParser,
+                                   build_ignore_patterns=build_ignore_patterns,
+                                   exclude_target_regexps=exlude_target_regexps)
 
     # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.

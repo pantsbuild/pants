@@ -5,7 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import re
 from collections import OrderedDict
+
+from pathspec import PathSpec
+from pathspec.gitignore import GitIgnorePattern
 
 from pants.build_graph.address import Address
 from pants.engine.objects import Serializable
@@ -34,8 +39,16 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
 
+  @staticmethod
+  def exclude_target(target_address, exclude_patterns):
+    if exclude_patterns:
+      for pattern in exclude_patterns:
+        if pattern.search(target_address) is not None:
+          return True
+    return False
+
   @classmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls, parser_cls):
+  def parse(cls, filepath, filecontent, symbol_table_cls, parser_cls, exclude_patterns=None):
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
@@ -64,7 +77,9 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
         raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
                                  'map {!r}'.format(filepath, name, objects_by_name[name], obj))
 
-      objects_by_name[name] = obj
+      target_address = '{}:{}'.format(os.path.dirname(filepath), name)
+      if not AddressMap.exclude_target(target_address, exclude_patterns):
+        objects_by_name[name] = obj
     return cls(filepath, OrderedDict(sorted(objects_by_name.items())))
 
 
@@ -156,7 +171,12 @@ class ResolveError(MappingError):
 class AddressMapper(object):
   """Configuration to parse build files matching a filename pattern."""
 
-  def __init__(self, symbol_table_cls, parser_cls, build_pattern=None):
+  def __init__(self,
+               symbol_table_cls,
+               parser_cls,
+               build_pattern=None,
+               build_ignore_patterns=None,
+               exclude_target_regexps=None):
     """Create an AddressMapper.
 
     Both the set of files that define a mappable BUILD files and the parser used to parse those
@@ -170,6 +190,10 @@ class AddressMapper(object):
     self.symbol_table_cls = symbol_table_cls
     self.parser_cls = parser_cls
     self.build_pattern = build_pattern or 'BUILD*'
+
+    self.build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
+    self._exclude_target_regexps = exclude_target_regexps or []
+    self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
 
   def __eq__(self, other):
     if self is other:

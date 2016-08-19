@@ -46,7 +46,9 @@ def filter_buildfile_paths(address_mapper, directory_listing):
 
   build_pattern = address_mapper.build_pattern
   def match(stat):
-    return type(stat) is File and fnmatch(basename(stat.path), build_pattern)
+    # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
+    ignored = len(list(address_mapper.build_ignore_patterns.match_files([stat.path]))) > 0
+    return type(stat) is File and fnmatch(basename(stat.path), build_pattern) and (not ignored)
   build_files = tuple(Path(stat.path, stat)
                       for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)
@@ -64,7 +66,8 @@ def parse_address_family(address_mapper, path, build_files_content):
     address_maps.append(AddressMap.parse(filepath,
                                          filecontent,
                                          address_mapper.symbol_table_cls,
-                                         address_mapper.parser_cls))
+                                         address_mapper.parser_cls,
+                                         address_mapper.exclude_patterns))
   return AddressFamily.create(path.path, address_maps)
 
 
@@ -226,10 +229,12 @@ def addresses_from_address_families(address_families):
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
 
 
-def filter_build_dirs(build_files):
+def filter_build_dirs(address_mapper, build_files):
   """Given Files matching a build pattern, return their parent directories as BuildDirs."""
   dirnames = set(dirname(f.stat.path) for f in build_files.dependencies)
-  return BuildDirs(tuple(Dir(d) for d in dirnames))
+  ignored_dirnames = address_mapper.build_ignore_patterns.match_files('{}/'.format(dirname) for dirname in dirnames)
+  ignored_dirnames = set(d.rstrip('/') for d in ignored_dirnames)
+  return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
 
 
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
@@ -292,7 +297,8 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      [SelectDependencies(AddressFamily, BuildDirs)],
      addresses_from_address_families),
     (BuildDirs,
-     [Select(Files)],
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(Files)],
      filter_build_dirs),
     (PathGlobs,
      [SelectLiteral(address_mapper, AddressMapper),
