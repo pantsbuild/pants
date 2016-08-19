@@ -4,6 +4,28 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0-dev5 (8/19/2016)
+----------------------
+
+Regularly scheduled unstable release.
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Defer daemon-wise `LegacyBuildGraph` construction to post-fork.
+  `RB #4168 <https://rbcommons.com/s/twitter/r/4168>`_
+
+* [engine] Validate that variant_key of SelectVariant is string type git_shat msg: 5a7e838d512069a24d12ec0b7dcdc7b7d5bdfa3b
+  `RB #4149 <https://rbcommons.com/s/twitter/r/4149>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Adjust the output file locations for the Antlr task.
+  `RB #4161 <https://rbcommons.com/s/twitter/r/4161>`_
+
+* build dictionary: one description per arg is plenty
+  `RB #4164 <https://rbcommons.com/s/twitter/r/4164>`_
 
 1.2.0-dev4 (8/12/2016)
 ----------------------
