@@ -5,3 +5,6 @@ authors = [ "Stu Hood <stuhood@gmail.com>" ]
 
 [lib]
 crate-type = ["dylib"]
+
+[dependencies]
+libc = "0.2.0"

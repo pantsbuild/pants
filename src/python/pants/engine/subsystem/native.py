@@ -9,6 +9,15 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
 
 
+@ffi.callback("bool(void*, Key*, TypeId*)")
+def extern_isinstance(storage_handle, key, type_id):
+  """Given storage, a Key for `obj`, and a TypeId for `type`, return isinstance(obj, type)."""
+  storage = ffi.from_handle(storage_handle)
+  obj = storage.get(key)
+  typ = storage.get(type_id)
+  return isinstance(obj, typ)
+
+
 class Native(object):
   """Encapsulates fetching a platform specific version of the native portion of the engine.
   """

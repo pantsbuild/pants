@@ -5,7 +5,9 @@ mod nodes;
 mod selectors;
 mod tasks;
 
-use core::{Field, Function, Key, TypeId};
+extern crate libc;
+
+use core::{Field, Function, IsInstanceExtern, IsInstanceFunction, Key, StorageExtern, TypeId};
 use nodes::{Complete, Runnable};
 use graph::{Graph, EntryId};
 use tasks::Tasks;
@@ -89,6 +91,8 @@ pub struct RawRunnable {
 
 #[no_mangle]
 pub extern fn scheduler_create(
+  isinstance: IsInstanceExtern,
+  storage: *const StorageExtern,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -105,6 +109,7 @@ pub extern fn scheduler_create(
         scheduler: Scheduler::new(
           Graph::new(),
           Tasks::new(
+            IsInstanceFunction::new(isinstance, storage),
             field_name,
             field_products,
             field_variants,

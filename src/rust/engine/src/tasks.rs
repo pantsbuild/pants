@@ -1,4 +1,4 @@
-use core::{Field, Function, Key, TypeId};
+use core::{Field, Function, IsInstanceFunction, Key, TypeId};
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
 use std::collections::HashMap;
 
@@ -24,6 +24,7 @@ impl Task {
  */
 pub struct Tasks {
   tasks: HashMap<TypeId, Vec<Task>>,
+  isinstance: IsInstanceFunction,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -44,6 +45,7 @@ pub struct Tasks {
  */
 impl Tasks {
   pub fn new(
+    isinstance: IsInstanceFunction,
     field_name: Field,
     field_products: Field,
     field_variants: Field,
@@ -53,6 +55,7 @@ impl Tasks {
   ) -> Tasks {
     Tasks {
       tasks: HashMap::new(),
+      isinstance: isinstance,
       field_name: field_name,
       field_products: field_products,
       field_variants: field_variants,

@@ -1,7 +1,7 @@
 To build for development, run:
 
-    rustc --crate-type=dylib graph.rs
+    cargo build
 
-To build for deployment, enable optimization:
+To build for release, enable optimization:
 
-    rustc -O --crate-type=dylib graph.rs
+    cargo build --release
