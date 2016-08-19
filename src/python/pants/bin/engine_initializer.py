@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 from collections import namedtuple
-from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -16,7 +15,8 @@ from pants.bin.options_initializer import OptionsInitializer
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
-from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
+from pants.engine.legacy.address_mapper import LegacyAddressMapper
+from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
 from pants.engine.mapper import AddressMapper
@@ -56,21 +56,28 @@ class LegacySymbolTable(SymbolTable):
     return aliases
 
 
-class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler',
-                                                         'engine',
-                                                         'symbol_table_cls',
-                                                         'legacy_graph_cls'])):
+class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 'symbol_table_cls'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
-  def create_graph(self, spec_roots):
-    """Construct and return a BuildGraph given a set of input specs."""
-    graph = self.legacy_graph_cls(self.scheduler, self.engine, self.symbol_table_cls)
+  def warm_product_graph(self, spec_roots):
+    """Warm the scheduler's `ProductGraph` with `LegacyTarget` products."""
+    request = self.scheduler.execution_request([LegacyTarget], spec_roots)
+    result = self.engine.execute(request)
+    if result.error:
+      raise result.error
+
+  def create_build_graph(self, spec_roots, build_root=None):
+    """Construct and return a `BuildGraph` given a set of input specs."""
+    graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
     with self.scheduler.locked():
-      for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
+      # Ensure the entire generator is unrolled.
+      for _ in graph.inject_specs_closure(spec_roots):
         pass
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
+    address_mapper = LegacyAddressMapper(graph, build_root or get_buildroot())
     logger.debug('build_graph is: %s', graph)
-    return graph
+    logger.debug('address_mapper is: %s', address_mapper)
+    return graph, address_mapper
 
 
 class EngineInitializer(object):
@@ -120,35 +127,4 @@ class EngineInitializer(object):
     scheduler = LocalScheduler(dict(), tasks, project_tree)
     engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
 
-    return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
-
-  @classmethod
-  @contextmanager
-  def open_legacy_graph(cls, options=None, path_ignore_patterns=None, symbol_table_cls=None):
-    """A context manager that yields a usable, legacy LegacyBuildGraph by way of the v2 scheduler.
-
-    This is used primarily for testing and non-daemon runs.
-
-    :param Options options: An Options object to use for this run.
-    :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
-                                      usually taken from the `--pants-ignore` global option.
-                                      Defaults to: ['.*']
-    :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
-                                         None to use the default.
-    :yields: A tuple of (graph, addresses, scheduler).
-    """
-    path_ignore_patterns = path_ignore_patterns or ['.*']
-    spec_roots = cls.parse_commandline_to_spec_roots(options=options)
-    (scheduler,
-     engine,
-     symbol_table_cls,
-     build_graph_cls) = cls.setup_legacy_graph(path_ignore_patterns, symbol_table_cls=symbol_table_cls)
-
-    engine.start()
-    try:
-      graph = build_graph_cls(scheduler, engine, symbol_table_cls)
-      addresses = tuple(graph.inject_specs_closure(spec_roots))
-      yield graph, addresses, scheduler
-    finally:
-      logger.debug('engine cache stats: {}'.format(engine.cache_stats()))
-      engine.close()
+    return LegacyGraphHelper(scheduler, engine, symbol_table_cls)
