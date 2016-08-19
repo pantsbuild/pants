@@ -148,8 +148,8 @@ class PathGlob(AbstractClass):
       raise ValueError('Expected a Dir as the canonical_stat. Got: {}'.format(canonical_stat))
 
     parts = normpath(filespec).split(os_sep)
-
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
+      # A request for the root path.
       return (PathRoot(),)
     elif cls._DOUBLE == parts[0]:
       parts = cls._prune_doublestar(parts)
