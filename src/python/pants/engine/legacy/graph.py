@@ -220,8 +220,6 @@ class LegacyBuildGraph(BuildGraph):
 
     existing_addresses = set()
     for root, state in self._scheduler.root_entries(request).items():
-      #if type(state) is Noop:
-      #  print(state)
       entries = maybe_list(state.value, expected_type=LegacyTarget)
       if not entries:
         raise self.InvalidCommandLineSpecError(

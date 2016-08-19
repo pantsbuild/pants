@@ -62,6 +62,9 @@ class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'fi
   The dependencies declared on `dep_product` (in the optional `field` parameter, which defaults
   to 'dependencies' when not specified) will be provided to the requesting task in the
   order they were declared.
+
+  Field types are used to statically declare the types expected to be contained by the
+  `dep_product`.
   """
 
   def __new__(cls, product, dep_product, field=None, field_types=tuple()):
@@ -70,14 +73,15 @@ class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'fi
   optional = False
 
   def __repr__(self):
+    if self.field_types:
+      field_types_portion = ', field_types={!r}'.format(tuple(f.__name__ for f in self.field_types))
+    else:
+      field_types_portion = ''
     return '{}({}, {}{}{})'.format(type(self).__name__,
                              self.product.__name__,
                              self.dep_product.__name__,
                              ', {}'.format(repr(self.field)) if self.field else '',
-                             ', field_types=({},)'.format(', '.join(f.__name__ for f in self.field_types)) if self.field_types else '',
-
-
-    )
+                             field_types_portion)
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):

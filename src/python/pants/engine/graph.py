@@ -233,14 +233,6 @@ def filter_build_dirs(build_files):
   return BuildDirs(tuple(Dir(d) for d in dirnames))
 
 
-def maybe_cast_to(klass):
-  """Creates a function that is identity iff its parameter is an instance of the type klass"""
-  def cast_fn(obj):
-    if isinstance(obj, klass):
-      return obj
-  return cast_fn
-
-
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
 
@@ -280,7 +272,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
-    # define that lookup for each literal product.
+    # define that lookup for coercing a struct into each literal product.
     CoercionFactory(product, Struct)
     for product in set(symbol_table_cls.table().values()) if product is not Struct
   ] + [

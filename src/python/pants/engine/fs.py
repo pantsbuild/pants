@@ -149,12 +149,8 @@ class PathGlob(AbstractClass):
 
     parts = normpath(filespec).split(os_sep)
 
-    # TODO: nh: I think this PathRoot business is not used.
     if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
-      # A request for the root path.
-      #raise Exception('got here somehow')
       return (PathRoot(),)
-
     elif cls._DOUBLE == parts[0]:
       parts = cls._prune_doublestar(parts)
 

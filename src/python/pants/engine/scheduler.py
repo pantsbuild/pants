@@ -521,11 +521,8 @@ class RulesetValidator(object):
     # really, the type constrains are based on tuples, because graphs are constructed as tuples
     # so select projections set the type of the subject for the product type in the tuple
 
-    available_product_types = set(serializable_tasks.keys())
-    available_product_types.update(prd_t for sbj_t, prd_t in intrinsics.keys())
-    #root_subject_types =
-      #[Address,
-    #  PathGlobs, SingleAddress, SiblingAddresses, DescendantAddresses]
+    task_and_intrinsic_product_types = set(serializable_tasks.keys())
+    task_and_intrinsic_product_types.update(prd_t for sbj_t, prd_t in intrinsics.keys())
 
     projected_subject_types = set()
     dependency_subject_types = set()
@@ -538,7 +535,7 @@ class RulesetValidator(object):
             dependency_subject_types.update(select.field_types)
 
     type_collections = {
-      'product types': available_product_types,
+      'product types': task_and_intrinsic_product_types,
       'root subject types': root_subject_types,
       'projected subject typos': projected_subject_types,
       'dependency subject types': dependency_subject_types
@@ -578,11 +575,9 @@ class RulesetValidator(object):
       logger.warn('warning count {}'.format(len(all_warnings)))
       logger.warn('Rules with warnings:\n  {}'.format('\n  '.join(all_warnings)))
     if all_errors:
-      er_ct=len(all_errors)
-      logger.error('err ct {}'.format(er_ct))
-      #logger.error('warn ct {}'.format(warn_ct))
-      n__format = 'Invalid rules.\n  {}'.format('\n  '.join(all_errors))
-      raise ValueError(n__format)
+      logger.error('err ct {}'.format(len(all_errors)))
+      error_message = 'Invalid rules.\n  {}'.format('\n  '.join(all_errors))
+      raise ValueError(error_message)
 
   @classmethod
   def _validate_product_is_provided(cls, rule, select, selection_product, type_collections):
@@ -610,7 +605,7 @@ class RulesetValidator(object):
         return err_msg, None
       else:
 
-        warn_msg = 'WARN Rule entry fulfilled through indirect means {} '.format(select)
+        warn_msg = 'Rule entry fulfilled through indirect means {} '.format(select)
         for x in type_collections.keys():
           if super_types_by_name.get(x):
             warn_msg += '  has supertyped {} : {}'.format(x, super_types_by_name[x])

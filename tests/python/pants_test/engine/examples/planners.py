@@ -487,9 +487,10 @@ def setup_json_scheduler(build_root, inline_nodes=True):
       (Classpath,
        [Select(BuildPropertiesConfiguration)],
        write_name_file),
+      # NB: Not sure these SelectDependencies should allow Jar, but they currently produce jars.
       (Classpath,
        [Select(JavaSources),
-        SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))], #NB, not sure these should allow Jar, but it is there. *shrugs*
+        SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))],
        javac),
       (Classpath,
        [Select(ScalaSources),
