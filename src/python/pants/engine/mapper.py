@@ -55,9 +55,13 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
     objects they point to in other namespaces or even in the same namespace but from a seperate
     source are left as unresolved pointers.
 
-    :param string path: The path to the byte source containing serialized objects.
+    :param string filepath: The path to the byte source containing serialized objects.
+    :param string filecontent: The content of byte source containing serialized objects to be parsed.
+    :param symbol_table_cls: The symbol table cls to expose a symbol table dict.
+    :type symbol_table_cls: A :class:`pants.engine.parser.SymbolTable`.
     :param parser_cls: The parser cls to use.
-    :type parser_cls: A :class:`pants.engine.parser.Parser`
+    :type parser_cls: A :class:`pants.engine.parser.Parser`.
+    :param list exclude_patterns: A list of compiled regular expression objects.
     """
     try:
       objects = parser_cls.parse(filepath, filecontent, symbol_table_cls)
