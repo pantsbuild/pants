@@ -83,12 +83,6 @@ class Key(object):
   def digest(self):
     return self._digest
 
-  def to_native(self):
-    """Returns this key in a format that CFFI can use for assignment to the Rust Key type."""
-    upper = self._digest[:self._DIGEST_HALF_SIZE]
-    lower = self._digest[self._DIGEST_HALF_SIZE:]
-    return (upper, lower)
-
   def __hash__(self):
     return self._hash
 
@@ -201,6 +195,9 @@ class Storage(Closable):
     if obj is not None:
       return obj
     return self._contents.get(key.digest, _unpickle)
+
+  def get_from_digest(self, digest):
+    return self.get(Key.create_from_digest(digest))
 
   def put_state(self, state):
     """Put the components of the State individually in storage, then put the aggregate."""

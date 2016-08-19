@@ -16,6 +16,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.graph import Graph
+from pants.engine.subsystem.native import extern_isinstance
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Noop, Runnable, SelectNode,
                                 StepContext, TaskNode, Waiting)
@@ -95,7 +96,10 @@ class LocalScheduler(object):
     self._product_graph_lock = graph_lock or threading.RLock()
 
     # Create the scheduler.
-    scheduler = native.lib.scheduler_create(self._key('name'),
+    self._storage_handle = native.new_handle(storage)
+    scheduler = native.lib.scheduler_create(extern_isinstance,
+                                            self._storage_handle,
+                                            self._key('name'),
                                             self._key('products'),
                                             self._key('default'),
                                             self._type_key(Address),
@@ -114,11 +118,14 @@ class LocalScheduler(object):
       #                                           input_select.product)
       self._native.lib.task_end(self._scheduler)
 
+  def _digest(self, obj):
+    return (self._storage.put(obj).digest,)
+
   def _type_key(self, t):
-    return self._storage.put(t).to_native()
+    return self._digest(t)
 
   def _key(self, obj):
-    return (self._storage.put(obj).to_native(), self._storage.put(type(obj)).to_native())
+    return (self._digest(obj), self._digest(type(obj)))
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.

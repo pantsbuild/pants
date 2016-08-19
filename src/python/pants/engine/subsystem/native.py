@@ -9,12 +9,92 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
 
 
-@ffi.callback("bool(void*, Key*, TypeId*)")
+from cffi import FFI
+
+_FFI = FFI()
+_FFI.cdef(
+    '''
+    typedef struct {
+      char digest[32];
+    } Digest;
+
+    typedef Digest TypeId;
+    typedef Digest Function;
+
+    typedef struct {
+      Digest   digest;
+      TypeId   type_id;
+    } Key;
+
+    typedef uint64_t EntryId;
+    typedef Key Field;
+
+    typedef void StorageHandle;
+
+    typedef bool (*isinstance_extern)(StorageHandle*, Key*, TypeId*);
+
+    typedef struct {
+      Function*   func;
+      Key*        args_ptr;
+      uint64_t    args_len;
+    } RawRunnable;
+
+    typedef struct {
+      Key*        func;
+      Key*        args_ptr;
+      uint64_t    args_len;
+    } Complete;
+
+    typedef struct {
+      EntryId*              ready_ptr;
+      RawRunnable*          ready_runnables_ptr;
+      uint64_t              ready_len;
+      // NB: there are more fields in this struct, but we can safely
+      // ignore them because we never have collections of this type.
+    } RawExecution;
+
+    typedef struct {
+      RawExecution execution;
+      // NB: there are more fields in this struct, but we can safely
+      // ignore them because we never have collections of this type.
+    } RawScheduler;
+
+    RawScheduler* scheduler_create(isinstance_extern,
+                                   StorageHandle*,
+                                   Field,
+                                   Field,
+                                   Field,
+                                   TypeId,
+                                   TypeId,
+                                   TypeId);
+    void scheduler_destroy(RawScheduler*);
+
+    void task_gen(RawScheduler*, Function, TypeId);
+    void task_end(RawScheduler*);
+
+    uint64_t graph_len(RawScheduler*);
+
+    void execution_reset(RawScheduler*);
+    void execution_add_root_select(RawScheduler*, Key, TypeId);
+    void execution_add_root_select_dependencies(RawScheduler*,
+                                                Key,
+                                                TypeId,
+                                                TypeId,
+                                                Field);
+    void execution_next(RawScheduler*,
+                        EntryId*,
+                        RawRunnable*,
+                        uint64_t);
+    '''
+  )
+
+@_FFI.callback("bool(StorageHandle*, Key*, TypeId*)")
 def extern_isinstance(storage_handle, key, type_id):
   """Given storage, a Key for `obj`, and a TypeId for `type`, return isinstance(obj, type)."""
-  storage = ffi.from_handle(storage_handle)
-  obj = storage.get(key)
-  typ = storage.get(type_id)
+  storage = _FFI.from_handle(storage_handle)
+  obj = storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
+  typ = storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
+  print(">>> extern_isinstance({}, {}) == {}".format(obj, typ, isinstance(obj, typ)))
   return isinstance(obj, typ)
 
 
@@ -52,89 +132,7 @@ class Native(object):
     self._version = version
     self._supportdir = supportdir
 
-    self._ffi_field = None
     self._lib_field = None
-
-  @property
-  def _ffi(self):
-    if self._ffi_field is not None:
-      return self._ffi_field
-
-    from cffi import FFI
-
-    self._ffi_field = FFI()
-    # TODO: This definition is coupled to callers: should memoize it there.
-    self._ffi_field.cdef(
-        '''
-        typedef struct {
-          char     digest_upper[32];
-          char     digest_lower[32];
-        } Digest;
-
-        typedef Digest TypeId;
-        typedef Digest Function;
-
-        typedef struct {
-          Digest   digest;
-          TypeId   type_id;
-        } Key;
-
-        typedef uint64_t EntryId;
-        typedef Key Field;
-
-        typedef struct {
-          Function*   func;
-          Key*        args_ptr;
-          uint64_t    args_len;
-        } RawRunnable;
-
-        typedef struct {
-          Key*        func;
-          Key*        args_ptr;
-          uint64_t    args_len;
-        } Complete;
-
-        typedef struct {
-          EntryId*              ready_ptr;
-          RawRunnable*          ready_runnables_ptr;
-          uint64_t              ready_len;
-          // NB: there are more fields in this struct, but we can safely
-          // ignore them because we never have collections of this type.
-        } RawExecution;
-
-        typedef struct {
-          RawExecution execution;
-          // NB: there are more fields in this struct, but we can safely
-          // ignore them because we never have collections of this type.
-        } RawScheduler;
-
-        RawScheduler* scheduler_create(Field,
-                                       Field,
-                                       Field,
-                                       TypeId,
-                                       TypeId,
-                                       TypeId);
-        void scheduler_destroy(RawScheduler*);
-
-        void task_gen(RawScheduler*, Function, TypeId);
-        void task_end(RawScheduler*);
-
-        uint64_t graph_len(RawScheduler*);
-
-        void execution_reset(RawScheduler*);
-        void execution_add_root_select(RawScheduler*, Key, TypeId);
-        void execution_add_root_select_dependencies(RawScheduler*,
-                                                    Key,
-                                                    TypeId,
-                                                    TypeId,
-                                                    Field);
-        void execution_next(RawScheduler*,
-                            EntryId*,
-                            RawRunnable*,
-                            uint64_t);
-        '''
-      )
-    return self._ffi_field
 
   @property
   def lib(self):
@@ -143,19 +141,25 @@ class Native(object):
       binary = self._binary_util.select_binary(self._supportdir,
                                               self._version,
                                               'native-engine')
-      self._lib_field = self._ffi.dlopen(binary)
+      self._lib_field = _FFI.dlopen(binary)
     return self._lib_field
 
   def new(self, cdecl, init):
-    return self._ffi.new(cdecl, init)
+    return _FFI.new(cdecl, init)
 
   def gc(self, cdata, destructor):
     """Register a method to be called when `cdata` is garbage collected.
 
     Returns a new reference that should be used in place of `cdata`.
     """
-    return self._ffi.gc(cdata, destructor)
+    return _FFI.gc(cdata, destructor)
 
   def unpack(self, cdata_ptr, count):
     """Given a pointer representing an array, and its count of entries, return a list."""
-    return self._ffi.unpack(cdata_ptr, count)
+    return _FFI.unpack(cdata_ptr, count)
+
+  def new_handle(self, obj):
+    return _FFI.new_handle(obj)
+
+  def from_handle(self, handle):
+    return _FFI.from_handle(handle)

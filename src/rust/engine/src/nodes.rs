@@ -110,7 +110,7 @@ impl<'g,'t> StepContext<'g,'t> {
     if item.type_id() == superclass {
       true
     } else {
-      panic!("TODO: not implemented!");
+      self.tasks.isinstance(item, superclass)
     }
   }
 

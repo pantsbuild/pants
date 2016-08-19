@@ -17,11 +17,7 @@ pub type Variants = Vec<(Key, Key)>;
 // NB: These structs are fairly small, so we allow copying them by default.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Digest {
-  // The 64 byte digest is split in two because the derived traits above are only
-  // implemented for arrays up to length 32: see
-  //   https://doc.rust-lang.org/std/primitive.array.html
-  digest_upper: [u8;32],
-  digest_lower: [u8;32],
+  digest: [u8;32],
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -54,7 +50,7 @@ impl IsInstanceFunction {
     }
   }
 
-  fn isinstance(&self, key: &Key, type_id: &TypeId) -> bool {
+  pub fn isinstance(&self, key: &Key, type_id: &TypeId) -> bool {
     (self.isinstance)(self.storage, key, type_id)
   }
 }

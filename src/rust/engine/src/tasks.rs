@@ -94,6 +94,10 @@ impl Tasks {
     &self.type_has_variants
   }
 
+  pub fn isinstance(&self, key: &Key, type_id: &TypeId) -> bool {
+    (self.isinstance).isinstance(key, type_id)
+  }
+
   /**
    * The following methods define the Task registration lifecycle.
    */
