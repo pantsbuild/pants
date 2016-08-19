@@ -189,7 +189,7 @@ class Storage(Closable):
     operation fails noisily.
     """
     if not isinstance(key, Key):
-      raise InvalidKeyError('Not a valid key: {}'.format(key))
+      raise InvalidKeyError('Not a valid key: {!r}'.format(key))
 
     obj = self._memo.get(key)
     if obj is not None:

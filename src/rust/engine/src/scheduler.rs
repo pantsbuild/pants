@@ -155,7 +155,7 @@ impl Scheduler {
               .map(|e| e.id());
           if let Some(first) = incomplete_deps.next() {
             // Mark incomplete deps as candidates for steps.
-            println!(">>> rust says {} at least is waiting for (at least): {}", entry_id, first);
+            println!(">>> rust says {} is waiting for (at least): {}", entry_id, first);
             self.candidates.push_back(first);
             self.candidates.extend(incomplete_deps);
           } else {

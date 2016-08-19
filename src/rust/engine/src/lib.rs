@@ -195,6 +195,27 @@ pub extern fn task_gen(
 }
 
 #[no_mangle]
+pub extern fn task_add_select(
+  scheduler_ptr: *mut RawScheduler,
+  product: TypeId,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.add_select(product, None);
+  })
+}
+
+#[no_mangle]
+pub extern fn task_add_select_variant(
+  scheduler_ptr: *mut RawScheduler,
+  product: TypeId,
+  variant_key: Key,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.add_select(product, Some(variant_key));
+  })
+}
+
+#[no_mangle]
 pub extern fn task_add_select_literal(
   scheduler_ptr: *mut RawScheduler,
   subject: Key,
@@ -202,6 +223,31 @@ pub extern fn task_add_select_literal(
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.tasks.add_select_literal(subject, product);
+  })
+}
+
+#[no_mangle]
+pub extern fn task_add_select_dependencies(
+  scheduler_ptr: *mut RawScheduler,
+  product: TypeId,
+  dep_product: TypeId,
+  field: Field,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.add_select_dependencies(product, dep_product, field);
+  })
+}
+
+#[no_mangle]
+pub extern fn task_add_select_projection(
+  scheduler_ptr: *mut RawScheduler,
+  product: TypeId,
+  projected_subject: TypeId,
+  field: Field,
+  input_product: TypeId,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.add_select_projection(product, projected_subject, field, input_product);
   })
 }
 

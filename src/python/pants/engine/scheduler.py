@@ -21,7 +21,8 @@ from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Noop, Runnable, SelectNode,
                                 StepContext, TaskNode, Waiting)
 from pants.engine.objects import Closable
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
+                                    SelectVariant)
 from pants.util.objects import datatype
 from pants.engine.struct import HasProducts, Variants
 
@@ -99,33 +100,69 @@ class LocalScheduler(object):
     self._storage_handle = native.new_handle(storage)
     scheduler = native.lib.scheduler_create(extern_isinstance,
                                             self._storage_handle,
-                                            self._key('name'),
-                                            self._key('products'),
-                                            self._key('default'),
-                                            self._type_key(Address),
-                                            self._type_key(HasProducts),
-                                            self._type_key(Variants))
+                                            self._to_key('name'),
+                                            self._to_key('products'),
+                                            self._to_key('default'),
+                                            self._to_type_key(Address),
+                                            self._to_type_key(HasProducts),
+                                            self._to_type_key(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     # And register all provided tasks.
-    for output_type, input_selects, func in tasks:
-      self._native.lib.task_gen(self._scheduler,
-                                self._type_key(func),
-                                self._type_key(output_type))
-      # FIXME!
-      #for input_select in input_selects:
-      #  self._native.lib.task_add_select_literal(self._scheduler,
-      #                                           input_select.subject,
-      #                                           input_select.product)
-      self._native.lib.task_end(self._scheduler)
+    for task in tasks:
+      self._register_task(task)
 
-  def _digest(self, obj):
+  def _register_task(self, task):
+    """Register the given task triple with the native scheduler."""
+    output_type, input_selects, func = task
+    self._native.lib.task_gen(self._scheduler,
+                              self._to_type_key(func),
+                              self._to_type_key(output_type))
+    for selector in input_selects:
+      selector_type = type(selector)
+      if selector_type is Select:
+        self._native.lib.task_add_select(self._scheduler,
+                                         self._to_type_key(selector.product))
+      elif selector_type is SelectVariant:
+        self._native.lib.task_add_select_variant(self._scheduler,
+                                                 self._to_type_key(selector.product),
+                                                 self._to_key(selector.variant_key))
+      elif selector_type is SelectLiteral:
+        # NB: Intentionally ignores subject parameter to provide a literal subject.
+        self._native.lib.task_add_select_literal(self._scheduler,
+                                                 self._to_key(selector.subject),
+                                                 self._to_type_key(selector.product))
+      elif selector_type is SelectDependencies:
+        self._native.lib.task_add_select_dependencies(self._scheduler,
+                                                      self._to_type_key(selector.product),
+                                                      self._to_type_key(selector.dep_product),
+                                                      self._to_key(selector.field))
+      elif selector_type is SelectProjection:
+        if len(selector.fields) != 1:
+          raise ValueError("TODO: remove support for projecting multiple fields at once.")
+        field = selector.fields[0]
+        self._native.lib.task_add_select_projection(self._scheduler,
+                                                    self._to_type_key(selector.product),
+                                                    self._to_type_key(selector.projected_subject),
+                                                    self._to_key(field),
+                                                    self._to_type_key(selector.input_product))
+      else:
+        raise ValueError('Unrecognized Selector type: {}'.format(selector))
+    self._native.lib.task_end(self._scheduler)
+
+  def _to_digest(self, obj):
     return (self._storage.put(obj).digest,)
 
-  def _type_key(self, t):
-    return self._digest(t)
+  def _to_type_key(self, t):
+    return self._to_digest(t)
 
-  def _key(self, obj):
-    return (self._digest(obj), self._digest(type(obj)))
+  def _to_key(self, obj):
+    return (self._to_digest(obj), self._to_digest(type(obj)))
+
+  def _from_type_key(self, cdata):
+    return self._storage.get_from_digest(self._native.buffer(cdata.digest)[:])
+
+  def _from_key(self, cdata):
+    return self._storage.get_from_digest(self._native.buffer(cdata.digest.digest)[:])
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -197,20 +234,26 @@ class LocalScheduler(object):
 
   def _execution_next(self, completed):
     # Unzip into two arrays.
-    ids = [i for i, _ in completed]
-    states = [c for _, c in completed]
+    completed_ids = [i for i, _ in completed]
+    completed_states = [c for _, c in completed]
+
     # Run, then collect the outputs from the Scheduler's RawExecution struct.
     self._native.lib.execution_next(self._scheduler,
-                                    ids,
-                                    states,
+                                    completed_ids,
+                                    completed_states,
                                     len(completed))
-    # Rezip into two arrays.
-    return zip(
-        self._native.unpack(self._scheduler.execution.ready_ptr,
-                            self._scheduler.execution.ready_len),
-        self._native.unpack(self._scheduler.execution.ready_runnables_ptr,
-                            self._scheduler.execution.ready_len)
-      )
+    def runnable(raw):
+      return Runnable(self._from_type_key(raw.func),
+                      tuple(self._from_key(key)
+                            for key in self._native.unpack(raw.args_ptr, raw.args_len)))
+
+    runnable_ids = self._native.unpack(self._scheduler.execution.ready_ptr,
+                                       self._scheduler.execution.ready_len)
+    runnable_states = [runnable(r) for r in
+                        self._native.unpack(self._scheduler.execution.ready_runnables_ptr,
+                                            self._scheduler.execution.ready_len)]
+    # Rezip from two arrays.
+    return zip(runnable_ids, runnable_states)
 
   def _execution_add_roots(self, execution_request):
     self._native.lib.execution_reset(self._scheduler)
@@ -218,15 +261,15 @@ class LocalScheduler(object):
       if type(subject) in [Address, PathGlobs]:
         self._native.lib.execution_add_root_select(
             self._scheduler,
-            self._key(subject),
-            self._type_key(product))
+            self._to_key(subject),
+            self._to_type_key(product))
       elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
         self._native.lib.execution_add_root_select_dependencies(
             self._scheduler,
-            self._key(subject),
-            self._type_key(product),
-            self._type_key(Addresses),
-            self._key('dependencies'))
+            self._to_key(subject),
+            self._to_type_key(product),
+            self._to_type_key(Addresses),
+            self._to_key('dependencies'))
       else:
         raise ValueError('Unsupported root subject type: {}'.format(subject))
 

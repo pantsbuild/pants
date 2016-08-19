@@ -57,7 +57,7 @@ class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'fi
   order they were declared.
   """
 
-  def __new__(cls, product, dep_product, field=None):
+  def __new__(cls, product, dep_product, field='dependencies'):
     return super(SelectDependencies, cls).__new__(cls, product, dep_product, field)
 
   optional = False

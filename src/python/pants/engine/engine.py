@@ -115,7 +115,8 @@ class Engine(AbstractClass):
 
     :returns: A tuple of a key and result, either of which may be None.
     """
-    if not node_entry.node.is_cacheable:
+    # TODO: Now only have `long` entry ids, rather than an entry object!
+    if True:
       return None, None
     return self._cache.get(runnable)
 
@@ -145,9 +146,11 @@ class LocalSerialEngine(Engine):
         key, result = self._maybe_cache_get(entry, runnable)
         if result is None:
           try:
+            print('>>> python running {}'.format(runnable))
             result = Return(runnable.func(*runnable.args))
             self._maybe_cache_put(key, result)
           except Exception as e:
+            print('>>> failed with {}'.format(e))
             result = Throw(e)
         completed.append((entry, result))
       generator.send(completed)

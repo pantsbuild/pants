@@ -70,6 +70,11 @@ _FFI.cdef(
     void scheduler_destroy(RawScheduler*);
 
     void task_gen(RawScheduler*, Function, TypeId);
+    void task_add_select(RawScheduler*, TypeId);
+    void task_add_select_variant(RawScheduler*, TypeId, Key);
+    void task_add_select_literal(RawScheduler*, Key, TypeId);
+    void task_add_select_dependencies(RawScheduler*, TypeId, TypeId, Field);
+    void task_add_select_projection(RawScheduler*, TypeId, TypeId, Field, TypeId);
     void task_end(RawScheduler*);
 
     uint64_t graph_len(RawScheduler*);
@@ -163,3 +168,6 @@ class Native(object):
 
   def from_handle(self, handle):
     return _FFI.from_handle(handle)
+
+  def buffer(self, cdata):
+    return _FFI.buffer(cdata)

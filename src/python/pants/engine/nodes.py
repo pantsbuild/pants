@@ -335,7 +335,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
     return self.selector.field
 
   def _dependency_nodes(self, step_context, dep_product):
-    for dependency in getattr(dep_product, self.field or 'dependencies'):
+    for dependency in getattr(dep_product, self.field):
       variants = self.variants
       if isinstance(dependency, Address):
         # If a subject has literal variants for particular dependencies, they win over all else.
