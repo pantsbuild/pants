@@ -5,15 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class JavaTestsTest(BaseTest):
 
   def test_validation(self):
+    init_subsystem(JUnit)
     target = self.make_target('//:mybird', Target)
     # A plain invocation with no frills
     test1 = self.make_target('//:test1', JavaTests, sources=["Test.java"], dependencies=[target])

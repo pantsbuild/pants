@@ -355,6 +355,7 @@ python_tests(
   sources = ['test_junit_run.py'],
   dependencies = [
     '3rdparty/python:mock',
+    'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',
     'src/python/pants/backend/python/tasks:python',
