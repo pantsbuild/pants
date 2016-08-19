@@ -20,7 +20,7 @@ from pants.engine.scheduler import (CompletedNodeException, IncompleteDependency
 from pants.engine.selectors import Select, SelectDependencies, SelectVariant
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
-                                                 Jar, JavaSources, ThriftSources,
+                                                 Goal, Jar, JavaSources, ThriftSources,
                                                  setup_json_scheduler)
 
 
@@ -418,17 +418,64 @@ class ProductGraphTest(unittest.TestCase):
           )
 
 
+class AGoal(Goal):
+
+  @classmethod
+  def products(cls):
+    return [A]
+
+
+class A(object):
+  pass
+
+
+class B(object):
+  pass
+
+
+def noop(*args):
+  pass
+
+
+class SubA(A):
+  pass
+
+
 class RulesetValidatorTest(unittest.TestCase):
   def test_ruleset_with_missing_product_type(self):
-    class A(object):
-      pass
-    class B(object):
-      pass
-    def noop(*args):
-      pass
+    validator = RulesetValidator(NodeBuilder.create([(A, (Select(B),), noop)]),
+      goal_to_product=dict(),
+      root_subject_types=tuple())
+    with self.assertRaises(ValueError):
+      validator.validate()
+
+  def test_ruleset_with_with_selector_only_provided_as_root_subject(self):
 
     validator = RulesetValidator(NodeBuilder.create([(A, (Select(B),), noop)]),
-      goal_to_product={'something': A},
+      goal_to_product=dict(),
+      root_subject_types=(B,))
+
+    validator.validate()
+
+  def test_ruleset_with_superclass_of_selected_type_produced(self):
+
+    rules = [
+      (A, (Select(B),), noop),
+      (B, (Select(SubA),), noop)
+    ]
+    validator = RulesetValidator(NodeBuilder.create(rules),
+      goal_to_product=dict(),
+      root_subject_types=tuple())
+
+    validator.validate()
+
+  def test_ruleset_with_goal_not_produced(self):
+
+    rules = [
+      (B, (Select(SubA),), noop)
+    ]
+    validator = RulesetValidator(NodeBuilder.create(rules),
+      goal_to_product={'goal-name': AGoal},
       root_subject_types=tuple())
     with self.assertRaises(ValueError):
       validator.validate()

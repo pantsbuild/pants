@@ -74,7 +74,7 @@ class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'fi
 
   def __repr__(self):
     if self.field_types:
-      field_types_portion = ', field_types={!r}'.format(tuple(f.__name__ for f in self.field_types))
+      field_types_portion = ', field_types=({},)'.format(', '.join(f.__name__ for f in self.field_types))
     else:
       field_types_portion = ''
     return '{}({}, {}{}{})'.format(type(self).__name__,

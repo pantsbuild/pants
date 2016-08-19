@@ -487,14 +487,12 @@ class RulesetValidator(object):
     self._goal_to_product = goal_to_product
 
   def validate(self):
-    self._validate_task_rules(intrinsics=self._node_builder._intrinsics,
-                              serializable_tasks=self._node_builder._tasks,
-                              root_subject_types=self._root_subject_types
-    )
+    self._validate_task_rules()
 
-  @classmethod
-  def _validate_task_rules(cls, intrinsics, serializable_tasks, root_subject_types):
-
+  def _validate_task_rules(self):
+    intrinsics=self._node_builder._intrinsics
+    serializable_tasks = self._node_builder._tasks
+    root_subject_types = self._root_subject_types
     # List provided product types
     # - lhs of tasks
     # - root subject types
@@ -542,6 +540,28 @@ class RulesetValidator(object):
     }
     all_errors = []
     all_warnings = []
+
+    selector_errors, selector_warnings = self._check_task_selectors(serializable_tasks, type_collections)
+
+    for goal, goal_product in self._goal_to_product.items():
+      if goal_product not in task_and_intrinsic_product_types:
+      #if any(p not in task_and_intrinsic_product_types for p in goal_product.products()):
+        raise ValueError('missing product for goal {} {}'.format(goal, goal_product))
+
+    all_errors.extend(selector_errors)
+    all_warnings.extend(selector_warnings)
+
+    if all_warnings:
+      logger.warn('warning count {}'.format(len(all_warnings)))
+      logger.warn('Rules with warnings:\n  {}'.format('\n  '.join(all_warnings)))
+    if all_errors:
+      logger.error('err ct {}'.format(len(all_errors)))
+      error_message = 'Invalid rules.\n  {}'.format('\n  '.join(all_errors))
+      raise ValueError(error_message)
+
+  def _check_task_selectors(self, serializable_tasks, type_collections):
+    all_errors = []
+    all_warnings = []
     for rules_of_type_x in serializable_tasks.values():
       for rule in rules_of_type_x:
         rule_errors = []
@@ -559,10 +579,8 @@ class RulesetValidator(object):
             selection_products = []
 
           for selection_product in selection_products:
-            err_msg, warn_msg = cls._validate_product_is_provided(rule,
-                                                                  select,
-                                                                  selection_product,
-                                                                  type_collections)
+            err_msg, warn_msg = self._validate_product_is_provided(rule, select, selection_product,
+              type_collections)
             if err_msg:
               rule_errors.append(err_msg)
             if warn_msg:
@@ -570,17 +588,9 @@ class RulesetValidator(object):
 
         all_errors.extend(rule_errors)
         all_warnings.extend(rule_warnings)
+    return all_errors, all_warnings
 
-    if all_warnings:
-      logger.warn('warning count {}'.format(len(all_warnings)))
-      logger.warn('Rules with warnings:\n  {}'.format('\n  '.join(all_warnings)))
-    if all_errors:
-      logger.error('err ct {}'.format(len(all_errors)))
-      error_message = 'Invalid rules.\n  {}'.format('\n  '.join(all_errors))
-      raise ValueError(error_message)
-
-  @classmethod
-  def _validate_product_is_provided(cls, rule, select, selection_product, type_collections):
+  def _validate_product_is_provided(self, rule, select, selection_product, type_collections):
     if all(selection_product not in coll for coll in type_collections.values()):
 
       def superclass_of_selection(b):
