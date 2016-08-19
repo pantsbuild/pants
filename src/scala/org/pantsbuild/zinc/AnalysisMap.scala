@@ -10,16 +10,20 @@ import java.io.{
   IOException
 }
 
-import sbt.{
-  CompileSetup,
-  Logger
+import xsbti.Maybe
+import xsbti.compile.{
+  CompileAnalysis,
+  DefinesClass,
+  MiniSetup,
+  PerClasspathEntryLookup
 }
-import sbt.inc.{
-  Analysis,
+import sbt.internal.inc.{
   AnalysisStore,
   FileBasedStore,
   Locate
 }
+import sbt.util.Logger
+import sbt.util.Logger.{m2o, o2m}
 
 import org.pantsbuild.zinc.cache.{
   Cache,
@@ -43,32 +47,39 @@ case class AnalysisMap private[AnalysisMap] (
   // log
   log: Logger
 ) {
-  /**
-   * An implementation of definesClass that will use analysis for an input directory to determine
-   * whether it defines a particular class.
-   *
-   * TODO: This optimization is unnecessary for jars on the classpath, which are already indexed.
-   * Can remove after the sbt jar output patch lands.
-   */
-  def definesClass(classpathEntry: File): String => Boolean =
-    getAnalysis(classpathEntry).map { analysis =>
-      log.debug(s"Hit analysis cache for class definitions with ${classpathEntry}")
-      // strongly hold the classNames, and transform them to ensure that they are unlinked from
-      // the remainder of the analysis
-      analysis.relations.classes.reverseMap.keys.toList.toSet
-    }.map { classes =>
-      (s: String) => classes(s)
-    }.getOrElse {
-      // no analysis: return a function that will scan instead
-      Locate.definesClass(classpathEntry)
-    }
 
-  /**
-   * Gets analysis for a classpath entry (if it exists) by translating its path to a potential
-   * cache location and then checking the cache.
-   */
-  def getAnalysis(classpathEntry: File): Option[Analysis] =
-    analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get)
+  def getPCELookup = new PerClasspathEntryLookup {
+    /**
+     * Gets analysis for a classpath entry (if it exists) by translating its path to a potential
+     * cache location and then checking the cache.
+     */
+    def analysis(classpathEntry: File): Maybe[CompileAnalysis] =
+      o2m(analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get))
+
+    /**
+     * An implementation of definesClass that will use analysis for an input directory to determine
+     * whether it defines a particular class.
+     *
+     * TODO: This optimization is unnecessary for jars on the classpath, which are already indexed.
+     * Can remove after the sbt jar output patch lands.
+     */
+    def definesClass(classpathEntry: File): DefinesClass = {
+        /* TODO: re-enable this optimization once we figure out the new way to get access to relations.
+        getAnalysis(classpathEntry).map { analysis =>
+          log.debug(s"Hit analysis cache for class definitions with ${classpathEntry}")
+          // strongly hold the classNames, and transform them to ensure that they are unlinked from
+          // the remainder of the analysis
+          analysis.relations.classes.reverseMap.keys.toList.toSet
+        }.map { classes =>
+          (s: String) => classes(s)
+        }.getOrElse {
+          ???
+        }
+        */
+        // no analysis: return a function that will scan instead
+        Locate.definesClass(classpathEntry)
+      }
+  }
 }
 
 object AnalysisMap {
@@ -77,7 +88,7 @@ object AnalysisMap {
    * know if, on a cache miss, the underlying file will yield a valid Analysis.
    */
   private val analysisCache =
-    Cache[FileFPrint, Option[(Analysis, CompileSetup)]](Setup.Defaults.analysisCacheLimit)
+    Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](Setup.Defaults.analysisCacheLimit)
 
   def create(
     // a map of classpath entries to cache file locations, excluding the current compile destination
@@ -93,7 +104,7 @@ object AnalysisMap {
       log
     )
 
-  private def get(cacheFPrint: FileFPrint): Option[Analysis] =
+  private def get(cacheFPrint: FileFPrint): Option[CompileAnalysis] =
     analysisCache.getOrElseUpdate(cacheFPrint) {
       // re-fingerprint the file on miss, to ensure that analysis hasn't changed since we started
       if (!FileFPrint.fprint(cacheFPrint.file).exists(_ == cacheFPrint)) {
@@ -109,11 +120,11 @@ object AnalysisMap {
     val fileStore = AnalysisStore.cached(FileBasedStore(cacheFile))
 
     val fprintStore = new AnalysisStore {
-      def set(analysis: Analysis, setup: CompileSetup) {
+      def set(analysis: CompileAnalysis, setup: MiniSetup) {
         fileStore.set(analysis, setup)
         FileFPrint.fprint(cacheFile) foreach { analysisCache.put(_, Some((analysis, setup))) }
       }
-      def get(): Option[(Analysis, CompileSetup)] = {
+      def get(): Option[(CompileAnalysis, MiniSetup)] = {
         FileFPrint.fprint(cacheFile) flatMap { fprint =>
           analysisCache.getOrElseUpdate(fprint) {
             fileStore.get

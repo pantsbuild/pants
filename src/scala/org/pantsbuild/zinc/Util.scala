@@ -5,7 +5,8 @@
 package org.pantsbuild.zinc
 
 import java.io.File
-import sbt.{ Hash, IO }
+import sbt.io.{ Hash, IO }
+import sbt.io.syntax._
 
 object Util {
   //
@@ -102,7 +103,7 @@ object Util {
    * Clean all class files from a directory.
    */
   def cleanAllClasses(dir: File): Unit = {
-    import sbt.Path._
+    import sbt.io.Path._
     IO.delete((dir ** "*.class").get)
   }
 
