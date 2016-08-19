@@ -15,7 +15,7 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_walk
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,11 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   def execute_codegen(self, target, target_workdir):
     args = ['-o', target_workdir]
     compiler = target.compiler
+    if target.package is None:
+      java_package = self._get_sources_package(target)
+    else:
+      java_package = target.package
+
     if compiler == 'antlr3':
       if target.package is not None:
         logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
@@ -65,10 +70,7 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
       # Note that this assumes that there is no package set in the antlr file itself,
       # which is considered an ANTLR best practice.
       args.append('-package')
-      if target.package is None:
-        args.append(self._get_sources_package(target))
-      else:
-        args.append(target.package)
+      args.append(java_package)
       java_main = 'org.antlr.v4.Tool'
 
     antlr_classpath = self.tool_classpath(compiler)
@@ -79,6 +81,7 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
     if result != 0:
       raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
 
+    self._rearrange_output_for_package(target_workdir, java_package)
     if compiler == 'antlr3':
       self._scrub_generated_timestamps(target_workdir)
 
@@ -108,6 +111,31 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
     return sources
 
   _COMMENT_WITH_TIMESTAMP_RE = re.compile('^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
+
+  def _rearrange_output_for_package(self, target_workdir, java_package):
+    """Rearrange the output files to match a standard Java structure.
+
+    Antlr emits a directory structure based on the relative path provided
+    for the grammar file. If the source root of the file is different from
+    the Pants build root, then the Java files end up with undesired parent
+    directories.
+    """
+    package_dir_rel = java_package.replace('.', os.path.sep)
+    package_dir = os.path.join(target_workdir, package_dir_rel)
+    safe_mkdir(package_dir)
+    for root, dirs, files in os.walk(target_workdir, topdown = False):
+      if root == package_dir_rel:
+        # This path is already in the correct location
+        continue
+      for f in files:
+        os.rename(
+          os.path.join(root, f),
+          os.path.join(package_dir, f)
+        )
+      for d in dirs:
+        full_dir = os.path.join(root, d)
+        if not os.listdir(full_dir):
+          os.rmdir(full_dir)
 
   def _scrub_generated_timestamps(self, target_workdir):
     """Remove the first line of comment from each file if it contains a timestamp."""
