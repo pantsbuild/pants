@@ -20,7 +20,7 @@ python_tests(
     ':base',
   ],
   tags = {'integration'},
-  timeout=600,
+  timeout=300,
 )
 
 python_library(
