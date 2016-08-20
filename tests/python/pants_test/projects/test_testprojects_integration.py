@@ -5,13 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.pants_run_integration_test import ensure_engine
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
 
 
 class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
-  @ensure_engine
   def tests_testprojects(self):
     # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
     # right now, just split them into two categories and ignore them.
