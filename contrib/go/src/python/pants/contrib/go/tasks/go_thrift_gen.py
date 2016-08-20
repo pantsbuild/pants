@@ -63,7 +63,7 @@ class GoThriftGen(SimpleCodegenTask):
 
   @memoized_property
   def _service_deps(self):
-    service_deps = self.get_options().service_deps
+    service_deps = self.get_options().get('service_deps')
     return list(self.resolve_deps(service_deps)) if service_deps else self._deps
 
   SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')

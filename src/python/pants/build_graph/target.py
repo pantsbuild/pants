@@ -560,6 +560,12 @@ class Target(AbstractTarget):
     """
     return self._sources_field.filespec
 
+  def rel_path_relative_to_buildroot(self):
+    """
+    :API: public
+    """
+    return self.payload.sources.rel_path
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.
