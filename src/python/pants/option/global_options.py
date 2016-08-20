@@ -173,15 +173,18 @@ class GlobalOptionsRegistrar(Optionable):
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
-             help='Glob patterns for ignoring files when reading BUILD files. '
-                  'Use to ignore unneeded directories or BUILD files. '
-                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
+             help='Pants will ignore paths that match the patterns in this option '
+                  'ONLY while searching for BUILD files (example: node_modules, BUILD.md, etc). '
+                  'Other filesystem related operation will not be affected by this option.'
+                  'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     # TODO: Clarify in the help msgs the difference between --ignore-patterns and --pants-ignore.
     # See https://github.com/pantsbuild/pants/issues/3671.
     register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*', rel_distdir],
-             help='Ignore files that match the specified patterns. '
-                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore). '
-                  'This option is currently experimental.')
+             help='Pants will ignore paths that match the patterns in this option in all cases, '
+                  'including in globs (example: *.pyc files, the .git directory, etc). '
+                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
+                  'This option is effective in v2 engine only. '
+                  'To experiment with v2 engine, try --enable-v2-engine option. ')
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
