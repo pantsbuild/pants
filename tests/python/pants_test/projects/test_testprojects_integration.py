@@ -13,7 +13,7 @@ def ensure_engine(f):
   """A decorator for running an integration test with and without the v2 engine enabled via
   temporary environment variables."""
   def wrapper(self, *args, **kwargs):
-    for env_var_value in ('true', 'false'):
+    for env_var_value in ('false','false'):
       with environment_as(PANTS_ENABLE_V2_ENGINE=env_var_value):
         f(self, *args, **kwargs)
   return wrapper
