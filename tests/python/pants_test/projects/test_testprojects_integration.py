@@ -5,18 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.pants_run_integration_test import environment_as
+from pants_test.pants_run_integration_test import ensure_engine
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
-
-
-def ensure_engine(f):
-  """A decorator for running an integration test with and without the v2 engine enabled via
-  temporary environment variables."""
-  def wrapper(self, *args, **kwargs):
-    for env_var_value in ('false','false'):
-      with environment_as(PANTS_ENABLE_V2_ENGINE=env_var_value):
-        f(self, *args, **kwargs)
-  return wrapper
 
 
 class TestProjectsIntegrationTest(ProjectIntegrationTest):
