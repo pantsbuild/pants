@@ -203,7 +203,19 @@ pub extern fn execution_next(
 }
 
 #[no_mangle]
-pub extern fn task_gen(
+pub extern fn intrinsic_task_add(
+  scheduler_ptr: *mut RawScheduler,
+  func: Function,
+  subject_type: TypeId,
+  output_type: TypeId,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.intrinsic_add(func, subject_type, output_type);
+  })
+}
+
+#[no_mangle]
+pub extern fn task_add(
   scheduler_ptr: *mut RawScheduler,
   func: Function,
   output_type: TypeId,

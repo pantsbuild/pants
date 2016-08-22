@@ -372,8 +372,17 @@ FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 
 
+def create_fs_intrinsics():
+  return [
+    (scan_directory, Dir, DirectoryListing),
+    (file_content, File, FileContent),
+    (file_digest, File, FileDigest),
+    (read_link, Link, ReadLink),
+  ]
+
+
 def create_fs_tasks():
-  """Creates tasks that consume the native filesystem Node type."""
+  """Creates tasks that consume the intrinsic filesystem types."""
   return [
     # Glob execution.
     (Paths,

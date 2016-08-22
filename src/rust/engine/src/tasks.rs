@@ -4,6 +4,7 @@ use core::{Field, Function, Key, TypeId};
 use externs::{IsInstanceFunction, StoreListFunction};
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
 
+#[derive(Debug)]
 pub struct Task {
   cacheable: bool,
   output_type: TypeId,
@@ -26,7 +27,7 @@ impl Task {
 }
 
 struct TaskFactory {
-  // An optional intrinsic task, which takes preference for its contained subject type.
+  // An optional intrinsic task, which takes precedence for its contained subject type.
   // If it is present, always contains a Vec of length one.
   intrinsic: Option<(TypeId,Vec<Task>)>,
   tasks: Vec<Task>,
@@ -89,15 +90,13 @@ impl Tasks {
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeId) -> Option<&Vec<Task>> {
     self.tasks.get(product).map(|factory| {
       // If there is a matching intrinsic defined, use that. Otherwise, tasks.
-      let intrinsic: Option<&Vec<Task>> =
-        factory.intrinsic.as_ref().and_then(|&(intrinsic_type, ref intrinsic_task)| {
-          if &intrinsic_type == subject_type {
-            Some(intrinsic_task)
-          } else {
-            None
-          }
-        });
-      intrinsic.unwrap_or(&factory.tasks)
+      factory.intrinsic.as_ref().and_then(|&(intrinsic_type, ref intrinsic_task)| {
+        if &intrinsic_type == subject_type {
+          Some(intrinsic_task)
+        } else {
+          None
+        }
+      }).unwrap_or(&factory.tasks)
     })
   }
 

@@ -10,11 +10,12 @@ import threading
 import time
 from collections import defaultdict
 from contextlib import contextmanager
+import functools
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
-from pants.engine.fs import PathGlobs
+from pants.engine.fs import PathGlobs, create_fs_intrinsics
 from pants.engine.graph import Graph
 from pants.engine.subsystem.native import extern_isinstance, extern_store_list
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
@@ -108,14 +109,30 @@ class LocalScheduler(object):
                                             self._to_type_key(HasProducts),
                                             self._to_type_key(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
-    # And register all provided tasks.
+    # Register all "intrinsic" tasks.
+    self._register_intrinsics()
+    # Register all provided tasks.
     for task in tasks:
       self._register_task(task)
+
+  def _register_intrinsics(self):
+    """Register any "intrinsic" tasks.
+    
+    Intrinsic tasks are those that are the default for a particular type(subject), type(product)
+    pair. By default, intrinsic tasks create Runnables that are not cacheable.
+    """
+    for func, subject_type, product_type in create_fs_intrinsics():
+      # Create a pickleable function for the task with the ProjectTree included.
+      pfunc = functools.partial(func, self._project_tree)
+      self._native.lib.intrinsic_task_add(self._scheduler,
+                                          self._to_type_key(pfunc),
+                                          self._to_type_key(subject_type),
+                                          self._to_type_key(product_type))
 
   def _register_task(self, task):
     """Register the given task triple with the native scheduler."""
     output_type, input_selects, func = task
-    self._native.lib.task_gen(self._scheduler,
+    self._native.lib.task_add(self._scheduler,
                               self._to_type_key(func),
                               self._to_type_key(output_type))
     for selector in input_selects:

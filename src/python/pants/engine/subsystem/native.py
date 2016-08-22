@@ -72,7 +72,9 @@ _FFI.cdef(
                                    TypeId);
     void scheduler_destroy(RawScheduler*);
 
-    void task_gen(RawScheduler*, Function, TypeId);
+    void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeId);
+
+    void task_add(RawScheduler*, Function, TypeId);
     void task_add_select(RawScheduler*, TypeId);
     void task_add_select_variant(RawScheduler*, TypeId, Key);
     void task_add_select_literal(RawScheduler*, Key, TypeId);
