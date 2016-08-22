@@ -47,8 +47,8 @@ def filter_buildfile_paths(address_mapper, directory_listing):
   build_pattern = address_mapper.build_pattern
   def match(stat):
     # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
-    ignored = len(list(address_mapper.build_ignore_patterns.match_files([stat.path]))) > 0
-    return type(stat) is File and fnmatch(basename(stat.path), build_pattern) and (not ignored)
+    ignored = sum(1 for _ in address_mapper.build_ignore_patterns.match_files([stat.path])) > 0
+    return (not ignored) and type(stat) is File and fnmatch(basename(stat.path), build_pattern)
   build_files = tuple(Path(stat.path, stat)
                       for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)

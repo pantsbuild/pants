@@ -62,7 +62,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                      results)
 
   @ensure_engine
-  def test_build_ignore_denpendency(self):
+  def test_build_ignore_dependency(self):
     run_result = self.run_pants(['-q',
                                  'list',
                                  'testprojects/tests/python/pants::'],
