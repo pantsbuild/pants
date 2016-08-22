@@ -24,7 +24,7 @@ class ThriftBinary(object):
 
     @classmethod
     def subsystem_dependencies(cls):
-      return (BinaryUtil.Factory,)
+      return super(ThriftBinary.Factory, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
 
     @classmethod
     def register_options(cls, register):
