@@ -98,7 +98,7 @@ script:
   - echo $JAVA_HOME
   # Check if JAVA_HOME is symlinked to the real home
   - ls -l $JAVA_HOME
-  - ./build-support/bin/ci.sh -x ${CI_FLAGS}
+  - travis_wait 40 ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
 # for now which is enabled even with no `notifications` config.
