@@ -129,7 +129,7 @@ class Throw(datatype('Throw', ['exc']), State):
   type_id = 2
 
 
-class Runnable(datatype('Runnable', ['func', 'args']), State):
+class Runnable(datatype('Runnable', ['func', 'args', 'cacheable']), State):
   """Indicates that the Node is ready to run with the given closure.
 
   The return value of the Runnable will become the final state of the Node.

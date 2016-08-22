@@ -255,7 +255,8 @@ class LocalScheduler(object):
     def runnable(raw):
       return Runnable(self._from_type_key(raw.func),
                       tuple(self._from_key(key)
-                            for key in self._native.unpack(raw.args_ptr, raw.args_len)))
+                            for key in self._native.unpack(raw.args_ptr, raw.args_len)),
+                      raw.cacheable)
 
     runnable_ids = self._native.unpack(self._scheduler.execution.ready_ptr,
                                        self._scheduler.execution.ready_len)

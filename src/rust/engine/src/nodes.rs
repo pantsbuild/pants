@@ -10,6 +10,7 @@ use tasks::Tasks;
 pub struct Runnable {
   func: Function,
   args: Vec<Key>,
+  cacheable: bool,
 }
 
 impl Runnable {
@@ -19,6 +20,10 @@ impl Runnable {
 
   pub fn args(&self) -> &Vec<Key> {
     &self.args
+  }
+
+  pub fn cacheable(&self) -> bool {
+    self.cacheable
   }
 }
 
@@ -47,25 +52,26 @@ impl<'g,'t> StepContext<'g,'t> {
    * given subject and variants.
    *
    * (analogous to NodeBuilder.gen_nodes)
-   *
-   * TODO: intrinsics
    */
   fn gen_nodes(&self, subject: &Key, product: &TypeId, variants: &Variants) -> Vec<Node> {
-    self.tasks.get(&product).map(|tasks|
-      tasks.iter()
-        .map(|task| {
-          Node::Task(
-            Task {
-              subject: subject.clone(),
-              product: product.clone(),
-              variants: variants.clone(),
-              func: task.func().clone(),
-              clause: task.input_clause().clone(),
-            }
+    self.tasks.gen_tasks(subject.type_id(), product)
+      .map(|tasks| {
+        tasks.iter()
+          .map(|task|
+            Node::Task(
+              Task {
+                subject: subject.clone(),
+                product: product.clone(),
+                variants: variants.clone(),
+                func: task.func().clone(),
+                clause: task.input_clause().clone(),
+                cacheable: task.cacheable(),
+              }
+            )
           )
-        })
-        .collect()
-    ).unwrap_or_else(|| Vec::new())
+          .collect()
+      })
+      .unwrap_or_else(|| Vec::new())
   }
 
   fn get(&self, node: &Node) -> Option<&Complete> {
@@ -445,6 +451,7 @@ pub struct Task {
   variants: Variants,
   func: Function,
   clause: Vec<selectors::Selector>,
+  cacheable: bool,
 }
 
 impl Step for Task {
@@ -482,6 +489,7 @@ impl Step for Task {
       State::Runnable(Runnable {
         func: self.func,
         args: dep_values.into_iter().map(|&d| d).collect(),
+        cacheable: self.cacheable,
       })
     }
   }

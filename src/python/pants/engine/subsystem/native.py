@@ -38,6 +38,7 @@ _FFI.cdef(
       Function*   func;
       Key*        args_ptr;
       uint64_t    args_len;
+      bool        cacheable;
     } RawRunnable;
 
     typedef struct {

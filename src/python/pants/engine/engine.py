@@ -116,7 +116,7 @@ class Engine(AbstractClass):
     :returns: A tuple of a key and result, either of which may be None.
     """
     # TODO: Now only have `long` entry ids, rather than an entry object!
-    if True:
+    if runnable.cacheable:
       return None, None
     return self._cache.get(runnable)
 

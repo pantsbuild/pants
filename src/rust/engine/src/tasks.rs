@@ -5,12 +5,17 @@ use externs::{IsInstanceFunction, StoreListFunction};
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
 
 pub struct Task {
+  cacheable: bool,
   output_type: TypeId,
   input_clause: Vec<Selector>,
   func: Function,
 }
 
 impl Task {
+  pub fn cacheable(&self) -> bool {
+    self.cacheable
+  }
+
   pub fn func(&self) -> &Function {
     &self.func
   }
@@ -20,12 +25,19 @@ impl Task {
   }
 }
 
+struct TaskFactory {
+  // An optional intrinsic task, which takes preference for its contained subject type.
+  // If it is present, always contains a Vec of length one.
+  intrinsic: Option<(TypeId,Vec<Task>)>,
+  tasks: Vec<Task>,
+}
+
 /**
  * Registry of tasks able to produce each type, along with a few fundamental python
  * types that the engine must be aware of.
  */
 pub struct Tasks {
-  tasks: HashMap<TypeId, Vec<Task>>,
+  tasks: HashMap<TypeId, TaskFactory>,
   isinstance: IsInstanceFunction,
   store_list: StoreListFunction,
   field_name: Field,
@@ -40,9 +52,12 @@ pub struct Tasks {
 
 /**
  * Defines a stateful lifecycle for defining tasks via the C api. Call in order:
- *   1. task_gen() - once per task
+ *   1. task_add() - once per task
  *   2. add_*() - zero or more times per task to add input clauses
  *   3. task_end() - once per task
+ *
+ * Also has a one-shot method for adding an intrinsic Task (which have no Selectors):
+ *   1. intrinsic_add()
  *
  * (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
  */
@@ -71,8 +86,19 @@ impl Tasks {
     }
   }
 
-  pub fn get(&self, type_id: &TypeId) -> Option<&Vec<Task>> {
-    self.tasks.get(type_id)
+  pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeId) -> Option<&Vec<Task>> {
+    self.tasks.get(product).map(|factory| {
+      // If there is a matching intrinsic defined, use that. Otherwise, tasks.
+      let intrinsic: Option<&Vec<Task>> =
+        factory.intrinsic.as_ref().and_then(|&(intrinsic_type, ref intrinsic_task)| {
+          if &intrinsic_type == subject_type {
+            Some(intrinsic_task)
+          } else {
+            None
+          }
+        });
+      intrinsic.unwrap_or(&factory.tasks)
+    })
   }
 
   pub fn field_name(&self) -> &Field {
@@ -103,15 +129,41 @@ impl Tasks {
     (self.isinstance).isinstance(key, type_id)
   }
 
+  fn task_factory(&mut self, output_type: TypeId) -> &mut TaskFactory {
+    self.tasks.entry(output_type).or_insert_with(||
+      TaskFactory {
+        intrinsic: None,
+        tasks: Vec::new(),
+      }
+    )
+  }
+
   pub fn store_list(&self, keys: Vec<&Key>) -> Key {
     (self.store_list).store_list(keys)
+  }
+
+  pub fn intrinsic_add(&mut self, func: Function, subject_type: TypeId, product: TypeId) {
+    self.task_factory(subject_type.clone()).intrinsic =
+      Some(
+        (
+          subject_type,
+          vec![
+            Task {
+              cacheable: false,
+              output_type: product,
+              input_clause: vec![Selector::select(subject_type)],
+              func: func,
+            }
+          ]
+        )
+      );
   }
 
   /**
    * The following methods define the Task registration lifecycle.
    */
 
-  pub fn task_gen(&mut self, func: Function, output_type: TypeId) {
+  pub fn task_add(&mut self, func: Function, output_type: TypeId) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
@@ -120,6 +172,7 @@ impl Tasks {
     self.preparing =
       Some(
         Task {
+          cacheable: true,
           output_type: output_type,
           input_clause: Vec::new(),
           func: func,
@@ -166,6 +219,11 @@ impl Tasks {
     // Move the task from `preparing` to the Tasks map
     let task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
 
-    self.tasks.entry(task.output_type.clone()).or_insert(Vec::new()).push(task);
+    self.tasks.entry(task.output_type.clone()).or_insert_with(||
+      TaskFactory {
+        intrinsic: None,
+        tasks: Vec::new(),
+      }
+    ).tasks.push(task);
   }
 }

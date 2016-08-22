@@ -71,6 +71,7 @@ impl RawExecution {
             func: runnable.func() as *const Function,
             args_ptr: runnable.args().as_ptr(),
             args_len: runnable.args().len() as u64,
+            cacheable: runnable.cacheable(),
           }
         })
         .collect();
@@ -89,6 +90,8 @@ pub struct RawRunnable {
   // Array of args.
   args_ptr: *const Key,
   args_len: u64,
+  // Boolean value indicating whether the runnable is cacheable.
+  cacheable: bool,
 }
 
 #[no_mangle]
@@ -206,7 +209,7 @@ pub extern fn task_gen(
   output_type: TypeId,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.task_gen(func, output_type);
+    raw.scheduler.tasks.task_add(func, output_type);
   })
 }
 
