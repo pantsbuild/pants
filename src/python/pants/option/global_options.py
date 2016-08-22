@@ -171,14 +171,12 @@ class GlobalOptionsRegistrar(Optionable):
     # Relative pants_distdir to buildroot. Requires --pants-distdir to be bootstrapped above first.
     # e.g. '/dist/'
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
-    register('--ignore-patterns', advanced=True, type=list, fromfile=True,
+    register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
              help='Pants will ignore paths that match the patterns in this option '
                   'ONLY while searching for BUILD files (example: node_modules, BUILD.md, etc). '
                   'Other filesystem related operation will not be affected by this option.'
                   'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
-    # TODO: Clarify in the help msgs the difference between --ignore-patterns and --pants-ignore.
-    # See https://github.com/pantsbuild/pants/issues/3671.
     register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*', rel_distdir],
              help='Pants will ignore paths that match the patterns in this option in all cases, '
                   'including in globs (example: *.pyc files, the .git directory, etc). '

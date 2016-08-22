@@ -45,7 +45,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                                  '--minimize-output-file={0}'.format(tmp_output)],
                                 config={
                                     'DEFAULT': {
-                                        'ignore_patterns': [
+                                        'build_ignore': [
                                             'testprojects/src/java/org/pantsbuild/testproject/phrases'
                                         ]
                                     }
@@ -68,7 +68,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                                  'testprojects/tests/python/pants::'],
                                 config={
                                   'DEFAULT': {
-                                    'ignore_patterns': [
+                                    'build_ignore': [
                                       'testprojects/src/'
                                     ]
                                   }
@@ -83,7 +83,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                                  'testprojects/tests/python/pants::'],
                                 config={
                                   'DEFAULT': {
-                                    'ignore_patterns': [
+                                    'build_ignore': [
                                       'testprojects/src/antlr'
                                     ]
                                   }

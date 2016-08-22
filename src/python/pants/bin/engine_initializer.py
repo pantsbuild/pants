@@ -98,10 +98,13 @@ class EngineInitializer(object):
                          exlude_target_regexps=None):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
-    :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
-                                      usually taken from the `--pants-ignore` global option.
+    :param list path_ignore_patterns: A list of paths ignore patterns for FileSystemProjectTree,
+                                 usually taken from the '--pants-ignore' global option.
     :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
                                          None to use the default.
+    :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
+                                       files, usually taken from the '--build-ignore' global option.
+    :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 

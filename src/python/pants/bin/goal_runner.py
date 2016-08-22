@@ -70,21 +70,21 @@ class GoalRunnerFactory(object):
     self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
       self._global_options.enable_v2_engine,
       self._global_options.pants_ignore,
-      self._global_options.ignore_patterns,
+      self._global_options.build_ignore,
       self._global_options.exclude_target_regexp,
       daemon_graph_helper)
 
   def _select_buildgraph_and_address_mapper(self,
                                             use_engine,
-                                            path_ignore_patterns,
+                                            pants_ignore_patterns,
                                             build_ignore_patterns,
                                             exclude_target_regexps,
                                             graph_helper=None):
     """Selects a BuildGraph and AddressMapper to use then constructs them and returns them.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
-    :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
-    :param list build_ignore_patterns: The build ignore patterns from '--ignore-patterns',
+    :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
+    :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
                                        applied during BUILD file searching.
     :param list exclude_target_regexps: Regular expressions for targets to be excluded.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
@@ -97,7 +97,7 @@ class GoalRunnerFactory(object):
                                                                      build_root=self._root_dir)
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
       graph_helper = graph_helper or \
-                     EngineInitializer.setup_legacy_graph(path_ignore_patterns,
+                     EngineInitializer.setup_legacy_graph(pants_ignore_patterns,
                                                           build_ignore_patterns=build_ignore_patterns,
                                                           exlude_target_regexps=exclude_target_regexps)
       return graph_helper.create_build_graph(root_specs, self._root_dir)
