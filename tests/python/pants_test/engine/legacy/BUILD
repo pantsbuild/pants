@@ -10,7 +10,7 @@ python_tests(
 )
 
 python_tests(
-  name = 'build_ignore',
+  name = 'build_ignore_integration',
   sources = [ 'test_build_ignore_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',

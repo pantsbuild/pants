@@ -18,10 +18,10 @@ python_tests(
   sources=['test_testprojects_integration.py'],
   dependencies=[
     ':base',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/util:contextutil',
   ],
   tags = {'integration'},
-  timeout=300,
+  timeout=600,
 )
 
 python_library(
