@@ -226,10 +226,6 @@ class LocalScheduler(object):
 
     return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
 
-  @property
-  def product_graph(self):
-    return self._product_graph
-
   @contextmanager
   def locked(self):
     with self._product_graph_lock:
@@ -273,7 +269,7 @@ class LocalScheduler(object):
       return Runnable(self._from_type_key(raw.func),
                       tuple(self._from_key(key)
                             for key in self._native.unpack(raw.args_ptr, raw.args_len)),
-                      raw.cacheable)
+                      bool(raw.cacheable))
 
     runnable_ids = self._native.unpack(self._scheduler.execution.ready_ptr,
                                        self._scheduler.execution.ready_len)

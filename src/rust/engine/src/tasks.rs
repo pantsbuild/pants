@@ -90,8 +90,9 @@ impl Tasks {
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeId) -> Option<&Vec<Task>> {
     self.tasks.get(product).map(|factory| {
       // If there is a matching intrinsic defined, use that. Otherwise, tasks.
-      factory.intrinsic.as_ref().and_then(|&(intrinsic_type, ref intrinsic_task)| {
-        if &intrinsic_type == subject_type {
+      factory.intrinsic.as_ref().and_then(|&(ref intrinsic_type, ref intrinsic_task)| {
+        if intrinsic_type == subject_type {
+          println!(">>> rust using intrinsic!");
           Some(intrinsic_task)
         } else {
           None

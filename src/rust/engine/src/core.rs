@@ -1,5 +1,3 @@
-use libc;
-
 // The type of a python object (which itself has a type, but which is not
 // represented by a Key, because that would result in a recursive structure.)
 pub type TypeId = Digest;

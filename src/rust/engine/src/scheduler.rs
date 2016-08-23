@@ -118,7 +118,7 @@ impl Scheduler {
     for (id, state) in completed {
       self.outstanding.remove(&id);
       self.candidates.extend(self.graph.entry_for_id(id).dependents());
-      println!(">>> rust completed {} with {:?}", id, state);
+      println!(">>> rust completed runnable {} with {:?}", id, state);
       self.graph.complete(id, state.clone());
     }
 
@@ -140,7 +140,7 @@ impl Scheduler {
         },
         Some(State::Complete(s)) => {
           // Node completed statically; mark any dependents of the Node as candidates.
-          println!(">>> rust says {} is complete with {:?}", entry_id, s);
+          println!(">>> rust says {} is statically complete with {:?}", entry_id, s);
           self.graph.complete(entry_id, s);
           self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
         },

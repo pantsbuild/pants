@@ -296,16 +296,16 @@ pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
   })
 }
 
-fn with_scheduler<F,T>(scheduler_ptr: *mut RawScheduler, mut f: F) -> T
-    where F: FnMut(&mut RawScheduler)->T {
+fn with_scheduler<F,T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
+    where F: FnOnce(&mut RawScheduler)->T {
   let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
   let t = f(&mut scheduler);
   std::mem::forget(scheduler);
   t
 }
 
-fn with_vec<F,C,T>(c_ptr: *mut C, c_len: usize, mut f: F) -> T
-    where F: FnMut(&Vec<C>)->T {
+fn with_vec<F,C,T>(c_ptr: *mut C, c_len: usize, f: F) -> T
+    where F: FnOnce(&Vec<C>)->T {
   let cs = unsafe { Vec::from_raw_parts(c_ptr, c_len, c_len) };
   let output = f(&cs);
   std::mem::forget(cs);

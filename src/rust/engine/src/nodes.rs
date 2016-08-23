@@ -496,20 +496,12 @@ impl Step for Task {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Filesystem {
-  subject: Key,
-  product: TypeId,
-  variants: Variants,
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Node {
   Select(Select),
   SelectLiteral(SelectLiteral),
   SelectDependencies(SelectDependencies),
   SelectProjection(SelectProjection),
   Task(Task),
-  Filesystem(Filesystem),
 }
 
 impl Node {
@@ -555,8 +547,6 @@ impl Node {
       &Node::SelectLiteral(ref n) => n.step(context),
       &Node::SelectProjection(ref n) => n.step(context),
       &Node::Task(ref n) => n.step(context),
-      &Node::Filesystem(ref n) => 
-        panic!("TODO! Need to implement step for: {:?}", n),
     }
   }
 }
