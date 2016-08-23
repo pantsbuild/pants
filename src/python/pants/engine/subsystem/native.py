@@ -18,6 +18,10 @@ _FFI.cdef(
       char digest[32];
     } Digest;
 
+    typedef struct {
+      char buf[256];
+    } FixedBuffer;
+
     typedef Digest TypeId;
     typedef Digest Function;
 
@@ -31,8 +35,9 @@ _FFI.cdef(
 
     typedef void StorageHandle;
 
-    typedef bool (*extern_isinstance)(StorageHandle*, Key*, TypeId*);
-    typedef Key  (*extern_store_list)(StorageHandle*, Key*, uint64_t);
+    typedef uint8_t (*extern_to_str)(StorageHandle*, Digest*, FixedBuffer*);
+    typedef bool    (*extern_isinstance)(StorageHandle*, Key*, TypeId*);
+    typedef Key     (*extern_store_list)(StorageHandle*, Key*, uint64_t);
 
     typedef struct {
       Function*   func;
@@ -85,6 +90,7 @@ _FFI.cdef(
     } RawNodes;
 
     RawScheduler* scheduler_create(StorageHandle*,
+                                   extern_to_str,
                                    extern_isinstance,
                                    extern_store_list,
                                    Field,
@@ -126,6 +132,18 @@ _FFI.cdef(
     void nodes_destroy(RawNodes*);
     '''
   )
+
+
+@_FFI.callback("uint8_t(StorageHandle*, Digest*, FixedBuffer*)")
+def extern_to_str(storage_handle, digest, output_buffer):
+  """Given storage, a Digest for `obj`, and a buffer to write to, write str(obj) and return a length."""
+  storage = _FFI.from_handle(storage_handle)
+  obj = storage.get_from_digest(_FFI.buffer(digest.digest)[:])
+  str_bytes = str(obj).encode('utf-8')
+  output = _FFI.buffer(output_buffer.buf)
+  write_len = min(len(str_bytes), len(output))
+  output[0:write_len] = str_bytes[0:write_len]
+  return write_len
 
 
 @_FFI.callback("bool(StorageHandle*, Key*, TypeId*)")

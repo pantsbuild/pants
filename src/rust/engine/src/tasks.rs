@@ -114,11 +114,11 @@ impl Tasks {
   }
 
   pub fn isinstance(&self, key: &Key, type_id: &TypeId) -> bool {
-    (self.isinstance).isinstance(key, type_id)
+    (self.isinstance).call(key, type_id)
   }
 
   pub fn store_list(&self, keys: Vec<&Key>) -> Key {
-    (self.store_list).store_list(keys)
+    (self.store_list).call(keys)
   }
 
   pub fn intrinsic_add(&mut self, func: Function, subject_type: TypeId, product: TypeId) {

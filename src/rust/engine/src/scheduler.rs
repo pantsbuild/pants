@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::path::Path;
 
+use externs::ToStrFunction;
 use core::{Field, Key, TypeId};
 use graph::{Entry, EntryId, Graph};
 use nodes::{Complete, Node, Runnable, State};
@@ -13,6 +14,7 @@ use tasks::Tasks;
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
 pub struct Scheduler {
+  pub to_str: ToStrFunction,
   pub graph: Graph,
   pub tasks: Tasks,
   // Initial set of roots for the execution.
@@ -29,8 +31,9 @@ impl Scheduler {
   /**
    * Creates a Scheduler with an initially empty set of roots.
    */
-  pub fn new(graph: Graph, tasks: Tasks) -> Scheduler {
+  pub fn new(to_str: ToStrFunction, graph: Graph, tasks: Tasks) -> Scheduler {
     Scheduler {
+      to_str: to_str,
       graph: graph,
       tasks: tasks,
       roots: Vec::new(),
@@ -40,7 +43,7 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, path: &Path) -> io::Result<()> {
-    self.graph.visualize(&self.roots, path)
+    self.graph.visualize(&self.roots, path, &self.to_str)
   }
 
   pub fn reset(&mut self) {

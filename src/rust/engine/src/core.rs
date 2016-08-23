@@ -47,6 +47,10 @@ impl Key {
     }
   }
 
+  pub fn digest(&self) -> &Digest {
+    &self.digest
+  }
+
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
   }

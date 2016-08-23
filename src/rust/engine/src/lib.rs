@@ -12,7 +12,7 @@ use std::ffi::CStr;
 use std::path::Path;
 
 use core::{Field, Function, Key, TypeId};
-use externs::{IsInstanceExtern, IsInstanceFunction, StorageExtern, StoreListExtern, StoreListFunction};
+use externs::{IsInstanceExtern, IsInstanceFunction, StorageExtern, StoreListExtern, StoreListFunction, ToStrExtern, ToStrFunction};
 use graph::{Graph, EntryId};
 use nodes::{Complete, Runnable};
 use scheduler::Scheduler;
@@ -176,6 +176,7 @@ impl RawNodes {
 #[no_mangle]
 pub extern fn scheduler_create(
   storage: *const StorageExtern,
+  to_str: ToStrExtern,
   isinstance: IsInstanceExtern,
   store_list: StoreListExtern,
   field_name: Field,
@@ -192,6 +193,7 @@ pub extern fn scheduler_create(
       RawScheduler {
         execution: RawExecution::new(),
         scheduler: Scheduler::new(
+          ToStrFunction::new(to_str, storage),
           Graph::new(),
           Tasks::new(
             IsInstanceFunction::new(isinstance, storage),

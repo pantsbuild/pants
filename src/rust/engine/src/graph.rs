@@ -4,6 +4,7 @@ use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
 
+use externs::ToStrFunction;
 use nodes::{Node, Complete};
 
 pub type EntryId = u64;
@@ -57,8 +58,14 @@ impl Entry {
     self.state.is_some()
   }
 
-  fn format(&self) -> String {
-    format!("{:?} == {:?}", self.node.subject_and_product(), self.state)
+  fn format(&self, to_str: &ToStrFunction) -> String {
+    let (subject, product) = self.node.subject_and_product();
+    format!(
+      "{}:{} == {:?}",
+      to_str.call(subject.digest()),
+      to_str.call(product),
+      self.state
+    ).replace("\"", "\\\"")
   }
 }
 
@@ -277,13 +284,9 @@ impl Graph {
     entries.len()
   }
 
-  pub fn visualize(&self, roots: &Vec<Node>, path: &Path) -> io::Result<()> {
+  pub fn visualize(&self, roots: &Vec<Node>, path: &Path, to_str: &ToStrFunction) -> io::Result<()> {
     let file = try!(File::create(path));
-    let mut writer = BufWriter::new(file);
-    self.visualize_internal(roots, &mut writer)
-  }
-
-  fn visualize_internal<F: Write>(&self, roots: &Vec<Node>, f: &mut BufWriter<F>) -> io::Result<()> {
+    let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
     let viz_color_scheme = "set312";
     let viz_max_colors = 12;
@@ -311,7 +314,7 @@ impl Graph {
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
-      let node_str = entry.format();
+      let node_str = entry.format(to_str);
 
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
@@ -325,7 +328,8 @@ impl Graph {
 
           // Write an entry per edge.
           let style = if cyclic { " [style=dashed]" } else { "" };
-          try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_entry.format(), style)));
+          let dep_str = dep_entry.format(to_str);
+          try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_str, style)));
         }
       }
     }
