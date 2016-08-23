@@ -1,3 +1,5 @@
+use std::fmt;
+
 // The type of a python object (which itself has a type, but which is not
 // represented by a Key, because that would result in a recursive structure.)
 pub type TypeId = Digest;
@@ -13,9 +15,18 @@ pub type Field = Key;
 pub type Variants = Vec<(Key, Key)>;
 
 // NB: These structs are fairly small, so we allow copying them by default.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Digest {
   digest: [u8;32],
+}
+
+impl fmt::Debug for Digest {
+  fn fmt(&self, fmtr: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    for byte in self.digest.iter() {
+      try!(fmtr.write_fmt(format_args!("{:02x}", byte)));
+    }
+    Ok(())
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

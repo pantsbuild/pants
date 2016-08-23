@@ -84,7 +84,9 @@ impl Tasks {
 
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeId) -> Option<&Vec<Task>> {
     // Use intrinsics if available, otherwise use tasks.
-    self.intrinsics.get(&(*subject_type, *product)).or(self.tasks.get(product))
+    let intrinsics = self.intrinsics.get(&(*subject_type, *product));
+    println!(">>> rust got intrinsics: {:?} (from {})", intrinsics, self.intrinsics.len());
+    intrinsics.or(self.tasks.get(product))
   }
 
   pub fn field_name(&self) -> &Field {

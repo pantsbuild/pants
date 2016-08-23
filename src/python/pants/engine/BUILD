@@ -63,14 +63,6 @@ python_library(
 )
 
 python_library(
-  name='graph',
-  sources=['graph.py'],
-  dependencies=[
-    ':nodes',
-  ]
-)
-
-python_library(
   name='build_files',
   sources=['build_files.py'],
   dependencies=[
@@ -168,7 +160,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':addressable',
     ':fs',
-    ':graph',
     ':isolated_process',
     ':nodes',
     'src/python/pants/base:specs',

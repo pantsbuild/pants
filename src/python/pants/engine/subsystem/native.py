@@ -5,11 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from cffi import FFI
+
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
 
-
-from cffi import FFI
 
 _FFI = FFI()
 _FFI.cdef(
@@ -125,6 +125,7 @@ _FFI.cdef(
     void nodes_destroy(RawNodes*);
     '''
   )
+
 
 @_FFI.callback("bool(StorageHandle*, Key*, TypeId*)")
 def extern_isinstance(storage_handle, key, type_id):

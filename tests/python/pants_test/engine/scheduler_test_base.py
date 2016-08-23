@@ -15,6 +15,7 @@ from pants.engine.fs import create_fs_tasks
 from pants.engine.nodes import Return
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
+from pants.engine.storage import Storage
 from pants.engine.subsystem.native import Native
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
@@ -51,20 +52,22 @@ class SchedulerTestBase(object):
   def mk_scheduler(self,
                    tasks=None,
                    goals=None,
-                   project_tree=None):
+                   project_tree=None,
+                   storage=None):
     """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
     goals = goals or dict()
     tasks = tasks or []
     project_tree = project_tree or self.mk_fs_tree()
+    storage = storage or Storage.create()
 
     tasks = list(tasks) + create_fs_tasks()
     with subsystem_instance(Native.Factory) as native_factory:
-      return LocalScheduler(goals, tasks, project_tree, native_factory.create())
+      return LocalScheduler(goals, tasks, storage, project_tree, native_factory.create())
 
   def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
     request = scheduler.execution_request([product], subjects)
-    with closing(LocalSerialEngine(scheduler)) as engine:
+    with closing(LocalSerialEngine(scheduler, storage=scheduler.storage)) as engine:
       res = engine.execute(request)
       if res.error:
         raise res.error

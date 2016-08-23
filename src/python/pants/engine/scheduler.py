@@ -5,27 +5,23 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import logging
 import threading
 import time
-from collections import defaultdict
 from contextlib import contextmanager
-import functools
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs, create_fs_intrinsics
-from pants.engine.graph import Graph
-from pants.engine.subsystem.native import extern_isinstance, extern_store_list
-from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
-from pants.engine.nodes import (DependenciesNode, FilesystemNode, Noop, Runnable, SelectNode,
-                                StepContext, TaskNode, Waiting, Return, Throw)
-from pants.engine.objects import Closable
+from pants.engine.isolated_process import ProcessExecutionNode
+from pants.engine.nodes import FilesystemNode, Noop, Return, Runnable, TaskNode, Throw
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
-from pants.util.objects import datatype
 from pants.engine.struct import HasProducts, Variants
+from pants.engine.subsystem.native import extern_isinstance, extern_store_list
+from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
@@ -169,7 +165,9 @@ class LocalScheduler(object):
     self._native.lib.task_end(self._scheduler)
 
   def _to_digest(self, obj):
-    return (self._storage.put(obj).digest,)
+    key = self._storage.put(obj)
+    print('>>> putting {} as {}'.format(obj, key))
+    return (key.digest,)
 
   def _to_type_key(self, t):
     return self._to_digest(t)
@@ -182,6 +180,10 @@ class LocalScheduler(object):
 
   def _from_key(self, cdata):
     return self._storage.get_from_digest(self._native.buffer(cdata.digest.digest)[:])
+
+  @property
+  def storage(self):
+    return self._storage
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
