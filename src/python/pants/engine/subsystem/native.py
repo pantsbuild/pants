@@ -61,6 +61,29 @@ _FFI.cdef(
       // ignore them because we never have collections of this type.
     } RawScheduler;
 
+    typedef enum {
+      Empty = 0,
+      Return = 1,
+      Throw = 2,
+      Noop = 3,
+    } RawState;
+
+    typedef struct {
+      Key      subject;
+      TypeId   product;
+      uint8_t  union_tag;
+      Key      union_return;
+      bool     union_throw;
+      bool     union_noop;
+    } RawNode;
+
+    typedef struct {
+      RawNode*  nodes_ptr;
+      uint64_t  nodes_len;
+      // NB: there are more fields in this struct, but we can safely (?)
+      // ignore them because we never have collections of this type.
+    } RawNodes;
+
     RawScheduler* scheduler_create(StorageHandle*,
                                    extern_isinstance,
                                    extern_store_list,
@@ -97,6 +120,9 @@ _FFI.cdef(
                         uint64_t,
                         EntryId*,
                         uint64_t);
+    RawNodes* execution_roots(RawScheduler*);
+
+    void nodes_destroy(RawNodes*);
     '''
   )
 

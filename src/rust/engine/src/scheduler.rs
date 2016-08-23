@@ -42,6 +42,10 @@ impl Scheduler {
     self.outstanding.clear();
   }
 
+  pub fn root_states(&self) -> Vec<(&Key,&TypeId,Option<&Complete>)> {
+    panic!("TODO: not implemented");
+  }
+
   pub fn add_root_select(&mut self, subject: Key, product: TypeId) {
     self.add_root(Node::create(Selector::select(product), subject, Vec::new()));
   }

@@ -94,6 +94,82 @@ pub struct RawRunnable {
   cacheable: bool,
 }
 
+enum RawState {
+  Empty = 0,
+  Return = 1,
+  Throw = 2,
+  Noop = 3,
+}
+
+pub struct RawNode {
+  subject: Key,
+  product: TypeId,
+  // The following values represent a union.
+  // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
+  // a stable release.
+  union_tag: u8,
+  union_return: Option<Key>,
+  // TODO: expose as cstrings.
+  union_throw: bool,
+  union_noop: bool,
+}
+
+impl RawNode {
+  fn new(subject: &Key, product: &TypeId, state: Option<&Complete>) -> RawNode {
+    RawNode {
+      subject: subject.clone(),
+      product: product.clone(),
+      union_tag: match state {
+        None => RawState::Empty as u8,
+        Some(&Complete::Return(_)) => RawState::Return as u8,
+        Some(&Complete::Throw(_)) => RawState::Throw as u8,
+        Some(&Complete::Noop(_)) => RawState::Noop as u8,
+      },
+      union_return: match state {
+        Some(&Complete::Return(ref r)) => Some(r.clone()),
+        _ => None,
+      },
+      union_throw: match state {
+        Some(&Complete::Throw(_)) => true,
+        _ => false,
+      },
+      union_noop: match state {
+        Some(&Complete::Noop(_)) => true,
+        _ => false,
+      },
+    }
+  }
+}
+
+pub struct RawNodes {
+  nodes_ptr: *const RawNode,
+  nodes_len: u64,
+  nodes: Vec<RawNode>,
+}
+
+impl RawNodes {
+  fn new(node_states: Vec<(&Key,&TypeId,Option<&Complete>)>) -> Box<RawNodes> {
+    let nodes =
+      node_states.iter()
+        .map(|&(subject, product, state)|
+          RawNode::new(subject, product, state)
+        )
+        .collect();
+    let mut raw_nodes =
+      Box::new(
+        RawNodes {
+          nodes_ptr: Vec::new().as_ptr(),
+          nodes_len: 0,
+          nodes: nodes,
+        }
+      );
+    // Update immediately to make the pointers above (likely dangling!) valid.
+    raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
+    raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
+    raw_nodes
+  }
+}
+
 #[no_mangle]
 pub extern fn scheduler_create(
   storage: *const StorageExtern,
@@ -203,6 +279,17 @@ pub extern fn execution_next(
 }
 
 #[no_mangle]
+pub extern fn execution_roots(
+  scheduler_ptr: *mut RawScheduler,
+) -> *const RawNodes {
+  with_scheduler(scheduler_ptr, |raw| {
+    Box::into_raw(RawNodes::new(raw.scheduler.root_states()))
+  })
+}
+
+
+
+#[no_mangle]
 pub extern fn intrinsic_task_add(
   scheduler_ptr: *mut RawScheduler,
   func: Function,
@@ -294,6 +381,13 @@ pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.graph.len() as u64
   })
+}
+
+#[no_mangle]
+pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
+  // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
+  // to be destroyed at the end of this function.
+  let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
 }
 
 fn with_scheduler<F,T>(scheduler_ptr: *mut RawScheduler, f: F) -> T

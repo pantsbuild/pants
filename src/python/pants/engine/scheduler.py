@@ -109,6 +109,7 @@ class LocalScheduler(object):
                                             self._to_type_key(HasProducts),
                                             self._to_type_key(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
+    self._execution_request = None
     # Register all "intrinsic" tasks.
     self._register_intrinsics()
     # Register all provided tasks.
@@ -234,6 +235,14 @@ class LocalScheduler(object):
   def root_entries(self, execution_request):
     """Returns the roots for the given ExecutionRequest as a dict from Node to State."""
     with self._product_graph_lock:
+      if self._execution_request is not execution_request:
+        raise ValueError(
+            "Multiple concurrent executions are not supported! {} vs {}".format(
+              self._execution_request, execution_request))
+      raw_roots = self._native.gc(self._native.lib.execution_roots(self._scheduler),
+                                  self._native.lib.nodes_destroy)
+      for root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
+        print("python got root: {}".format(root))
       return {root: self._product_graph.state(root) for root in execution_request.roots}
 
   def invalidate_files(self, filenames):
@@ -280,7 +289,9 @@ class LocalScheduler(object):
     return zip(runnable_ids, runnable_states)
 
   def _execution_add_roots(self, execution_request):
-    self._native.lib.execution_reset(self._scheduler)
+    if self._execution_request is not None:
+      self._native.lib.execution_reset(self._scheduler)
+    self._execution_request = execution_request
     for subject, product in execution_request.roots:
       if type(subject) in [Address, PathGlobs]:
         self._native.lib.execution_add_root_select(
