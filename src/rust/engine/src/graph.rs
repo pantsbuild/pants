@@ -60,11 +60,17 @@ impl Entry {
 
   fn format(&self, to_str: &ToStrFunction) -> String {
     let (subject, product) = self.node.subject_and_product();
+    let state =
+      match self.state {
+        Some(Complete::Return(r)) => to_str.call(r.digest()),
+        ref x => format!("{:?}", x),
+      };
     format!(
-      "{}:{} == {:?}",
+      "{}:{}:{} == {}",
+      self.node.format(to_str),
       to_str.call(subject.digest()),
       to_str.call(product),
-      self.state
+      state,
     ).replace("\"", "\\\"")
   }
 }
@@ -320,6 +326,7 @@ impl Graph {
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
 
       for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
+        let style = if cyclic { " [style=dashed]" } else { "" };
         for &dep_id in adjacencies {
           let dep_entry = self.entry_for_id(dep_id);
           if !predicate(dep_entry) {
@@ -327,7 +334,6 @@ impl Graph {
           }
 
           // Write an entry per edge.
-          let style = if cyclic { " [style=dashed]" } else { "" };
           let dep_str = dep_entry.format(to_str);
           try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_str, style)));
         }

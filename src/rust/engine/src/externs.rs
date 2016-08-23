@@ -50,7 +50,7 @@ impl StoreListFunction {
 }
 
 pub struct FixedBuffer {
-  buf: [u8;256],
+  buf: [u8;255],
 }
 
 pub type ToStrExtern =
@@ -71,13 +71,20 @@ impl ToStrFunction {
 
   pub fn call(&self, digest: &Digest) -> String {
     // Create a buffer with a maximum length.
-    let mut buffer = FixedBuffer { buf: [0;256] };
+    let mut buffer = FixedBuffer { buf: [0;255] };
+    let max_len = buffer.buf.len();
     let len = (self.to_str)(self.storage, digest, &mut buffer) as usize;
     // Trim the buffer content to the reported written length, and decode.
     let mut trimmed = buffer.buf.to_vec();
     trimmed.truncate(len);
     // Attempt to decode from unicode.
-    String::from_utf8(trimmed).unwrap_or_else(|e| {
+    String::from_utf8(trimmed).map(|s| {
+      if len == max_len {
+        format!("{}...", s)
+      } else {
+        s
+      }
+    }).unwrap_or_else(|e| {
       format!("<failed to decode unicode for {:?}: {}>", digest, e)
     })
   }

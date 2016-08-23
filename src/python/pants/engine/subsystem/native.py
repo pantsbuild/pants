@@ -19,7 +19,7 @@ _FFI.cdef(
     } Digest;
 
     typedef struct {
-      char buf[256];
+      char buf[255];
     } FixedBuffer;
 
     typedef Digest TypeId;

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use core::{Field, Function, Key, TypeId, Variants};
-use selectors;
+use externs::ToStrFunction;
 use selectors::Selector;
+use selectors;
 use tasks::Tasks;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -505,6 +505,16 @@ pub enum Node {
 }
 
 impl Node {
+  pub fn format(&self, to_str: &ToStrFunction) -> String {
+    match self {
+      &Node::Select(_) => "Select".to_string(),
+      &Node::SelectLiteral(_) => "Literal".to_string(),
+      &Node::SelectDependencies(_) => "Dependencies".to_string(),
+      &Node::SelectProjection(_) => "Projection".to_string(),
+      &Node::Task(ref t) => format!("Task({})", to_str.call(&t.func)),
+    }
+  }
+
   pub fn subject_and_product(&self) -> (&Key, &TypeId) {
     match self {
       &Node::Select(ref s) => (&s.subject, &s.selector.product),
