@@ -42,20 +42,14 @@ class ConsolidateClasspath(JvmBinaryTask):
     consolidated_classpath = self.context.products.get_data(
       'consolidated_classpath', runtime_classpath.copy)
 
-<<<<<<< ours
     # TODO: use a smarter filter method we should be able to limit the targets a bit more.
     # https://github.com/pantsbuild/pants/issues/3807
-=======
->>>>>>> theirs
     targets_to_consolidate = self.context.targets(**self._target_closure_kwargs)
     self._consolidate_classpath(targets_to_consolidate, consolidated_classpath)
 
   def _consolidate_classpath(self, targets, classpath_products):
     """Convert loose directories in classpath_products into jars. """
-<<<<<<< ours
     # TODO: find a way to not process classpath entries for valid VTs.
-=======
->>>>>>> theirs
 
     # NB: It is very expensive to call to get entries for each target one at a time.
     # For performance reasons we look them all up at once.
