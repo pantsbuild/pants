@@ -1,4 +1,9 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::io;
+use std::path::Path;
+
 use nodes::{Node, Complete};
 
 pub type EntryId = u64;
@@ -241,7 +246,6 @@ impl Graph {
   }
 
   fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: HashSet<EntryId>) -> usize {
-
     // Remove the roots from their dependencies' dependents lists.
     for id in &ids {
       // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
@@ -267,6 +271,45 @@ impl Graph {
     nodes.extend(filtered);
 
     entries.len()
+  }
+
+  pub fn visualize(&self, roots: &Vec<Node>, path: &Path) -> io::Result<()> {
+    let file = try!(File::create(path));
+    let mut writer = BufWriter::new(file);
+    self.visualize_internal(roots, &mut writer)
+  }
+
+  fn visualize_internal<F: Write>(&self, roots: &Vec<Node>, f: &mut BufWriter<F>) -> io::Result<()> {
+    let mut viz_colors = HashMap::new();
+    let viz_color_scheme = "set312";
+    let viz_max_colors = 12;
+
+    try!(f.write_all(b"digraph plans {"));
+    try!(f.write_fmt(format_args!("  node[colorscheme={}];", viz_color_scheme)));
+    try!(f.write_all(b"  concentrate=true;"));
+    try!(f.write_all(b"  rankdir=LR;"));
+
+    let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
+    let predicate = |_| true;
+
+    for entry in self.walk(root_entries, |_| true, false) {
+      let node_str = format_node(entry.node, entry.state);
+
+      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];", node_str, format_color(entry.node, entry.state))));
+
+      for (cyclic, adjacencies) in vec![(false, entry.dependencies), (true, entry.cyclic_dependencies)] {
+        for dep_id in adjacencies {
+          let dep_entry = self.entry_for_id(dep_id);
+          if !predicate(dep_entry) {
+            continue;
+          }
+          try!(f.write_all(format_edge(node_str, format_node(dep_entry), cyclic)));
+        }
+      }
+    }
+
+    try!(f.write_all(b"}"));
+    Ok(())
   }
 }
 
