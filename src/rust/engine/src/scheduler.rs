@@ -1,5 +1,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use std::io;
+use std::path::Path;
+
 use core::{Field, Key, TypeId};
 use graph::{Entry, EntryId, Graph};
 use nodes::{Complete, Node, Runnable, State};
@@ -34,6 +37,10 @@ impl Scheduler {
       candidates: VecDeque::new(),
       outstanding: HashSet::new(),
     }
+  }
+
+  pub fn visualize(&self, path: &Path) -> io::Result<()> {
+    self.graph.visualize(&self.roots, path)
   }
 
   pub fn reset(&mut self) {

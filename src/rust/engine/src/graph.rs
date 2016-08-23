@@ -56,6 +56,10 @@ impl Entry {
   pub fn is_complete(&self) -> bool {
     self.state.is_some()
   }
+
+  fn format(&self) -> String {
+    format!("{:?} == {:?}", self.node.subject_and_product(), self.state)
+  }
 }
 
 type Nodes = HashMap<Node, EntryId>;
@@ -283,6 +287,20 @@ impl Graph {
     let mut viz_colors = HashMap::new();
     let viz_color_scheme = "set312";
     let viz_max_colors = 12;
+    let mut format_color =
+      |entry: &Entry| {
+        match entry.state {
+          None => "white".to_string(),
+          Some(Complete::Noop(_)) => "white".to_string(),
+          Some(Complete::Throw(_)) => "tomato".to_string(),
+          Some(Complete::Return(_)) => {
+            let viz_colors_len = viz_colors.len();
+            viz_colors.entry(entry.node.subject_and_product().1.clone()).or_insert_with(|| {
+              format!("{}", viz_colors_len % viz_max_colors + 1)
+            }).clone()
+          },
+        }
+      };
 
     try!(f.write_all(b"digraph plans {"));
     try!(f.write_fmt(format_args!("  node[colorscheme={}];", viz_color_scheme)));
@@ -293,17 +311,21 @@ impl Graph {
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
-      let node_str = format_node(entry.node, entry.state);
+      let node_str = entry.format();
 
-      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];", node_str, format_color(entry.node, entry.state))));
+      // Write the node header.
+      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];", node_str, format_color(entry))));
 
-      for (cyclic, adjacencies) in vec![(false, entry.dependencies), (true, entry.cyclic_dependencies)] {
-        for dep_id in adjacencies {
+      for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
+        for &dep_id in adjacencies {
           let dep_entry = self.entry_for_id(dep_id);
           if !predicate(dep_entry) {
             continue;
           }
-          try!(f.write_all(format_edge(node_str, format_node(dep_entry), cyclic)));
+
+          // Write an entry per edge.
+          let style = if cyclic { " [style=dashed]" } else { "" };
+          try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}", node_str, dep_entry.format(), style)));
         }
       }
     }

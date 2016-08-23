@@ -8,6 +8,9 @@ mod tasks;
 
 extern crate libc;
 
+use std::ffi::CStr;
+use std::path::Path;
+
 use core::{Field, Function, Key, TypeId};
 use externs::{IsInstanceExtern, IsInstanceFunction, StorageExtern, StoreListExtern, StoreListFunction};
 use graph::{Graph, EntryId};
@@ -380,6 +383,17 @@ pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
 pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.graph.len() as u64
+  })
+}
+
+#[no_mangle]
+pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const libc::c_char) {
+  with_scheduler(scheduler_ptr, |raw| {
+    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+    let path = Path::new(path_str.as_str());
+    raw.scheduler.visualize(&path).unwrap_or_else(|e| {
+      println!("Failed to visualize to {}: {:?}", path.display(), e);
+    });
   })
 }
 
