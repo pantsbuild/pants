@@ -27,6 +27,16 @@ jvm_app(name='relative_to',
   ]
 )
 
+jvm_app(name='rel_path',
+  binary=':bundle-bin',
+  bundles=[
+    bundle(
+      rel_path='testprojects/src/java/org/pantsbuild/testproject/bundle/a',
+      fileset=['b/file1.txt']
+    )
+  ]
+)
+
 # The binary, the "runnable" part:
 
 jvm_binary(name = 'bundle-bin',

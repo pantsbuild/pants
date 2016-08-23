@@ -20,9 +20,6 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)
     self.assert_success(self.run_pants(['clean-all', 'test.junit', '--strict-jvm-version', spec]))
 
-  # See https://github.com/pantsbuild/pants/issues/2894 for details on why this is
-  # marked xfail.
-  @expectedFailure
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_java_eight(self):
     self._testjvms('eight')

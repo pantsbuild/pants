@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from contextlib import contextmanager
 
+from pants.base.deprecated import deprecated
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem import Subsystem
@@ -14,6 +15,7 @@ from pants_test.option.util.fakes import (create_option_values_for_optionable,
                                           create_options_for_optionables)
 
 
+@deprecated('1.4.0', "Use BaseTest.context()'s for_subsystems and options args.")
 def create_subsystem(subsystem_type, scope='test-scope', **options):
   """Creates a Subsystem for test.
 

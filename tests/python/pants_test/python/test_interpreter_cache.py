@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
 from contextlib import contextmanager
 
 import mock
@@ -16,10 +15,10 @@ from pex.resolver import Unsatisfiable, resolve
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.util.contextutil import temporary_dir
-from pants_test.subsystem.subsystem_util import create_subsystem
+from pants_test.base_test import BaseTest
 
 
-class TestInterpreterCache(unittest.TestCase):
+class TestInterpreterCache(BaseTest):
   def _make_bad_requirement(self, requirement):
     """Turns a requirement that passes into one we know will fail.
 
@@ -28,6 +27,7 @@ class TestInterpreterCache(unittest.TestCase):
     return str(requirement).replace('==2.', '==99.')
 
   def setUp(self):
+    super(TestInterpreterCache, self).setUp()
     self._interpreter = PythonInterpreter.get()
 
   @contextmanager
@@ -89,14 +89,21 @@ class TestInterpreterCache(unittest.TestCase):
       wheel_version = link_egg(egg_dir, 'wheel')
 
       interpreter_requirement = self._interpreter.identity.requirement
-      python_setup = create_subsystem(PythonSetup,
-                                      interpreter_cache_dir=None,
-                                      pants_workdir=os.path.join(root, 'workdir'),
-                                      interpreter_requirement=interpreter_requirement,
-                                      setuptools_version=setuptools_version,
-                                      wheel_version=wheel_version)
-      python_repos = create_subsystem(PythonRepos, indexes=[], repos=[egg_dir])
-      cache = PythonInterpreterCache(python_setup, python_repos)
+
+      self.context(for_subsystems=[PythonSetup, PythonRepos], options={
+        PythonSetup.options_scope: {
+          'interpreter_cache_dir': None,
+          'pants_workdir': os.path.join(root, 'workdir'),
+          'interpreter_requirement': interpreter_requirement,
+          'setuptools_version': setuptools_version,
+          'wheel_version': wheel_version,
+        },
+        PythonRepos.options_scope: {
+          'indexes': [],
+          'repos': [egg_dir],
+        }
+      })
+      cache = PythonInterpreterCache(PythonSetup.global_instance(), PythonRepos.global_instance())
 
       interpereters = cache.setup(paths=[os.path.dirname(self._interpreter.binary)],
                                   filters=[str(interpreter_requirement)])
