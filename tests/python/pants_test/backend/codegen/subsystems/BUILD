@@ -8,7 +8,6 @@ python_tests(
     'src/python/pants/backend/codegen/subsystems:thrift_defaults',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:base_test',
   ]
 )

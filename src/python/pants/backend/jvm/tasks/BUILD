@@ -8,6 +8,7 @@ python_library(
     ':binary_create',
     ':bootstrap_jvm_tools',
     ':bundle_create',
+    ':consolidate_classpath',
     ':check_published_deps',
     ':checkstyle',
     ':detect_duplicates',
@@ -58,6 +59,16 @@ python_library(
 python_library(
   name = 'binary_create',
   sources = ['binary_create.py'],
+  dependencies = [
+    ':jvm_binary_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'consolidate_classpath',
+  sources = ['consolidate_classpath.py'],
   dependencies = [
     ':jvm_binary_task',
     'src/python/pants/base:build_environment',

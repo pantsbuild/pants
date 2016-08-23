@@ -101,6 +101,13 @@ class AntlrGenTest(NailgunTaskTestBase):
 
       self.assertIn(syn_target, context.targets())
 
+    # Check that the output file locations match the package
+    if expected_package is not None:
+      expected_path_prefix = expected_package.replace('.', os.path.sep) + os.path.sep
+      for source in syn_target.sources_relative_to_source_root():
+        self.assertTrue(source.startswith(expected_path_prefix),
+                        "{0} does not start with {1}".format(source, expected_path_prefix))
+
     return syn_target
 
   def test_explicit_package_v3(self):

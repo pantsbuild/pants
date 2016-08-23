@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import sys
 from abc import abstractproperty
 
+import six
+
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -42,6 +44,11 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   ApacheThrift value.
   """
   optional = False
+
+  def __new__(cls, product, variant_key):
+    if not isinstance(variant_key, six.string_types):
+      raise ValueError('Expected variant_key to be a string, but was {!r}'.format(variant_key))
+    return super(SelectVariant, cls).__new__(cls, product, variant_key)
 
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__,

@@ -117,7 +117,6 @@ python_tests(
     'src/python/pants/backend/project_info/tasks:ide_gen',
     'src/python/pants/source',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
