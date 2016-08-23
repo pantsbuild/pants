@@ -61,6 +61,11 @@ class BundleCreate(JvmBinaryTask):
     return super(BundleCreate, cls).implementation_version() + [('BundleCreate', 1)]
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    super(BundleCreate, cls).prepare(options, round_manager)
+    round_manager.require_data('consolidated_classpath')
+
+  @classmethod
   def product_types(cls):
     return ['jvm_archives', 'jvm_bundles', 'deployable_archives']
 
@@ -123,19 +128,6 @@ class BundleCreate(JvmBinaryTask):
     self.context.log.debug('created {}'.format(os.path.relpath(path, get_buildroot())))
 
   def execute(self):
-    # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
-    # more efficient than loading them as individual files.
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
-
-    # TODO (from mateor) The consolidate classpath is something that we could do earlier in the
-    # pipeline and it would be nice to just add those unpacked classed to a product and get the
-    # consolidated classpath for free.
-    targets_to_consolidate = self.find_consolidate_classpath_candidates(
-      runtime_classpath,
-      self.context.targets(**self._target_closure_kwargs),
-    )
-    self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
-
     targets_to_bundle = self.context.targets(self.App.is_app)
 
     if self.get_options().use_basename_prefix:
@@ -181,7 +173,6 @@ class BundleCreate(JvmBinaryTask):
 
     The bundle will contain the target classes, dependencies and resources.
     """
-
     assert(isinstance(app, BundleCreate.App))
 
     bundle_dir = self._get_bundle_dir(app, results_dir)
@@ -196,9 +187,9 @@ class BundleCreate(JvmBinaryTask):
     lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
     if not app.deployjar:
       os.mkdir(lib_dir)
-      runtime_classpath = self.context.products.get_data('runtime_classpath')
+      consolidated_classpath = self.context.products.get_data('consolidated_classpath')
       classpath.update(ClasspathUtil.create_canonical_classpath(
-        runtime_classpath,
+        consolidated_classpath,
         app.target.closure(bfs=True, **self._target_closure_kwargs),
         lib_dir,
         internal_classpath_only=False,
@@ -230,36 +221,6 @@ class BundleCreate(JvmBinaryTask):
         os.symlink(path, bundle_path)
 
     return bundle_dir
-
-  def consolidate_classpath(self, targets, classpath_products):
-    """Convert loose directories in classpath_products into jars. """
-
-    with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation:
-      for vt in invalidation.all_vts:
-        entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
-        for index, (conf, entry) in enumerate(entries):
-          if ClasspathUtil.is_dir(entry.path):
-            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
-
-            # regenerate artifact for invalid vts
-            if not vt.valid:
-              with self.open_jar(jarpath, overwrite=True, compressed=False) as jar:
-                jar.write(entry.path)
-
-            # replace directory classpath entry with its jarpath
-            classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
-            classpath_products.add_for_target(vt.target, [(conf, jarpath)])
-
-  def find_consolidate_classpath_candidates(self, classpath_products, targets):
-    targets_with_directory_in_classpath = []
-    for target in targets:
-      entries = classpath_products.get_internal_classpath_entries_for_targets([target])
-      for conf, entry in entries:
-        if ClasspathUtil.is_dir(entry.path):
-          targets_with_directory_in_classpath.append(target)
-          break
-
-    return targets_with_directory_in_classpath
 
   def check_basename_conflicts(self, targets):
     """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
