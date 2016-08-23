@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import defaultdict
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
@@ -41,18 +42,21 @@ class ConsolidateClasspath(JvmBinaryTask):
     consolidated_classpath = self.context.products.get_data(
       'consolidated_classpath', runtime_classpath.copy)
 
-    targets_to_consolidate = self._find_consolidate_classpath_candidates(
-      consolidated_classpath,
-      self.context.targets(**self._target_closure_kwargs),
-    )
+    targets_to_consolidate = self.context.targets(**self._target_closure_kwargs)
     self._consolidate_classpath(targets_to_consolidate, consolidated_classpath)
 
   def _consolidate_classpath(self, targets, classpath_products):
     """Convert loose directories in classpath_products into jars. """
+
+    # NB: It is very expensive to call to get entries for each target one at a time.
+    # For performance reasons we look them all up at once.
+    entries_map = defaultdict(list)
+    for (cp, target) in classpath_products.get_product_target_mappings_for_targets(targets, True):
+      entries_map[target].append(cp)
+
     with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation:
       for vt in invalidation.all_vts:
-        # TODO: find a way to not process classpath entries for valid VTs.
-        entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
+        entries = entries_map.get(vt.target, [])
         for index, (conf, entry) in enumerate(entries):
           if ClasspathUtil.is_dir(entry.path):
             jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
