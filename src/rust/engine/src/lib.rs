@@ -108,7 +108,7 @@ pub struct RawNode {
   // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
   // a stable release.
   union_tag: u8,
-  union_return: Option<Key>,
+  union_return: Key,
   // TODO: expose as cstrings.
   union_throw: bool,
   union_noop: bool,
@@ -126,8 +126,8 @@ impl RawNode {
         Some(&Complete::Noop(_)) => RawState::Noop as u8,
       },
       union_return: match state {
-        Some(&Complete::Return(ref r)) => Some(r.clone()),
-        _ => None,
+        Some(&Complete::Return(ref r)) => r.clone(),
+        _ => Key::empty(),
       },
       union_throw: match state {
         Some(&Complete::Throw(_)) => true,

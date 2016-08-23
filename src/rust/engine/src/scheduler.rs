@@ -43,7 +43,13 @@ impl Scheduler {
   }
 
   pub fn root_states(&self) -> Vec<(&Key,&TypeId,Option<&Complete>)> {
-    panic!("TODO: not implemented");
+    self.roots.iter()
+      .map(|root| {
+        let state = self.graph.entry(root).and_then(|e| e.state());
+        let (subject, product) = root.subject_and_product();
+        (subject, product, state)
+      })
+      .collect()
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeId) {

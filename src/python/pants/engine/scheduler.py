@@ -241,9 +241,22 @@ class LocalScheduler(object):
               self._execution_request, execution_request))
       raw_roots = self._native.gc(self._native.lib.execution_roots(self._scheduler),
                                   self._native.lib.nodes_destroy)
+      roots = {}
       for root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
-        print("python got root: {}".format(root))
-      return {root: self._product_graph.state(root) for root in execution_request.roots}
+        subject = self._from_key(root.subject)
+        product = self._from_type_key(root.product)
+        if root.union_tag is 0:
+          state = None
+        elif root.union_tag is 1:
+          state = Return(self._from_key(root.union_return))
+        elif root.union_tag is 2:
+          state = Throw("Failed")
+        elif root.union_tag is 3:
+          state = Noop("Nooped")
+        roots[(subject, product)] = state
+
+      print('>>> roots were: {}'.format(roots))
+      return roots
 
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""

@@ -505,6 +505,16 @@ pub enum Node {
 }
 
 impl Node {
+  pub fn subject_and_product(&self) -> (&Key, &TypeId) {
+    match self {
+      &Node::Select(ref s) => (&s.subject, &s.selector.product),
+      &Node::SelectLiteral(ref s) => (&s.subject, &s.selector.product),
+      &Node::SelectDependencies(ref s) => (&s.subject, &s.selector.product),
+      &Node::SelectProjection(ref s) => (&s.subject, &s.selector.product),
+      &Node::Task(ref t) => (&t.subject, &t.product),
+    }
+  }
+
   pub fn create(selector: Selector, subject: Key, variants: Variants) -> Node {
     match selector {
       Selector::Select(s) =>

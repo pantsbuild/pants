@@ -25,6 +25,17 @@ pub struct Key {
 }
 
 impl Key {
+  pub fn empty() -> Key {
+    Key {
+      digest: Digest {
+        digest: [0;32]
+      },
+      type_id: TypeId {
+        digest: [0;32]
+      },
+    }
+  }
+
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
   }
