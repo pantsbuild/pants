@@ -126,7 +126,7 @@ impl RawNode {
         None => RawState::Empty as u8,
         Some(&Complete::Return(_)) => RawState::Return as u8,
         Some(&Complete::Throw(_)) => RawState::Throw as u8,
-        Some(&Complete::Noop(_)) => RawState::Noop as u8,
+        Some(&Complete::Noop(_, _)) => RawState::Noop as u8,
       },
       union_return: match state {
         Some(&Complete::Return(ref r)) => r.clone(),
@@ -137,7 +137,7 @@ impl RawNode {
         _ => false,
       },
       union_noop: match state {
-        Some(&Complete::Noop(_)) => true,
+        Some(&Complete::Noop(_, _)) => true,
         _ => false,
       },
     }

@@ -36,7 +36,7 @@ pub enum State {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Complete {
-  Noop(String),
+  Noop(&'static str, Selector),
   Return(Key),
   Throw(String),
 }
@@ -63,9 +63,7 @@ impl<'g,'t> StepContext<'g,'t> {
                 subject: subject.clone(),
                 product: product.clone(),
                 variants: variants.clone(),
-                func: task.func().clone(),
-                clause: task.input_clause().clone(),
-                cacheable: task.cacheable(),
+                selector: task.clone(),
               }
             )
           )
@@ -226,7 +224,7 @@ impl Step for Select {
         match context.get(&variants_node) {
           Some(&Complete::Return(ref value)) =>
             panic!("TODO: merging variants is not yet implemented"),
-          Some(&Complete::Noop(_)) =>
+          Some(&Complete::Noop(_, _)) =>
             &self.variants,
           Some(&Complete::Throw(ref msg)) =>
             return State::Complete(Complete::Throw(msg.clone())),
@@ -248,7 +246,8 @@ impl Step for Select {
           if variant_value.is_none() {
             return State::Complete(
               Complete::Noop(
-                format!("Variant key {:?} was not configured in variants.", self.selector.variant_key)
+                "Variant key for {} was not configured in variants.",
+                Selector::Select(self.selector.clone())
               )
             )
           }
@@ -269,7 +268,7 @@ impl Step for Select {
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
           matches.push(&value),
-        Some(&Complete::Noop(_)) =>
+        Some(&Complete::Noop(_, _)) =>
           continue,
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
@@ -299,7 +298,7 @@ impl Step for Select {
         State::Complete(Complete::Return(matched)),
       None =>
         State::Complete(
-          Complete::Noop(format!("No source of product {:?} for {:?}.", self.product(), self.subject))
+          Complete::Noop("No source of {}.", Selector::Select(self.selector.clone()))
         ),
     }
   }
@@ -353,9 +352,9 @@ impl Step for SelectDependencies {
       match context.get(&dep_product_node) {
         Some(&Complete::Return(ref value)) =>
           value,
-        Some(&Complete::Noop(_)) =>
+        Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            Complete::Noop(format!("Could not compute {:?} to determine deps.", dep_product_node))
+            Complete::Noop("Could not compute {} to determine deps.", dep_product_node.selector())
           ),
         Some(&Complete::Throw(ref msg)) =>
           return State::Complete(Complete::Throw(msg.clone())),
@@ -370,8 +369,10 @@ impl Step for SelectDependencies {
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
           dep_values.push(&value),
-        Some(&Complete::Noop(_)) =>
-          continue,
+        Some(&Complete::Noop(_, _)) =>
+          return State::Complete(
+            Complete::Throw(format!("No source of explicit dep {:?}", dep_node))
+          ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
           return State::Complete(Complete::Throw(msg.clone())),
@@ -408,9 +409,9 @@ impl Step for SelectProjection {
       match context.get(&input_node) {
         Some(&Complete::Return(ref value)) =>
           value,
-        Some(&Complete::Noop(_)) =>
+        Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            Complete::Noop(format!("Could not compute {:?} to project its field.", input_node))
+            Complete::Noop("Could not compute {} to project its field.", input_node.selector())
           ),
         Some(&Complete::Throw(ref msg)) =>
           return State::Complete(Complete::Throw(msg.clone())),
@@ -431,7 +432,7 @@ impl Step for SelectProjection {
     match context.get(&output_node) {
       Some(&Complete::Return(value)) =>
         return State::Complete(Complete::Return(value)),
-      Some(&Complete::Noop(_)) =>
+      Some(&Complete::Noop(_, _)) =>
         return State::Complete(
           Complete::Throw(format!("No source of projected dependency {:?}", output_node))
         ),
@@ -449,9 +450,7 @@ pub struct Task {
   subject: Key,
   product: TypeId,
   variants: Variants,
-  func: Function,
-  clause: Vec<selectors::Selector>,
-  cacheable: bool,
+  selector: selectors::Task,
 }
 
 impl Step for Task {
@@ -459,7 +458,7 @@ impl Step for Task {
     // Compute dependencies for the Node, or determine whether it is a Noop.
     let mut dependencies = Vec::new();
     let mut dep_values: Vec<&Key> = Vec::new();
-    for selector in &self.clause {
+    for selector in &self.selector.clause {
       let dep_node =
         Node::create(
           selector.clone(),
@@ -469,9 +468,9 @@ impl Step for Task {
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
           dep_values.push(&value),
-        Some(&Complete::Noop(_)) =>
+        Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            Complete::Noop(format!("Was missing (at least) input for {:?}.", selector))
+            Complete::Noop("Was missing (at least) input for {}.", selector.clone())
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
@@ -487,9 +486,9 @@ impl Step for Task {
     } else {
       // Ready to run!
       State::Runnable(Runnable {
-        func: self.func,
+        func: self.selector.func,
         args: dep_values.into_iter().map(|&d| d).collect(),
-        cacheable: self.cacheable,
+        cacheable: self.selector.cacheable,
       })
     }
   }
@@ -511,17 +510,37 @@ impl Node {
       &Node::SelectLiteral(_) => "Literal".to_string(),
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
-      &Node::Task(ref t) => format!("Task({})", to_str.call(&t.func)),
+      &Node::Task(ref t) => format!("Task({})", to_str.call(&t.selector.func)),
     }
   }
 
-  pub fn subject_and_product(&self) -> (&Key, &TypeId) {
+  pub fn subject(&self) -> &Key {
     match self {
-      &Node::Select(ref s) => (&s.subject, &s.selector.product),
-      &Node::SelectLiteral(ref s) => (&s.subject, &s.selector.product),
-      &Node::SelectDependencies(ref s) => (&s.subject, &s.selector.product),
-      &Node::SelectProjection(ref s) => (&s.subject, &s.selector.product),
-      &Node::Task(ref t) => (&t.subject, &t.product),
+      &Node::Select(ref s) => &s.subject,
+      &Node::SelectLiteral(ref s) => &s.subject,
+      &Node::SelectDependencies(ref s) => &s.subject,
+      &Node::SelectProjection(ref s) => &s.subject,
+      &Node::Task(ref t) => &t.subject,
+    }
+  }
+
+  pub fn product(&self) -> &TypeId {
+    match self {
+      &Node::Select(ref s) => &s.selector.product,
+      &Node::SelectLiteral(ref s) => &s.selector.product,
+      &Node::SelectDependencies(ref s) => &s.selector.product,
+      &Node::SelectProjection(ref s) => &s.selector.product,
+      &Node::Task(ref t) => &t.selector.product,
+    }
+  }
+
+  pub fn selector(&self) -> Selector {
+    match self {
+      &Node::Select(ref s) => Selector::Select(s.selector.clone()),
+      &Node::SelectLiteral(ref s) => Selector::SelectLiteral(s.selector.clone()),
+      &Node::SelectDependencies(ref s) => Selector::SelectDependencies(s.selector.clone()),
+      &Node::SelectProjection(ref s) => Selector::SelectProjection(s.selector.clone()),
+      &Node::Task(ref t) => Selector::Task(t.selector.clone()),
     }
   }
 
@@ -551,6 +570,13 @@ impl Node {
           subject: subject,
           variants: variants,
           selector: s,
+        }),
+      Selector::Task(t) =>
+        Node::Task(Task {
+          subject: subject,
+          product: t.product,
+          variants: variants,
+          selector: t,
         }),
     }
   }

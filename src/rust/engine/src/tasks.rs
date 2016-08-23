@@ -2,29 +2,7 @@ use std::collections::HashMap;
 
 use core::{Field, Function, Key, TypeId};
 use externs::{IsInstanceFunction, StoreListFunction};
-use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
-
-#[derive(Debug)]
-pub struct Task {
-  cacheable: bool,
-  output_type: TypeId,
-  input_clause: Vec<Selector>,
-  func: Function,
-}
-
-impl Task {
-  pub fn cacheable(&self) -> bool {
-    self.cacheable
-  }
-
-  pub fn func(&self) -> &Function {
-    &self.func
-  }
-
-  pub fn input_clause(&self) -> &Vec<Selector> {
-    &self.input_clause
-  }
-}
+use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
 
 /**
  * Registry of tasks able to produce each type, along with a few fundamental python
@@ -127,8 +105,8 @@ impl Tasks {
       .push(
         Task {
           cacheable: false,
-          output_type: product,
-          input_clause: vec![Selector::select(subject_type)],
+          product: product,
+          clause: vec![Selector::select(subject_type)],
           func: func,
         },
       );
@@ -138,7 +116,7 @@ impl Tasks {
    * The following methods define the Task registration lifecycle.
    */
 
-  pub fn task_add(&mut self, func: Function, output_type: TypeId) {
+  pub fn task_add(&mut self, func: Function, product: TypeId) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
@@ -148,8 +126,8 @@ impl Tasks {
       Some(
         Task {
           cacheable: true,
-          output_type: output_type,
-          input_clause: Vec::new(),
+          product: product,
+          clause: Vec::new(),
           func: func,
         }
       );
@@ -182,7 +160,7 @@ impl Tasks {
   fn clause(&mut self, selector: Selector) {
     self.preparing.as_mut()
       .expect("Must `begin()` a task creation before adding clauses!")
-      .input_clause.push(selector);
+      .clause.push(selector);
   }
 
   pub fn task_end(&mut self) {
@@ -194,6 +172,6 @@ impl Tasks {
     // Move the task from `preparing` to the Tasks map
     let task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
 
-    self.tasks.entry(task.output_type.clone()).or_insert_with(|| Vec::new()).push(task);
+    self.tasks.entry(task.product.clone()).or_insert_with(|| Vec::new()).push(task);
   }
 }

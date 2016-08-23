@@ -55,8 +55,9 @@ impl Scheduler {
   pub fn root_states(&self) -> Vec<(&Key,&TypeId,Option<&Complete>)> {
     self.roots.iter()
       .map(|root| {
+        let subject = root.subject();
+        let product = root.product();
         let state = self.graph.entry(root).and_then(|e| e.state());
-        let (subject, product) = root.subject_and_product();
         (subject, product, state)
       })
       .collect()
@@ -101,8 +102,6 @@ impl Scheduler {
       return None;
     }
 
-    println!(">>> rust attempting step for {}", id);
-
     let dep_entries: Vec<&Entry> =
       entry.dependencies().iter()
         .map(|&d| self.graph.entry_for_id(d))
@@ -113,15 +112,21 @@ impl Scheduler {
     }
 
     // All deps are complete: gather them.
-    let cyclic = Complete::Noop("Dep would be cyclic.".to_string());
+    let cyclic_deps: Vec<(&Entry, Complete)> =
+      entry.cyclic_dependencies().iter()
+        .map(|&id| {
+          let entry = self.graph.entry_for_id(id);
+          (entry, Complete::Noop("Dep would be cyclic: {}.", entry.node().selector()))
+        })
+        .collect();
     let mut dep_map: HashMap<&Node, &Complete> =
       dep_entries.iter()
         .filter_map(|e| {
           e.state().map(|s| (e.node(), s))
         })
         .collect();
-    for &id in entry.cyclic_dependencies() {
-      dep_map.insert(self.graph.entry_for_id(id).node(), &cyclic);
+    for &(e, ref s) in cyclic_deps.iter() {
+      dep_map.insert(e.node(), &s);
     }
 
     // And finally, run!

@@ -59,7 +59,6 @@ impl Entry {
   }
 
   fn format(&self, to_str: &ToStrFunction) -> String {
-    let (subject, product) = self.node.subject_and_product();
     let state =
       match self.state {
         Some(Complete::Return(r)) => to_str.call(r.digest()),
@@ -68,8 +67,8 @@ impl Entry {
     format!(
       "{}:{}:{} == {}",
       self.node.format(to_str),
-      to_str.call(subject.digest()),
-      to_str.call(product),
+      to_str.call(self.node.subject().digest()),
+      to_str.call(self.node.selector().product()),
       state,
     ).replace("\"", "\\\"")
   }
@@ -300,11 +299,11 @@ impl Graph {
       |entry: &Entry| {
         match entry.state {
           None => "white".to_string(),
-          Some(Complete::Noop(_)) => "white".to_string(),
+          Some(Complete::Noop(_, _)) => "white".to_string(),
           Some(Complete::Throw(_)) => "tomato".to_string(),
           Some(Complete::Return(_)) => {
             let viz_colors_len = viz_colors.len();
-            viz_colors.entry(entry.node.subject_and_product().1.clone()).or_insert_with(|| {
+            viz_colors.entry(entry.node.selector().product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
             }).clone()
           },
