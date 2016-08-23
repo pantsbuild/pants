@@ -26,19 +26,13 @@ impl Task {
   }
 }
 
-struct TaskFactory {
-  // An optional intrinsic task, which takes precedence for its contained subject type.
-  // If it is present, always contains a Vec of length one.
-  intrinsic: Option<(TypeId,Vec<Task>)>,
-  tasks: Vec<Task>,
-}
-
 /**
  * Registry of tasks able to produce each type, along with a few fundamental python
  * types that the engine must be aware of.
  */
 pub struct Tasks {
-  tasks: HashMap<TypeId, TaskFactory>,
+  intrinsics: HashMap<(TypeId,TypeId), Vec<Task>>,
+  tasks: HashMap<TypeId, Vec<Task>>,
   isinstance: IsInstanceFunction,
   store_list: StoreListFunction,
   field_name: Field,
@@ -74,6 +68,7 @@ impl Tasks {
     type_has_variants: TypeId,
   ) -> Tasks {
     Tasks {
+      intrinsics: HashMap::new(),
       tasks: HashMap::new(),
       isinstance: isinstance,
       store_list: store_list,
@@ -88,17 +83,8 @@ impl Tasks {
   }
 
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeId) -> Option<&Vec<Task>> {
-    self.tasks.get(product).map(|factory| {
-      // If there is a matching intrinsic defined, use that. Otherwise, tasks.
-      factory.intrinsic.as_ref().and_then(|&(ref intrinsic_type, ref intrinsic_task)| {
-        if intrinsic_type == subject_type {
-          println!(">>> rust using intrinsic!");
-          Some(intrinsic_task)
-        } else {
-          None
-        }
-      }).unwrap_or(&factory.tasks)
-    })
+    // Use intrinsics if available, otherwise use tasks.
+    self.intrinsics.get(&(*subject_type, *product)).or(self.tasks.get(product))
   }
 
   pub fn field_name(&self) -> &Field {
@@ -129,33 +115,20 @@ impl Tasks {
     (self.isinstance).isinstance(key, type_id)
   }
 
-  fn task_factory(&mut self, output_type: TypeId) -> &mut TaskFactory {
-    self.tasks.entry(output_type).or_insert_with(||
-      TaskFactory {
-        intrinsic: None,
-        tasks: Vec::new(),
-      }
-    )
-  }
-
   pub fn store_list(&self, keys: Vec<&Key>) -> Key {
     (self.store_list).store_list(keys)
   }
 
   pub fn intrinsic_add(&mut self, func: Function, subject_type: TypeId, product: TypeId) {
-    self.task_factory(subject_type.clone()).intrinsic =
-      Some(
-        (
-          subject_type,
-          vec![
-            Task {
-              cacheable: false,
-              output_type: product,
-              input_clause: vec![Selector::select(subject_type)],
-              func: func,
-            }
-          ]
-        )
+    self.intrinsics.entry((subject_type, product))
+      .or_insert_with(|| Vec::new())
+      .push(
+        Task {
+          cacheable: false,
+          output_type: product,
+          input_clause: vec![Selector::select(subject_type)],
+          func: func,
+        },
       );
   }
 
@@ -219,11 +192,6 @@ impl Tasks {
     // Move the task from `preparing` to the Tasks map
     let task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
 
-    self.tasks.entry(task.output_type.clone()).or_insert_with(||
-      TaskFactory {
-        intrinsic: None,
-        tasks: Vec::new(),
-      }
-    ).tasks.push(task);
+    self.tasks.entry(task.output_type.clone()).or_insert_with(|| Vec::new()).push(task);
   }
 }

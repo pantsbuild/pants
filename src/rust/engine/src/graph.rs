@@ -178,10 +178,10 @@ impl Graph {
 
     // Determine whether each awaited dep is cyclic.
     // TODO: skip cycle detection for deps that are already valid.
-    let (deps, cyclic_deps): (Vec<_>, Vec<_>) =
+    let (deps, cyclic_deps): (HashSet<_>, HashSet<_>) =
       dsts.into_iter()
         .map(|dst| self.ensure_entry(dst))
-        .collect::<Vec<_>>()
+        .collect::<HashSet<_>>()
         .into_iter()
         .partition(|&dst_id| !self.detect_cycle(src_id, dst_id));
 
