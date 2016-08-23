@@ -106,6 +106,7 @@ _FFI.cdef(
     void task_end(RawScheduler*);
 
     uint64_t graph_len(RawScheduler*);
+    void graph_visualize(RawScheduler*, char*);
 
     void execution_reset(RawScheduler*);
     void execution_add_root_select(RawScheduler*, Key, TypeId);

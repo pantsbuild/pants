@@ -302,10 +302,10 @@ impl Graph {
         }
       };
 
-    try!(f.write_all(b"digraph plans {"));
-    try!(f.write_fmt(format_args!("  node[colorscheme={}];", viz_color_scheme)));
-    try!(f.write_all(b"  concentrate=true;"));
-    try!(f.write_all(b"  rankdir=LR;"));
+    try!(f.write_all(b"digraph plans {\n"));
+    try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme)));
+    try!(f.write_all(b"  concentrate=true;\n"));
+    try!(f.write_all(b"  rankdir=LR;\n"));
 
     let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
     let predicate = |_| true;
@@ -314,7 +314,7 @@ impl Graph {
       let node_str = entry.format();
 
       // Write the node header.
-      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];", node_str, format_color(entry))));
+      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
 
       for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
         for &dep_id in adjacencies {
@@ -325,12 +325,12 @@ impl Graph {
 
           // Write an entry per edge.
           let style = if cyclic { " [style=dashed]" } else { "" };
-          try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}", node_str, dep_entry.format(), style)));
+          try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_entry.format(), style)));
         }
       }
     }
 
-    try!(f.write_all(b"}"));
+    try!(f.write_all(b"}\n"));
     Ok(())
   }
 }

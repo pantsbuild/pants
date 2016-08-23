@@ -185,16 +185,14 @@ class LocalScheduler(object):
   def storage(self):
     return self._storage
 
-  def visualize_graph_to_file(self, roots, filename):
+  def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
 
     :param iterable roots: An iterable of the root nodes to begin the graph walk from.
     :param str filename: The filename to output the graphviz output to.
     """
-    with self._product_graph_lock, open(filename, 'wb') as fh:
-      for line in self.product_graph.visualize(roots):
-        fh.write(line)
-        fh.write('\n')
+    with self._product_graph_lock:
+      self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
@@ -351,6 +349,7 @@ class LocalScheduler(object):
         runnable_count += len(runnable)
         scheduling_iterations += 1
 
+      self.visualize_graph_to_file('viz.dot')
       logger.debug(
         'ran %s scheduling iterations and %s runnables in %f seconds. '
         'there are %s total nodes.',
