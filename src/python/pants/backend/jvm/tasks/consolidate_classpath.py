@@ -69,16 +69,3 @@ class ConsolidateClasspath(JvmBinaryTask):
             # Replace directory classpath entry with its jarpath.
             classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
             classpath_products.add_for_target(vt.target, [(conf, jarpath)])
-
-  def _find_consolidate_classpath_candidates(self, classpath_products, targets):
-    # TODO: investigate if inlining this method will provide enough benefit by reducing calls
-    # to justify not being able to short circuit.  See: https://rbcommons.com/s/twitter/r/4152/
-    targets_with_directory_in_classpath = []
-    for target in targets:
-      entries = classpath_products.get_internal_classpath_entries_for_targets([target])
-      for conf, entry in entries:
-        if ClasspathUtil.is_dir(entry.path):
-          targets_with_directory_in_classpath.append(target)
-          break
-
-    return targets_with_directory_in_classpath
