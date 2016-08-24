@@ -25,6 +25,7 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
+from pants.option.ranked_value import RankedValue
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
@@ -67,12 +68,31 @@ class GoalRunnerFactory(object):
     self._kill_nailguns = self._global_options.kill_nailguns
 
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
+
+    self._handle_ignore_patterns()
+
     self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
       self._global_options.enable_v2_engine,
       self._global_options.pants_ignore,
       self._global_options.build_ignore,
       self._global_options.exclude_target_regexp,
       daemon_graph_helper)
+
+  # TODO: Remove this once we have better support of option renaming in option.parser
+  def _handle_ignore_patterns(self):
+    ignore_patterns_explicit = not self._global_options.is_default('ignore_patterns')
+    build_ignore_explicit = not self._global_options.is_default('build_ignore')
+    if ignore_patterns_explicit and build_ignore_explicit:
+      raise type(str('MutualExclusiveOptionError'), (Exception,), dict())(
+        'Can\'t use both --ignore-patterns and --build-ignore, should use --build-ignore only.')
+
+    # If --ignore-patterns is specified, we copy it to --build-ignore,
+    # since the backend uses build_ignore.
+    if ignore_patterns_explicit:
+      self._global_options.build_ignore = RankedValue(
+        self._global_options.get_rank('ignore_patterns'),
+        self._global_options.ignore_patterns
+      )
 
   def _select_buildgraph_and_address_mapper(self,
                                             use_engine,
