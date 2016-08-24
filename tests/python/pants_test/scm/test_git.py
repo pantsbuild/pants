@@ -412,9 +412,14 @@ class GitTest(unittest.TestCase):
       # Mix in a non-UTF-8 author to all commits to exercise the corner described here does not
       # adversely impact the ability to render the changelog (even if rendering for certain
       # characters is incorrect): http://comments.gmane.org/gmane.comp.version-control.git/262685
+      # NB: This method of override requires we include `user.name` and `user.email` even though we
+      # only use `user.name` to exercise non-UTF-8.  Without `user.email`, it will be unset and
+      # commits can then fail on machines without a proper hostname setup for git to fall back to
+      # when concocting a last-ditch `user.email`.
       non_utf8_config = dedent("""
       [user]
         name = Noralf Trønnes
+        email = noralf@example.com
       """).encode('iso-8859-1')
 
       with open(os.path.join(self.gitdir, 'config'), 'wb') as fp:

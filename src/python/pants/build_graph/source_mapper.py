@@ -60,17 +60,23 @@ class SpecSourceMapper(SourceMapper):
       self._build_graph.inject_address_closure(address)
       target = self._build_graph.get_target(address)
       sources = target.payload.get_field('sources')
-      if sources and not isinstance(sources, DeferredSourcesField) and sources.matches(source):
+      if self._sources_match(source, sources):
         yield address
-      if address.build_file.relpath == source:
+      elif self._address_mapper.is_declaring_file(address, source):
         yield address
-      if target.has_resources:
+      elif target.has_resources:
         for resource in target.resources:
           """
           :type resource: pants.build_graph.resources.Resources
           """
           if resource.payload.sources.matches(source):
             yield address
+            break
+
+  def _sources_match(self, source, sources):
+    if not sources or isinstance(sources, DeferredSourcesField):
+      return False
+    return sources.matches(source)
 
 
 class LazySourceMapper(SourceMapper):

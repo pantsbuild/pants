@@ -13,6 +13,7 @@ from six import string_types
 from pants.build_graph.address import Addresses
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import PathGlobs
+from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
@@ -46,7 +47,7 @@ class TargetAdaptor(StructWithDeps):
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
       if not self.has_concrete_sources:
         return tuple()
-      base_globs = BaseGlobs.from_sources_field(self.sources)
+      base_globs = BaseGlobs.from_sources_field(self.sources, self.address.spec_path)
       path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
       return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs, excluded_path_globs),)
 
@@ -130,22 +131,30 @@ class JvmAppAdaptor(TargetAdaptor):
       field_adaptors = super(JvmAppAdaptor, self).field_adaptors
       if getattr(self, 'bundles', None) is None:
         return field_adaptors
-      # Construct a field for the `bundles` argument.
-      filespecs_list = []
-      path_globs_list = []
-      excluded_path_globs_list = []
-      for bundle in self.bundles:
-        base_globs = BaseGlobs.from_sources_field(bundle.fileset)
-        filespecs_list.append(base_globs.filespecs)
-        path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-        path_globs_list.append(path_globs)
-        excluded_path_globs_list.append(excluded_path_globs)
-      bundles_field = BundlesField(self.address,
-                                   self.bundles,
-                                   filespecs_list,
-                                   path_globs_list,
-                                   excluded_path_globs_list)
+
+      bundles_field = self._construct_bundles_field()
       return field_adaptors + (bundles_field,)
+
+  def _construct_bundles_field(self):
+    filespecs_list = []
+    path_globs_list = []
+    excluded_path_globs_list = []
+    for bundle in self.bundles:
+      # NB: if a bundle has a rel_path, then the rel_root of the resulting file globs must be
+      # set to that rel_path.
+      rel_root = getattr(bundle, 'rel_path', self.address.spec_path)
+
+      base_globs = BaseGlobs.from_sources_field(bundle.fileset, rel_root)
+      path_globs, excluded_path_globs = base_globs.to_path_globs(rel_root)
+
+      filespecs_list.append(base_globs.filespecs)
+      path_globs_list.append(path_globs)
+      excluded_path_globs_list.append(excluded_path_globs)
+    return BundlesField(self.address,
+                        self.bundles,
+                        filespecs_list,
+                        path_globs_list,
+                        excluded_path_globs_list)
 
 
 class PythonTargetAdaptor(TargetAdaptor):
@@ -155,7 +164,7 @@ class PythonTargetAdaptor(TargetAdaptor):
       field_adaptors = super(PythonTargetAdaptor, self).field_adaptors
       if getattr(self, 'resources', None) is None:
         return field_adaptors
-      base_globs = BaseGlobs.from_sources_field(self.resources)
+      base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)
       path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
       sources_field = SourcesField(self.address,
                                    'resources',
@@ -165,35 +174,35 @@ class PythonTargetAdaptor(TargetAdaptor):
       return field_adaptors + (sources_field,)
 
 
-class BaseGlobs(AbstractClass):
+class BaseGlobs(Locatable, AbstractClass):
   """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
 
   @staticmethod
-  def from_sources_field(sources):
+  def from_sources_field(sources, spec_path):
     """Return a BaseGlobs for the given sources field.
 
     `sources` may be None, a list/tuple/set, a string or a BaseGlobs instance.
     """
     if sources is None:
-      return Files()
+      return Files(spec_path=spec_path)
     elif isinstance(sources, BaseGlobs):
       return sources
     elif isinstance(sources, string_types):
-      return Files(sources)
+      return Files(sources, spec_path=spec_path)
     elif isinstance(sources, (set, list, tuple)):
-      return Files(*sources)
+      return Files(*sources, spec_path=spec_path)
     else:
       raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
   @staticmethod
-  def _filespec_for_excludes(raw_excludes):
+  def _filespec_for_excludes(raw_excludes, spec_path):
     if isinstance(raw_excludes, string_types):
       raise ValueError('Excludes of type `{}` are not supported: got "{}"'
                        .format(type(raw_excludes).__name__, raw_excludes))
 
     excluded_patterns = []
     for raw_exclude in raw_excludes:
-      exclude_filespecs = BaseGlobs.from_sources_field(raw_exclude).filespecs
+      exclude_filespecs = BaseGlobs.from_sources_field(raw_exclude, spec_path).filespecs
       if exclude_filespecs.get('exclude', []):
         raise ValueError('Nested excludes are not supported: got {}'.format(raw_excludes))
       excluded_patterns.extend(exclude_filespecs.get('globs', []))
@@ -208,9 +217,11 @@ class BaseGlobs(AbstractClass):
     """The corresponding `wrapped_globs` class for this BaseGlobs."""
 
   def __init__(self, *patterns, **kwargs):
-    self._filespecs = self.legacy_globs_class.to_filespec(patterns).get('globs', [])
+    raw_spec_path = kwargs.pop('spec_path')
+    self._file_globs = self.legacy_globs_class.to_filespec(patterns).get('globs', [])
     raw_excludes = kwargs.pop('exclude', [])
-    self._excluded_filespecs = self._filespec_for_excludes(raw_excludes).get('globs', [])
+    self._excluded_file_globs = self._filespec_for_excludes(raw_excludes, raw_spec_path).get('globs', [])
+    self._spec_path = raw_spec_path
 
     # `follow_links=True` is the default behavior for wrapped globs, so we pop the old kwarg
     # and warn here to bridge the gap from v1->v2 BUILD files.
@@ -227,13 +238,20 @@ class BaseGlobs(AbstractClass):
   @property
   def filespecs(self):
     """Return a filespecs dict representing both globs and excludes."""
-    return {'globs': self._filespecs, 'exclude': self._excluded_filespecs}
+    return {'globs': self._file_globs, 'exclude': self._exclude_filespecs}
+
+  @property
+  def _exclude_filespecs(self):
+    if self._excluded_file_globs:
+      return [{'globs': self._excluded_file_globs}]
+    else:
+      return []
 
   def to_path_globs(self, relpath):
     """Return two PathGlobs representing the included and excluded Files for these patterns."""
     return (
-        PathGlobs.create_from_specs(relpath, self._filespecs),
-        PathGlobs.create_from_specs(relpath, self._excluded_filespecs)
+        PathGlobs.create_from_specs(relpath, self._file_globs),
+        PathGlobs.create_from_specs(relpath, self._excluded_file_globs)
       )
 
 

@@ -7,7 +7,6 @@ python_tests(
   dependencies = [
     'src/python/pants/source',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

@@ -36,16 +36,16 @@ logger = logging.getLogger(__name__)
 
 
 class GoalRunnerFactory(object):
-  def __init__(self, root_dir, options, build_config, run_tracker, reporting, build_graph=None,
-               exiter=sys.exit):
+  def __init__(self, root_dir, options, build_config, run_tracker, reporting,
+               daemon_graph_helper=None, exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
     :param Options options: The global, pre-initialized Options instance.
     :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
-    :param BuildGraph build_graph: A BuildGraph instance (for graph reuse, optional).
-    :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
+    :param LegacyGraphHelper daemon_graph_helper: A LegacyGraphHelper instance for graph reuse. (Optional)
+    :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
     self._options = options
@@ -68,32 +68,39 @@ class GoalRunnerFactory(object):
 
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
     build_ignore_patterns = self._global_options.ignore_patterns or []
-    self._address_mapper = BuildFileAddressMapper(
-      self._build_file_parser,
-      get_project_tree(self._global_options),
+    self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
+      self._global_options.enable_v2_engine,
+      self._global_options.pants_ignore,
       build_ignore_patterns,
-      exclude_target_regexps=self._global_options.exclude_target_regexp
+      daemon_graph_helper
     )
-    self._build_graph = self._select_buildgraph(self._global_options.enable_v2_engine,
-                                                self._global_options.pants_ignore,
-                                                build_graph)
 
-  def _select_buildgraph(self, use_engine, path_ignore_patterns, cached_buildgraph=None):
-    """Selects a BuildGraph to use then constructs and returns it.
+  def _select_buildgraph_and_address_mapper(self, use_engine, path_ignore_patterns,
+                                            build_ignore_patterns, graph_helper=None):
+    """Selects a BuildGraph and AddressMapper to use then constructs them and returns them.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
-    :param LegacyBuildGraph cached_buildgraph: A cached graph to reuse, if available.
+    :param list build_ignore_patterns: The legacy path ignore patterns from `--ignore-patterns` (v1).
+    :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
+                                           if available. This would usually come from the daemon.
+    :returns: A tuple of (BuildGraph, AddressMapper).
     """
-    if cached_buildgraph is not None:
-      return cached_buildgraph
-    elif use_engine:
+    # N.B. Use of the daemon implies use of the v2 engine.
+    if graph_helper or use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
-      graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns)
-      return graph_helper.create_graph(root_specs)
+      # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
+      graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(path_ignore_patterns)
+      return graph_helper.create_build_graph(root_specs, self._root_dir)
     else:
-      return MutableBuildGraph(self._address_mapper)
+      address_mapper = BuildFileAddressMapper(
+        self._build_file_parser,
+        get_project_tree(self._global_options),
+        build_ignore_patterns,
+        exclude_target_regexps=self._global_options.exclude_target_regexp
+      )
+      return MutableBuildGraph(address_mapper), address_mapper
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""

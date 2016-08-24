@@ -35,10 +35,22 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_relative_to(self):
     with temporary_dir() as temp_distdir:
       with self.pants_results(
-          ['-q',
-           '--pants-distdir={}'.format(temp_distdir),
-           'bundle',
-           '{}:relative_to'.format(self.TARGET_PATH)]) as pants_run:
+        ['-q',
+          '--pants-distdir={}'.format(temp_distdir),
+          'bundle',
+          '{}:relative_to'.format(self.TARGET_PATH)]) as pants_run:
         self.assert_success(pants_run)
         self.assertTrue(os.path.isfile(
           '{}/{}.relative_to-bundle/b/file1.txt'.format(temp_distdir, self.TARGET_PATH.replace('/', '.'))))
+
+  @ensure_engine
+  def test_bundle_rel_path(self):
+    with temporary_dir() as temp_distdir:
+      with self.pants_results(
+        ['-q',
+          '--pants-distdir={}'.format(temp_distdir),
+          'bundle',
+          '{}:rel_path'.format(self.TARGET_PATH)]) as pants_run:
+        self.assert_success(pants_run)
+        self.assertTrue(os.path.isfile(
+          '{}/{}.rel_path-bundle/b/file1.txt'.format(temp_distdir, self.TARGET_PATH.replace('/', '.'))))

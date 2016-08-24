@@ -21,6 +21,7 @@ from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.address_mapper import AddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.util.dirutil import fast_relpath
 
@@ -38,26 +39,8 @@ logger = logging.getLogger(__name__)
 #     so that callers do not have to reference those modules
 #
 # Note: 'spec' should not be a user visible term, substitute 'address' instead.
-class BuildFileAddressMapper(object):
+class BuildFileAddressMapper(AddressMapper):
   """Maps addresses in the pants virtual address space to corresponding BUILD file declarations."""
-
-  class AddressNotInBuildFile(AddressLookupError):
-    """Indicates an address cannot be found in an existing BUILD file."""
-
-  class EmptyBuildFileError(AddressLookupError):
-    """Indicates no addresses are defined in a BUILD file."""
-
-  class InvalidBuildFileReference(AddressLookupError):
-    """Indicates no BUILD file exists at the address referenced."""
-
-  class InvalidAddressError(AddressLookupError):
-    """Indicates an address cannot be parsed."""
-
-  class BuildFileScanError(AddressLookupError):
-    """Indicates a problem was encountered scanning a tree of BUILD files."""
-
-  class InvalidRootError(BuildFileScanError):
-    """Indicates an invalid scan root was supplied."""
 
   # Target specs are mapped to the patterns which match them, if any. This variable is a key for
   # specs which don't match any exclusion regexps. We know it won't already be in the list of
@@ -82,38 +65,6 @@ class BuildFileAddressMapper(object):
   def root_dir(self):
     return self._build_file_parser.root_dir
 
-  def _raise_incorrect_address_error(self, spec_path, wrong_target_name, targets):
-    """Search through the list of targets and return those which originate from the same folder
-    which wrong_target_name resides in.
-
-    :raises: A helpful error message listing possible correct target addresses.
-    """
-    was_not_found_message = '{target_name} was not found in BUILD files from {spec_path}'.format(
-      target_name=wrong_target_name, spec_path=os.path.join(self._project_tree.build_root, spec_path))
-
-    if not targets:
-      raise self.EmptyBuildFileError(
-        '{was_not_found_message}, because that directory contains no BUILD files defining addressable entities.'
-          .format(was_not_found_message=was_not_found_message))
-
-    # Print BUILD file extensions if there's more than one BUILD file with targets only.
-    if len(set([target.build_file for target in targets])) == 1:
-      specs = [':{}'.format(target.target_name) for target in targets]
-    else:
-      specs = [':{} (from {})'.format(target.target_name, os.path.basename(target.build_file.relpath))
-               for target in targets]
-
-    # Might be neat to sort by edit distance or something, but for now alphabetical is fine.
-    specs = [''.join(pair) for pair in sorted(specs)]
-
-    # Give different error messages depending on whether BUILD file was empty.
-    one_of = ' one of' if len(specs) > 1 else ''  # Handle plurality, just for UX.
-    raise self.AddressNotInBuildFile(
-      '{was_not_found_message}. Perhaps you '
-      'meant{one_of}: \n  {specs}'.format(was_not_found_message=was_not_found_message,
-                                          one_of=one_of,
-                                          specs='\n  '.join(specs)))
-
   def resolve(self, address):
     """Maps an address in the virtual address space to an object.
 
@@ -126,15 +77,6 @@ class BuildFileAddressMapper(object):
       self._raise_incorrect_address_error(address.spec_path, address.target_name, address_map)
     else:
       return address_map[address]
-
-  def resolve_spec(self, spec):
-    """Converts a spec to an address and maps it using `resolve`"""
-    try:
-      address = Address.parse(spec)
-    except ValueError as e:
-      raise self.InvalidAddressError(e)
-    _, addressable = self.resolve(address)
-    return addressable
 
   def _address_map_from_spec_path(self, spec_path):
     """Returns a resolution map of all addresses in a "directory" in the virtual address space.
@@ -260,6 +202,9 @@ class BuildFileAddressMapper(object):
                    .format(count=excluded_count,
                            plural=('s' if excluded_count != 1 else '')))
     return addresses
+
+  def is_declaring_file(self, address, file_path):
+    return address.build_file.relpath == file_path
 
   def _scan_spec(self, spec, fail_fast, exclude_spec):
     """Scans the given address spec."""
