@@ -171,6 +171,10 @@ class GlobalOptionsRegistrar(Optionable):
     # Relative pants_distdir to buildroot. Requires --pants-distdir to be bootstrapped above first.
     # e.g. '/dist/'
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
+    register('--ignore-patterns', advanced=True, type=list, fromfile=True,
+             default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
+             removal_version='1.3.0', removal_hint='Use --build-ignore instead.', replace='build_ignore',
+             help='See help for --build-ignore.')
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
              help='Pants will ignore paths that match the patterns in this option '
@@ -182,7 +186,7 @@ class GlobalOptionsRegistrar(Optionable):
                   'including in globs (example: *.pyc files, the .git directory, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
                   'This option is effective in v2 engine only. '
-                  'To experiment with v2 engine, try --enable-v2-engine option. ')
+                  'To experiment with v2 engine, try --enable-v2-engine option.')
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
