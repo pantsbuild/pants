@@ -34,7 +34,7 @@ class TarutilTest(unittest.TestCase):
     with open(self.file_tar, 'r+w') as fp:
       content = fp.read()
       fp.seek(0)
-      # Replace 1 byte of good data with garbage.
+      # Replace 8 bytes of good data with garbage.
       fp.write(content[:512+148] + 'aaaaaaaa' + content[512+156:])
 
   def extract_tar(self, path, **kwargs):
@@ -49,3 +49,9 @@ class TarutilTest(unittest.TestCase):
     self.inject_corruption()
     with self.assertRaises(tarfile.ReadError):
       self.extract_tar(self.file_tar, errorlevel=1)
+
+  def test_extract(self):
+    self.extract_tar(self.file_tar, errorlevel=2)
+    self.assertEqual(
+      set(os.listdir(self.basedir)),
+      set([os.path.relpath(self.file_tar, self.basedir)] + self.file_list))
