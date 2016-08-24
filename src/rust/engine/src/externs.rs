@@ -73,7 +73,11 @@ impl ProjectMultiFunction {
   }
 
   pub fn call(&self, key: &Key, field: &Field) -> Vec<Key> {
-    panic!("Not implemented!:");
+    let buf = unsafe { &*(self.project_multi)(self.storage, key, field) };
+    let keys = with_vec(buf.keys_ptr, buf.keys_len as usize, |key_vec| key_vec.clone());
+    // This isn't ours: forget about it!
+    mem::forget(buf);
+    keys
   }
 }
 
@@ -100,7 +104,6 @@ impl ToStrFunction {
   }
 
   pub fn call(&self, digest: &Digest) -> String {
-    // Trim the buffer content to the reported written length, and decode.
     let buf = unsafe { &*(self.to_str)(self.storage, digest) };
     let str =
       with_vec(buf.str_ptr, buf.str_len as usize, |char_vec| {

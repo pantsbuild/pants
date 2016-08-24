@@ -78,34 +78,34 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   fn type_address(&self) -> &TypeId {
-    self.tasks.type_address()
+    &self.tasks.type_address
   }
 
   fn type_has_variants(&self) -> &TypeId {
-    self.tasks.type_has_variants()
+    &self.tasks.type_has_variants
   }
 
   fn has_products(&self, item: &Key) -> bool {
-    self.isinstance(item, self.tasks.type_has_products())
+    self.isinstance(item, &self.tasks.type_has_products)
   }
 
   fn field_name(&self, item: &Key) -> Key {
-    self.project(item, self.tasks.field_name())
+    self.project(item, &self.tasks.field_name)
   }
 
   fn field_variants(&self, item: &Key) -> Key {
-    self.project(item, self.tasks.field_variants())
+    self.project(item, &self.tasks.field_variants)
   }
 
   fn field_products(&self, item: &Key) -> Vec<Key> {
-    self.project_multi(item, self.tasks.field_products())
+    self.project_multi(item, &self.tasks.field_products)
   }
 
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
   fn store_list(&self, items: Vec<&Key>) -> Key {
-    self.tasks.store_list(items)
+    (self.tasks.store_list).call(items)
   }
 
   /**
@@ -115,7 +115,7 @@ impl<'g,'t> StepContext<'g,'t> {
     if item.type_id() == superclass {
       true
     } else {
-      self.tasks.isinstance(item, superclass)
+      (self.tasks.isinstance).call(item, superclass)
     }
   }
 
@@ -130,7 +130,7 @@ impl<'g,'t> StepContext<'g,'t> {
    * Calls back to Python to project a field representing a collection.
    */
   fn project_multi(&self, item: &Key, field: &Field) -> Vec<Key> {
-    panic!("TODO: not implemented!");
+    (self.tasks.project_multi).call(item, field)
   }
 
   fn to_str(&self) -> &ToStrFunction {

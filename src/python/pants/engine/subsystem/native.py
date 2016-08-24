@@ -18,12 +18,6 @@ _FFI.cdef(
       char digest[32];
     } Digest;
 
-    typedef struct {
-      char*    str_ptr;
-      uint64_t str_len;
-      uint64_t str_cap;
-    } UTF8Buffer;
-
     typedef Digest TypeId;
     typedef Digest Function;
 
@@ -31,6 +25,18 @@ _FFI.cdef(
       Digest   digest;
       TypeId   type_id;
     } Key;
+
+    typedef struct {
+      char*    str_ptr;
+      uint64_t str_len;
+      uint64_t str_cap;
+    } UTF8Buffer;
+
+    typedef struct {
+      Key*     keys_ptr;
+      uint64_t keys_len;
+      uint64_t keys_cap;
+    } KeyBuffer;
 
     typedef uint64_t EntryId;
     typedef Key Field;
@@ -40,6 +46,7 @@ _FFI.cdef(
     typedef UTF8Buffer* (*extern_to_str)(StorageHandle*, Digest*);
     typedef bool        (*extern_isinstance)(StorageHandle*, Key*, TypeId*);
     typedef Key         (*extern_store_list)(StorageHandle*, Key*, uint64_t);
+    typedef KeyBuffer*  (*extern_project_multi)(StorageHandle*, Key*, Field*);
 
     typedef struct {
       Function*   func;
@@ -95,6 +102,7 @@ _FFI.cdef(
                                    extern_to_str,
                                    extern_isinstance,
                                    extern_store_list,
+                                   extern_project_multi,
                                    Field,
                                    Field,
                                    Field,
@@ -136,8 +144,10 @@ _FFI.cdef(
   )
 
 
-# A static string buffer used for all extern_to_str calls. Not threadsafe.
+# Static buffers used for all extern calls. Not threadsafe.
+# TODO: All of these functions need (better) error handling.
 _UTF8_BUF = _FFI.new('UTF8Buffer*', (_FFI.new('char[]', 256), 256, 256))
+_KEYS_BUF = _FFI.new('KeyBuffer*', (_FFI.new('Key[]', 64), 64, 64))
 
 
 @_FFI.callback("UTF8Buffer*(StorageHandle*, Digest*)")
@@ -167,7 +177,7 @@ def extern_isinstance(storage_handle, key, type_id):
 
 @_FFI.callback("Key(StorageHandle*, Key*, uint64_t)")
 def extern_store_list(storage_handle, keys_ptr, keys_len):
-  """Given storage, a Key for `obj`, and a TypeId for `type`, return isinstance(obj, type)."""
+  """Given storage and an array of Keys, return a new Key to represent the list."""
   storage = _FFI.from_handle(storage_handle)
   digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
   key = storage.put_from_digests(digests)
@@ -175,6 +185,24 @@ def extern_store_list(storage_handle, keys_ptr, keys_len):
   # NB: not actually storing the digest of the type of KeyList here, since it is not
   # supposed to be an exposed type. This effectively means that it is a "unique" type.
   return ((key.digest,), (key.digest,))
+
+
+@_FFI.callback("KeyBuffer*(StorageHandle*, Key*, Field*)")
+def extern_project_multi(storage_handle, key, field):
+  """Given storage, a Key for `obj`, and a field name, project the field as a list of Keys."""
+  storage = _FFI.from_handle(storage_handle)
+  obj = storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
+  field_name = storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
+
+  projected = [((storage.put(p).digest,), (storage.put(type(p)).digest,))
+               for p in getattr(obj, field_name)]
+  if _KEYS_BUF.keys_cap < len(projected):
+    new_len = max(len(projected), _KEYS_BUF.keys_cap * 2)
+    _KEYS_BUF.keys_ptr = _FFI.new('Key[]', new_len)
+    _KEYS_BUF.keys_cap = new_len
+  _KEYS_BUF.keys_ptr[0:len(projected)] = projected
+  _KEYS_BUF.keys_len = len(projected)
+  return _KEYS_BUF
 
 
 class Native(object):

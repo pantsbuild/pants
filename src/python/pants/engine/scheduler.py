@@ -20,7 +20,7 @@ from pants.engine.nodes import FilesystemNode, Noop, Return, Runnable, TaskNode,
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import extern_isinstance, extern_store_list, extern_to_str
+from pants.engine.subsystem.native import extern_isinstance, extern_store_list, extern_to_str, extern_project_multi
 from pants.util.objects import datatype
 
 
@@ -99,6 +99,7 @@ class LocalScheduler(object):
                                             extern_to_str,
                                             extern_isinstance,
                                             extern_store_list,
+                                            extern_project_multi,
                                             self._to_key('name'),
                                             self._to_key('products'),
                                             self._to_key('default'),

@@ -13,7 +13,7 @@ use std::mem;
 use std::path::Path;
 
 use core::{Field, Function, Key, TypeId};
-use externs::{IsInstanceExtern, IsInstanceFunction, StorageExtern, StoreListExtern, StoreListFunction, ToStrExtern, ToStrFunction, with_vec};
+use externs::{IsInstanceExtern, IsInstanceFunction, ProjectMultiExtern, ProjectMultiFunction, StorageExtern, StoreListExtern, StoreListFunction, ToStrExtern, ToStrFunction, with_vec};
 use graph::{Graph, EntryId};
 use nodes::{Complete, Runnable};
 use scheduler::Scheduler;
@@ -180,6 +180,7 @@ pub extern fn scheduler_create(
   to_str: ToStrExtern,
   isinstance: IsInstanceExtern,
   store_list: StoreListExtern,
+  project_multi: ProjectMultiExtern,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -199,6 +200,7 @@ pub extern fn scheduler_create(
           Tasks::new(
             IsInstanceFunction::new(isinstance, storage),
             StoreListFunction::new(store_list, storage),
+            ProjectMultiFunction::new(project_multi, storage),
             field_name,
             field_products,
             field_variants,

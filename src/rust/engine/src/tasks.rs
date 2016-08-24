@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use core::{Field, Function, Key, TypeId};
-use externs::{IsInstanceFunction, StoreListFunction};
+use externs::{IsInstanceFunction, StoreListFunction, ProjectMultiFunction};
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
 
 /**
@@ -11,14 +11,15 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
 pub struct Tasks {
   intrinsics: HashMap<(TypeId,TypeId), Vec<Task>>,
   tasks: HashMap<TypeId, Vec<Task>>,
-  isinstance: IsInstanceFunction,
-  store_list: StoreListFunction,
-  field_name: Field,
-  field_products: Field,
-  field_variants: Field,
-  type_address: TypeId,
-  type_has_products: TypeId,
-  type_has_variants: TypeId,
+  pub isinstance: IsInstanceFunction,
+  pub store_list: StoreListFunction,
+  pub project_multi: ProjectMultiFunction,
+  pub field_name: Field,
+  pub field_products: Field,
+  pub field_variants: Field,
+  pub type_address: TypeId,
+  pub type_has_products: TypeId,
+  pub type_has_variants: TypeId,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
 }
@@ -38,6 +39,7 @@ impl Tasks {
   pub fn new(
     isinstance: IsInstanceFunction,
     store_list: StoreListFunction,
+    project_multi: ProjectMultiFunction,
     field_name: Field,
     field_products: Field,
     field_variants: Field,
@@ -50,6 +52,7 @@ impl Tasks {
       tasks: HashMap::new(),
       isinstance: isinstance,
       store_list: store_list,
+      project_multi: project_multi,
       field_name: field_name,
       field_products: field_products,
       field_variants: field_variants,
@@ -65,38 +68,6 @@ impl Tasks {
     let intrinsics = self.intrinsics.get(&(*subject_type, *product));
     println!(">>> rust got intrinsics: {:?} (from {})", intrinsics, self.intrinsics.len());
     intrinsics.or(self.tasks.get(product))
-  }
-
-  pub fn field_name(&self) -> &Field {
-    &self.field_name
-  }
-
-  pub fn field_products(&self) -> &Field {
-    &self.field_products
-  }
-
-  pub fn field_variants(&self) -> &Field {
-    &self.field_variants
-  }
-
-  pub fn type_address(&self) -> &TypeId {
-    &self.type_address
-  }
-
-  pub fn type_has_products(&self) -> &TypeId {
-    &self.type_has_products
-  }
-
-  pub fn type_has_variants(&self) -> &TypeId {
-    &self.type_has_variants
-  }
-
-  pub fn isinstance(&self, key: &Key, type_id: &TypeId) -> bool {
-    (self.isinstance).call(key, type_id)
-  }
-
-  pub fn store_list(&self, keys: Vec<&Key>) -> Key {
-    (self.store_list).call(keys)
   }
 
   pub fn intrinsic_add(&mut self, func: Function, subject_type: TypeId, product: TypeId) {
