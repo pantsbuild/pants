@@ -269,14 +269,14 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      [SelectLiteral(address_mapper, AddressMapper),
       Select(DirectoryListing)],
      filter_buildfile_paths),
-  ] + [
+  ] + list({
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
     # define that lookup for each literal product.
     (product,
-     [Select(Struct)],
+     (Select(Struct),),
      identity)
     for product in symbol_table_cls.table().values() if product is not Struct
-  ] + [
+    }) + [
     # Simple spec handling.
     (Addresses,
      [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
