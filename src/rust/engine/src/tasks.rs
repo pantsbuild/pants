@@ -1,7 +1,12 @@
 use std::collections::HashMap;
 
 use core::{Field, Function, Key, TypeId};
-use externs::{IsInstanceFunction, StoreListFunction, ProjectMultiFunction};
+use externs::{
+  IsInstanceFunction,
+  ProjectFunction,
+  ProjectMultiFunction,
+  StoreListFunction,
+};
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
 
 /**
@@ -13,6 +18,7 @@ pub struct Tasks {
   tasks: HashMap<TypeId, Vec<Task>>,
   pub isinstance: IsInstanceFunction,
   pub store_list: StoreListFunction,
+  pub project: ProjectFunction,
   pub project_multi: ProjectMultiFunction,
   pub field_name: Field,
   pub field_products: Field,
@@ -39,6 +45,7 @@ impl Tasks {
   pub fn new(
     isinstance: IsInstanceFunction,
     store_list: StoreListFunction,
+    project: ProjectFunction,
     project_multi: ProjectMultiFunction,
     field_name: Field,
     field_products: Field,
@@ -52,6 +59,7 @@ impl Tasks {
       tasks: HashMap::new(),
       isinstance: isinstance,
       store_list: store_list,
+      project: project,
       project_multi: project_multi,
       field_name: field_name,
       field_products: field_products,

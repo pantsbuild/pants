@@ -50,6 +50,27 @@ impl StoreListFunction {
   }
 }
 
+pub type ProjectExtern =
+  extern "C" fn(*const StorageExtern, *const Key, *const Field, *const TypeId) -> Key;
+
+pub struct ProjectFunction {
+  project: ProjectExtern,
+  storage: *const StorageExtern,
+}
+
+impl ProjectFunction {
+  pub fn new(project: ProjectExtern, storage: *const StorageExtern) -> ProjectFunction {
+    ProjectFunction {
+      project: project,
+      storage: storage,
+    }
+  }
+
+  pub fn call(&self, key: &Key, field: &Field, type_id: &TypeId) -> Key {
+    (self.project)(self.storage, key, field, type_id)
+  }
+}
+
 pub struct KeyBuffer {
   keys_ptr: *mut Key,
   keys_len: u64,
@@ -69,7 +90,7 @@ impl ProjectMultiFunction {
     ProjectMultiFunction {
       project_multi: project_multi,
       storage: storage,
-    } 
+    }
   }
 
   pub fn call(&self, key: &Key, field: &Field) -> Vec<Key> {

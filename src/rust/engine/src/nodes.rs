@@ -90,15 +90,18 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   fn field_name(&self, item: &Key) -> Key {
-    self.project(item, &self.tasks.field_name)
+    panic!("TODO: Not implemented");
+    //self.project(item, &self.tasks.field_name)
   }
 
   fn field_variants(&self, item: &Key) -> Key {
-    self.project(item, &self.tasks.field_variants)
+    panic!("TODO: Not implemented");
+    //self.project(item, &self.tasks.field_variants)
   }
 
   fn field_products(&self, item: &Key) -> Vec<Key> {
-    self.project_multi(item, &self.tasks.field_products)
+    panic!("TODO: Not implemented");
+    //self.project_multi(item, &self.tasks.field_products)
   }
 
   /**
@@ -122,8 +125,8 @@ impl<'g,'t> StepContext<'g,'t> {
   /**
    * Calls back to Python to project a field.
    */
-  fn project(&self, item: &Key, field: &Field) -> Key {
-    panic!("TODO: not implemented!");
+  fn project(&self, item: &Key, field: &Field, type_id: &TypeId) -> Key {
+    (self.tasks.project).call(item, field, type_id)
   }
 
   /**
@@ -433,7 +436,12 @@ impl Step for SelectProjection {
       };
 
     // The input product is available: use it to construct the new Subject.
-    let projected_subject = context.project(dep_product, &self.selector.field);
+    let projected_subject =
+      context.project(
+        dep_product,
+        &self.selector.field,
+        &self.selector.projected_subject
+      );
 
     // When the output product is available, return it.
     let output_node =

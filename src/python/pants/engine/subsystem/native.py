@@ -46,6 +46,7 @@ _FFI.cdef(
     typedef UTF8Buffer* (*extern_to_str)(StorageHandle*, Digest*);
     typedef bool        (*extern_isinstance)(StorageHandle*, Key*, TypeId*);
     typedef Key         (*extern_store_list)(StorageHandle*, Key*, uint64_t);
+    typedef Key         (*extern_project)(StorageHandle*, Key*, Field*, TypeId*);
     typedef KeyBuffer*  (*extern_project_multi)(StorageHandle*, Key*, Field*);
 
     typedef struct {
@@ -102,6 +103,7 @@ _FFI.cdef(
                                    extern_to_str,
                                    extern_isinstance,
                                    extern_store_list,
+                                   extern_project,
                                    extern_project_multi,
                                    Field,
                                    Field,
@@ -157,9 +159,9 @@ def extern_to_str(storage_handle, digest):
   obj = storage.get_from_digest(_FFI.buffer(digest.digest)[:])
   str_bytes = str(obj).encode('utf-8')
   if _UTF8_BUF.str_cap < len(str_bytes):
-    new_len = max(len(str_bytes), _UTF8_BUF.str_cap * 2)
-    _UTF8_BUF.str_ptr = _FFI.new('char[]', new_len)
-    _UTF8_BUF.str_cap = new_len
+    new_cap = max(len(str_bytes), _UTF8_BUF.str_cap * 2)
+    _UTF8_BUF.str_ptr = _FFI.new('char[]', new_cap)
+    _UTF8_BUF.str_cap = new_cap
   _UTF8_BUF.str_ptr[0:len(str_bytes)] = str_bytes
   _UTF8_BUF.str_len = len(str_bytes)
   return _UTF8_BUF
@@ -187,6 +189,21 @@ def extern_store_list(storage_handle, keys_ptr, keys_len):
   return ((key.digest,), (key.digest,))
 
 
+@_FFI.callback("Key(StorageHandle*, Key*, Field*, TypeId*)")
+def extern_project(storage_handle, key, field, type_id):
+  """Given storage, a Key for `obj`, a field name, and a type, project the field as a new Key."""
+  storage = _FFI.from_handle(storage_handle)
+  obj = storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
+  field_name = storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
+  typ = storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
+
+  projected = getattr(obj, field_name)
+  if type(projected) is not typ:
+    projected = typ(projected)
+
+  return ((storage.put(projected).digest,), (storage.put(type(projected)).digest,))
+
+
 @_FFI.callback("KeyBuffer*(StorageHandle*, Key*, Field*)")
 def extern_project_multi(storage_handle, key, field):
   """Given storage, a Key for `obj`, and a field name, project the field as a list of Keys."""
@@ -197,9 +214,9 @@ def extern_project_multi(storage_handle, key, field):
   projected = [((storage.put(p).digest,), (storage.put(type(p)).digest,))
                for p in getattr(obj, field_name)]
   if _KEYS_BUF.keys_cap < len(projected):
-    new_len = max(len(projected), _KEYS_BUF.keys_cap * 2)
-    _KEYS_BUF.keys_ptr = _FFI.new('Key[]', new_len)
-    _KEYS_BUF.keys_cap = new_len
+    new_cap = max(len(projected), _KEYS_BUF.keys_cap * 2)
+    _KEYS_BUF.keys_ptr = _FFI.new('Key[]', new_cap)
+    _KEYS_BUF.keys_cap = new_cap
   _KEYS_BUF.keys_ptr[0:len(projected)] = projected
   _KEYS_BUF.keys_len = len(projected)
   return _KEYS_BUF
