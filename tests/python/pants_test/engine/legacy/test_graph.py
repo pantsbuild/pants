@@ -56,9 +56,9 @@ def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=
   spec_roots = EngineInitializer.parse_commandline_to_spec_roots(options=options)
   graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                       symbol_table_cls=symbol_table_cls)
-  scheduler, engine, _ = graph_helper
+  scheduler, engine = graph_helper[:2]
   try:
-    graph, _ = graph_helper.create_build_graph(spec_roots)
+    graph = graph_helper.create_build_graph(spec_roots)[0]
     addresses = tuple(graph.inject_specs_closure(spec_roots))
     yield graph, addresses, scheduler
   finally:

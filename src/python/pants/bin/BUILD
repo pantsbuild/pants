@@ -42,6 +42,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:memo',
+    'src/python/pants/scm/subsystems:changed',
     ':options_initializer',
   ],
 )
@@ -84,6 +85,7 @@ python_library(
     'src/python/pants/logging:logging',
     'src/python/pants/option:option',
     'src/python/pants/subsystem:subsystem',
+    'src/python/pants/engine/legacy:change_calculator',
     ':extension_loader',
     ':plugin_resolver',
   ]

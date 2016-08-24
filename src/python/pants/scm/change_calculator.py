@@ -1,19 +1,44 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import re
 
-from pants.base.build_environment import get_scm
-from pants.base.exceptions import TaskError
 from pants.build_graph.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
 
 
+logger = logging.getLogger(__name__)
+
+
 class ChangeCalculator(object):
+  """A utility for calculating changed files."""
+
+  def __init__(self, scm, workspace=None, changes_since=None, diffspec=None):
+    self._scm = scm
+    self._workspace = workspace or ScmWorkspace(scm)
+    self._changes_since = changes_since
+    self._diffspec = diffspec
+
+  def changed_files(self, changed_request=None):
+    """Determines the files changed according to SCM/workspace and options."""
+    if changed_request:
+      changes_since = changed_request.changes_since
+      diffspec = changed_request.diffspec
+    else:
+      changes_since = self._changes_since
+      diffspec = self._diffspec
+
+    changes_since = changes_since or self._scm.current_rev_identifier()
+    return self._workspace.changes_in(diffspec) if diffspec else self._workspace.touched_files(
+      changes_since)
+
+
+class BuildGraphChangeCalculator(ChangeCalculator):
   """A utility for calculating changed files or changed target addresses."""
 
   def __init__(self,
@@ -26,16 +51,12 @@ class ChangeCalculator(object):
                changes_since=None,
                diffspec=None,
                exclude_target_regexp=None):
-    self._scm = scm
-    self._workspace = workspace
+    super(BuildGraphChangeCalculator, self).__init__(scm, workspace, changes_since, diffspec)
     self._address_mapper = address_mapper
     self._build_graph = build_graph
     self._include_dependees = include_dependees
-
     self._fast = fast
-    self._changes_since = changes_since
-    self._diffspec = diffspec
-    self._exclude_target_regexp = exclude_target_regexp
+    self._exclude_target_regexp = exclude_target_regexp or []
 
     self._mapper_cache = None
 
@@ -44,14 +65,6 @@ class ChangeCalculator(object):
     if self._mapper_cache is None:
       self._mapper_cache = SpecSourceMapper(self._address_mapper, self._build_graph, self._fast)
     return self._mapper_cache
-
-  def changed_files(self):
-    """Determines the files changed according to SCM/workspace and options."""
-    if self._diffspec:
-      return self._workspace.changes_in(self._diffspec)
-    else:
-      since = self._changes_since or self._scm.current_rev_identifier()
-      return self._workspace.touched_files(since)
 
   def _directly_changed_targets(self):
     # Internal helper to find target addresses containing SCM changes.
@@ -104,42 +117,3 @@ class ChangeCalculator(object):
     return set([
       t for t in changed if not any(exclude.search(t.spec) is not None for exclude in excludes)
     ])
-
-
-class ChangedFileTaskMixin(object):
-  """A mixin for tasks which require the set of targets (or files) changed according to SCM.
-
-  Changes are calculated relative to a ref/tree-ish (defaults to HEAD), and changed files are then
-  mapped to targets using LazySourceMapper. LazySourceMapper can optionally be used in "fast" mode,
-  which stops searching for additional owners for a given source once a one is found.
-  """
-
-  @classmethod
-  def register_change_file_options(cls, register):
-    register('--fast', type=bool,
-             help='Stop searching for owners once a source is mapped to at least owning target.')
-    register('--changes-since', '--parent',
-             help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
-    register('--diffspec',
-             help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
-    register('--include-dependees', choices=['none', 'direct', 'transitive'], default='none',
-             help='Include direct or transitive dependees of changed targets.')
-
-  @classmethod
-  def change_calculator(cls, options, address_mapper, build_graph, scm=None, workspace=None):
-    scm = scm or get_scm()
-    if scm is None:
-      raise TaskError('No SCM available.')
-    workspace = workspace or ScmWorkspace(scm)
-
-    return ChangeCalculator(scm,
-                            workspace,
-                            address_mapper,
-                            build_graph,
-                            options.include_dependees,
-                            fast=options.fast,
-                            changes_since=options.changes_since,
-                            diffspec=options.diffspec,
-                            # NB: exclude_target_regexp is a global scope option registered
-                            # elsewhere
-                            exclude_target_regexp=options.exclude_target_regexp)

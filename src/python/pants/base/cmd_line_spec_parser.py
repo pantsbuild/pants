@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
+                              SingleAddress)
 
 
 class CmdLineSpecParser(object):
@@ -63,6 +64,9 @@ class CmdLineSpecParser(object):
     if spec.endswith('::'):
       spec_path = spec[:-len('::')]
       return DescendantAddresses(self._normalize_spec_path(spec_path))
+    elif spec.endswith('^'):
+      spec_path = spec[:-len('^')]
+      return AscendantAddresses(self._normalize_spec_path(spec_path))
     elif spec.endswith(':'):
       spec_path = spec[:-len(':')]
       return SiblingAddresses(self._normalize_spec_path(spec_path))

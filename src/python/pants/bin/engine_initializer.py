@@ -8,14 +8,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 from collections import namedtuple
 
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.specs import DescendantAddresses, Spec
 from pants.bin.options_initializer import OptionsInitializer
+from pants.build_graph.address import Address
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
+from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, RemoteSourcesAdaptor,
@@ -58,28 +61,82 @@ class LegacySymbolTable(SymbolTable):
     return aliases
 
 
-class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 'symbol_table_cls'])):
+class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 'symbol_table_cls',
+                                                         'change_calculator'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
-  def warm_product_graph(self, spec_roots):
-    """Warm the scheduler's `ProductGraph` with `LegacyTarget` products."""
+  class InvalidSpecConstraint(Exception):
+    """Raised when invalid constraints are given via target specs and arguments like --changed*."""
+
+  def _to_v1_target_specs(self, spec_roots):
+    """Given v2 spec roots, produce v1 compatible specs."""
+    for spec in spec_roots:
+      if isinstance(spec, Spec):
+        yield spec.to_spec_string()
+      elif isinstance(spec, Address):
+        yield spec.spec
+      else:
+        raise TypeError('unsupported spec type `{}` when converting {!r} to v1 spec'
+                        .format(type(spec), spec))
+
+  def _determine_spec_roots(self, changed_request, spec_roots):
+    """Determines the spec roots/target roots for a given request."""
+    logger.debug('spec_roots is: %s', spec_roots)
+    logger.debug('changed_request is: %s', changed_request)
+    if changed_request and changed_request.is_actionable():
+      if spec_roots:
+        # We've been provided spec roots (e.g. `./pants list ::`) AND a changed request. Error out.
+        raise self.InvalidSpecConstraint('cannot provide changed parameters and target specs!')
+      else:
+        # We've been provided no spec roots (e.g. `./pants list`) AND a changed request. Compute
+        # alternate target roots.
+        changed = self.change_calculator.changed_target_addresses(changed_request)
+        logger.debug('changed addresses: %s', changed)
+        return list(self._to_v1_target_specs(changed)), changed
+    else:
+      if spec_roots:
+        # We've been provided spec_roots (e.g. `./pants list ::`) and no changed request. Proxy.
+        return list(self._to_v1_target_specs(spec_roots)), spec_roots
+      else:
+        # We've been provided no spec_roots (e.g. `./pants list`) and no changed request. Translate.
+        return ['::'], [DescendantAddresses(directory=u'')]
+
+  def warm_product_graph(self, spec_roots, changed_request=None):
+    """Warm the scheduler's `ProductGraph` with `LegacyTarget` products.
+
+    :param list spec_roots: A list of specs representing the root targets of the request.
+    :param ChangedRequest changed_request: A ChangedRequest for determining alternate target roots.
+    """
+    _, spec_roots = self._determine_spec_roots(changed_request, spec_roots)
+    logger.debug('v2_spec_roots are: %s', spec_roots)
     request = self.scheduler.execution_request([LegacyTarget], spec_roots)
     result = self.engine.execute(request)
     if result.error:
       raise result.error
 
-  def create_build_graph(self, spec_roots, build_root=None):
-    """Construct and return a `BuildGraph` given a set of input specs."""
+  def create_build_graph(self, spec_roots, build_root=None, changed_request=None):
+    """Construct and return a `BuildGraph` given a set of input specs.
+
+    :param list spec_roots: A list of specs representing the root targets of the request.
+    :param string build_root: The build root.
+    :param ChangedRequest changed_request: A ChangedRequest for determining alternate target roots.
+    :returns: A tuple of (BuildGraph, AddressMapper, list[specs]).
+    """
+    v1_spec_roots, v2_spec_roots = self._determine_spec_roots(changed_request, spec_roots)
+    logger.debug('v1_spec_roots are: %s', v1_spec_roots)
+    logger.debug('v2_spec_roots are: %s', v2_spec_roots)
+
     graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
+    logger.debug('build_graph is: %s', graph)
     with self.scheduler.locked():
       # Ensure the entire generator is unrolled.
-      for _ in graph.inject_specs_closure(spec_roots):
+      for _ in graph.inject_specs_closure(v2_spec_roots):
         pass
+
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
     address_mapper = LegacyAddressMapper(graph, build_root or get_buildroot())
-    logger.debug('build_graph is: %s', graph)
     logger.debug('address_mapper is: %s', address_mapper)
-    return graph, address_mapper
+    return graph, address_mapper, v1_spec_roots
 
 
 class EngineInitializer(object):
@@ -111,6 +168,7 @@ class EngineInitializer(object):
     """
 
     build_root = get_buildroot()
+    scm = get_scm()
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
     symbol_table_cls = symbol_table_cls or LegacySymbolTable
 
@@ -132,5 +190,6 @@ class EngineInitializer(object):
     scheduler = LocalScheduler(dict(), tasks, project_tree)
     # TODO: Do not use the cache yet, as it incurs a high overhead.
     engine = LocalSerialEngine(scheduler, Storage.create(), use_cache=False)
+    change_calculator = EngineChangeCalculator(engine, scm) if scm else None
 
-    return LegacyGraphHelper(scheduler, engine, symbol_table_cls)
+    return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)

@@ -40,7 +40,6 @@ class SpecSourceMapper(SourceMapper):
 
   def target_addresses_for_source(self, source):
     result = []
-
     path = source
 
     # a top-level source has empty dirname, so do/while instead of straight while loop.

@@ -28,6 +28,7 @@ from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.reporting import Reporting
+from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig
 from pants.task.task import QuietTaskMixin
 from pants.util.filtering import create_filters, wrap_filters
@@ -58,7 +59,6 @@ class GoalRunnerFactory(object):
     self._goals = []
     self._targets = []
     self._requested_goals = self._options.goals
-    self._target_specs = self._options.target_specs
     self._help_request = self._options.help_request
 
     self._global_options = options.for_global_scope()
@@ -71,12 +71,14 @@ class GoalRunnerFactory(object):
 
     self._handle_ignore_patterns()
 
-    self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
+    self._build_graph, self._address_mapper, self._target_specs = self._init_graph(
       self._global_options.enable_v2_engine,
       self._global_options.pants_ignore,
       self._global_options.build_ignore,
       self._global_options.exclude_target_regexp,
-      daemon_graph_helper)
+      self._options.target_specs,
+      daemon_graph_helper
+    )
 
   # TODO: Remove this once we have better support of option renaming in option.parser
   def _handle_ignore_patterns(self):
@@ -97,25 +99,23 @@ class GoalRunnerFactory(object):
         self._global_options.ignore_patterns
       )
 
-  def _select_buildgraph_and_address_mapper(self,
-                                            use_engine,
-                                            pants_ignore_patterns,
-                                            build_ignore_patterns,
-                                            exclude_target_regexps,
-                                            graph_helper=None):
-    """Selects a BuildGraph and AddressMapper to use then constructs them and returns them.
+  def _init_graph(self, use_engine, pants_ignore_patterns, build_ignore_patterns,
+                  exclude_target_regexps, target_specs, graph_helper=None):
+    """Determines the BuildGraph, AddressMapper and spec_roots for a given run.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
     :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
                                        applied during BUILD file searching.
     :param list exclude_target_regexps: Regular expressions for targets to be excluded.
+    :param list target_specs: The original target specs.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
                                            if available. This would usually come from the daemon.
-    :returns: A tuple of (BuildGraph, AddressMapper).
+    :returns: A tuple of (BuildGraph, AddressMapper, spec_roots).
     """
     # N.B. Use of the daemon implies use of the v2 engine.
     if graph_helper or use_engine:
+      changed_request = Changed.Factory.global_instance().create().changed_request
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
@@ -123,15 +123,14 @@ class GoalRunnerFactory(object):
         pants_ignore_patterns,
         build_ignore_patterns=build_ignore_patterns,
         exclude_target_regexps=exclude_target_regexps)
-      return graph_helper.create_build_graph(root_specs, self._root_dir)
+      return graph_helper.create_build_graph(root_specs, self._root_dir, changed_request)
     else:
       address_mapper = BuildFileAddressMapper(
         self._build_file_parser,
         get_project_tree(self._global_options),
         build_ignore_patterns,
         exclude_target_regexps)
-
-      return MutableBuildGraph(address_mapper), address_mapper
+      return MutableBuildGraph(address_mapper), address_mapper, target_specs
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""
@@ -241,8 +240,15 @@ class GoalRunner(object):
 
   @classmethod
   def subsystems(cls):
-    # Subsystems used outside of any task.
-    return {SourceRootConfig, Reporting, Reproducer, RunTracker, PantsDaemonLauncher.Factory}
+    """Subsystems used outside of any task."""
+    return {
+      SourceRootConfig,
+      Reporting,
+      Reproducer,
+      RunTracker,
+      Changed.Factory,
+      PantsDaemonLauncher.Factory
+    }
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir

@@ -12,7 +12,8 @@ from os.path import basename, dirname, join
 import six
 
 from pants.base.project_tree import Dir, File
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
+                              SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
@@ -75,7 +76,7 @@ class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'depen
   """A product type that holds a Struct which has not yet been hydrated.
 
   A Struct counts as "hydrated" when all of its members (which are not themselves dependencies
-  lists) have been resolved from the graph. This means that hyrating a struct is eager in terms
+  lists) have been resolved from the graph. This means that hydrating a struct is eager in terms
   of inline addressable fields, but lazy in terms of the complete graph walk represented by
   the `dependencies` field of StructWithDeps.
   """
@@ -242,9 +243,30 @@ def descendant_addresses_to_globs(address_mapper, descendant_addresses):
 
   This allows us to limit our AddressFamily requests to directories that contain build files.
   """
-
   pattern = address_mapper.build_pattern
   return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
+
+
+def recursive_dirname(f):
+  """Given a relative path like 'a/b/c/d', yield all ascending path components like:
+
+        'a/b/c/d'
+        'a/b/c'
+        'a/b'
+        'a'
+        ''
+  """
+  while f:
+    yield f
+    f = dirname(f)
+  yield ''
+
+
+def ascendant_addresses_to_globs(address_mapper, ascendant_addresses):
+  """Given an AscendantAddresses object, return a PathGlobs object for matching build files."""
+  pattern = address_mapper.build_pattern
+  patterns = [join(f, pattern) for f in recursive_dirname(ascendant_addresses.directory)]
+  return PathGlobs.create_from_specs('', patterns)
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
@@ -298,4 +320,8 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      [SelectLiteral(address_mapper, AddressMapper),
       Select(DescendantAddresses)],
      descendant_addresses_to_globs),
+    (PathGlobs,
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(AscendantAddresses)],
+     ascendant_addresses_to_globs),
   ]

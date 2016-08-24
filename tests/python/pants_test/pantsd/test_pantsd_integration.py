@@ -122,4 +122,6 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
       # Assert there were no warnings or errors thrown in the pantsd log.
       for line in read_pantsd_log(workdir):
-        self.assertNotRegexpMatches(line, r'^[WE].*')
+        # Ignore deprecation warning emissions.
+        if 'DeprecationWarning' not in line:
+          self.assertNotRegexpMatches(line, r'^[WE].*')

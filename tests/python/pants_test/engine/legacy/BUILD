@@ -95,8 +95,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'what_changed_integration',
-  sources = ['test_what_changed_integration.py'],
+  name = 'changed_integration',
+  sources = ['test_changed_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test'
   ],

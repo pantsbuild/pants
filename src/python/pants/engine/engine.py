@@ -14,6 +14,7 @@ from collections import OrderedDict
 from Queue import Queue
 
 from concurrent.futures import ThreadPoolExecutor
+from twitter.common.collections import maybe_list
 
 from pants.base.exceptions import TaskError
 from pants.engine.nodes import Return, Throw
@@ -101,6 +102,29 @@ class Engine(AbstractClass):
       return self.Result.finished(self._scheduler.root_entries(execution_request))
     except TaskError as e:
       return self.Result.failure(e)
+
+  def product_request(self, product, subjects):
+    """Executes a request for a singular product type from the scheduler for one or more subjects
+    and yields the products.
+
+    :param class product: A product type for the request.
+    :param list subjects: A list of subjects for the request.
+    :yields: The requested products.
+    """
+    request = self._scheduler.execution_request([product], subjects)
+    result = self.execute(request)
+    if result.error:
+      raise result.error
+
+    for root, state in self._scheduler.root_entries(request).items():
+      if type(state) is Throw:
+        raise state
+      elif type(state) is Return:
+        entries = maybe_list(state.value, expected_type=product)
+        for computed_product in entries:
+          yield computed_product
+      else:
+        raise TypeError('Cannot process type `{}`, received: {}'.format(type(state), state))
 
   def close(self):
     """Shutdown this engine instance, releasing resources it was using."""

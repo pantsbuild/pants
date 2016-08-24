@@ -57,3 +57,24 @@ python_library(
     'src/python/pants/util:objects',
   ],
 )
+
+python_library(
+  name='source_mapper',
+  sources=['source_mapper.py'],
+  dependencies=[
+    ':graph',
+    ':address_mapper',
+    'src/python/pants/base:specs',
+    'src/python/pants/base:build_file',
+  ]
+)
+
+python_library(
+  name='change_calculator',
+  sources=['change_calculator.py'],
+  dependencies=[
+    'src/python/pants/engine/legacy:source_mapper',
+    'src/python/pants/goal:workspace',
+    'src/python/pants/scm:change_calculator',
+  ]
+)
