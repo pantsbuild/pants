@@ -15,6 +15,7 @@ pub type Field = Key;
 pub type Variants = Vec<(Key, Key)>;
 
 // NB: These structs are fairly small, so we allow copying them by default.
+#[repr(C)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Digest {
   digest: [u8;32],
@@ -29,6 +30,7 @@ impl fmt::Debug for Digest {
   }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Key {
   digest: Digest,

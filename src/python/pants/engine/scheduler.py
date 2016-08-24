@@ -93,7 +93,8 @@ class LocalScheduler(object):
     self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
 
-    # Create the scheduler.
+    # Create a handle for Storage (which must be kept alive as long as this object), and
+    # the native Scheduler.
     self._storage_handle = native.new_handle(storage)
     scheduler = native.lib.scheduler_create(self._storage_handle,
                                             extern_to_str,

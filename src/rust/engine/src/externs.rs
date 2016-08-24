@@ -1,10 +1,10 @@
 use libc;
 
-use std::ffi::CString;
 use std::mem;
 
 use core::{Digest, Field, Key, TypeId};
 
+// An opaque pointer representing a Storage instance.
 pub type StorageExtern = libc::c_void;
 
 pub type IsInstanceExtern =
@@ -71,6 +71,7 @@ impl ProjectFunction {
   }
 }
 
+#[repr(C)]
 pub struct KeyBuffer {
   keys_ptr: *mut Key,
   keys_len: u64,
@@ -102,6 +103,7 @@ impl ProjectMultiFunction {
   }
 }
 
+#[repr(C)]
 pub struct UTF8Buffer {
   str_ptr: *mut u8,
   str_len: u64,
