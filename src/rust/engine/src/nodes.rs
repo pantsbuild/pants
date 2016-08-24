@@ -44,6 +44,7 @@ pub enum Complete {
 pub struct StepContext<'g,'t> {
   deps: HashMap<&'g Node, &'g Complete>,
   tasks: &'t Tasks,
+  to_str: &'t ToStrFunction,
 }
 
 impl<'g,'t> StepContext<'g,'t> {
@@ -130,6 +131,10 @@ impl<'g,'t> StepContext<'g,'t> {
    */
   fn project_multi(&self, item: &Key, field: &Field) -> Vec<Key> {
     panic!("TODO: not implemented!");
+  }
+
+  fn to_str(&self) -> &ToStrFunction {
+    self.to_str
   }
 }
 
@@ -348,7 +353,7 @@ impl Step for SelectDependencies {
         self.subject,
         self.variants.clone()
       );
-    let dep_product_state =
+    let dep_product =
       match context.get(&dep_product_node) {
         Some(&Complete::Return(ref value)) =>
           value,
@@ -365,13 +370,21 @@ impl Step for SelectDependencies {
     // The product and its dependency list are available.
     let mut dependencies = Vec::new();
     let mut dep_values: Vec<&Key> = Vec::new();
-    for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
+    for dep_subject in context.project_multi(dep_product, &self.selector.field) {
+      let dep_node =
+        Node::create(
+          Selector::select(self.selector.product),
+          dep_subject,
+          self.variants.clone()
+        );
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
           dep_values.push(&value),
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            Complete::Throw(format!("No source of explicit dep {:?}", dep_node))
+            Complete::Throw(
+              format!("No source of explicit dep {}", dep_node.format(context.to_str()))
+            )
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
@@ -434,7 +447,9 @@ impl Step for SelectProjection {
         return State::Complete(Complete::Return(value)),
       Some(&Complete::Noop(_, _)) =>
         return State::Complete(
-          Complete::Throw(format!("No source of projected dependency {:?}", output_node))
+          Complete::Throw(
+            format!("No source of projected dependency {}", output_node.format(context.to_str()))
+          )
         ),
       Some(&Complete::Throw(ref msg)) =>
         // NB: propagate thrown exception directly.
@@ -581,11 +596,12 @@ impl Node {
     }
   }
 
-  pub fn step(&self, deps: HashMap<&Node, &Complete>, tasks: &Tasks) -> State {
+  pub fn step(&self, deps: HashMap<&Node, &Complete>, tasks: &Tasks, to_str: &ToStrFunction) -> State {
     let context =
       StepContext {
         deps: deps,
         tasks: tasks,
+        to_str: to_str
       };
     match self {
       &Node::Select(ref n) => n.step(context),

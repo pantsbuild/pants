@@ -22,7 +22,7 @@ pub struct Digest {
 
 impl fmt::Debug for Digest {
   fn fmt(&self, fmtr: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    for byte in self.digest.iter() {
+    for byte in self.digest.iter().take(4) {
       try!(fmtr.write_fmt(format_args!("{:02x}", byte)));
     }
     Ok(())

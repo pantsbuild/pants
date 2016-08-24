@@ -130,7 +130,7 @@ impl Scheduler {
     }
 
     // And finally, run!
-    Some(entry.node().step(dep_map, &self.tasks))
+    Some(entry.node().step(dep_map, &self.tasks, &self.to_str))
   }
 
   /**
