@@ -73,9 +73,7 @@ impl Tasks {
 
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeId) -> Option<&Vec<Task>> {
     // Use intrinsics if available, otherwise use tasks.
-    let intrinsics = self.intrinsics.get(&(*subject_type, *product));
-    println!(">>> rust got intrinsics: {:?} (from {})", intrinsics, self.intrinsics.len());
-    intrinsics.or(self.tasks.get(product))
+    self.intrinsics.get(&(*subject_type, *product)).or(self.tasks.get(product))
   }
 
   pub fn intrinsic_add(&mut self, func: Function, subject_type: TypeId, product: TypeId) {
@@ -143,14 +141,14 @@ impl Tasks {
   }
 
   pub fn task_end(&mut self) {
-    assert!(
-      self.preparing.is_some(),
-      "Must `begin()` a task creation before ending it!"
-    );
-
     // Move the task from `preparing` to the Tasks map
     let task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
-
-    self.tasks.entry(task.product.clone()).or_insert_with(|| Vec::new()).push(task);
+    let mut tasks = self.tasks.entry(task.product.clone()).or_insert_with(|| Vec::new());
+    assert!(
+      !tasks.contains(&task),
+      "Task {:?} was double-registered.",
+      task,
+    );
+    tasks.push(task);
   }
 }

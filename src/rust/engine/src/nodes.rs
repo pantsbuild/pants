@@ -271,11 +271,14 @@ impl Step for Select {
 
     // Else, attempt to use a configured task to compute the value.
     let mut dependencies = Vec::new();
-    let mut matches: Vec<&Key> = Vec::new();
+    let mut matches: Vec<Key> = Vec::new();
     for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
       match context.get(&dep_node) {
-        Some(&Complete::Return(ref value)) =>
-          matches.push(&value),
+        Some(&Complete::Return(ref value)) => {
+          if let Some(v) = self.select_literal(&context, value, variant_value) {
+            matches.push(v);
+          }
+        },
         Some(&Complete::Noop(_, _)) =>
           continue,
         Some(&Complete::Throw(ref msg)) =>
@@ -296,12 +299,14 @@ impl Step for Select {
       // by adding support for "mergeable" products. see:
       //   https://github.com/pantsbuild/pants/issues/2526
       return State::Complete(
-        Complete::Throw(format!("Conflicting values produced for this subject and type: {:?}", matches))
+        Complete::Throw(
+          format!("Conflicting values produced for subject and type.")
+        )
       );
     }
 
     match matches.pop() {
-      Some(&matched) =>
+      Some(matched) =>
         // Statically completed!
         State::Complete(Complete::Return(matched)),
       None =>
