@@ -1,8 +1,9 @@
 use libc;
 
 use std::ffi::CString;
+use std::mem;
 
-use core::{Digest, Key, TypeId};
+use core::{Digest, Field, Key, TypeId};
 
 pub type StorageExtern = libc::c_void;
 
@@ -49,12 +50,41 @@ impl StoreListFunction {
   }
 }
 
-pub struct FixedBuffer {
-  buf: [u8;255],
+pub struct KeyBuffer {
+  keys_ptr: *mut Key,
+  keys_len: u64,
+  keys_cap: u64,
+}
+
+pub type ProjectMultiExtern =
+  extern "C" fn(*const StorageExtern, *const Key, *const Field) -> *mut KeyBuffer;
+
+pub struct ProjectMultiFunction {
+  project_multi: ProjectMultiExtern,
+  storage: *const StorageExtern,
+}
+
+impl ProjectMultiFunction {
+  pub fn new(project_multi: ProjectMultiExtern, storage: *const StorageExtern) -> ProjectMultiFunction {
+    ProjectMultiFunction {
+      project_multi: project_multi,
+      storage: storage,
+    } 
+  }
+
+  pub fn call(&self, key: &Key, field: &Field) -> Vec<Key> {
+    panic!("Not implemented!:");
+  }
+}
+
+pub struct UTF8Buffer {
+  str_ptr: *mut u8,
+  str_len: u64,
+  str_cap: u64,
 }
 
 pub type ToStrExtern =
-  extern "C" fn(*const StorageExtern, *const Digest, *mut FixedBuffer) -> u8;
+  extern "C" fn(*const StorageExtern, *const Digest) -> *mut UTF8Buffer;
 
 pub struct ToStrFunction {
   to_str: ToStrExtern,
@@ -70,22 +100,25 @@ impl ToStrFunction {
   }
 
   pub fn call(&self, digest: &Digest) -> String {
-    // Create a buffer with a maximum length.
-    let mut buffer = FixedBuffer { buf: [0;255] };
-    let max_len = buffer.buf.len();
-    let len = (self.to_str)(self.storage, digest, &mut buffer) as usize;
     // Trim the buffer content to the reported written length, and decode.
-    let mut trimmed = buffer.buf.to_vec();
-    trimmed.truncate(len);
-    // Attempt to decode from unicode.
-    String::from_utf8(trimmed).map(|s| {
-      if len == max_len {
-        format!("{}...", s)
-      } else {
-        s
-      }
-    }).unwrap_or_else(|e| {
-      format!("<failed to decode unicode for {:?}: {}>", digest, e)
-    })
+    let buf = unsafe { &*(self.to_str)(self.storage, digest) };
+    let str =
+      with_vec(buf.str_ptr, buf.str_len as usize, |char_vec| {
+        // Attempt to decode from unicode.
+        String::from_utf8(char_vec.clone()).unwrap_or_else(|e| {
+          format!("<failed to decode unicode for {:?}: {}>", digest, e)
+        })
+      });
+    // This isn't ours: forget about it!
+    mem::forget(buf);
+    str
   }
+}
+
+pub fn with_vec<F,C,T>(c_ptr: *mut C, c_len: usize, f: F) -> T
+    where F: FnOnce(&Vec<C>)->T {
+  let cs = unsafe { Vec::from_raw_parts(c_ptr, c_len, c_len) };
+  let output = f(&cs);
+  mem::forget(cs);
+  output
 }

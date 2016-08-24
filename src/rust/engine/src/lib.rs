@@ -9,10 +9,11 @@ mod tasks;
 extern crate libc;
 
 use std::ffi::CStr;
+use std::mem;
 use std::path::Path;
 
 use core::{Field, Function, Key, TypeId};
-use externs::{IsInstanceExtern, IsInstanceFunction, StorageExtern, StoreListExtern, StoreListFunction, ToStrExtern, ToStrFunction};
+use externs::{IsInstanceExtern, IsInstanceFunction, StorageExtern, StoreListExtern, StoreListFunction, ToStrExtern, ToStrFunction, with_vec};
 use graph::{Graph, EntryId};
 use nodes::{Complete, Runnable};
 use scheduler::Scheduler;
@@ -410,14 +411,6 @@ fn with_scheduler<F,T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
     where F: FnOnce(&mut RawScheduler)->T {
   let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
   let t = f(&mut scheduler);
-  std::mem::forget(scheduler);
+  mem::forget(scheduler);
   t
-}
-
-fn with_vec<F,C,T>(c_ptr: *mut C, c_len: usize, f: F) -> T
-    where F: FnOnce(&Vec<C>)->T {
-  let cs = unsafe { Vec::from_raw_parts(c_ptr, c_len, c_len) };
-  let output = f(&cs);
-  std::mem::forget(cs);
-  output
 }

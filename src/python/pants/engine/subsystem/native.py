@@ -19,8 +19,10 @@ _FFI.cdef(
     } Digest;
 
     typedef struct {
-      char buf[255];
-    } FixedBuffer;
+      char*    str_ptr;
+      uint64_t str_len;
+      uint64_t str_cap;
+    } UTF8Buffer;
 
     typedef Digest TypeId;
     typedef Digest Function;
@@ -35,9 +37,9 @@ _FFI.cdef(
 
     typedef void StorageHandle;
 
-    typedef uint8_t (*extern_to_str)(StorageHandle*, Digest*, FixedBuffer*);
-    typedef bool    (*extern_isinstance)(StorageHandle*, Key*, TypeId*);
-    typedef Key     (*extern_store_list)(StorageHandle*, Key*, uint64_t);
+    typedef UTF8Buffer* (*extern_to_str)(StorageHandle*, Digest*);
+    typedef bool        (*extern_isinstance)(StorageHandle*, Key*, TypeId*);
+    typedef Key         (*extern_store_list)(StorageHandle*, Key*, uint64_t);
 
     typedef struct {
       Function*   func;
@@ -134,16 +136,23 @@ _FFI.cdef(
   )
 
 
-@_FFI.callback("uint8_t(StorageHandle*, Digest*, FixedBuffer*)")
-def extern_to_str(storage_handle, digest, output_buffer):
-  """Given storage, a Digest for `obj`, and a buffer to write to, write str(obj) and return a length."""
+# A static string buffer used for all extern_to_str calls. Not threadsafe.
+_UTF8_BUF = _FFI.new('UTF8Buffer*', (_FFI.new('char[]', 256), 256, 256))
+
+
+@_FFI.callback("UTF8Buffer*(StorageHandle*, Digest*)")
+def extern_to_str(storage_handle, digest):
+  """Given storage and a Digest for `obj`, write str(obj) and return it."""
   storage = _FFI.from_handle(storage_handle)
   obj = storage.get_from_digest(_FFI.buffer(digest.digest)[:])
   str_bytes = str(obj).encode('utf-8')
-  output = _FFI.buffer(output_buffer.buf)
-  write_len = min(len(str_bytes), len(output))
-  output[0:write_len] = str_bytes[0:write_len]
-  return write_len
+  if _UTF8_BUF.str_cap < len(str_bytes):
+    new_len = max(len(str_bytes), _UTF8_BUF.str_cap * 2)
+    _UTF8_BUF.str_ptr = _FFI.new('char[]', new_len)
+    _UTF8_BUF.str_cap = new_len
+  _UTF8_BUF.str_ptr[0:len(str_bytes)] = str_bytes
+  _UTF8_BUF.str_len = len(str_bytes)
+  return _UTF8_BUF
 
 
 @_FFI.callback("bool(StorageHandle*, Key*, TypeId*)")
