@@ -29,7 +29,7 @@ def _unpickle(value):
   if isinstance(value, six.binary_type):
     # Deserialize string values.
     return pickle.loads(value)
-  # Deserialize values with file interface,
+  # Deserialize values with file interface.
   return pickle.load(value)
 
 
@@ -72,6 +72,8 @@ class Key(object):
 
     :param digest: The digest for the Key.
     """
+    if not isinstance(digest, six.binary_type):
+      raise ValueError('Expected a binary value as digest; got value of type: {}'.format(type(digest)))
     hash_ = cls._32_BIT_STRUCT.unpack(digest)[0]
     return cls(digest, hash_)
 

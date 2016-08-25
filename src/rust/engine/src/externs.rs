@@ -75,11 +75,10 @@ impl ProjectFunction {
 pub struct KeyBuffer {
   keys_ptr: *mut Key,
   keys_len: u64,
-  keys_cap: u64,
 }
 
 pub type ProjectMultiExtern =
-  extern "C" fn(*const StorageExtern, *const Key, *const Field) -> *mut KeyBuffer;
+  extern "C" fn(*const StorageExtern, *const Key, *const Field) -> KeyBuffer;
 
 pub struct ProjectMultiFunction {
   project_multi: ProjectMultiExtern,
@@ -95,10 +94,8 @@ impl ProjectMultiFunction {
   }
 
   pub fn call(&self, key: &Key, field: &Field) -> Vec<Key> {
-    let buf = unsafe { &*(self.project_multi)(self.storage, key, field) };
+    let buf = (self.project_multi)(self.storage, key, field);
     let keys = with_vec(buf.keys_ptr, buf.keys_len as usize, |key_vec| key_vec.clone());
-    // This isn't ours: forget about it!
-    mem::forget(buf);
     keys
   }
 }
@@ -107,11 +104,10 @@ impl ProjectMultiFunction {
 pub struct UTF8Buffer {
   str_ptr: *mut u8,
   str_len: u64,
-  str_cap: u64,
 }
 
 pub type ToStrExtern =
-  extern "C" fn(*const StorageExtern, *const Digest) -> *mut UTF8Buffer;
+  extern "C" fn(*const StorageExtern, *const Digest) -> UTF8Buffer;
 
 pub struct ToStrFunction {
   to_str: ToStrExtern,
@@ -127,7 +123,7 @@ impl ToStrFunction {
   }
 
   pub fn call(&self, digest: &Digest) -> String {
-    let buf = unsafe { &*(self.to_str)(self.storage, digest) };
+    let buf = (self.to_str)(self.storage, digest);
     let str =
       with_vec(buf.str_ptr, buf.str_len as usize, |char_vec| {
         // Attempt to decode from unicode.
@@ -135,8 +131,6 @@ impl ToStrFunction {
           format!("<failed to decode unicode for {:?}: {}>", digest, e)
         })
       });
-    // This isn't ours: forget about it!
-    mem::forget(buf);
     str
   }
 }
