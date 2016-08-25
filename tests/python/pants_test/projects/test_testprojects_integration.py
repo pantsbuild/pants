@@ -11,7 +11,7 @@ from pants_test.projects.base_project_integration_test import ProjectIntegration
 
 class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
-  def base_testprojects(self):
+  def test_testprojects(self):
     # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
     # right now, just split them into two categories and ignore them.
 
@@ -89,10 +89,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
   # This is a special case that we split into 2 tests instead of using ensure_engine.
   # The reason is the original test with ensure_engine takes more than 10 minutes in travis ci,
   # which will cause travis to terminate the build. By spliting, each test finishes in less than 10 min.
-  def test_testprojects_v1_engine(self):
-    with environment_as(PANTS_ENABLE_V2_ENGINE='false'):
-      self.base_testprojects()
-
   def test_testprojects_v2_engine(self):
     with environment_as(PANTS_ENABLE_V2_ENGINE='true'):
-      self.base_testprojects()
+      self.test_testprojects()

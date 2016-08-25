@@ -83,8 +83,11 @@ class GoalRunnerFactory(object):
     ignore_patterns_explicit = not self._global_options.is_default('ignore_patterns')
     build_ignore_explicit = not self._global_options.is_default('build_ignore')
     if ignore_patterns_explicit and build_ignore_explicit:
-      raise type(str('MutualExclusiveOptionError'), (Exception,), dict())(
-        'Can\'t use both --ignore-patterns and --build-ignore, should use --build-ignore only.')
+      class MutualExclusiveOptionError(Exception):
+        """Raised when both of exclusive options are given."""
+
+      raise MutualExclusiveOptionError(
+        "Can't use both --ignore-patterns and --build-ignore, should use --build-ignore only.")
 
     # If --ignore-patterns is specified, we copy it to --build-ignore,
     # since the backend uses build_ignore.
