@@ -194,7 +194,6 @@ class Storage(Closable):
     return key
 
   def put_from_digests(self, digests):
-    print('$$$ store list of keys: {}'.format(len(digests)))
     return self.put(KeyList([Key.create_from_digest(digest) for digest in digests]))
 
   def get(self, key):
@@ -213,7 +212,6 @@ class Storage(Closable):
     # on the put_from_digests side, because the definition of the nesting should be explicit.
     if type(obj) == KeyList:
       obj = [self.get(inner) for inner in obj.keys]
-      print('$$$ found list of keys: {}'.format(obj))
     return obj
 
   def get_from_digest(self, digest):

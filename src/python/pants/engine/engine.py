@@ -145,11 +145,9 @@ class LocalSerialEngine(Engine):
         key, result = self._maybe_cache_get(entry, runnable)
         if result is None:
           try:
-            print('>>> python running {}'.format(runnable))
             result = Return(runnable.func(*runnable.args))
             self._maybe_cache_put(key, result)
           except Exception as e:
-            print('>>> failed with {}'.format(e))
             result = Throw(e)
         completed.append((entry, result))
       generator.send(completed)

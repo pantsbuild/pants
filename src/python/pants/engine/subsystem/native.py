@@ -159,7 +159,6 @@ def extern_isinstance(context_handle, key, type_id):
   c = _FFI.from_handle(context_handle)
   obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
   typ = c.storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
-  print(">>> extern_isinstance({}, {}) == {}".format(obj, typ, isinstance(obj, typ)))
   return isinstance(obj, typ)
 
 
@@ -169,7 +168,6 @@ def extern_store_list(context_handle, keys_ptr, keys_len):
   c = _FFI.from_handle(context_handle)
   digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
   key = c.storage.put_from_digests(digests)
-  print(">>> extern_store_list({}) == {}".format(len(digests), key))
   # NB: not actually storing the digest of the type of KeyList here, since it is not
   # supposed to be an exposed type. This effectively means that it is a "unique" type.
   return ((key.digest,), (key.digest,))

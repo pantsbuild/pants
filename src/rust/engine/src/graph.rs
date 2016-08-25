@@ -205,8 +205,6 @@ impl Graph {
         .collect::<HashSet<_>>()
         .into_iter()
         .partition(|&dst_id| !self.detect_cycle(src_id, dst_id));
-
-    println!(">>> rust adding deps to {}: {:?} and {:?}", src_id, deps, cyclic_deps);
     
     // Add the source as a dependent of each non-cyclic dep.
     for &dep in &deps {

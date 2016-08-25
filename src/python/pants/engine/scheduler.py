@@ -171,7 +171,6 @@ class LocalScheduler(object):
 
   def _to_digest(self, obj):
     key = self._storage.put(obj)
-    print('>>> putting {} as {}'.format(obj, key))
     return (key.digest,)
 
   def _to_type_key(self, t):
@@ -346,7 +345,6 @@ class LocalScheduler(object):
       while True:
         # Call the scheduler to create Runnables for the Engine.
         runnable = self._execution_next(completed)
-        print('>>> python got {} runnables'.format(len(runnable)))
         if not runnable and not outstanding_runnable:
           # Finished.
           break
@@ -355,7 +353,6 @@ class LocalScheduler(object):
         runnable_count += len(runnable)
         scheduling_iterations += 1
 
-      self.visualize_graph_to_file('viz.dot')
       logger.debug(
         'ran %s scheduling iterations and %s runnables in %f seconds. '
         'there are %s total nodes.',

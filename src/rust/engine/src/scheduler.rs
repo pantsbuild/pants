@@ -143,11 +143,8 @@ impl Scheduler {
     for (id, state) in completed {
       self.outstanding.remove(&id);
       self.candidates.extend(self.graph.entry_for_id(id).dependents());
-      println!(">>> rust completed runnable {} with {:?}", id, state);
       self.graph.complete(id, state.clone());
     }
-
-    println!(">>> rust has candidates: {:?}", self.candidates);
 
     // For each changed node, determine whether its dependents or itself are a candidate.
     while let Some(entry_id) = self.candidates.pop_front() {
@@ -165,7 +162,6 @@ impl Scheduler {
         },
         Some(State::Complete(s)) => {
           // Node completed statically; mark any dependents of the Node as candidates.
-          println!(">>> rust says {} is statically complete with {:?}", entry_id, s);
           self.graph.complete(entry_id, s);
           self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
         },
@@ -181,12 +177,10 @@ impl Scheduler {
               .map(|e| e.id());
           if let Some(first) = incomplete_deps.next() {
             // Mark incomplete deps as candidates for steps.
-            println!(">>> rust says {} is waiting for (at least): {}", entry_id, first);
             self.candidates.push_back(first);
             self.candidates.extend(incomplete_deps);
           } else {
             // All newly declared deps are already completed: still a candidate.
-            println!(">>> rust says all deps of {} are ready!", entry_id);
             self.candidates.push_front(entry_id);
           }
         },

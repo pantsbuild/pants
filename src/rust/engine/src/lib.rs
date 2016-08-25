@@ -96,8 +96,6 @@ impl RawExecution {
     self.ready_ptr = self.ready.as_mut_ptr();
     self.runnables_ptr = self.raw_runnables.as_mut_ptr();
     self.len = self.ready.len() as u64;
-
-    println!(">>> rust has {} ready entries", self.len);
   }
 }
 
@@ -203,7 +201,6 @@ pub extern fn scheduler_create(
   type_has_variants: TypeId,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  println!(">>> rust creating scheduler.");
   Box::into_raw(
     Box::new(
       RawScheduler {
@@ -293,7 +290,6 @@ pub extern fn execution_next(
           let throws =
             throws_ids.iter()
               .map(|&id| (id, Complete::Throw(format!("{} failed!", id))));
-          println!(">>> rust continuing execution for {:?} and {:?}", returns_ids, throws_ids);
           raw.next(returns.chain(throws).collect());
         })
       })
