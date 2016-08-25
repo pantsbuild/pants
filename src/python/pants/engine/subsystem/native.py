@@ -42,7 +42,7 @@ _FFI.cdef(
     typedef void ExternContext;
 
     typedef UTF8Buffer  (*extern_to_str)(ExternContext*, Digest*);
-    typedef bool        (*extern_isinstance)(ExternContext*, Key*, TypeId*);
+    typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
     typedef Key         (*extern_store_list)(ExternContext*, Key*, uint64_t);
     typedef Key         (*extern_project)(ExternContext*, Key*, Field*, TypeId*);
     typedef KeyBuffer   (*extern_project_multi)(ExternContext*, Key*, Field*);
@@ -99,7 +99,7 @@ _FFI.cdef(
 
     RawScheduler* scheduler_create(ExternContext*,
                                    extern_to_str,
-                                   extern_isinstance,
+                                   extern_issubclass,
                                    extern_store_list,
                                    extern_project,
                                    extern_project_multi,
@@ -153,13 +153,13 @@ def extern_to_str(context_handle, digest):
   return (c.utf8_buf(str_bytes), len(str_bytes))
 
 
-@_FFI.callback("bool(ExternContext*, Key*, TypeId*)")
-def extern_isinstance(context_handle, key, type_id):
-  """Given storage, a Key for `obj`, and a TypeId for `type`, return isinstance(obj, type)."""
+@_FFI.callback("bool(ExternContext*, TypeId*, TypeId*)")
+def extern_issubclass(context_handle, cls_id, super_cls_id):
+  """Given storage and two TypeIds, return issubclass(left, right)."""
   c = _FFI.from_handle(context_handle)
-  obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
-  typ = c.storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
-  return isinstance(obj, typ)
+  cls = c.storage.get_from_digest(_FFI.buffer(cls_id.digest)[:])
+  super_cls = c.storage.get_from_digest(_FFI.buffer(super_cls_id.digest)[:])
+  return issubclass(cls, super_cls)
 
 
 @_FFI.callback("Key(ExternContext*, Key*, uint64_t)")

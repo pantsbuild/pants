@@ -112,13 +112,13 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   /**
-   * Calls back to Python for an isinstance check.
+   * Calls back to Python for an issubclass check.
    */
   fn isinstance(&self, item: &Key, superclass: &TypeId) -> bool {
     if item.type_id() == superclass {
       true
     } else {
-      (self.tasks.isinstance).call(item, superclass)
+      (self.tasks.issubclass).call(item.type_id(), superclass)
     }
   }
 

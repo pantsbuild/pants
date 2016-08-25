@@ -14,8 +14,8 @@ use std::path::Path;
 
 use core::{Field, Function, Key, TypeId};
 use externs::{
-  IsInstanceExtern,
-  IsInstanceFunction,
+  IsSubClassExtern,
+  IsSubClassFunction,
   ProjectExtern,
   ProjectFunction,
   ProjectMultiExtern,
@@ -189,7 +189,7 @@ impl RawNodes {
 pub extern fn scheduler_create(
   ext_context: *const ExternContext,
   to_str: ToStrExtern,
-  isinstance: IsInstanceExtern,
+  issubclass: IsSubClassExtern,
   store_list: StoreListExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
@@ -209,7 +209,7 @@ pub extern fn scheduler_create(
           ToStrFunction::new(to_str, ext_context),
           Graph::new(),
           Tasks::new(
-            IsInstanceFunction::new(isinstance, ext_context),
+            IsSubClassFunction::new(issubclass, ext_context),
             StoreListFunction::new(store_list, ext_context),
             ProjectFunction::new(project, ext_context),
             ProjectMultiFunction::new(project_multi, ext_context),

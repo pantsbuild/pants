@@ -1,5 +1,7 @@
 use libc;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::mem;
 
 use core::{Digest, Field, Key, TypeId};
@@ -7,24 +9,31 @@ use core::{Digest, Field, Key, TypeId};
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = libc::c_void;
 
-pub type IsInstanceExtern =
-  extern "C" fn(*const ExternContext, *const Key, *const TypeId) -> bool;
+pub type IsSubClassExtern =
+  extern "C" fn(*const ExternContext, *const TypeId, *const TypeId) -> bool;
 
-pub struct IsInstanceFunction {
-  isinstance: IsInstanceExtern,
+pub struct IsSubClassFunction {
+  issubclass: IsSubClassExtern,
   context: *const ExternContext,
+  // A cache of answers.
+  cache: RefCell<HashMap<(TypeId,TypeId),bool>>,
 }
 
-impl IsInstanceFunction {
-  pub fn new(isinstance: IsInstanceExtern, context: *const ExternContext) -> IsInstanceFunction {
-    IsInstanceFunction {
-      isinstance: isinstance,
+impl IsSubClassFunction {
+  pub fn new(issubclass: IsSubClassExtern, context: *const ExternContext) -> IsSubClassFunction {
+    IsSubClassFunction {
+      issubclass: issubclass,
       context: context,
+      cache: RefCell::new(HashMap::new()),
     }
   }
 
-  pub fn call(&self, key: &Key, type_id: &TypeId) -> bool {
-    (self.isinstance)(self.context, key, type_id)
+  pub fn call(&self, cls: &TypeId, super_cls: &TypeId) -> bool {
+    self.cache.borrow_mut().entry((*cls, *super_cls))
+      .or_insert_with(||
+        (self.issubclass)(self.context, cls, super_cls)
+      )
+      .clone()
   }
 }
 

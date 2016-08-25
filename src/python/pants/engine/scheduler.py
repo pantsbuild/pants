@@ -20,7 +20,7 @@ from pants.engine.nodes import FilesystemNode, Noop, Return, Runnable, TaskNode,
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import (ExternContext, extern_isinstance, extern_project,
+from pants.engine.subsystem.native import (ExternContext, extern_issubclass, extern_project,
                                            extern_project_multi, extern_store_list, extern_to_str)
 from pants.util.objects import datatype
 
@@ -99,7 +99,7 @@ class LocalScheduler(object):
     self._extern_context = native.new_handle(ExternContext(storage))
     scheduler = native.lib.scheduler_create(self._extern_context,
                                             extern_to_str,
-                                            extern_isinstance,
+                                            extern_issubclass,
                                             extern_store_list,
                                             extern_project,
                                             extern_project_multi,
