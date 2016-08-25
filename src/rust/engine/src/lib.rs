@@ -20,7 +20,7 @@ use externs::{
   ProjectFunction,
   ProjectMultiExtern,
   ProjectMultiFunction,
-  StorageExtern,
+  ExternContext,
   StoreListExtern,
   StoreListFunction,
   ToStrExtern,
@@ -189,7 +189,7 @@ impl RawNodes {
 
 #[no_mangle]
 pub extern fn scheduler_create(
-  storage: *const StorageExtern,
+  ext_context: *const ExternContext,
   to_str: ToStrExtern,
   isinstance: IsInstanceExtern,
   store_list: StoreListExtern,
@@ -209,13 +209,13 @@ pub extern fn scheduler_create(
       RawScheduler {
         execution: RawExecution::new(),
         scheduler: Scheduler::new(
-          ToStrFunction::new(to_str, storage),
+          ToStrFunction::new(to_str, ext_context),
           Graph::new(),
           Tasks::new(
-            IsInstanceFunction::new(isinstance, storage),
-            StoreListFunction::new(store_list, storage),
-            ProjectFunction::new(project, storage),
-            ProjectMultiFunction::new(project_multi, storage),
+            IsInstanceFunction::new(isinstance, ext_context),
+            StoreListFunction::new(store_list, ext_context),
+            ProjectFunction::new(project, ext_context),
+            ProjectMultiFunction::new(project_multi, ext_context),
             field_name,
             field_products,
             field_variants,

@@ -4,70 +4,70 @@ use std::mem;
 
 use core::{Digest, Field, Key, TypeId};
 
-// An opaque pointer representing a Storage instance.
-pub type StorageExtern = libc::c_void;
+// An opaque pointer to a context used by the extern functions.
+pub type ExternContext = libc::c_void;
 
 pub type IsInstanceExtern =
-  extern "C" fn(*const StorageExtern, *const Key, *const TypeId) -> bool;
+  extern "C" fn(*const ExternContext, *const Key, *const TypeId) -> bool;
 
 pub struct IsInstanceFunction {
   isinstance: IsInstanceExtern,
-  storage: *const StorageExtern,
+  context: *const ExternContext,
 }
 
 impl IsInstanceFunction {
-  pub fn new(isinstance: IsInstanceExtern, storage: *const StorageExtern) -> IsInstanceFunction {
+  pub fn new(isinstance: IsInstanceExtern, context: *const ExternContext) -> IsInstanceFunction {
     IsInstanceFunction {
       isinstance: isinstance,
-      storage: storage,
+      context: context,
     }
   }
 
   pub fn call(&self, key: &Key, type_id: &TypeId) -> bool {
-    (self.isinstance)(self.storage, key, type_id)
+    (self.isinstance)(self.context, key, type_id)
   }
 }
 
 pub type StoreListExtern =
-  extern "C" fn(*const StorageExtern, *const Key, u64) -> Key;
+  extern "C" fn(*const ExternContext, *const Key, u64) -> Key;
 
 pub struct StoreListFunction {
   store_list: StoreListExtern,
-  storage: *const StorageExtern,
+  context: *const ExternContext,
 }
 
 impl StoreListFunction {
-  pub fn new(store_list: StoreListExtern, storage: *const StorageExtern) -> StoreListFunction {
+  pub fn new(store_list: StoreListExtern, context: *const ExternContext) -> StoreListFunction {
     StoreListFunction {
       store_list: store_list,
-      storage: storage,
+      context: context,
     }
   }
 
   pub fn call(&self, keys: Vec<&Key>) -> Key {
     let keys_clone: Vec<Key> = keys.into_iter().map(|&k| k).collect();
-    (self.store_list)(self.storage, keys_clone.as_ptr(), keys_clone.len() as u64)
+    (self.store_list)(self.context, keys_clone.as_ptr(), keys_clone.len() as u64)
   }
 }
 
 pub type ProjectExtern =
-  extern "C" fn(*const StorageExtern, *const Key, *const Field, *const TypeId) -> Key;
+  extern "C" fn(*const ExternContext, *const Key, *const Field, *const TypeId) -> Key;
 
 pub struct ProjectFunction {
   project: ProjectExtern,
-  storage: *const StorageExtern,
+  context: *const ExternContext,
 }
 
 impl ProjectFunction {
-  pub fn new(project: ProjectExtern, storage: *const StorageExtern) -> ProjectFunction {
+  pub fn new(project: ProjectExtern, context: *const ExternContext) -> ProjectFunction {
     ProjectFunction {
       project: project,
-      storage: storage,
+      context: context,
     }
   }
 
   pub fn call(&self, key: &Key, field: &Field, type_id: &TypeId) -> Key {
-    (self.project)(self.storage, key, field, type_id)
+    (self.project)(self.context, key, field, type_id)
   }
 }
 
@@ -78,23 +78,23 @@ pub struct KeyBuffer {
 }
 
 pub type ProjectMultiExtern =
-  extern "C" fn(*const StorageExtern, *const Key, *const Field) -> KeyBuffer;
+  extern "C" fn(*const ExternContext, *const Key, *const Field) -> KeyBuffer;
 
 pub struct ProjectMultiFunction {
   project_multi: ProjectMultiExtern,
-  storage: *const StorageExtern,
+  context: *const ExternContext,
 }
 
 impl ProjectMultiFunction {
-  pub fn new(project_multi: ProjectMultiExtern, storage: *const StorageExtern) -> ProjectMultiFunction {
+  pub fn new(project_multi: ProjectMultiExtern, context: *const ExternContext) -> ProjectMultiFunction {
     ProjectMultiFunction {
       project_multi: project_multi,
-      storage: storage,
+      context: context,
     }
   }
 
   pub fn call(&self, key: &Key, field: &Field) -> Vec<Key> {
-    let buf = (self.project_multi)(self.storage, key, field);
+    let buf = (self.project_multi)(self.context, key, field);
     let keys = with_vec(buf.keys_ptr, buf.keys_len as usize, |key_vec| key_vec.clone());
     keys
   }
@@ -107,23 +107,23 @@ pub struct UTF8Buffer {
 }
 
 pub type ToStrExtern =
-  extern "C" fn(*const StorageExtern, *const Digest) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, *const Digest) -> UTF8Buffer;
 
 pub struct ToStrFunction {
   to_str: ToStrExtern,
-  storage: *const StorageExtern,
+  context: *const ExternContext,
 }
 
 impl ToStrFunction {
-  pub fn new(to_str: ToStrExtern, storage: *const StorageExtern) -> ToStrFunction {
+  pub fn new(to_str: ToStrExtern, context: *const ExternContext) -> ToStrFunction {
     ToStrFunction {
       to_str: to_str,
-      storage: storage,
+      context: context,
     }
   }
 
   pub fn call(&self, digest: &Digest) -> String {
-    let buf = (self.to_str)(self.storage, digest);
+    let buf = (self.to_str)(self.context, digest);
     let str =
       with_vec(buf.str_ptr, buf.str_len as usize, |char_vec| {
         // Attempt to decode from unicode.

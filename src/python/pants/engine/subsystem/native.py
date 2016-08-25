@@ -39,13 +39,13 @@ _FFI.cdef(
     typedef uint64_t EntryId;
     typedef Key Field;
 
-    typedef void StorageHandle;
+    typedef void ExternContext;
 
-    typedef UTF8Buffer  (*extern_to_str)(StorageHandle*, Digest*);
-    typedef bool        (*extern_isinstance)(StorageHandle*, Key*, TypeId*);
-    typedef Key         (*extern_store_list)(StorageHandle*, Key*, uint64_t);
-    typedef Key         (*extern_project)(StorageHandle*, Key*, Field*, TypeId*);
-    typedef KeyBuffer   (*extern_project_multi)(StorageHandle*, Key*, Field*);
+    typedef UTF8Buffer  (*extern_to_str)(ExternContext*, Digest*);
+    typedef bool        (*extern_isinstance)(ExternContext*, Key*, TypeId*);
+    typedef Key         (*extern_store_list)(ExternContext*, Key*, uint64_t);
+    typedef Key         (*extern_project)(ExternContext*, Key*, Field*, TypeId*);
+    typedef KeyBuffer   (*extern_project_multi)(ExternContext*, Key*, Field*);
 
     typedef struct {
       Function*   func;
@@ -97,7 +97,7 @@ _FFI.cdef(
       // ignore them because we never have collections of this type.
     } RawNodes;
 
-    RawScheduler* scheduler_create(StorageHandle*,
+    RawScheduler* scheduler_create(ExternContext*,
                                    extern_to_str,
                                    extern_isinstance,
                                    extern_store_list,
@@ -143,74 +143,96 @@ _FFI.cdef(
     '''
   )
 
-# Static buffers used for all extern calls. Not threadsafe.
-# TODO: All of these functions need (better) error handling.
-_UTF8_BUF = _FFI.new('char[]', 256)
-_KEYS_BUF = _FFI.new('Key[]', 64)
 
-
-@_FFI.callback("UTF8Buffer(StorageHandle*, Digest*)")
-def extern_to_str(storage_handle, digest):
+@_FFI.callback("UTF8Buffer(ExternContext*, Digest*)")
+def extern_to_str(context_handle, digest):
   """Given storage and a Digest for `obj`, write str(obj) and return it."""
-  storage = _FFI.from_handle(storage_handle)
-  obj = storage.get_from_digest(_FFI.buffer(digest.digest)[:])
+  c = _FFI.from_handle(context_handle)
+  obj = c.storage.get_from_digest(_FFI.buffer(digest.digest)[:])
   str_bytes = str(obj).encode('utf-8')
-  if len(_UTF8_BUF) < len(str_bytes):
-    _UTF8_BUF = _FFI.new('char[]', max(len(str_bytes), 2 * len(_UTF8_BUF)))
-  _UTF8_BUF[0:len(str_bytes)] = str_bytes
-  return (_UTF8_BUF, len(str_bytes))
+  return (c.utf8_buf(str_bytes), len(str_bytes))
 
 
-@_FFI.callback("bool(StorageHandle*, Key*, TypeId*)")
-def extern_isinstance(storage_handle, key, type_id):
+@_FFI.callback("bool(ExternContext*, Key*, TypeId*)")
+def extern_isinstance(context_handle, key, type_id):
   """Given storage, a Key for `obj`, and a TypeId for `type`, return isinstance(obj, type)."""
-  storage = _FFI.from_handle(storage_handle)
-  obj = storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
-  typ = storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
+  c = _FFI.from_handle(context_handle)
+  obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
+  typ = c.storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
   print(">>> extern_isinstance({}, {}) == {}".format(obj, typ, isinstance(obj, typ)))
   return isinstance(obj, typ)
 
 
-@_FFI.callback("Key(StorageHandle*, Key*, uint64_t)")
-def extern_store_list(storage_handle, keys_ptr, keys_len):
+@_FFI.callback("Key(ExternContext*, Key*, uint64_t)")
+def extern_store_list(context_handle, keys_ptr, keys_len):
   """Given storage and an array of Keys, return a new Key to represent the list."""
-  storage = _FFI.from_handle(storage_handle)
+  c = _FFI.from_handle(context_handle)
   digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
-  key = storage.put_from_digests(digests)
+  key = c.storage.put_from_digests(digests)
   print(">>> extern_store_list({}) == {}".format(len(digests), key))
   # NB: not actually storing the digest of the type of KeyList here, since it is not
   # supposed to be an exposed type. This effectively means that it is a "unique" type.
   return ((key.digest,), (key.digest,))
 
 
-@_FFI.callback("Key(StorageHandle*, Key*, Field*, TypeId*)")
-def extern_project(storage_handle, key, field, type_id):
+@_FFI.callback("Key(ExternContext*, Key*, Field*, TypeId*)")
+def extern_project(context_handle, key, field, type_id):
   """Given storage, a Key for `obj`, a field name, and a type, project the field as a new Key."""
-  storage = _FFI.from_handle(storage_handle)
-  obj = storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
-  field_name = storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
-  typ = storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
+  c = _FFI.from_handle(context_handle)
+  obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
+  field_name = c.storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
+  typ = c.storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
 
   projected = getattr(obj, field_name)
   if type(projected) is not typ:
     projected = typ(projected)
 
-  return ((storage.put(projected).digest,), (storage.put(type(projected)).digest,))
+  return ((c.storage.put(projected).digest,), (c.storage.put(type(projected)).digest,))
 
 
-@_FFI.callback("KeyBuffer(StorageHandle*, Key*, Field*)")
-def extern_project_multi(storage_handle, key, field):
+@_FFI.callback("KeyBuffer(ExternContext*, Key*, Field*)")
+def extern_project_multi(context_handle, key, field):
   """Given storage, a Key for `obj`, and a field name, project the field as a list of Keys."""
-  storage = _FFI.from_handle(storage_handle)
-  obj = storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
-  field_name = storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
+  c = _FFI.from_handle(context_handle)
+  obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
+  field_name = c.storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
 
-  projected = [((storage.put(p).digest,), (storage.put(type(p)).digest,))
+  projected = [((c.storage.put(p).digest,), (c.storage.put(type(p)).digest,))
                for p in getattr(obj, field_name)]
-  if len(_KEYS_BUF) < len(projected):
-    _KEYS_BUF = _FFI.new('Key[]', max(len(projected), 2 * len(_KEYS_BUF)))
-  _KEYS_BUF[0:len(projected)] = projected
-  return (_KEYS_BUF, len(projected))
+  return (c.keys_buf(projected), len(projected))
+
+
+class ExternContext(object):
+  """A wrapper around python objects used in static extern functions in this module."""
+
+  def __init__(self, storage):
+    self._storage = storage
+    self._resize_utf8(256)
+    self._resize_keys(64)
+
+  def _resize_utf8(self, size):
+    self._utf8_cap = size
+    self._utf8_buf = _FFI.new('char[]', self._utf8_cap)
+
+  def _resize_keys(self, size):
+    self._keys_cap = size
+    self._keys_buf = _FFI.new('Key[]', self._keys_cap)
+
+  @property
+  def storage(self):
+    return self._storage
+
+  def utf8_buf(self, utf8):
+    if self._utf8_cap < len(utf8):
+      self._resize_utf8(max(len(utf8), 2 * self._utf8_cap))
+    self._utf8_buf[0:len(utf8)] = utf8
+    return self._utf8_buf
+
+  def keys_buf(self, keys):
+    if self._keys_cap < len(keys):
+      self._resize_keys(max(len(keys), 2 * self._keys_cap))
+    self._keys_buf[0:len(keys)] = keys
+    return self._keys_buf
 
 
 class Native(object):
