@@ -8,11 +8,12 @@ pub type TypeId = Digest;
 pub type Function = Digest;
 
 // The name of a field.
+// TODO: Change to just a Digest... we don't need type information here.
 pub type Field = Key;
 
 // On the python side this is string->string; but to allow for equality checks
 // without a roundtrip to python, we keep them encoded here.
-pub type Variants = Vec<(Key, Key)>;
+pub type Variants = Vec<(Field, Field)>;
 
 // NB: These structs are fairly small, so we allow copying them by default.
 #[repr(C)]

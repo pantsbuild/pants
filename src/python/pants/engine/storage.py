@@ -41,62 +41,38 @@ def _copy_bytes(value):
   return bytes(value)
 
 
-class Key(object):
+# The digest implementation used for Digests.
+_DIGEST_IMPL = sha256
+_DIGEST_SIZE = _DIGEST_IMPL().digest_size
+# A struct.Struct definition for grabbing the first 4 bytes off of a digest of
+# size DIGEST_SIZE, and discarding the rest.
+_32_BIT_STRUCT = StdlibStruct(b'<l' + (b'x' * (_DIGEST_SIZE - 4)))
+
+
+class Digest(datatype('Digest', ['digest'])):
   """Holds the digest for the object, which uniquely identifies it.
 
-  The `_hash` is a memoized 32 bit integer hashcode computed from the digest.
+  Extends datatype (and thus tuple) to allow for destructuring with CFFI.
   """
 
-  __slots__ = ['_digest', '_hash']
-
-  # The digest implementation used for Keys.
-  _DIGEST_IMPL = sha256
-  _DIGEST_SIZE = _DIGEST_IMPL().digest_size
-  _DIGEST_HALF_SIZE = _DIGEST_SIZE // 2
-
-  # A struct.Struct definition for grabbing the first 4 bytes off of a digest of
-  # size DIGEST_SIZE, and discarding the rest.
-  _32_BIT_STRUCT = StdlibStruct(b'<l' + (b'x' * (_DIGEST_SIZE - 4)))
+  def __new__(cls, digest):
+    if type(digest) is not six.binary_type:
+      raise ValueError('Cannot create digest object from type {}'.format(type(digest)))
+    return super(Digest, cls).__new__(cls, digest)
 
   @classmethod
   def create(cls, blob):
-    """Given a blob, hash it to construct a Key.
+    """Given a blob, hash it to construct a Digest.
 
     :param blob: Binary content to hash.
     """
-    return cls.create_from_digest(cls._DIGEST_IMPL(blob).digest())
-
-  @classmethod
-  def create_from_digest(cls, digest):
-    """Given the digest for a key, create a Key.
-
-    :param digest: The digest for the Key.
-    """
-    if type(digest) is not six.binary_type:
-      raise ValueError('Expected a binary value as digest; got value of type: {}'.format(type(digest)))
-    hash_ = cls._32_BIT_STRUCT.unpack(digest)[0]
-    return cls(digest, hash_)
-
-  def __init__(self, digest, hash_):
-    """Not for direct use: construct a Key via `create` instead."""
-    self._digest = digest
-    self._hash = hash_
-
-  @property
-  def digest(self):
-    return self._digest
+    return cls(_DIGEST_IMPL(blob).digest())
 
   def __hash__(self):
-    return self._hash
-
-  def __eq__(self, other):
-    return self._digest == other._digest
-
-  def __ne__(self, other):
-    return not (self == other)
+    return _32_BIT_STRUCT.unpack(self.digest)[0]
 
   def __repr__(self):
-    return 'Key({})'.format(hexlify(self._digest))
+    return 'Digest({})'.format(hexlify(self.digest[:4]))
 
   def __str__(self):
     return repr(self)
@@ -106,7 +82,7 @@ class KeyList(datatype('KeyList', ['keys'])):
   """A private typed marker for a list of Keys.
 
   KeyLists should never be created by user code, so they can be used to identify stored
-  values which are themselves lists of Keys (such as the result of a DependenciesNode.
+  values which are themselves lists of Keys (such as the result of a DependenciesNode).
   """
 
 
@@ -120,8 +96,8 @@ class Storage(Closable):
   Storage as `Closable`, `close()` can be called either explicitly or through the `with`
   statement in a context.
 
-  Besides contents indexed by their hashed Keys, a secondary index is also provided
-  for mappings between Keys. This allows to establish links between contents that
+  Besides contents indexed by their hashed Digests, a secondary index is also provided
+  for mappings between Digests. This allows to establish links between contents that
   are represented by those keys. Cache for example is such a use case.
 
   Convenience methods to translate nodes and states in
@@ -181,20 +157,20 @@ class Storage(Closable):
         blob = buf.getvalue()
 
         # Hash the blob and store it if it does not exist.
-        key = Key.create(blob)
-        if key not in self._memo:
-          self._memo[key] = obj
-          self._contents.put(key.digest, blob)
+        digest = Digest.create(blob)
+        if digest not in self._memo:
+          self._memo[digest] = obj
+          self._contents.put(digest.digest, blob)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
       # `Exception` type here.
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e), e)
 
-    return key
+    return digest
 
   def put_from_digests(self, digests):
-    return self.put(KeyList([Key.create_from_digest(digest) for digest in digests]))
+    return self.put(KeyList([Digest(digest) for digest in digests]))
 
   def get(self, key):
     """Given a key, return its deserialized content.
@@ -202,7 +178,7 @@ class Storage(Closable):
     Note that since this is not a cache, if we do not have the content for the object, this
     operation fails noisily.
     """
-    if type(key) is not Key:
+    if type(key) is not Digest:
       raise InvalidKeyError('Not a valid key: {!r}'.format(key))
 
     obj = self._memo.get(key)
@@ -215,15 +191,7 @@ class Storage(Closable):
     return obj
 
   def get_from_digest(self, digest):
-    return self.get(Key.create_from_digest(digest))
-
-  def put_state(self, state):
-    """Put the components of the State individually in storage, then put the aggregate."""
-    return self.put(tuple(self.put(r).digest for r in state.to_components()))
-
-  def get_state(self, state_key):
-    """The inverse of put_state: get a State given its Key."""
-    return State.from_components(tuple(self.get(Key.create_from_digest(d)) for d in self.get(state_key)))
+    return self.get(Digest(digest))
 
   def add_mapping(self, from_key, to_key):
     """Establish one to one relationship from one Key to another Key.
@@ -306,7 +274,7 @@ class Cache(Closable):
   def items(self):
     """Iterate over all cached request, result for testing purpose."""
     for digest, _ in self._storage._key_mappings.items():
-      request_key = Key.create_from_digest(digest)
+      request_key = Digest(digest)
       request = self._storage.get(request_key)
       yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
 
