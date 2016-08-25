@@ -177,15 +177,14 @@ class GlobalOptionsRegistrar(Optionable):
              help='See help for --build-ignore.')
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
-             help='Pants will ignore paths that match the patterns in this option '
-                  'ONLY while searching for BUILD files (example: node_modules, BUILD.md, etc). '
-                  'Other filesystem related operation will not be affected by this option.'
+             help='Paths to ignore when identifying BUILD files. '
+                  'This does not affect any other filesystem operations. '
                   'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*', rel_distdir],
-             help='Pants will ignore paths that match the patterns in this option in all cases, '
-                  'including in globs (example: *.pyc files, the .git directory, etc). '
+             help='Paths to ignore for all filesystem operations performed by pants '
+                  '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
-                  'This option is effective in v2 engine only. '
+                  'This currently only affects the v2 engine. '
                   'To experiment with v2 engine, try --enable-v2-engine option.')
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '

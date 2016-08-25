@@ -92,14 +92,14 @@ class EngineInitializer(object):
     return spec_roots
 
   @staticmethod
-  def setup_legacy_graph(path_ignore_patterns,
+  def setup_legacy_graph(pants_ignore_patterns,
                          symbol_table_cls=None,
                          build_ignore_patterns=None,
-                         exlude_target_regexps=None):
+                         exclude_target_regexps=None):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
-    :param list path_ignore_patterns: A list of paths ignore patterns for FileSystemProjectTree,
-                                 usually taken from the '--pants-ignore' global option.
+    :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
+                                       usually taken from the '--pants-ignore' global option.
     :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
                                          None to use the default.
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
@@ -109,7 +109,7 @@ class EngineInitializer(object):
     """
 
     build_root = get_buildroot()
-    project_tree = FileSystemProjectTree(build_root, path_ignore_patterns)
+    project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
     symbol_table_cls = symbol_table_cls or LegacySymbolTable
 
     # Register "literal" subjects required for these tasks.
@@ -117,7 +117,7 @@ class EngineInitializer(object):
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=LegacyPythonCallbacksParser,
                                    build_ignore_patterns=build_ignore_patterns,
-                                   exclude_target_regexps=exlude_target_regexps)
+                                   exclude_target_regexps=exclude_target_regexps)
 
     # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.

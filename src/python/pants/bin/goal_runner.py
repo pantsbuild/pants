@@ -119,7 +119,7 @@ class GoalRunnerFactory(object):
       graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(
         pants_ignore_patterns,
         build_ignore_patterns=build_ignore_patterns,
-        exlude_target_regexps=exclude_target_regexps)
+        exclude_target_regexps=exclude_target_regexps)
       return graph_helper.create_build_graph(root_specs, self._root_dir)
     else:
       address_mapper = BuildFileAddressMapper(
