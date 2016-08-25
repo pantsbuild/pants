@@ -123,7 +123,7 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
     package_dir_rel = java_package.replace('.', os.path.sep)
     package_dir = os.path.join(target_workdir, package_dir_rel)
     safe_mkdir(package_dir)
-    for root, dirs, files in os.walk(target_workdir, topdown = False):
+    for root, dirs, files in safe_walk(target_workdir):
       if root == package_dir_rel:
         # This path is already in the correct location
         continue
@@ -132,6 +132,9 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
           os.path.join(root, f),
           os.path.join(package_dir, f)
         )
+
+    # Remove any empty directories that were left behind
+    for root, dirs, files in safe_walk(target_workdir, topdown = False):
       for d in dirs:
         full_dir = os.path.join(root, d)
         if not os.listdir(full_dir):
