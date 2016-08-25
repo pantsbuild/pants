@@ -14,7 +14,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.options_initializer import OptionsInitializer
 from pants.engine.build_files import create_graph_tasks
-from pants.engine.engine import LocalSerialEngine
+from pants.engine.engine import LocalMultiprocessEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
@@ -130,9 +130,9 @@ class EngineInitializer(object):
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
     
-    storage = Storage.create()
+    storage = Storage.create(in_memory=False)
     scheduler = LocalScheduler(dict(), tasks, storage, project_tree, native)
-    engine = LocalSerialEngine(scheduler, storage)
+    engine = LocalMultiprocessEngine(scheduler, storage)
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, LegacyBuildGraph)
 

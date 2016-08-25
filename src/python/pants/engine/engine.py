@@ -115,7 +115,7 @@ class Engine(AbstractClass):
 
     :returns: A tuple of a key and result, either of which may be None.
     """
-    if not runnable.cacheable:
+    if True or not runnable.cacheable:
       return None, None
     return self._cache.get(runnable)
 
@@ -217,140 +217,33 @@ class ConcurrentEngine(Engine):
     """Await one completed step, remove it from in_flight, and return it."""
 
 
-class ThreadHybridEngine(ConcurrentEngine):
-  """An engine that runs locally but allows nodes to be optionally run concurrently.
-
-  The decision to run concurrently or in serial is determined by _is_async_node.
-  For IO bound nodes we will run concurrently using threads.
-  """
-
-  def __init__(self, scheduler, storage, cache=None, threaded_node_types=tuple(),
-               pool_size=None, debug=True):
-    """
-    :param scheduler: The local scheduler for creating execution graphs.
-    :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
-    :param storage: The storage instance for serializables keyed by their hashes.
-    :type storage: :class:`pants.engine.storage.Storage`
-    :param cache: The cache instance for storing execution results, by default it uses the same
-      Storage instance if not specified.
-    :type cache: :class:`pants.engine.storage.Cache`
-    :param tuple threaded_node_types: Node types that will be processed using the thread pool.
-    :param int pool_size: The number of worker processes to use; by default 2 processes per core will
-                          be used.
-    :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
-    """
-    super(ThreadHybridEngine, self).__init__(scheduler, storage, cache)
-    self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
-
-    self._pending = set()  # Keep track of futures so we can cleanup at the end.
-    self._processed_queue = Queue()
-    self._async_nodes = threaded_node_types
-    self._node_builder = scheduler.node_builder
-    self._state = (self._node_builder, storage)
-    self._pool = ThreadPoolExecutor(max_workers=self._pool_size)
-    self._debug = debug
-
-  def _is_async_node(self, node):
-    """Override default behavior and handle specific nodes asynchronously."""
-    return isinstance(node, self._async_nodes)
-
-  def _maybe_cache_step(self, step_request):
-    if step_request.node.is_cacheable:
-      return step_request.step_id, self._cache.get(step_request)
-    else:
-      return step_request.step_id, None
-
-  def _execute_step(self, step, runnable):
-    """A function to help support local step execution.
-
-    :param step: Step to be executed.
-    """
-    key, result = self._maybe_cache_get(step, runnable)
-    if result is None:
-      try:
-        result = Return(runnable.func(*runnable.args))
-        self._maybe_cache_put(key, result)
-      except Exception as e:
-        result = Throw(e)
-    return step, result
-
-  def _processed_node_callback(self, finished_future):
-    self._processed_queue.put(finished_future)
-    self._pending.remove(finished_future)
-
-  def _submit_until(self, pending_submission, in_flight, n):
-    """Submit pending while there's capacity, and more than `n` items in pending_submission."""
-    to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
-    submitted = 0
-    completed = []
-    for _ in range(to_submit):
-      step, runnable = pending_submission.popitem(last=False)
-      if self._is_async_node(step.node):
-        # Run in a future.
-        if step in in_flight:
-          raise InFlightException('{} is already in_flight!'.format(step))
-
-        future = self._pool.submit(functools.partial(self._execute_step, step, runnable))
-        in_flight[step] = future
-        self._pending.add(future)
-        future.add_done_callback(self._processed_node_callback)
-
-        submitted += 1
-
-      else:
-        # Run inline.
-        completed.append(self._execute_step(step, runnable))
-
-    return submitted, completed
-
-  def _await_one(self, in_flight):
-    """Await one completed step, and remove it from in_flight."""
-    if not in_flight:
-      raise InFlightException('Awaited an empty pool!')
-
-    entry, result = self._processed_queue.get().result()
-    if isinstance(result, Exception):
-      raise result
-    in_flight.pop(entry)
-    return entry, result
-
-  def close(self):
-    """Cleanup thread pool."""
-    for f in self._pending:
-      f.cancel()
-    self._pool.shutdown()  # Wait for pool to cleanup before we cleanup storage.
-    super(ThreadHybridEngine, self).close()
-
-
-def _execute_step(debug, process_state, step):
+def _execute_step(process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
   result or exception. Since step execution is only on cache misses, this also saves result
   to the cache.
   """
   storage, cache = process_state
-  step_id, runnable_key, is_cacheable = step
+  runnable_id, runnable = step
 
   def execute():
     try:
-      runnable = storage.get_state(runnable_key)
-      result = Return(runnable.func(*runnable.args))
-      if debug:
-        _try_pickle(result)
-      result_key = storage.put_state(result)
-      if is_cacheable:
-        cache.put(runnable_key, result)
+      func = storage.get(runnable.func)
+      args = [storage.get(arg) for arg in runnable.args]
+      result = storage.put_typed(func(*args))
+      if False: #runnable.cacheable:
+        cache.put(runnable, result)
+      return Return(result)
     except Exception as e:
-      result_key = storage.put_state(Throw(e))
-    return result_key
+      return Throw(storage.put_typed(e))
 
   try:
-    return step_id, execute()
+    return runnable_id, execute()
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
     logger.warn(traceback.format_exc())
-    return step_id, e
+    return runnable_id, e
 
 
 def _process_initializer(storage):
@@ -372,7 +265,7 @@ class LocalMultiprocessEngine(ConcurrentEngine):
   process boundaries repeatedly.
   """
 
-  def __init__(self, scheduler, storage=None, cache=None, pool_size=None, debug=True):
+  def __init__(self, scheduler, storage=None, cache=None, pool_size=None):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
@@ -390,19 +283,13 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
 
-    execute_step = functools.partial(_execute_step, debug)
-
     self._processed_queue = Queue()
-    self.node_builder = scheduler.node_builder
     process_initializer = functools.partial(_process_initializer, self._storage)
-    self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
-    self._debug = debug
+    self._pool = StatefulPool(self._pool_size, process_initializer, _execute_step)
     self._pool.start()
 
-  def _submit(self, step_id, runnable_key, is_cacheable):
-    entry = (step_id, runnable_key, is_cacheable)
-    if self._debug:
-      _try_pickle(entry)
+  def _submit(self, step_id, runnable):
+    entry = (step_id, runnable)
     self._pool.submit(entry)
 
   def close(self):
@@ -414,22 +301,17 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     submitted = 0
     completed = []
     for _ in range(to_submit):
-      step, runnable = pending_submission.popitem(last=False)
-      if step in in_flight:
-        raise InFlightException('{} is already in_flight!'.format(step))
+      runnable_id, runnable = pending_submission.popitem(last=False)
+      if runnable_id in in_flight:
+        raise InFlightException('{} is already in_flight!'.format(runnable_id))
 
-      # We eagerly compute a key for the Runnable, because it allows us to avoid sending the same
-      # data across process boundaries repeatedly.
-      runnable_key = self._storage.put_state(runnable)
-      is_cacheable = step.node.is_cacheable
-      result = self._cache.get_for_key(runnable_key) if step.node.is_cacheable else None
+      result = None # TODO: self._cache.get_for_key(runnable) if runnable.cacheable else None
       if result is not None:
         # Skip in_flight on cache hit.
-        completed.append((step, result))
+        completed.append((runnable_id, result))
       else:
-        step_id = id(step)
-        in_flight[step_id] = step
-        self._submit(step_id, runnable_key, is_cacheable)
+        in_flight[runnable_id] = runnable_id
+        self._submit(runnable_id, runnable)
         submitted += 1
 
     return submitted, completed
@@ -438,10 +320,10 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     """Await one completed step, and remove it from in_flight."""
     if not in_flight:
       raise InFlightException('Awaited an empty pool!')
-    step_id, result_key = self._pool.await_one_result()
-    if isinstance(result_key, Exception):
-      raise result_key
-    if step_id not in in_flight:
+    runnable_id, result = self._pool.await_one_result()
+    if isinstance(result, Exception):
+      raise result
+    if runnable_id not in in_flight:
       raise InFlightException(
-        'Received unexpected work from the Executor: {} vs {}'.format(step_id, in_flight.keys()))
-    return in_flight.pop(step_id), self._storage.get_state(result_key)
+        'Received unexpected work from the Executor: {} vs {}'.format(runnable_id, in_flight.keys()))
+    return in_flight.pop(runnable_id), result

@@ -20,6 +20,7 @@ from pants.engine.nodes import FilesystemNode, Noop, Return, Runnable, TaskNode,
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
+from pants.engine.storage import Digest
 from pants.engine.subsystem.native import (ExternContext, extern_issubclass, extern_project,
                                            extern_project_multi, extern_store_list, extern_to_str)
 from pants.util.objects import datatype
@@ -169,6 +170,9 @@ class LocalScheduler(object):
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
     self._native.lib.task_end(self._scheduler)
 
+  def _digest(self, cdata):
+    return Digest(self._native.buffer(cdata.digest)[:])
+
   def _to_type_key(self, typ):
     return self._storage.put(typ)
 
@@ -176,10 +180,10 @@ class LocalScheduler(object):
     return self._storage.put_typed(obj)
 
   def _from_type_key(self, cdata):
-    return self._storage.get_from_digest(self._native.buffer(cdata.digest)[:])
+    return self._storage.get(self._digest(cdata))
 
   def _from_key(self, cdata):
-    return self._storage.get_from_digest(self._native.buffer(cdata.digest.digest)[:])
+    return self._storage.get(self._digest(cdata.digest))
 
   @property
   def storage(self):
@@ -274,7 +278,7 @@ class LocalScheduler(object):
     for cid, c in completed:
       if type(c) is Return:
         returns_ids.append(cid)
-        returns_states.append(self._to_key(c.value))
+        returns_states.append(c.value)
       elif type(c) is Throw:
         throws_ids.append(cid)
       else:
@@ -288,8 +292,8 @@ class LocalScheduler(object):
                                     throws_ids,
                                     len(throws_ids))
     def runnable(raw):
-      return Runnable(self._from_type_key(raw.func),
-                      tuple(self._from_key(key)
+      return Runnable(self._digest(raw.func),
+                      tuple(self._digest(key.digest)
                             for key in self._native.unpack(raw.args_ptr, raw.args_len)),
                       bool(raw.cacheable))
 
@@ -336,11 +340,13 @@ class LocalScheduler(object):
 
       # Yield nodes that are Runnable, and then compute new ones.
       completed = []
-      outstanding_runnable = dict()
+      outstanding_runnable = set()
       runnable_count, scheduling_iterations = 0, 0
       while True:
         # Call the scheduler to create Runnables for the Engine.
         runnable = self._execution_next(completed)
+        outstanding_runnable.difference_update(i for i, _ in completed)
+        outstanding_runnable.update(i for i, _ in runnable)
         if not runnable and not outstanding_runnable:
           # Finished.
           break
