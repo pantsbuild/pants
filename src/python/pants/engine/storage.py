@@ -26,7 +26,7 @@ from pants.util.objects import datatype
 
 
 def _unpickle(value):
-  if isinstance(value, six.binary_type):
+  if type(value) is six.binary_type:
     # Deserialize string values.
     return pickle.loads(value)
   # Deserialize values with file interface.
@@ -72,7 +72,7 @@ class Key(object):
 
     :param digest: The digest for the Key.
     """
-    if not isinstance(digest, six.binary_type):
+    if type(digest) is not six.binary_type:
       raise ValueError('Expected a binary value as digest; got value of type: {}'.format(type(digest)))
     hash_ = cls._32_BIT_STRUCT.unpack(digest)[0]
     return cls(digest, hash_)
@@ -202,7 +202,7 @@ class Storage(Closable):
     Note that since this is not a cache, if we do not have the content for the object, this
     operation fails noisily.
     """
-    if not isinstance(key, Key):
+    if type(key) is not Key:
       raise InvalidKeyError('Not a valid key: {!r}'.format(key))
 
     obj = self._memo.get(key)
@@ -247,7 +247,7 @@ class Storage(Closable):
     if to_key is None:
       return None
 
-    if isinstance(to_key, six.binary_type):
+    if type(to_key) is six.binary_type:
       return pickle.loads(to_key)
     return pickle.load(to_key)
 
