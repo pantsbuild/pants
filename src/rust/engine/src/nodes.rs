@@ -36,7 +36,7 @@ pub enum State {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Complete {
-  Noop(&'static str, Selector),
+  Noop(&'static str, Option<Node>),
   Return(Key),
   Throw(String),
 }
@@ -123,10 +123,14 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   /**
-   * Calls back to Python to project a field.
+   * Returns a Runnable that projects the given field from the given item.
    */
-  fn project(&self, item: &Key, field: &Field, type_id: &TypeId) -> Key {
-    (self.tasks.project).call(item, field, type_id)
+  fn project(&self, item: Key, field: Field) -> Runnable {
+    Runnable {
+      func: self.tasks.project,
+      args: vec![item, field],
+      cacheable: true,
+    }
   }
 
   /**
@@ -253,10 +257,7 @@ impl Step for Select {
               .map(|&(_, ref v)| v);
           if variant_value.is_none() {
             return State::Complete(
-              Complete::Noop(
-                "Variant key for {} was not configured in variants.",
-                Selector::Select(self.selector.clone())
-              )
+              Complete::Noop("A matching variant key was not configured in variants.", None)
             )
           }
           variant_value
@@ -311,7 +312,7 @@ impl Step for Select {
         State::Complete(Complete::Return(matched)),
       None =>
         State::Complete(
-          Complete::Noop("No source of {}.", Selector::Select(self.selector.clone()))
+          Complete::Noop("No task was available to compute the value.", None)
         ),
     }
   }
@@ -367,7 +368,7 @@ impl Step for SelectDependencies {
           value,
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            Complete::Noop("Could not compute {} to determine deps.", dep_product_node.selector())
+            Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
           ),
         Some(&Complete::Throw(ref msg)) =>
           return State::Complete(Complete::Throw(msg.clone())),
@@ -411,6 +412,43 @@ impl Step for SelectDependencies {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ProjectField {
+  subject: Key,
+  variants: Variants,
+  selector: selectors::SelectProjection,
+}
+
+impl Step for ProjectField {
+  fn step(&self, context: StepContext) -> State {
+    // Request the input value we need to execute the projection.
+    let input_node =
+      Node::create(
+        Selector::select(self.selector.input_product),
+        self.subject,
+        self.variants.clone()
+      );
+    match context.get(&input_node) {
+      Some(&Complete::Return(ref value)) =>
+        // The input product is available: use it to construct the new Subject.
+        State::Runnable(
+          context.project(
+            value.clone(),
+            self.selector.field.clone(),
+          )
+        ),
+      Some(&Complete::Noop(_, _)) =>
+        State::Complete(
+          Complete::Noop("Could not compute {} to project its field.", Some(input_node))
+        ),
+      Some(&Complete::Throw(ref msg)) =>
+        State::Complete(Complete::Throw(msg.clone())),
+      None =>
+        State::Waiting(vec![input_node]),
+    }
+  }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
   subject: Key,
   variants: Variants,
@@ -419,34 +457,28 @@ pub struct SelectProjection {
 
 impl Step for SelectProjection {
   fn step(&self, context: StepContext) -> State {
-    // Request the product we need to compute the subject.
+    // Request the projected field of the subject.
     let input_node =
-      Node::create(
-        Selector::select(self.selector.input_product),
-        self.subject,
-        self.variants.clone()
+      Node::ProjectField(
+        ProjectField {
+          subject: self.subject,
+          variants: self.variants.clone(),
+          selector: self.selector.clone(),
+        }
       );
-    let dep_product =
+    let projected_subject =
       match context.get(&input_node) {
-        Some(&Complete::Return(ref value)) =>
+        Some(&Complete::Return(value)) =>
           value,
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            Complete::Noop("Could not compute {} to project its field.", input_node.selector())
+            Complete::Noop("Could not compute {} to project its field.", Some(input_node))
           ),
         Some(&Complete::Throw(ref msg)) =>
           return State::Complete(Complete::Throw(msg.clone())),
         None =>
           return State::Waiting(vec![input_node]),
       };
-
-    // The input product is available: use it to construct the new Subject.
-    let projected_subject =
-      context.project(
-        dep_product,
-        &self.selector.field,
-        &self.selector.projected_subject
-      );
 
     // When the output product is available, return it.
     let output_node =
@@ -498,7 +530,7 @@ impl Step for Task {
           dep_values.push(&value),
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            Complete::Noop("Was missing (at least) input for {}.", selector.clone())
+            Complete::Noop("Was missing (at least) input {}.", Some(dep_node))
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
@@ -527,6 +559,7 @@ pub enum Node {
   Select(Select),
   SelectLiteral(SelectLiteral),
   SelectDependencies(SelectDependencies),
+  ProjectField(ProjectField),
   SelectProjection(SelectProjection),
   Task(Task),
 }
@@ -537,6 +570,7 @@ impl Node {
       &Node::Select(_) => "Select".to_string(),
       &Node::SelectLiteral(_) => "Literal".to_string(),
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
+      &Node::ProjectField(_) => "ProjectField".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
       &Node::Task(ref t) => format!("Task({})", to_str.call(&t.selector.func)),
     }
@@ -547,6 +581,7 @@ impl Node {
       &Node::Select(ref s) => &s.subject,
       &Node::SelectLiteral(ref s) => &s.subject,
       &Node::SelectDependencies(ref s) => &s.subject,
+      &Node::ProjectField(ref p) => &p.subject,
       &Node::SelectProjection(ref s) => &s.subject,
       &Node::Task(ref t) => &t.subject,
     }
@@ -557,18 +592,9 @@ impl Node {
       &Node::Select(ref s) => &s.selector.product,
       &Node::SelectLiteral(ref s) => &s.selector.product,
       &Node::SelectDependencies(ref s) => &s.selector.product,
+      &Node::ProjectField(ref p) => &p.selector.projected_subject,
       &Node::SelectProjection(ref s) => &s.selector.product,
       &Node::Task(ref t) => &t.selector.product,
-    }
-  }
-
-  pub fn selector(&self) -> Selector {
-    match self {
-      &Node::Select(ref s) => Selector::Select(s.selector.clone()),
-      &Node::SelectLiteral(ref s) => Selector::SelectLiteral(s.selector.clone()),
-      &Node::SelectDependencies(ref s) => Selector::SelectDependencies(s.selector.clone()),
-      &Node::SelectProjection(ref s) => Selector::SelectProjection(s.selector.clone()),
-      &Node::Task(ref t) => Selector::Task(t.selector.clone()),
     }
   }
 
@@ -620,6 +646,7 @@ impl Node {
       &Node::Select(ref n) => n.step(context),
       &Node::SelectDependencies(ref n) => n.step(context),
       &Node::SelectLiteral(ref n) => n.step(context),
+      &Node::ProjectField(ref p) => p.step(context),
       &Node::SelectProjection(ref n) => n.step(context),
       &Node::Task(ref n) => n.step(context),
     }

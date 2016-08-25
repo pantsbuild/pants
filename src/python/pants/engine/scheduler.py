@@ -21,7 +21,7 @@ from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, S
                                     SelectVariant)
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.storage import Digest
-from pants.engine.subsystem.native import (ExternContext, extern_issubclass, extern_project,
+from pants.engine.subsystem.native import (ExternContext, extern_issubclass,
                                            extern_project_multi, extern_store_list, extern_to_str)
 from pants.util.objects import datatype
 
@@ -59,11 +59,24 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
     return self.input_selectors
 
 
-class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type'])):
-  """A set-friendly curried TaskNode constructor."""
+class Field(datatype('Field', ['name', 'typ'])):
+  """Represents a typed field of an object.
 
-  def as_node(self, subject, product_type, variants):
-    return TaskNode(subject, product_type, variants, self.task_func, self.input_selects)
+  TODO: Move to a 'core' module?
+  """
+
+
+def _project_field(obj, field):
+  """Projects the given Field of the given object.
+
+  TODO: Move to a 'core' module?
+  """
+  projected = getattr(obj, field.name, None)
+  if projected is None:
+    raise ValueError('No field {} on object {}'.format(field, obj))
+  if type(projected) is not field.typ:
+    projected = field.typ(projected)
+  return projected
 
 
 class LocalScheduler(object):
@@ -102,7 +115,7 @@ class LocalScheduler(object):
                                             extern_to_str,
                                             extern_issubclass,
                                             extern_store_list,
-                                            extern_project,
+                                            self._to_type_key(_project_field),
                                             extern_project_multi,
                                             self._to_key('name'),
                                             self._to_key('products'),
@@ -164,7 +177,7 @@ class LocalScheduler(object):
         self._native.lib.task_add_select_projection(self._scheduler,
                                                     self._to_type_key(selector.product),
                                                     self._to_type_key(selector.projected_subject),
-                                                    self._to_key(field),
+                                                    self._to_key(Field(field, selector.projected_subject)),
                                                     self._to_type_key(selector.input_product))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
@@ -280,6 +293,7 @@ class LocalScheduler(object):
         returns_ids.append(cid)
         returns_states.append(c.value)
       elif type(c) is Throw:
+        print('>>> {} failed with {}'.format(cid, c))
         throws_ids.append(cid)
       else:
         raise ValueError("Unexpected `Completed` state from Runnable execution: {}".format(c))
@@ -363,3 +377,4 @@ class LocalScheduler(object):
         time.time() - start_time,
         self._native.lib.graph_len(self._scheduler)
       )
+      #self.visualize_graph_to_file('viz.dot')

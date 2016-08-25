@@ -116,7 +116,7 @@ impl Scheduler {
       entry.cyclic_dependencies().iter()
         .map(|&id| {
           let entry = self.graph.entry_for_id(id);
-          (entry, Complete::Noop("Dep would be cyclic: {}.", entry.node().selector()))
+          (entry, Complete::Noop("Dep would be cyclic: {}.", Some(entry.node().clone())))
         })
         .collect();
     let mut dep_map: HashMap<&Node, &Complete> =
