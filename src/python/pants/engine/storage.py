@@ -169,8 +169,11 @@ class Storage(Closable):
 
     return digest
 
-  def put_from_digests(self, digests):
-    return self.put(KeyList([Digest(digest) for digest in digests]))
+  def put_typed(self, obj):
+    return (self.put(obj), self.put(type(obj)))
+
+  def put_typed_from_digests(self, digests):
+    return self.put_typed(KeyList([Digest(digest) for digest in digests]))
 
   def get(self, key):
     """Given a key, return its deserialized content.

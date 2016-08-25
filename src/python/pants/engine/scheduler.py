@@ -169,15 +169,11 @@ class LocalScheduler(object):
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
     self._native.lib.task_end(self._scheduler)
 
-  def _to_digest(self, obj):
-    key = self._storage.put(obj)
-    return (key.digest,)
-
-  def _to_type_key(self, t):
-    return self._to_digest(t)
+  def _to_type_key(self, typ):
+    return self._storage.put(typ)
 
   def _to_key(self, obj):
-    return (self._to_digest(obj), self._to_digest(type(obj)))
+    return self._storage.put_typed(obj)
 
   def _from_type_key(self, cdata):
     return self._storage.get_from_digest(self._native.buffer(cdata.digest)[:])

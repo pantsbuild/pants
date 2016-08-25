@@ -167,10 +167,7 @@ def extern_store_list(context_handle, keys_ptr, keys_len):
   """Given storage and an array of Keys, return a new Key to represent the list."""
   c = _FFI.from_handle(context_handle)
   digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
-  key = c.storage.put_from_digests(digests)
-  # NB: not actually storing the digest of the type of KeyList here, since it is not
-  # supposed to be an exposed type. This effectively means that it is a "unique" type.
-  return ((key.digest,), (key.digest,))
+  return c.storage.put_typed_from_digests(digests)
 
 
 @_FFI.callback("Key(ExternContext*, Key*, Field*, TypeId*)")
@@ -185,7 +182,7 @@ def extern_project(context_handle, key, field, type_id):
   if type(projected) is not typ:
     projected = typ(projected)
 
-  return ((c.storage.put(projected).digest,), (c.storage.put(type(projected)).digest,))
+  return c.storage.put_typed(projected)
 
 
 @_FFI.callback("KeyBuffer(ExternContext*, Key*, Field*)")
@@ -195,8 +192,7 @@ def extern_project_multi(context_handle, key, field):
   obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
   field_name = c.storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
 
-  projected = [((c.storage.put(p).digest,), (c.storage.put(type(p)).digest,))
-               for p in getattr(obj, field_name)]
+  projected = [c.storage.put_typed(p) for p in getattr(obj, field_name)]
   return (c.keys_buf(projected), len(projected))
 
 
