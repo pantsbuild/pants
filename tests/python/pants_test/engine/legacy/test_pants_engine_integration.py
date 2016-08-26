@@ -14,7 +14,7 @@ class PantsEngineIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertRegexpMatches(pants_run.stderr_data, 'build_graph is: .*LegacyBuildGraph')
     self.assertRegexpMatches(pants_run.stderr_data,
-                             'ran \d+ scheduling iterations and \d+ runnables in')
+                             'ran \d+ scheduling iterations, \d+ runnables, and \d+ steps in')
     self.assertNotRegexpMatches(pants_run.stderr_data, 'pantsd is running at pid \d+')
 
   def test_engine_binary(self):
