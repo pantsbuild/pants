@@ -19,7 +19,7 @@ Refactoring, Improvements, and Tooling
   `RB #4152 <https://rbcommons.com/s/twitter/r/4152>`_
 
 * Simplify `ConcurrentRunnerScheduler` & cleanup.
-  `RB #4091 <https://rbcommons.com/s/twitter/r/4191>`_
+  `RB #4091 <https://rbcommons.com/s/twitter/r/4091>`_
 
 1.1.0-rc9 (07/22/2016)
 ----------------------
