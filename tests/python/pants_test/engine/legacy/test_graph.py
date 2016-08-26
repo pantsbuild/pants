@@ -57,8 +57,6 @@ def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=
   graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                       symbol_table_cls=symbol_table_cls)
   scheduler, engine, _ = graph_helper
-
-  engine.start()
   try:
     graph, _ = graph_helper.create_build_graph(spec_roots)
     addresses = tuple(graph.inject_specs_closure(spec_roots))

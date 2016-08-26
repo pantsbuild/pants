@@ -70,7 +70,7 @@ class Engine(AbstractClass):
       """
       return cls(error=error, root_products=None)
 
-  def __init__(self, scheduler, storage=None, cache=None):
+  def __init__(self, scheduler, storage=None, cache=None, use_cache=True):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
@@ -79,10 +79,14 @@ class Engine(AbstractClass):
     :param cache: The cache instance for storing execution results, by default it uses the same
       Storage instance if not specified.
     :type cache: :class:`pants.engine.storage.Cache`
+    :param use_cache: True to enable usage of the cache. The cache incurs a large amount of
+      overhead for small tasks, and needs TODO: further improvement.
+    :type use_cache: bool
     """
     self._scheduler = scheduler
     self._storage = storage or Storage.create()
     self._cache = cache or Cache.create(storage)
+    self._use_cache = use_cache
 
   def execute(self, execution_request):
     """Executes the requested build.
@@ -115,7 +119,7 @@ class Engine(AbstractClass):
 
     :returns: A tuple of a key and result, either of which may be None.
     """
-    if not node_entry.node.is_cacheable:
+    if not self._use_cache or not node_entry.node.is_cacheable:
       return None, None
     return self._cache.get(runnable)
 
@@ -421,8 +425,8 @@ class LocalMultiprocessEngine(ConcurrentEngine):
       # We eagerly compute a key for the Runnable, because it allows us to avoid sending the same
       # data across process boundaries repeatedly.
       runnable_key = self._storage.put_state(runnable)
-      is_cacheable = step.node.is_cacheable
-      result = self._cache.get_for_key(runnable_key) if step.node.is_cacheable else None
+      is_cacheable = self._use_cache and step.node.is_cacheable
+      result = self._cache.get_for_key(runnable_key) if is_cacheable else None
       if result is not None:
         # Skip in_flight on cache hit.
         completed.append((step, result))

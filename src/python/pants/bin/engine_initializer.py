@@ -122,6 +122,7 @@ class EngineInitializer(object):
     )
 
     scheduler = LocalScheduler(dict(), tasks, project_tree)
-    engine = LocalSerialEngine(scheduler, Storage.create())
+    # TODO: Do not use the cache yet, as it incurs a high overhead.
+    engine = LocalSerialEngine(scheduler, Storage.create(), use_cache=False)
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls)
