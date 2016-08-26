@@ -186,10 +186,14 @@ class AddressMapper(object):
     Both the set of files that define a mappable BUILD files and the parser used to parse those
     files can be customized.  See the `pants.engine.parsers` module for example parsers.
 
-    :param string build_pattern: A fnmatch-compatible pattern for identifying BUILD files used
-      to resolve addresses; by default looks for `BUILD*` files.
+    :param symbol_table_cls: The symbol table cls to expose a symbol table dict.
+    :type symbol_table_cls: A :class:`pants.engine.parser.SymbolTable`.
     :param parser_cls: The BUILD file parser cls to use.
-    :type parser_cls: A :class:`pants.engine.parser.Parser`
+    :type parser_cls: A :class:`pants.engine.parser.Parser`.
+    :param string build_pattern: A fnmatch-compatible pattern for identifying BUILD files used
+                                 to resolve addresses; by default looks for `BUILD*` files.
+    :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
+    :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     """
     self.symbol_table_cls = symbol_table_cls
     self.parser_cls = parser_cls
