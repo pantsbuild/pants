@@ -107,7 +107,7 @@ class ProductGraph(object):
 
   def complete_node(self, node, state):
     """Updates the Node with the given State, creating any Nodes which do not already exist."""
-    if type(state) not in [Return, Throw, Noop]:
+    if type(state) not in (Return, Throw, Noop):
       raise ValueError('A Node may only be completed with a final State. Got: {}'.format(state))
     entry = self.ensure_entry(node)
     entry.set_state(state)
@@ -670,6 +670,8 @@ class LocalScheduler(object):
         if not runnable and not outstanding:
           # Finished.
           break
+        # The double yield here is intentional, and assumes consumption of this generator in
+        # a `for` loop with a `generator.send(completed)` call in the body of the loop.
         completed = yield runnable
         yield
         runnable_count += len(runnable)

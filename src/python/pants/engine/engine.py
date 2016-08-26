@@ -264,19 +264,20 @@ class ThreadHybridEngine(ConcurrentEngine):
     else:
       return step_request.step_id, None
 
-  def _execute_step(self, step, runnable):
+  def _execute_step(self, step_entry, runnable):
     """A function to help support local step execution.
 
-    :param step: Step to be executed.
+    :param step_entry: Entry that the step is for.
+    :param runnable: Runnable to execute.
     """
-    key, result = self._maybe_cache_get(step, runnable)
+    key, result = self._maybe_cache_get(step_entry, runnable)
     if result is None:
       try:
         result = Return(runnable.func(*runnable.args))
         self._maybe_cache_put(key, result)
       except Exception as e:
         result = Throw(e)
-    return step, result
+    return step_entry, result
 
   def _processed_node_callback(self, finished_future):
     self._processed_queue.put(finished_future)

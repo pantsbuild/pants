@@ -66,9 +66,9 @@ def _run_command(binary, sandbox_dir, process_request):
   command = binary.prefix_of_command() + tuple(process_request.args)
   logger.debug('Running command: "{}" in {}'.format(command, sandbox_dir))
   popen = subprocess.Popen(command,
-                            stderr=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            cwd=sandbox_dir)
+                           stderr=subprocess.PIPE,
+                           stdout=subprocess.PIPE,
+                           cwd=sandbox_dir)
   # TODO At some point, we may want to replace this blocking wait with a timed one that returns
   # some kind of in progress state.
   popen.wait()
