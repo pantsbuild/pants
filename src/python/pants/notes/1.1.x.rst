@@ -1,6 +1,8 @@
 1.1.x Stable Releases
 =====================
 
+This document describes releases from the ``1.1.x`` ``stable`` branch.
+
 1.1.0 (08/26/2016)
 ------------------
 
@@ -23,8 +25,6 @@ Refactoring, Improvements, and Tooling
 
 * Simplify `ConcurrentRunnerScheduler` & cleanup.
   `RB #4091 <https://rbcommons.com/s/twitter/r/4191>`_
-
-This document describes releases from the ``1.1.x`` ``stable`` branch.
 
 1.1.0-rc9 (07/22/2016)
 ----------------------
