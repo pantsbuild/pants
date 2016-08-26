@@ -199,7 +199,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     # test (ie: pants_test.contrib) namespace packages.
     # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
     #  https://github.com/pantsbuild/pants/issues/1149
-    ./pants.pex ${PANTS_ARGS[@]}  --exclude-target-regexp='.*/testprojects/.*' --ignore-patterns=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
+    ./pants.pex ${PANTS_ARGS[@]}  --exclude-target-regexp='.*/testprojects/.*' --build-ignore=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
   ) || die "Contrib python test failure"
 fi
 

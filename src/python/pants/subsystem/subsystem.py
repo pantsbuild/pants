@@ -171,8 +171,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     TODO: We'd like that to be true of Tasks some day. Subsystems will help with that.
 
-    Task code should call scoped_instance() or global_instance() to get a subsystem instance.
-    Tests can call this constructor directly though.
+    Code should call scoped_instance() or global_instance() to get a subsystem instance.
+    It should not invoke this constructor directly.
 
     :API: public
     """

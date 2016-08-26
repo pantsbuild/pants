@@ -13,10 +13,11 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.classpath_util import MissingClasspathEntryError
 from pants.build_graph.resources import Resources
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_file_dump
+from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
 
@@ -26,9 +27,31 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   def task_type(cls):
     return BundleCreate
 
+  def add_consolidated_bundle(self, context, tgt, files_dict):
+    """Add a bundle to the classpath as if it has been consolidated already.
+    """
+    consolidated_classpath = context.products.get_data(
+      'consolidated_classpath',
+      init_func=ClasspathProducts.init_func(self.pants_workdir)
+    )
+    # Create a temporary directory under the target id, then dump all files.
+    target_dir = os.path.join(self.test_workdir, tgt.id)
+    safe_mkdir(target_dir)
+    entry_path = safe_mkdtemp(dir=target_dir)
+    classpath_dir = safe_mkdtemp(dir=target_dir)
+    for rel_path, content in files_dict.items():
+      safe_file_dump(os.path.join(entry_path, rel_path), content)
+
+    # Create Jar to mimic consolidate classpath behavior.
+    jarpath = os.path.join(classpath_dir, 'output-0.jar')
+    with self.task.open_jar(jarpath, overwrite=True, compressed=False) as jar:
+      jar.write(entry_path)
+    consolidated_classpath.add_for_target(tgt, [('default', jarpath)])
+
   def setUp(self):
     """Prepare targets, context, runtime classpath. """
     super(TestBundleCreate, self).setUp()
+    self.task = self.prepare_execute(self.context())
 
     self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
     self.zip_artifact = self.create_artifact(org='org.pantsbuild', name='bar', rev='2.0.0',
@@ -76,7 +99,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     """As a separate prep step because to test different option settings, this needs to rerun
     after context is re-created.
     """
-    classpath_products = self.ensure_classpath_products(task_context)
+    classpath_products = self.ensure_consolidated_classpath_products(task_context)
     classpath_products.add_jars_for_targets(targets=[self.jar_lib],
                                             conf='default',
                                             resolved_jars=[self.jar_artifact,
@@ -84,7 +107,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                                            self.bundle_artifact,
                                                            self.tar_gz_artifact])
 
-    self.add_to_runtime_classpath(task_context, self.binary_target,
+    self.add_consolidated_bundle(task_context, self.binary_target,
                                   {'Foo.class': '', 'foo.txt': '', 'foo/file': ''})
 
   def test_jvm_bundle_products(self):
@@ -119,7 +142,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self.task_context = self.context(target_roots=[self.app_target])
     missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
                                                 materialize=False)
-    classpath_products = self.ensure_classpath_products(self.task_context)
+    classpath_products = self.ensure_consolidated_classpath_products(self.task_context)
     classpath_products.add_jars_for_targets(targets=[self.binary_target],
                                             conf='default',
                                             resolved_jars=[missing_jar_artifact])

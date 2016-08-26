@@ -87,7 +87,8 @@ the release manager may also need to do a release from a stable branch.*
 
 * ###Preparation for the release from the master branch
     1. Edit the version number in `src/python/pants/version.py`
-    2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week.
+    2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week (can use
+       `build-support/bin/release-changelog-helper.sh` to get a head start).
     3. If this release is also a release candidate then:
          * Update the corresponding notes file for that release. <br/>
            _For example if you were releasing `1.2.0rc0` you would need to
@@ -95,7 +96,7 @@ the release manager may also need to do a release from a stable branch.*
          * Add the file to pants.ini in the branch_notes section.
          * Add the new notes file to `src/docs/docsite.json`.
          * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
-       For addtional information on generating documenation see the
+       For additional information on generating documentation see the
        [docs reference](http://pantsbuild.github.io/docs#generating-the-site)
     4. Bring the CONTRIBUTORS roster (from master) in
        [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
@@ -110,7 +111,8 @@ the release manager may also need to do a release from a stable branch.*
   whether a release is needed from a stable branch.
     1. Cherry pick changes that have been identified in the [backport proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
     2. In your release branch: Edit the version number in `src/python/pants/version.py`
-    3. Update `src/python/pants/notes/*.rst` to reflect the changes for this week.  For example if
+    3. Update `src/python/pants/notes/*.rst` to reflect the changes for this week (can use
+       `build-support/bin/release-changelog-helper.sh` to get a head start).  For example if
        you were releasing 1.2.0rc1 you would need to create `src/python/pants/notes/1.2.x.rst`.
     4. Cherry pick changes to branch specific notes back to master.
     5. Create a review for changes in the stable branch and indicate the stable
