@@ -4,6 +4,41 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0-dev6 (8/26/2016)
+----------------------
+
+Regularly scheduled unstable release. Thanks to the contributors!
+
+New Features
+~~~~~~~~~~~~
+
+* A clear error message for checkstyle misconfiguration.
+  `RB #4176 <https://rbcommons.com/s/twitter/r/4176>`_
+
+Bugfixes
+~~~~~~~~
+
+* Performance fix for consolidated classpath
+  `RB #4184 <https://rbcommons.com/s/twitter/r/4184>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Refactor classpath consolidation into a separate task.
+  `RB #4152 <https://rbcommons.com/s/twitter/r/4152>`_
+
+* Refactor idea-plugin goal
+  `RB #4159 <https://rbcommons.com/s/twitter/r/4159>`_
+
+* Remove all calls to create_subsystem() in tests.
+  `RB #4178 <https://rbcommons.com/s/twitter/r/4178>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Support exclude_target_regexps and ignore_patterns in v2 engine
+  `RB #4172 <https://rbcommons.com/s/twitter/r/4172>`_
+
 1.2.0-dev5 (8/19/2016)
 ----------------------
 
