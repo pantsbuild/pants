@@ -4,6 +4,27 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0-dev6 (08/26/2016)
+-----------------------
+
+Regularly scheduled unstable release.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Performance fix for consolidated classpath
+  `RB #4184 <https://rbcommons.com/s/twitter/r/4184>`_
+
+* Refactor idea-plugin goal
+  `RB #4159 <https://rbcommons.com/s/twitter/r/4159>`_
+
+* Refactor classpath consolidation into a separate task.
+  `RB #4152 <https://rbcommons.com/s/twitter/r/4152>`_
+
+* Remove all calls to create_subsystem() in tests.
+  `RB #4178 <https://rbcommons.com/s/twitter/r/4178>`_
+
+
 1.2.0-dev5 (8/19/2016)
 ----------------------
 
