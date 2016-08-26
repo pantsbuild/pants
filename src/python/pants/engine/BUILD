@@ -81,6 +81,7 @@ python_library(
   name='mapper',
   sources=['mapper.py'],
   dependencies=[
+    '3rdparty/python:pathspec',
     ':objects',
     ':parser',
     'src/python/pants/build_graph',

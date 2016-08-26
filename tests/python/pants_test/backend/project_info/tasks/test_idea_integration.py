@@ -12,7 +12,7 @@ import xml.dom.minidom as minidom
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 
 class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
@@ -396,6 +396,7 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
                       'idea': {'exclude_folders': ['exclude-folder-sentinel']}
                     })
 
+  @ensure_engine
   def test_all_targets(self):
     self._idea_test([
       'src::', 'tests::', 'examples::', 'testprojects::',

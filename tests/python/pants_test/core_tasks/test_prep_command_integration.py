@@ -53,7 +53,7 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
       # Make sure the emitted BUILD under .pants.d is not ignored.
       config = {
         'GLOBAL': {
-          'ignore_patterns': [],
+          'build_ignore': [],
           'pants_ignore': []
         }
       }
