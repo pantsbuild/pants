@@ -164,8 +164,8 @@ class ProjectTree(AbstractClass):
     relpath = self._relpath_no_dot(relpath)
     if directory:
       relpath = self._append_trailing_slash(relpath)
-    match_result = list(self.ignore.match_files([relpath]))
-    return len(match_result) > 0
+    # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
+    return any(True for _ in self.ignore.match_files([relpath]))
 
   def _filter_ignored(self, entries, selector=None):
     """Given an opaque entry list, filter any ignored entries.

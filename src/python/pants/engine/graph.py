@@ -47,7 +47,7 @@ def filter_buildfile_paths(address_mapper, directory_listing):
   build_pattern = address_mapper.build_pattern
   def match(stat):
     # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
-    ignored = sum(1 for _ in address_mapper.build_ignore_patterns.match_files([stat.path])) > 0
+    ignored = any(True for _ in address_mapper.build_ignore_patterns.match_files([stat.path]))
     return (not ignored) and type(stat) is File and fnmatch(basename(stat.path), build_pattern)
   build_files = tuple(Path(stat.path, stat)
                       for stat in directory_listing.dependencies if match(stat))
@@ -239,7 +239,7 @@ def filter_build_dirs(address_mapper, build_files):
 
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
-  
+
   This allows us to limit our AddressFamily requests to directories that contain build files.
   """
 
