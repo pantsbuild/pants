@@ -1,6 +1,29 @@
 1.1.x Stable Releases
 =====================
 
+1.1.0 (08/26/2016)
+------------------
+
+1.1.0 Release
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix a non-determinism I added in the ANTLR support
+  `RB #4187 <https://rbcommons.com/s/twitter/r/4187>`_
+
+* Performance fix for consolidated classpath
+  `RB #4184 <https://rbcommons.com/s/twitter/r/4184>`_
+
+* Adjust the output file locations for the Antlr task.
+  `RB #4161 <https://rbcommons.com/s/twitter/r/4161>`_
+
+* Refactor classpath consolidation into a separate task.
+  `RB #4152 <https://rbcommons.com/s/twitter/r/4152>`_
+
+* Simplify `ConcurrentRunnerScheduler` & cleanup.
+  `RB #4091 <https://rbcommons.com/s/twitter/r/4191>`_
+
 This document describes releases from the ``1.1.x`` ``stable`` branch.
 
 1.1.0-rc9 (07/22/2016)
