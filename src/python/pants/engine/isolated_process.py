@@ -94,8 +94,8 @@ def _execute(process):
 
     process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
     if process_result.exit_code != 0:
-      return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(process.binary,
-                                                                                    process_result.exit_code)))
+      raise Exception('Running {} failed with non-zero exit code: {}'.format(process.binary,
+                                                                             process_result.exit_code))
 
     return process.output_conversion(process_result, sandbox_dir)
 
