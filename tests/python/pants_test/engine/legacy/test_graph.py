@@ -40,6 +40,33 @@ class TaggingSymbolTable(LegacySymbolTable):
       )
 
 
+@contextmanager
+def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=None):
+  """A context manager that yields a usable, legacy LegacyBuildGraph by way of the v2 scheduler.
+
+  :param Options options: An Options object to use for this run.
+  :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
+                                    usually taken from the `--pants-ignore` global option.
+                                    Defaults to: ['.*']
+  :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
+                                       None to use the default.
+  :yields: A tuple of (graph, addresses, scheduler).
+  """
+  path_ignore_patterns = path_ignore_patterns or ['.*']
+  spec_roots = EngineInitializer.parse_commandline_to_spec_roots(options=options)
+  graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
+                                                      symbol_table_cls=symbol_table_cls)
+  scheduler, engine, _ = graph_helper
+
+  engine.start()
+  try:
+    graph, _ = graph_helper.create_build_graph(spec_roots)
+    addresses = tuple(graph.inject_specs_closure(spec_roots))
+    yield graph, addresses, scheduler
+  finally:
+    engine.close()
+
+
 class GraphInvalidationTest(unittest.TestCase):
   def _make_setup_args(self, specs, symbol_table_cls=None):
     options = mock.Mock()
@@ -49,7 +76,7 @@ class GraphInvalidationTest(unittest.TestCase):
   @contextmanager
   def open_scheduler(self, specs, symbol_table_cls=None):
     kwargs = self._make_setup_args(specs, symbol_table_cls=symbol_table_cls)
-    with EngineInitializer.open_legacy_graph(**kwargs) as triple:
+    with open_legacy_graph(**kwargs) as triple:
       yield triple
 
   @contextmanager

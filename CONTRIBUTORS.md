@@ -75,6 +75,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Larry Hosken
 + Lei Wang
 + Leo Kim
++ Lex Spoon
 + Luc Cary
 + Luca Clementi
 + Marc Abramowitz
