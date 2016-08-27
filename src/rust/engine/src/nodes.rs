@@ -7,9 +7,15 @@ use selectors;
 use tasks::Tasks;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Arg {
+  Value(Key),
+  Node(Node),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Runnable {
   func: Function,
-  args: Vec<Key>,
+  args: Vec<Arg>,
   cacheable: bool,
 }
 
@@ -18,7 +24,7 @@ impl Runnable {
     &self.func
   }
 
-  pub fn args(&self) -> &Vec<Key> {
+  pub fn args(&self) -> &Vec<Arg> {
     &self.args
   }
 
@@ -128,7 +134,7 @@ impl<'g,'t> StepContext<'g,'t> {
   fn project(&self, item: Key, field: Field) -> Runnable {
     Runnable {
       func: self.tasks.project,
-      args: vec![item, field],
+      args: vec![Arg::Value(item), Arg::Value(field)],
       cacheable: true,
     }
   }
@@ -547,7 +553,7 @@ impl Step for Task {
       // Ready to run!
       State::Runnable(Runnable {
         func: self.selector.func,
-        args: dep_values.into_iter().map(|&d| d).collect(),
+        args: dep_values.into_iter().map(|&d| Arg::Value(d)).collect(),
         cacheable: self.selector.cacheable,
       })
     }

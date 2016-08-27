@@ -26,7 +26,7 @@ use externs::{
   with_vec,
 };
 use graph::{Graph, EntryId};
-use nodes::{Complete, Runnable};
+use nodes::{Arg, Complete, Runnable};
 use scheduler::Scheduler;
 use tasks::Tasks;
 
@@ -50,11 +50,10 @@ impl RawScheduler {
  * An unzipped, raw-pointer form of the return value of Scheduler.next().
  */
 pub struct RawExecution {
-  ready_ptr: *const EntryId,
   runnables_ptr: *const RawRunnable,
   len: u64,
-  ready: Vec<EntryId>,
   runnables: Vec<Runnable>,
+  runnable_args: Vec<Vec<RawArg>>,
   raw_runnables: Vec<RawRunnable>,
 }
 
@@ -62,11 +61,10 @@ impl RawExecution {
   fn new() -> RawExecution {
     let mut execution =
       RawExecution {
-        ready_ptr: Vec::new().as_ptr(),
         runnables_ptr: Vec::new().as_ptr(),
         len: 0,
-        ready: Vec::new(),
         runnables: Vec::new(),
+        runnable_args: Vec::new(),
         raw_runnables: Vec::new(),
       };
     // Update immediately to make the pointers above (likely dangling!) valid.
@@ -75,56 +73,98 @@ impl RawExecution {
   }
 
   fn update(&mut self, ready_entries: Vec<(EntryId, Runnable)>) {
-    let (ready, runnables) = ready_entries.into_iter().unzip();
-    self.ready = ready;
+    let (ids, runnables): (Vec<_>, Vec<_>) = ready_entries.into_iter().unzip();
     self.runnables = runnables;
 
-    self.raw_runnables =
+    self.runnable_args =
       self.runnables.iter()
-        .map(|runnable| {
+        .map(|runnable| runnable.args().iter().map(RawArg::from).collect())
+        .collect();
+
+    self.raw_runnables =
+      ids.into_iter().zip(self.runnables.iter().zip(self.runnable_args.iter()))
+        .map(|(id, (runnable, raw_args))| {
           RawRunnable {
+            id: id,
             func: runnable.func() as *const Function,
-            args_ptr: runnable.args().as_ptr(),
-            args_len: runnable.args().len() as u64,
+            args_ptr: raw_args.as_ptr(),
+            args_len: raw_args.len() as u64,
             cacheable: runnable.cacheable(),
           }
         })
         .collect();
 
-    self.ready_ptr = self.ready.as_mut_ptr();
     self.runnables_ptr = self.raw_runnables.as_mut_ptr();
-    self.len = self.ready.len() as u64;
+    self.len = self.runnables.len() as u64;
   }
 }
 
+#[repr(C,u8)]
+enum RawArgTag {
+  Key = 0,
+  EntryId = 1,
+}
+
+#[repr(C)]
+pub struct RawArg {
+  // A union of either a Key to represent a value, or an EntryId to represent the return
+  // value of another Runnable within this batch.
+  tag: RawArgTag,
+  key: Key,
+  entry: EntryId,
+}
+
+impl RawArg {
+  fn from(arg: &Arg) -> RawArg {
+    match arg {
+      &Arg::Value(v) =>
+        RawArg {
+          tag: RawArgTag::Key,
+          key: v,
+          entry: 0,
+        },
+      &Arg::Node(n) =>
+        RawArg {
+          tag: RawArgTag::EntryId,
+          key: Key::empty(),
+          entry: n,
+        },
+    }
+  }
+}
+
+#[repr(C)]
 pub struct RawRunnable {
+  id: EntryId,
   // Single Key.
   func: *const Function,
   // Array of args.
-  args_ptr: *const Key,
+  args_ptr: *const RawArg,
   args_len: u64,
   // Boolean value indicating whether the runnable is cacheable.
   cacheable: bool,
 }
 
-enum RawState {
+#[repr(C,u8)]
+enum RawStateTag {
   Empty = 0,
   Return = 1,
   Throw = 2,
   Noop = 3,
 }
 
+#[repr(C)]
 pub struct RawNode {
   subject: Key,
   product: TypeId,
   // The following values represent a union.
   // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
   // a stable release.
-  union_tag: u8,
-  union_return: Key,
+  state_tag: RawStateTag,
+  state_return: Key,
   // TODO: expose as cstrings.
-  union_throw: bool,
-  union_noop: bool,
+  state_throw: bool,
+  state_noop: bool,
 }
 
 impl RawNode {
@@ -132,21 +172,22 @@ impl RawNode {
     RawNode {
       subject: subject.clone(),
       product: product.clone(),
-      union_tag: match state {
-        None => RawState::Empty as u8,
-        Some(&Complete::Return(_)) => RawState::Return as u8,
-        Some(&Complete::Throw(_)) => RawState::Throw as u8,
-        Some(&Complete::Noop(_, _)) => RawState::Noop as u8,
-      },
-      union_return: match state {
+      state_tag: 
+        match state {
+          None => RawStateTag::Empty,
+          Some(&Complete::Return(_)) => RawStateTag::Return,
+          Some(&Complete::Throw(_)) => RawStateTag::Throw,
+          Some(&Complete::Noop(_, _)) => RawStateTag::Noop,
+        },
+      state_return: match state {
         Some(&Complete::Return(ref r)) => r.clone(),
         _ => Key::empty(),
       },
-      union_throw: match state {
+      state_throw: match state {
         Some(&Complete::Throw(_)) => true,
         _ => false,
       },
-      union_noop: match state {
+      state_noop: match state {
         Some(&Complete::Noop(_, _)) => true,
         _ => false,
       },
