@@ -7,24 +7,24 @@ use selectors;
 use tasks::Tasks;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Arg {
-  Value(Key),
-  Node(Node),
+pub enum StagedArg<T> {
+  Key(Key),
+  Promise(T),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Runnable {
+pub struct Staged<T> {
   func: Function,
-  args: Vec<Arg>,
+  args: Vec<StagedArg<T>>,
   cacheable: bool,
 }
 
-impl Runnable {
+impl<T> Staged<T> {
   pub fn func(&self) -> &Function {
     &self.func
   }
 
-  pub fn args(&self) -> &Vec<Arg> {
+  pub fn args(&self) -> &Vec<StagedArg<T>> {
     &self.args
   }
 
@@ -34,10 +34,43 @@ impl Runnable {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum State {
-  Waiting(Vec<Node>),
+pub enum State<T> {
+  Waiting(Vec<T>),
   Complete(Complete),
-  Runnable(Runnable),
+  Staged(Staged<T>),
+}
+
+impl<T> State<T> {
+  pub fn empty_waiting() -> State<T> {
+    State::Waiting(vec![])
+  }
+
+  /**
+   * Converts a State of type T to a State of type O.
+   */
+  pub fn map<O,F>(self, conversion: F) -> State<O>
+      where F: Fn(T)->O {
+    match self {
+      State::Complete(c) => State::Complete(c),
+      State::Staged(s) =>
+        State::Staged(
+          Staged {
+            func: s.func,
+            args:
+              s.args.into_iter()
+                .map(|a| {
+                  match a {
+                    StagedArg::Key(k) => StagedArg::Key(k),
+                    StagedArg::Promise(p) => StagedArg::Promise(conversion(p)),
+                  }
+                })
+                .collect(),
+            cacheable: s.cacheable
+          }
+        ),
+      State::Waiting(w) => State::Waiting(w.into_iter().map(conversion).collect()),
+    }
+  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -129,12 +162,12 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   /**
-   * Returns a Runnable that projects the given field from the given item.
+   * Returns a `Staged` state that projects the given field from the given item.
    */
-  fn project(&self, item: Key, field: Field) -> Runnable {
-    Runnable {
+  fn project(&self, item: Key, field: Field) -> Staged<Node> {
+    Staged {
       func: self.tasks.project,
-      args: vec![Arg::Value(item), Arg::Value(field)],
+      args: vec![StagedArg::Key(item), StagedArg::Key(field)],
       cacheable: true,
     }
   }
@@ -155,7 +188,7 @@ impl<'g,'t> StepContext<'g,'t> {
  * Defines executing a single step for the given context.
  */
 trait Step {
-  fn step(&self, context: StepContext) -> State;
+  fn step(&self, context: StepContext) -> State<Node>;
 }
 
 /**
@@ -227,7 +260,7 @@ impl Select {
 }
 
 impl Step for Select {
-  fn step(&self, context: StepContext) -> State {
+  fn step(&self, context: StepContext) -> State<Node> {
     // Request default Variants for the subject, so that if there are any we can propagate
     // them to task nodes.
     let variants =
@@ -332,7 +365,7 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, _: StepContext) -> State {
+  fn step(&self, _: StepContext) -> State<Node> {
     State::Complete(Complete::Return(self.selector.subject))
   }
 }
@@ -360,7 +393,7 @@ impl SelectDependencies {
 }
 
 impl Step for SelectDependencies {
-  fn step(&self, context: StepContext) -> State {
+  fn step(&self, context: StepContext) -> State<Node> {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
@@ -425,7 +458,7 @@ pub struct ProjectField {
 }
 
 impl Step for ProjectField {
-  fn step(&self, context: StepContext) -> State {
+  fn step(&self, context: StepContext) -> State<Node> {
     // Request the input value we need to execute the projection.
     let input_node =
       Node::create(
@@ -436,7 +469,7 @@ impl Step for ProjectField {
     match context.get(&input_node) {
       Some(&Complete::Return(ref value)) =>
         // The input product is available: use it to construct the new Subject.
-        State::Runnable(
+        State::Staged(
           context.project(
             value.clone(),
             self.selector.field.clone(),
@@ -462,7 +495,7 @@ pub struct SelectProjection {
 }
 
 impl Step for SelectProjection {
-  fn step(&self, context: StepContext) -> State {
+  fn step(&self, context: StepContext) -> State<Node> {
     // Request the projected field of the subject.
     let input_node =
       Node::ProjectField(
@@ -520,7 +553,7 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: StepContext) -> State {
+  fn step(&self, context: StepContext) -> State<Node> {
     // Compute dependencies for the Node, or determine whether it is a Noop.
     let mut dependencies = Vec::new();
     let mut dep_values: Vec<&Key> = Vec::new();
@@ -550,10 +583,10 @@ impl Step for Task {
       // A clause was still waiting on dependencies.
       State::Waiting(dependencies)
     } else {
-      // Ready to run!
-      State::Runnable(Runnable {
+      // Staged to run!
+      State::Staged(Staged {
         func: self.selector.func,
-        args: dep_values.into_iter().map(|&d| Arg::Value(d)).collect(),
+        args: dep_values.into_iter().map(|&d| StagedArg::Key(d)).collect(),
         cacheable: self.selector.cacheable,
       })
     }
@@ -641,7 +674,7 @@ impl Node {
     }
   }
 
-  pub fn step(&self, deps: HashMap<&Node, &Complete>, tasks: &Tasks, to_str: &ToStrFunction) -> State {
+  pub fn step(&self, deps: HashMap<&Node, &Complete>, tasks: &Tasks, to_str: &ToStrFunction) -> State<Node> {
     let context =
       StepContext {
         deps: deps,

@@ -26,8 +26,8 @@ use externs::{
   with_vec,
 };
 use graph::{Graph, EntryId};
-use nodes::{Arg, Complete, Runnable};
-use scheduler::Scheduler;
+use nodes::Complete;
+use scheduler::{Scheduler, Runnable, RunnableArg};
 use tasks::Tasks;
 
 pub struct RawScheduler {
@@ -115,19 +115,19 @@ pub struct RawArg {
 }
 
 impl RawArg {
-  fn from(arg: &Arg) -> RawArg {
+  fn from(arg: &RunnableArg) -> RawArg {
     match arg {
-      &Arg::Value(v) =>
+      &RunnableArg::Value(v) =>
         RawArg {
           tag: RawArgTag::Key,
           key: v,
           entry: 0,
         },
-      &Arg::Node(n) =>
+      &RunnableArg::EntryId(id) =>
         RawArg {
           tag: RawArgTag::EntryId,
           key: Key::empty(),
-          entry: n,
+          entry: id,
         },
     }
   }

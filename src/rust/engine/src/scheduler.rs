@@ -4,11 +4,38 @@ use std::io;
 use std::path::Path;
 
 use externs::ToStrFunction;
-use core::{Field, Key, TypeId};
+use core::{Field, Function, Key, TypeId};
 use graph::{Entry, EntryId, Graph};
-use nodes::{Complete, Node, Runnable, State};
+use nodes::{Complete, Node, Staged, State};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum RunnableArg {
+  Value(Key),
+  EntryId(EntryId),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Runnable {
+  func: Function,
+  args: Vec<RunnableArg>,
+  cacheable: bool,
+}
+
+impl Runnable {
+  pub fn func(&self) -> &Function {
+    &self.func
+  }
+
+  pub fn args(&self) -> &Vec<RunnableArg> {
+    &self.args
+  }
+
+  pub fn cacheable(&self) -> bool {
+    self.cacheable
+  }
+}
 
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
@@ -95,7 +122,7 @@ impl Scheduler {
    * If the currently declared dependencies of the Entry are not yet available, returns None. If
    * they are available, runs a Step and returns the resulting State.
    */
-  fn attempt_step(&self, id: EntryId) -> Option<State> {
+  fn attempt_step(&self, id: EntryId) -> Option<State<Node>> {
     let entry = self.graph.entry_for_id(id);
     if entry.is_complete() {
       // Already complete.
@@ -155,8 +182,9 @@ impl Scheduler {
 
       // Attempt to run a step for the Node.
       match self.attempt_step(entry_id) {
-        Some(State::Runnable(s)) => {
-          // The node is ready to run!
+        Some(State::Staged(s)) => {
+          // The node is Staged to run! Declare any dependencies, and either queue to
+          // run or push back to wait for them to be Staged as well.
           ready.push((entry_id, s));
           self.outstanding.insert(entry_id);
         },

@@ -5,7 +5,7 @@ use std::io;
 use std::path::Path;
 
 use externs::ToStrFunction;
-use nodes::{Node, Complete};
+use nodes::{Node, Complete, State};
 
 pub type EntryId = u64;
 
@@ -21,7 +21,7 @@ pub struct Entry {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  state: Option<Complete>,
+  state: State<EntryId>,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: HashSet<EntryId>,
   dependents: HashSet<EntryId>,
@@ -38,8 +38,8 @@ impl Entry {
     &self.node
   }
 
-  pub fn state(&self) -> Option<&Complete> {
-    self.state.as_ref()
+  pub fn state(&self) -> &State<EntryId> {
+    &self.state
   }
 
   pub fn dependencies(&self) -> &HashSet<EntryId> {
@@ -55,13 +55,16 @@ impl Entry {
   }
 
   pub fn is_complete(&self) -> bool {
-    self.state.is_some()
+    match &self.state {
+      &State::Complete(_) => true,
+      _ => false,
+    }
   }
 
   fn format(&self, to_str: &ToStrFunction) -> String {
     let state =
       match self.state {
-        Some(Complete::Return(r)) => to_str.call(r.digest()),
+        State::Complete(Complete::Return(r)) => to_str.call(r.digest()),
         ref x => format!("{:?}", x),
       };
     format!(
@@ -167,7 +170,7 @@ impl Graph {
       Entry {
         id: id,
         node: entry_node,
-        state: None,
+        state: State::empty_waiting(),
         dependencies: HashSet::new(),
         dependents: HashSet::new(),
         cyclic_dependencies: HashSet::new(),
@@ -177,11 +180,26 @@ impl Graph {
     id
   }
 
-  pub fn complete(&mut self, id: EntryId, state: Complete) {
-    assert!(self.is_ready(id), "Node {:?} is already completed, or has incomplete deps.", id);
-
-    let entry = self.entry_for_id_mut(id);
-    entry.state = Some(state);
+  pub fn set_state(&mut self, id: EntryId, next_state: State<Node>) -> &State<EntryId> {
+    // Validate the State change.
+    match (self.entry_for_id(id).state(), &next_state) {
+      (&State::Waiting(_), &State::Complete(_)) =>
+        // TODO: can simplify the is_ready check to just: !"has incomplete deps".
+        assert!(self.is_ready(id), "Node {:?} has incomplete deps.", id),
+      (&State::Waiting(_), &State::Staged(_)) =>
+        // TODO: can simplify the is_ready check to just: !"has incomplete deps".
+        assert!(self.is_ready(id), "Node {:?} is already completed, or has incomplete deps.", id),
+      (&State::Staged(_), &State::Complete(_)) =>
+        (),
+      (&State::Staged(s), &State::Waiting(w)) =>
+        panic!("A staged Node cannot begin waiting again!: from {:?} to {:?}", s, w),
+      (&State::Complete(c), t) =>
+        panic!("Cannot change the State of a completed Node!: from {:?} to {:?}", c, t),
+    };
+    // The state is valid! Map from State<Node> to State<EntryId> and store it.
+    self.entry_for_id_mut(id).state = next_state.map(|n| self.ensure_entry(n));
+    // And declare dependencies for each dep.
+    panic!("TODO: Adding deps not implemented");
   }
 
   /**
@@ -189,7 +207,7 @@ impl Graph {
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  pub fn add_dependencies(&mut self, src_id: EntryId, dsts: Vec<Node>) {
+  fn add_dependencies(&mut self, src_id: EntryId, dsts: Vec<Node>) {
     assert!(
       !self.is_complete_entry(src_id),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
@@ -296,15 +314,16 @@ impl Graph {
     let mut format_color =
       |entry: &Entry| {
         match entry.state {
-          None => "white".to_string(),
-          Some(Complete::Noop(_, _)) => "white".to_string(),
-          Some(Complete::Throw(_)) => "tomato".to_string(),
-          Some(Complete::Return(_)) => {
+          State::Complete(Complete::Noop(_, _)) => "white".to_string(),
+          State::Complete(Complete::Throw(_)) => "tomato".to_string(),
+          State::Complete(Complete::Return(_)) => {
             let viz_colors_len = viz_colors.len();
             viz_colors.entry(entry.node.product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
             }).clone()
           },
+          State::Staged(_) => "limegreen".to_string(),
+          State::Waiting(_) => "lightyellow".to_string(),
         }
       };
 
