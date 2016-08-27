@@ -178,7 +178,7 @@ impl Graph {
     id
   }
 
-  pub fn set_state(&mut self, id: EntryId, next_state: State<Node>) -> &State<EntryId> {
+  pub fn set_state(&mut self, id: EntryId, next_state: State<Node>) {
     // Validate the State change.
     match (self.entry_for_id(id).state(), &next_state) {
       (&State::Waiting(_), &State::Complete(_)) =>
@@ -194,20 +194,20 @@ impl Graph {
       (&State::Complete(ref c), t) =>
         panic!("Cannot change the State of a completed Node!: from {:?} to {:?}", c, t),
     };
-    // The state is valid! Map from State<Node> to State<EntryId> and store it.
-    self.entry_for_id_mut(id).state = next_state.map(|n| self.ensure_entry(n));
-    // And declare dependencies for each dep.
-    panic!("TODO: Adding deps not implemented");
-    // Finally, return a reference to the stored state.
-    self.entry_for_id(id).state()
+
+    // The change is valid! Add all dependencies from the state, and then store it.
+    let state = next_state.map(|n| self.ensure_entry(n));
+    self.add_dependencies(id, state.dependencies());
+    self.entry_for_id_mut(id).state = state;
   }
 
   /**
-   * Adds the given dst Nodes as dependencies of the src Node.
+   * Adds the given dst Nodes as dependencies of the src Node, and returns true if any of them
+   * were cyclic.
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  fn add_dependencies(&mut self, src_id: EntryId, dsts: Vec<Node>) {
+  fn add_dependencies(&mut self, src_id: EntryId, dsts: HashSet<EntryId>) {
     assert!(
       !self.is_complete_entry(src_id),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
@@ -216,12 +216,9 @@ impl Graph {
     );
 
     // Determine whether each awaited dep is cyclic.
-    // TODO: skip cycle detection for deps that are already valid.
+    // TODO: skip cycle detection for deps that are already declared.
     let (deps, cyclic_deps): (HashSet<_>, HashSet<_>) =
       dsts.into_iter()
-        .map(|dst| self.ensure_entry(dst))
-        .collect::<HashSet<_>>()
-        .into_iter()
         .partition(|&dst_id| !self.detect_cycle(src_id, dst_id));
     
     // Add the source as a dependent of each non-cyclic dep.

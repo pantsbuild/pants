@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 use core::{Field, Function, Key, TypeId, Variants};
 use externs::ToStrFunction;
@@ -40,9 +41,28 @@ pub enum State<T> {
   Staged(Staged<T>),
 }
 
-impl<T> State<T> {
+impl<T: Clone + Eq + Hash> State<T> {
   pub fn empty_waiting() -> State<T> {
     State::Waiting(vec![])
+  }
+
+  /**
+   * Return all dependencies declared by this state.
+   */
+  pub fn dependencies(&self) -> HashSet<T> {
+    match self {
+      &State::Complete(_) => HashSet::new(),
+      &State::Staged(ref s) =>
+        s.args().iter()
+          .filter_map(|arg|
+            match arg {
+              &StagedArg::Promise(ref t) => Some(t.clone()),
+              &StagedArg::Key(_) => None,
+            }
+          )
+          .collect(),
+      &State::Waiting(ref w) => w.iter().map(|s| s.clone()).collect(),
+    }
   }
 
   /**

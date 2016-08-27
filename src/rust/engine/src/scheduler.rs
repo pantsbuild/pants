@@ -104,12 +104,12 @@ impl Scheduler {
     let entry = self.graph.entry_for_id(id);
 
     // Collect complete deps.
-    let mut dep_map = HashMap::new();
+    let mut initial_dep_map = HashMap::new();
     for &dep_id in entry.dependencies() {
       let dep_entry = self.graph.entry_for_id(dep_id);
       match dep_entry.state() {
         &State::Complete(ref c) =>
-          dep_map.insert(dep_entry.node(), c),
+          initial_dep_map.insert(dep_entry.node(), c),
         _ =>
           // A dep is not complete.
           return None,
@@ -124,6 +124,7 @@ impl Scheduler {
           (entry, Complete::Noop("Dep would be cyclic: {}.", Some(entry.node().clone())))
         })
         .collect();
+    let mut dep_map = initial_dep_map;
     for &(e, ref s) in cyclic_deps.iter() {
       dep_map.insert(e.node(), &s);
     }
@@ -157,13 +158,13 @@ impl Scheduler {
       }
 
       // Determine whether the node needs additional steps, or whether it is runnable.
-      let new_state =
+      let new_node_state =
         match self.graph.entry_for_id(entry_id).state() {
           &State::Waiting(_) => {
             // See whether we can run a step for this node.
             match self.attempt_step(entry_id) {
               // Ran a step!
-              Some(s) => self.graph.set_state(entry_id, s),
+              Some(s) => s,
               // Not ready.
               None => continue,
             }
@@ -181,10 +182,11 @@ impl Scheduler {
             // Deps aren't ready: continue waiting.
             continue,
         };
+      self.graph.set_state(entry_id, new_node_state);
 
       // The node ran a step! Determine which nodes are affected.
-      match new_state {
-        &State::Staged(s) => {
+      match self.graph.entry_for_id(entry_id).state() {
+        &State::Staged(ref s) => {
           // If all dependencies of the Node are staged, the node is still a candidate.
           let ref graph = self.graph;
           let mut incomplete_deps =
