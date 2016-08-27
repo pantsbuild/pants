@@ -26,8 +26,8 @@ use externs::{
   with_vec,
 };
 use graph::{Graph, EntryId};
-use nodes::Complete;
-use scheduler::{Scheduler, Runnable, RunnableArg};
+use nodes::{Complete, Staged, StagedArg};
+use scheduler::Scheduler;
 use tasks::Tasks;
 
 pub struct RawScheduler {
@@ -52,7 +52,7 @@ impl RawScheduler {
 pub struct RawExecution {
   runnables_ptr: *const RawRunnable,
   len: u64,
-  runnables: Vec<Runnable>,
+  runnables: Vec<Staged<EntryId>>,
   runnable_args: Vec<Vec<RawArg>>,
   raw_runnables: Vec<RawRunnable>,
 }
@@ -72,7 +72,7 @@ impl RawExecution {
     execution
   }
 
-  fn update(&mut self, ready_entries: Vec<(EntryId, Runnable)>) {
+  fn update(&mut self, ready_entries: Vec<(EntryId, Staged<EntryId>)>) {
     let (ids, runnables): (Vec<_>, Vec<_>) = ready_entries.into_iter().unzip();
     self.runnables = runnables;
 
@@ -102,7 +102,7 @@ impl RawExecution {
 #[repr(C,u8)]
 enum RawArgTag {
   Key = 0,
-  EntryId = 1,
+  Promise = 1,
 }
 
 #[repr(C)]
@@ -111,23 +111,23 @@ pub struct RawArg {
   // value of another Runnable within this batch.
   tag: RawArgTag,
   key: Key,
-  entry: EntryId,
+  promise: EntryId,
 }
 
 impl RawArg {
-  fn from(arg: &RunnableArg) -> RawArg {
+  fn from(arg: &StagedArg<EntryId>) -> RawArg {
     match arg {
-      &RunnableArg::Value(v) =>
+      &StagedArg::Key(k) =>
         RawArg {
           tag: RawArgTag::Key,
-          key: v,
-          entry: 0,
+          key: k,
+          promise: 0,
         },
-      &RunnableArg::EntryId(id) =>
+      &StagedArg::Promise(id) =>
         RawArg {
-          tag: RawArgTag::EntryId,
+          tag: RawArgTag::Promise,
           key: Key::empty(),
-          entry: id,
+          promise: id,
         },
     }
   }

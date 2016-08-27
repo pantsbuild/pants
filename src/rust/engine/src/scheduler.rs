@@ -10,33 +10,6 @@ use nodes::{Complete, Node, Staged, State};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum RunnableArg {
-  Value(Key),
-  EntryId(EntryId),
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Runnable {
-  func: Function,
-  args: Vec<RunnableArg>,
-  cacheable: bool,
-}
-
-impl Runnable {
-  pub fn func(&self) -> &Function {
-    &self.func
-  }
-
-  pub fn args(&self) -> &Vec<RunnableArg> {
-    &self.args
-  }
-
-  pub fn cacheable(&self) -> bool {
-    self.cacheable
-  }
-}
-
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
@@ -84,7 +57,14 @@ impl Scheduler {
       .map(|root| {
         let subject = root.subject();
         let product = root.product();
-        let state = self.graph.entry(root).and_then(|e| e.state());
+        // TODO: Expose all States?
+        let state =
+          self.graph.entry(root).and_then(|e| {
+            match e.state() {
+              &State::Complete(ref c) => Some(c),
+              _ => None,
+            }
+          });
         (subject, product, state)
       })
       .collect()
@@ -163,14 +143,14 @@ impl Scheduler {
   /**
    * Continues execution after the given runnables have completed execution.
    */
-  pub fn next(&mut self, completed: Vec<(EntryId, Complete)>) -> Vec<(EntryId, Runnable)> {
+  pub fn next(&mut self, completed: Vec<(EntryId, Complete)>) -> Vec<(EntryId, Staged<EntryId>)> {
     let mut ready = Vec::new();
 
     // Mark any completed entries as such.
     for (id, state) in completed {
       self.outstanding.remove(&id);
       self.candidates.extend(self.graph.entry_for_id(id).dependents());
-      self.graph.complete(id, state.clone());
+      self.graph.set_state(id, State::Complete(state));
     }
 
     // For each changed node, determine whether its dependents or itself are a candidate.
@@ -179,40 +159,43 @@ impl Scheduler {
         // Already running.
         continue;
       }
-
       // Attempt to run a step for the Node.
-      match self.attempt_step(entry_id) {
-        Some(State::Staged(s)) => {
-          // The node is Staged to run! Declare any dependencies, and either queue to
-          // run or push back to wait for them to be Staged as well.
+      let state =
+        match self.attempt_step(entry_id) {
+          Some(s) => s,
+          None =>
+            // Not ready to run.
+            continue,
+        };
+
+      match self.graph.set_state(entry_id, state) {
+        &State::Staged(s) => {
+          // The node is Staged to run! Either queue to run or push back to wait for deps to be
+          // Staged as well.
           ready.push((entry_id, s));
           self.outstanding.insert(entry_id);
         },
-        Some(State::Complete(s)) => {
-          // Node completed statically; mark any dependents of the Node as candidates.
-          self.graph.complete(entry_id, s);
+        &State::Complete(_) => {
+          // Statically completed: mark any dependents of the Node as candidates.
           self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
         },
-        Some(State::Waiting(w)) => {
-          // Add the new dependencies.
-          self.graph.add_dependencies(entry_id, w);
-          let ref graph = self.graph;
+        &State::Waiting(_) => {
           // If all dependencies of the Node are completed, the Node is still a candidate.
+          let ref graph = self.graph;
           let mut incomplete_deps =
             self.graph.entry_for_id(entry_id).dependencies().iter()
               .map(|&d| graph.entry_for_id(d))
               .filter(|e| !e.is_complete())
-              .map(|e| e.id());
-          if let Some(first) = incomplete_deps.next() {
+              .map(|e| e.id())
+              .peekable();
+          if incomplete_deps.peek().is_some() {
             // Mark incomplete deps as candidates for steps.
-            self.candidates.push_back(first);
             self.candidates.extend(incomplete_deps);
           } else {
             // All newly declared deps are already completed: still a candidate.
             self.candidates.push_front(entry_id);
           }
         },
-        None => continue,
       }
     }
 

@@ -200,6 +200,8 @@ impl Graph {
     self.entry_for_id_mut(id).state = next_state.map(|n| self.ensure_entry(n));
     // And declare dependencies for each dep.
     panic!("TODO: Adding deps not implemented");
+    // Finally, return a reference to the stored state.
+    self.entry_for_id(id).state()
   }
 
   /**
