@@ -203,15 +203,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'ignore_patterns_pants_ini_integration',
-  sources = [ 'test_ignore_patterns_pants_ini_integration.py' ],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name = 'worker_pool',
   sources = ['test_worker_pool.py'],
   dependencies = [

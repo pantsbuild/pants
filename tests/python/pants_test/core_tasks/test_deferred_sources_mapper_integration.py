@@ -65,7 +65,7 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
       workdir=workdir,
       config={
         'GLOBAL': {
-          'ignore_patterns': [],
+          'build_ignore': [],
           'pants_ignore': []
         },
         'jvm-platform': {

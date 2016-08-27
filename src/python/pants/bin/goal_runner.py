@@ -25,6 +25,7 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
+from pants.option.ranked_value import RankedValue
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
@@ -67,21 +68,48 @@ class GoalRunnerFactory(object):
     self._kill_nailguns = self._global_options.kill_nailguns
 
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    build_ignore_patterns = self._global_options.ignore_patterns or []
+
+    self._handle_ignore_patterns()
+
     self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
       self._global_options.enable_v2_engine,
       self._global_options.pants_ignore,
-      build_ignore_patterns,
-      daemon_graph_helper
-    )
+      self._global_options.build_ignore,
+      self._global_options.exclude_target_regexp,
+      daemon_graph_helper)
 
-  def _select_buildgraph_and_address_mapper(self, use_engine, path_ignore_patterns,
-                                            build_ignore_patterns, graph_helper=None):
+  # TODO: Remove this once we have better support of option renaming in option.parser
+  def _handle_ignore_patterns(self):
+    ignore_patterns_explicit = not self._global_options.is_default('ignore_patterns')
+    build_ignore_explicit = not self._global_options.is_default('build_ignore')
+    if ignore_patterns_explicit and build_ignore_explicit:
+      class MutualExclusiveOptionError(Exception):
+        """Raised when both of exclusive options are given."""
+
+      raise MutualExclusiveOptionError(
+        "Can't use both --ignore-patterns and --build-ignore, should use --build-ignore only.")
+
+    # If --ignore-patterns is specified, we copy it to --build-ignore,
+    # since the backend uses build_ignore.
+    if ignore_patterns_explicit:
+      self._global_options.build_ignore = RankedValue(
+        self._global_options.get_rank('ignore_patterns'),
+        self._global_options.ignore_patterns
+      )
+
+  def _select_buildgraph_and_address_mapper(self,
+                                            use_engine,
+                                            pants_ignore_patterns,
+                                            build_ignore_patterns,
+                                            exclude_target_regexps,
+                                            graph_helper=None):
     """Selects a BuildGraph and AddressMapper to use then constructs them and returns them.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
-    :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
-    :param list build_ignore_patterns: The legacy path ignore patterns from `--ignore-patterns` (v1).
+    :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
+    :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
+                                       applied during BUILD file searching.
+    :param list exclude_target_regexps: Regular expressions for targets to be excluded.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
                                            if available. This would usually come from the daemon.
     :returns: A tuple of (BuildGraph, AddressMapper).
@@ -91,15 +119,18 @@ class GoalRunnerFactory(object):
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
-      graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(path_ignore_patterns)
+      graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(
+        pants_ignore_patterns,
+        build_ignore_patterns=build_ignore_patterns,
+        exclude_target_regexps=exclude_target_regexps)
       return graph_helper.create_build_graph(root_specs, self._root_dir)
     else:
       address_mapper = BuildFileAddressMapper(
         self._build_file_parser,
         get_project_tree(self._global_options),
         build_ignore_patterns,
-        exclude_target_regexps=self._global_options.exclude_target_regexp
-      )
+        exclude_target_regexps)
+
       return MutableBuildGraph(address_mapper), address_mapper
 
   def _expand_goals(self, goals):
