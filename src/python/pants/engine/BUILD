@@ -174,10 +174,11 @@ python_library(
   name='storage',
   sources=['storage.py'],
   dependencies=[
+    '3rdparty/python:cffi',
+    '3rdparty/python:lmdb',
+    ':nodes',
     ':objects',
     ':scheduler',
-    '3rdparty/python:lmdb',
-    '3rdparty/python:cffi',
-    'src/python/pants/util:dirutil'
+    'src/python/pants/util:dirutil',
   ]
 )

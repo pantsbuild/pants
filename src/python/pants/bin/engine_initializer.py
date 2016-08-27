@@ -18,7 +18,8 @@ from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
+from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, RemoteSourcesAdaptor,
+                                         TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -50,6 +51,7 @@ class LegacySymbolTable(SymbolTable):
     # These should likely move onto Target subclasses as the engine gets deeper into beta
     # territory.
     aliases['jvm_app'] = JvmAppAdaptor
+    aliases['remote_sources'] = RemoteSourcesAdaptor
     for alias in ('python_library', 'python_tests', 'python_binary'):
       aliases[alias] = PythonTargetAdaptor
 
@@ -128,6 +130,7 @@ class EngineInitializer(object):
     )
 
     scheduler = LocalScheduler(dict(), tasks, project_tree)
-    engine = LocalSerialEngine(scheduler, Storage.create(debug=False))
+    # TODO: Do not use the cache yet, as it incurs a high overhead.
+    engine = LocalSerialEngine(scheduler, Storage.create(), use_cache=False)
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls)

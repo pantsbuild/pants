@@ -279,30 +279,33 @@ class ProductGraphTest(unittest.TestCase):
     for state in states:
       dest = None
       for src in reversed(sequence):
-        graph.update_state(src, state([dest] if dest else []))
+        if state is Waiting:
+          graph.add_dependencies(src, [dest] if dest else [])
+        else:
+          graph.complete_node(src, state([dest]))
         dest = src
     return sequence
 
   def test_disallow_completed_state_change(self):
-    self.pg.update_state('A', Return('done!'))
+    self.pg.complete_node('A', Return('done!'))
     with self.assertRaises(CompletedNodeException):
-      self.pg.update_state('A', Waiting(['B']))
+      self.pg.add_dependencies('A', ['B'])
 
   def test_disallow_completing_with_incomplete_deps(self):
-    self.pg.update_state('A', Waiting(['B']))
-    self.pg.update_state('B', Waiting(['C']))
+    self.pg.add_dependencies('A', ['B'])
+    self.pg.add_dependencies('B', ['C'])
     with self.assertRaises(IncompleteDependencyException):
-      self.pg.update_state('A', Return('done!'))
+      self.pg.complete_node('A', Return('done!'))
 
   def test_dependency_edges(self):
-    self.pg.update_state('A', Waiting(['B', 'C']))
+    self.pg.add_dependencies('A', ['B', 'C'])
     self.assertEquals({'B', 'C'}, set(self.pg.dependencies_of('A')))
     self.assertEquals({'A'}, set(self.pg.dependents_of('B')))
     self.assertEquals({'A'}, set(self.pg.dependents_of('C')))
 
   def test_cycle_simple(self):
-    self.pg.update_state('A', Waiting(['B']))
-    self.pg.update_state('B', Waiting(['A']))
+    self.pg.add_dependencies('A', ['B'])
+    self.pg.add_dependencies('B', ['A'])
     # NB: Order matters: the second insertion is the one tracked as a cycle.
     self.assertEquals({'B'}, set(self.pg.dependencies_of('A')))
     self.assertEquals(set(), set(self.pg.dependencies_of('B')))
@@ -310,9 +313,9 @@ class ProductGraphTest(unittest.TestCase):
     self.assertEquals({'A'}, set(self.pg.cyclic_dependencies_of('B')))
 
   def test_cycle_indirect(self):
-    self.pg.update_state('A', Waiting(['B']))
-    self.pg.update_state('B', Waiting(['C']))
-    self.pg.update_state('C', Waiting(['A']))
+    self.pg.add_dependencies('A', ['B'])
+    self.pg.add_dependencies('B', ['C'])
+    self.pg.add_dependencies('C', ['A'])
 
     self.assertEquals({'B'}, set(self.pg.dependencies_of('A')))
     self.assertEquals({'C'}, set(self.pg.dependencies_of('B')))
@@ -330,7 +333,7 @@ class ProductGraphTest(unittest.TestCase):
 
     # Closing the chain is not.
     begin, end = nodes[0], nodes[-1]
-    self.pg.update_state(end, Waiting([begin]))
+    self.pg.add_dependencies(end, [begin])
     self.assertEquals(set(), set(self.pg.dependencies_of(end)))
     self.assertEquals({begin}, set(self.pg.cyclic_dependencies_of(end)))
 

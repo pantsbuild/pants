@@ -45,9 +45,6 @@ class SchedulerService(PantsService):
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 
-    # Start the engine.
-    self._engine.start()
-
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
     self._logger.info('enqueuing {} changes for subscription {}'

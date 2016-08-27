@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
 import unittest
 from contextlib import contextmanager
@@ -15,6 +16,28 @@ from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
+
+
+# Macro that adds the specified tag.
+def macro(target_cls, tag, parse_context, tags=None, **kwargs):
+  tags = tags or set()
+  tags.add(tag)
+  parse_context.create_object(target_cls, tags=tags, **kwargs)
+
+
+# SymbolTable that extends the legacy table to apply the macro.
+class TaggingSymbolTable(LegacySymbolTable):
+  tag = 'tag_added_by_macro'
+  target_cls = Target
+
+  @classmethod
+  def aliases(cls):
+    tag_macro = functools.partial(macro, cls.target_cls, cls.tag)
+    return super(TaggingSymbolTable, cls).aliases().merge(
+        BuildFileAliases(
+          targets={'target': TargetMacro.Factory.wrap(tag_macro, cls.target_cls),}
+        )
+      )
 
 
 @contextmanager
@@ -34,8 +57,6 @@ def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=
   graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                       symbol_table_cls=symbol_table_cls)
   scheduler, engine, _ = graph_helper
-
-  engine.start()
   try:
     graph, _ = graph_helper.create_build_graph(spec_roots)
     addresses = tuple(graph.inject_specs_closure(spec_roots))
@@ -96,28 +117,10 @@ class GraphInvalidationTest(unittest.TestCase):
 
     Installs an additional TargetMacro that wraps `target` aliases to add a tag to all definitions.
     """
-    tag = 'tag_added_by_macro'
-    target_cls = Target
     spec = 'testprojects/tests/python/pants/build_parsing:'
-
-    # Macro that adds the specified tag.
-    def macro(parse_context, tags=None, **kwargs):
-      tags = tags or set()
-      tags.add(tag)
-      parse_context.create_object(target_cls, tags=tags, **kwargs)
-
-    # SymbolTable that extends the legacy table to apply the macro.
-    class TaggingSymbolTable(LegacySymbolTable):
-      @classmethod
-      def aliases(cls):
-        return super(TaggingSymbolTable, cls).aliases().merge(
-            BuildFileAliases(
-              targets={'target': TargetMacro.Factory.wrap(macro, target_cls),}
-            )
-          )
 
     # Confirm that python_tests in a small directory are marked.
     with self.open_scheduler([spec], symbol_table_cls=TaggingSymbolTable) as (graph, addresses, _):
       self.assertTrue(len(addresses) > 0, 'No targets matched by {}'.format(addresses))
       for address in addresses:
-        self.assertIn(tag, graph.get_target(address).tags)
+        self.assertIn(TaggingSymbolTable.tag, graph.get_target(address).tags)
