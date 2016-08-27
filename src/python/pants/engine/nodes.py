@@ -504,11 +504,15 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def generate_subjects(cls, filenames):
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
-      # ReadLink, or FileContent for the literal path.
+      # ReadLink, FileContent, or DirectoryListing for the literal path.
       yield File(f)
       yield Link(f)
-      # DirectoryListing for parent dirs.
-      yield Dir(dirname(f))
+      yield Dir(f)
+      # Additionally, since the FS event service does not send invalidation events
+      # for the root directory, treat any changed file in the root as an invalidation
+      # of the root's listing.
+      if dirname(f) in ('.', ''):
+        yield Dir('')
 
   def step(self, step_context):
     if self.product is DirectoryListing:

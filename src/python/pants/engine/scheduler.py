@@ -234,7 +234,6 @@ class ProductGraph(object):
 
     # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
     for entry in invalidated_entries:
-      logger.debug('invalidating node: %r', entry.node)
       _delete_node(entry)
 
     invalidated_count = len(invalidated_entries)
