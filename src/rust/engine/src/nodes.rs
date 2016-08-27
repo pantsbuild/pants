@@ -48,8 +48,8 @@ impl<T> State<T> {
   /**
    * Converts a State of type T to a State of type O.
    */
-  pub fn map<O,F>(self, conversion: F) -> State<O>
-      where F: Fn(T)->O {
+  pub fn map<O,F>(self, mut conversion: F) -> State<O>
+      where F: FnMut(T)->O {
     match self {
       State::Complete(c) => State::Complete(c),
       State::Staged(s) =>

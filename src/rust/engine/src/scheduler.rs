@@ -97,39 +97,31 @@ impl Scheduler {
   }
 
   /**
-   * Attempt to run a Step with the currently available dependencies of the given Node.
-   *
-   * If the currently declared dependencies of the Entry are not yet available, returns None. If
-   * they are available, runs a Step and returns the resulting State.
+   * Attempt to run a step with the currently available dependencies of the given Node. If
+   * a step runs, the new State of the Node will be returned.
    */
   fn attempt_step(&self, id: EntryId) -> Option<State<Node>> {
     let entry = self.graph.entry_for_id(id);
-    if entry.is_complete() {
-      // Already complete.
-      return None;
+
+    // Collect complete deps.
+    let mut dep_map = HashMap::new();
+    for &dep_id in entry.dependencies() {
+      let dep_entry = self.graph.entry_for_id(dep_id);
+      match dep_entry.state() {
+        &State::Complete(ref c) =>
+          dep_map.insert(dep_entry.node(), c),
+        _ =>
+          // A dep is not complete.
+          return None,
+      };
     }
 
-    let dep_entries: Vec<&Entry> =
-      entry.dependencies().iter()
-        .map(|&d| self.graph.entry_for_id(d))
-        .collect();
-    if dep_entries.iter().any(|d| !d.is_complete()) {
-      // Dep is not complete.
-      return None;
-    }
-
-    // All deps are complete: gather them.
+    // Additionally, gather cyclic deps.
     let cyclic_deps: Vec<(&Entry, Complete)> =
       entry.cyclic_dependencies().iter()
         .map(|&id| {
           let entry = self.graph.entry_for_id(id);
           (entry, Complete::Noop("Dep would be cyclic: {}.", Some(entry.node().clone())))
-        })
-        .collect();
-    let mut dep_map: HashMap<&Node, &Complete> =
-      dep_entries.iter()
-        .filter_map(|e| {
-          e.state().map(|s| (e.node(), s))
         })
         .collect();
     for &(e, ref s) in cyclic_deps.iter() {
@@ -142,6 +134,10 @@ impl Scheduler {
 
   /**
    * Continues execution after the given runnables have completed execution.
+   *
+   * Returns a batch of `Staged<EntryId>` for which every `StagedArg::Promise` is satisfiable
+   * by an entry which is already outstanding. This "mini graph" can be executed in parallel as
+   * long as those promise dependencies are observed.
    */
   pub fn next(&mut self, completed: Vec<(EntryId, Complete)>) -> Vec<(EntryId, Staged<EntryId>)> {
     let mut ready = Vec::new();
@@ -159,26 +155,55 @@ impl Scheduler {
         // Already running.
         continue;
       }
-      // Attempt to run a step for the Node.
-      let state =
-        match self.attempt_step(entry_id) {
-          Some(s) => s,
-          None =>
-            // Not ready to run.
+
+      // Determine whether the node needs additional steps, or whether it is runnable.
+      let new_state =
+        match self.graph.entry_for_id(entry_id).state() {
+          &State::Waiting(_) => {
+            // See whether we can run a step for this node.
+            match self.attempt_step(entry_id) {
+              // Ran a step!
+              Some(s) => self.graph.set_state(entry_id, s),
+              // Not ready.
+              None => continue,
+            }
+          },
+          &State::Staged(ref s) if self.graph.dependencies_all(entry_id, Entry::is_staged) => {
+            // All of the deps of a staged Node are staged, so it is runnable!
+            ready.push((entry_id, s.clone()));
+            self.outstanding.insert(entry_id);
+            continue;
+          },
+          &State::Complete(_) =>
+            // Already complete!
+            continue,
+          &State::Staged(_) =>
+            // Deps aren't ready: continue waiting.
             continue,
         };
 
-      match self.graph.set_state(entry_id, state) {
+      // The node ran a step! Determine which nodes are affected.
+      match new_state {
         &State::Staged(s) => {
-          // The node is Staged to run! Either queue to run or push back to wait for deps to be
-          // Staged as well.
-          ready.push((entry_id, s));
-          self.outstanding.insert(entry_id);
+          // If all dependencies of the Node are staged, the node is still a candidate.
+          let ref graph = self.graph;
+          let mut incomplete_deps =
+            self.graph.entry_for_id(entry_id).dependencies().iter()
+              .map(|&d| graph.entry_for_id(d))
+              .filter(|e| !e.is_staged())
+              .map(|e| e.id())
+              .peekable();
+          if incomplete_deps.peek().is_some() {
+            // Mark incomplete deps as candidates for steps.
+            self.candidates.extend(incomplete_deps);
+          } else {
+            // All newly declared deps are already completed: still a candidate.
+            self.candidates.push_front(entry_id);
+          }
         },
-        &State::Complete(_) => {
+        &State::Complete(_) =>
           // Statically completed: mark any dependents of the Node as candidates.
-          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
-        },
+          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents()),
         &State::Waiting(_) => {
           // If all dependencies of the Node are completed, the Node is still a candidate.
           let ref graph = self.graph;

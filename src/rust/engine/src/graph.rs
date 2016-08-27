@@ -1,7 +1,8 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{hash_set, HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::io;
+use std::iter;
 use std::path::Path;
 
 use externs::ToStrFunction;
@@ -52,6 +53,14 @@ impl Entry {
 
   pub fn cyclic_dependencies(&self) -> &HashSet<EntryId> {
     &self.cyclic_dependencies
+  }
+
+  pub fn is_staged(&self) -> bool {
+    match &self.state {
+      &State::Staged(_) => true,
+      &State::Complete(_) => true,
+      _ => false,
+    }
   }
 
   pub fn is_complete(&self) -> bool {
@@ -110,20 +119,9 @@ impl Graph {
     self.entries.get(&id).map(|entry| entry.is_complete()).unwrap_or(false)
   }
 
-  fn is_ready(&self, id: EntryId) -> bool {
-    self.is_ready_entry(self.entry_for_id(id))
-  }
-
-  /**
-   * A Node is 'ready' (to run) when it is not complete, but all of its dependencies
-   * are complete.
-   */
-  pub fn is_ready_entry(&self, entry: &Entry) -> bool {
-    !entry.is_complete() && (
-      entry.dependencies.iter()
-        .filter_map(|d| self.entries.get(d))
-        .all(|d| { d.is_complete() })
-    )
+  pub fn dependencies_all<P>(&self, id: EntryId, predicate: P) -> bool
+      where P: Fn(&Entry)->bool {
+    self.entry_for_id(id).dependencies.iter().all(|&d| predicate(self.entry_for_id(d)))
   }
 
   pub fn entry(&self, node: &Node) -> Option<&Entry> {
@@ -184,16 +182,16 @@ impl Graph {
     // Validate the State change.
     match (self.entry_for_id(id).state(), &next_state) {
       (&State::Waiting(_), &State::Complete(_)) =>
-        // TODO: can simplify the is_ready check to just: !"has incomplete deps".
-        assert!(self.is_ready(id), "Node {:?} has incomplete deps.", id),
+        assert!(self.dependencies_all(id, Entry::is_complete), "Node {:?} has incomplete deps.", id),
       (&State::Waiting(_), &State::Staged(_)) =>
-        // TODO: can simplify the is_ready check to just: !"has incomplete deps".
-        assert!(self.is_ready(id), "Node {:?} is already completed, or has incomplete deps.", id),
+        assert!(self.dependencies_all(id, Entry::is_staged), "Node {:?} has unstaged deps.", id),
+      (&State::Waiting(_), &State::Waiting(_)) =>
+        (),
       (&State::Staged(_), &State::Complete(_)) =>
         (),
-      (&State::Staged(s), &State::Waiting(w)) =>
-        panic!("A staged Node cannot begin waiting again!: from {:?} to {:?}", s, w),
-      (&State::Complete(c), t) =>
+      (&State::Staged(ref s), t) =>
+        panic!("A staged Node may only complete!: from {:?} to {:?}", s, t),
+      (&State::Complete(ref c), t) =>
         panic!("Cannot change the State of a completed Node!: from {:?} to {:?}", c, t),
     };
     // The state is valid! Map from State<Node> to State<EntryId> and store it.
