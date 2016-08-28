@@ -138,6 +138,15 @@ impl Scheduler {
             &State::Complete(Complete::Throw(ref t)) =>
               // Dep threw: fail statically.
               return Some(Result::Err(Complete::Throw(t.clone()))),
+            &State::Complete(Complete::Noop(..)) if staged.required =>
+              // Dep nooped, but all deps are required: fail statically.
+              return Some(
+                Result::Err(
+                  Complete::Throw(
+                    format!("No source of explicit dep {}", dep_entry.node().format(&self.to_str))
+                  )
+                )
+              ),
             &State::Complete(Complete::Noop(..)) =>
               // Dep noop'ed: noop statically.
               return Some(
@@ -168,6 +177,7 @@ impl Scheduler {
           func: staged.func.clone(),
           args: args,
           cacheable: staged.cacheable,
+          required: staged.required,
         }
       )
     )
