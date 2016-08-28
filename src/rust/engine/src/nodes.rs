@@ -184,8 +184,13 @@ impl<'g,'t> StepContext<'g,'t> {
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
-  fn store_list(&self, items: Vec<&Key>) -> Key {
-    (self.tasks.store_list).call(items)
+  fn store_list(&self, items: Vec<StagedArg<Node>>, required: bool) -> Staged<Node> {
+    Staged {
+      func: self.tasks.store_list,
+      args: items,
+      cacheable: false,
+      required: required,
+    }
   }
 
   /**
@@ -454,38 +459,26 @@ impl Step for SelectDependencies {
           return State::Waiting(vec![dep_product_node]),
       };
 
-    // The product and its dependency list are available: stage creation of the list.
-    let mut dependencies = Vec::new();
-    let mut dep_values: Vec<&Key> = Vec::new();
-    for dep_subject in context.project_multi(dep_product, &self.selector.field) {
-      let dep_node =
-        Node::create(
-          Selector::select(self.selector.product),
-          dep_subject,
-          self.variants.clone()
-        );
-      match context.get(&dep_node) {
-        Some(&Complete::Return(ref value)) =>
-          dep_values.push(&value),
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            Complete::Throw(
-              format!("No source of explicit dep {}", dep_node.format(context.to_str()))
-            )
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg.clone())),
-        None =>
-          dependencies.push(dep_node),
-      }
-    }
+    // Project the field of the product to collect the new list of subjects.
+    let dep_subjects = context.project_multi(dep_product, &self.selector.field);
 
-    if dependencies.len() > 0 {
-      State::Waiting(dependencies)
-    } else {
-      State::Complete(Complete::Return(context.store_list(dep_values)))
-    }
+    // Stage creation of the list requesting the product for each subject.
+    State::Staged(
+      context.store_list(
+        dep_subjects.into_iter()
+          .map(|dep_subject|
+            StagedArg::Promise(
+              Node::create(
+                Selector::select(self.selector.product),
+                dep_subject,
+                self.variants.clone(),
+              )
+            )
+          )
+          .collect(),
+        true,
+      )
+    )
   }
 }
 

@@ -22,7 +22,7 @@ from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, S
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.storage import Digest
 from pants.engine.subsystem.native import (ExternContext, extern_issubclass,
-                                           extern_project_multi, extern_store_list, extern_to_str)
+                                           extern_project_multi, extern_to_str)
 from pants.util.objects import datatype
 
 
@@ -57,6 +57,17 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
   @property
   def input_selects(self):
     return self.input_selectors
+
+
+def _store_list(*args):
+  """Accepts varargs and returns a tuple.
+
+  This tiny function carries it's weight by allowing the aggregation of dependencies
+  to be pipelined with their consumption by a Task function.
+
+  TODO: Move to a 'core' module?
+  """
+  return args
 
 
 class Field(datatype('Field', ['name', 'typ'])):
@@ -114,7 +125,7 @@ class LocalScheduler(object):
     scheduler = native.lib.scheduler_create(self._extern_context,
                                             extern_to_str,
                                             extern_issubclass,
-                                            extern_store_list,
+                                            self._to_type_key(_store_list),
                                             self._to_type_key(_project_field),
                                             extern_project_multi,
                                             self._to_key('name'),
