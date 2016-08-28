@@ -1,3 +1,4 @@
+
 use std::collections::{hash_set, HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -6,9 +7,10 @@ use std::iter;
 use std::path::Path;
 
 use externs::ToStrFunction;
+use core::FNV;
 use nodes::{Node, Complete, State};
 
-pub type EntryId = u64;
+pub type EntryId = usize;
 
 /**
  * An Entry and its adjacencies.
@@ -24,10 +26,10 @@ pub struct Entry {
   node: Node,
   state: State<EntryId>,
   // Sets of all Nodes which have ever been awaited by this Node.
-  dependencies: HashSet<EntryId>,
-  dependents: HashSet<EntryId>,
+  dependencies: HashSet<EntryId, FNV>,
+  dependents: HashSet<EntryId, FNV>,
   // Deps that would be illegal to actually provide, since they would be cyclic.
-  cyclic_dependencies: HashSet<EntryId>,
+  cyclic_dependencies: HashSet<EntryId, FNV>,
 }
 
 impl Entry {
@@ -43,15 +45,15 @@ impl Entry {
     &self.state
   }
 
-  pub fn dependencies(&self) -> &HashSet<EntryId> {
+  pub fn dependencies(&self) -> &HashSet<EntryId, FNV> {
     &self.dependencies
   }
 
-  pub fn dependents(&self) -> &HashSet<EntryId> {
+  pub fn dependents(&self) -> &HashSet<EntryId, FNV> {
     &self.dependents
   }
 
-  pub fn cyclic_dependencies(&self) -> &HashSet<EntryId> {
+  pub fn cyclic_dependencies(&self) -> &HashSet<EntryId, FNV> {
     &self.cyclic_dependencies
   }
 
@@ -86,8 +88,8 @@ impl Entry {
   }
 }
 
-type Nodes = HashMap<Node, EntryId>;
-type Entries = HashMap<EntryId, Entry>;
+type Nodes = HashMap<Node, EntryId, FNV>;
+type Entries = Vec<Entry>;
 
 /**
  * A DAG (enforced on mutation) of Entries.
@@ -102,8 +104,8 @@ impl Graph {
   pub fn new() -> Graph {
     Graph {
       id_generator: 0,
-      nodes: HashMap::new(),
-      entries: HashMap::new(),
+      nodes: HashMap::default(),
+      entries: Vec::new(),
     }
   }
 
@@ -116,7 +118,7 @@ impl Graph {
   }
 
   fn is_complete_entry(&self, id: EntryId) -> bool {
-    self.entries.get(&id).map(|entry| entry.is_complete()).unwrap_or(false)
+    self.entry_for_id(id).is_complete()
   }
 
   pub fn dependencies_all<P>(&self, id: EntryId, predicate: P) -> bool
@@ -129,15 +131,11 @@ impl Graph {
   }
 
   pub fn entry_for_id(&self, id: EntryId) -> &Entry {
-    self.entries.get(&id).unwrap_or_else(|| {
-      panic!("No Entry exists for {}!", id);
-    })
+    &self.entries[id]
   }
 
   pub fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    self.entries.get_mut(&id).unwrap_or_else(|| {
-      panic!("No Entry exists for {}!", id);
-    })
+    &mut self.entries[id]
   }
 
   pub fn ensure_entry(&mut self, node: Node) -> EntryId {
@@ -159,19 +157,29 @@ impl Graph {
     let entry_node = node.clone();
     let id =
       nodes.entry(node).or_insert_with(|| {
+        let id = *id_generator;
         *id_generator += 1;
-        *id_generator
+        id
       }).clone();
 
-    // Update the Nodes map if needed.
-    entries.entry(id).or_insert_with(||
+    // If this was an existing entry, we're done..
+    if id < entries.len() {
+      return id;
+    }
+
+    // New entry.
+    assert!(
+      id == entries.len(),
+      "Entry id generator mismatched entries length: {} vs {}", id, entries.len()
+    );
+    entries.push(
       Entry {
         id: id,
         node: entry_node,
         state: State::empty_waiting(),
-        dependencies: HashSet::new(),
-        dependents: HashSet::new(),
-        cyclic_dependencies: HashSet::new(),
+        dependencies: HashSet::default(),
+        dependents: HashSet::default(),
+        cyclic_dependencies: HashSet::default(),
       }
     );
 
@@ -253,7 +261,7 @@ impl Graph {
       graph: self,
       dependents: dependents,
       deque: roots,
-      walked: HashSet::new(),
+      walked: HashSet::default(),
       predicate: predicate,
     }
   }
@@ -276,14 +284,14 @@ impl Graph {
 
   fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: HashSet<EntryId>) -> usize {
     // Remove the roots from their dependencies' dependents lists.
-    for id in &ids {
+    for &id in &ids {
       // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
       // I can't figure out how to iterate over one immutable Entry while mutating a different
       // mutable Entry... so I clone() here. Perhaps this is completely sane, because what's to say
       // they're not the same Entry after all? But regardless, less efficient than it could be.
-      let dep_ids = entries.get(id).map(|e| e.dependencies.clone()).unwrap_or(HashSet::new());
+      let dep_ids = entries[id].dependencies.clone();
       for dep_id in dep_ids {
-        match entries.get_mut(&dep_id) {
+        match entries.get_mut(dep_id) {
           Some(entry) => { entry.dependents.remove(&entry.id); () },
           _ => {},
         }
@@ -366,7 +374,7 @@ struct Walk<'a, P: Fn(&Entry)->bool> {
   graph: &'a Graph,
   dependents: bool,
   deque: VecDeque<EntryId>,
-  walked: HashSet<EntryId>,
+  walked: HashSet<EntryId, FNV>,
   predicate: P,
 }
 
@@ -380,18 +388,20 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
       }
       self.walked.insert(id);
 
-      match self.graph.entries.get(&id) {
-        Some(entry) if (self.predicate)(entry) => {
-          if self.dependents {
-            self.deque.extend(&entry.dependents);
-          } else {
-            self.deque.extend(&entry.dependencies);
-          }
-          return Some(entry);
-        }
-        _ => {},
+      let entry = self.graph.entry_for_id(id);
+      if !(self.predicate)(entry) {
+        continue;
       }
-    };
+
+      // Entry matches.
+      if self.dependents {
+        self.deque.extend(&entry.dependents);
+      } else {
+        self.deque.extend(&entry.dependencies);
+      }
+      return Some(entry);
+    }
+
     None
   }
 }

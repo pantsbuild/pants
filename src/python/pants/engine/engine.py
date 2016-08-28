@@ -281,7 +281,7 @@ class LocalMultiprocessEngine(ConcurrentEngine):
     # This is the only place where non in-memory storage is needed, create one if not specified.
     storage = storage or Storage.create(in_memory=False)
     super(LocalMultiprocessEngine, self).__init__(scheduler, storage, cache)
-    self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
+    self._pool_size = pool_size if pool_size and pool_size > 0 else multiprocessing.cpu_count()
 
     self._processed_queue = Queue()
     process_initializer = functools.partial(_process_initializer, self._storage)

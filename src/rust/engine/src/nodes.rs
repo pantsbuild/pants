@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
-use core::{Field, Function, Key, TypeId, Variants};
+use core::{FNV, Field, Function, Key, TypeId, Variants};
 use externs::ToStrFunction;
 use selectors::Selector;
 use selectors;
@@ -95,7 +95,7 @@ pub enum Complete {
 }
 
 pub struct StepContext<'g,'t> {
-  deps: HashMap<&'g Node, &'g Complete>,
+  deps: HashMap<&'g Node, &'g Complete, FNV>,
   tasks: &'t Tasks,
   to_str: &'t ToStrFunction,
 }
@@ -657,7 +657,7 @@ impl Node {
     }
   }
 
-  pub fn step(&self, deps: HashMap<&Node, &Complete>, tasks: &Tasks, to_str: &ToStrFunction) -> State<Node> {
+  pub fn step(&self, deps: HashMap<&Node, &Complete, FNV>, tasks: &Tasks, to_str: &ToStrFunction) -> State<Node> {
     let context =
       StepContext {
         deps: deps,

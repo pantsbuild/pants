@@ -4,7 +4,7 @@ use std::io;
 use std::path::Path;
 
 use externs::ToStrFunction;
-use core::{Field, Function, Key, TypeId};
+use core::{FNV, Field, Function, Key, TypeId};
 use graph::{Entry, EntryId, Graph};
 use nodes::{Complete, Node, Staged, StagedArg, State};
 use selectors::{Selector, SelectDependencies};
@@ -24,7 +24,7 @@ pub struct Scheduler {
   // Ready ids. This will always contain at least as many entries as the `ready` Vec. If
   // it contains more ids than the `ready` Vec, it is because entries that were previously
   // declared to be ready are still outstanding.
-  outstanding: HashSet<EntryId>,
+  outstanding: HashSet<EntryId, FNV>,
 }
 
 impl Scheduler {
@@ -38,7 +38,7 @@ impl Scheduler {
       tasks: tasks,
       roots: Vec::new(),
       candidates: VecDeque::new(),
-      outstanding: HashSet::new(),
+      outstanding: HashSet::default(),
     }
   }
 
@@ -105,7 +105,7 @@ impl Scheduler {
 
     // Collect complete deps.
     // TODO: should determine whether all deps are complete before allocating.
-    let mut initial_dep_map = HashMap::new();
+    let mut initial_dep_map: HashMap<_, _, FNV> = HashMap::default();
     for &dep_id in entry.dependencies() {
       let dep_entry = self.graph.entry_for_id(dep_id);
       match dep_entry.state() {

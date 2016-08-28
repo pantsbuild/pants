@@ -7,6 +7,7 @@ mod selectors;
 mod tasks;
 
 extern crate libc;
+extern crate fnv;
 
 use std::ffi::CStr;
 use std::mem;

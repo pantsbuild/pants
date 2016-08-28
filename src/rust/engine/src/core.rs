@@ -1,4 +1,9 @@
+use fnv::FnvHasher;
+
 use std::fmt;
+use std::hash;
+
+pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
 // The type of a python object (which itself has a type, but which is not
 // represented by a Key, because that would result in a recursive structure.)
@@ -17,7 +22,7 @@ pub type Variants = Vec<(Field, Field)>;
 
 // NB: These structs are fairly small, so we allow copying them by default.
 #[repr(C)]
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Digest {
   digest: [u8;32],
 }
@@ -28,6 +33,13 @@ impl fmt::Debug for Digest {
       try!(fmtr.write_fmt(format_args!("{:02x}", byte)));
     }
     Ok(())
+  }
+}
+
+impl hash::Hash for Digest {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    // The digest is already a very strong hash, so the first 4 bytes are sufficient.
+    state.write(&self.digest[0 .. 4])
   }
 }
 

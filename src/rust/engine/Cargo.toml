@@ -8,3 +8,4 @@ crate-type = ["dylib"]
 
 [dependencies]
 libc = "0.2.0"
+fnv = "1.0.3"
