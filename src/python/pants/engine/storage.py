@@ -360,7 +360,7 @@ class InMemoryDb(KeyValueStore):
     self._storage = dict()
 
   def get(self, key, transform=_identity):
-    return transform(self._storage.get(key))
+    return transform(self._storage[key])
 
   def put(self, key, value, transform=_copy_bytes):
     if key in self._storage:
@@ -428,9 +428,9 @@ class Lmdb(KeyValueStore):
     """
     with self._env.begin(db=self._db, buffers=True) as txn:
       value = txn.get(key)
-      if value is not None:
-        return transform(StringIO.StringIO(value))
-      return None
+      if value is None:
+        raise KeyError('Unknown key: {}'.format(key))
+      return transform(StringIO.StringIO(value))
 
   def put(self, key, value, transform=_identity):
     """Returning True if the key/value are actually written to the storage.

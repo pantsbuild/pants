@@ -51,7 +51,7 @@ impl RawScheduler {
  */
 pub struct RawExecution {
   runnables_ptr: *const RawRunnable,
-  len: u64,
+  runnables_len: u64,
   runnables: Vec<Staged<EntryId>>,
   runnable_args: Vec<Vec<RawArg>>,
   raw_runnables: Vec<RawRunnable>,
@@ -62,7 +62,7 @@ impl RawExecution {
     let mut execution =
       RawExecution {
         runnables_ptr: Vec::new().as_ptr(),
-        len: 0,
+        runnables_len: 0,
         runnables: Vec::new(),
         runnable_args: Vec::new(),
         raw_runnables: Vec::new(),
@@ -78,7 +78,7 @@ impl RawExecution {
 
     self.runnable_args =
       self.runnables.iter()
-        .map(|runnable| runnable.args().iter().map(RawArg::from).collect())
+        .map(|runnable| runnable.args.iter().map(RawArg::from).collect())
         .collect();
 
     self.raw_runnables =
@@ -86,20 +86,20 @@ impl RawExecution {
         .map(|(id, (runnable, raw_args))| {
           RawRunnable {
             id: id,
-            func: runnable.func() as *const Function,
+            func: &runnable.func as *const Function,
             args_ptr: raw_args.as_ptr(),
             args_len: raw_args.len() as u64,
-            cacheable: runnable.cacheable(),
+            cacheable: runnable.cacheable,
           }
         })
         .collect();
 
     self.runnables_ptr = self.raw_runnables.as_mut_ptr();
-    self.len = self.runnables.len() as u64;
+    self.runnables_len = self.raw_runnables.len() as u64;
   }
 }
 
-#[repr(C,u8)]
+#[repr(C)]
 enum RawArgTag {
   Key = 0,
   Promise = 1,
@@ -109,7 +109,7 @@ enum RawArgTag {
 pub struct RawArg {
   // A union of either a Key to represent a value, or an EntryId to represent the return
   // value of another Runnable within this batch.
-  tag: RawArgTag,
+  tag: u8,
   key: Key,
   promise: EntryId,
 }
@@ -119,13 +119,13 @@ impl RawArg {
     match arg {
       &StagedArg::Key(k) =>
         RawArg {
-          tag: RawArgTag::Key,
+          tag: RawArgTag::Key as u8,
           key: k,
           promise: 0,
         },
       &StagedArg::Promise(id) =>
         RawArg {
-          tag: RawArgTag::Promise,
+          tag: RawArgTag::Promise as u8,
           key: Key::empty(),
           promise: id,
         },
@@ -145,7 +145,7 @@ pub struct RawRunnable {
   cacheable: bool,
 }
 
-#[repr(C,u8)]
+#[repr(C)]
 enum RawStateTag {
   Empty = 0,
   Return = 1,
@@ -160,7 +160,7 @@ pub struct RawNode {
   // The following values represent a union.
   // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
   // a stable release.
-  state_tag: RawStateTag,
+  state_tag: u8,
   state_return: Key,
   // TODO: expose as cstrings.
   state_throw: bool,
@@ -174,10 +174,10 @@ impl RawNode {
       product: product.clone(),
       state_tag: 
         match state {
-          None => RawStateTag::Empty,
-          Some(&Complete::Return(_)) => RawStateTag::Return,
-          Some(&Complete::Throw(_)) => RawStateTag::Throw,
-          Some(&Complete::Noop(_, _)) => RawStateTag::Noop,
+          None => RawStateTag::Empty as u8,
+          Some(&Complete::Return(_)) => RawStateTag::Return as u8,
+          Some(&Complete::Throw(_)) => RawStateTag::Throw as u8,
+          Some(&Complete::Noop(_, _)) => RawStateTag::Noop as u8,
         },
       state_return: match state {
         Some(&Complete::Return(ref r)) => r.clone(),

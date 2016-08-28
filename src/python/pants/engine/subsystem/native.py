@@ -47,8 +47,15 @@ _FFI.cdef(
     typedef KeyBuffer   (*extern_project_multi)(ExternContext*, Key*, Field*);
 
     typedef struct {
+      uint8_t  tag;
+      Key      key;
+      EntryId  promise;
+    } RawArg;
+
+    typedef struct {
+      EntryId     id;
       Function*   func;
-      Key*        args_ptr;
+      RawArg*     args_ptr;
       uint64_t    args_len;
       bool        cacheable;
     } RawRunnable;
@@ -60,9 +67,8 @@ _FFI.cdef(
     } Complete;
 
     typedef struct {
-      EntryId*              ready_ptr;
-      RawRunnable*          ready_runnables_ptr;
-      uint64_t              ready_len;
+      RawRunnable*          runnables_ptr;
+      uint64_t              runnables_len;
       // NB: there are more fields in this struct, but we can safely (?)
       // ignore them because we never have collections of this type.
     } RawExecution;
@@ -72,13 +78,6 @@ _FFI.cdef(
       // NB: there are more fields in this struct, but we can safely (?)
       // ignore them because we never have collections of this type.
     } RawScheduler;
-
-    typedef enum {
-      Empty = 0,
-      Return = 1,
-      Throw = 2,
-      Noop = 3,
-    } RawState;
 
     typedef struct {
       Key      subject;

@@ -135,89 +135,64 @@ impl Scheduler {
   }
 
   /**
-   * Determine whether the `Staged` node is runnable.
+   * Determine whether the `Staged` node is runnable, and if so, return a new Staged state
+   * that inlines any values that completed statically.
    *
-   * Alternatives:
-   *   1. Some deps are not yet Staged: None/noop.
+   * Cases:
+   *   1. Some deps are not yet Complete/Outstanding: None.
    *   2. All deps are Staged, and any that are Completed are successes: ready to run!
    *   3. All deps are Staged, but some are Completed with failures: fail with the same State.
    */
-  fn attempt_stage(&self, id: EntryId, staged: &Staged<EntryId>) -> Option<Result<(), Complete>> {
+  fn attempt_stage(
+    &self,
+    id: EntryId,
+    staged: &Staged<EntryId>
+  ) -> Option<Result<Staged<EntryId>, Complete>> {
     let entry = self.graph.entry_for_id(id);
 
-    // Determine whether all of the runnables deps are complete or staged.
-    for dep_id in staged.dependencies() {
-      let dep_entry = self.graph.entry_for_id(dep_id);
-      match dep_entry.state() {
-        &State::Complete(Complete::Throw(ref t)) =>
-          // Dep threw: throw statically.
-          return Some(Result::Err(Complete::Throw(t.clone()))),
-        &State::Complete(Complete::Noop(..)) =>
-          // Dep noop'ed: noop statically.
-          return Some(
-            Result::Err(
-              Complete::Noop("Was missing (at least) input {}.", Some(dep_entry.node().clone()))
-            )
-          ),
-        &State::Complete(Complete::Return(_)) | &State::Staged(_) =>
-          // Dep completed successfully, or is also staged.
-          continue,
-        &State::Waiting(_) =>
-          // A dep is not complete.
-          return None,
+    // Determine whether all of the runnable's deps are complete or outstanding.
+    let mut args = Vec::new();
+    for arg in &staged.args {
+      match arg {
+        &StagedArg::Key(k) =>
+          args.push(arg.clone()),
+        &StagedArg::Promise(dep_id) => {
+          let dep_entry = self.graph.entry_for_id(dep_id);
+          match dep_entry.state() {
+            &State::Complete(Complete::Throw(ref t)) =>
+              // Dep threw: fail statically.
+              return Some(Result::Err(Complete::Throw(t.clone()))),
+            &State::Complete(Complete::Noop(..)) =>
+              // Dep noop'ed: noop statically.
+              return Some(
+                Result::Err(
+                  Complete::Noop("Was missing (at least) input {}.", Some(dep_entry.node().clone()))
+                )
+              ),
+            &State::Complete(Complete::Return(k)) =>
+              // Dep completed successfully.
+              args.push(StagedArg::Key(k)),
+            &State::Staged(_) if self.outstanding.contains(&dep_id) =>
+              // Dep is staged and already outstanding.
+              args.push(arg.clone()),
+            &State::Waiting(_) | &State::Staged(_) =>
+              // Dep is not complete.
+              return None,
+          };
+        },
       };
     }
 
     // All deps are complete or staged! Runnable.
-    Some(Result::Ok(()))
-  }
-
-  /**
-   * A finalization step to inline any arguments for Staged nodes. The resulting Staged
-   * Nodes are guaranteed to contain only EntryId contained in `self.outstanding`; all others
-   * will have been inlined as their literal result Keys.
-   *
-   *
-   */
-  fn prepare_runnables(&self, entries: Vec<(EntryId, Staged<EntryId>)>) -> Vec<(EntryId, Staged<EntryId>)> {
-    entries.into_iter()
-      .map(|(id, staged_input)| {
-        let staged = Staged {
-          func: staged_input.func,
-          cacheable: staged_input.cacheable,
-          args:
-            staged_input.args.into_iter()
-              .map(|arg|
-                match arg {
-                  &StagedArg::Key(ref k) =>
-                    args.push(arg.clone()),
-                  &StagedArg::Promise(ref dep_id) => {
-                    let dep_entry = self.graph.entry_for_id(dep_id);
-                    match dep_entry.state() {
-                      &State::Throw(ref t) =>
-                        // Dep threw: throw statically.
-                        return Some(Result::Err(State::Complete(Complete::Throw(t.clone())))),
-                      &State::Noop(ref t) =>
-                        // Dep nooped: noop statically.
-                        return Some(Result::Err(State::Complete(
-                          Complete::Noop("Was missing (at least) input {}.", Some(dep_entry.node()))
-                        ))),
-                      &State::Complete(Return(k)) =>
-                        // Dep completed successfully.
-                        args.push(StagedArg::Key(k)),
-                      &State::Staged(_) =>
-                        // Dep is also staged.
-                        args.push(StagedArg::Promise(dep_id)),
-                      &State::Waiting(ref c) =>
-                        // A dep is not complete.
-                        return None,
-                    };
-                  }
-                }
-              )
-        };
-        (id, staged)
-      })
+    Some(
+      Result::Ok(
+        Staged {
+          func: staged.func.clone(),
+          args: args,
+          cacheable: staged.cacheable,
+        }
+      )
+    )
   }
 
   /**
@@ -256,12 +231,12 @@ impl Scheduler {
               // Not ready.
               None => continue,
             },
-          &State::Staged(ref s) =>
+          &State::Staged(ref input_staged) =>
             // See whether the staged Node is runnable.
-            match self.attempt_stage(entry_id, s) {
-              Some(Result::Ok(())) => {
+            match self.attempt_stage(entry_id, input_staged) {
+              Some(Result::Ok(staged)) => {
                 // Success! Ready to run.
-                ready.push((entry_id, s.clone()));
+                ready.push((entry_id, staged));
                 self.outstanding.insert(entry_id);
                 continue;
               },

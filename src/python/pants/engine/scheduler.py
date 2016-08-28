@@ -305,19 +305,30 @@ class LocalScheduler(object):
                                     len(returns_ids),
                                     throws_ids,
                                     len(throws_ids))
-    def runnable(raw):
-      return Runnable(self._digest(raw.func),
-                      tuple(self._digest(key.digest)
-                            for key in self._native.unpack(raw.args_ptr, raw.args_len)),
-                      bool(raw.cacheable))
+    def decode_arg(raw):
+      if raw.tag is 0:
+        # Is a literal key: decode.
+        return self._digest(raw.key.digest)
+      elif raw.tag is 1:
+        # Is the id of another outstanding runnable.
+        raise AssertionError('TODO! implement pipelining to run: {}'.format(raw.promise))
+      else:
+        raise ValueError('Unrecognized RawArg tag `{}` for: {}'.format(raw.tag, raw))
 
-    runnable_ids = self._native.unpack(self._scheduler.execution.ready_ptr,
-                                       self._scheduler.execution.ready_len)
-    runnable_states = [runnable(r) for r in
-                        self._native.unpack(self._scheduler.execution.ready_runnables_ptr,
-                                            self._scheduler.execution.ready_len)]
+    def decode_runnable(raw):
+      return (
+          raw.id,
+          Runnable(self._digest(raw.func),
+                   tuple(decode_arg(arg)
+                         for arg in self._native.unpack(raw.args_ptr, raw.args_len)),
+                   bool(raw.cacheable))
+        )
+
+    runnables = [decode_runnable(r)
+                 for r in self._native.unpack(self._scheduler.execution.runnables_ptr,
+                                              self._scheduler.execution.runnables_len)]
     # Rezip from two arrays.
-    return zip(runnable_ids, runnable_states)
+    return runnables
 
   def _execution_add_roots(self, execution_request):
     if self._execution_request is not None:

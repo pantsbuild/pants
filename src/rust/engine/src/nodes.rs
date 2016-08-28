@@ -15,24 +15,12 @@ pub enum StagedArg<T> {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Staged<T> {
-  func: Function,
-  args: Vec<StagedArg<T>>,
-  cacheable: bool,
+  pub func: Function,
+  pub args: Vec<StagedArg<T>>,
+  pub cacheable: bool,
 }
 
 impl<T: Clone + Eq + Hash> Staged<T> {
-  pub fn func(&self) -> &Function {
-    &self.func
-  }
-
-  pub fn args(&self) -> &Vec<StagedArg<T>> {
-    &self.args
-  }
-
-  pub fn cacheable(&self) -> bool {
-    self.cacheable
-  }
-
   /**
    * Return all dependencies declared by this state.
    */
@@ -580,42 +568,23 @@ pub struct Task {
 
 impl Step for Task {
   fn step(&self, context: StepContext) -> State<Node> {
-    // Compute dependencies for the Node, or determine whether it is a Noop.
-    let mut dependencies = Vec::new();
-    let mut dep_values: Vec<&Key> = Vec::new();
-    for selector in &self.selector.clause {
-      let dep_node =
-        Node::create(
-          selector.clone(),
-          self.subject,
-          self.variants.clone()
-        );
-      match context.get(&dep_node) {
-        Some(&Complete::Return(ref value)) =>
-          dep_values.push(&value),
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            Complete::Noop("Was missing (at least) input {}.", Some(dep_node))
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg.clone())),
-        None =>
-          dependencies.push(dep_node),
-      }
-    }
-
-    if !dependencies.is_empty() {
-      // A clause was still waiting on dependencies.
-      State::Waiting(dependencies)
-    } else {
-      // Staged to run!
-      State::Staged(Staged {
-        func: self.selector.func,
-        args: dep_values.into_iter().map(|&d| StagedArg::Key(d)).collect(),
-        cacheable: self.selector.cacheable,
-      })
-    }
+    // Stage the Node to run immediately.
+    State::Staged(Staged {
+      func: self.selector.func,
+      args:
+        self.selector.clause.iter()
+          .map(|selector|
+            StagedArg::Promise(
+              Node::create(
+                selector.clone(),
+                self.subject,
+                self.variants.clone()
+              )
+            )
+          )
+          .collect(),
+      cacheable: self.selector.cacheable,
+    })
   }
 }
 
