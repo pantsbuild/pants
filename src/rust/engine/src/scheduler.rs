@@ -135,7 +135,7 @@ impl Scheduler {
   }
 
   /**
-   * Attempt to convert the `Staged` node to a runnable.
+   * Determine whether the `Staged` node is runnable.
    *
    * Alternatives:
    *   1. Some deps are not yet Staged: None/noop.
@@ -172,46 +172,53 @@ impl Scheduler {
     Some(Result::Ok(()))
   }
 
-
-
   /**
-    TODO: will need to flatten all deps before Running, but should do that only after all
-    deps that can complete statically have.
-
-      match arg {
-        &StagedArg::Key(ref k) =>
-          args.push(arg.clone()),
-        &StagedArg::Promise(ref dep_id) => {
-          let dep_entry = self.graph.entry_for_id(dep_id);
-          match dep_entry.state() {
-            &State::Throw(ref t) =>
-              // Dep threw: throw statically.
-              return Some(Result::Err(State::Complete(Complete::Throw(t.clone())))),
-            &State::Noop(ref t) =>
-              // Dep nooped: noop statically.
-              return Some(Result::Err(State::Complete(
-                Complete::Noop("Was missing (at least) input {}.", Some(dep_entry.node()))
-              ))),
-            &State::Complete(Return(k)) =>
-              // Dep completed successfully.
-              args.push(StagedArg::Key(k)),
-            &State::Staged(_) =>
-              // Dep is also staged.
-              args.push(StagedArg::Promise(dep_id)),
-            &State::Waiting(ref c) =>
-              // A dep is not complete.
-              return None,
-          };
-        }
-      }
-  */
-
-
-
-
-
-
-
+   * A finalization step to inline any arguments for Staged nodes. The resulting Staged
+   * Nodes are guaranteed to contain only EntryId contained in `self.outstanding`; all others
+   * will have been inlined as their literal result Keys.
+   *
+   *
+   */
+  fn prepare_runnables(&self, entries: Vec<(EntryId, Staged<EntryId>)>) -> Vec<(EntryId, Staged<EntryId>)> {
+    entries.into_iter()
+      .map(|(id, staged_input)| {
+        let staged = Staged {
+          func: staged_input.func,
+          cacheable: staged_input.cacheable,
+          args:
+            staged_input.args.into_iter()
+              .map(|arg|
+                match arg {
+                  &StagedArg::Key(ref k) =>
+                    args.push(arg.clone()),
+                  &StagedArg::Promise(ref dep_id) => {
+                    let dep_entry = self.graph.entry_for_id(dep_id);
+                    match dep_entry.state() {
+                      &State::Throw(ref t) =>
+                        // Dep threw: throw statically.
+                        return Some(Result::Err(State::Complete(Complete::Throw(t.clone())))),
+                      &State::Noop(ref t) =>
+                        // Dep nooped: noop statically.
+                        return Some(Result::Err(State::Complete(
+                          Complete::Noop("Was missing (at least) input {}.", Some(dep_entry.node()))
+                        ))),
+                      &State::Complete(Return(k)) =>
+                        // Dep completed successfully.
+                        args.push(StagedArg::Key(k)),
+                      &State::Staged(_) =>
+                        // Dep is also staged.
+                        args.push(StagedArg::Promise(dep_id)),
+                      &State::Waiting(ref c) =>
+                        // A dep is not complete.
+                        return None,
+                    };
+                  }
+                }
+              )
+        };
+        (id, staged)
+      })
+  }
 
   /**
    * Continues execution after the given runnables have completed execution.
