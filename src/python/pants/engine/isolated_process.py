@@ -42,7 +42,7 @@ def _create_snapshot_archive(file_list, step_context):
 
 def _fingerprint_files_in_tar(file_list, tar_location):
   hasher = sha1()
-  with open_tar(tar_location, mode='r') as tar:
+  with open_tar(tar_location, mode='r', errorlevel=1) as tar:
     for file in file_list.dependencies:
       hasher.update(file.path)
       hasher.update(tar.extractfile(file.path).read())
