@@ -101,37 +101,13 @@ impl Scheduler {
    * a step runs, the new State of the Node will be returned.
    */
   fn attempt_step(&self, id: EntryId) -> Option<State<Node>> {
+    if !self.graph.dependencies_all(id, |d| d.is_complete()) {
+      return None;
+    }
+
+    // Run a step.
     let entry = self.graph.entry_for_id(id);
-
-    // Collect complete deps.
-    // TODO: should determine whether all deps are complete before allocating.
-    let mut initial_dep_map: HashMap<_, _, FNV> = HashMap::default();
-    for &dep_id in entry.dependencies() {
-      let dep_entry = self.graph.entry_for_id(dep_id);
-      match dep_entry.state() {
-        &State::Complete(ref c) =>
-          initial_dep_map.insert(dep_entry.node(), c),
-        _ =>
-          // A dep is not complete.
-          return None,
-      };
-    }
-
-    // Additionally, gather cyclic deps.
-    let cyclic_deps: Vec<(&Entry, Complete)> =
-      entry.cyclic_dependencies().iter()
-        .map(|&id| {
-          let entry = self.graph.entry_for_id(id);
-          (entry, Complete::Noop("Dep would be cyclic: {}.", Some(entry.node().clone())))
-        })
-        .collect();
-    let mut dep_map = initial_dep_map;
-    for &(e, ref s) in cyclic_deps.iter() {
-      dep_map.insert(e.node(), &s);
-    }
-
-    // And finally, run!
-    Some(entry.node().step(dep_map, &self.tasks, &self.to_str))
+    Some(entry.node().step(entry, &self.graph, &self.tasks, &self.to_str))
   }
 
   /**

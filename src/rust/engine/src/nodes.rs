@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
+use graph::{Entry, Graph};
 use core::{FNV, Field, Function, Key, TypeId, Variants};
 use externs::ToStrFunction;
 use selectors::Selector;
@@ -94,8 +95,11 @@ pub enum Complete {
   Throw(String),
 }
 
+static Cyclic: Complete = Complete::Noop("Dep would be cyclic.", None);
+
 pub struct StepContext<'g,'t> {
-  deps: HashMap<&'g Node, &'g Complete, FNV>,
+  entry: &'g Entry,
+  graph: &'g Graph,
   tasks: &'t Tasks,
   to_str: &'t ToStrFunction,
 }
@@ -127,7 +131,24 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   fn get(&self, node: &Node) -> Option<&Complete> {
-    self.deps.get(node).map(|c| *c)
+    self.graph.entry(node).and_then(|dep_entry| {
+      // The entry exists. If it's a declared dep, return it immediately.
+      if self.entry.dependencies().contains(&dep_entry.id()) {
+        // Declared.
+        match dep_entry.state() {
+          &State::Complete(ref c) => Some(c),
+          _ => None,
+        }
+      } else if self.entry.cyclic_dependencies().contains(&dep_entry.id()) {
+        // Declared, but cyclic.
+        Some(&Cyclic)
+      } else {
+        // Undeclared. In theory we could still immediately return the dep here, but unfortunately
+        // that occasionally allows Nodes to finish executing before all of their declared deps are
+        // available.
+        None
+      }
+    })
   }
 
   fn type_address(&self) -> &TypeId {
@@ -657,10 +678,11 @@ impl Node {
     }
   }
 
-  pub fn step(&self, deps: HashMap<&Node, &Complete, FNV>, tasks: &Tasks, to_str: &ToStrFunction) -> State<Node> {
+  pub fn step(&self, entry: &Entry, graph: &Graph, tasks: &Tasks, to_str: &ToStrFunction) -> State<Node> {
     let context =
       StepContext {
-        deps: deps,
+        entry: entry,
+        graph: graph,
         tasks: tasks,
         to_str: to_str
       };
