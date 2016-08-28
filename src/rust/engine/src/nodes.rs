@@ -178,10 +178,10 @@ impl<'g,'t> StepContext<'g,'t> {
   /**
    * Returns a `Staged` state that projects the given field from the given item.
    */
-  fn project(&self, item: Key, field: Field) -> Staged<Node> {
+  fn project(&self, item: StagedArg<Node>, field: Field) -> Staged<Node> {
     Staged {
       func: self.tasks.project,
-      args: vec![StagedArg::Key(item), StagedArg::Key(field)],
+      args: vec![item, StagedArg::Key(field)],
       cacheable: true,
     }
   }
@@ -473,31 +473,19 @@ pub struct ProjectField {
 
 impl Step for ProjectField {
   fn step(&self, context: StepContext) -> State<Node> {
-    // Request the input value we need to execute the projection.
-    let input_node =
-      Node::create(
-        Selector::select(self.selector.input_product),
-        self.subject,
-        self.variants.clone()
-      );
-    match context.get(&input_node) {
-      Some(&Complete::Return(ref value)) =>
-        // The input product is available: use it to construct the new Subject.
-        State::Staged(
-          context.project(
-            value.clone(),
-            self.selector.field.clone(),
+    // Request the input product and stage the projection.
+    State::Staged(
+      context.project(
+        StagedArg::Promise(
+          Node::create(
+            Selector::select(self.selector.input_product),
+            self.subject,
+            self.variants.clone()
           )
         ),
-      Some(&Complete::Noop(_, _)) =>
-        State::Complete(
-          Complete::Noop("Could not compute {} to project its field.", Some(input_node))
-        ),
-      Some(&Complete::Throw(ref msg)) =>
-        State::Complete(Complete::Throw(msg.clone())),
-      None =>
-        State::Waiting(vec![input_node]),
-    }
+        self.selector.field.clone(),
+      )
+    )
   }
 }
 
