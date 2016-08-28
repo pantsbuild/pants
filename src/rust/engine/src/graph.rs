@@ -184,7 +184,7 @@ impl Graph {
       (&State::Waiting(_), &State::Complete(_)) =>
         assert!(self.dependencies_all(id, Entry::is_complete), "Node {:?} has incomplete deps.", id),
       (&State::Waiting(_), &State::Staged(_)) =>
-        assert!(self.dependencies_all(id, Entry::is_staged), "Node {:?} has unstaged deps.", id),
+        (),
       (&State::Waiting(_), &State::Waiting(_)) =>
         (),
       (&State::Staged(_), &State::Complete(_)) =>

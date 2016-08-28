@@ -6,7 +6,7 @@ use std::path::Path;
 use externs::ToStrFunction;
 use core::{Field, Function, Key, TypeId};
 use graph::{Entry, EntryId, Graph};
-use nodes::{Complete, Node, Staged, State};
+use nodes::{Complete, Node, Staged, StagedArg, State};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 
@@ -104,6 +104,7 @@ impl Scheduler {
     let entry = self.graph.entry_for_id(id);
 
     // Collect complete deps.
+    // TODO: should determine whether all deps are complete before allocating.
     let mut initial_dep_map = HashMap::new();
     for &dep_id in entry.dependencies() {
       let dep_entry = self.graph.entry_for_id(dep_id);
@@ -134,6 +135,85 @@ impl Scheduler {
   }
 
   /**
+   * Attempt to convert the `Staged` node to a runnable.
+   *
+   * Alternatives:
+   *   1. Some deps are not yet Staged: None/noop.
+   *   2. All deps are Staged, and any that are Completed are successes: ready to run!
+   *   3. All deps are Staged, but some are Completed with failures: fail with the same State.
+   */
+  fn attempt_stage(&self, id: EntryId, staged: &Staged<EntryId>) -> Option<Result<(), Complete>> {
+    let entry = self.graph.entry_for_id(id);
+
+    // Determine whether all of the runnables deps are complete or staged.
+    for dep_id in staged.dependencies() {
+      let dep_entry = self.graph.entry_for_id(dep_id);
+      match dep_entry.state() {
+        &State::Complete(Complete::Throw(ref t)) =>
+          // Dep threw: throw statically.
+          return Some(Result::Err(Complete::Throw(t.clone()))),
+        &State::Complete(Complete::Noop(..)) =>
+          // Dep noop'ed: noop statically.
+          return Some(
+            Result::Err(
+              Complete::Noop("Was missing (at least) input {}.", Some(dep_entry.node().clone()))
+            )
+          ),
+        &State::Complete(Complete::Return(_)) | &State::Staged(_) =>
+          // Dep completed successfully, or is also staged.
+          continue,
+        &State::Waiting(_) =>
+          // A dep is not complete.
+          return None,
+      };
+    }
+
+    // All deps are complete or staged! Runnable.
+    Some(Result::Ok(()))
+  }
+
+
+
+  /**
+    TODO: will need to flatten all deps before Running, but should do that only after all
+    deps that can complete statically have.
+
+      match arg {
+        &StagedArg::Key(ref k) =>
+          args.push(arg.clone()),
+        &StagedArg::Promise(ref dep_id) => {
+          let dep_entry = self.graph.entry_for_id(dep_id);
+          match dep_entry.state() {
+            &State::Throw(ref t) =>
+              // Dep threw: throw statically.
+              return Some(Result::Err(State::Complete(Complete::Throw(t.clone())))),
+            &State::Noop(ref t) =>
+              // Dep nooped: noop statically.
+              return Some(Result::Err(State::Complete(
+                Complete::Noop("Was missing (at least) input {}.", Some(dep_entry.node()))
+              ))),
+            &State::Complete(Return(k)) =>
+              // Dep completed successfully.
+              args.push(StagedArg::Key(k)),
+            &State::Staged(_) =>
+              // Dep is also staged.
+              args.push(StagedArg::Promise(dep_id)),
+            &State::Waiting(ref c) =>
+              // A dep is not complete.
+              return None,
+          };
+        }
+      }
+  */
+
+
+
+
+
+
+
+
+  /**
    * Continues execution after the given runnables have completed execution.
    *
    * Returns a batch of `Staged<EntryId>` for which every `StagedArg::Promise` is satisfiable
@@ -158,33 +238,43 @@ impl Scheduler {
       }
 
       // Determine whether the node needs additional steps, or whether it is runnable.
+      // TODO: hold the Entry for the length of this block, or break out to new method.
       let new_node_state =
         match self.graph.entry_for_id(entry_id).state() {
-          &State::Waiting(_) => {
+          &State::Waiting(_) =>
             // See whether we can run a step for this node.
             match self.attempt_step(entry_id) {
               // Ran a step!
               Some(s) => s,
               // Not ready.
               None => continue,
-            }
-          },
-          &State::Staged(ref s) if self.graph.dependencies_all(entry_id, Entry::is_staged) => {
-            // All of the deps of a staged Node are staged, so it is runnable!
-            ready.push((entry_id, s.clone()));
-            self.outstanding.insert(entry_id);
-            continue;
-          },
+            },
+          &State::Staged(ref s) =>
+            // See whether the staged Node is runnable.
+            match self.attempt_stage(entry_id, s) {
+              Some(Result::Ok(())) => {
+                // Success! Ready to run.
+                ready.push((entry_id, s.clone()));
+                self.outstanding.insert(entry_id);
+                continue;
+              },
+              Some(Result::Err(s)) =>
+                // Node completed statically.
+                State::Complete(s),
+              None =>
+                // Deps weren't staged/complete.
+                continue,
+            },
           &State::Complete(_) =>
             // Already complete!
             continue,
-          &State::Staged(_) =>
-            // Deps aren't ready: continue waiting.
-            continue,
         };
+
+      // Store the new state of the Node.
       self.graph.set_state(entry_id, new_node_state);
 
-      // The node ran a step! Determine which nodes are affected.
+      // The Node's state has changed! Determine which nodes are affected.
+      // TODO: hold the Entry for the length of this block.
       match self.graph.entry_for_id(entry_id).state() {
         &State::Staged(ref s) => {
           // If all dependencies of the Node are staged, the node is still a candidate.

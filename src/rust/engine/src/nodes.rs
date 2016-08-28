@@ -20,7 +20,7 @@ pub struct Staged<T> {
   cacheable: bool,
 }
 
-impl<T> Staged<T> {
+impl<T: Clone + Eq + Hash> Staged<T> {
   pub fn func(&self) -> &Function {
     &self.func
   }
@@ -31,6 +31,20 @@ impl<T> Staged<T> {
 
   pub fn cacheable(&self) -> bool {
     self.cacheable
+  }
+
+  /**
+   * Return all dependencies declared by this state.
+   */
+  pub fn dependencies(&self) -> HashSet<T> {
+    self.args.iter()
+      .filter_map(|arg|
+        match arg {
+          &StagedArg::Promise(ref t) => Some(t.clone()),
+          &StagedArg::Key(_) => None,
+        }
+      )
+      .collect()
   }
 }
 
@@ -52,15 +66,7 @@ impl<T: Clone + Eq + Hash> State<T> {
   pub fn dependencies(&self) -> HashSet<T> {
     match self {
       &State::Complete(_) => HashSet::new(),
-      &State::Staged(ref s) =>
-        s.args().iter()
-          .filter_map(|arg|
-            match arg {
-              &StagedArg::Promise(ref t) => Some(t.clone()),
-              &StagedArg::Key(_) => None,
-            }
-          )
-          .collect(),
+      &State::Staged(ref s) => s.dependencies(),
       &State::Waiting(ref w) => w.iter().map(|s| s.clone()).collect(),
     }
   }
