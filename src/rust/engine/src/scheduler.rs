@@ -159,7 +159,6 @@ impl Scheduler {
               args.push(StagedArg::Key(k)),
             &State::Staged(_) if self.outstanding.contains(&dep_id) => {
               // Dep is staged and already outstanding.
-              println!(">>> rust is staging a promise for {} -> {}", id, dep_id);
               args.push(arg.clone());
             },
             &State::Waiting(_) | &State::Staged(_) =>

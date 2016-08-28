@@ -322,7 +322,7 @@ class LocalScheduler(object):
         return self._digest(raw.key.digest)
       elif raw.tag is 1:
         # Is the id of another outstanding runnable.
-        raise AssertionError('TODO! implement pipelining to run: {}'.format(raw.promise))
+        return raw.promise
       else:
         raise ValueError('Unrecognized RawArg tag `{}` for: {}'.format(raw.tag, raw))
 
