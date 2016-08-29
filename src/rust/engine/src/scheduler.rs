@@ -71,7 +71,7 @@ impl Scheduler {
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeId) {
-    self.add_root(Node::create(Selector::select(product), subject, Vec::new()));
+    self.add_root(Node::create(Selector::select(product), subject, Vec::with_capacity(0)));
   }
 
   pub fn add_root_select_dependencies(
@@ -86,7 +86,7 @@ impl Scheduler {
         Selector::SelectDependencies(
           SelectDependencies { product: product, dep_product: dep_product, field: field }),
         subject,
-        Vec::new(),
+        Vec::with_capacity(0),
       )
     );
   }

@@ -137,13 +137,14 @@ impl Tasks {
 
   pub fn task_end(&mut self) {
     // Move the task from `preparing` to the Tasks map
-    let task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
+    let mut task = self.preparing.take().expect("Must `begin()` a task creation before ending it!");
     let mut tasks = self.tasks.entry(task.product.clone()).or_insert_with(|| Vec::new());
     assert!(
       !tasks.contains(&task),
       "Task {:?} was double-registered.",
       task,
     );
+    task.clause.shrink_to_fit();
     tasks.push(task);
   }
 }

@@ -12,11 +12,17 @@ use nodes::{Node, Complete, State};
 
 pub type EntryId = usize;
 
+pub type DepSet = Vec<EntryId>;
+
 /**
  * An Entry and its adjacencies.
  *
  * The dependencies and cyclic_dependencies sets are stored as vectors in order to expose
  * them more easily via the C API, but they should never contain dupes.
+ *
+ * NB: The average number of dependencies for a Node is somewhere between 1 and 2, so Vec is
+ * not too crazy (although maintaining sorted order and then binary-searching in sufficiently
+ * large Vecs would make sense).
  */
 pub struct Entry {
   id: EntryId,
@@ -26,10 +32,10 @@ pub struct Entry {
   node: Node,
   state: State<EntryId>,
   // Sets of all Nodes which have ever been awaited by this Node.
-  dependencies: HashSet<EntryId, FNV>,
-  dependents: HashSet<EntryId, FNV>,
+  dependencies: DepSet,
+  dependents: DepSet,
   // Deps that would be illegal to actually provide, since they would be cyclic.
-  cyclic_dependencies: HashSet<EntryId, FNV>,
+  cyclic_dependencies: DepSet,
 }
 
 impl Entry {
@@ -45,15 +51,15 @@ impl Entry {
     &self.state
   }
 
-  pub fn dependencies(&self) -> &HashSet<EntryId, FNV> {
+  pub fn dependencies(&self) -> &DepSet {
     &self.dependencies
   }
 
-  pub fn dependents(&self) -> &HashSet<EntryId, FNV> {
+  pub fn dependents(&self) -> &DepSet {
     &self.dependents
   }
 
-  pub fn cyclic_dependencies(&self) -> &HashSet<EntryId, FNV> {
+  pub fn cyclic_dependencies(&self) -> &DepSet {
     &self.cyclic_dependencies
   }
 
@@ -177,9 +183,9 @@ impl Graph {
         id: id,
         node: entry_node,
         state: State::empty_waiting(),
-        dependencies: HashSet::default(),
-        dependents: HashSet::default(),
-        cyclic_dependencies: HashSet::default(),
+        dependencies: Vec::with_capacity(4),
+        dependents: Vec::with_capacity(4),
+        cyclic_dependencies: Vec::with_capacity(0),
       }
     );
 
@@ -205,7 +211,7 @@ impl Graph {
 
     // The change is valid! Add all dependencies from the state, and then store it.
     let state = next_state.map(|n| self.ensure_entry(n));
-    self.add_dependencies(id, state.dependencies());
+    state.dependencies().map(|dst_ids| self.add_dependencies(id, dst_ids));
     self.entry_for_id_mut(id).state = state;
   }
 
@@ -215,7 +221,7 @@ impl Graph {
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  fn add_dependencies(&mut self, src_id: EntryId, dsts: HashSet<EntryId>) {
+  fn add_dependencies(&mut self, src_id: EntryId, dsts: DepSet) {
     assert!(
       !self.is_complete_entry(src_id),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
@@ -224,14 +230,16 @@ impl Graph {
     );
 
     // Determine whether each awaited dep is cyclic.
-    // TODO: skip cycle detection for deps that are already declared.
-    let (deps, cyclic_deps): (HashSet<_>, HashSet<_>) =
+    let (deps, cyclic_deps): (DepSet, DepSet) = {
+      let src = self.entry_for_id(src_id);
       dsts.into_iter()
-        .partition(|&dst_id| !self.detect_cycle(src_id, dst_id));
+        .filter(|dst_id| !(src.dependencies.contains(dst_id) || src.cyclic_dependencies.contains(dst_id)))
+        .partition(|&dst_id| !self.detect_cycle(src_id, dst_id))
+    };
     
     // Add the source as a dependent of each non-cyclic dep.
     for &dep in &deps {
-      self.entry_for_id_mut(dep).dependents.insert(src_id);
+      self.entry_for_id_mut(dep).dependents.push(src_id);
     }
 
     // Finally, add all deps to the source.
@@ -246,6 +254,12 @@ impl Graph {
    * Returns true if a cycle would be created by adding an edge from src->dst.
    */
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
+    // If dst has no (incomplete) dependencies (a very common case), don't even allocate the
+    // structures to begin the walk.
+    if self.dependencies_all(dst_id, |e| e.is_complete()) {
+      return false;
+    }
+
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(dst_id);
@@ -271,7 +285,7 @@ impl Graph {
    */
   pub fn invalidate(&mut self, roots: &Vec<Node>) -> usize {
     // Eagerly collect all entries that will be deleted before we begin mutating anything.
-    let ids: HashSet<EntryId> = {
+    let ids: HashSet<EntryId, FNV> = {
       let root_ids = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
       self.walk(root_ids, { |_| true }, true).map(|e| e.id()).collect()
     };
@@ -282,8 +296,9 @@ impl Graph {
     )
   }
 
-  fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: HashSet<EntryId>) -> usize {
+  fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: HashSet<EntryId, FNV>) -> usize {
     // Remove the roots from their dependencies' dependents lists.
+    panic!("FIXME: Needs updating for Entries-as-array.");
     for &id in &ids {
       // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
       // I can't figure out how to iterate over one immutable Entry while mutating a different
@@ -292,7 +307,7 @@ impl Graph {
       let dep_ids = entries[id].dependencies.clone();
       for dep_id in dep_ids {
         match entries.get_mut(dep_id) {
-          Some(entry) => { entry.dependents.remove(&entry.id); () },
+          Some(entry) => { entry.dependents.retain(|&dependent| dependent != id); () },
           _ => {},
         }
       }

@@ -27,7 +27,7 @@ impl<T: Clone + Eq + Hash> Staged<T> {
   /**
    * Return all dependencies declared by this state.
    */
-  pub fn dependencies(&self) -> HashSet<T> {
+  pub fn dependencies(&self) -> Vec<T> {
     self.args.iter()
       .filter_map(|arg|
         match arg {
@@ -48,17 +48,18 @@ pub enum State<T> {
 
 impl<T: Clone + Eq + Hash> State<T> {
   pub fn empty_waiting() -> State<T> {
-    State::Waiting(vec![])
+    State::Waiting(Vec::with_capacity(0))
   }
 
   /**
    * Return all dependencies declared by this state.
    */
-  pub fn dependencies(&self) -> HashSet<T> {
+  pub fn dependencies(&self) -> Option<Vec<T>> {
     match self {
-      &State::Complete(_) => HashSet::new(),
-      &State::Staged(ref s) => s.dependencies(),
-      &State::Waiting(ref w) => w.iter().map(|s| s.clone()).collect(),
+      &State::Complete(_) => None,
+      &State::Staged(ref s) => Some(s.dependencies()),
+      &State::Waiting(ref w) if w.is_empty() => None,
+      &State::Waiting(ref w) => Some(w.iter().map(|s| s.clone()).collect()),
     }
   }
 
