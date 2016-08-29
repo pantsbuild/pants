@@ -155,7 +155,10 @@ class BinaryUtil(object):
       try:
         with temporary_file() as dest:
           fetcher = fetcher or Fetcher(get_buildroot())
-          fetcher.download(url, listener=Fetcher.ProgressListener(), path_or_fd=dest)
+          fetcher.download(url,
+                           listener=Fetcher.ProgressListener(),
+                           path_or_fd=dest,
+                           timeout_secs=self._timeout_secs)
           logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
           downloaded_successfully = True
           dest.seek(0)
