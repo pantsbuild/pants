@@ -8,7 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
+import mock
+
 from pants.binaries.binary_util import BinaryUtil
+from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants_test.base_test import BaseTest
@@ -23,7 +26,7 @@ class BinaryUtilTest(BaseTest):
     def __init__(self, read_map):
       self._map = read_map
 
-    def download(self, url, listener=None, path_or_fd=None):
+    def download(self, url, path_or_fd=None, **kwargs):
       if not url in self._map:
         raise IOError("404: Virtual URL '{}' does not exist.".format(url))
       if not path_or_fd:
@@ -40,9 +43,6 @@ class BinaryUtilTest(BaseTest):
     def __getitem__(self, key):
       return self._map[key]  # Vanilla internal map access (without lambda shenanigans).
 
-  def setUp(self):
-    super(BinaryUtilTest, self).setUp()
-
   @classmethod
   def _fake_base(cls, name):
     return 'fake-url-{name}'.format(name=name)
@@ -53,6 +53,19 @@ class BinaryUtilTest(BaseTest):
     supportdir, version, name = binaries[binary_key]
     binary = binary_util._select_binary_base_path(supportdir, version, binary_key)
     return '{base}/{binary}'.format(base=base, binary=binary)
+
+  def test_timeout(self):
+    fetcher = mock.mock.create_autospec(Fetcher)
+    binary_util = BinaryUtil(baseurls=['http://binaries.example.com'],
+                             timeout_secs=42,
+                             bootstrapdir='/tmp')
+    self.assertFalse(fetcher.download.called)
+
+    with binary_util._select_binary_stream('a-binary', 'a-binary/v1.2/a-binary', fetcher=fetcher):
+      fetcher.download.assert_called_once_with('http://binaries.example.com/a-binary/v1.2/a-binary',
+                                               listener=mock.ANY,
+                                               path_or_fd=mock.ANY,
+                                               timeout_secs=42)
 
   def test_nobases(self):
     """Tests exception handling if build support urls are improperly specified."""
