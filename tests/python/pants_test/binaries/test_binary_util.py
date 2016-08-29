@@ -55,7 +55,7 @@ class BinaryUtilTest(BaseTest):
     return '{base}/{binary}'.format(base=base, binary=binary)
 
   def test_timeout(self):
-    fetcher = mock.mock.create_autospec(Fetcher, spec_set=True)
+    fetcher = mock.create_autospec(Fetcher, spec_set=True)
     binary_util = BinaryUtil(baseurls=['http://binaries.example.com'],
                              timeout_secs=42,
                              bootstrapdir='/tmp')
