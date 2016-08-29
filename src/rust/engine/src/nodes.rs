@@ -48,7 +48,7 @@ pub enum State<T> {
 
 impl<T: Clone + Eq + Hash> State<T> {
   pub fn empty_waiting() -> State<T> {
-    State::Waiting(Vec::with_capacity(0))
+    State::Waiting(Vec::new())
   }
 
   /**

@@ -183,9 +183,9 @@ impl Graph {
         id: id,
         node: entry_node,
         state: State::empty_waiting(),
-        dependencies: Vec::with_capacity(4),
-        dependents: Vec::with_capacity(4),
-        cyclic_dependencies: Vec::with_capacity(0),
+        dependencies: Vec::new(),
+        dependents: Vec::new(),
+        cyclic_dependencies: Vec::new(),
       }
     );
 

@@ -17,14 +17,15 @@ pub struct Scheduler {
   pub to_str: ToStrFunction,
   pub graph: Graph,
   pub tasks: Tasks,
-  // Initial set of roots for the execution.
+  // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Node>,
-  // Candidates for Scheduler, in the order they were declared.
+  // Candidates for execution.
   candidates: VecDeque<EntryId>,
-  // Ready ids. This will always contain at least as many entries as the `ready` Vec. If
-  // it contains more ids than the `ready` Vec, it is because entries that were previously
+  // Outstanding ids. This will always contain at least as many entries as the `ready` set. If
+  // it contains more ids than the `ready` set, it is because entries that were previously
   // declared to be ready are still outstanding.
   outstanding: HashSet<EntryId, FNV>,
+  runnable: HashSet<EntryId, FNV>,
 }
 
 impl Scheduler {
@@ -39,6 +40,7 @@ impl Scheduler {
       roots: Vec::new(),
       candidates: VecDeque::new(),
       outstanding: HashSet::default(),
+      runnable: HashSet::default(),
     }
   }
 
@@ -71,7 +73,7 @@ impl Scheduler {
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeId) {
-    self.add_root(Node::create(Selector::select(product), subject, Vec::with_capacity(0)));
+    self.add_root(Node::create(Selector::select(product), subject, Vec::new()));
   }
 
   pub fn add_root_select_dependencies(
@@ -86,7 +88,7 @@ impl Scheduler {
         Selector::SelectDependencies(
           SelectDependencies { product: product, dep_product: dep_product, field: field }),
         subject,
-        Vec::with_capacity(0),
+        Vec::new(),
       )
     );
   }
@@ -157,8 +159,8 @@ impl Scheduler {
             &State::Complete(Complete::Return(k)) =>
               // Dep completed successfully.
               args.push(StagedArg::Key(k)),
-            &State::Staged(_) if self.outstanding.contains(&dep_id) => {
-              // Dep is staged and already outstanding.
+            &State::Staged(_) if self.runnable.contains(&dep_id) => {
+              // Dep is staged and will run in the same batch.
               args.push(arg.clone());
             },
             &State::Waiting(_) | &State::Staged(_) =>
@@ -185,9 +187,9 @@ impl Scheduler {
   /**
    * Continues execution after the given runnables have completed execution.
    *
-   * Returns a batch of `Staged<EntryId>` for which every `StagedArg::Promise` is satisfiable
-   * by an entry which is already outstanding. This "mini graph" can be executed in parallel as
-   * long as those promise dependencies are observed.
+   * Returns an ordered batch of `Staged<EntryId>` for which every `StagedArg::Promise` is
+   * satisfiable by an entry earlier in the list. This "mini graph" can be executed linearly, or in
+   * parallel as long as those promise dependencies are observed.
    */
   pub fn next(&mut self, completed: Vec<(EntryId, Complete)>) -> Vec<(EntryId, Staged<EntryId>)> {
     let mut ready = Vec::new();
@@ -224,6 +226,7 @@ impl Scheduler {
               Some(Result::Ok(staged)) => {
                 // Success! Ready to run.
                 ready.push((entry_id, staged));
+                self.runnable.insert(entry_id);
                 self.outstanding.insert(entry_id);
                 continue;
               },
@@ -285,6 +288,7 @@ impl Scheduler {
       }
     }
 
+    self.runnable.clear();
     ready
   }
 }
