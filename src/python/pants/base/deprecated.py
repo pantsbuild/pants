@@ -10,8 +10,9 @@ import warnings
 from functools import wraps
 
 import six
+from packaging.version import Version
 
-from pants.base.revision import Revision
+# from pants.base.revision import Revision
 from pants.version import PANTS_SEMVER
 
 
@@ -43,7 +44,7 @@ class BadDecoratorNestingError(DeprecationApplicationError):
 
 def get_deprecated_tense(removal_version, future_tense='will be', past_tense='was'):
   """Provides the grammatical tense for a given deprecated version vs the current version."""
-  return future_tense if (Revision.semver(removal_version) >= PANTS_SEMVER) else past_tense
+  return future_tense if (Version(removal_version) >= PANTS_SEMVER) else past_tense
 
 
 def validate_removal_semver(removal_version):
@@ -60,7 +61,7 @@ def validate_removal_semver(removal_version):
   if not isinstance(removal_version, six.string_types):
     raise BadRemovalVersionError('The removal_version must be a semver version string.')
   try:
-    return Revision.semver(removal_version)
+    return Version(removal_version)
   except Revision.BadRevision as e:
     raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
                                  '{}'.format(removal_version, e))
