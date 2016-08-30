@@ -60,7 +60,13 @@ def validate_removal_semver(removal_version):
   if not isinstance(removal_version, six.string_types):
     raise BadRemovalVersionError('The removal_version must be a version string.')
   try:
-    return Version(removal_version)
+    # NB: packaging will see versions like 1.a.0 as 1a0, and are "valid"
+    # We explicitly want our versions to be of the form x.y.z.
+    v = Version(removal_version)
+    if len(v.base_version.split('.')) != 3:
+      raise BadRemovalVersionError('The given removal version {} is not a valid version: '
+                                   '{}'.format(removal_version, removal_version))
+    return v
   except InvalidVersion as e:
     raise BadRemovalVersionError('The given removal version {} is not a valid version: '
                                  '{}'.format(removal_version, e))

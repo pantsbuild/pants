@@ -119,6 +119,14 @@ def test_removal_version_required():
 
 def test_removal_version_bad():
   with pytest.raises(BadRemovalVersionError):
+    warn_or_error('a.a.a', 'dummy description')
+
+  with pytest.raises(BadRemovalVersionError):
+    @deprecated('a.a.a')
+    def test_func0():
+      pass
+
+  with pytest.raises(BadRemovalVersionError):
     warn_or_error(1.0, 'dummy description')
 
   with pytest.raises(BadRemovalVersionError):
