@@ -8,9 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from packaging.version import Version
 
 
-# from pants.base.revision import Revision
-
-
 VERSION = '1.2.0-dev6'
 
 PANTS_SEMVER = Version(VERSION)

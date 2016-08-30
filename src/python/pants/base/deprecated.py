@@ -12,7 +12,6 @@ from functools import wraps
 import six
 from packaging.version import InvalidVersion, Version
 
-# from pants.base.revision import Revision
 from pants.version import PANTS_SEMVER
 
 
