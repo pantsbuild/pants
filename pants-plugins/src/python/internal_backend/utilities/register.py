@@ -108,9 +108,9 @@ class PantsReleases(Subsystem):
     In particular, `-dev` suffixed releases always live on master. Any other (modern) release
     lives in a branch.
     """
-    components = version.components
-    suffix = components[3]
-    if suffix is None or suffix.startswith('rc'):
+    suffix = version.public[len(version.base_version) + 1:]
+    components = version.public.split('.')
+    if suffix == '' or suffix.startswith('rc'):
       # An un-suffixed, or suffixed-with-rc version is a release from a stable branch.
       return '{}.{}.x'.format(*components[:2])
     elif suffix.startswith('dev'):

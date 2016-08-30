@@ -10,7 +10,7 @@ import warnings
 from functools import wraps
 
 import six
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 # from pants.base.revision import Revision
 from pants.version import PANTS_SEMVER
@@ -59,11 +59,11 @@ def validate_removal_semver(removal_version):
   if removal_version is None:
     raise MissingRemovalVersionError('The removal version must be provided.')
   if not isinstance(removal_version, six.string_types):
-    raise BadRemovalVersionError('The removal_version must be a semver version string.')
+    raise BadRemovalVersionError('The removal_version must be a version string.')
   try:
     return Version(removal_version)
-  except Revision.BadRevision as e:
-    raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
+  except InvalidVersion as e:
+    raise BadRemovalVersionError('The given removal version {} is not a valid version: '
                                  '{}'.format(removal_version, e))
 
 
