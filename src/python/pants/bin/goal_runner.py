@@ -19,14 +19,13 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
-from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
+from pants.option.ranked_value import RankedValue
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
@@ -38,16 +37,16 @@ logger = logging.getLogger(__name__)
 
 
 class GoalRunnerFactory(object):
-  def __init__(self, root_dir, options, build_config, run_tracker, reporting, daemon_build_graph=None,
-               exiter=sys.exit):
+  def __init__(self, root_dir, options, build_config, run_tracker, reporting,
+               daemon_graph_helper=None, exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
     :param Options options: The global, pre-initialized Options instance.
     :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
-    :param BuildGraph daemon_build_graph: A BuildGraph instance (for graph reuse, optional).
-    :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
+    :param LegacyGraphHelper daemon_graph_helper: A LegacyGraphHelper instance for graph reuse. (Optional)
+    :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
     self._options = options
@@ -69,40 +68,69 @@ class GoalRunnerFactory(object):
     self._kill_nailguns = self._global_options.kill_nailguns
 
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    build_ignore_patterns = self._global_options.ignore_patterns or []
-    self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
-                                                self._global_options.enable_v2_engine,
-                                                self._global_options.pants_ignore,
-                                                build_ignore_patterns,
-                                                daemon_build_graph)
 
-  def _select_buildgraph_and_address_mapper(self, use_engine, path_ignore_patterns, build_ignore_patterns, daemon_buildgraph=None):
+    self._handle_ignore_patterns()
+
+    self._build_graph, self._address_mapper = self._select_buildgraph_and_address_mapper(
+      self._global_options.enable_v2_engine,
+      self._global_options.pants_ignore,
+      self._global_options.build_ignore,
+      self._global_options.exclude_target_regexp,
+      daemon_graph_helper)
+
+  # TODO: Remove this once we have better support of option renaming in option.parser
+  def _handle_ignore_patterns(self):
+    ignore_patterns_explicit = not self._global_options.is_default('ignore_patterns')
+    build_ignore_explicit = not self._global_options.is_default('build_ignore')
+    if ignore_patterns_explicit and build_ignore_explicit:
+      class MutualExclusiveOptionError(Exception):
+        """Raised when both of exclusive options are given."""
+
+      raise MutualExclusiveOptionError(
+        "Can't use both --ignore-patterns and --build-ignore, should use --build-ignore only.")
+
+    # If --ignore-patterns is specified, we copy it to --build-ignore,
+    # since the backend uses build_ignore.
+    if ignore_patterns_explicit:
+      self._global_options.build_ignore = RankedValue(
+        self._global_options.get_rank('ignore_patterns'),
+        self._global_options.ignore_patterns
+      )
+
+  def _select_buildgraph_and_address_mapper(self,
+                                            use_engine,
+                                            pants_ignore_patterns,
+                                            build_ignore_patterns,
+                                            exclude_target_regexps,
+                                            graph_helper=None):
     """Selects a BuildGraph and AddressMapper to use then constructs them and returns them.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
-    :param list path_ignore_patterns: The path ignore patterns from `--pants-ignore`.
-    :param LegacyBuildGraph daemon_buildgraph: A cached graph to reuse, if available.
-    :returns a tuple of the graph and the address mapper.
+    :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
+    :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
+                                       applied during BUILD file searching.
+    :param list exclude_target_regexps: Regular expressions for targets to be excluded.
+    :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
+                                           if available. This would usually come from the daemon.
+    :returns: A tuple of (BuildGraph, AddressMapper).
     """
-    if daemon_buildgraph is not None:
-      # NB: The daemon may provide a buildgraph. In that case, we ignore the use_engine option,
-      #     since using the engine is implied by using the daemon. However, it is possible for the
-      #     daemon to pass a non-engine backed build graph instance, so we fall back to that.
-      if isinstance(daemon_buildgraph, LegacyBuildGraph):
-        return daemon_buildgraph, LegacyAddressMapper(daemon_buildgraph, self._root_dir)
-      else:
-        return daemon_buildgraph, daemon_buildgraph._address_mapper
-    elif use_engine:
+    # N.B. Use of the daemon implies use of the v2 engine.
+    if graph_helper or use_engine:
       root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
                                                                      build_root=self._root_dir)
-      graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns)
-      graph = graph_helper.create_graph(root_specs)
-      return graph, LegacyAddressMapper(graph, self._root_dir)
+      # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
+      graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(
+        pants_ignore_patterns,
+        build_ignore_patterns=build_ignore_patterns,
+        exclude_target_regexps=exclude_target_regexps)
+      return graph_helper.create_build_graph(root_specs, self._root_dir)
     else:
-      address_mapper = BuildFileAddressMapper(self._build_file_parser,
-                                              get_project_tree(self._global_options),
-                                              build_ignore_patterns,
-                                              exclude_target_regexps=self._global_options.exclude_target_regexp)
+      address_mapper = BuildFileAddressMapper(
+        self._build_file_parser,
+        get_project_tree(self._global_options),
+        build_ignore_patterns,
+        exclude_target_regexps)
+
       return MutableBuildGraph(address_mapper), address_mapper
 
   def _expand_goals(self, goals):

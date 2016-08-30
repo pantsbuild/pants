@@ -34,19 +34,24 @@ class PythonTarget(Target):
                compatibility=None,
                **kwargs):
     """
-    :param dependencies: Other targets that this target depends on.
+    :param dependencies: The addresses of targets that this target depends on.
       These dependencies may
       be ``python_library``-like targets (``python_library``,
       ``python_thrift_library``, ``python_antlr_library`` and so forth) or
       ``python_requirement_library`` targets.
-    :type dependencies: List of target specs
+    :type dependencies: list of strings
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
     :type sources: ``Fileset`` or list of strings
     :param resources: non-Python resources, e.g. templates, keys, other data
       (it is
       recommended that your application uses the pkgutil package to access these
-      resources in a .zip-module friendly way.)
+      resources in a .zip-module friendly way.) Paths are relative to the BUILD
+      file's directory.
+    :type sources: ``Fileset`` or list of strings
+    :param resource_targets: The addresses of ``resources`` targets this target
+      depends on.
+    :type resource_targets: list of strings
     :param provides:
       The `setup_py <#setup_py>`_ to publish that represents this
       target outside the repo.

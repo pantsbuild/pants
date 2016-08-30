@@ -79,6 +79,35 @@ class State(object):
   def raise_unrecognized(cls, state):
     raise ValueError('Unrecognized Node State: {}'.format(state))
 
+  @staticmethod
+  def from_components(components):
+    """Given the components of a State, construct the State."""
+    cls, remainder = components[0], components[1:]
+    return cls._from_components(remainder)
+
+  def to_components(self):
+    """Return a flat tuple containing individual pickleable components of the State.
+
+    TODO: Consider https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-external-objects
+    for this usecase?
+    """
+    return (type(self),) + self._to_components()
+
+  @classmethod
+  def _from_components(cls, components):
+    """Given the components of a State, construct the State.
+
+    Default implementation assumes that `self` extends tuple.
+    """
+    return cls(*components)
+
+  def _to_components(self):
+    """Return all components of the State as a flat tuple.
+
+    Default implementation assumes that `self` extends tuple.
+    """
+    return self
+
 
 class Noop(datatype('Noop', ['format_string', 'args']), State):
   """Indicates that a Node did not have the inputs which would be needed for it to execute.
@@ -92,6 +121,10 @@ class Noop(datatype('Noop', ['format_string', 'args']), State):
 
   def __new__(cls, format_string, *args):
     return super(Noop, cls).__new__(cls, format_string, args)
+
+  @classmethod
+  def _from_components(cls, components):
+    return cls(components[0], *components[1])
 
   @property
   def msg(self):
@@ -107,9 +140,33 @@ class Noop(datatype('Noop', ['format_string', 'args']), State):
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
 
+  @classmethod
+  def _from_components(cls, components):
+    return cls(components[0])
+
+  def _to_components(self):
+    return (self.value,)
+
 
 class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
+
+
+class Runnable(datatype('Runnable', ['func', 'args']), State):
+  """Indicates that the Node is ready to run with the given closure.
+
+  The return value of the Runnable will become the final state of the Node.
+
+  Overrides _to_components and _from_components to flatten the function arguments as independent
+  pickleable values.
+  """
+
+  @classmethod
+  def _from_components(cls, components):
+    return cls(components[0], components[1:])
+
+  def _to_components(self):
+    return (self.func,) + self.args
 
 
 class Waiting(datatype('Waiting', ['dependencies']), State):
@@ -393,6 +450,17 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
       raise State.raise_unrecognized(output_state)
 
 
+def _func_with_return_type_check(func, product_type):
+  def new_func(*args):
+    result = func(*args)
+    if result is None or isinstance(result, product_type):
+      return result
+    else:
+      raise ValueError('result of {} was not a {}, instead was {}'
+                       .format(func.__name__, product_type, type(result).__name__))
+  return new_func
+
+
 class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', 'clause']), Node):
   """A Node representing execution of a non-blocking python function.
 
@@ -401,7 +469,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', '
   executing the function, and provides a satisfied argument per clause entry to the function.
   """
 
-  is_cacheable = False
+  is_cacheable = True
   is_inlineable = False
 
   def step(self, step_context):
@@ -431,18 +499,8 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', '
     # If any clause was still waiting on dependencies, indicate it; else execute.
     if dependencies:
       return Waiting(dependencies)
-    try:
-      result = self.func(*dep_values)
-      if isinstance(result, self.product) or result is None:
-        # TODO: maybe tighten this up to only allow subclasses if they're explicitly allowed by the
-        # rule.
-        return Return(result)
-      else:
-        return Throw(ValueError(
-          'result of {} was not a {}, instead was {}'.format(self.func.__name__, self.product,
-            type(result).__name__)))
-    except Exception as e:
-      return Throw(e)
+    # Ready to run!
+    return Runnable(_func_with_return_type_check(self.func, self.product), tuple(dep_values))
 
   def __repr__(self):
     return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}' \
@@ -480,27 +538,28 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   def generate_subjects(cls, filenames):
     """Given filenames, generate a set of subjects for invalidation predicate matching."""
     for f in filenames:
-      # ReadLink, or FileContent for the literal path.
+      # ReadLink, FileContent, or DirectoryListing for the literal path.
       yield File(f)
       yield Link(f)
-      # DirectoryListing for parent dirs.
-      yield Dir(dirname(f))
+      yield Dir(f)
+      # Additionally, since the FS event service does not send invalidation events
+      # for the root directory, treat any changed file in the root as an invalidation
+      # of the root's listing.
+      if dirname(f) in ('.', ''):
+        yield Dir('')
 
   def step(self, step_context):
-    try:
-      if self.product is DirectoryListing:
-        return Return(scan_directory(step_context.project_tree, self.subject))
-      elif self.product is FileContent:
-        return Return(file_content(step_context.project_tree, self.subject))
-      elif self.product is FileDigest:
-        return Return(file_digest(step_context.project_tree, self.subject))
-      elif self.product is ReadLink:
-        return Return(read_link(step_context.project_tree, self.subject))
-      else:
-        # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
-        raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
-    except Exception as e:
-      return Throw(e)
+    if self.product is DirectoryListing:
+      return Runnable(scan_directory, (step_context.project_tree, self.subject))
+    elif self.product is FileContent:
+      return Runnable(file_content, (step_context.project_tree, self.subject))
+    elif self.product is FileDigest:
+      return Runnable(file_digest, (step_context.project_tree, self.subject))
+    elif self.product is ReadLink:
+      return Runnable(read_link, (step_context.project_tree, self.subject))
+    else:
+      # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
+      raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
 
 
 class StepContext(object):

@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.source.source_root import SourceRoot, SourceRootConfig, SourceRootFactory, SourceRootTrie
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import create_subsystem
 
 
 class SourceRootTest(BaseTest):
@@ -135,7 +134,10 @@ class SourceRootTest(BaseTest):
     }
     options.update(self.options[''])  # We need inherited values for pants_workdir etc.
 
-    source_roots = create_subsystem(SourceRootConfig, **options).get_source_roots()
+    self.context(for_subsystems=[SourceRootConfig], options={
+      SourceRootConfig.options_scope: options
+    })
+    source_roots = SourceRootConfig.global_instance().get_source_roots()
     # Ensure that we see any manually added roots.
     source_roots.add_source_root('fixed/root/jvm', ('java', 'scala'))
     source_roots.all_roots()

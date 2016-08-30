@@ -53,6 +53,7 @@ class StatefulPool(object):
 
   def start(self):
     for process in self._processes:
+      process.daemon = True
       process.start()
 
   def submit(self, item):

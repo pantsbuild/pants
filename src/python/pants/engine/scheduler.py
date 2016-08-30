@@ -17,7 +17,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, ProjectionNode,
-                                Return, SelectNode, State, StepContext, TaskNode, Throw, Waiting,
+                                Return, Runnable, SelectNode, StepContext, TaskNode, Throw, Waiting,
                                 collect_item_of_type)
 from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -62,6 +62,26 @@ class ProductGraph(object):
     def is_complete(self):
       return self.state is not None
 
+    def validate_not_complete(self):
+      if self.is_complete:
+        # It's important not to allow state changes on completed Nodes, because that invariant
+        # is used in cycle detection to avoid walking into completed Nodes.
+        raise CompletedNodeException('Node {} is already completed with:\n  {}'
+                                    .format(self.node, self.state))
+
+    def set_state(self, state):
+      self.validate_not_complete()
+
+      # Validate that a completed Node depends only on other completed Nodes.
+      for dep in self.dependencies:
+        if not dep.is_complete:
+          raise IncompleteDependencyException(
+              'Cannot complete {} with {} while it has an incomplete dep:\n  {}'
+                .format(self, state, dep.node))
+
+      # Finally, set.
+      self.state = state
+
     def structure(self):
       return (self.node,
               self.state,
@@ -87,27 +107,17 @@ class ProductGraph(object):
       return None
     return entry.state
 
-  def update_state(self, node, state):
+  def complete_node(self, node, state):
     """Updates the Node with the given State, creating any Nodes which do not already exist."""
+    if type(state) not in (Return, Throw, Noop):
+      raise ValueError('A Node may only be completed with a final State. Got: {}'.format(state))
     entry = self.ensure_entry(node)
-    if entry.state is not None:
-      # It's important not to allow state changes on completed Nodes, because that invariant
-      # is used in cycle detection to avoid walking into completed Nodes.
-      raise CompletedNodeException('Node {} is already completed:\n  {}\n  {}'
-                                   .format(node, entry.state, state))
+    entry.set_state(state)
 
-    if type(state) in [Return, Throw, Noop]:
-      # Validate that a completed Node depends only on other completed Nodes.
-      for dep in entry.dependencies:
-        if dep.state is None:
-          raise IncompleteDependencyException(
-              'Cannot complete {} with {} while it has an incomplete dep:\n  {}'
-                .format(node, state, dep.node))
-      entry.state = state
-    elif type(state) is Waiting:
-      self._add_dependencies(entry, state.dependencies)
-    else:
-      raise State.raise_unrecognized(state)
+  def add_dependencies(self, node, dependencies):
+    entry = self.ensure_entry(node)
+    entry.validate_not_complete()
+    self._add_dependencies(entry, dependencies)
 
   def _detect_cycle(self, src, dest):
     """Detect whether adding an edge from src to dest would create a cycle.
@@ -226,7 +236,6 @@ class ProductGraph(object):
 
     # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
     for entry in invalidated_entries:
-      logger.debug('invalidating node: %r', entry.node)
       _delete_node(entry)
 
     invalidated_count = len(invalidated_entries)
@@ -390,35 +399,6 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   :param roots: Root Nodes for this request.
   :type roots: list of :class:`pants.engine.nodes.Node`
   """
-
-
-class Promise(object):
-  """An extremely simple _non-threadsafe_ Promise class."""
-
-  def __init__(self):
-    self._success = None
-    self._failure = None
-    self._is_complete = False
-
-  def is_complete(self):
-    return self._is_complete
-
-  def success(self, success):
-    self._success = success
-    self._is_complete = True
-
-  def failure(self, exception):
-    self._failure = exception
-    self._is_complete = True
-
-  def get(self):
-    """Returns the resulting value, or raises the resulting exception."""
-    if not self._is_complete:
-      raise ValueError('{} has not been completed.'.format(self))
-    if self._failure:
-      raise self._failure
-    else:
-      return self._success
 
 
 class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
@@ -670,41 +650,6 @@ class NodeBuilder(Closable):
       raise ValueError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
-class StepRequest(datatype('Step', ['step_id', 'node', 'dependencies', 'inline_nodes', 'project_tree'])):
-  """Additional inputs needed to run Node.step for the given Node.
-
-  TODO: Unclear why this has a ProjectTree reference; should be passed in by the Engine.
-
-  :param step_id: A unique id for the step, to ease comparison.
-  :param node: The Node instance that will run.
-  :param dependencies: The declared dependencies of the Node from previous Waiting steps.
-  :param inline_nodes: See `LocalScheduler._inline_nodes`.
-  :param project_tree: A FileSystemProjectTree instance.
-  """
-
-  def __call__(self, node_builder):
-    """Called by the Engine in order to execute this Step."""
-    step_context = StepContext(node_builder, self.project_tree, self.dependencies, self.inline_nodes)
-    state = self.node.step(step_context)
-    return StepResult(state)
-
-  def __eq__(self, other):
-    return type(self) == type(other) and self.step_id == other.step_id
-
-  def __ne__(self, other):
-    return not (self == other)
-
-  def __hash__(self):
-    return hash(self.step_id)
-
-
-class StepResult(datatype('Step', ['state'])):
-  """The result of running a Step, passed back to the Scheduler via the Promise class.
-
-  :param state: The State value returned by the Step.
-  """
-
-
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
@@ -737,7 +682,6 @@ class LocalScheduler(object):
     self._product_graph = ProductGraph()
     self._product_graph_lock = graph_lock or threading.RLock()
     self._inline_nodes = inline_nodes
-    self._step_id = 0
 
     select_product = lambda product: Select(product)
     select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address,))
@@ -762,35 +706,29 @@ class LocalScheduler(object):
         fh.write(line)
         fh.write('\n')
 
-  def _create_step(self, node_entry):
-    """Creates a Step and Promise with the currently available dependencies of the given Node.
+  def _attempt_run_step(self, node_entry):
+    """Attempt to run a Step with the currently available dependencies of the given Node.
 
-    If the dependencies of a Node are not available, returns None.
-
-    TODO: Content addressing node and its dependencies should only happen if node is cacheable
-      or in a multi-process environment.
+    If the currently declared dependencies of a Node are not yet available, returns None. If
+    they are available, runs a Step and returns the resulting State.
     """
-    Node.validate_node(node_entry.node)
-
     # See whether all of the dependencies for the node are available.
+    if any(not dep_entry.is_complete for dep_entry in node_entry.dependencies):
+      return None
+
+    # Collect the deps.
     deps = dict()
     for dep_entry in node_entry.dependencies:
-      if not dep_entry.is_complete:
-        return None
       deps[dep_entry.node] = dep_entry.state
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in node_entry.cyclic_dependencies:
       deps[dep] = Noop.cycle(node_entry.node, dep)
 
-    # Ready.
-    self._step_id += 1
-    step_request = StepRequest(self._step_id,
-                               node_entry.node,
-                               deps,
-                               self._inline_nodes,
-                               self._project_tree)
-    return (step_request, Promise())
+    # Run.
+    step_context = StepContext(self.node_builder, self._project_tree, deps, self._inline_nodes)
+    return node_entry.node.step(step_context)
 
+  @property
   def node_builder(self):
     """Return the NodeBuilder instance for this Scheduler.
 
@@ -856,12 +794,6 @@ class LocalScheduler(object):
     with self._product_graph_lock:
       return {root: self._product_graph.state(root) for root in execution_request.roots}
 
-  def _complete_step(self, node, step_result):
-    """Given a StepResult for the given Node, complete the step."""
-    result = step_result.state
-    # Update the Node's state in the graph.
-    self._product_graph.update_state(node, result)
-
   def invalidate_files(self, filenames):
     """Calls `ProductGraph.invalidate_files()` against an internal ProductGraph instance
     under protection of a scheduler-level lock."""
@@ -878,65 +810,73 @@ class LocalScheduler(object):
 
     with self._product_graph_lock:
       # A dict from Node entry to a possibly executing Step. Only one Step exists for a Node at a time.
-      outstanding = {}
+      outstanding = set()
       # Node entries that might need to have Steps created (after any outstanding Step returns).
-      candidates = set(self._product_graph.ensure_entry(r) for r in execution_request.roots)
+      candidates = deque(self._product_graph.ensure_entry(r) for r in execution_request.roots)
 
-      # Yield nodes that are ready, and then compute new ones.
-      scheduling_iterations = 0
+      # Yield nodes that are Runnable, and then compute new ones.
+      step_count, runnable_count, scheduling_iterations = 0, 0, 0
       start_time = time.time()
       while True:
-        # Create Steps for candidates that are ready to run, and not already running.
-        ready = dict()
-        for candidate in list(candidates):
-          if candidate in outstanding:
-            # Node is still a candidate, but is currently running.
-            continue
-          if candidate.is_complete:
-            # Node has already completed.
-            candidates.discard(candidate)
+        # Drain the candidate list to create Runnables for the Engine.
+        runnable = []
+        while candidates:
+          node_entry = candidates.popleft()
+          if node_entry.is_complete or node_entry in outstanding:
+            # Node has already completed, or is runnable
             continue
           # Create a step if all dependencies are available; otherwise, can assume they are
           # outstanding, and will cause this Node to become a candidate again later.
-          candidate_step = self._create_step(candidate)
-          if candidate_step is not None:
-            ready[candidate] = candidate_step
-          candidates.discard(candidate)
-
-        if not ready and not outstanding:
-          # Finished.
-          break
-        yield ready.values()
-        scheduling_iterations += 1
-        outstanding.update(ready)
-
-        # Finalize completed Steps.
-        for node_entry, value in outstanding.items()[:]:
-          step, promise = value
-          if not promise.is_complete():
+          state = self._attempt_run_step(node_entry)
+          if state is None:
+            # No state change.
             continue
-          # The step has completed; see whether the Node is completed.
-          outstanding.pop(node_entry)
-          self._complete_step(step.node, promise.get())
-          if node_entry.is_complete:
-            # The Node is completed: mark any of its dependents as candidates for Steps.
-            candidates.update(d for d in node_entry.dependents)
-          else:
+
+          # The Node's state is changing due to this Step.
+          step_count += 1
+          if type(state) is Runnable:
+            # The Node is ready to run in the Engine.
+            runnable.append((node_entry, state))
+            outstanding.add(node_entry)
+          elif type(state) is Waiting:
             # Waiting on dependencies.
+            self._product_graph.add_dependencies(node_entry.node, state.dependencies)
             incomplete_deps = [d for d in node_entry.dependencies if not d.is_complete]
             if incomplete_deps:
               # Mark incomplete deps as candidates for Steps.
-              candidates.update(incomplete_deps)
+              candidates.extend(incomplete_deps)
             else:
               # All deps are already completed: mark this Node as a candidate for another step.
-              candidates.add(node_entry)
+              candidates.append(node_entry)
+          else:
+            # The Node has completed statically.
+            self._product_graph.complete_node(node_entry.node, state)
+            candidates.extend(d for d in node_entry.dependents)
+
+        if not runnable and not outstanding:
+          # Finished.
+          break
+        # The double yield here is intentional, and assumes consumption of this generator in
+        # a `for` loop with a `generator.send(completed)` call in the body of the loop.
+        completed = yield runnable
+        yield
+        runnable_count += len(runnable)
+        scheduling_iterations += 1
+
+        # Finalize any Runnables that completed in the previous round.
+        for node_entry, state in completed:
+          # Complete the Node and mark any of its dependents as candidates for Steps.
+          outstanding.discard(node_entry)
+          self._product_graph.complete_node(node_entry.node, state)
+          candidates.extend(d for d in node_entry.dependents)
 
       logger.debug(
-        'ran %s scheduling iterations in %f seconds. '
-        'there have been %s total steps for %s total nodes.',
+        'ran %s scheduling iterations, %s runnables, and %s steps in %f seconds. '
+        'there are %s total nodes.',
         scheduling_iterations,
+        runnable_count,
+        step_count,
         time.time() - start_time,
-        self._step_id,
         len(self._product_graph)
       )
 

@@ -60,21 +60,14 @@ class FSEventService(PantsService):
       name,
       dict(
         fields=['name'],
-        # N.B. In this expression we intentionally avoid directory change events (['type', 'd']).
-        # The reason for this is two-fold:
-        #
-        #   1) Directory change detection in Watchman is super aggressive - simply opening a file
-        #      in vim with no writes is enough to immediately invalidate the parent dir's
-        #      DirectoryListing. This seems inefficient when nothing relevant is actually changing.
-        #
-        #   2) Directory change detection does not cover the build_root without moving the watch-
-        #      project target one level higher than the buildroot, which could be problematic.
-        #
-        # Instead, we key directory invalidation off of file change events by doing an
-        # `os.path.dirname(file)` during invalidation subject generation, which covers both cases.
+        # Request events for all file types.
+        # NB: Touching a file invalidates its parent directory due to:
+        #   https://github.com/facebook/watchman/issues/305
+        # ...but if we were to skip watching directories, we'd still have to invalidate
+        # the parents of any changed files, and we wouldn't see creation/deletion of
+        # empty directories.
         expression=[
           'allof',  # All of the below rules must be true to match.
-          ['anyof', ['type', 'f'], ['type', 'l']],  # Match only files and symlinks.
           ['not', ['dirname', 'dist', self.ZERO_DEPTH]],  # Exclude the ./dist dir.
           # N.B. 'wholename' ensures we match against the absolute ('x/y/z') vs base path ('z').
           ['not', ['pcre', r'^\..*', 'wholename']],  # Exclude files in hidden dirs (.pants.d etc).
