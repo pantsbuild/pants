@@ -207,14 +207,18 @@ class BundleCreate(JvmBinaryTask):
         # TODO run in parallel to speed up
         self.shade_jar(shading_rules=app.binary.shading_rules, jar_path=jar_path)
 
+    bundle_counter = 0
     for bundle in app.bundles:
+      if not bundle.filemap:
+        raise TaskError('In target {}, bundle index {} of "bundles" field does not match any files.'.format(
+          app.address.spec, bundle_counter))
+
       for path, relpath in bundle.filemap.items():
         bundle_path = os.path.join(bundle_dir, relpath)
-        if not os.path.exists(path):
-          raise TaskError('Given path: {} does not exist in target {}'.format(
-            path, app.address.spec))
         safe_mkdir(os.path.dirname(bundle_path))
         os.symlink(path, bundle_path)
+
+      bundle_counter += 1
 
     return bundle_dir
 
