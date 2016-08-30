@@ -180,19 +180,6 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           for other_id in other_target_ids:
             self.assertNotIn(other_id, contents)
 
-  def test_classpath_includes_jars_when_use_jars_enabled(self):
-    target_spec = 'examples/src/java/org/pantsbuild/example/hello/main'
-    classpath_filename = 'examples.src.java.org.pantsbuild.example.hello.main.main-bin.txt'
-
-    with self.do_test_compile(target_spec,
-      expected_files=[classpath_filename],
-      extra_args=['--compile-zinc-capture-classpath', '--compile-zinc-use-classpath-jars']) as found:
-
-      found_classpath_file = self.get_only(found, classpath_filename)
-      with open(found_classpath_file, 'r') as f:
-        contents = f.read()
-        self.assertIn('z.jar', contents)
-
   def test_record_classpath(self):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion:printversion'
     target_id = Target.compute_target_id(Address.parse(target_spec))
