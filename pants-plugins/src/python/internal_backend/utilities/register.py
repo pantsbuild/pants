@@ -110,7 +110,6 @@ class PantsReleases(Subsystem):
     """
     suffix = version.public[len(version.base_version):]
     components = version.base_version.split('.') + [suffix]
-    print(version, suffix, components)
     if suffix == '' or suffix.startswith('rc'):
       # An un-suffixed, or suffixed-with-rc version is a release from a stable branch.
       return '{}.{}.x'.format(*components[:2])
