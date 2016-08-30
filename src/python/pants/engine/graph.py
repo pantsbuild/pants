@@ -18,7 +18,7 @@ from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConst
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.scheduler import CoercionFactory
+from pants.engine.rules import CoercionRule
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
@@ -278,7 +278,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
     # define that lookup for coercing a struct into each literal product.
-    CoercionFactory(product, Struct)
+    CoercionRule(product, Struct)
     for product in set(symbol_table_cls.table().values()) if product is not Struct
   ] + [
     # Simple spec handling.

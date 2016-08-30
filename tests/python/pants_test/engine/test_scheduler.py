@@ -15,8 +15,9 @@ from pants.engine.addressable import Addresses
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                 Throw, Waiting)
+from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.scheduler import (CompletedNodeException, IncompleteDependencyException,
-                                    NodeBuilder, ProductGraph, RulesetValidator)
+                                    ProductGraph)
 from pants.engine.selectors import Select, SelectDependencies, SelectVariant
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
