@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import logging
 import os
 from abc import abstractmethod, abstractproperty
@@ -450,15 +451,13 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
       raise State.raise_unrecognized(output_state)
 
 
-def _func_with_return_type_check(func, product_type):
-  def new_func(*args):
-    result = func(*args)
-    if result is None or isinstance(result, product_type):
-      return result
-    else:
-      raise ValueError('result of {} was not a {}, instead was {}'
-                       .format(func.__name__, product_type, type(result).__name__))
-  return new_func
+def _run_func_and_check_type(product_type, func, *args):
+  result = func(*args)
+  if result is None or isinstance(result, product_type):
+    return result
+  else:
+    raise ValueError('result of {} was not a {}, instead was {}'
+                     .format(func.__name__, product_type, type(result).__name__))
 
 
 class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', 'clause']), Node):
@@ -500,7 +499,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', '
     if dependencies:
       return Waiting(dependencies)
     # Ready to run!
-    return Runnable(_func_with_return_type_check(self.func, self.product), tuple(dep_values))
+    return Runnable(functools.partial(_run_func_and_check_type, self.product, self.func), tuple(dep_values))
 
   def __repr__(self):
     return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}' \

@@ -307,17 +307,13 @@ def scalac(sources, classpath):
 # unpickleable input and output test planners below to engine test.  There will be less setup
 # required at that point since no target addresses will need to be supplied in the build_request.
 class UnpickleableOutput(object):
-  pass
+  def __init__(self):
+    # Nested functions like this lambda are unpicklable.
+    self.lamb = lambda : None
 
 
 class UnpickleableResult(object):
   pass
-
-
-def unpickleable_output():
-  """Generates an unpickleable output."""
-  # Nested functions like this lambda are unpicklable.
-  return lambda: None
 
 
 def unpickleable_input(unpickleable):
@@ -500,7 +496,7 @@ def setup_json_scheduler(build_root, inline_nodes=True):
       # TODO
       (UnpickleableOutput,
         [],
-        unpickleable_output),
+        UnpickleableOutput),
       (UnpickleableResult,
        [Select(UnpickleableOutput)],
        unpickleable_input),

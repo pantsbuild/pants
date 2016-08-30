@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import logging
 import threading
 import time
@@ -420,12 +421,11 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
     return self.input_selectors
 
 
-def coerce_fn(klass):
-  """Creates a function that returns the passed object iff it is of the type klass, or returns a product of the object if it has products of the right type."""
-  def cast_fn(obj):
-    return collect_item_of_type(klass, obj, None)
-  cast_fn.__name__ = str('coerce_to_{}'.format(klass.__name__))
-  return cast_fn
+def coerce_fn(klass, obj):
+  """Returns the passed object iff it is of the type klass, or returns a  product of the object if
+  it has products of the right type.
+  """
+  return collect_item_of_type(klass, obj, None)
 
 
 class CoercionFactory(datatype('CoercionFactory', ['requested_type', 'available_type'])):
@@ -433,7 +433,7 @@ class CoercionFactory(datatype('CoercionFactory', ['requested_type', 'available_
   def __new__(cls, *args, **kwargs):
     factory = super(CoercionFactory, cls).__new__(cls, *args, **kwargs)
     factory.input_selects = (Select(factory.available_type),)
-    factory.func = coerce_fn(factory.requested_type)
+    factory.func = functools.partial(coerce_fn, factory.requested_type)
     return factory
 
   @property
