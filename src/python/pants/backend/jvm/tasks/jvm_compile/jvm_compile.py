@@ -680,7 +680,7 @@ class JvmCompile(NailgunTaskBase):
       counter()
       return True
 
-    def should_compile_incrementally(vts):
+    def should_compile_incrementally(vts, ctx):
       """Check to see if the compile should try to re-use the existing analysis.
 
       Returns true if we should try to compile the target incrementally.
@@ -689,7 +689,7 @@ class JvmCompile(NailgunTaskBase):
         return False
       if not self._clear_invalid_analysis:
         return True
-      return os.path.exists(compile_context.analysis_file)
+      return os.path.exists(ctx.analysis_file)
 
     def work_for_vts(vts, ctx):
       progress_message = ctx.target.address.spec
@@ -702,7 +702,7 @@ class JvmCompile(NailgunTaskBase):
 
       if not hit_cache:
         # Compute the compile classpath for this target.
-        cp_entries = [compile_context.classes_dir]
+        cp_entries = [ctx.classes_dir]
         cp_entries.extend(ClasspathUtil.compute_classpath(ctx.dependencies(self._dep_context),
                                                           classpath_products,
                                                           extra_compile_time_classpath,
@@ -712,7 +712,7 @@ class JvmCompile(NailgunTaskBase):
 
         # Write analysis to a temporary file, and move it to the final location on success.
         tmp_analysis_file = "{}.tmp".format(ctx.analysis_file)
-        if should_compile_incrementally(vts):
+        if should_compile_incrementally(vts, ctx):
           # If this is an incremental compile, rebase the analysis to our new classes directory.
           self._analysis_tools.rebase_from_path(ctx.analysis_file,
                                                 tmp_analysis_file,
