@@ -209,17 +209,17 @@ class BundleCreate(JvmBinaryTask):
 
     bundle_counter = 0
     for bundle in app.bundles:
-      if not bundle.filemap:
-        raise TaskError('In target {}, bundle index {} of "bundles" field does not match any files.'.format(
-          app.address.spec, bundle_counter))
-
+      fileset_empty = True
       for path, relpath in bundle.filemap.items():
         bundle_path = os.path.join(bundle_dir, relpath)
-        if not os.path.exists(path):
-          raise TaskError('Given path: {} does not exist in target {}'.format(
-            path, app.address.spec))
-        safe_mkdir(os.path.dirname(bundle_path))
-        os.symlink(path, bundle_path)
+        if os.path.exists(path):
+          safe_mkdir(os.path.dirname(bundle_path))
+          os.symlink(path, bundle_path)
+          fileset_empty = False
+
+      if fileset_empty:
+        raise TaskError('In target {}, bundle index {} of "bundles" field does not match any files.'.format(
+          app.address.spec, bundle_counter))
 
       bundle_counter += 1
 
