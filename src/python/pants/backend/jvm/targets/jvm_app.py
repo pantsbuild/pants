@@ -79,8 +79,7 @@ class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset']))
         abspath = path
         if not os.path.isabs(abspath):
           abspath = os.path.join(get_buildroot(), self.rel_path, path)
-        if os.path.exists(abspath):
-          filemap[abspath] = self.mapper(abspath)
+        filemap[abspath] = self.mapper(abspath)
     return filemap
 
   def __hash__(self):
