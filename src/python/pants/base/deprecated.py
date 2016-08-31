@@ -52,7 +52,7 @@ def validate_removal_semver(removal_version):
   If so, returns that semver.  Raises an error otherwise.
 
   :param str removal_version: The pantsbuild.pants version which will remove the deprecated entity.
-  :rtype: `pants.base.Revision`
+  :rtype: `packaging.version.Version`
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   """
   if removal_version is None:

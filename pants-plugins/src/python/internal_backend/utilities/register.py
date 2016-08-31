@@ -120,7 +120,7 @@ class PantsReleases(Subsystem):
       raise ValueError('Unparseable pants version number: {}'.format(version))
 
   def notes_for_version(self, version):
-    """Given the parsed Revision of pants, return its release notes.
+    """Given the parsed Version of pants, return its release notes.
 
     TODO: This method should parse out the specific version from the resulting file:
       see https://github.com/pantsbuild/pants/issues/1708
