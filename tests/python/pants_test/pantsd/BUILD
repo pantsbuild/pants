@@ -5,7 +5,6 @@ python_library(
   name = 'test_deps',
   dependencies = [
     '3rdparty/python:mock',
-    '3rdparty/python:pytest',
     'tests/python/pants_test:base_test'
   ]
 )

@@ -5,7 +5,6 @@ python_tests(
   name='subsystem',
   sources=['test_subsystem.py'],
   dependencies=[
-    '3rdparty/python:pytest',
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],

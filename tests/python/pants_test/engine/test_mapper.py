@@ -11,8 +11,6 @@ import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
-import pytest
-
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
@@ -308,7 +306,8 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                       self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
                      self.resolve_multi(DescendantAddresses('a/d')))
 
-  @pytest.mark.xfail(reason='''Excludes are not implemented: expects excludes=['a/b', 'a/d/e'])''')
+  # Excludes are not implemented: expects excludes=['a/b', 'a/d/e'].
+  @unittest.expectedFailure
   def test_walk_descendants_path_excludes(self):
     self.assertEqual({self.addr('//:root'): Struct(name='root'),
                       self.addr('a/d:d'): Target(name='d')},
