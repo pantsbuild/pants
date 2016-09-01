@@ -250,20 +250,16 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
   def step(self, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
-    select_variants = Select(Variants)
-    if type(self.subject) is Address and self.selector != select_variants:
-      variants_node = step_context.select_node(select_variants, self.subject, self.variants)
+    variants = self.variants
+    if type(self.subject) is Address and self.product is not Variants:
+      variants_node = step_context.select_node(Select(Variants), self.subject, self.variants)
       dep_state = step_context.get(variants_node)
-      if type(dep_state) in (Waiting, Throw):
+      if type(dep_state) is Waiting:
         return dep_state
       elif type(dep_state) is Return:
         # A subject's variants are overridden by any dependent's requested variants, so
         # we merge them left to right here.
         variants = Variants.merge(dep_state.value.default.items(), self.variants)
-      else:
-        variants = self.variants
-    else:
-      variants = self.variants
 
     # If there is a variant_key, see whether it has been configured.
     if type(self.selector) is SelectVariant:
@@ -345,9 +341,6 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
 
   def _dependency_nodes(self, step_context, dep_product):
     for dependency in getattr(dep_product, self.field or 'dependencies'):
-      if type(dependency) not in self.selector.field_types:
-        logger.warn('Unexpected type: {} for : {}'.format(type(dependency), self.selector))
-
       variants = self.variants
       if isinstance(dependency, Address):
         # If a subject has literal variants for particular dependencies, they win over all else.
@@ -370,6 +363,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
     dep_values = []
     dependencies = []
     for dependency in self._dependency_nodes(step_context, dep_product_state.value):
+      if type(dependency.subject) not in self.selector.field_types:
+        return Throw(TypeError('Unexpected type: {} for : {}'.format(type(dependency.subject), self.selector)))
+
       dep_state = step_context.get(dependency)
       if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
@@ -417,31 +413,30 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
     input_node = step_context.select_node(Select(self.input_product), self.subject, self.variants)
 
     input_state = step_context.get(input_node)
-    input_state_type = type(input_state)
-    if input_state_type in (Throw, Waiting):
+    if type(input_state) in (Throw, Waiting):
       return input_state
-    elif input_state_type is Noop:
+    elif type(input_state) is Noop:
       return Noop('Could not compute {} in order to project its fields.', input_node)
-    elif input_state_type is not Return:
+    elif type(input_state) is not Return:
       State.raise_unrecognized(input_state)
 
     # The input product is available: use it to construct the new Subject.
     input_product = input_state.value
     values = [getattr(input_product, field) for field in self.fields]
 
-    projected_subject_type = self.selector.projected_subject
     # If there was only one projected field and it is already of the correct type, project it.
     try:
-      if len(values) == 1 and type(values[0]) is projected_subject_type:
+      if len(values) == 1 and type(values[0]) is self.projected_subject:
         projected_subject = values[0]
       else:
-        projected_subject = projected_subject_type(*values)
+        projected_subject = self.projected_subject(*values)
     except Exception as e:
-      return Throw(ValueError('Fields {} of {} could not be projected as {}: {}'.format(
-                   self.fields, input_product, projected_subject_type, e)))
+      return Throw(ValueError(
+        'Fields {} of {} could not be projected as {}: {}'.format(self.fields, input_product,
+          self.projected_subject, e)))
 
     # When the output node is available, return its result.
-    output_node = step_context.select_node(Select(self.selector.product), projected_subject, self.variants)
+    output_node = step_context.select_node(Select(self.product), projected_subject, self.variants)
     output_state = step_context.get(output_node)
     if type(output_state) in (Return, Throw, Waiting):
       return output_state
@@ -486,10 +481,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', '
         if selector.optional:
           dep_values.append(None)
         else:
-          return Noop('Was missing (at least) input for {}.'
-          ' Waiting on: {}'
-          ' passed clauses {}'
-          ' collected vals: {}', selector, dependencies, self.clause[:index], dep_values)
+          return Noop('Was missing (at least) input for {}.', selector)
       elif type(dep_state) is Throw:
         # NB: propagate thrown exception directly.
         return dep_state

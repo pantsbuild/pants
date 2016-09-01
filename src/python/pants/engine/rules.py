@@ -110,10 +110,6 @@ class RulesetValidator(object):
       'projected subject types': projected_subject_types,
       'dependency subject types': dependency_subject_types
     }
-    all_errors = []
-    all_warnings = []
-
-    selector_errors, selector_warnings = self._check_task_selectors(serializable_tasks, type_collections)
 
     for goal, goal_product in self._goal_to_product.items():
       if goal_product not in task_and_intrinsic_product_types:
@@ -121,8 +117,7 @@ class RulesetValidator(object):
         # available.
         raise ValueError('missing product for goal {} {}'.format(goal, goal_product))
 
-    all_errors.extend(selector_errors)
-    all_warnings.extend(selector_warnings)
+    all_errors, all_warnings = self._check_task_selectors(serializable_tasks, type_collections)
 
     if all_warnings:
       logger.warn('warning count {}'.format(len(all_warnings)))
@@ -163,39 +158,38 @@ class RulesetValidator(object):
         all_warnings.extend(rule_warnings)
     return all_errors, all_warnings
 
-  def _validate_product_is_provided(self, rule, select, selection_product, type_collections):
-    if all(selection_product not in coll for coll in type_collections.values()):
+  def _validate_product_is_provided(self, rule, select, selection_product_type, type_collections):
+    if any(selection_product_type in list_of_types for list_of_types in type_collections.values()):
+      return None, None
 
-      def superclass_of_selection(b):
-        return issubclass(selection_product, b)
+    def superclass_of_selection(b):
+      return issubclass(selection_product_type, b)
 
-      def subclass_of_selection(b):
-        return issubclass(b, selection_product)
+    def subclass_of_selection(b):
+      return issubclass(b, selection_product_type)
 
-      super_types_by_name = {name: filter(superclass_of_selection, types) for name, types in
-        type_collections.items()}
-      sub_types_by_name = {name: filter(subclass_of_selection, types) for name, types in
-        type_collections.items()}
+    super_types_by_name = {name: filter(superclass_of_selection, types) for name, types in
+      type_collections.items()}
+    sub_types_by_name = {name: filter(subclass_of_selection, types) for name, types in
+      type_collections.items()}
 
-      if (all(len(b) == 0 for b in super_types_by_name.values()) and all(
-          len(b) == 0 for b in sub_types_by_name.values())):
-        # doesn't cover HasProducts relationships or projections since they have middle
-        # implicit types
-        err_msg = 'Rule entry with no possible fulfillment: {} There is no producer of {} ' \
-                  'or a super/subclass of ' \
-                  'it'.format(
-          rule, select)
-        return err_msg, None
-      else:
-
-        warn_msg = 'Rule entry fulfilled through indirect means {} '.format(select)
-        for x in type_collections.keys():
-          if super_types_by_name.get(x):
-            warn_msg += '  has supertyped {} : {}'.format(x, super_types_by_name[x])
-          if sub_types_by_name.get(x):
-            warn_msg += '  has sub  typed {} : {}'.format(x, sub_types_by_name[x])
-        return None, warn_msg
-    return None, None
+    if (all(len(b) == 0 for b in super_types_by_name.values()) and all(
+        len(b) == 0 for b in sub_types_by_name.values())):
+      # doesn't cover HasProducts relationships or projections since they have middle
+      # implicit types
+      err_msg = 'Rule entry with no possible fulfillment: {} There is no producer of {} ' \
+                'or a super/subclass of ' \
+                'it'.format(
+        rule, select)
+      return err_msg, None
+    else:
+      warn_msg = 'Rule entry fulfilled through indirect means {} '.format(select)
+      for x in type_collections.keys():
+        if super_types_by_name.get(x):
+          warn_msg += '  has supertyped {} : {}'.format(x, super_types_by_name[x])
+        if sub_types_by_name.get(x):
+          warn_msg += '  has sub  typed {} : {}'.format(x, sub_types_by_name[x])
+      return None, warn_msg
 
 
 def coerce_fn(klass, obj):
