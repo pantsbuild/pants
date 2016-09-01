@@ -15,7 +15,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
-#from pants.build_graph.mutable_build_graph import MutableBuildGraph
+from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
@@ -350,8 +350,7 @@ class Context(object):
     :param string root: The path to scan; by default, the build root.
     :returns: A new build graph encapsulating the targets found.
     """
-    #build_graph = MutableBuildGraph(self.address_mapper)
-    build_graph = self.build_graph
+    build_graph = MutableBuildGraph(self.address_mapper)
     for address in self.address_mapper.scan_addresses(root):
       build_graph.inject_address_closure(address)
     return build_graph
