@@ -28,7 +28,7 @@ python_library(
   name='version',
   sources=['version.py'],
   dependencies = [
-    "src/python/pants/base:revision"
+    "3rdparty/python:packaging",
   ]
 )
 
