@@ -215,7 +215,8 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     if process_request.snapshot_subjects:
       snapshot_subjects_node = step_context.select_node(SelectDependencies(Snapshot,
                                                                            SnapshottedProcessRequest,
-                                                                           'snapshot_subjects'),
+                                                                           'snapshot_subjects',
+                                                                           field_types=(Files,)),
                                                         process_request,
                                                         self.variants)
       snapshot_subjects_state = step_context.get(snapshot_subjects_node)

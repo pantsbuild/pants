@@ -8,17 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from contextlib import contextmanager
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
-from pants.engine.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return, Runnable,
-                                SelectNode, StepContext, TaskNode, Throw, Waiting)
-from pants.engine.objects import Closable
+from pants.engine.nodes import (FilesystemNode, Node, Noop, Return, Runnable, SelectNode,
+                                StepContext, TaskNode, Throw, Waiting)
+from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
 
@@ -399,81 +398,6 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   """
 
 
-class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
-                                                         'binary_type',
-                                                         'input_selectors',
-                                                         'input_conversion',
-                                                         'output_conversion'])):
-  """A task type for defining execution of snapshotted processes."""
-
-  def as_node(self, subject, product_type, variants):
-    return ProcessExecutionNode(subject, variants, self)
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-  @property
-  def input_selects(self):
-    return self.input_selectors
-
-
-class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type'])):
-  """A set-friendly curried TaskNode constructor."""
-
-  def as_node(self, subject, product_type, variants):
-    return TaskNode(subject, product_type, variants, self.task_func, self.input_selects)
-
-
-class NodeBuilder(Closable):
-  """Holds an index of tasks and intrinsics used to instantiate Nodes."""
-
-  @classmethod
-  def create(cls, task_entries):
-    """Creates a NodeBuilder with tasks indexed by their output type."""
-    serializable_tasks = defaultdict(set)
-    for entry in task_entries:
-      if isinstance(entry, (tuple, list)) and len(entry) == 3:
-        output_type, input_selects, task = entry
-        serializable_tasks[output_type].add(
-          TaskNodeFactory(tuple(input_selects), task, output_type)
-        )
-      elif isinstance(entry, SnapshottedProcess):
-        serializable_tasks[entry.output_product_type].add(entry)
-      else:
-        raise Exception("Unexpected type for entry {}".format(entry))
-
-    intrinsics = dict()
-    intrinsics.update(FilesystemNode.as_intrinsics())
-    intrinsics.update(SnapshotNode.as_intrinsics())
-    return cls(serializable_tasks, intrinsics)
-
-  @classmethod
-  def create_task_node(cls, subject, product_type, variants, task_func, clause):
-    return TaskNode(subject, product_type, variants, task_func, clause)
-
-  def __init__(self, tasks, intrinsics):
-    self._tasks = tasks
-    self._intrinsics = intrinsics
-
-  def gen_nodes(self, subject, product_type, variants):
-    # Intrinsics that provide the requested product for the current subject type.
-    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject)
-    if intrinsic_node_factory:
-      yield intrinsic_node_factory(subject, product_type, variants)
-    else:
-      # Tasks that provide the requested product.
-      for node_factory in self._lookup_tasks(product_type):
-        yield node_factory(subject, product_type, variants)
-
-  def _lookup_tasks(self, product_type):
-    for entry in self._tasks[product_type]:
-      yield entry.as_node
-
-  def _lookup_intrinsic(self, product_type, subject):
-    return self._intrinsics.get((type(subject), product_type))
-
-
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
@@ -506,6 +430,18 @@ class LocalScheduler(object):
     self._product_graph = ProductGraph()
     self._product_graph_lock = graph_lock or threading.RLock()
     self._inline_nodes = inline_nodes
+
+    select_product = lambda product: Select(product)
+    select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address,))
+    self._root_selector_fns = {
+      Address: select_product,
+      PathGlobs: select_product,
+      SingleAddress: select_dep_addrs,
+      SiblingAddresses: select_dep_addrs,
+      DescendantAddresses: select_dep_addrs,
+    }
+
+    RulesetValidator(self._node_builder, goals, self._root_selector_fns.keys()).validate()
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -583,13 +519,13 @@ class LocalScheduler(object):
     # Determine the root Nodes for the products and subjects selected by the goals and specs.
     def roots():
       for subject in subjects:
+        selector_fn = self._root_selector_fns.get(type(subject), None)
+        if not selector_fn:
+          raise TypeError('Unsupported root subject type: {} for {!r}'
+                          .format(type(subject), subject))
+
         for product in products:
-          if type(subject) in [Address, PathGlobs]:
-            yield SelectNode(subject, None, Select(product))
-          elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
-            yield DependenciesNode(subject, None, SelectDependencies(product, Addresses))
-          else:
-            raise ValueError('Unsupported root subject type: {}'.format(subject))
+          yield self._node_builder.select_node(selector_fn(product), subject, None)
 
     return ExecutionRequest(tuple(roots()))
 

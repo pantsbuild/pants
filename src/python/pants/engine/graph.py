@@ -18,6 +18,7 @@ from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConst
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
+from pants.engine.rules import CoercionRule
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
@@ -257,7 +258,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Support for resolving Structs from Addresses
     (Struct,
      [Select(UnhydratedStruct),
-      SelectDependencies(Struct, UnhydratedStruct)],
+      SelectDependencies(Struct, UnhydratedStruct, field_types=(Address,))],
      hydrate_struct),
     (UnhydratedStruct,
      [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
@@ -276,11 +277,9 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      filter_buildfile_paths),
   ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
-    # define that lookup for each literal product.
-    (product,
-     [Select(Struct)],
-     identity)
-    for product in symbol_table_cls.table().values() if product is not Struct
+    # define that lookup for coercing a struct into each literal product.
+    CoercionRule(product, Struct)
+    for product in set(symbol_table_cls.table().values()) if product is not Struct
   ] + [
     # Simple spec handling.
     (Addresses,
@@ -294,7 +293,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Recursive spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     (Addresses,
-     [SelectDependencies(AddressFamily, BuildDirs)],
+     [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,))],
      addresses_from_address_families),
     (BuildDirs,
      [SelectLiteral(address_mapper, AddressMapper),

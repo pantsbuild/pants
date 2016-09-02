@@ -149,6 +149,17 @@ python_tests(
 )
 
 python_tests(
+  name='rules',
+  sources=['test_rules.py'],
+  coverage=['pants.engine.rules'],
+  dependencies=[
+    'src/python/pants/engine:selectors',
+    'src/python/pants/engine:rules',
+  ]
+)
+
+
+python_tests(
   name='storage',
   sources=['test_storage.py'],
   dependencies=[

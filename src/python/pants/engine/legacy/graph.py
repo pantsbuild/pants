@@ -303,8 +303,8 @@ def create_legacy_graph_tasks():
     # will result in an eager, transitive graph walk.
     (LegacyTarget,
      [Select(TargetAdaptor),
-      SelectDependencies(LegacyTarget, TargetAdaptor, 'dependencies'),
-      SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors')],
+      SelectDependencies(LegacyTarget, TargetAdaptor, 'dependencies', field_types=(Address,)),
+      SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors', field_types=(SourcesField, BundlesField, ))],
      reify_legacy_graph),
     (HydratedField,
      [Select(SourcesField),
@@ -313,7 +313,7 @@ def create_legacy_graph_tasks():
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),
-      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list'),
-      SelectDependencies(Files, BundlesField, 'excluded_path_globs_list')],
+      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list', field_types=(PathGlobs,)),
+      SelectDependencies(Files, BundlesField, 'excluded_path_globs_list', field_types=(PathGlobs,))],
      hydrate_bundles),
   ]

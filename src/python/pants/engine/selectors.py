@@ -56,24 +56,34 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
                              repr(self.variant_key))
 
 
-class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'field']), Selector):
+class SelectDependencies(datatype('Dependencies',
+                                  ['product', 'dep_product', 'field', 'field_types']),
+                         Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
   The dependencies declared on `dep_product` (in the optional `field` parameter, which defaults
   to 'dependencies' when not specified) will be provided to the requesting task in the
   order they were declared.
+
+  Field types are used to statically declare the types expected to be contained by the
+  `dep_product`.
   """
 
-  def __new__(cls, product, dep_product, field=None):
-    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field)
+  def __new__(cls, product, dep_product, field=None, field_types=tuple()):
+    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
 
   optional = False
 
   def __repr__(self):
-    return '{}({}, {}{})'.format(type(self).__name__,
-                             self.product.__name__,
-                             self.dep_product.__name__,
-                             ', {}'.format(repr(self.field)) if self.field else '')
+    if self.field_types:
+      field_types_portion = ', field_types=({},)'.format(', '.join(f.__name__ for f in self.field_types))
+    else:
+      field_types_portion = ''
+    return '{}({}, {}{}{})'.format(type(self).__name__,
+                                   self.product.__name__,
+                                   self.dep_product.__name__,
+                                   ', {}'.format(repr(self.field)) if self.field else '',
+                                   field_types_portion)
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
@@ -113,7 +123,7 @@ class Collection(object):
   @classmethod
   @memoized
   def of(cls, element_type, fields=('dependencies',)):
-    type_name = b'{}({})'.format(cls.__name__, element_type.__name__)
+    type_name = b'{}.of({})'.format(cls.__name__, element_type.__name__)
 
     collection_of_type = type(type_name, (cls, datatype("{}s".format(element_type.__name__), fields)), {})
 

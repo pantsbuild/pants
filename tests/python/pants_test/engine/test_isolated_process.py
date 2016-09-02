@@ -13,7 +13,7 @@ from pants.engine.fs import Files, PathGlobs
 from pants.engine.isolated_process import (Binary, Snapshot, SnapshottedProcessRequest,
                                            _snapshot_path)
 from pants.engine.nodes import Return, StepContext, Throw
-from pants.engine.scheduler import SnapshottedProcess
+from pants.engine.rules import SnapshottedProcess
 from pants.engine.selectors import Select, SelectLiteral
 from pants.util.contextutil import open_tar
 from pants.util.objects import datatype

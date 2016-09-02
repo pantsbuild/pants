@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
+import logging
 import os
 from abc import abstractmethod, abstractproperty
 from os.path import dirname
@@ -16,11 +18,38 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
 from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
                              file_digest, read_link, scan_directory)
-from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant)
+from pants.engine.selectors import Select, SelectVariant
 from pants.engine.struct import HasProducts, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
+
+
+def collect_item_of_type(product, candidate, variant_value):
+  """Looks for has-a or is-a relationships between the given value and the requested product.
+
+  Returns the resulting product value, or None if no match was made.
+  """
+  def items():
+    # Check whether the subject is-a instance of the product.
+    yield candidate
+    # Else, check whether it has-a instance of the product.
+    if isinstance(candidate, HasProducts):
+      for subject in candidate.products:
+        yield subject
+
+  # TODO: returning only the first literal configuration of a given type/variant. Need to
+  # define mergeability for products.
+  for item in items():
+
+    if not isinstance(item, product):
+      continue
+    if variant_value and not getattr(item, 'name', None) == variant_value:
+      continue
+    return item
+  return None
 
 
 class ConflictingProducersError(Exception):
@@ -216,24 +245,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
 
     Returns the resulting product value, or None if no match was made.
     """
-
-    def items():
-      # Check whether the subject is-a instance of the product.
-      yield candidate
-      # Else, check whether it has-a instance of the product.
-      if isinstance(candidate, HasProducts):
-        for subject in candidate.products:
-          yield subject
-
-    # TODO: returning only the first literal configuration of a given type/variant. Need to
-    # define mergeability for products.
-    for item in items():
-      if not isinstance(item, self.product):
-        continue
-      if variant_value and not getattr(item, 'name', None) == variant_value:
-        continue
-      return item
-    return None
+    return collect_item_of_type(self.product, candidate, variant_value)
 
   def step(self, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
@@ -247,17 +259,18 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
       elif type(dep_state) is Return:
         # A subject's variants are overridden by any dependent's requested variants, so
         # we merge them left to right here.
-        variants = Variants.merge(dep_state.value.default.items(), variants)
+        variants = Variants.merge(dep_state.value.default.items(), self.variants)
 
     # If there is a variant_key, see whether it has been configured.
-    variant_value = None
-    if self.variant_key:
+    if type(self.selector) is SelectVariant:
       variant_values = [value for key, value in variants
-                        if key == self.variant_key] if variants else None
+        if key == self.variant_key] if variants else None
       if not variant_values:
         # Select cannot be satisfied: no variant configured for this key.
         return Noop('Variant key {} was not configured in variants {}', self.variant_key, variants)
       variant_value = variant_values[0]
+    else:
+      variant_value = None
 
     # If the Subject "is a" or "has a" Product, then we're done.
     literal_value = self._select_literal(self.subject, variant_value)
@@ -350,6 +363,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
     dep_values = []
     dependencies = []
     for dependency in self._dependency_nodes(step_context, dep_product_state.value):
+      if type(dependency.subject) not in self.selector.field_types:
+        return Throw(TypeError('Unexpected type: {} for {}'.format(type(dependency.subject), self.selector)))
+
       dep_state = step_context.get(dependency)
       if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
@@ -395,6 +411,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
   def step(self, step_context):
     # Request the product we need to compute the subject.
     input_node = step_context.select_node(Select(self.input_product), self.subject, self.variants)
+
     input_state = step_context.get(input_node)
     if type(input_state) in (Throw, Waiting):
       return input_state
@@ -405,9 +422,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
 
     # The input product is available: use it to construct the new Subject.
     input_product = input_state.value
-    values = []
-    for field in self.fields:
-      values.append(getattr(input_product, field))
+    values = [getattr(input_product, field) for field in self.fields]
 
     # If there was only one projected field and it is already of the correct type, project it.
     try:
@@ -416,8 +431,9 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
       else:
         projected_subject = self.projected_subject(*values)
     except Exception as e:
-      return Throw(ValueError('Fields {} of {} could not be projected as {}: {}'.format(
-                   self.fields, input_product, self.projected_subject, e)))
+      return Throw(ValueError(
+        'Fields {} of {} could not be projected as {}: {}'.format(self.fields, input_product,
+          self.projected_subject, e)))
 
     # When the output node is available, return its result.
     output_node = step_context.select_node(Select(self.product), projected_subject, self.variants)
@@ -430,7 +446,16 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
       raise State.raise_unrecognized(output_state)
 
 
-class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', 'clause']), Node):
+def _run_func_and_check_type(product_type, func, *args):
+  result = func(*args)
+  if result is None or isinstance(result, product_type):
+    return result
+  else:
+    raise ValueError('result of {} was not a {}, instead was {}'
+                     .format(func.__name__, product_type, type(result).__name__))
+
+
+class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', 'clause']), Node):
   """A Node representing execution of a non-blocking python function.
 
   All dependencies of the function are declared ahead of time in the dependency `clause` of the
@@ -466,7 +491,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     if dependencies:
       return Waiting(dependencies)
     # Ready to run!
-    return Runnable(self.func, tuple(dep_values))
+    return Runnable(functools.partial(_run_func_and_check_type, self.product, self.func), tuple(dep_values))
 
   def __repr__(self):
     return 'TaskNode(subject={}, product={}, variants={}, func={}, clause={}' \
@@ -570,15 +595,4 @@ class StepContext(object):
     This method is decoupled from Selector classes in order to allow the `selector` package to not
     need a dependency on the `nodes` package.
     """
-    selector_type = type(selector)
-    if selector_type in [Select, SelectVariant]:
-      return SelectNode(subject, variants, selector)
-    elif selector_type is SelectLiteral:
-      # NB: Intentionally ignores subject parameter to provide a literal subject.
-      return SelectNode(selector.subject, variants, selector)
-    elif selector_type is SelectDependencies:
-      return DependenciesNode(subject, variants, selector)
-    elif selector_type is SelectProjection:
-      return ProjectionNode(subject, variants, selector)
-    else:
-      raise ValueError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
+    return self._node_builder.select_node(selector, subject, variants)

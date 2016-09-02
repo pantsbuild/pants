@@ -145,6 +145,21 @@ python_library(
 )
 
 python_library(
+  name='rules',
+  sources=['rules.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':addressable',
+    ':fs',
+    ':isolated_process',
+    ':nodes',
+    'src/python/pants/base:specs',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:objects',
+  ]
+)
+
+python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
@@ -164,6 +179,7 @@ python_library(
     ':fs',
     ':isolated_process',
     ':nodes',
+    ':rules',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',
