@@ -4,6 +4,54 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0dev7 (09/02/2016)
+----------------------
+
+Regularly scheduled unstable release. Thanks to the contributors!
+
+Bugfixes
+~~~~~~~~
+* [jvm-compile][bug] Fixes other target's class dir ending up on classpath
+  `RB #3635 <https://rbcommons.com/s/twitter/r/3635>`_
+  `RB #4198 <https://rbcommons.com/s/twitter/r/4198>`_
+
+* Fixed bugs in Go thrift generation with services
+  `RB #4177 <https://rbcommons.com/s/twitter/r/4177>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Add Runnable State
+  `RB #4158 <https://rbcommons.com/s/twitter/r/4158>`_
+
+* [engine] Don't filter directories in watchman subscription
+  `RB #4095 <https://rbcommons.com/s/twitter/r/4095>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Eliminate all direct use of pytest.
+  `RB #4201 <https://rbcommons.com/s/twitter/r/4201>`_
+
+* Update pants versioning to use python's packaging.version
+  `RB #4200 <https://rbcommons.com/s/twitter/r/4200>`_
+
+* [jvm-compile][test] Add test explicitly checking classpath for z.jars
+  `RB #4198, <https://rbcommons.com/s/twitter/r/4198,>`_
+  `RB #4199 <https://rbcommons.com/s/twitter/r/4199>`_
+
+* Plumb fetch timeout through `BinaryUtil`.
+  `RB #4196 <https://rbcommons.com/s/twitter/r/4196>`_
+
+* Upgrade default go to 1.7.
+  `RB #4195 <https://rbcommons.com/s/twitter/r/4195>`_
+
+* Fixup `PythonTarget` `resource_targets` docs.
+  `RB #4148 <https://rbcommons.com/s/twitter/r/4148>`_
+
+* Customize tarfile module next() method
+  `RB #4123 <https://rbcommons.com/s/twitter/r/4123>`_
+
 1.2.0-dev6 (8/26/2016)
 ----------------------
 

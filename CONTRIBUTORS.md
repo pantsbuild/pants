@@ -84,6 +84,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Mark McBride
 + Mateo Rodriguez
 + Mathew Jennings
++ Matt Dee
 + Matt Landis
 + Matt Olsen
 + Matthew Jeffryes
