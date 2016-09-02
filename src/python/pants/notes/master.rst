@@ -36,7 +36,7 @@ Refactoring, Improvements, and Tooling
   `RB #4200 <https://rbcommons.com/s/twitter/r/4200>`_
 
 * [jvm-compile][test] Add test explicitly checking classpath for z.jars
-  `RB #4199, <https://rbcommons.com/s/twitter/r/4199,>`_
+  `RB #4199 <https://rbcommons.com/s/twitter/r/4199>`_
 
 * Plumb fetch timeout through `BinaryUtil`.
   `RB #4196 <https://rbcommons.com/s/twitter/r/4196>`_
