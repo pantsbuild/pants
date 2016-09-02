@@ -34,7 +34,7 @@ class Rule(object):
     """Constructs a ProductGraph node for this rule."""
 
 
-class CoercionRule(datatype('CoercionFactory', ['requested_type', 'available_type']), Rule):
+class CoercionRule(datatype('CoercionRule', ['requested_type', 'available_type']), Rule):
   """Defines a task for converting from the available type to the requested type using the selection
   rules from Select.
 
@@ -55,19 +55,31 @@ class CoercionRule(datatype('CoercionFactory', ['requested_type', 'available_typ
     return TaskNode(subject, variants, self.requested_type, self.func, self.input_selects)
 
 
-class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type']), Rule):
+class TaskNodeFactory(datatype('TaskNodeFactory', ['input_selects', 'task_func', 'product_type']), Rule):
   """A set-friendly curried TaskNode constructor."""
 
   def as_node(self, subject, variants):
-    return TaskNode(subject,
-      variants,
-      self.product_type,
-      self.task_func,
-      self.input_selects)
+    return TaskNode(subject, variants, self.product_type, self.task_func, self.input_selects)
 
   @property
   def output_product_type(self):
     return self.product_type
+
+  def __str__(self):
+    return '({}, {!r}, {})'.format(self.product_type.__name__, self.input_selects, self.task_func.__name__)
+
+
+class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', 'warnings'])):
+  """Container for errors and warnings found during rule validation."""
+
+  def valid(self):
+    return len(self.errors) == 0 and len(self.warnings) == 0
+
+  def has_warnings(self):
+    return len(self.warnings) > 0
+
+  def has_errors(self):
+    return len(self.errors) > 0
 
 
 class RulesetValidator(object):
@@ -84,15 +96,18 @@ class RulesetValidator(object):
     self._validate_task_rules()
 
   def _validate_task_rules(self):
-    # Validate that
-    # - all products selected by tasks are produced by some task or intrinsic, or come from a root
-    #  subject type
-    # - all goal products are also produced
+    """ Validates that all tasks can be executed based on the defined product types and selectors.
+
+    It checks
+     - all products selected by tasks are produced by some task or intrinsic, or come from a root
+      subject type
+     - all goal products are also produced
+    """
     intrinsics = self._node_builder._intrinsics
     serializable_tasks = self._node_builder._tasks
     root_subject_types = self._root_subject_types
     task_and_intrinsic_product_types = set(serializable_tasks.keys())
-    task_and_intrinsic_product_types.update(prd_t for sbj_t, prd_t in intrinsics.keys())
+    task_and_intrinsic_product_types.update(product_type for _, product_type in intrinsics.keys())
 
     projected_subject_types = set()
     dependency_subject_types = set()
@@ -113,23 +128,29 @@ class RulesetValidator(object):
 
     for goal, goal_product in self._goal_to_product.items():
       if goal_product not in task_and_intrinsic_product_types:
-        # NB: We could also check goals of the Goal type to see if the products they request are also
-        # available.
-        raise ValueError('missing product for goal {} {}'.format(goal, goal_product))
+        # NB: We could also check goals of the Goal type to see if the products they request are
+        # also available.
+        raise ValueError('no task for product used by goal "{}": {}'.format(goal, goal_product))
 
-    all_errors, all_warnings = self._check_task_selectors(serializable_tasks, type_collections)
+    validation_results = self._check_task_selectors(serializable_tasks, type_collections)
+    results_with_warnings = [r for r in validation_results if r.has_warnings()]
+    results_with_errors = [r for r in validation_results if r.has_errors()]
 
-    if all_warnings:
-      logger.warn('warning count {}'.format(len(all_warnings)))
-      logger.warn('Rules with warnings:\n  {}'.format('\n  '.join(all_warnings)))
-    if all_errors:
-      logger.error('err ct {}'.format(len(all_errors)))
-      error_message = 'Invalid rules.\n  {}'.format('\n  '.join(all_errors))
+    if results_with_warnings:
+      warning_listing = '\n  '.join('{}\n    {}'.format(result.rule, '\n    '.join(result.warnings))
+                                    for result in results_with_warnings)
+      logger.warn('Found {} rules with warnings:\n  {}'.format(len(results_with_warnings),
+                                                               warning_listing))
+
+    if results_with_errors:
+      error_listing = '\n  '.join('{}\n    {}'.format(result.rule, '\n    '.join(result.errors))
+                                  for result in results_with_errors)
+      error_message = 'Found {} rules with errors:\n  {}'.format(len(results_with_errors),
+                                                                 error_listing)
       raise ValueError(error_message)
 
   def _check_task_selectors(self, serializable_tasks, type_collections):
-    all_errors = []
-    all_warnings = []
+    validation_results = []
     for rules_of_type_x in serializable_tasks.values():
       for rule in rules_of_type_x:
         rule_errors = []
@@ -147,48 +168,47 @@ class RulesetValidator(object):
             selection_products = []
 
           for selection_product in selection_products:
-            err_msg, warn_msg = self._validate_product_is_provided(rule, select, selection_product,
-              type_collections)
+            err_msg, warn_msg = self._validate_product_is_provided(select,
+                                                                   selection_product,
+                                                                   type_collections)
             if err_msg:
               rule_errors.append(err_msg)
             if warn_msg:
               rule_warnings.append(warn_msg)
+        result = RuleValidationResult(rule, rule_errors, rule_warnings)
+        if not result.valid():
+          validation_results.append(result)
+    return validation_results
 
-        all_errors.extend(rule_errors)
-        all_warnings.extend(rule_warnings)
-    return all_errors, all_warnings
-
-  def _validate_product_is_provided(self, rule, select, selection_product_type, type_collections):
-    if any(selection_product_type in list_of_types for list_of_types in type_collections.values()):
+  def _validate_product_is_provided(self, select, selection_product_type, type_collections_by_name):
+    if any(selection_product_type in types_in_collection
+           for types_in_collection in type_collections_by_name.values()):
       return None, None
 
-    def superclass_of_selection(b):
-      return issubclass(selection_product_type, b)
+    def superclass_of_selection(current_type):
+      return issubclass(selection_product_type, current_type)
 
-    def subclass_of_selection(b):
-      return issubclass(b, selection_product_type)
+    def subclass_of_selection(current_type):
+      return issubclass(current_type, selection_product_type)
 
     super_types_by_name = {name: filter(superclass_of_selection, types) for name, types in
-      type_collections.items()}
+      type_collections_by_name.items()}
     sub_types_by_name = {name: filter(subclass_of_selection, types) for name, types in
-      type_collections.items()}
+      type_collections_by_name.items()}
 
-    if (all(len(b) == 0 for b in super_types_by_name.values()) and all(
-        len(b) == 0 for b in sub_types_by_name.values())):
+    if (all(len(super_types) == 0 for super_types in super_types_by_name.values()) and all(
+        len(sub_types) == 0 for sub_types in sub_types_by_name.values())):
       # doesn't cover HasProducts relationships or projections since they have middle
       # implicit types
-      err_msg = 'Rule entry with no possible fulfillment: {} There is no producer of {} ' \
-                'or a super/subclass of ' \
-                'it'.format(
-        rule, select)
+      err_msg = 'There is no producer of {} or a super/subclass of it'.format(select)
       return err_msg, None
     else:
-      warn_msg = 'Rule entry fulfilled through indirect means {} '.format(select)
-      for x in type_collections.keys():
-        if super_types_by_name.get(x):
-          warn_msg += '  has supertyped {} : {}'.format(x, super_types_by_name[x])
-        if sub_types_by_name.get(x):
-          warn_msg += '  has sub  typed {} : {}'.format(x, sub_types_by_name[x])
+      warn_msg = 'There is only an indirect producer of {}. '.format(select)
+      for name in type_collections_by_name.keys():
+        if super_types_by_name.get(name):
+          warn_msg += ' has supertyped {}: {}'.format(name, super_types_by_name[name])
+        if sub_types_by_name.get(name):
+          warn_msg += ' has subtyped {}: {}'.format(name, sub_types_by_name[name])
       return None, warn_msg
 
 
@@ -211,11 +231,12 @@ class NodeBuilder(Closable):
         serializable_tasks[entry.output_product_type].add(entry)
       elif isinstance(entry, (tuple, list)) and len(entry) == 3:
         output_type, input_selects, task = entry
-        serializable_tasks[output_type].add(
-          TaskNodeFactory(tuple(input_selects), task, output_type)
-        )
+        serializable_tasks[output_type].add(TaskNodeFactory(tuple(input_selects),
+                                                            task,
+                                                            output_type))
       else:
-        raise Exception("Unexpected type for entry {}".format(entry))
+        raise TypeError("Unexpected rule type: {}."
+                        " Rules either extend Rule, or are 3 elem tuples.".format(type(entry)))
 
     intrinsics = dict()
     intrinsics.update(FilesystemNode.as_intrinsics())
@@ -262,7 +283,7 @@ class NodeBuilder(Closable):
     elif selector_type is SelectProjection:
       return ProjectionNode(subject, variants, selector)
     else:
-      raise ValueError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
+      raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
 class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',

@@ -51,11 +51,11 @@ class SchedulerTest(unittest.TestCase):
     node_type = SelectNode
 
     variants = tuple(variants.items()) if variants else None
-    self.assertEqual(list({node_type(subject, variants, selector) for subject in subjects}),
-      list({node for node, _ in walk
-                      if isinstance(node, node_type) and
-                         node.selector == selector and
-                         node.variants == variants}))
+    self.assertEqual({node_type(subject, variants, selector) for subject in subjects},
+                     {node for node, _ in walk
+                       if node.product == selector.product and
+                          isinstance(node, node_type) and
+                          node.variants == variants})
 
   def build_and_walk(self, build_request):
     """Build and then walk the given build_request, returning the walked graph as a list."""
@@ -93,6 +93,12 @@ class SchedulerTest(unittest.TestCase):
     dependencies = [(d, self.pg.state(d)) for d in self.pg.dependencies_of(root)]
     self.assertIn((node, thrown_type), [(k, type(v.exc))
                                         for k, v in dependencies if type(v) is Throw])
+
+  def test_type_error_on_unexpected_subject_type(self):
+    with self.assertRaises(TypeError) as cm:
+      self.scheduler.build_request(goals={}, subjects=['string'])
+    self.assertEquals("Unsupported root subject type: <type 'unicode'> for u'string'",
+                      str(cm.exception))
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],

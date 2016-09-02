@@ -364,7 +364,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
     dependencies = []
     for dependency in self._dependency_nodes(step_context, dep_product_state.value):
       if type(dependency.subject) not in self.selector.field_types:
-        return Throw(TypeError('Unexpected type: {} for : {}'.format(type(dependency.subject), self.selector)))
+        return Throw(TypeError('Unexpected type: {} for {}'.format(type(dependency.subject), self.selector)))
 
       dep_state = step_context.get(dependency)
       if type(dep_state) is Waiting:
@@ -470,7 +470,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'product', 'func', '
     # Compute dependencies for the Node, or determine whether it is a Noop.
     dependencies = []
     dep_values = []
-    for index, selector in enumerate(self.clause):
+    for selector in self.clause:
       dep_node = step_context.select_node(selector, self.subject, self.variants)
       dep_state = step_context.get(dep_node)
       if type(dep_state) is Waiting:

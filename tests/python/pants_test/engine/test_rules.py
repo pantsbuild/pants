@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
+from textwrap import dedent
 
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import Select
@@ -35,13 +36,46 @@ class SubA(A):
   pass
 
 
+class NodeBuilderTest(unittest.TestCase):
+  def test_creation_fails_with_bad_declaration_type(self):
+    with self.assertRaises(TypeError) as cm:
+      NodeBuilder.create([A()])
+    self.assertEquals("Unexpected rule type: <class 'pants_test.engine.test_rules.A'>."
+                      " Rules either extend Rule, or are 3 elem tuples.",
+                      str(cm.exception))
+
+
 class RulesetValidatorTest(unittest.TestCase):
   def test_ruleset_with_missing_product_type(self):
-    validator = RulesetValidator(NodeBuilder.create([(A, (Select(B),), noop)]),
+    rules = [(A, (Select(B),), noop)]
+    validator = RulesetValidator(NodeBuilder.create(rules),
       goal_to_product=dict(),
       root_subject_types=tuple())
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       validator.validate()
+
+    self.assertEquals(dedent("""
+                                Found 1 rules with errors:
+                                  (A, (Select(B),), noop)
+                                    There is no producer of Select(B) or a super/subclass of it
+                             """).strip(),
+      str(cm.exception))
+
+  def test_ruleset_with_rule_with_two_missing_selects(self):
+    rules = [(A, (Select(B), Select(B)), noop)]
+    validator = RulesetValidator(NodeBuilder.create(rules),
+      goal_to_product=dict(),
+      root_subject_types=tuple())
+    with self.assertRaises(ValueError) as cm:
+      validator.validate()
+
+    self.assertEquals(dedent("""
+                                Found 1 rules with errors:
+                                  (A, (Select(B), Select(B)), noop)
+                                    There is no producer of Select(B) or a super/subclass of it
+                                    There is no producer of Select(B) or a super/subclass of it
+                             """).strip(),
+      str(cm.exception))
 
   def test_ruleset_with_with_selector_only_provided_as_root_subject(self):
 
@@ -71,5 +105,8 @@ class RulesetValidatorTest(unittest.TestCase):
     validator = RulesetValidator(NodeBuilder.create(rules),
       goal_to_product={'goal-name': AGoal},
       root_subject_types=tuple())
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       validator.validate()
+
+    self.assertEquals("no task for product used by goal \"goal-name\": <class 'pants_test.engine.test_rules.AGoal'>",
+                      str(cm.exception))

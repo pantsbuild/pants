@@ -56,7 +56,9 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
                              repr(self.variant_key))
 
 
-class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'field', 'field_types']), Selector):
+class SelectDependencies(datatype('Dependencies',
+                                  ['product', 'dep_product', 'field', 'field_types']),
+                         Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
   The dependencies declared on `dep_product` (in the optional `field` parameter, which defaults
@@ -78,10 +80,10 @@ class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'fi
     else:
       field_types_portion = ''
     return '{}({}, {}{}{})'.format(type(self).__name__,
-                             self.product.__name__,
-                             self.dep_product.__name__,
-                             ', {}'.format(repr(self.field)) if self.field else '',
-                             field_types_portion)
+                                   self.product.__name__,
+                                   self.dep_product.__name__,
+                                   ', {}'.format(repr(self.field)) if self.field else '',
+                                   field_types_portion)
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):

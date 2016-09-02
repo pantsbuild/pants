@@ -521,7 +521,8 @@ class LocalScheduler(object):
       for subject in subjects:
         selector_fn = self._root_selector_fns.get(type(subject), None)
         if not selector_fn:
-          raise ValueError('Unsupported root subject type: {}'.format(subject))
+          raise TypeError('Unsupported root subject type: {} for {!r}'
+                          .format(type(subject), subject))
 
         for product in products:
           yield self._node_builder.select_node(selector_fn(product), subject, None)
