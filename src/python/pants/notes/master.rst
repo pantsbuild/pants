@@ -13,7 +13,6 @@ Bugfixes
 ~~~~~~~~
 * [jvm-compile][bug] Fixes other target's class dir ending up on classpath
   `RB #3635 <https://rbcommons.com/s/twitter/r/3635>`_
-  `RB #4198 <https://rbcommons.com/s/twitter/r/4198>`_
 
 * Fixed bugs in Go thrift generation with services
   `RB #4177 <https://rbcommons.com/s/twitter/r/4177>`_
@@ -38,7 +37,6 @@ Refactoring, Improvements, and Tooling
 
 * [jvm-compile][test] Add test explicitly checking classpath for z.jars
   `RB #4198, <https://rbcommons.com/s/twitter/r/4198,>`_
-  `RB #4199 <https://rbcommons.com/s/twitter/r/4199>`_
 
 * Plumb fetch timeout through `BinaryUtil`.
   `RB #4196 <https://rbcommons.com/s/twitter/r/4196>`_
