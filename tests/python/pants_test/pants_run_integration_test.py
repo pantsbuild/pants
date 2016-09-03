@@ -18,7 +18,6 @@ from colors import strip_color
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
-from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
@@ -93,10 +92,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
     except OSError:
       return False
 
-  def setUp(self):
-    super(PantsRunIntegrationTest, self).setUp()
-    # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
-    Subsystem.reset()
+  @classmethod
+  def add_test(cls, method_name, method):
+    """A classmethod that allows for adding of dynamic test methods at runtime."""
+    assert not hasattr(cls, method_name), (
+      'a test with name `{}` already exists on `{}`!'.format(method_name, cls.__name__)
+    )
+    assert method_name.startswith('test_'), '{} is not a valid test name!'.format(method_name)
+    setattr(cls, method_name, method)
 
   def temporary_workdir(self, cleanup=True):
     # We can hard-code '.pants.d' here because we know that will always be its value

@@ -7,4 +7,5 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from python_targets.test_library import say_test
 
+
 say_test()

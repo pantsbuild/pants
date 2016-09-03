@@ -84,25 +84,6 @@ class ChangedIntegrationTest(PantsRunIntegrationTest):
     )
   }
 
-  def assert_changed_new_equals_old(self, extra_args, success=True):
-    args = ['-q', 'changed'] + extra_args
-    normal_run = self.do_command(*args, success=success, enable_v2_engine=False)
-    engine_run = self.do_command(*args, success=success, enable_v2_engine=True)
-    self.assertEqual(normal_run.stdout_data, engine_run.stdout_data)
-    return normal_run.stdout_data
-
-  def test_changed(self):
-    self.assert_changed_new_equals_old([])
-
-  def test_changed_with_changes_since(self):
-    self.assert_changed_new_equals_old(['--changes-since=HEAD^^'])
-
-  def test_changed_with_changes_since_direct(self):
-    self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=direct'])
-
-  def test_changed_with_changes_since_transitive(self):
-    self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
-
   @classmethod
   def generate_changed_coverage_tests(cls):
     """Generates tests on the class for better reporting granularity than an opaque for loop test."""
@@ -123,11 +104,29 @@ class ChangedIntegrationTest(PantsRunIntegrationTest):
               sort_lines(stdout)
             )
 
-        setattr(
-          cls,
+        cls.add_test(
           'test_changed_coverage_{}_{}'.format(dependee_type, safe_filename(filename)),
           inner_integration_coverage_test
         )
+
+  def assert_changed_new_equals_old(self, extra_args, success=True):
+    args = ['-q', 'changed'] + extra_args
+    normal_run = self.do_command(*args, success=success, enable_v2_engine=False)
+    engine_run = self.do_command(*args, success=success, enable_v2_engine=True)
+    self.assertEqual(normal_run.stdout_data, engine_run.stdout_data)
+    return normal_run.stdout_data
+
+  def test_changed(self):
+    self.assert_changed_new_equals_old([])
+
+  def test_changed_with_changes_since(self):
+    self.assert_changed_new_equals_old(['--changes-since=HEAD^^'])
+
+  def test_changed_with_changes_since_direct(self):
+    self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=direct'])
+
+  def test_changed_with_changes_since_transitive(self):
+    self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
 
 
 ChangedIntegrationTest.generate_changed_coverage_tests()
