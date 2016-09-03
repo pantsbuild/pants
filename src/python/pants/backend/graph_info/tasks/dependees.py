@@ -58,7 +58,7 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
           deps[root.address.spec].append(dependent.address.spec)
       for address in deps.keys():
         deps[address].sort()
-      yield json.dumps(deps, indent=4, separators=(',', ': '))
+      yield json.dumps(deps, indent=4, separators=(',', ': '), sort_keys=True)
     else:
       if self._closed:
         for root in roots:
