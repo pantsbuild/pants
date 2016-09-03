@@ -4,6 +4,12 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0dev8 (09/02/2016)
+----------------------
+
+Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.
+
 1.2.0dev7 (09/02/2016)
 ----------------------
 
