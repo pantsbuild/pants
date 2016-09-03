@@ -29,11 +29,11 @@ def mutated_working_copy(files_to_mutate, to_append='\n '):
         fh.truncate()
 
 
-def sort_lines(str_or_list):
+def lines_to_set(str_or_list):
   if isinstance(str_or_list, list):
-    return '\n'.join(sorted(str_or_list))
+    return set(str_or_list)
   else:
-    return '\n'.join(sorted(x for x in str(str_or_list).split('\n') if x))
+    return set(x for x in str(str_or_list).split('\n') if x)
 
 
 class ChangedIntegrationTest(PantsRunIntegrationTest):
@@ -96,12 +96,13 @@ class ChangedIntegrationTest(PantsRunIntegrationTest):
           # Mutate the working copy so we can do `--changed-parent=HEAD` deterministically.
           with mutated_working_copy([filename]):
             stdout = self.assert_changed_new_equals_old(
-              ['--changed-include-dependees={}'.format(dependee_type), '--changed-parent=HEAD']
+              ['--changed-include-dependees={}'.format(dependee_type), '--changed-parent=HEAD'],
+              test_list=True
             )
 
             self.assertEqual(
-              sort_lines(self.TEST_MAPPING[filename][dependee_type]),
-              sort_lines(stdout)
+              lines_to_set(self.TEST_MAPPING[filename][dependee_type]),
+              lines_to_set(stdout)
             )
 
         cls.add_test(
@@ -109,12 +110,24 @@ class ChangedIntegrationTest(PantsRunIntegrationTest):
           inner_integration_coverage_test
         )
 
-  def assert_changed_new_equals_old(self, extra_args, success=True):
+  def assert_changed_new_equals_old(self, extra_args, success=True, test_list=False):
     args = ['-q', 'changed'] + extra_args
-    normal_run = self.do_command(*args, success=success, enable_v2_engine=False)
-    engine_run = self.do_command(*args, success=success, enable_v2_engine=True)
-    self.assertEqual(normal_run.stdout_data, engine_run.stdout_data)
-    return normal_run.stdout_data
+    changed_run = self.do_command(*args, success=success, enable_v2_engine=False)
+    engine_changed_run = self.do_command(*args, success=success, enable_v2_engine=True)
+    self.assertEqual(
+      lines_to_set(changed_run.stdout_data), lines_to_set(engine_changed_run.stdout_data)
+    )
+
+    if test_list:
+      # In the v2 engine, `--changed-*` options can alter the specs of any goal - test with `list`.
+      list_args = ['-q', 'list'] + extra_args
+      engine_list_run = self.do_command(*list_args, success=success, enable_v2_engine=True)
+      self.assertEqual(
+        lines_to_set(changed_run.stdout_data), lines_to_set(engine_list_run.stdout_data)
+      )
+
+    # If we get to here without asserting, we know all copies of stdout are identical - return one.
+    return changed_run.stdout_data
 
   def test_changed(self):
     self.assert_changed_new_equals_old([])

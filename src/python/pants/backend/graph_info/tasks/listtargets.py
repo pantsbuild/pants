@@ -69,14 +69,8 @@ class ListTargets(ConsoleTask):
       print_fn = lambda target: target.address.spec
 
     visited = set()
-    for target in self._targets():
+    for target in self.context.target_roots:
       result = print_fn(target)
       if result and result not in visited:
         visited.add(result)
         yield result
-
-  def _targets(self):
-    if self.context.target_roots:
-      return self.context.target_roots
-    else:
-      return self.context.scan().targets(predicate=lambda target: not target.is_synthetic)

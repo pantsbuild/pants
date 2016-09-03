@@ -21,6 +21,7 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
+from pants.engine.legacy.spec_parser import EngineCmdLineSpecParser
 from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, RemoteSourcesAdaptor,
                                          TargetAdaptor)
 from pants.engine.mapper import AddressMapper
@@ -99,7 +100,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
         return list(self._to_v1_target_specs(spec_roots)), spec_roots
       else:
         # We've been provided no spec_roots (e.g. `./pants list`) and no changed request. Translate.
-        return ['::'], [DescendantAddresses(directory=u'')]
+        return ['::'], [DescendantAddresses('')]
 
   def warm_product_graph(self, spec_roots, changed_request=None):
     """Warm the scheduler's `ProductGraph` with `LegacyTarget` products.
@@ -190,6 +191,7 @@ class EngineInitializer(object):
     scheduler = LocalScheduler(dict(), tasks, project_tree)
     # TODO: Do not use the cache yet, as it incurs a high overhead.
     engine = LocalSerialEngine(scheduler, Storage.create(), use_cache=False)
-    change_calculator = EngineChangeCalculator(engine, scm) if scm else None
+    spec_parser = EngineCmdLineSpecParser(build_root)
+    change_calculator = EngineChangeCalculator(engine, spec_parser, scm) if scm else None
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)

@@ -78,3 +78,11 @@ python_library(
     'src/python/pants/scm:change_calculator',
   ]
 )
+
+python_library(
+  name='spec_parser',
+  sources=['spec_parser.py'],
+  dependencies=[
+    'src/python/pants/base:specs',
+  ]
+)
