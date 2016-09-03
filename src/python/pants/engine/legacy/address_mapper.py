@@ -14,6 +14,7 @@ from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
+from pants.engine.fs import Files
 from pants.util.dirutil import fast_relpath
 
 
@@ -26,9 +27,24 @@ class LegacyAddressMapper(AddressMapper):
   This allows tasks to use the context's address_mapper when the v2 engine is enabled.
   """
 
-  def __init__(self, graph, build_root):
+  def __init__(self, scheduler, engine, graph, build_root):
+    self._scheduler = scheduler
+    self._engine = engine
+    self._product_graph = scheduler.product_graph
     self._build_root = build_root
     self._graph = graph
+
+  def scan_build_files(self, base_path):
+    """"""
+    request = self._scheduler.execution_request([Files], [DescendantAddresses(base_path)])
+    import pdb;pdb.set_trace()
+    result = self._engine.execute(request)
+    if result.error:
+      raise result.error
+    import pdb;pdb.set_trace()
+    return self._scheduler.root_entries(request).items()
+    for root, state in self._scheduler.root_entries(request).items():
+      import pdb;pdb.set_trace()
 
   def is_declaring_file(self, address, file_path):
     # NB: this will cause any BUILD file, whether it contains the address declaration or not to be

@@ -76,9 +76,10 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
       for _ in graph.inject_specs_closure(spec_roots):
         pass
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
-    address_mapper = LegacyAddressMapper(graph, build_root or get_buildroot())
+    address_mapper = LegacyAddressMapper(self.scheduler, self.engine, graph, build_root or get_buildroot())
     logger.debug('build_graph is: %s', graph)
     logger.debug('address_mapper is: %s', address_mapper)
+    #address_mapper.scan_build_files('src/python/pants/engine')
     return graph, address_mapper
 
 
