@@ -106,5 +106,5 @@ script:
 #   email: ...
 
 after_success:
-  coveralls
+  coveralls debug
 
