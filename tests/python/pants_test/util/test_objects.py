@@ -103,8 +103,8 @@ class DatatypeTest(unittest.TestCase):
 
   def test_mixed_argument_types(self):
     bar = datatype('Bar', ['val', 'zal'])
-    self.assertEqual(bar(1, 1), bar(val=1, zal=1))
-    self.assertEqual(bar(1, 1), bar(zal=1, val=1))
+    self.assertEqual(bar(1, 2), bar(val=1, zal=2))
+    self.assertEqual(bar(1, 2), bar(zal=2, val=1))
 
   def test_double_passed_arg(self):
     bar = datatype('Bar', ['val', 'zal'])

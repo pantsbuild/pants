@@ -11,7 +11,6 @@ from collections import OrderedDict, namedtuple
 def datatype(*args, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
-  :param is_iterable: If passed as True, then the resulting type will be iterable. False by default.
   """
   class DataType(namedtuple(*args, **kwargs)):
     __slots__ = ()
