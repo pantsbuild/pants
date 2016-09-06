@@ -60,7 +60,10 @@ class ChangedIntegrationTest(PantsRunIntegrationTest):
       transitive=['testprojects/src/python/python_targets:test',
                   'testprojects/src/python/python_targets:test_library',
                   'testprojects/src/python/python_targets:test_library_direct_dependee',
-                  'testprojects/src/python/python_targets:test_library_transitive_dependee']
+                  'testprojects/src/python/python_targets:test_library_transitive_dependee',
+                  'testprojects/src/python/python_targets:test_library_transitive_dependee_2',
+                  'testprojects/src/python/python_targets:test_library_transitive_dependee_3',
+                  'testprojects/src/python/python_targets:test_library_transitive_dependee_4']
     ),
     # A `resources` target with `sources=['file.name']` referenced by a `java_library` target.
     'testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly/README.md': dict(

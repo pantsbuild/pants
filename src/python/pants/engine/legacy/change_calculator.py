@@ -9,8 +9,8 @@ import itertools
 import logging
 from collections import defaultdict
 
-from pants.build_graph.address import Address
 from pants.base.specs import DescendantAddresses
+from pants.build_graph.address import Address
 from pants.engine.legacy.graph import LegacyTarget
 from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.scm.change_calculator import ChangeCalculator

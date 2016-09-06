@@ -23,3 +23,21 @@ python_library(
   sources=[],
   dependencies=[':test_library_direct_dependee']
 )
+
+python_library(
+  name='test_library_transitive_dependee_2',
+  sources=[],
+  dependencies=[':test_library_transitive_dependee']
+)
+
+python_library(
+  name='test_library_transitive_dependee_3',
+  sources=[],
+  dependencies=[':test_library_transitive_dependee']
+)
+
+python_library(
+  name='test_library_transitive_dependee_4',
+  sources=[],
+  dependencies=[':test_library_transitive_dependee_3']
+)
