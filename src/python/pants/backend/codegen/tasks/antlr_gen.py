@@ -124,7 +124,7 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
     package_dir = os.path.join(target_workdir, package_dir_rel)
     safe_mkdir(package_dir)
     for root, dirs, files in os.walk(target_workdir, topdown = False):
-      if root == package_dir_rel:
+      if root == package_dir:
         # This path is already in the correct location
         continue
       for f in files:
@@ -134,7 +134,7 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
         )
       for d in dirs:
         full_dir = os.path.join(root, d)
-        if not os.listdir(full_dir):
+        if not os.listdir(full_dir) and full_dir != package_dir:
           os.rmdir(full_dir)
 
   def _scrub_generated_timestamps(self, target_workdir):
