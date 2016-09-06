@@ -9,7 +9,6 @@ import logging
 from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import DescendantAddresses, Spec
 from pants.bin.options_initializer import OptionsInitializer
@@ -147,7 +146,7 @@ class EngineInitializer(object):
   def parse_commandline_to_spec_roots(options=None, args=None, build_root=None):
     if not options:
       options, _ = OptionsInitializer(OptionsBootstrapper(args=args)).setup(init_logging=False)
-    cmd_line_spec_parser = CmdLineSpecParser(build_root or get_buildroot())
+    cmd_line_spec_parser = EngineCmdLineSpecParser(build_root or get_buildroot())
     spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
     return spec_roots
 
