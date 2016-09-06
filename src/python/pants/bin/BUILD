@@ -29,6 +29,7 @@ python_library(
     'src/python/pants/engine/legacy:address_mapper',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:parser',
+    'src/python/pants/engine/legacy:spec_parser',
     'src/python/pants/goal',
     'src/python/pants/goal:context',
     'src/python/pants/goal:run_tracker',
