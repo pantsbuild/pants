@@ -98,6 +98,7 @@ python_tests(
   name = 'changed_integration',
   sources = ['test_changed_integration.py'],
   dependencies = [
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test:int-test'
   ],
   tags = {'integration'},

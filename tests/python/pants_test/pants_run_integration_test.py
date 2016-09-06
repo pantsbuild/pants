@@ -92,15 +92,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     except OSError:
       return False
 
-  @classmethod
-  def add_test(cls, method_name, method):
-    """A classmethod that allows for adding of dynamic test methods at runtime."""
-    assert not hasattr(cls, method_name), (
-      'a test with name `{}` already exists on `{}`!'.format(method_name, cls.__name__)
-    )
-    assert method_name.startswith('test_'), '{} is not a valid test name!'.format(method_name)
-    setattr(cls, method_name, method)
-
   def temporary_workdir(self, cleanup=True):
     # We can hard-code '.pants.d' here because we know that will always be its value
     # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).

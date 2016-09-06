@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
+from pants_test.base_test import TestGenerator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -36,7 +37,7 @@ def lines_to_set(str_or_list):
     return set(x for x in str(str_or_list).split('\n') if x)
 
 
-class ChangedIntegrationTest(PantsRunIntegrationTest):
+class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
 
   TEST_MAPPING = {
     # A `jvm_binary` with `source='file.name'`.
@@ -88,7 +89,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest):
   }
 
   @classmethod
-  def generate_changed_coverage_tests(cls):
+  def generate_tests(cls):
     """Generates tests on the class for better reporting granularity than an opaque for loop test."""
     def safe_filename(f):
       return f.replace('/', '_').replace('.', '_')
@@ -145,4 +146,4 @@ class ChangedIntegrationTest(PantsRunIntegrationTest):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
 
 
-ChangedIntegrationTest.generate_changed_coverage_tests()
+ChangedIntegrationTest.generate_tests()
