@@ -32,16 +32,6 @@ from pants.util.memo import memoized_method
 logger = logging.getLogger(__name__)
  
 
-def profile(meth, path=None):
-  path = path or 'stats.dump'
-  import cProfile
-  profiler = cProfile.Profile()
-  try:
-    return profiler.runcall(meth)
-  finally:
-    profiler.dump_stats(path)
-
-
 # N.B. This should be top-level in the module for pickleability - don't nest it.
 class LegacySymbolTable(SymbolTable):
   """A v1 SymbolTable facade for use with the v2 engine."""
@@ -79,10 +69,8 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler',
     """Construct and return a BuildGraph given a set of input specs."""
     graph = self.legacy_graph_cls(self.scheduler, self.engine, self.symbol_table_cls)
     with self.scheduler.locked():
-      def meth():
-        for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
-          pass
-      profile(meth, path='stats.dump')
+      for _ in graph.inject_specs_closure(spec_roots):  # Ensure the entire generator is unrolled.
+        pass
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
     logger.debug('build_graph is: %s', graph)
     return graph
