@@ -81,8 +81,8 @@ class EngineSourceMapper(SourceMapper):
   def iter_target_addresses_for_sources(self, sources):
     """Bulk, iterable form of `target_addresses_for_source`."""
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
-    subjects = [AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources)]
     sources_set = set(sources)
+    subjects = [AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set)]
 
     for legacy_target in self._engine.product_request(LegacyTarget, subjects):
       legacy_address = legacy_target.adaptor.address
@@ -93,6 +93,6 @@ class EngineSourceMapper(SourceMapper):
       else:
         # Handle claimed files.
         target_files_iter = self._iter_owned_files_from_legacy_target(legacy_target)
-        if any(True for source_file in target_files_iter if source_file in sources_set):
+        if any(source_file in sources_set for source_file in target_files_iter):
           # At least one file in this targets sources match our changed sources - emit its address.
           yield legacy_address
