@@ -114,14 +114,16 @@ class EngineChangeCalculator(ChangeCalculator):
     for address in changed_addresses:
       yield address
 
-    if changed_request.include_dependees in ('direct', 'transitive'):
-      # For dependee finding, we need to parse all build files.
-      product_iter = self._engine.product_request(LegacyTarget, [DescendantAddresses('')])
-      graph = _LegacyTargetDependentGraph.from_iterable(self._spec_parser, product_iter)
+    if changed_request.include_dependees not in ('direct', 'transitive'):
+      return
 
-      if changed_request.include_dependees == 'direct':
-        for address in graph.dependents_of_addresses(changed_addresses):
-          yield address
-      elif changed_request.include_dependees == 'transitive':
-        for address in graph.transitive_dependents_of_addresses(changed_addresses):
-          yield address
+    # For dependee finding, we need to parse all build files.
+    product_iter = self._engine.product_request(LegacyTarget, [DescendantAddresses('')])
+    graph = _LegacyTargetDependentGraph.from_iterable(self._spec_parser, product_iter)
+
+    if changed_request.include_dependees == 'direct':
+      for address in graph.dependents_of_addresses(changed_addresses):
+        yield address
+    elif changed_request.include_dependees == 'transitive':
+      for address in graph.transitive_dependents_of_addresses(changed_addresses):
+        yield address
