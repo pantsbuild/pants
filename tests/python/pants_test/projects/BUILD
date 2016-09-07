@@ -15,13 +15,13 @@ python_tests(
 
 python_tests(
   name='testprojects_integration',
-  timeout=600,
   sources=['test_testprojects_integration.py'],
   dependencies=[
     ':base',
-    'tests/python/pants_test/testutils:mock_logger',
+    'src/python/pants/util:contextutil',
   ],
   tags = {'integration'},
+  timeout=600,
 )
 
 python_library(

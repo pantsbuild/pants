@@ -70,7 +70,7 @@ class Engine(AbstractClass):
       """
       return cls(error=error, root_products=None)
 
-  def __init__(self, scheduler, storage=None, cache=None):
+  def __init__(self, scheduler, storage=None, cache=None, use_cache=True):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
@@ -79,10 +79,14 @@ class Engine(AbstractClass):
     :param cache: The cache instance for storing execution results, by default it uses the same
       Storage instance if not specified.
     :type cache: :class:`pants.engine.storage.Cache`
+    :param use_cache: True to enable usage of the cache. The cache incurs a large amount of
+      overhead for small tasks, and needs TODO: further improvement.
+    :type use_cache: bool
     """
     self._scheduler = scheduler
     self._storage = storage or Storage.create()
     self._cache = cache or Cache.create(storage)
+    self._use_cache = use_cache
 
   def execute(self, execution_request):
     """Executes the requested build.
@@ -115,7 +119,7 @@ class Engine(AbstractClass):
 
     :returns: A tuple of a key and result, either of which may be None.
     """
-    if True or not runnable.cacheable:
+    if not self._use_cache or not runnable.cacheable:
       return None, None
     return self._cache.get(runnable)
 
@@ -264,6 +268,16 @@ def _execute_step(process_state, step):
     # pass this back to our main thread for handling.
     logger.warn(traceback.format_exc())
     return runnable_id, e
+
+
+def _process_initializer(storage):
+  """Another picklable top-level function that provides multi-processes' initial states.
+
+  States are returned as a tuple. States are `Closable` so they can be cleaned up once
+  processes are done.
+  """
+  storage = Storage.clone(storage)
+  return (storage, Cache.create(storage=storage))
 
 
 def _process_initializer(storage):

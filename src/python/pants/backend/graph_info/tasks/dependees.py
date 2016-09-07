@@ -34,24 +34,19 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
 
   def console_output(self, _):
     address_mapper = self.context.address_mapper
-    buildfiles = address_mapper.scan_build_files(base_path=None)
-
     build_graph = self.context.build_graph
-    build_file_parser = self.context.build_file_parser
 
     dependees_by_target = defaultdict(set)
-    for build_file in buildfiles:
-      address_map = build_file_parser.parse_build_file(build_file)
-      for address in address_map.keys():
-        build_graph.inject_address_closure(address)
-      for address in address_map.keys():
-        target = build_graph.get_target(address)
-        # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
-        # user vs. targets created by pants at runtime.
-        target = self.get_concrete_target(target)
-        for dependency in target.dependencies:
-          dependency = self.get_concrete_target(dependency)
-          dependees_by_target[dependency].add(target)
+
+    for address in address_mapper.scan_addresses():
+      build_graph.inject_address_closure(address)
+      target = build_graph.get_target(address)
+      # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
+      # user vs. targets created by pants at runtime.
+      target = self.get_concrete_target(target)
+      for dependency in target.dependencies:
+        dependency = self.get_concrete_target(dependency)
+        dependees_by_target[dependency].add(target)
 
     roots = set(self.context.target_roots)
     if self.get_options().output_format == 'json':
@@ -61,7 +56,9 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
           deps[root.address.spec].append(root.address.spec)
         for dependent in self.get_dependents(dependees_by_target, [root]):
           deps[root.address.spec].append(dependent.address.spec)
-      yield json.dumps(deps, indent=4, separators=(',', ': '))
+      for address in deps.keys():
+        deps[address].sort()
+      yield json.dumps(deps, indent=4, separators=(',', ': '), sort_keys=True)
     else:
       if self._closed:
         for root in roots:

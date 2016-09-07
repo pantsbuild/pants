@@ -45,9 +45,6 @@ class SchedulerService(PantsService):
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 
-    # Start the engine.
-    self._engine.start()
-
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
     self._logger.info('enqueuing {} changes for subscription {}'
@@ -84,9 +81,13 @@ class SchedulerService(PantsService):
       self._handle_batch_event(files)
     self._event_queue.task_done()
 
-  def get_build_graph(self, spec_roots):
-    """Returns a legacy BuildGraph given a set of input specs."""
-    return self._graph_helper.create_graph(spec_roots)
+  def warm_product_graph(self, spec_roots):
+    """Runs an execution request against the captive scheduler given a set of input specs to warm.
+
+    :returns: A `LegacyGraphHelper` instance for graph construction.
+    """
+    self._graph_helper.warm_product_graph(spec_roots)
+    return self._graph_helper
 
   def run(self):
     """Main service entrypoint."""

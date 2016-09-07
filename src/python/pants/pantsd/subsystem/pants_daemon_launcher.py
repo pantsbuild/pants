@@ -61,7 +61,7 @@ class PantsDaemonLauncher(object):
                                  pailgun_port=options.pailgun_port,
                                  fs_event_enabled=options.fs_event_detection,
                                  fs_event_workers=options.fs_event_workers,
-                                 path_ignore_patterns=options.pants_ignore)
+                                 pants_ignore_patterns=options.pants_ignore)
 
   def __init__(self,
                build_root,
@@ -73,7 +73,7 @@ class PantsDaemonLauncher(object):
                pailgun_port,
                fs_event_enabled,
                fs_event_workers,
-               path_ignore_patterns):
+               pants_ignore_patterns):
     """
     :param str build_root: The path of the build root.
     :param str pants_workdir: The path of the pants workdir.
@@ -85,7 +85,7 @@ class PantsDaemonLauncher(object):
     :param bool fs_event_enabled: Whether or not to enable fs event detection (Watchman) for graph
                                   invalidation.
     :param int fs_event_workers: The number of workers to use for processing the fs event queue.
-    :param list path_ignore_patterns: A list of ignore patterns for filesystem operations.
+    :param list pants_ignore_patterns: A list of path ignore patterns for filesystem operations.
     """
     self._build_root = build_root
     self._pants_workdir = pants_workdir
@@ -96,7 +96,7 @@ class PantsDaemonLauncher(object):
     self._pailgun_port = pailgun_port
     self._fs_event_enabled = fs_event_enabled
     self._fs_event_workers = fs_event_workers
-    self._path_ignore_patterns = path_ignore_patterns
+    self._pants_ignore_patterns = pants_ignore_patterns
     # TODO(kwlzn): Thread filesystem path ignores here to Watchman's subscription registration.
 
     lock_location = os.path.join(self._build_root, '.pantsd.startup')
@@ -126,7 +126,7 @@ class PantsDaemonLauncher(object):
     if self._fs_event_enabled:
       fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
 
-      legacy_graph_helper = self._engine_initializer.setup_legacy_graph(self._path_ignore_patterns)
+      legacy_graph_helper = self._engine_initializer.setup_legacy_graph(self._pants_ignore_patterns)
       scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
       services.extend((fs_event_service, scheduler_service))
 

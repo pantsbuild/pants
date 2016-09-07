@@ -54,8 +54,6 @@ class StorageTest(unittest.TestCase):
     with closing(self.storage) as storage:
       key = storage.put(self.TEST_PATH)
       self.assertEquals(self.TEST_PATH, storage.get(key))
-      # The deserialized blob is equal by not the same as the input data.
-      self.assertFalse(storage.get(key) is self.TEST_PATH)
 
       with self.assertRaises(InvalidKeyError):
         self.assertFalse(storage.get(self.TEST_KEY))
@@ -106,8 +104,7 @@ class CacheTest(unittest.TestCase):
       self.cache.put(request_key, self.result)
 
       self.assertEquals(self.result, self.cache.get(self.request)[1])
-      self.assertIsNot(self.result, self.cache.get(self.request)[1])
-      self._assert_hits_misses(hits=2, misses=1)
+      self._assert_hits_misses(hits=1, misses=1)
 
   def test_failure_to_update_mapping(self):
     """Verify we can access cached result only if we save both result and the key mapping."""

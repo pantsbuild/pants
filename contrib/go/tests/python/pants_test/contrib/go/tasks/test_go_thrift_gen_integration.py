@@ -27,6 +27,10 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
             struct Duck {
               1: optional string quack,
             }
+
+            service Feeder {
+              void feed(1:Duck duck),
+            }
             """).strip())
       with safe_open(os.path.join(srcdir, 'src/thrift/thrifttest/BUILD'), 'w') as fp:
         fp.write(dedent("""
@@ -42,8 +46,9 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
 
             import "thrifttest/duck"
 
-            func whatevs() string {
+            func whatevs(f duck.Feeder) string {
               d := duck.NewDuck()
+              f.Feed(d)
               return d.GetQuack()
             }
             """).strip())
@@ -87,7 +92,9 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
                             target_dir.replace(os.path.sep, '.'), 'current')
 
         self.assertEquals(sorted(['src/go/thrifttest/duck/constants.go',
-                                  'src/go/thrifttest/duck/ttypes.go']),
+                                  'src/go/thrifttest/duck/ttypes.go',
+                                  'src/go/thrifttest/duck/feeder.go',
+                                  'src/go/thrifttest/duck/feeder-remote/feeder-remote.go']),
                           sorted(exact_files(root)))
 
   def test_go_thrift_gen_and_compile(self):

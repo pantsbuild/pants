@@ -42,6 +42,53 @@ class TaggingSymbolTable(LegacySymbolTable):
       )
 
 
+# Macro that adds the specified tag.
+def macro(target_cls, tag, parse_context, tags=None, **kwargs):
+  tags = tags or set()
+  tags.add(tag)
+  parse_context.create_object(target_cls, tags=tags, **kwargs)
+
+
+# SymbolTable that extends the legacy table to apply the macro.
+class TaggingSymbolTable(LegacySymbolTable):
+  tag = 'tag_added_by_macro'
+  target_cls = Target
+
+  @classmethod
+  def aliases(cls):
+    tag_macro = functools.partial(macro, cls.target_cls, cls.tag)
+    return super(TaggingSymbolTable, cls).aliases().merge(
+        BuildFileAliases(
+          targets={'target': TargetMacro.Factory.wrap(tag_macro, cls.target_cls),}
+        )
+      )
+
+
+@contextmanager
+def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=None):
+  """A context manager that yields a usable, legacy LegacyBuildGraph by way of the v2 scheduler.
+
+  :param Options options: An Options object to use for this run.
+  :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
+                                    usually taken from the `--pants-ignore` global option.
+                                    Defaults to: ['.*']
+  :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
+                                       None to use the default.
+  :yields: A tuple of (graph, addresses, scheduler).
+  """
+  path_ignore_patterns = path_ignore_patterns or ['.*']
+  spec_roots = EngineInitializer.parse_commandline_to_spec_roots(options=options)
+  graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
+                                                      symbol_table_cls=symbol_table_cls)
+  scheduler, engine, _ = graph_helper
+  try:
+    graph, _ = graph_helper.create_build_graph(spec_roots)
+    addresses = tuple(graph.inject_specs_closure(spec_roots))
+    yield graph, addresses, scheduler
+  finally:
+    engine.close()
+
+
 class GraphInvalidationTest(unittest.TestCase):
   def _make_setup_args(self, specs, **kwargs):
     options = mock.Mock()
@@ -55,7 +102,7 @@ class GraphInvalidationTest(unittest.TestCase):
       kwargs = self._make_setup_args(specs,
                                      native=native_factory.create(),
                                      symbol_table_cls=symbol_table_cls)
-      with EngineInitializer.open_legacy_graph(**kwargs) as triple:
+      with open_legacy_graph(**kwargs) as triple:
         yield triple
 
   def test_invalidate_fsnode(self):
@@ -68,16 +115,18 @@ class GraphInvalidationTest(unittest.TestCase):
       self.assertLess(len(scheduler.product_graph), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
-    with self.open_scheduler(['3rdparty::']) as (_, _, scheduler):
-      node_count = len(scheduler.product_graph)
+    with self.open_scheduler(['//:', '3rdparty/::']) as (graph, _, _):
+      node_count = len(product_graph)
       self.assertGreater(node_count, 0)
 
-      # Invalidate the '3rdparty/python' DirectoryListing, and then the `3rdparty` DirectoryListing.
-      # by "touching" random files.
-      for filename in ('3rdparty/python/BUILD', '3rdparty/CHANGED_RANDOM_FILE'):
-        invalidated_count = scheduler.invalidate_files([filename])
-        self.assertGreater(invalidated_count, 0)
-        node_count, last_node_count = len(scheduler.product_graph), node_count
+      # Invalidate the '3rdparty/python' DirectoryListing, the `3rdparty` DirectoryListing,
+      # and then the root DirectoryListing by "touching" files/dirs.
+      for filename in ('3rdparty/python/BUILD', '3rdparty/python', 'non_existing_file'):
+        invalidated_count = product_graph.invalidate_files([filename])
+        self.assertGreater(invalidated_count,
+                           0,
+                           'File {} did not invalidate any Nodes.'.format(filename))
+        node_count, last_node_count = len(product_graph), node_count
         self.assertLess(node_count, last_node_count)
 
   def test_sources_ordering(self):

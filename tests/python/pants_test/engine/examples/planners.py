@@ -13,6 +13,7 @@ from os.path import join as os_path_join
 
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
 from pants.engine.build_files import create_graph_tasks
@@ -129,8 +130,8 @@ def extract_scala_imports(source_files_content):
   """A toy example of dependency inference. Would usually be a compiler plugin."""
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
-  for _, content in source_files_content.dependencies:
-    for line in content.splitlines():
+  for filecontent in source_files_content.dependencies:
+    for line in filecontent.content.splitlines():
       match = import_re.search(line)
       if match:
         packages.add(match.group(1).rsplit('.', 1)[0])
@@ -306,17 +307,13 @@ def scalac(sources, classpath):
 # unpickleable input and output test planners below to engine test.  There will be less setup
 # required at that point since no target addresses will need to be supplied in the build_request.
 class UnpickleableOutput(object):
-  pass
+  def __init__(self):
+    # Nested functions like this lambda are unpicklable.
+    self.lamb = lambda : None
 
 
 class UnpickleableResult(object):
   pass
-
-
-def unpickleable_output():
-  """Generates an unpickleable output."""
-  # Nested functions like this lambda are unpicklable.
-  return lambda: None
 
 
 def unpickleable_input(unpickleable):
@@ -456,14 +453,14 @@ def setup_json_scheduler(build_root, native, inline_nodes=True):
       # scala dependency inference
       (ScalaSources,
        [Select(ScalaInferredDepsSources),
-        SelectDependencies(Address, ImportedJVMPackages)],
+        SelectDependencies(Address, ImportedJVMPackages, field_types=(JVMPackageName,))],
        reify_scala_sources),
       (ImportedJVMPackages,
        [SelectProjection(FilesContent, PathGlobs, ('path_globs',), ScalaInferredDepsSources)],
        extract_scala_imports),
       (Address,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Dirs, field='stats')],
+        SelectDependencies(AddressFamily, Dirs, field='stats', field_types=(Dir,))],
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),
@@ -486,19 +483,20 @@ def setup_json_scheduler(build_root, native, inline_nodes=True):
       (Classpath,
        [Select(BuildPropertiesConfiguration)],
        write_name_file),
+      # NB: Not sure these SelectDependencies should allow Jar, but they currently produce jars.
       (Classpath,
        [Select(JavaSources),
-        SelectDependencies(Classpath, JavaSources)],
+        SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))],
        javac),
       (Classpath,
        [Select(ScalaSources),
-        SelectDependencies(Classpath, ScalaSources)],
+        SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))],
        scalac),
     ] + [
       # TODO
       (UnpickleableOutput,
         [],
-        unpickleable_output),
+        UnpickleableOutput),
       (UnpickleableResult,
        [Select(UnpickleableOutput)],
        unpickleable_input),

@@ -160,7 +160,7 @@ class JvmAppAdaptor(TargetAdaptor):
 class RemoteSourcesAdaptor(TargetAdaptor):
   def __init__(self, dest=None, **kwargs):
     """
-    :param  bundles: A list of `BundleAdaptor` objects
+    :param dest: A target constructor.
     """
     if not isinstance(dest, string_types):
       dest = dest._type_alias

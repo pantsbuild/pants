@@ -101,6 +101,20 @@ class AntlrGenTest(NailgunTaskTestBase):
 
       self.assertIn(syn_target, context.targets())
 
+    # Check that the output file locations match the package
+    if expected_package is not None:
+      expected_path_prefix = expected_package.replace('.', os.path.sep) + os.path.sep
+      for source in syn_target.sources_relative_to_source_root():
+        self.assertTrue(source.startswith(expected_path_prefix),
+                        "{0} does not start with {1}".format(source, expected_path_prefix))
+
+    # Check that empty directories have been removed
+    for root, dirs, files in os.walk(target_workdir):
+      for d in dirs:
+        full_dir = os.path.join(root, d)
+        self.assertTrue(os.listdir(full_dir),
+                         "Empty directories should have been removed ({0})".format(full_dir))
+
     return syn_target
 
   def test_explicit_package_v3(self):

@@ -195,7 +195,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
 
-    build_ignore_patterns = self.context.options.for_global_scope().ignore_patterns or []
+    build_ignore_patterns = self.context.options.for_global_scope().build_ignore or []
     project = Project(self.project_name,
                       self.python,
                       self.skip_java,

@@ -42,7 +42,7 @@ def _create_snapshot_archive(file_list, step_context):
 
 def _fingerprint_files_in_tar(file_list, tar_location):
   hasher = sha1()
-  with open_tar(tar_location, mode='r') as tar:
+  with open_tar(tar_location, mode='r', errorlevel=1) as tar:
     for file in file_list.dependencies:
       hasher.update(file.path)
       hasher.update(tar.extractfile(file.path).read())
@@ -66,9 +66,9 @@ def _run_command(binary, sandbox_dir, process_request):
   command = binary.prefix_of_command() + tuple(process_request.args)
   logger.debug('Running command: "{}" in {}'.format(command, sandbox_dir))
   popen = subprocess.Popen(command,
-                            stderr=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            cwd=sandbox_dir)
+                           stderr=subprocess.PIPE,
+                           stdout=subprocess.PIPE,
+                           cwd=sandbox_dir)
   # TODO At some point, we may want to replace this blocking wait with a timed one that returns
   # some kind of in progress state.
   popen.wait()
@@ -94,8 +94,8 @@ def _execute(process):
 
     process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
     if process_result.exit_code != 0:
-      return Throw(Exception('Running {} failed with non-zero exit code: {}'.format(process.binary,
-                                                                                    process_result.exit_code)))
+      raise Exception('Running {} failed with non-zero exit code: {}'.format(process.binary,
+                                                                             process_result.exit_code))
 
     return process.output_conversion(process_result, sandbox_dir)
 
@@ -215,7 +215,8 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     if process_request.snapshot_subjects:
       snapshot_subjects_node = step_context.select_node(SelectDependencies(Snapshot,
                                                                            SnapshottedProcessRequest,
-                                                                           'snapshot_subjects'),
+                                                                           'snapshot_subjects',
+                                                                           field_types=(Files,)),
                                                         process_request,
                                                         self.variants)
       snapshot_subjects_state = step_context.get(snapshot_subjects_node)

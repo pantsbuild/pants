@@ -18,6 +18,7 @@ from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConst
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
+from pants.engine.rules import CoercionRule
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
@@ -46,7 +47,9 @@ def filter_buildfile_paths(address_mapper, directory_listing):
 
   build_pattern = address_mapper.build_pattern
   def match(stat):
-    return type(stat) is File and fnmatch(basename(stat.path), build_pattern)
+    # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
+    ignored = any(True for _ in address_mapper.build_ignore_patterns.match_files([stat.path]))
+    return (not ignored) and type(stat) is File and fnmatch(basename(stat.path), build_pattern)
   build_files = tuple(Path(stat.path, stat)
                       for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)
@@ -60,11 +63,12 @@ def parse_address_family(address_mapper, path, build_files_content):
   if not build_files_content.dependencies:
     raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
-  for filepath, filecontent in build_files_content.dependencies:
-    address_maps.append(AddressMap.parse(filepath,
-                                         filecontent,
+  for filecontent_product in build_files_content.dependencies:
+    address_maps.append(AddressMap.parse(filecontent_product.path,
+                                         filecontent_product.content,
                                          address_mapper.symbol_table_cls,
-                                         address_mapper.parser_cls))
+                                         address_mapper.parser_cls,
+                                         address_mapper.exclude_patterns))
   return AddressFamily.create(path.path, address_maps)
 
 
@@ -226,15 +230,17 @@ def addresses_from_address_families(address_families):
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
 
 
-def filter_build_dirs(build_files):
+def filter_build_dirs(address_mapper, build_files):
   """Given Files matching a build pattern, return their parent directories as BuildDirs."""
   dirnames = set(dirname(f.stat.path) for f in build_files.dependencies)
-  return BuildDirs(tuple(Dir(d) for d in dirnames))
+  ignored_dirnames = address_mapper.build_ignore_patterns.match_files('{}/'.format(dirname) for dirname in dirnames)
+  ignored_dirnames = set(d.rstrip('/') for d in ignored_dirnames)
+  return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
 
 
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
-  
+
   This allows us to limit our AddressFamily requests to directories that contain build files.
   """
 
@@ -252,7 +258,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Support for resolving Structs from Addresses
     (Struct,
      [Select(UnhydratedStruct),
-      SelectDependencies(Struct, UnhydratedStruct)],
+      SelectDependencies(Struct, UnhydratedStruct, field_types=(Address,))],
      hydrate_struct),
     (UnhydratedStruct,
      [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
@@ -271,12 +277,10 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      filter_buildfile_paths),
   ] + list({
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
-    # define that lookup for each literal product.
-    (product,
-     (Select(Struct),),
-     identity)
-    for product in symbol_table_cls.table().values() if product is not Struct
-    }) + [
+    # define that lookup for coercing a struct into each literal product.
+    CoercionRule(product, Struct)
+    for product in set(symbol_table_cls.table().values()) if product is not Struct
+  }) + [
     # Simple spec handling.
     (Addresses,
      [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
@@ -289,10 +293,11 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Recursive spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     (Addresses,
-     [SelectDependencies(AddressFamily, BuildDirs)],
+     [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,))],
      addresses_from_address_families),
     (BuildDirs,
-     [Select(Files)],
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(Files)],
      filter_build_dirs),
     (PathGlobs,
      [SelectLiteral(address_mapper, AddressMapper),

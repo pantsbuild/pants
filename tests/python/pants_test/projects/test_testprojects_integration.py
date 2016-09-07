@@ -5,12 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.util.contextutil import environment_as
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
 
 
 class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
-  def tests_testprojects(self):
+  def test_testprojects(self):
     # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
     # right now, just split them into two categories and ignore them.
 
@@ -84,3 +85,10 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
                        targets_to_exclude)
     pants_run = self.pants_test(['testprojects::', '--jvm-platform-default-platform=java6'] + exclude_opts)
     self.assert_success(pants_run)
+
+  # This is a special case that we split into 2 tests instead of using ensure_engine.
+  # The reason is the original test with ensure_engine takes more than 10 minutes in travis ci,
+  # which will cause travis to terminate the build. By spliting, each test finishes in less than 10 min.
+  def test_testprojects_v2_engine(self):
+    with environment_as(PANTS_ENABLE_V2_ENGINE='true'):
+      self.test_testprojects()

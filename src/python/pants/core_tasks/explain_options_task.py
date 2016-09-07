@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 
 from colors import black, blue, cyan, green, magenta, red, white
+from packaging.version import Version
 
-from pants.base.revision import Revision
 from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
 from pants.version import PANTS_SEMVER
@@ -140,7 +140,7 @@ class ExplainOptionsTask(ConsoleTask):
         if self.get_options().only_overridden and not history.was_overridden:
           continue
         # Skip the option if it has already passed the deprecation period.
-        if history.latest.deprecation_version and PANTS_SEMVER >= Revision.semver(
+        if history.latest.deprecation_version and PANTS_SEMVER >= Version(
           history.latest.deprecation_version):
           continue
         if self.get_options().skip_inherited:

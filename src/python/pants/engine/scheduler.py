@@ -17,12 +17,13 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs, create_fs_intrinsics
 from pants.engine.isolated_process import ProcessExecutionNode
 from pants.engine.nodes import FilesystemNode, Noop, Return, Runnable, TaskNode, Throw
+from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
-from pants.engine.struct import HasProducts, Variants
 from pants.engine.storage import Digest
-from pants.engine.subsystem.native import (ExternContext, extern_issubclass,
-                                           extern_project_multi, extern_to_str)
+from pants.engine.struct import HasProducts, Variants
+from pants.engine.subsystem.native import (ExternContext, extern_issubclass, extern_project_multi,
+                                           extern_to_str)
 from pants.util.objects import datatype
 
 
@@ -38,25 +39,6 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
   """
-
-
-class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
-                                                         'binary_type',
-                                                         'input_selectors',
-                                                         'input_conversion',
-                                                         'output_conversion'])):
-  """A task type for defining execution of snapshotted processes."""
-
-  def as_node(self, subject, product_type, variants):
-    return ProcessExecutionNode(subject, variants, self)
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-  @property
-  def input_selects(self):
-    return self.input_selectors
 
 
 def _store_list(*args):
@@ -118,6 +100,17 @@ class LocalScheduler(object):
     self._storage = storage
     self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
+    select_product = lambda product: Select(product)
+    select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address,))
+    self._root_selector_fns = {
+      Address: select_product,
+      PathGlobs: select_product,
+      SingleAddress: select_dep_addrs,
+      SiblingAddresses: select_dep_addrs,
+      DescendantAddresses: select_dep_addrs,
+    }
+
+    RulesetValidator(self._node_builder, goals, self._root_selector_fns.keys()).validate()
 
     # Create a handle for Storage (which must be kept alive as long as this object), and
     # the native Scheduler.
@@ -253,7 +246,13 @@ class LocalScheduler(object):
     :returns: An ExecutionRequest for the given products and subjects.
     """
 
-    return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
+    def selector_fn(subject):
+      selector_fn = self._root_selector_fns.get(type(subject), None)
+      if not selector_fn:
+        raise TypeError('Unsupported root subject type: {} for {!r}'
+                        .format(type(subject), subject))
+      return selector_fn
+    return ExecutionRequest(tuple((selector_fn(s), p) for s in subjects for p in products))
 
   @contextmanager
   def locked(self):

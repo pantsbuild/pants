@@ -15,7 +15,7 @@ from twitter.common.collections import maybe_list
 from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
@@ -223,6 +223,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEquals('java7', json_data['targets'][test_target]['platform'])
       self.assertEquals('java8', json_data['targets'][test_target]['test_platform'])
 
+  @ensure_engine
   def test_intellij_integration(self):
     with self.temporary_workdir() as workdir:
       exported_file = os.path.join(workdir, "export_file.json")

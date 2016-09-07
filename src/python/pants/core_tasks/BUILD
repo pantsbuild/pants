@@ -8,6 +8,7 @@ python_library(
   dependencies=[
     '3rdparty/python:ansicolors',
     '3rdparty/python:setuptools',
+    '3rdparty/python:packaging',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',

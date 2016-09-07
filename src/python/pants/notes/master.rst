@@ -4,6 +4,161 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0dev8 (09/02/2016)
+----------------------
+
+Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.
+
+1.2.0dev7 (09/02/2016)
+----------------------
+
+Regularly scheduled unstable release. Thanks to the contributors!
+
+Bugfixes
+~~~~~~~~
+* [jvm-compile][bug] Fixes other target's class dir ending up on classpath
+  `RB #4198 <https://rbcommons.com/s/twitter/r/4198>`_
+
+* Fixed bugs in Go thrift generation with services
+  `RB #4177 <https://rbcommons.com/s/twitter/r/4177>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Add Runnable State
+  `RB #4158 <https://rbcommons.com/s/twitter/r/4158>`_
+
+* [engine] Don't filter directories in watchman subscription
+  `RB #4095 <https://rbcommons.com/s/twitter/r/4095>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Eliminate all direct use of pytest.
+  `RB #4201 <https://rbcommons.com/s/twitter/r/4201>`_
+
+* Update pants versioning to use python's packaging.version
+  `RB #4200 <https://rbcommons.com/s/twitter/r/4200>`_
+
+* [jvm-compile][test] Add test explicitly checking classpath for z.jars
+  `RB #4199 <https://rbcommons.com/s/twitter/r/4199>`_
+
+* Plumb fetch timeout through `BinaryUtil`.
+  `RB #4196 <https://rbcommons.com/s/twitter/r/4196>`_
+
+* Upgrade default go to 1.7.
+  `RB #4195 <https://rbcommons.com/s/twitter/r/4195>`_
+
+* Fixup `PythonTarget` `resource_targets` docs.
+  `RB #4148 <https://rbcommons.com/s/twitter/r/4148>`_
+
+* Customize tarfile module next() method
+  `RB #4123 <https://rbcommons.com/s/twitter/r/4123>`_
+
+1.2.0-dev6 (8/26/2016)
+----------------------
+
+Regularly scheduled unstable release. Thanks to the contributors!
+
+New Features
+~~~~~~~~~~~~
+
+* A clear error message for checkstyle misconfiguration.
+  `RB #4176 <https://rbcommons.com/s/twitter/r/4176>`_
+
+Bugfixes
+~~~~~~~~
+
+* Performance fix for consolidated classpath
+  `RB #4184 <https://rbcommons.com/s/twitter/r/4184>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Refactor classpath consolidation into a separate task.
+  `RB #4152 <https://rbcommons.com/s/twitter/r/4152>`_
+
+* Refactor idea-plugin goal
+  `RB #4159 <https://rbcommons.com/s/twitter/r/4159>`_
+
+* Remove all calls to create_subsystem() in tests.
+  `RB #4178 <https://rbcommons.com/s/twitter/r/4178>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Support exclude_target_regexps and ignore_patterns in v2 engine
+  `RB #4172 <https://rbcommons.com/s/twitter/r/4172>`_
+
+1.2.0-dev5 (8/19/2016)
+----------------------
+
+Regularly scheduled unstable release.
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Defer daemon-wise `LegacyBuildGraph` construction to post-fork.
+  `RB #4168 <https://rbcommons.com/s/twitter/r/4168>`_
+
+* [engine] Validate that variant_key of SelectVariant is string type git_shat msg: 5a7e838d512069a24d12ec0b7dcdc7b7d5bdfa3b
+  `RB #4149 <https://rbcommons.com/s/twitter/r/4149>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Adjust the output file locations for the Antlr task.
+  `RB #4161 <https://rbcommons.com/s/twitter/r/4161>`_
+
+* build dictionary: one description per arg is plenty
+  `RB #4164 <https://rbcommons.com/s/twitter/r/4164>`_
+
+1.2.0-dev4 (8/12/2016)
+----------------------
+
+Regularly scheduled unstable release.
+
+New Features
+~~~~~~~~~~~~
+
+* Introduce fmt goal, isort subgoal
+  `RB #4134 <https://rbcommons.com/s/twitter/r/4134>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix GitTest control of git `user.email`.
+  `RB #4146 <https://rbcommons.com/s/twitter/r/4146>`_
+
+* Restore publishing of the docsite during releases
+  `RB #4140 <https://rbcommons.com/s/twitter/r/4140>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Fix bundle rel_path handling in engine
+  `RB #4150 <https://rbcommons.com/s/twitter/r/4150>`_
+
+* [engine] Fix running changed with v2 flag; Replace context address_mapper; Fix excludes filespecs in engine globs.
+  `RB #4114 <https://rbcommons.com/s/twitter/r/4114>`_
+
+* Fix BundleAdaptor to BundleProps Conversion
+  `RB #4057 <https://rbcommons.com/s/twitter/r/4057>`_
+  `RB #4129 <https://rbcommons.com/s/twitter/r/4129>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Eliminate use of mox in favor of mock.
+  `RB #4143 <https://rbcommons.com/s/twitter/r/4143>`_
+
+* Convert FetcherTest to use mock instead of mox.
+  `RB #4142 <https://rbcommons.com/s/twitter/r/4142>`_
+
+* [jvm-compile] narrow compile dependencies from full closure to just next nearest invalid compilation targets
+  `RB #4136 <https://rbcommons.com/s/twitter/r/4136>`_
+
 
 1.2.0-dev3 (8/7/2016)
 ---------------------

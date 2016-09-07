@@ -27,6 +27,8 @@ class SelectorsTest(unittest.TestCase):
     self.assert_repr("SelectDependencies(AClass, AClass)", SelectDependencies(AClass, AClass))
     self.assert_repr("SelectDependencies(AClass, AClass, u'some_field')",
                      SelectDependencies(AClass, AClass, field='some_field'))
+    self.assert_repr("SelectDependencies(AClass, AClass, u'some_field', field_types=(AClass,))",
+                     SelectDependencies(AClass, AClass, field='some_field', field_types=(AClass,)))
 
   def test_projection_repr(self):
     self.assert_repr("SelectProjection(AClass, AClass, (u'field',), AClass)",
@@ -37,3 +39,7 @@ class SelectorsTest(unittest.TestCase):
 
   def assert_repr(self, expected, selector):
     self.assertEqual(expected, repr(selector))
+
+  def test_select_variant_requires_string_key(self):
+    with self.assertRaises(ValueError):
+      SelectVariant(AClass, None)

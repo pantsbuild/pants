@@ -81,6 +81,7 @@ python_library(
   name='mapper',
   sources=['mapper.py'],
   dependencies=[
+    '3rdparty/python:pathspec',
     ':objects',
     ':parser',
     'src/python/pants/build_graph',
@@ -144,9 +145,25 @@ python_library(
 )
 
 python_library(
+  name='rules',
+  sources=['rules.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':addressable',
+    ':fs',
+    ':isolated_process',
+    ':nodes',
+    'src/python/pants/base:specs',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:objects',
+  ]
+)
+
+python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
+    '3rdparty/python:six',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
@@ -162,6 +179,7 @@ python_library(
     ':fs',
     ':isolated_process',
     ':nodes',
+    ':rules',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/engine/subsystem:native',
