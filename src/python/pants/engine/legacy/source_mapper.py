@@ -31,7 +31,7 @@ class EngineSourceMapper(SourceMapper):
         yield source_dir
 
   def target_addresses_for_source(self, source):
-    return list(self.iter_target_addresses_for_sources, [source])
+    return list(self.iter_target_addresses_for_sources([source]))
 
   def _iter_owned_files_from_legacy_target(self, legacy_target):
     """Given a `LegacyTarget` instance, yield all files owned by the target."""
