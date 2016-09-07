@@ -70,6 +70,10 @@ class ExactlyTest(TypeConstraintTestBase):
     self.assertFalse(exactly_a_or_b.satisfied_by(self.BPrime()))
     self.assertFalse(exactly_a_or_b.satisfied_by(self.C()))
 
+  def test_disallows_unsplatted_lists(self):
+    with self.assertRaises(TypeError):
+      Exactly([1])
+
 
 class SubclassesOfTest(TypeConstraintTestBase):
   def test_none(self):

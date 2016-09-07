@@ -38,6 +38,9 @@ class TypeConstraint(AbstractClass):
     """
     if not types:
       raise ValueError('Must supply at least one type')
+    if any(not isinstance(t, type) for t in types):
+      raise TypeError('Supplied types must be types. {!r}'.format(types))
+
     self._types = types
 
   @property
