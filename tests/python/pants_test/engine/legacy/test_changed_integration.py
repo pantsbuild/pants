@@ -94,8 +94,9 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
     def safe_filename(f):
       return f.replace('/', '_').replace('.', '_')
 
-    for filename in cls.TEST_MAPPING.keys():
-      for dependee_type in ('none', 'direct', 'transitive'):
+    for filename, dependee_mapping in cls.TEST_MAPPING.items():
+      for dependee_type in dependee_mapping.keys():
+        # N.B. The parameters here are used purely to close over the respective loop variables.
         def inner_integration_coverage_test(self, filename=filename, dependee_type=dependee_type):
           # Mutate the working copy so we can do `--changed-parent=HEAD` deterministically.
           with mutated_working_copy([filename]):
