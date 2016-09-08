@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import logging
 import threading
 import time
@@ -14,9 +13,9 @@ from contextlib import contextmanager
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
-from pants.engine.fs import PathGlobs, create_fs_intrinsics
-from pants.engine.isolated_process import ProcessExecutionNode
-from pants.engine.nodes import FilesystemNode, Noop, Return, Runnable, TaskNode, Throw
+from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
+from pants.engine.isolated_process import create_snapshot_intrinsics
+from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
@@ -100,17 +99,6 @@ class LocalScheduler(object):
     self._storage = storage
     self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
-    select_product = lambda product: Select(product)
-    select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address,))
-    self._root_selector_fns = {
-      Address: select_product,
-      PathGlobs: select_product,
-      SingleAddress: select_dep_addrs,
-      SiblingAddresses: select_dep_addrs,
-      DescendantAddresses: select_dep_addrs,
-    }
-
-    RulesetValidator(self._node_builder, goals, self._root_selector_fns.keys()).validate()
 
     # Create a handle for Storage (which must be kept alive as long as this object), and
     # the native Scheduler.
@@ -129,63 +117,86 @@ class LocalScheduler(object):
                                             self._to_type_key(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     self._execution_request = None
-    # Register all "intrinsic" tasks.
-    self._register_intrinsics()
-    # Register all provided tasks.
-    for task in tasks:
-      self._register_task(task)
 
-  def _register_intrinsics(self):
-    """Register any "intrinsic" tasks.
+    # Validate and register all provided and intrinsic tasks.
+    self._root_selector_fns = {
+      Address: self._select_product,
+      PathGlobs: self._select_product,
+      SingleAddress: self._select_dep_addrs,
+      SiblingAddresses: self._select_dep_addrs,
+      DescendantAddresses: self._select_dep_addrs,
+    }
+    intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
+    node_builder = NodeBuilder.create(tasks, intrinsics)
+    RulesetValidator(node_builder, goals, self._root_selector_fns.keys()).validate()
+    self._register_tasks(node_builder.tasks)
+    self._register_intrinsics(node_builder.intrinsics)
+
+  def _select_product(self, subject, product):
+    self._native.lib.execution_add_root_select(
+        self._scheduler,
+        self._to_key(subject),
+        self._to_type_key(product))
+
+  def _select_dep_addrs(self, subject, product):
+    self._native.lib.execution_add_root_select_dependencies(
+        self._scheduler,
+        self._to_key(subject),
+        self._to_type_key(product),
+        self._to_type_key(Addresses),
+        self._to_key('dependencies'))
+
+  def _register_intrinsics(self, intrinsics):
+    """Register the given intrinsics dict.
     
     Intrinsic tasks are those that are the default for a particular type(subject), type(product)
     pair. By default, intrinsic tasks create Runnables that are not cacheable.
     """
-    for func, subject_type, product_type in create_fs_intrinsics():
-      # Create a pickleable function for the task with the ProjectTree included.
-      pfunc = functools.partial(func, self._project_tree)
+    for (subject_type, product_type), func in intrinsics.items():
       self._native.lib.intrinsic_task_add(self._scheduler,
-                                          self._to_type_key(pfunc),
+                                          self._to_type_key(func),
                                           self._to_type_key(subject_type),
                                           self._to_type_key(product_type))
 
-  def _register_task(self, task):
-    """Register the given task triple with the native scheduler."""
-    output_type, input_selects, func = task
-    self._native.lib.task_add(self._scheduler,
-                              self._to_type_key(func),
-                              self._to_type_key(output_type))
-    for selector in input_selects:
-      selector_type = type(selector)
-      if selector_type is Select:
-        self._native.lib.task_add_select(self._scheduler,
-                                         self._to_type_key(selector.product))
-      elif selector_type is SelectVariant:
-        self._native.lib.task_add_select_variant(self._scheduler,
-                                                 self._to_type_key(selector.product),
-                                                 self._to_key(selector.variant_key))
-      elif selector_type is SelectLiteral:
-        # NB: Intentionally ignores subject parameter to provide a literal subject.
-        self._native.lib.task_add_select_literal(self._scheduler,
-                                                 self._to_key(selector.subject),
-                                                 self._to_type_key(selector.product))
-      elif selector_type is SelectDependencies:
-        self._native.lib.task_add_select_dependencies(self._scheduler,
-                                                      self._to_type_key(selector.product),
-                                                      self._to_type_key(selector.dep_product),
-                                                      self._to_key(selector.field))
-      elif selector_type is SelectProjection:
-        if len(selector.fields) != 1:
-          raise ValueError("TODO: remove support for projecting multiple fields at once.")
-        field = selector.fields[0]
-        self._native.lib.task_add_select_projection(self._scheduler,
+  def _register_tasks(self, tasks):
+    """Register the given tasks dict with the native scheduler."""
+    for output_type, rules in tasks.items():
+      for rule in rules:
+        _, input_selects, func = rule.as_triple()
+        self._native.lib.task_add(self._scheduler,
+                                  self._to_type_key(func),
+                                  self._to_type_key(output_type))
+        for selector in input_selects:
+          selector_type = type(selector)
+          if selector_type is Select:
+            self._native.lib.task_add_select(self._scheduler,
+                                            self._to_type_key(selector.product))
+          elif selector_type is SelectVariant:
+            self._native.lib.task_add_select_variant(self._scheduler,
                                                     self._to_type_key(selector.product),
-                                                    self._to_type_key(selector.projected_subject),
-                                                    self._to_key(Field(field, selector.projected_subject)),
-                                                    self._to_type_key(selector.input_product))
-      else:
-        raise ValueError('Unrecognized Selector type: {}'.format(selector))
-    self._native.lib.task_end(self._scheduler)
+                                                    self._to_key(selector.variant_key))
+          elif selector_type is SelectLiteral:
+            # NB: Intentionally ignores subject parameter to provide a literal subject.
+            self._native.lib.task_add_select_literal(self._scheduler,
+                                                    self._to_key(selector.subject),
+                                                    self._to_type_key(selector.product))
+          elif selector_type is SelectDependencies:
+            self._native.lib.task_add_select_dependencies(self._scheduler,
+                                                          self._to_type_key(selector.product),
+                                                          self._to_type_key(selector.dep_product),
+                                                          self._to_key(selector.field))
+          elif selector_type is SelectProjection:
+            if len(selector.fields) != 1:
+              raise ValueError("TODO: remove support for projecting multiple fields at once.")
+            field = selector.fields[0]
+            self._native.lib.task_add_select_projection(self._scheduler,
+                                                        self._to_type_key(selector.product),
+                                                        self._to_type_key(selector.projected_subject),
+                                                        self._to_key(Field(field, selector.projected_subject)),
+                                                        self._to_type_key(selector.input_product))
+          else:
+            raise ValueError('Unrecognized Selector type: {}'.format(selector))
+        self._native.lib.task_end(self._scheduler)
 
   def _digest(self, cdata):
     return Digest(self._native.buffer(cdata.digest)[:])
@@ -245,14 +256,7 @@ class LocalScheduler(object):
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-
-    def selector_fn(subject):
-      selector_fn = self._root_selector_fns.get(type(subject), None)
-      if not selector_fn:
-        raise TypeError('Unsupported root subject type: {} for {!r}'
-                        .format(type(subject), subject))
-      return selector_fn
-    return ExecutionRequest(tuple((selector_fn(s), p) for s in subjects for p in products))
+    return ExecutionRequest((s, p) for s in subjects for p in products)
 
   @contextmanager
   def locked(self):
@@ -280,6 +284,8 @@ class LocalScheduler(object):
           state = Throw("Failed")
         elif root.union_tag is 3:
           state = Noop("Nooped")
+        else:
+          raise ValueError('Unrecognized State type `{}` on: {}'.format(root.union_tag, root))
         roots[(subject, product)] = state
 
       print('>>> roots were: {}'.format(roots))
@@ -288,12 +294,8 @@ class LocalScheduler(object):
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
     with self._product_graph_lock:
-      subjects = set(FilesystemNode.generate_subjects(filenames))
-
-      def predicate(node, state):
-        return type(node) is FilesystemNode and node.subject in subjects
-
-      return self._product_graph.invalidate(predicate)
+      subjects = set(generate_fs_subjects(filenames))
+      raise AssertionError('TODO: invalidation not implemented for {}'.formast(subjects))
 
   def _execution_next(self, completed):
     # Unzip into two arrays.
@@ -345,20 +347,11 @@ class LocalScheduler(object):
       self._native.lib.execution_reset(self._scheduler)
     self._execution_request = execution_request
     for subject, product in execution_request.roots:
-      if type(subject) in [Address, PathGlobs]:
-        self._native.lib.execution_add_root_select(
-            self._scheduler,
-            self._to_key(subject),
-            self._to_type_key(product))
-      elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
-        self._native.lib.execution_add_root_select_dependencies(
-            self._scheduler,
-            self._to_key(subject),
-            self._to_type_key(product),
-            self._to_type_key(Addresses),
-            self._to_key('dependencies'))
-      else:
-        raise ValueError('Unsupported root subject type: {}'.format(subject))
+      selector_fn = self._root_selector_fns.get(type(subject), None)
+      if not selector_fn:
+        raise TypeError('Unsupported root subject type: {} for {!r}'
+                        .format(type(subject), subject))
+      selector_fn(subject, product)
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -398,4 +391,4 @@ class LocalScheduler(object):
         time.time() - start_time,
         self._native.lib.graph_len(self._scheduler)
       )
-      #self.visualize_graph_to_file('viz.dot')
+      #self.visualize_graph_to_file('viz.0.dot')

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import logging
 import os
 import shutil
@@ -13,7 +14,7 @@ from abc import abstractproperty
 from hashlib import sha1
 
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.nodes import Node, Noop, Return, Runnable, State, Throw, Waiting
+from pants.engine.nodes import Return, Runnable, State, Throw
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir
@@ -23,7 +24,7 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-def _create_snapshot_archive(file_list, step_context):
+def create_snapshot_archive(project_tree, snapshot_archive_root, file_list):
   logger.debug('snapshotting files: {}'.format(file_list))
 
   # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
@@ -31,9 +32,9 @@ def _create_snapshot_archive(file_list, step_context):
     with open_tar(tmp_path, mode='w') as tar:
       for file in file_list.dependencies:
         # TODO handle GitProjectTree. Using add this this will fail with a non-filesystem project tree.
-        tar.add(os.path.join(step_context.project_tree.build_root, file.path), file.path)
+        tar.add(os.path.join(project_tree.build_root, file.path), file.path)
     snapshot = Snapshot(_fingerprint_files_in_tar(file_list, tmp_path))
-  tar_location = _snapshot_path(snapshot, step_context.snapshot_archive_root)
+  tar_location = _snapshot_path(snapshot, snapshot_archive_root)
 
   shutil.move(tmp_path, tar_location)
 
@@ -154,7 +155,9 @@ class _Process(datatype('_Process', ['snapshot_archive_root',
   """All (pickleable) arguments for the execution of a sandboxed process."""
 
 
-class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'snapshotted_process']), Node):
+# TODO: port to native Engine.
+
+class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'snapshotted_process'])):
   """Wraps a process execution, preparing and tearing down the execution environment."""
 
   is_cacheable = True
@@ -233,32 +236,10 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     return Runnable(_execute, (execution,))
 
 
-class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
-  is_inlineable = False
-  is_cacheable = False
-  product = Snapshot
-
-  @classmethod
-  def as_intrinsics(cls):
-    return {(Files, Snapshot): cls.create,
-            (PathGlobs, Snapshot): cls.create}
-
-  @classmethod
-  def create(cls, subject, product_type, variants):
-    assert product_type == Snapshot
-    return SnapshotNode(subject, variants)
-
-  def step(self, step_context):
-    selector = Select(Files)
-    node = step_context.select_node(selector, self.subject, self.variants)
-    select_state = step_context.get(node)
-
-    if type(select_state) in {Waiting, Noop, Throw}:
-      return select_state
-    elif type(select_state) is not Return:
-      State.raise_unrecognized(select_state)
-    file_list = select_state.value
-
-    snapshot = _create_snapshot_archive(file_list, step_context)
-
-    return Return(snapshot)
+def create_snapshot_intrinsics(project_tree):
+  snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
+  def ptree(func):
+    return functools.partial(func, project_tree, snapshot_archive_root)
+  return [
+      (ptree(create_snapshot_archive), Files, Snapshot),
+    ]

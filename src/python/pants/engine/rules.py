@@ -5,14 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import logging
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
 
-from pants.engine.isolated_process import ProcessExecutionNode, SnapshotNode
-from pants.engine.nodes import (DependenciesNode, FilesystemNode, ProjectionNode, SelectNode,
-                                TaskNode, collect_item_of_type)
+from pants.engine.isolated_process import ProcessExecutionNode
 from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
@@ -30,36 +27,15 @@ class Rule(object):
     """The product type produced by this rule."""
 
   @abstractmethod
-  def as_node(self, subject, variants):
-    """Constructs a ProductGraph node for this rule."""
-
-
-class CoercionRule(datatype('CoercionRule', ['requested_type', 'available_type']), Rule):
-  """Defines a task for converting from the available type to the requested type using the selection
-  rules from Select.
-
-  TODO: remove this by introducing union types as product types for tasks.
-  """
-
-  def __new__(cls, *args, **kwargs):
-    factory = super(CoercionRule, cls).__new__(cls, *args, **kwargs)
-    factory.input_selects = (Select(factory.available_type),)
-    factory.func = functools.partial(coerce_fn, factory.requested_type)
-    return factory
-
-  @property
-  def output_product_type(self):
-    return self.requested_type
-
-  def as_node(self, subject, variants):
-    return TaskNode(subject, variants, self.requested_type, self.func, self.input_selects)
+  def as_triple(self):
+    """Constructs an (output, input, func) triple for this rule."""
 
 
 class TaskNodeFactory(datatype('TaskNodeFactory', ['input_selects', 'task_func', 'product_type']), Rule):
   """A set-friendly curried TaskNode constructor."""
 
-  def as_node(self, subject, variants):
-    return TaskNode(subject, variants, self.product_type, self.task_func, self.input_selects)
+  def as_triple(self):
+    return (self.product_type, self.input_selects, self.task_func)
 
   @property
   def output_product_type(self):
@@ -83,9 +59,7 @@ class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', '
 
 
 class RulesetValidator(object):
-  """Validates that the set of rules used by the node builder has no missing tasks.
-
-  """
+  """Validates that the set of rules used by the node builder has no missing tasks."""
 
   def __init__(self, node_builder, goal_to_product, root_subject_types):
     self._root_subject_types = root_subject_types
@@ -103,8 +77,8 @@ class RulesetValidator(object):
       subject type
      - all goal products are also produced
     """
-    intrinsics = self._node_builder._intrinsics
-    serializable_tasks = self._node_builder._tasks
+    intrinsics = self._node_builder.intrinsics
+    serializable_tasks = self._node_builder.tasks
     root_subject_types = self._root_subject_types
     task_and_intrinsic_product_types = set(serializable_tasks.keys())
     task_and_intrinsic_product_types.update(product_type for _, product_type in intrinsics.keys())
@@ -212,18 +186,11 @@ class RulesetValidator(object):
       return None, warn_msg
 
 
-def coerce_fn(klass, obj):
-  """Returns the passed object iff it is of the type klass, or returns a  product of the object if
-  it has products of the right type.
-  """
-  return collect_item_of_type(klass, obj, None)
-
-
-class NodeBuilder(Closable):
+class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics'])):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, task_entries):
+  def create(cls, task_entries, intrinsic_entries):
     """Creates a NodeBuilder with tasks indexed by their output type."""
     serializable_tasks = defaultdict(set)
     for entry in task_entries:
@@ -238,52 +205,9 @@ class NodeBuilder(Closable):
         raise TypeError("Unexpected rule type: {}."
                         " Rules either extend Rule, or are 3 elem tuples.".format(type(entry)))
 
-    intrinsics = dict()
-    intrinsics.update(FilesystemNode.as_intrinsics())
-    intrinsics.update(SnapshotNode.as_intrinsics())
+    intrinsics = {(input_type, output_type): func
+                  for func, input_type, output_type in intrinsic_entries}
     return cls(serializable_tasks, intrinsics)
-
-  def __init__(self, tasks, intrinsics):
-    self._tasks = tasks
-    self._intrinsics = intrinsics
-
-  def gen_nodes(self, subject, product_type, variants):
-    # Intrinsics that provide the requested product for the current subject type.
-    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject)
-    if intrinsic_node_factory:
-      yield intrinsic_node_factory(subject, product_type, variants)
-    else:
-      # Tasks that provide the requested product.
-      for node_factory in self._lookup_tasks(product_type):
-        yield node_factory(subject, variants)
-
-  def _lookup_tasks(self, product_type):
-    for entry in self._tasks[product_type]:
-      yield entry.as_node
-
-  def _lookup_intrinsic(self, product_type, subject):
-    return self._intrinsics.get((type(subject), product_type))
-
-  def select_node(self, selector, subject, variants):
-    """Constructs a Node for the given Selector and the given Subject/Variants.
-
-    This method is decoupled from Selector classes in order to allow the `selector` package to not
-    need a dependency on the `nodes` package.
-    """
-    selector_type = type(selector)
-    if selector_type is Select:
-      return SelectNode(subject, variants, selector)
-    if selector_type is SelectVariant:
-      return SelectNode(subject, variants, selector)
-    elif selector_type is SelectLiteral:
-      # NB: Intentionally ignores subject parameter to provide a literal subject.
-      return SelectNode(selector.subject, variants, selector)
-    elif selector_type is SelectDependencies:
-      return DependenciesNode(subject, variants, selector)
-    elif selector_type is SelectProjection:
-      return ProjectionNode(subject, variants, selector)
-    else:
-      raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
 class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
@@ -293,13 +217,5 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
                                                          'output_conversion']), Rule):
   """A task type for defining execution of snapshotted processes."""
 
-  def as_node(self, subject, variants):
-    return ProcessExecutionNode(subject, variants, self)
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-  @property
-  def input_selects(self):
-    return self.input_selectors
+  def as_triple(self):
+    raise ValueError('TODO: Not implemented. Need to functools.partial the chain of operations and concat the input selects.')

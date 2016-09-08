@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
+import functools
 from fnmatch import fnmatch
 from os.path import basename, dirname, join
 
@@ -18,7 +19,7 @@ from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConst
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.rules import CoercionRule
+from pants.engine.nodes import collect_item_of_type
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
@@ -248,6 +249,13 @@ def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
 
 
+def coerce_fn(klass):
+  """Returns a one arg function that returns the passed object iff it is of the type
+  klass, or returns a product of the object if it has products of the right type.
+  """
+  return functools.partial(collect_item_of_type, product=klass, variant_value=None)
+
+
 def create_graph_tasks(address_mapper, symbol_table_cls):
   """Creates tasks used to parse Structs from BUILD files.
 
@@ -275,12 +283,12 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      [SelectLiteral(address_mapper, AddressMapper),
       Select(DirectoryListing)],
      filter_buildfile_paths),
-  ] + list({
+  ] + [
     # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
     # define that lookup for coercing a struct into each literal product.
-    CoercionRule(product, Struct)
+    (product, [Select(Struct)], coerce_fn(product))
     for product in set(symbol_table_cls.table().values()) if product is not Struct
-  }) + [
+  ] + [
     # Simple spec handling.
     (Addresses,
      [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),

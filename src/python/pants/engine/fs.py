@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
+import functools
 from abc import abstractproperty
 from fnmatch import fnmatch
 from hashlib import sha1
@@ -371,13 +372,28 @@ def files_digest(files, file_values):
 FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 
+def generate_fs_subjects(cls, filenames):
+  """Given filenames, generate a set of subjects for invalidation predicate matching."""
+  for f in filenames:
+    # ReadLink, FileContent, or DirectoryListing for the literal path.
+    yield File(f)
+    yield Link(f)
+    yield Dir(f)
+    # Additionally, since the FS event service does not send invalidation events
+    # for the root directory, treat any changed file in the root as an invalidation
+    # of the root's listing.
+    if dirname(f) in ('.', ''):
+      yield Dir('')
 
-def create_fs_intrinsics():
+
+def create_fs_intrinsics(project_tree):
+  def ptree(func):
+    return functools.partial(func, project_tree)
   return [
-    (scan_directory, Dir, DirectoryListing),
-    (file_content, File, FileContent),
-    (file_digest, File, FileDigest),
-    (read_link, Link, ReadLink),
+    (ptree(scan_directory), Dir, DirectoryListing),
+    (ptree(file_content), File, FileContent),
+    (ptree(file_digest), File, FileDigest),
+    (ptree(read_link), Link, ReadLink),
   ]
 
 

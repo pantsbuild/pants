@@ -18,7 +18,7 @@ from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.nodes import Return, State, TaskNode, Throw
+from pants.engine.nodes import Return, State, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
@@ -84,8 +84,6 @@ class LegacyBuildGraph(BuildGraph):
       elif type(state) is not Return:
         State.raise_unrecognized(state)
       if node.product is not LegacyTarget:
-        continue
-      if type(node) is not TaskNode:
         continue
 
       # We have a successfully parsed LegacyTarget, which includes its declared dependencies.
