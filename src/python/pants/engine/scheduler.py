@@ -432,13 +432,12 @@ class LocalScheduler(object):
     self._inline_nodes = inline_nodes
 
     select_product = lambda product: Select(product)
-    select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address,))
     self._root_selector_fns = {
       Address: select_product,
       PathGlobs: select_product,
-      SingleAddress: select_dep_addrs,
-      SiblingAddresses: select_dep_addrs,
-      DescendantAddresses: select_dep_addrs,
+      SingleAddress: select_product,
+      SiblingAddresses: select_product,
+      DescendantAddresses: select_product,
     }
 
     RulesetValidator(self._node_builder, goals, self._root_selector_fns.keys()).validate()

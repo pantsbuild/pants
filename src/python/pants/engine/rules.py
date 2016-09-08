@@ -45,6 +45,7 @@ class CoercionRule(datatype('CoercionRule', ['requested_type', 'available_type']
     factory = super(CoercionRule, cls).__new__(cls, *args, **kwargs)
     factory.input_selects = (Select(factory.available_type),)
     factory.func = functools.partial(coerce_fn, factory.requested_type)
+    factory.func.__name__ = 'coerce'
     return factory
 
   @property
