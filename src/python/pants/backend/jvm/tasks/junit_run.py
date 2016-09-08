@@ -35,6 +35,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util import desktop
 from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
+from pants.util.iterators import accumulate
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -331,15 +332,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       if target is None:
         self.context.log.warn('Unknown target for test %{0}'.format(test))
 
-      # Look for a TEST-*.xml file that matches the classname or a containing classname
-      test_class_name = test
-      for _part in test.split('$'):
+      # Look for a TEST-*.xml file that matches the classname or a containing classname.
+      class_names = reversed(list(accumulate(test.split('$'), func=lambda x, y: x + '$' + y)))
+      for test_class_name in class_names:
         filename = get_test_filename(test_class_name)
         if os.path.exists(filename):
           xml_filenames_to_targets[filename] = target
           break
-        else:
-          test_class_name = test_class_name.rsplit('$', 1)[0]
 
     failed_targets = defaultdict(set)
     for xml_filename, target in xml_filenames_to_targets.items():

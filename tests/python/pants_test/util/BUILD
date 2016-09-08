@@ -59,6 +59,14 @@ python_tests(
 )
 
 python_tests(
+  name = 'iterators',
+  sources = ['test_iterators.py'],
+  dependencies = [
+    'src/python/pants/util:iterators',
+  ]
+)
+
+python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
