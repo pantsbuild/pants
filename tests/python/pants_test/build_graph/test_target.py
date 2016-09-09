@@ -13,7 +13,7 @@ from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target import Target
 from pants.source.payload_fields import DeferredSourcesField
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class TestDeferredSourcesTarget(Target):
@@ -68,17 +68,17 @@ class TargetTest(BaseTest):
     self.assertSequenceEqual(['//:foo'], list(target.traversable_dependency_specs))
 
   def test_illegal_kwargs(self):
-    with subsystem_instance(Target.UnknownArguments):
-      with self.assertRaises(Target.UnknownArguments.Error) as cm:
-        self.make_target('foo:bar', Target, foobar='barfoo')
-      self.assertTrue('foobar = barfoo' in str(cm.exception))
-      self.assertTrue('foo:bar' in str(cm.exception))
+    init_subsystem(Target.UnknownArguments)
+    with self.assertRaises(Target.UnknownArguments.Error) as cm:
+      self.make_target('foo:bar', Target, foobar='barfoo')
+    self.assertTrue('foobar = barfoo' in str(cm.exception))
+    self.assertTrue('foo:bar' in str(cm.exception))
 
   def test_unknown_kwargs(self):
     options = {Target.UnknownArguments.options_scope: {'ignored': {'Target': ['foobar']}}}
-    with subsystem_instance(Target.UnknownArguments, **options):
-      target = self.make_target('foo:bar', Target, foobar='barfoo')
-      self.assertFalse(hasattr(target, 'foobar'))
+    init_subsystem(Target.UnknownArguments, options)
+    target = self.make_target('foo:bar', Target, foobar='barfoo')
+    self.assertFalse(hasattr(target, 'foobar'))
 
   def test_target_id_long(self):
     long_path = 'dummy'

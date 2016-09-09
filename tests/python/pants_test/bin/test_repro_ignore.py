@@ -14,7 +14,7 @@ from pants.bin.repro import Reproducer
 from pants.fs.archive import TGZ
 from pants.util.contextutil import pushd, temporary_dir
 from pants_test.bin.repro_mixin import ReproMixin
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class ReproOptionsTest(unittest.TestCase, ReproMixin):
@@ -39,20 +39,20 @@ class ReproOptionsTest(unittest.TestCase, ReproMixin):
 
             repro_file = os.path.join(capture_dir, 'repro.tar.gz')
             options = {
-              'repro': dict(
+              Reproducer.options_scope: dict(
                 capture=repro_file,
                 ignore=['src'],
             )}
-            with subsystem_instance(Reproducer, **options) as repro_sub:
-              repro = repro_sub.create_repro()  # This is normally called in pants_exe
-              repro.capture(run_info_dict={})
+            repro_sub = global_subsystem_instance(Reproducer, options=options)
+            repro = repro_sub.create_repro()  # This is normally called in pants_exe.
+            repro.capture(run_info_dict={})
 
-              extract_loc = os.path.join(capture_dir, 'extract')
-              TGZ.extract(repro_file, extract_loc)
+            extract_loc = os.path.join(capture_dir, 'extract')
+            TGZ.extract(repro_file, extract_loc)
 
-              assert_file = partial(self.assert_file, extract_loc)
-              assert_file('foo/bar', 'baz')
+            assert_file = partial(self.assert_file, extract_loc)
+            assert_file('foo/bar', 'baz')
 
-              assert_not_exists = partial(self.assert_not_exists, extract_loc)
-              assert_not_exists('.git')
-              assert_not_exists('src')
+            assert_not_exists = partial(self.assert_not_exists, extract_loc)
+            assert_not_exists('.git')
+            assert_not_exists('src')

@@ -26,7 +26,7 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
@@ -488,11 +488,9 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
 
   def setUp(self):
     super(IvyResolveFingerprintStrategyTest, self).setUp()
-    self._subsystem_scope = subsystem_instance(JarDependencyManagement)
-    self._subsystem_scope.__enter__()
+    init_subsystem(JarDependencyManagement)
 
   def tearDown(self):
-    self._subsystem_scope.__exit__(None, None, None)
     super(IvyResolveFingerprintStrategyTest, self).tearDown()
 
   def set_artifact_set_for(self, managed_jar_target, artifact_set):

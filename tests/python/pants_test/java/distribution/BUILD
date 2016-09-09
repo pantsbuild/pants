@@ -19,6 +19,7 @@ python_tests(
   sources = ['test_distribution_integration.py'],
   dependencies = [
     'src/python/pants/java/distribution',
+    'src/python/pants/subsystem',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/subsystem:subsystem_utils',
