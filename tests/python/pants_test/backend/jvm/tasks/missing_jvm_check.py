@@ -6,13 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.java.distribution.distribution import DistributionLocator
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def is_missing_jvm(version):
-  with subsystem_instance(DistributionLocator):
-    try:
-      DistributionLocator.cached(minimum_version=version, maximum_version='{}.9999'.format(version))
-      return False
-    except DistributionLocator.Error:
-      return True
+  init_subsystem(DistributionLocator)
+  try:
+    DistributionLocator.cached(minimum_version=version, maximum_version='{}.9999'.format(version))
+    return False
+  except DistributionLocator.Error:
+    return True
