@@ -106,7 +106,7 @@ class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field'
   optional = False
 
   def __repr__(self):
-    return '{}({}, {}{}{})'.format(type(self).__name__,
+    return '{}({}, {}{})'.format(type(self).__name__,
                                    self.product.__name__,
                                    self.dep_product.__name__,
                                    ', {}'.format(repr(self.field)) if self.field else '')
