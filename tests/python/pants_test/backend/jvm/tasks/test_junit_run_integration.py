@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import codecs
 import os.path
 import time
-from unittest import expectedFailure, skipIf
+from unittest import skipIf
 
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -82,7 +82,6 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     # Ensure that the timeout triggered.
     self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
 
-  @expectedFailure
   def test_junit_tests_using_cucumber(self):
     test_spec = 'testprojects/tests/java/org/pantsbuild/testproject/cucumber'
     with self.pants_results(['clean-all', 'test.junit', '--per-test-timer', test_spec]) as results:

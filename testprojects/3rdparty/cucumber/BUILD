@@ -9,7 +9,12 @@ jar_library(name='cuke-core',
 
 jar_library(name='cuke-guice',
   jars=[
-    jar(org='info.cukes', name='cucumber-guice', rev='1.2.4',)
+    jar(org='info.cukes', name='cucumber-guice', rev='1.2.4',),
+  ],
+  dependencies=[
+    # The cucumber-guice jar has a 'provided' scope dep on guice itself so we're forced to adjoin
+    # a direct (runtime) dep here.
+    ':com.google.inject.guice',
   ],
 )
 
@@ -29,4 +34,5 @@ jar_library(name='com.google.inject.guice',
   jars=[
     jar(org='com.google.inject', name='guice', rev='4.0',)
   ],
+  scope='runtime',
 )
