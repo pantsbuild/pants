@@ -21,7 +21,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, Throw
-from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
+from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection, SelectTransitive
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -84,14 +84,17 @@ class LegacyBuildGraph(BuildGraph):
             'Build graph construction failed for {}:\n{}'.format(node, trace))
       elif type(state) is not Return:
         State.raise_unrecognized(state)
+      if type(state.value) is not HydratedTargets:
+        raise TypeError('Expected roots to hold {}; got: {}'.format(
+          HydratedTargets, type(state.value)))
 
-      # We have HydratedTargets (for a particular input Spec).
-      for hydrated_targets in state.value:
-        for hydrated_target in hydrated_targets.dependencies:
-          address = hydrated_target.adaptor.address
-          all_addresses.add(address)
-          if address not in self._target_by_address:
-            new_targets.append(self._index_target(hydrated_target.adaptor))
+      # We have a successful HydratedTargets value (for a particular input Spec).
+      for hydrated_target in state.value.dependencies:
+        target_adaptor = hydrated_target.adaptor
+        address = target_adaptor.address
+        all_addresses.add(address)
+        if address not in self._target_by_address:
+          new_targets.append(self._index_target(target_adaptor))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -223,36 +226,27 @@ class LegacyBuildGraph(BuildGraph):
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(root.subject))
       # TODO! this is yielding transitive addresses rather than roots again.
-      for hydrated_targets in state.value:
-        for hydrated_target in hydrated_targets.dependencies:
-          address = hydrated_target.adaptor.address
-          if address not in yielded_addresses:
-            yielded_addresses.add(address)
-            yield address
-
-
-class HydratedField(datatype('HydratedField', ['name', 'value'])):
-  """A wrapper for a fully constructed replacement kwarg for a LegacyTarget."""
+      for hydrated_target in state.value.dependencies:
+        address = hydrated_target.adaptor.address
+        if address not in yielded_addresses:
+          yielded_addresses.add(address)
+          yield address
 
 
 class HydratedTarget(datatype('HydratedTarget', ['adaptor', 'dependencies'])):
   """A wrapper for a fully hydrated TargetAdaptor object."""
 
 
+# TODO: Only used (currently) to represent transitive hydrated targets. Consider renaming.
 HydratedTargets = Collection.of(HydratedTarget)
 
-
-def transitive_targets_merge(hydrated_target, transitive_deps_list):
-  merged = {}
-  for hydrated_targets_list in ([HydratedTargets([hydrated_target])], transitive_deps_list):
-    for hydrated_targets in hydrated_targets_list:
-      merged.update((ht.adaptor.address, ht) for ht in hydrated_targets.dependencies)
-  return HydratedTargets(tuple(merged.values()))
+class HydratedField(datatype('HydratedField', ['name', 'value'])):
+  """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
 def hydrate_target(target_adaptor, hydrated_fields):
-  """Hydrate a TargetAdaptor given its deps and hydrated versions of its adapted fields."""
-  # Hydrate the fields of the adaptor.
+  """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
+  # Hydrate the fields of the adaptor and re-construct it.
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
@@ -308,14 +302,14 @@ def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
+    # Recursively requests HydratedTargets, which will result in an eager, transitive graph walk.
     (HydratedTargets,
-     [Select(HydratedTarget),
-      SelectDependencies(HydratedTargets, HydratedTarget, field_types=(Address,))],
-     transitive_targets_merge),
+     [SelectTransitive(HydratedTarget, Addresses)],
+     HydratedTargets),
     (HydratedTarget,
      [Select(TargetAdaptor),
-      SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors', field_types=(SourcesField, BundlesField, ))],
-      hydrate_target),
+      SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors', field_types=(SourcesField, BundlesField,))],
+     hydrate_target),
     (HydratedField,
      [Select(SourcesField),
       SelectProjection(FilesDigest, PathGlobs, ('path_globs',), SourcesField),

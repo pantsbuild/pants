@@ -14,12 +14,12 @@ import six
 
 from pants.build_graph.address import Address
 from pants.engine.objects import Resolvable, Serializable
+from pants.engine.selectors import Collection
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Addresses(datatype('Addresses', ['dependencies'])):
-  pass
+Addresses = Collection.of(Address)
 
 
 class TypeConstraint(AbstractClass):

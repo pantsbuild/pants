@@ -86,6 +86,32 @@ class SelectDependencies(datatype('Dependencies',
                                    field_types_portion)
 
 
+class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field']),
+                       Selector):
+  """Recursively requests the given product for each member of the given field of the dep_product.
+
+  While recursive aggregation of fields can be implemented directly by tasks, in many cases
+  the intermediate, unmerged collections of values need not be memoized as Nodes. Use of
+  SelectTransitive causes the entire recursive loop to be represented as a single Node.
+
+  TODO: `field` is currently assumed to match on both dep_product and product.
+  """
+
+  def __new__(cls, product, dep_product, field=None):
+    if not issubclass(dep_product, Collection):
+      raise TypeError('SelectTransitive requires a subtype of {} as the dep_product. Got: {}'.format(
+        Collection, dep_product))
+    return super(SelectTransitive, cls).__new__(cls, product, dep_product, field)
+
+  optional = False
+
+  def __repr__(self):
+    return '{}({}, {}{}{})'.format(type(self).__name__,
+                                   self.product.__name__,
+                                   self.dep_product.__name__,
+                                   ', {}'.format(repr(self.field)) if self.field else '')
+
+
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
   """Selects a field of the given Subject to produce a Subject, Product dependency from.
 
