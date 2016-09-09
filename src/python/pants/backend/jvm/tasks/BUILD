@@ -37,6 +37,7 @@ python_library(
     ':run_jvm_prep_command',
     ':scala_repl',
     ':scaladoc_gen',
+    ':scalafmt',
     ':scalastyle',
     ':unpack_jars',
     'src/python/pants/backend/jvm/tasks/jvm_compile:all',
@@ -616,6 +617,15 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/process',
     'src/python/pants/util:dirutil'
+  ],
+)
+
+python_library(
+  name = 'scalafmt',
+  sources = ['scalafmt.py'],
+  dependencies = [
+    'src/python/pants/base:exceptions',
+    'src/python/pants/task',
   ],
 )
 

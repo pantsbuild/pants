@@ -1,13 +1,12 @@
 /**
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
-
 package org.pantsbuild.zinc
 
 import java.io.File
 import sbt.Level
 import xsbti.CompileFailed
-import org.pantsbuild.zinc.logging.{ Loggers, Reporters }
+import org.pantsbuild.zinc.logging.{Loggers, Reporters}
 
 /**
  * Command-line main class.
@@ -29,25 +28,22 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log =
-      Loggers.create(
+    val log = Loggers.create(
         settings.consoleLog.logLevel,
         settings.consoleLog.color,
         captureLog = settings.captureLog
-      )
+    )
     val isDebug = settings.consoleLog.logLevel == Level.Debug
-    val reporter =
-      Reporters.create(
+    val reporter = Reporters.create(
         log,
         settings.consoleLog.fileFilters,
         settings.consoleLog.msgFilters
-      )
-    val progress =
-      new SimpleCompileProgress(
+    )
+    val progress = new SimpleCompileProgress(
         settings.consoleLog.logPhases,
         settings.consoleLog.printProgress,
         settings.consoleLog.heartbeatSecs
-      )(log)
+    )(log)
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {

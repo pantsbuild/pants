@@ -10,12 +10,12 @@ import org.pantsbuild.example.hello.welcome
 // A simple jvm binary to illustrate Scala BUILD targets
 
 object Exe {
+
   /** Test that resources are properly namespaced. */
   def getWorld: String = {
-    val is =
-      this.getClass.getClassLoader.getResourceAsStream(
+    val is = this.getClass.getClassLoader.getResourceAsStream(
         "org/pantsbuild/example/hello/world.txt"
-      )
+    )
     try {
       new BufferedReader(new InputStreamReader(is)).readLine()
     } finally {

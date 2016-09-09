@@ -5,7 +5,6 @@ package org.pantsbuild.example.scala_with_java_sources;
 
 import org.pantsbuild.example.java_sources.Greet
 
-
 object GreetEverybody {
 
   def greetAll(everybody: Array[String]): Array[String] = {

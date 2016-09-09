@@ -5,12 +5,7 @@ package org.pantsbuild.zinc
 
 import java.io.File
 
-import sbt.{
-  ConsoleLogger,
-  ConsoleOut,
-  IO,
-  Logger
-}
+import sbt.{ConsoleLogger, ConsoleOut, IO, Logger}
 
 import org.junit.runner.RunWith
 import org.scalatest.WordSpec

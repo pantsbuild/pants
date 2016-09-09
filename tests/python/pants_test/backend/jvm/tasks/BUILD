@@ -125,6 +125,17 @@ python_tests(
 )
 
 python_tests(
+  name = 'scalafmt',
+  sources = ['test_scalafmt.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:scalafmt',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+  timeout = 120,
+)
+
+python_tests(
   name = 'checkstyle_integration',
   sources = ['test_checkstyle_integration.py'],
   dependencies = [
@@ -666,3 +677,4 @@ python_tests(
   ],
   tags = {'integration'},
 )
+

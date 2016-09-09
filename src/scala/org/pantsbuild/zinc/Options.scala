@@ -1,7 +1,6 @@
 /**
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
-
 package org.pantsbuild.zinc
 
 import java.io.File
@@ -11,11 +10,21 @@ import scala.annotation.tailrec
  * Parsing command-line options, immutably.
  */
 object Options {
-  def parse[Context](context: Context, options: Set[OptionDef[Context]], args: Seq[String], stopOnError: Boolean): Parsed[Context] =
+  def parse[Context](
+      context: Context,
+      options: Set[OptionDef[Context]],
+      args: Seq[String],
+      stopOnError: Boolean): Parsed[Context] =
     parseOptions(context, options, args, Seq.empty, Seq.empty, stopOnError)
 
   @tailrec
-  def parseOptions[Context](context: Context, options: Set[OptionDef[Context]], args: Seq[String], residual: Seq[String], errors: Seq[String], stopOnError: Boolean): Parsed[Context] = {
+  def parseOptions[Context](
+      context: Context,
+      options: Set[OptionDef[Context]],
+      args: Seq[String],
+      residual: Seq[String],
+      errors: Seq[String],
+      stopOnError: Boolean): Parsed[Context] = {
     if (args.isEmpty || (stopOnError && !errors.isEmpty)) {
       Parsed(context, residual, errors)
     } else {
@@ -23,7 +32,13 @@ object Options {
       options find (_ claims arg) match {
         case Some(option) =>
           val parsed = option.process(context, args)
-          parseOptions(parsed.context, options, parsed.remaining, residual, errors ++ parsed.errors, stopOnError)
+          parseOptions(
+              parsed.context,
+              options,
+              parsed.remaining,
+              residual,
+              errors ++ parsed.errors,
+              stopOnError)
         case None =>
           parseOptions(context, options, args.tail, residual :+ arg, errors, stopOnError)
       }
@@ -31,7 +46,10 @@ object Options {
   }
 }
 
-case class Parsed[Context](context: Context, remaining: Seq[String], errors: Seq[String] = Seq.empty)
+case class Parsed[Context](
+    context: Context,
+    remaining: Seq[String],
+    errors: Seq[String] = Seq.empty)
 
 abstract class OptionDef[Context] {
   def options: Seq[String]
@@ -59,10 +77,11 @@ abstract class ArgumentOption[Value, Context] extends OptionDef[Context] {
     val rest = args.tail
     def error = Parsed(context, rest, Seq(invalid))
     if (rest.isEmpty) error
-    else parse(rest.head) match {
-      case Some(value) => Parsed(action(context, value), rest.tail)
-      case None        => error
-    }
+    else
+      parse(rest.head) match {
+        case Some(value) => Parsed(action(context, value), rest.tail)
+        case None => error
+      }
   }
 
   def invalid = "Invalid option for " + options.headOption.getOrElse("")
@@ -71,52 +90,50 @@ abstract class ArgumentOption[Value, Context] extends OptionDef[Context] {
 }
 
 class BooleanOption[Context](
-  val options: Seq[String],
-  val description: String,
-  val action: Context => Context)
-extends FlagOption[Context]
+    val options: Seq[String],
+    val description: String,
+    val action: Context => Context)
+    extends FlagOption[Context]
 
 class StringOption[Context](
-  val options: Seq[String],
-  val argument: String,
-  val description: String,
-  val action: (Context, String) => Context)
-extends ArgumentOption[String, Context] {
+    val options: Seq[String],
+    val argument: String,
+    val description: String,
+    val action: (Context, String) => Context)
+    extends ArgumentOption[String, Context] {
   def parse(arg: String): Option[String] = {
     Some(arg)
   }
 }
 
 class IntOption[Context](
-  val options: Seq[String],
-  val argument: String,
-  val description: String,
-  val action: (Context, Int) => Context)
-extends ArgumentOption[Int, Context] {
+    val options: Seq[String],
+    val argument: String,
+    val description: String,
+    val action: (Context, Int) => Context)
+    extends ArgumentOption[Int, Context] {
   def parse(arg: String): Option[Int] = {
-    try { Some(arg.toInt) }
-    catch { case _: NumberFormatException => None }
+    try { Some(arg.toInt) } catch { case _: NumberFormatException => None }
   }
 }
 
 class DoubleOption[Context](
-  val options: Seq[String],
-  val argument: String,
-  val description: String,
-  val action: (Context, Double) => Context)
-extends ArgumentOption[Double, Context] {
+    val options: Seq[String],
+    val argument: String,
+    val description: String,
+    val action: (Context, Double) => Context)
+    extends ArgumentOption[Double, Context] {
   def parse(arg: String): Option[Double] = {
-    try { Some(arg.toDouble) }
-    catch { case _: NumberFormatException => None }
+    try { Some(arg.toDouble) } catch { case _: NumberFormatException => None }
   }
 }
 
 class FractionOption[Context](
-  val options: Seq[String],
-  val argument: String,
-  val description: String,
-  val action: (Context, Double) => Context)
-extends ArgumentOption[Double, Context] {
+    val options: Seq[String],
+    val argument: String,
+    val description: String,
+    val action: (Context, Double) => Context)
+    extends ArgumentOption[Double, Context] {
   def parse(arg: String): Option[Double] = {
     try {
       val fraction = arg.toDouble
@@ -126,31 +143,31 @@ extends ArgumentOption[Double, Context] {
 }
 
 class FileOption[Context](
-  val options: Seq[String],
-  val argument: String,
-  val description: String,
-  val action: (Context, File) => Context)
-extends ArgumentOption[File, Context] {
+    val options: Seq[String],
+    val argument: String,
+    val description: String,
+    val action: (Context, File) => Context)
+    extends ArgumentOption[File, Context] {
   def parse(arg: String): Option[File] = {
     Some(new File(arg))
   }
 }
 
 class PathOption[Context](
-  val options: Seq[String],
-  val argument: String,
-  val description: String,
-  val action: (Context, Seq[File]) => Context)
-extends ArgumentOption[Seq[File], Context] {
+    val options: Seq[String],
+    val argument: String,
+    val description: String,
+    val action: (Context, Seq[File]) => Context)
+    extends ArgumentOption[Seq[File], Context] {
   def parse(arg: String): Option[Seq[File]] = ParseHelpers.parseFileSeq(arg)
 }
 
 class PrefixOption[Context](
-  val prefix: String,
-  val argument: String,
-  val description: String,
-  val action: (Context, String) => Context)
-extends OptionDef[Context] {
+    val prefix: String,
+    val argument: String,
+    val description: String,
+    val action: (Context, String) => Context)
+    extends OptionDef[Context] {
   def options = Seq(prefix)
 
   override def claims(option: String) = option startsWith prefix
@@ -164,11 +181,11 @@ extends OptionDef[Context] {
 }
 
 class FilePairOption[Context](
-  val options: Seq[String],
-  val argument: String,
-  val description: String,
-  val action: (Context, (File, File)) => Context)
-extends ArgumentOption[(File, File), Context] {
+    val options: Seq[String],
+    val argument: String,
+    val description: String,
+    val action: (Context, (File, File)) => Context)
+    extends ArgumentOption[(File, File), Context] {
   val pairSeparator = File.pathSeparatorChar
 
   def parse(arg: String): Option[(File, File)] = {
@@ -178,10 +195,10 @@ extends ArgumentOption[(File, File), Context] {
 }
 
 class FileMapOption[Context](
-  val options: Seq[String],
-  val description: String,
-  val action: (Context, Map[File, File]) => Context)
-extends ArgumentOption[Map[File, File], Context] {
+    val options: Seq[String],
+    val description: String,
+    val action: (Context, Map[File, File]) => Context)
+    extends ArgumentOption[Map[File, File], Context] {
   val argument = "mapping"
 
   val argSeparator = ','
@@ -204,10 +221,10 @@ extends ArgumentOption[Map[File, File], Context] {
 }
 
 class FileSeqMapOption[Context](
-  val options: Seq[String],
-  val description: String,
-  val action: (Context, Map[Seq[File], File]) => Context)
-        extends ArgumentOption[Map[Seq[File], File], Context] {
+    val options: Seq[String],
+    val description: String,
+    val action: (Context, Map[Seq[File], File]) => Context)
+    extends ArgumentOption[Map[Seq[File], File], Context] {
   val argument = "mapping"
 
   val argSeparator = ','
@@ -240,9 +257,7 @@ class FileSeqMapOption[Context](
   }
 }
 
-class HeaderOption[Context](
-  val header: String)
-extends OptionDef[Context] {
+class HeaderOption[Context](val header: String) extends OptionDef[Context] {
   def options: Seq[String] = Seq.empty
   def description = ""
   def process(context: Context, args: Seq[String]) = Parsed(context, args.tail)
@@ -253,10 +268,8 @@ extends OptionDef[Context] {
   override def extraline = true
 }
 
-class DummyOption[Context](
-  val optionHelp: String,
-  val description: String)
-extends OptionDef[Context] {
+class DummyOption[Context](val optionHelp: String, val description: String)
+    extends OptionDef[Context] {
   def options: Seq[String] = Seq.empty
   def process(context: Context, args: Seq[String]) = Parsed(context, args.tail)
   override def claims(option: String): Boolean = false

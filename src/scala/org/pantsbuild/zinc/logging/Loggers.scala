@@ -3,23 +3,23 @@
  * Copyright (C) 2015 Pants project contributors (see CONTRIBUTORS.md).
  * Licensed under the Apache License, Version 2.0 (see LICENSE).
  */
-
 package org.pantsbuild.zinc.logging
 
-import java.io.{ BufferedOutputStream, File, FileOutputStream, PrintWriter }
-import sbt.{ AbstractLogger, ConsoleLogger, FullLogger, ConsoleOut, Level, Logger, MultiLogger }
+import java.io.{BufferedOutputStream, File, FileOutputStream, PrintWriter}
+import sbt.{AbstractLogger, ConsoleLogger, FullLogger, ConsoleOut, Level, Logger, MultiLogger}
 
 object Loggers {
+
   /**
    * Create a new console logger based on level and color settings. If captureLog is
    * specified, a compound logger is created that will additionally log all output (unfiltered)
    * to a file.
    */
   def create(
-    level: Level.Value,
-    color: Boolean,
-    out: ConsoleOut = ConsoleOut.systemOut,
-    captureLog: Option[File] = None
+      level: Level.Value,
+      color: Boolean,
+      out: ConsoleOut = ConsoleOut.systemOut,
+      captureLog: Option[File] = None
   ): Logger = {
     // log to the console at the configured levels
     val consoleLogger = {

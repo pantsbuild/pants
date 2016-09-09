@@ -1,0 +1,12 @@
+--maxColumn 100
+--javaDocs
+--alignStripMarginStrings false
+--alignByOpenParenCallSite false
+--alignByOpenParenDefnSite false
+--continuationIndentCallSite 4
+--continuationIndentDefnSite 4
+--spacesInImportCurlyBraces false
+--allowNewlineBeforeColonInMassiveReturnTypes true
+--binPackParentConstructors false
+--spaceAfterTripleEquals true
+--alignByArrowEnumeratorGenerator true

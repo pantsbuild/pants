@@ -5,7 +5,6 @@ package org.pantsbuild.testproject.unicode.unicodedep.consumer
 
 import org.pantsbuild.testproject.unicode.unicodedep.provider.Provider
 
-
 object Consumer {
   def main(args: Array[String]) = {
     println(Provider.ε)

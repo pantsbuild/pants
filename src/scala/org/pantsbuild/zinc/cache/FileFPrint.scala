@@ -1,13 +1,11 @@
 /**
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
-
 package org.pantsbuild.zinc.cache
 
 import java.io.{FileNotFoundException, File}
 import com.google.common.hash.Hashing
 import com.google.common.base.Charsets
-
 
 class FileFPrint(val file: File, val fprint: String) {
   override def hashCode = fprint.hashCode
@@ -22,7 +20,7 @@ class FileFPrint(val file: File, val fprint: String) {
 
 object FileFPrint {
   private val HashFunction = Hashing.murmur3_128()
-  private val LongStringLen = (2l^31).toString.size
+  private val LongStringLen = (2l ^ 31).toString.size
 
   /**
    * Fingerprint the given File. The resulting FileFPrint will be for the canonical file behind

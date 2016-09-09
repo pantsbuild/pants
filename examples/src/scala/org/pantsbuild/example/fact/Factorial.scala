@@ -9,5 +9,5 @@ import scala.annotation.tailrec
 object Factorial {
   @tailrec
   def apply(n: BigInt, result: BigInt = 1): BigInt =
-    if (n == 0) result else apply(n-1, n * result)
+    if (n == 0) result else apply(n - 1, n * result)
 }

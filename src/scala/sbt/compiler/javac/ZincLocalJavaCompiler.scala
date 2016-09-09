@@ -1,13 +1,12 @@
 /**
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
-
 package sbt.compiler.javac
 
-import java.io.{ File, PrintWriter }
+import java.io.{File, PrintWriter}
 
 import xsbti.Reporter
-import sbt.{ LoggerWriter, Logger }
+import sbt.{LoggerWriter, Logger}
 
 /**
  * TODO: A backport of
@@ -19,7 +18,9 @@ import sbt.{ LoggerWriter, Logger }
  */
 @deprecated("Backport of changes that should be available in 0.13.10", "0.13.9")
 final class ZincLocalJavaCompiler(compiler: javax.tools.JavaCompiler) extends JavaCompiler {
-  override def run(sources: Seq[File], options: Seq[String])(implicit log: Logger, reporter: Reporter): Boolean = {
+  override def run(sources: Seq[File], options: Seq[String])(
+      implicit log: Logger,
+      reporter: Reporter): Boolean = {
     import collection.JavaConverters._
     val logger = new LoggerWriter(log)
     val logWriter = new PrintWriter(logger)
