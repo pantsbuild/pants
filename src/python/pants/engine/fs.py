@@ -18,7 +18,7 @@ import six
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import Dir, File, Link
-from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
+from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection, SelectTransitive
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -185,7 +185,7 @@ class PathRoot(datatype('PathRoot', []), PathGlob):
   """A PathGlob matching the root of the ProjectTree.
 
   The root is special because it's the only symbolic path that we can implicit trust is
-  not a symlink.
+  not a symlink due to ProjectTree-construction-time normalization.
   """
   canonical_stat = Dir('')
   symbolic_path = ''
@@ -249,6 +249,14 @@ class PathGlobs(datatype('PathGlobs', ['dependencies']), Collection):
     return cls(tuple(chain.from_iterable(path_globs)))
 
 
+class PathsExpansion(datatype('PathsExpansion', ['paths', 'dependencies']), Collection):
+  """Represents the (in-progress) expansion of one or more PathGlob objects.
+
+  The dependencies of a PathsExpansion are additional PathGlob objects to be expanded.
+  """
+  element_types = (PathRoot, PathWildcard, PathDirWildcard)
+
+
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):
   """A list of Stat objects representing a directory listing.
 
@@ -270,12 +278,12 @@ def scan_directory(project_tree, directory):
       raise e
 
 
-def merge_paths(paths_list):
-  """Merge Paths lists."""
+def finalize_path_expansion(paths_expansion_list):
+  """Finalize and merge PathExpansion lists into Paths."""
   path_seen = set()
   merged_paths = []
-  for paths in paths_list:
-    for p in paths.dependencies:
+  for paths_expansion in paths_expansion_list:
+    for p in paths_expansion.paths.dependencies:
       if p not in path_seen:
         merged_paths.append(p)
         path_seen.add(p)
@@ -284,14 +292,15 @@ def merge_paths(paths_list):
 
 def apply_path_root(path_root):
   """Returns the `Paths` for the root of the repo."""
-  return path_root.paths
+  return PathsExpansion(path_root.paths, tuple())
 
 
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given DirectoryListing object using the given PathWildcard."""
-  return Paths(tuple(Path(normpath(join(path_wildcard.symbolic_path, basename(s.path))), s)
-                     for s in stats.dependencies
-                     if fnmatch(basename(s.path), path_wildcard.wildcard)))
+  paths = Paths(tuple(Path(normpath(join(path_wildcard.symbolic_path, basename(s.path))), s)
+                      for s in stats.dependencies
+                      if fnmatch(basename(s.path), path_wildcard.wildcard)))
+  return PathsExpansion(paths, tuple())
 
 
 def apply_path_dir_wildcard(dirs, path_dir_wildcard):
@@ -301,8 +310,10 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   sense that they will be relative to known-canonical subdirectories.
   """
   # For each matching Path, create a PathGlob per remainder.
-  path_globs = (PathGlob.create_from_spec(d.stat, d.path, path_dir_wildcard.remainder) for d in dirs.dependencies)
-  return PathGlobs(tuple(chain.from_iterable(path_globs)))
+  path_globs = tuple(pg
+                     for d in dirs.dependencies
+                     for pg in PathGlob.create_from_spec(d.stat, d.path, path_dir_wildcard.remainder))
+  return PathsExpansion(Paths(tuple()), path_globs)
 
 
 def _zip_links(links, linked_paths):
@@ -404,18 +415,19 @@ def create_fs_intrinsics(project_tree):
 def create_fs_tasks():
   """Creates tasks that consume the intrinsic filesystem types."""
   return [
-    # Glob execution.
+    # Glob execution: to avoid memoizing lots of incremental results, we recursively expand PathGlobs, and then
+    # convert them to Paths independently.
     (Paths,
-     [SelectDependencies(Paths, PathGlobs, field_types=(PathWildcard, PathDirWildcard, PathRoot))],
-     merge_paths),
-    (Paths,
+     [SelectTransitive(PathsExpansion, PathGlobs, field_types=(PathWildcard, PathDirWildcard, PathRoot))],
+     finalize_path_expansion),
+    (PathsExpansion,
      [Select(PathRoot)],
      apply_path_root),
-    (Paths,
+    (PathsExpansion,
      [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathWildcard),
       Select(PathWildcard)],
      apply_path_wildcard),
-    (PathGlobs,
+    (PathsExpansion,
      [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
