@@ -101,9 +101,9 @@ class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field_
     if not issubclass(dep_product, Collection):
       raise TypeError('SelectTransitive requires a subtype of {} as the dep_product. Got: {}'.format(
         Collection, dep_product))
-    if dep_product.element_type not in field_types:
-      raise TypeError('The root element type {} is not one of the field types: {}'.format(
-        dep_product.element_type, field_types))
+    if not set(dep_product.element_types) <= set(field_types):
+      raise TypeError('The root element types {} are not a subset of the field types: {}'.format(
+        dep_product.element_types, field_types))
     return super(SelectTransitive, cls).__new__(cls, product, dep_product, field_types, field)
 
   optional = False
@@ -151,10 +151,12 @@ class Collection(object):
 
   @classmethod
   @memoized
-  def of(cls, element_type, fields=('dependencies',)):
-    type_name = b'{}.of({})'.format(cls.__name__, element_type.__name__)
-
-    collection_of_type = type(type_name, (cls, datatype("{}s".format(element_type.__name__), fields)), {})
+  def of(cls, *element_types):
+    union = '|'.join(element_type.__name__ for element_type in element_types)
+    type_name = b'{}.of({})'.format(cls.__name__, union)
+    supertypes = (cls, datatype('_Anon', ['dependencies']))
+    properties = {'element_types': element_types}
+    collection_of_type = type(type_name, supertypes, properties)
 
     # Expose the custom class type at the module level to be pickle compatible.
     setattr(sys.modules[cls.__module__], type_name, collection_of_type)
