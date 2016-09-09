@@ -165,11 +165,12 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
                         JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']))
 
   def test_java_home_extraction(self):
-    _, source, _, target, foo, bar, composite, single = tuple(ZincCompile._get_zinc_arguments(
-      JvmPlatformSettings('1.7', '1.7', [
-        'foo', 'bar', 'foo:$JAVA_HOME/bar:$JAVA_HOME/foobar', '$JAVA_HOME',
-      ])
-    ))
+    with subsystem_instance(DistributionLocator):
+      _, source, _, target, foo, bar, composite, single = tuple(ZincCompile._get_zinc_arguments(
+        JvmPlatformSettings('1.7', '1.7', [
+          'foo', 'bar', 'foo:$JAVA_HOME/bar:$JAVA_HOME/foobar', '$JAVA_HOME',
+        ])
+      ))
 
     self.assertEquals('-C1.7', source)
     self.assertEquals('-C1.7', target)
@@ -223,9 +224,8 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
             }
           }
         }
-        with subsystem_instance(DistributionLocator, **path_options) as locator:
+        with subsystem_instance(DistributionLocator, **path_options):
           yield paths
-          locator._reset()
 
     # Completely missing a usable distribution.
     with fake_distribution_locator(far_future_version):
