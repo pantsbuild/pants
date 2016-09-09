@@ -154,7 +154,7 @@ class Collection(object):
   def of(cls, *element_types):
     union = '|'.join(element_type.__name__ for element_type in element_types)
     type_name = b'{}.of({})'.format(cls.__name__, union)
-    supertypes = (cls, datatype('_Anon', ['dependencies']))
+    supertypes = (cls, datatype('Collection', ['dependencies']))
     properties = {'element_types': element_types}
     collection_of_type = type(type_name, supertypes, properties)
 

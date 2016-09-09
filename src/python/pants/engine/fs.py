@@ -204,12 +204,14 @@ class PathDirWildcard(datatype('PathDirWildcard', ['canonical_stat', 'symbolic_p
   """
 
 
-class PathGlobs(datatype('PathGlobs', ['dependencies'])):
+class PathGlobs(datatype('PathGlobs', ['dependencies']), Collection):
   """A set of 'PathGlob' objects.
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
   globs/rglobs/zglobs into 'filespecs'.
   """
+
+  element_types = (PathRoot, PathWildcard, PathDirWildcard)
 
   @classmethod
   def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
