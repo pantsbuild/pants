@@ -10,7 +10,7 @@ from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.source_root import SourceRootConfig
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 # Note: There is no longer any special maven_layout directive.  Maven layouts should just
@@ -27,6 +27,7 @@ class MavenLayoutTest(BaseTest):
 
   def setUp(self):
     super(MavenLayoutTest, self).setUp()
+    init_subsystem(SourceRootConfig)
     self.add_to_build_file('projectB/src/test/scala',
                            'junit_tests(name="test", sources=["a/source"])')
 
@@ -34,11 +35,9 @@ class MavenLayoutTest(BaseTest):
                            'java_library(name="test", sources=[])')
 
   def test_layout_here(self):
-    with subsystem_instance(SourceRootConfig):
-      self.assertEqual('projectB/src/test/scala',
-                       self.target('projectB/src/test/scala:test').target_base)
+    self.assertEqual('projectB/src/test/scala',
+                     self.target('projectB/src/test/scala:test').target_base)
 
   def test_subproject_layout(self):
-    with subsystem_instance(SourceRootConfig):
-      self.assertEqual('projectA/subproject/src/main/java',
-                       self.target('projectA/subproject/src/main/java:test').target_base)
+    self.assertEqual('projectA/subproject/src/main/java',
+                     self.target('projectA/subproject/src/main/java:test').target_base)

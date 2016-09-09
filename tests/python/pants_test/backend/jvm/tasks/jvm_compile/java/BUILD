@@ -68,6 +68,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
     'src/python/pants/fs',
+    'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',
