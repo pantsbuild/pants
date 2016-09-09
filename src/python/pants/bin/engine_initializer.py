@@ -16,7 +16,7 @@ from pants.engine.build_files import create_graph_tasks
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import LegacyBuildGraph, HydratedTargets, create_legacy_graph_tasks
+from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, RemoteSourcesAdaptor,
                                          TargetAdaptor)

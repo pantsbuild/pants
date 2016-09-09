@@ -12,7 +12,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.base.specs import SingleAddress
+from pants.engine.addressable import Addresses
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -21,7 +21,8 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, Throw
-from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection, SelectTransitive
+from pants.engine.selectors import (Collection, Select, SelectDependencies, SelectProjection,
+                                    SelectTransitive)
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype

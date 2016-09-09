@@ -114,16 +114,19 @@ class LocalScheduler(object):
     self._execution_request = None
 
     # Validate and register all provided and intrinsic tasks.
-    self._root_selector_fns = {
-      Address: self._select_product,
-      PathGlobs: self._select_product,
-      SingleAddress: self._select_dep_addrs,
-      SiblingAddresses: self._select_dep_addrs,
-      DescendantAddresses: self._select_dep_addrs,
+    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
+    # strictly necessary for execution. We might eventually be able to remove it by only executing
+    # validation below the execution roots (and thus not considering paths that aren't in use).
+    self._legal_root_types = {
+      Address,
+      PathGlobs,
+      SingleAddress,
+      SiblingAddresses,
+      DescendantAddresses,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     node_builder = NodeBuilder.create(tasks, intrinsics)
-    RulesetValidator(node_builder, goals, self._root_selector_fns.keys()).validate()
+    RulesetValidator(node_builder, goals, self._legal_root_types).validate()
     self._register_tasks(node_builder.tasks)
     self._register_intrinsics(node_builder.intrinsics)
 

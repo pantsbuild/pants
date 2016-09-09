@@ -12,7 +12,7 @@ from collections import defaultdict
 from pants.engine.isolated_process import ProcessExecutionNode
 from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant)
+                                    SelectTransitive, SelectVariant)
 from pants.util.objects import datatype
 
 

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 from abc import abstractmethod, abstractproperty
+from collections import deque
 from os.path import dirname
 
 from pants.base.project_tree import Dir, File, Link
