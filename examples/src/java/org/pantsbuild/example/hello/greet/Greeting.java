@@ -32,7 +32,7 @@ public final class Greeting {
   }
 
   public static String greet(String greetee) {
-    return "Hello, " + greetee + "!";
+    return String.format("Hello, %s!", greetee);
   }
 
   private Greeting() {
