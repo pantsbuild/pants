@@ -13,15 +13,17 @@ TEST_DIR = 'testprojects/src/scala/org/pantsbuild/testproject'
 
 class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
   def test_scalafmt_fail(self):
-    target = '{}:badScalaStyle'.format(TEST_DIR)
+    target = '{}/badscalastyle::'.format(TEST_DIR)
     #test should fail because of style error
-    failing_test = self.run_pants(['test', target])
+    failing_test = self.run_pants(['test', target],
+      {'test.scalafmt':{'skip': 'False'}})
+
     self.assert_failure(failing_test)
 
-  # def test_scalafmt_success(self):
-  #   #Verifies that checked in Scala testprojects pass scalafmt"
-  #   for project in ('emptyscala', 'scalac'):
-  #     target = '{}/{}::'.format(TEST_DIR, project)
-  #     #test should pass because of style error
-  #     passing_test = self.run_pants(['test', target])
-  #     self.assert_success(passing_test)
+  def test_scalafmt_disabled(self):
+    target = '{}/badscalastyle::'.format(TEST_DIR)
+    #test should pass because of scalafmt disabled
+    failing_test = self.run_pants(['test', target],
+      {'test.scalafmt':{'skip': 'True'}})
+
+    self.assert_success(failing_test)

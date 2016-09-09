@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.build_graph.target import Target
 from pants.option.custom_types import file_option
 
 
@@ -22,7 +23,7 @@ class ScalaFmt(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ScalaFmt, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip checkstyle')
+    register('--skip', type=bool, fingerprint=True, help='Skip Scalafmt Check')
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
               help='Path to scalafmt config file.')
     cls.register_jvm_tool(register,
@@ -38,7 +39,8 @@ class ScalaFmt(NailgunTask):
     if self.get_options().skip:
       return
 
-    sources = self.calculate_sources(self.context.targets())
+    targets = self.get_non_synthetic_scala_targets(self.context.targets())
+    sources = self.calculate_sources(targets)
 
     if sources:
       files = ""
@@ -57,6 +59,13 @@ class ScalaFmt(NailgunTask):
         scalafmtCmd = 'scalafmt -i --config {} --files {}'.format(configFile, files)
         raise TaskError('Scalafmt failed with exit code {} to fix run: `{}`'.format(result, scalafmtCmd), exit_code=result)
   
+  def get_non_synthetic_scala_targets(self, targets):
+    return filter(
+      lambda target: isinstance(target, Target)
+                     and target.has_sources(self._SCALA_SOURCE_EXTENSION)
+                     and (not target.is_synthetic),
+      targets)
+
   def calculate_sources(self, targets):
     sources = set() 
     for target in targets:
