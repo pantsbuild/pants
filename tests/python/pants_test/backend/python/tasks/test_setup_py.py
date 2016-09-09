@@ -26,7 +26,7 @@ from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class TestSetupPy(PythonTaskTestBase):
@@ -474,9 +474,9 @@ class TestSetupPy(PythonTaskTestBase):
     # `pants.java.distribution.distribution.Distribution` gained in
     # https://rbcommons.com/s/twitter/r/2657
     # Remove this once proper Subsystem dependency chains are re-established.
-    with subsystem_instance(JVM):
-      with self.run_execute(target) as created:
-        self.assertEqual([target], created.keys())
+    init_subsystem(JVM)
+    with self.run_execute(target) as created:
+      self.assertEqual([target], created.keys())
 
   def test_exported_thrift(self):
     self.create_file(relpath='src/thrift/exported/exported.thrift', contents=dedent("""

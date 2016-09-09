@@ -60,6 +60,7 @@ python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
