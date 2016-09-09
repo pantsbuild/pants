@@ -26,6 +26,7 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
@@ -46,8 +47,13 @@ class PythonChrootTest(BaseTest):
 
   @contextmanager
   def dumped_chroot(self, targets):
+    # TODO(benjy): We shouldn't need to mention DistributionLocator here, as IvySubsystem
+    # declares it as a dependency. However if we don't then test_antlr() below fails on
+    # uninitialized options for that subsystem.  Hopefully my pending (as of 9/2016) change
+    # to clean up how we initialize and create instances of subsystems in tests will make
+    # this problem go away.
     self.context(for_subsystems=[PythonRepos, PythonSetup, IvySubsystem,
-                                 ThriftBinary.Factory, BinaryUtil.Factory])
+                                 DistributionLocator, ThriftBinary.Factory, BinaryUtil.Factory])
     python_repos = PythonRepos.global_instance()
     ivy_bootstrapper = Bootstrapper(ivy_subsystem=IvySubsystem.global_instance())
     thrift_binary_factory = ThriftBinary.Factory.global_instance().create

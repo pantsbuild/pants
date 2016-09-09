@@ -430,10 +430,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
                                        non_strict_home
                                      ]
                                    })
-        with subsystem_instance(DistributionLocator) as locator:
-          locator._reset()  # Make sure we get a fresh read from the options set just above.
-          self.addCleanup(locator._reset)  # And make sure we we clean up the values we cache.
-
+        with subsystem_instance(DistributionLocator):
           export_json = self.execute_export_json()
           self.assertEqual({'strict': strict_home, 'non_strict': non_strict_home},
                            export_json['preferred_jvm_distributions']['java9999'])
