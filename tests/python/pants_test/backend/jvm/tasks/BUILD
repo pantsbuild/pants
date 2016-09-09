@@ -586,6 +586,17 @@ python_tests(
 )
 
 python_tests(
+  name = 'scalafmt',
+  sources = ['test_scalafmt.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:scalafmt',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+  timeout = 120,
+)
+
+python_tests(
   name = 'scalastyle',
   sources = ['test_scalastyle.py'],
   dependencies = [
