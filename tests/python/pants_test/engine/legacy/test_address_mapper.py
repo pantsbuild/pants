@@ -14,7 +14,7 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address import Address
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget
+from pants.engine.legacy.graph import LegacyBuildGraph
 
 
 class LegacyAddressMapperTest(unittest.TestCase):
@@ -50,7 +50,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
     graph_mock.inject_specs_closure.assert_called_with([DescendantAddresses('a')])
 
   def test_resolve_with_a_target(self):
-    target = LegacyTarget(None, None)
+    target = 'Pretend this string is a target!'
     address = Address('a', 'a')
 
     graph_mock = mock.Mock()

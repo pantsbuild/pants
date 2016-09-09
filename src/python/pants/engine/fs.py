@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import errno
 import functools
 from abc import abstractproperty
+from binascii import hexlify
 from fnmatch import fnmatch
 from hashlib import sha1
 from itertools import chain
@@ -78,6 +79,16 @@ class FileContent(datatype('FileContent', ['path', 'content'])):
 
 class FileDigest(datatype('FileDigest', ['path', 'digest'])):
   """A unique fingerprint for the content of a File."""
+
+  @classmethod
+  def create(cls, path, content):
+    return cls(path, sha1(content).digest())
+
+  def __repr__(self):
+    return 'FileDigest(path={}, digest={})'.format(self.path, hexlify(self.digest)[:8])
+
+  def __str__(self):
+    return repr(self)
 
 
 class Path(datatype('Path', ['path', 'stat'])):
@@ -363,7 +374,7 @@ def file_digest(project_tree, f):
 
   See NB on file_content.
   """
-  return FileDigest(f.path, sha1(project_tree.content(f.path)).digest())
+  return FileDigest.create(f.path, project_tree.content(f.path))
 
 
 def resolve_link(stats):

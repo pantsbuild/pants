@@ -125,7 +125,7 @@ class TransitiveNode(datatype('TransitiveNode', ['subject', 'variants', 'selecto
     requested = set()
     requesting = deque(self._dependencies(step_context, dep_product_state.value))
     while requesting:
-      dependency_value = requesting.pop()
+      dependency_value = requesting.popleft()
       if dependency_value in requested:
         continue
       requested.add(dependency_value)
@@ -141,7 +141,7 @@ class TransitiveNode(datatype('TransitiveNode', ['subject', 'variants', 'selecto
       elif type(dep_state) is Return:
         # Append the value, and recurse to request its dependencies.
         dep_values.append(dep_state.value)
-        requesting.extend(self._dependencies(step_context, dep_state.value))
+        requesting.extendleft(reversed(self._dependencies(step_context, dep_state.value)))
       elif type(dep_state) is Noop:
         return Throw(ValueError('No source of transitive dependency {}: {}'.format(dependency, dep_state)))
       elif type(dep_state) is Throw:
