@@ -13,10 +13,11 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
+from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.java.distribution.test_distribution import EXE, distribution
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -217,15 +218,16 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
       """
       with fake_distributions(versions) as paths:
         path_options = {
-          'jvm-distributions': {
+          DistributionLocator.options_scope: {
             'paths': {
               os_name: paths,
             }
           }
         }
-        with subsystem_instance(DistributionLocator, **path_options) as locator:
-          yield paths
-          locator._reset()
+        Subsystem.reset()
+        locator = global_subsystem_instance(DistributionLocator, options=path_options)
+        yield paths
+        locator._reset()
 
     # Completely missing a usable distribution.
     with fake_distribution_locator(far_future_version):

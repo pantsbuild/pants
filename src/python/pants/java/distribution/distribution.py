@@ -474,7 +474,7 @@ class _Locator(object):
         return version_a
       return stricter(version_a, version_b)
 
-    # take the tighter constraint of method args and subsystem options
+    # Take the tighter constraint of method args and subsystem options.
     minimum_version = _get_stricter_version(minimum_version,
                                             self._minimum_version,
                                             "minimum_version",
@@ -635,6 +635,9 @@ class DistributionLocator(Subsystem):
                     self.get_options().maximum_version)
 
   # Exposed for tests.
+  # Necessary because we memoize the locator created by the subsystem instance, so
+  # clearing the subsystem state isn't enough.  This is an unpleasant gotcha that we
+  # may want to clean up at some point.
   def _reset(self):
     self._locator.clear()
     self._normalized_jdk_paths.clear()

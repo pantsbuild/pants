@@ -10,19 +10,30 @@ from contextlib import contextmanager
 from unittest import skipIf
 
 from pants.java.distribution.distribution import Distribution, DistributionLocator
+from pants.subsystem.subsystem import Subsystem
 from pants.util.osutil import OS_ALIASES, get_os_name
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 @contextmanager
-def _distribution_locator(**options):
-  with subsystem_instance(DistributionLocator, **options) as locator:
-    locator._reset()  # Force a fresh locator.
-    try:
-      yield locator
-    finally:
-      locator._reset()  # And make sure we we clean up the values we cache.
+def _distribution_locator(distribution_locator_options=None):
+  if distribution_locator_options:
+    options = {
+      DistributionLocator.options_scope: distribution_locator_options
+    }
+  else:
+    options = None
+  # We have to manually reset because PantsRunIntegrationTest isn't a BaseTest.
+  # See https://github.com/pantsbuild/pants/issues/3845.
+  Subsystem.reset()
+  locator = global_subsystem_instance(DistributionLocator, options=options)
+  locator._reset()  # Force a fresh locator.
+  try:
+    yield locator
+  finally:
+    pass
+    locator._reset()  # And make sure we we clean up the values we cache.
 
 
 def _get_two_distributions():
@@ -107,13 +118,11 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
                                                         max_version_arg=None,
                                                         min_version_option=None,
                                                         max_version_option=None):
-    options = {
-      'jvm-distributions': {
-        'minimum_version': min_version_option,
-        'maximum_version': max_version_option,
-      }
+    distribution_locator_options = {
+      'minimum_version': min_version_option,
+      'maximum_version': max_version_option,
     }
-    with _distribution_locator(**options) as locator:
+    with _distribution_locator(distribution_locator_options) as locator:
       with self.assertRaises(Distribution.Error):
         locator.cached(minimum_version=min_version_arg, maximum_version=max_version_arg, jdk=False)
 
