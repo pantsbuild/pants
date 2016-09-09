@@ -130,7 +130,7 @@ class TransitiveNode(datatype('TransitiveNode', ['subject', 'variants', 'selecto
       requested.add(dependency_value)
 
       # Select the Node for this dependency value.
-      if type(dependency_value) is not self.dep_product.element_type:
+      if type(dependency_value) not in self.selector.field_types:
         return Throw(TypeError('Unexpected type: {} for {}'.format(type(dependency_value), self.selector)))
       dependency = self._dependency_node(step_context, dependency_value)
 

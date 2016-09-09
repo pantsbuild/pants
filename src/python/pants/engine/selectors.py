@@ -86,7 +86,7 @@ class SelectDependencies(datatype('Dependencies',
                                    field_types_portion)
 
 
-class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field']),
+class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field_types', 'field']),
                        Selector):
   """Recursively requests the given product for each member of the given field of the dep_product.
 
@@ -97,11 +97,14 @@ class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field'
   TODO: `field` is currently assumed to match on both dep_product and product.
   """
 
-  def __new__(cls, product, dep_product, field=None):
+  def __new__(cls, product, dep_product, field_types, field=None):
     if not issubclass(dep_product, Collection):
       raise TypeError('SelectTransitive requires a subtype of {} as the dep_product. Got: {}'.format(
         Collection, dep_product))
-    return super(SelectTransitive, cls).__new__(cls, product, dep_product, field)
+    if dep_product.element_type not in field_types:
+      raise TypeError('The root element type {} is not one of the field types: {}'.format(
+        dep_product.element_type, field_types))
+    return super(SelectTransitive, cls).__new__(cls, product, dep_product, field_types, field)
 
   optional = False
 

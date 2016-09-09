@@ -304,7 +304,7 @@ def create_legacy_graph_tasks():
   return [
     # Recursively requests HydratedTargets, which will result in an eager, transitive graph walk.
     (HydratedTargets,
-     [SelectTransitive(HydratedTarget, Addresses)],
+     [SelectTransitive(HydratedTarget, Addresses, field_types=(Address,))],
      HydratedTargets),
     (HydratedTarget,
      [Select(TargetAdaptor),
