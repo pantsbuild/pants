@@ -47,7 +47,7 @@ class LegacySymbolTable(SymbolTable):
   @memoized_method
   def table(cls):
     aliases = {alias: TargetAdaptor for alias in cls.aliases().target_types}
-    # TODO: The alias replacement here is to avoid elevating "HydratedTargets" into the public
+    # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
     # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
     # These should likely move onto Target subclasses as the engine gets deeper into beta
     # territory.

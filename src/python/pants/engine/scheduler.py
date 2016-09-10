@@ -117,7 +117,7 @@ class LocalScheduler(object):
     # TODO: This bounding of input Subject types allows for closed-world validation, but is not
     # strictly necessary for execution. We might eventually be able to remove it by only executing
     # validation below the execution roots (and thus not considering paths that aren't in use).
-    self._legal_root_types = {
+    input_types = {
       Address,
       PathGlobs,
       SingleAddress,
@@ -126,7 +126,7 @@ class LocalScheduler(object):
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     node_builder = NodeBuilder.create(tasks, intrinsics)
-    RulesetValidator(node_builder, goals, self._legal_root_types).validate()
+    RulesetValidator(node_builder, goals, input_types).validate()
     self._register_tasks(node_builder.tasks)
     self._register_intrinsics(node_builder.intrinsics)
 
@@ -135,14 +135,6 @@ class LocalScheduler(object):
         self._scheduler,
         self._to_key(subject),
         self._to_type_key(product))
-
-  def _select_dep_addrs(self, subject, product):
-    self._native.lib.execution_add_root_select_dependencies(
-        self._scheduler,
-        self._to_key(subject),
-        self._to_type_key(product),
-        self._to_type_key(Addresses),
-        self._to_key('dependencies'))
 
   def _register_intrinsics(self, intrinsics):
     """Register the given intrinsics dict.
