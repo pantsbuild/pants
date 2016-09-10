@@ -474,7 +474,7 @@ class _Locator(object):
         return version_a
       return stricter(version_a, version_b)
 
-    # take the tighter constraint of method args and subsystem options
+    # Take the tighter constraint of method args and subsystem options.
     minimum_version = _get_stricter_version(minimum_version,
                                             self._minimum_version,
                                             "minimum_version",

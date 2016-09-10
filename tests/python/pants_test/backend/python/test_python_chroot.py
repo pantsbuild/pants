@@ -29,7 +29,7 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 def test_get_current_platform():
@@ -41,8 +41,7 @@ class PythonChrootTest(BaseTest):
 
   def setUp(self):
     # Capture PythonSetup with the real BUILD_ROOT before that is reset to a tmpdir by super.
-    with subsystem_instance(PythonSetup) as python_setup:
-      self.python_setup = python_setup
+    self.python_setup = global_subsystem_instance(PythonSetup)
     super(PythonChrootTest, self).setUp()
 
   @contextmanager
