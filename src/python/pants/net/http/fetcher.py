@@ -300,7 +300,6 @@ class Fetcher(object):
     if path.startswith('/'):
       return path
     elif url.startswith('file:'):
-
       return os.path.join(self._root_dir, path)
     else:
       return None
