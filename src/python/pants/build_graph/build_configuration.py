@@ -25,10 +25,6 @@ class BuildConfiguration(object):
 
   ParseState = namedtuple('ParseState', ['registered_addressable_instances', 'parse_globals'])
 
-  @staticmethod
-  def _is_subsystem_type(obj):
-    return inspect.isclass(obj) and issubclass(obj, Subsystem)
-
   def __init__(self):
     self._target_by_alias = {}
     self._target_macro_factory_by_alias = {}
@@ -117,7 +113,7 @@ class BuildConfiguration(object):
     """
     if not isinstance(subsystems, Iterable):
       raise TypeError('The subsystems must be an iterable, given {}'.format(subsystems))
-    invalid_subsystems = [s for s in subsystems if not self._is_subsystem_type(s)]
+    invalid_subsystems = [s for s in subsystems if not Subsystem.is_subsystem_type(s)]
     if invalid_subsystems:
       raise TypeError('The following items from the given subsystems are not Subsystem '
                       'subclasses:\n\t{}'.format('\n\t'.join(str(i) for i in invalid_subsystems)))

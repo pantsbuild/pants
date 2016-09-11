@@ -107,11 +107,11 @@ def init_subsystems(subsystem_types, options=None):
                   subsystems they transitively depend on.
   """
   for s in subsystem_types:
-    if not issubclass(s, Subsystem):
+    if not Subsystem.is_subsystem_type(s):
       raise TypeError('{} is not a subclass of `Subsystem`'.format(s))
   optionables = Subsystem.closure(subsystem_types)
   if options:
-    allowed_scopes = set([o.options_scope for o in optionables])
+    allowed_scopes = {o.options_scope for o in optionables}
     for scope in options.keys():
       if scope not in allowed_scopes:
         raise ValueError('`{}` is not the scope of any of these subsystems: {}'.format(
