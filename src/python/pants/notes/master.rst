@@ -4,6 +4,40 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0dev9 (9/12/2016)
+
+Bugfixes
+~~~~~~~~
+* Re-enable test_junit_tests_using_cucumber.
+  `RB #4212 <https://rbcommons.com/s/twitter/r/4212>`_
+
+* Reset subsystem state for integration tests.
+  `RB #4219 <https://rbcommons.com/s/twitter/r/4219>`_
+
+* Remove spurious pants.pex file that somehow ended up in the repo.
+  `RB #4214 <https://rbcommons.com/s/twitter/r/4214>`_
+  `RB #4218 <https://rbcommons.com/s/twitter/r/4218>`_
+
+* Fix a non-determinism I added in the ANTLR support
+  `RB #4187 <https://rbcommons.com/s/twitter/r/4187>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Edit Greeting{,Test}.java to get a known edit sha for tests.
+  `RB #4217 <https://rbcommons.com/s/twitter/r/4217>`_
+
+* Refactor memoization of the global distribution locator.
+  `RB #4214 <https://rbcommons.com/s/twitter/r/4214>`_
+
+* Clean up junit xml report file location logic.
+  `RB #4211 <https://rbcommons.com/s/twitter/r/4211>`_
+
+* Upgrade default go to 1.7.1.
+  `RB #4210 <https://rbcommons.com/s/twitter/r/4210>`_
+
+* Make util.objects.datatype classes not iterable
+  `RB #4163 <https://rbcommons.com/s/twitter/r/4163>`_
+
 1.2.0dev8 (09/02/2016)
 ----------------------
 
