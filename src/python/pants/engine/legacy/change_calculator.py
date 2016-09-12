@@ -93,13 +93,7 @@ class EngineChangeCalculator(ChangeCalculator):
     super(EngineChangeCalculator, self).__init__(scm)
     self._engine = engine
     self._spec_parser = spec_parser
-    self._mapper_cache = None
-
-  @property
-  def _mapper(self):
-    if self._mapper_cache is None:
-      self._mapper_cache = EngineSourceMapper(self._engine, self._spec_parser)
-    return self._mapper_cache
+    self._mapper = EngineSourceMapper(engine, spec_parser)
 
   def changed_target_addresses(self, changed_request):
     """Given a `ChangedRequest`, compute and yield all affected target addresses."""

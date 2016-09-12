@@ -57,14 +57,7 @@ class BuildGraphChangeCalculator(ChangeCalculator):
     self._include_dependees = include_dependees
     self._fast = fast
     self._exclude_target_regexp = exclude_target_regexp or []
-
-    self._mapper_cache = None
-
-  @property
-  def _mapper(self):
-    if self._mapper_cache is None:
-      self._mapper_cache = SpecSourceMapper(self._address_mapper, self._build_graph, self._fast)
-    return self._mapper_cache
+    self._mapper = SpecSourceMapper(address_mapper, build_graph, fast)
 
   def _directly_changed_targets(self):
     # Internal helper to find target addresses containing SCM changes.

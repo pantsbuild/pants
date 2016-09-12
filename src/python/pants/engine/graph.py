@@ -247,7 +247,7 @@ def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
 
 
-def recursive_dirname(f):
+def _recursive_dirname(f):
   """Given a relative path like 'a/b/c/d', yield all ascending path components like:
 
         'a/b/c/d'
@@ -265,7 +265,7 @@ def recursive_dirname(f):
 def ascendant_addresses_to_globs(address_mapper, ascendant_addresses):
   """Given an AscendantAddresses object, return a PathGlobs object for matching build files."""
   pattern = address_mapper.build_pattern
-  patterns = [join(f, pattern) for f in recursive_dirname(ascendant_addresses.directory)]
+  patterns = [join(f, pattern) for f in _recursive_dirname(ascendant_addresses.directory)]
   return PathGlobs.create_from_specs('', patterns)
 
 
