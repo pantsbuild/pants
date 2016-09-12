@@ -119,7 +119,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         for file_name in file_names:
           with open(os.path.join(dir_path, file_name), 'r') as f:
             content = f.read()
-          if BuildFile.is_buildfile_name(file_name):
+          if BuildFile._is_buildfile_name(file_name):
             content = content.replace(source_dir, target_spec_dir)
           with open(os.path.join(clone_dir_path, file_name), 'w') as f:
             f.write(content)

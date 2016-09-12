@@ -38,7 +38,7 @@ class LegacyAddressMapper(AddressMapper):
     #
     # We could call into the engine to ask for the file that declared the address.
     return (os.path.dirname(file_path) == address.spec_path and
-            BuildFile.is_buildfile_name(os.path.basename(file_path)))
+            BuildFile._is_buildfile_name(os.path.basename(file_path)))
 
   def addresses_in_spec_path(self, spec_path):
     try:

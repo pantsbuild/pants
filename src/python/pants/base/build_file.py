@@ -49,7 +49,7 @@ class BuildFile(AbstractClass):
     return BuildFile._cache[cache_key]
 
   @staticmethod
-  def is_buildfile_name(name):
+  def _is_buildfile_name(name):
     return BuildFile._PATTERN.match(name)
 
   @staticmethod
@@ -79,7 +79,7 @@ class BuildFile(AbstractClass):
         # Remove trailing '/' from paths which were added to indicate that paths are paths to directories.
         dirs.remove(fast_relpath(subdir, root)[:-1])
       for filename in files:
-        if BuildFile.is_buildfile_name(filename):
+        if BuildFile._is_buildfile_name(filename):
           build_files.add(os.path.join(root, filename))
 
     return BuildFile._build_files_from_paths(project_tree, build_files, build_ignore_patterns)
@@ -119,7 +119,7 @@ class BuildFile(AbstractClass):
       raise self.MissingBuildFileError('Path to buildfile ({buildfile}) is a directory, '
                                        'but it must be a file.'.format(buildfile=path))
 
-    if not self.is_buildfile_name(os.path.basename(path)):
+    if not self._is_buildfile_name(os.path.basename(path)):
       raise self.MissingBuildFileError('{path} is not a BUILD file'
                                        .format(path=path))
 
@@ -135,7 +135,7 @@ class BuildFile(AbstractClass):
     """Returns all the BUILD files on a path"""
     build_files = set()
     for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
-      if BuildFile.is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
+      if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
         build_files.add(os.path.join(dir_relpath, build))
     return BuildFile._build_files_from_paths(project_tree, build_files, build_ignore_patterns)
 
