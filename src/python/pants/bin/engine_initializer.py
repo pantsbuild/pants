@@ -83,6 +83,8 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
     """Determines the spec roots/target roots for a given request."""
     logger.debug('spec_roots is: %s', spec_roots)
     logger.debug('changed_request is: %s', changed_request)
+
+    # TODO: Kill v1_spec_roots once `LegacyAddressMapper.specs_to_addresses()` exists.
     if changed_request and changed_request.is_actionable():
       if spec_roots:
         # We've been provided spec roots (e.g. `./pants list ::`) AND a changed request. Error out.

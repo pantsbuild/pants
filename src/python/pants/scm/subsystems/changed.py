@@ -5,8 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import namedtuple
-
+from pants.util.objects import datatype
 from pants.base.build_environment import get_scm
 from pants.base.exceptions import TaskError
 from pants.goal.workspace import ScmWorkspace
@@ -14,7 +13,7 @@ from pants.scm.change_calculator import BuildGraphChangeCalculator
 from pants.subsystem.subsystem import Subsystem
 
 
-class ChangedRequest(namedtuple('ChangedRequest', ['changes_since', 'diffspec', 'include_dependees',
+class ChangedRequest(datatype('ChangedRequest', ['changes_since', 'diffspec', 'include_dependees',
                                                    'fast'])):
   """Parameters required to compute a changed file/target set."""
 
