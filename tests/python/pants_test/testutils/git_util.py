@@ -54,4 +54,4 @@ def initialize_repo(worktree, gitdir=None):
     subprocess.check_call(['git', 'add', '.'])
     subprocess.check_call(['git', 'commit', '-am', 'Add project files.'])
 
-    yield Git(gitdir=gitdir, worktree=worktree)
+    yield Git(gitdir=git_dir, worktree=worktree)
