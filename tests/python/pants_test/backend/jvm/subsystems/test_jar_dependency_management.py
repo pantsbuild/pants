@@ -22,6 +22,7 @@ class JarDependencyManagementTest(BaseTest):
   _coord_two = M2Coordinate('foobar', 'foobar', '1.2')
 
   def _jar_dependency_management(self, **flags):
+    # Need to reset, because we can get called multiple times in a single test.
     Subsystem.reset()
     options = {
       JarDependencyManagement.options_scope: flags,

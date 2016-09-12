@@ -73,7 +73,11 @@ def subsystem_instance(subsystem_type, scope=None, **options):
 
 
 def global_subsystem_instance(subsystem_type, options=None):
-  """Returns the global instance of a subsystem, for use in tests.
+  """Initializes a subsystem, and returns its global instance, for use in tests.
+
+  Note that if the subsystem was already initialized and an instance of it created, then that
+  instance will not be cleared by this function.
+  TODO: Support reset of individual subsystems. See https://github.com/pantsbuild/pants/issues/3856.
 
   :API: public
 
@@ -94,6 +98,10 @@ def init_subsystems(subsystem_types, options=None):
   Does not create an instance.  This function is for setting up subsystems that the code
   under test creates.
 
+  Note that if the subsystem was already initialized and an instance of it created, then that
+  instance will not be cleared by this function.
+  TODO: Support reset of individual subsystems. See https://github.com/pantsbuild/pants/issues/3856.
+
   Note that there is some redundancy between this function and BaseTest.context(for_subsystems=...).
   TODO: Fix that.
 
@@ -109,6 +117,7 @@ def init_subsystems(subsystem_types, options=None):
   for s in subsystem_types:
     if not Subsystem.is_subsystem_type(s):
       raise TypeError('{} is not a subclass of `Subsystem`'.format(s))
+
   optionables = Subsystem.closure(subsystem_types)
   if options:
     allowed_scopes = {o.options_scope for o in optionables}
