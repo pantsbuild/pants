@@ -104,7 +104,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
   def warm_product_graph(self, spec_roots, changed_request=None):
     """Warm the scheduler's `ProductGraph` with `LegacyTarget` products.
 
-    :param list spec_roots: A list of specs representing the root targets of the request.
+    :param list spec_roots: A list of `Spec` instances representing the root targets of the request.
     :param ChangedRequest changed_request: A ChangedRequest for determining alternate target roots.
     """
     _, spec_roots = self._determine_spec_roots(changed_request, spec_roots)
@@ -117,7 +117,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
   def create_build_graph(self, spec_roots, build_root=None, changed_request=None):
     """Construct and return a `BuildGraph` given a set of input specs.
 
-    :param list spec_roots: A list of specs representing the root targets of the request.
+    :param list spec_roots: A list of `Spec` instances representing the root targets of the request.
     :param string build_root: The build root.
     :param ChangedRequest changed_request: A ChangedRequest for determining alternate target roots.
     :returns: A tuple of (BuildGraph, AddressMapper, list[specs]).
