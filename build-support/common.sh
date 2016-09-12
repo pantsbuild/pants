@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-qfunction log() {
+function log() {
   echo -e "$@" 1>&2
 }
 
