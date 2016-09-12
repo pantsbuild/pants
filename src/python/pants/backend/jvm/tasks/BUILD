@@ -1,4 +1,4 @@
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
@@ -611,8 +611,10 @@ python_library(
   name = 'scalafmt',
   sources = ['scalafmt.py'],
   dependencies = [
+    ':nailgun_task',
     'src/python/pants/base:exceptions',
-    'src/python/pants/task',
+    'src/python/pants/build_graph',
+    'src/python/pants/option',
   ]
 )
 

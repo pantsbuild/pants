@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -43,12 +43,10 @@ class ScalaFmt(NailgunTask):
     sources = self.calculate_sources(targets)
 
     if sources:
-      files = ""
-      for source in sources:
-        files = files + source + ','
+      files = ",".join(sources)
 
-      configFile = self.get_options().configuration
-      args = ['--test', '--config', configFile, '--files', files]
+      config_file = self.get_options().configuration
+      args = ['--test', '--config', config_file, '--files', files]
 
       result = self.runjava(classpath=self.tool_classpath('scalafmt'),
                    main=self._SCALAFMT_MAIN,
@@ -56,9 +54,9 @@ class ScalaFmt(NailgunTask):
                    workunit_name='scalafmt')
 
       if result != 0:
-        scalafmtCmd = 'scalafmt -i --config {} --files {}'.format(configFile, files)
-        raise TaskError('Scalafmt failed with exit code {} to fix run: `{}`'.format(result, scalafmtCmd), exit_code=result)
-  
+        scalafmt_cmd = 'scalafmt -i --config {} --files {}'.format(config_file, files)
+        raise TaskError('Scalafmt failed with exit code {} to fix run: `{}`'.format(result, scalafmt_cmd), exit_code=result)
+
   def get_non_synthetic_scala_targets(self, targets):
     return filter(
       lambda target: isinstance(target, Target)
@@ -67,7 +65,7 @@ class ScalaFmt(NailgunTask):
       targets)
 
   def calculate_sources(self, targets):
-    sources = set() 
+    sources = set()
     for target in targets:
       sources.update(source for source in target.sources_relative_to_buildroot()
                       if source.endswith(self._SCALA_SOURCE_EXTENSION))
