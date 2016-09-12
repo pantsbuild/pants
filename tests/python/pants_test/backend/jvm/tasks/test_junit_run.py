@@ -25,7 +25,7 @@ from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_file_dump
 from pants.util.timeout import TimeoutReached
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class JUnitRunnerTest(JvmToolTaskTestBase):
@@ -156,12 +156,12 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     # Invoke ivy to resolve classpath for junit.
     classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
-    with subsystem_instance(IvySubsystem) as ivy_subsystem:
-      distribution = DistributionLocator.cached(jdk=True)
-      ivy = Bootstrapper(ivy_subsystem=ivy_subsystem).ivy()
-      ivy.execute(args=['-cachepath', classpath_file_abs_path,
-                        '-dependency', 'junit', 'junit-dep', '4.10'],
-                  executor=SubprocessExecutor(distribution=distribution))
+    ivy_subsystem = global_subsystem_instance(IvySubsystem)
+    distribution = DistributionLocator.cached(jdk=True)
+    ivy = Bootstrapper(ivy_subsystem=ivy_subsystem).ivy()
+    ivy.execute(args=['-cachepath', classpath_file_abs_path,
+                      '-dependency', 'junit', 'junit-dep', '4.10'],
+                executor=SubprocessExecutor(distribution=distribution))
 
     with open(classpath_file_abs_path) as fp:
       classpath = fp.read()

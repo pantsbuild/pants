@@ -9,7 +9,7 @@ import os
 
 from pants.java.distribution.distribution import Distribution, DistributionLocator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class AndroidIntegrationTest(PantsRunIntegrationTest):
@@ -38,8 +38,8 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
     else:
       return False
     try:
-      with subsystem_instance(DistributionLocator) as locator:
-        locator.cached(minimum_version=cls.JAVA_MIN, maximum_version=cls.JAVA_MAX)
+      locator = global_subsystem_instance(DistributionLocator)
+      locator.cached(minimum_version=cls.JAVA_MIN, maximum_version=cls.JAVA_MAX)
     except Distribution.Error:
       return False
     return True
