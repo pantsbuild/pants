@@ -55,7 +55,6 @@ class StrutilTest(unittest.TestCase):
     self.assertEquals('/testString', strip_prefix('/testString', '//'))
     self.assertEquals('testString', strip_prefix('//testString', '//'))
     self.assertEquals('/testString', strip_prefix('///testString', '//'))
-    self.assertEquals('testString', strip_prefix('////testString', '//'))
-    self.assertEquals('//testString', strip_prefix('////testString', '//', 1))
+    self.assertEquals('//testString', strip_prefix('////testString', '//'))
     self.assertEquals('test//String', strip_prefix('test//String', '//'))
     self.assertEquals('testString//', strip_prefix('testString//', '//'))

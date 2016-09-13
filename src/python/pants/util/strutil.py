@@ -65,7 +65,7 @@ def pluralize(count, item_type):
   return text
 
 
-def strip_prefix(string, prefix, num_instances_to_strip=six.MAXSIZE):
+def strip_prefix(string, prefix):
   """Returns a copy of the string from which the multi-character prefix has been stripped.
 
   Use strip_prefix() instead of lstrip() to remove a substring (instead of individual characters)
@@ -74,11 +74,10 @@ def strip_prefix(string, prefix, num_instances_to_strip=six.MAXSIZE):
 
   :param str string: The string from which to strip the specified prefix.
   :param str prefix: The substring to strip from the left of string, if present.
-  :param int num_instances_to_strip: Number of instances of prefix to remove, if present.
   :return: The string with prefix stripped from the left, if present.
   :rtype: string
   """
-  while (num_instances_to_strip > 0 and string.startswith(prefix)):
-    string = string[len(prefix):]
-    num_instances_to_strip -= 1
-  return string
+  if string.startswith(prefix):
+    return string[len(prefix):]
+  else:
+    return string

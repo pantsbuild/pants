@@ -52,7 +52,7 @@ def parse_spec(spec, relative_to=None):
     )
   """
   def normalize_absolute_refs(ref):
-    return strip_prefix(ref,'//', 1)
+    return strip_prefix(ref, '//')
 
   def check_path(path):
     # A root or relative spec is OK
