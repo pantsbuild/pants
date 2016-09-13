@@ -11,6 +11,7 @@ from xml.dom import minidom
 
 from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION, IdeaPluginGen
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.address import Address
 from pants.util.contextutil import temporary_file
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -92,28 +93,13 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     )
 
   def test_idea_plugin_long_project_name(self):
-    a_lot_of_targets = [
-      "testprojects/tests/java/org/pantsbuild/testproject/depman:new-manager",
-      "testprojects/tests/java/org/pantsbuild/testproject/unicode/cucumber:cucumber",
-      "testprojects/tests/java/org/pantsbuild/testproject/depman:old-manager",
-      "testprojects/tests/java/org/pantsbuild/testproject/depman:common-lib",
-      "testprojects/tests/java/org/pantsbuild/testproject/parallel:parallel",
-      "testprojects/tests/java/org/pantsbuild/testproject/parallel:cmdline",
-      "testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform",
-      "testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:run",
-      "testprojects/tests/java/org/pantsbuild/testproject/empty:empty",
-      "testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:test",
-      "testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight",
-      "testprojects/tests/java/org/pantsbuild/testproject/ideacodeandresources:code",
-      "testprojects/tests/java/org/pantsbuild/testproject/annotation:annotation",
-      "testprojects/tests/java/org/pantsbuild/testproject/parallel:junit-runner-annotations",
-      "testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests",
-      "testprojects/tests/java/org/pantsbuild/testproject/parallel:annotated-parallel",
-      "testprojects/tests/java/org/pantsbuild/testproject/testjvms:six",
-      "testprojects/tests/java/org/pantsbuild/testproject/parallelmethods:parallelmethods",
-      "testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests",
-      "testprojects/tests/java/org/pantsbuild/testproject/ideatestsandlib:lib",
-      "testprojects/tests/java/org/pantsbuild/testproject/testjvms:base",
-    ]
+    list_run = self.run_pants(['-q', 'list', 'testprojects/tests/java/org/pantsbuild/testproject/::'])
+    self.assert_success(list_run)
+
+    self.assertGreater(len(list_run.stdout_data), IdeaPluginGen.PROJECT_NAME_LIMIT)
+    # sorted the targets in order to determine the first target as project path.
+    a_lot_of_targets = sorted(l for l in list_run.stdout_data.splitlines() if l)
+    spec_path = Address.parse(a_lot_of_targets[0]).spec_path
+
     self.assertEqual(IdeaPluginGen.PROJECT_NAME_LIMIT, len(IdeaPluginGen.get_project_name(a_lot_of_targets)))
-    self._run_and_check("testprojects/tests/java/org/pantsbuild/testproject/depman", a_lot_of_targets)
+    self._run_and_check(spec_path, a_lot_of_targets)
