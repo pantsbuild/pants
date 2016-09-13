@@ -7,16 +7,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import re
+from abc import abstractmethod
 
 from pants.build_graph.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
+from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
 
 
-class ChangeCalculator(object):
-  """A utility for calculating changed files."""
+class ChangeCalculator(AbstractClass):
+  """An abstract class for changed target calculation."""
 
   def __init__(self, scm, workspace=None, changes_since=None, diffspec=None):
     self._scm = scm
@@ -24,22 +26,21 @@ class ChangeCalculator(object):
     self._changes_since = changes_since
     self._diffspec = diffspec
 
-  def changed_files(self, changed_request=None):
+  def changed_files(self, changes_since=None, diffspec=None):
     """Determines the files changed according to SCM/workspace and options."""
-    if changed_request:
-      changes_since = changed_request.changes_since
-      diffspec = changed_request.diffspec
-    else:
-      changes_since = self._changes_since
-      diffspec = self._diffspec
+    if diffspec:
+      return self._workspace.changes_in(diffspec)
 
     changes_since = changes_since or self._scm.current_rev_identifier()
-    return self._workspace.changes_in(diffspec) if diffspec else self._workspace.touched_files(
-      changes_since)
+    return self._workspace.touched_files(changes_since)
+
+  @abstractmethod
+  def changed_target_addresses(self):
+    """Find changed targets, according to SCM."""
 
 
 class BuildGraphChangeCalculator(ChangeCalculator):
-  """A utility for calculating changed files or changed target addresses."""
+  """A `BuildGraph`-based helper for calculating changed target addresses."""
 
   def __init__(self,
                scm,
@@ -63,7 +64,7 @@ class BuildGraphChangeCalculator(ChangeCalculator):
     # Internal helper to find target addresses containing SCM changes.
     targets_for_source = self._mapper.target_addresses_for_source
     result = set()
-    for src in self.changed_files():
+    for src in self.changed_files(self._changes_since, self._diffspec):
       result.update(set(targets_for_source(src)))
     return result
 

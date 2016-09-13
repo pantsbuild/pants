@@ -97,7 +97,7 @@ class EngineChangeCalculator(ChangeCalculator):
 
   def changed_target_addresses(self, changed_request):
     """Given a `ChangedRequest`, compute and yield all affected target addresses."""
-    changed_files = self.changed_files(changed_request)
+    changed_files = self.changed_files(changed_request.changes_since, changed_request.diffspec)
     logger.debug('changed files: %s', changed_files)
     if not changed_files:
       return

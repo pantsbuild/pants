@@ -5,12 +5,24 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.util.objects import datatype
 from pants.base.build_environment import get_scm
 from pants.base.exceptions import TaskError
 from pants.goal.workspace import ScmWorkspace
 from pants.scm.change_calculator import BuildGraphChangeCalculator
 from pants.subsystem.subsystem import Subsystem
+from pants.util.objects import datatype
+
+
+class _ChainedOptions(object):
+  def __init__(self, options_seq):
+    self._options_seq = options_seq
+
+  def __getattr__(self, attr):
+    for options in self._options_seq:
+      option_value = getattr(options, attr)
+      if option_value is not None:
+        return option_value
+    return None
 
 
 class ChangedRequest(datatype('ChangedRequest', ['changes_since', 'diffspec', 'include_dependees',
@@ -19,7 +31,7 @@ class ChangedRequest(datatype('ChangedRequest', ['changes_since', 'diffspec', 'i
 
   @classmethod
   def from_options(cls, options):
-    """Given options, produce a ChangedRequest or None if no core params are provided."""
+    """Given an `Options` object, produce a `ChangedRequest`."""
     return cls(options.changes_since,
                options.diffspec,
                options.include_dependees,
@@ -30,7 +42,12 @@ class ChangedRequest(datatype('ChangedRequest', ['changes_since', 'diffspec', 'i
 
 
 class Changed(object):
-  """A subsystem for global `changed` functionality."""
+  """A subsystem for global `changed` functionality.
+
+  This supports the "legacy" `changed`, `test-changed` and `compile-changed` goals as well as the
+  v2 engine style `--changed-*` argument target root replacements which can apply to any goal (e.g.
+  `./pants --changed-parent=HEAD~3 list` replaces `./pants --changed-parent=HEAD~3 changed`).
+  """
 
   class Factory(Subsystem):
     options_scope = 'changed'
@@ -46,9 +63,18 @@ class Changed(object):
       register('--fast', type=bool,
                help='Stop searching for owners once a source is mapped to at least one owning target.')
 
-    def create(self):
-      options = self.global_instance().get_options()
-      changed_request = ChangedRequest.from_options(options)
+    @classmethod
+    def create(cls, alternate_options=None):
+      """
+      :param Options alternate_options: An alternate `Options` object for overrides.
+      """
+      options = cls.global_instance().get_options()
+      # N.B. This chaining is purely to support the `changed` tests until deprecation.
+      ordered_options = [option for option in (alternate_options, options) if option is not None]
+      chained_options = _ChainedOptions(ordered_options)
+      # TODO: Kill this chaining (in favor of outright options replacement) as part of the `changed`
+      # task removal (post-deprecation cycle).
+      changed_request = ChangedRequest.from_options(chained_options)
       return Changed(changed_request)
 
   def __init__(self, changed_request):
@@ -58,11 +84,10 @@ class Changed(object):
   def changed_request(self):
     return self._changed_request
 
-  def change_calculator(self, config, build_graph, address_mapper, scm=None, workspace=None,
+  def change_calculator(self, build_graph, address_mapper, scm=None, workspace=None,
                         exclude_target_regexp=None):
     """Constructs and returns a BuildGraphChangeCalculator.
 
-    :param object config: An object representing the options/ChangedRequest config.
     :param BuildGraph build_graph: A BuildGraph instance.
     :param AddressMapper address_mapper: A AddressMapper instance.
     :param Scm scm: The SCM instance. Defaults to discovery.
@@ -71,7 +96,8 @@ class Changed(object):
     """
     scm = scm or get_scm()
     if scm is None:
-      raise TaskError('No SCM available.')
+      raise TaskError('A `changed` goal or --changed option was specified, '
+                      'but no SCM is available to satisfy the request.')
     workspace = workspace or ScmWorkspace(scm)
 
     return BuildGraphChangeCalculator(
@@ -79,9 +105,9 @@ class Changed(object):
       workspace,
       address_mapper,
       build_graph,
-      config.include_dependees,
-      fast=config.fast,
-      changes_since=config.changes_since,
-      diffspec=config.diffspec,
+      self._changed_request.include_dependees,
+      fast=self._changed_request.fast,
+      changes_since=self._changed_request.changes_since,
+      diffspec=self._changed_request.diffspec,
       exclude_target_regexp=exclude_target_regexp
     )

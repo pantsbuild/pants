@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.scm.subsystems.changed import Changed, ChangedRequest
+from pants.scm.subsystems.changed import Changed
 from pants.task.console_task import ConsoleTask
 
 
@@ -26,19 +26,8 @@ class WhatChanged(ConsoleTask):
   def console_output(self, _):
     # N.B. This task shares an options scope ('changed') with the `Changed` subsystem.
     options = self.get_options()
-    changed = Changed.Factory.global_instance().create()
-    changed_request = changed.changed_request
-
-    # Allow options-based passthrough for easier testing.
-    merged_changed_request = ChangedRequest(
-      options.get('changes_since', changed_request.changes_since),
-      options.get('diffspec', changed_request.diffspec),
-      options.get('include_dependees', changed_request.include_dependees),
-      options.get('fast', changed_request.fast)
-    )
-
+    changed = Changed.Factory.global_instance().create(options)
     change_calculator = changed.change_calculator(
-      merged_changed_request,
       build_graph=self.context.build_graph,
       address_mapper=self.context.address_mapper,
       scm=self.context.scm,
