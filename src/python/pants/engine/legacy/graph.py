@@ -83,16 +83,14 @@ class LegacyBuildGraph(BuildGraph):
             'Build graph construction failed for {}:\n{}'.format(node.subject, trace))
       elif type(state) is not Return:
         State.raise_unrecognized(state)
-      if type(state.value) is not TargetAdaptors:
-        raise TypeError('Expected roots to hold {}; got: {}'.format(
-          TargetAdaptors, type(state.value)))
 
-      # We have a successful TargetAdaptors value (for a particular input Spec).
-      for target_adaptor in state.value.dependencies:
-        address = target_adaptor.address
-        all_addresses.add(address)
-        if address not in self._target_by_address:
-          new_targets.append(self._index_target(target_adaptor))
+      # We have a list of TargetAdaptors (for a particular input Spec).
+      for target_adaptors in state.value:
+        for target_adaptor in target_adaptors.dependencies:
+          address = target_adaptor.address
+          all_addresses.add(address)
+          if address not in self._target_by_address:
+            new_targets.append(self._index_target(target_adaptor))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -220,15 +218,16 @@ class LegacyBuildGraph(BuildGraph):
 
     yielded_addresses = set()
     for root, state in self._scheduler.root_entries(request).items():
-      if not state.value.dependencies:
+      if not state.value:
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(root.subject))
       # TODO! this is yielding transitive addresses rather than roots again.
-      for target_adaptor in state.value.dependencies:
-        address = target_adaptor.address
-        if address not in yielded_addresses:
-          yielded_addresses.add(address)
-          yield address
+      for target_adaptors in state.value:
+        for target_adaptor in target_adaptors.dependencies:
+          address = target_adaptor.address
+          if address not in yielded_addresses:
+            yielded_addresses.add(address)
+            yield address
 
 
 class HydratedField(datatype('HydratedField', ['name', 'value'])):
