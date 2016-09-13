@@ -49,9 +49,15 @@ class ProcessGroup(object):
                           metadata_base_dir=self._metadata_base_dir)
 
   def iter_processes(self, proc_filter=None):
-    proc_filter = proc_filter or (lambda x: True)
+    if proc_filter:
+      def filter(o):
+        with swallow_psutil_exceptions():
+          return proc_filter(o)
+    else:
+      filter = lambda x: True
+
     with swallow_psutil_exceptions():
-      for proc in (x for x in psutil.process_iter() if proc_filter(x)):
+      for proc in (x for x in psutil.process_iter() if filter(x)):
         yield proc
 
   def iter_instances(self, *args, **kwargs):
