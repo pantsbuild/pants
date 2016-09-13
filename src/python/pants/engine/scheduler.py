@@ -21,8 +21,8 @@ from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, S
                                     SelectVariant)
 from pants.engine.storage import Digest
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import (ExternContext, extern_issubclass, extern_project_multi,
-                                           extern_to_str)
+from pants.engine.subsystem.native import (ExternContext, extern_issubclass,
+                                           extern_project_multi, extern_store_list, extern_to_str)
 from pants.util.objects import datatype
 
 
@@ -40,15 +40,23 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   """
 
 
-def _store_list(*args):
-  """Accepts varargs and returns a tuple.
+class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
+                                                         'binary_type',
+                                                         'input_selectors',
+                                                         'input_conversion',
+                                                         'output_conversion'])):
+  """A task type for defining execution of snapshotted processes."""
 
-  This tiny function carries it's weight by allowing the aggregation of dependencies
-  to be pipelined with their consumption by a Task function.
+  def as_node(self, subject, product_type, variants):
+    return ProcessExecutionNode(subject, variants, self)
 
-  TODO: Move to a 'core' module?
-  """
-  return args
+  @property
+  def output_product_type(self):
+    return self.product_type
+
+  @property
+  def input_selects(self):
+    return self.input_selectors
 
 
 class Field(datatype('Field', ['name', 'typ'])):
@@ -106,7 +114,7 @@ class LocalScheduler(object):
     scheduler = native.lib.scheduler_create(self._extern_context,
                                             extern_to_str,
                                             extern_issubclass,
-                                            self._to_type_key(_store_list),
+                                            extern_store_list,
                                             self._to_type_key(_project_field),
                                             extern_project_multi,
                                             self._to_key('name'),

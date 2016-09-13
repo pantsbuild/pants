@@ -43,6 +43,7 @@ _FFI.cdef(
 
     typedef UTF8Buffer  (*extern_to_str)(ExternContext*, Digest*);
     typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
+    typedef Key         (*extern_store_list)(ExternContext*, Key*, uint64_t);
     typedef KeyBuffer   (*extern_project_multi)(ExternContext*, Key*, Field*);
 
     typedef struct {
@@ -97,7 +98,7 @@ _FFI.cdef(
     RawScheduler* scheduler_create(ExternContext*,
                                    extern_to_str,
                                    extern_issubclass,
-                                   Function,
+                                   extern_store_list,
                                    Function,
                                    extern_project_multi,
                                    Field,
@@ -157,6 +158,14 @@ def extern_issubclass(context_handle, cls_id, super_cls_id):
   cls = c.storage.get_from_digest(_FFI.buffer(cls_id.digest)[:])
   super_cls = c.storage.get_from_digest(_FFI.buffer(super_cls_id.digest)[:])
   return issubclass(cls, super_cls)
+
+
+@_FFI.callback("Key(ExternContext*, Key*, uint64_t)")
+def extern_store_list(context_handle, keys_ptr, keys_len):
+  """Given storage and an array of Keys, return a new Key to represent the list."""
+  c = _FFI.from_handle(context_handle)
+  digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
+  return c.storage.put_typed_from_digests(digests)
 
 
 @_FFI.callback("KeyBuffer(ExternContext*, Key*, Field*)")

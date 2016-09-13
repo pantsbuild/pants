@@ -37,6 +37,28 @@ impl IsSubClassFunction {
   }
 }
 
+pub type StoreListExtern =
+  extern "C" fn(*const ExternContext, *const Key, u64) -> Key;
+
+pub struct StoreListFunction {
+  store_list: StoreListExtern,
+  context: *const ExternContext,
+}
+
+impl StoreListFunction {
+  pub fn new(store_list: StoreListExtern, context: *const ExternContext) -> StoreListFunction {
+    StoreListFunction {
+      store_list: store_list,
+      context: context,
+    }
+  }
+
+  pub fn call(&self, keys: Vec<&Key>) -> Key {
+    let keys_clone: Vec<Key> = keys.into_iter().map(|&k| k).collect();
+    (self.store_list)(self.context, keys_clone.as_ptr(), keys_clone.len() as u64)
+  }
+}
+
 #[repr(C)]
 pub struct KeyBuffer {
   keys_ptr: *mut Key,
