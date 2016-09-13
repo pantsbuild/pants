@@ -150,10 +150,9 @@ impl Scheduler {
             &State::Complete(Complete::Return(k)) =>
               // Dep completed successfully.
               args.push(StagedArg::Key(k)),
-            &State::Staged(_) if self.outstanding.contains(&dep_id) => {
+            &State::Staged(_) if self.outstanding.contains(&dep_id) =>
               // Dep is staged and already outstanding.
-              args.push(arg.clone());
-            },
+              args.push(arg.clone()),
             &State::Waiting(_) | &State::Staged(_) =>
               // Dep is not complete.
               return None,
