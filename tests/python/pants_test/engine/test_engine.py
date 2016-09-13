@@ -30,10 +30,17 @@ class EngineTest(unittest.TestCase):
                                         subjects=addresses)
 
   def assert_engine(self, engine):
-    result = engine.execute(self.request(['compile'], self.java))
-    self.assertEqual({SelectNode(self.java, None, Select(Classpath)):
-                      Return(Classpath(creator='javac'))},
-                     result.root_products)
+    request = self.request(['compile'], self.java)
+    result = engine.execute(request)
+    expected_roots = {SelectNode(self.java, None, Select(Classpath)):
+                      Return(Classpath(creator='javac'))}
+    if result.root_products != expected_roots:
+      root, state = self.scheduler.root_entries(request).items()[0]
+      self.fail(
+        'Unexpected root products.\n  First root: {}\n  Product graph len: {}\n  Trace:\n{}'.format(
+          root,
+          len(self.scheduler.product_graph),
+        '\n'.join(self.scheduler.product_graph.trace(root))))
     self.assertIsNone(result.error)
 
   @contextmanager
