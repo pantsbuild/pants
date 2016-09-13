@@ -15,7 +15,16 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
 
-SourceRoot = namedtuple('_SourceRoot', ['path', 'langs'])
+class SourceRootCategories(object):
+  UNKNOWN = 'unknown'
+  SOURCE = 'source'
+  TEST = 'test'
+  THIRDPARTY = 'thirdparty'
+  ALL = [UNKNOWN, SOURCE, TEST, THIRDPARTY]
+
+
+SourceRoot = namedtuple('_SourceRoot', ['path', 'langs', 'category'])
+SourceRoot.__new__.__defaults__ = (SourceRootCategories.UNKNOWN,)
 
 
 class SourceRootFactory(object):
@@ -35,12 +44,12 @@ class SourceRootFactory(object):
       for canonical in canonicalized:
         yield canonical
 
-  def create(self, relpath, langs):
-    """Return a source root at the given `relpath` for the given `langs`.
+  def create(self, relpath, langs, category):
+    """Return a source root at the given `relpath` for the given `langs` and `category`.
 
     :returns: :class:`SourceRoot`.
     """
-    return SourceRoot(relpath, tuple(self._canonicalize_langs(langs)))
+    return SourceRoot(relpath, tuple(self._canonicalize_langs(langs)), category)
 
 
 class SourceRoots(object):
@@ -57,14 +66,14 @@ class SourceRoots(object):
     self._source_root_factory = source_root_config.source_root_factory
     self._options = source_root_config.get_options()
 
-  def add_source_root(self, path, langs=tuple()):
+  def add_source_root(self, path, langs=tuple(), category=SourceRootCategories.UNKNOWN):
     """Add the specified fixed source root, which must be relative to the buildroot.
 
     Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
     unknown structure.  Tests should prefer to use dirs that match our source root patterns
     instead of explicitly setting source roots here.
     """
-    self._trie.add_fixed(path, langs)
+    self._trie.add_fixed(path, langs, category)
 
   def find(self, target):
     """Find the source root for the given target, or None.
@@ -89,12 +98,12 @@ class SourceRoots(object):
     elif self._options.unmatched == 'create':
       # If no source root is found, use the path directly.
       # TODO: Remove this logic. It should be an error to have no matching source root.
-      return SourceRoot(path, [])
+      return SourceRoot(path, [], SourceRootCategories.UNKNOWN)
 
   def all_roots(self):
     """Return all known source roots.
 
-    Returns a generator over (source root, list of langs) pairs.
+    Returns a generator over (source root, list of langs, category) triples.
 
     Note: Requires a directory walk to match actual directories against patterns.
     However we don't descend into source roots, once found, so this should be fast in practice.
@@ -103,9 +112,9 @@ class SourceRoots(object):
     project_tree = get_project_tree(self._options)
 
     fixed_roots = set()
-    for root, langs in self._trie.fixed():
+    for root, langs, category in self._trie.fixed():
       if project_tree.exists(root):
-        yield self._source_root_factory.create(root, langs)
+        yield self._source_root_factory.create(root, langs, category)
       fixed_roots.add(root)
 
     for relpath, dirnames, _ in project_tree.walk('', topdown=True):
@@ -164,7 +173,6 @@ class SourceRootConfig(Subsystem):
   }
 
   _DEFAULT_SOURCE_ROOT_PATTERNS = [
-    '3rdparty/*',
     'src/*',
     'src/main/*',
   ]
@@ -175,47 +183,57 @@ class SourceRootConfig(Subsystem):
     'src/test/*'
   ]
 
+  _DEFAULT_THIRDPARTY_ROOT_PATTERNS = [
+    '3rdparty/*',
+    '3rd_party/*',
+    'thirdparty/*',
+    'third_party/*',
+  ]
+
   _DEFAULT_SOURCE_ROOTS = {
-    # Go requires some special-case handling of source roots.  In particular, go buildgen assumes
-    # that there's a single source root for local code and (optionally) a single source root
-    # for remote code.  This fixed source root shows how to capture that distinction.
-    # Go repos may need to add their own appropriate special cases in their pants.ini, until we fix
-    # this hack.
-    # TODO: Treat third-party/remote code as a separate category (akin to 'source' and 'test').
-    # Then this hack won't be necessary.
-    '3rdparty/go': ('go_remote',),
   }
 
   _DEFAULT_TEST_ROOTS = {
+  }
+
+  _DEFAULT_THIRDPARTY_ROOTS = {
   }
 
   @classmethod
   def register_options(cls, register):
     super(SourceRootConfig, cls).register_options(register)
     register('--unmatched', choices=['create', 'fail'], default='create', advanced=True,
-             help='Configures the behaviour when sources are defined outside of any configured '
+             help='Configures the behavior when sources are defined outside of any configured '
                   'source root. `create` will cause a source root to be implicitly created at '
                   'the definition location of the sources; `fail` will trigger an error.')
     register('--lang-canonicalizations', metavar='<map>', type=dict,
              default=cls._DEFAULT_LANG_CANONICALIZATIONS, advanced=True,
              help='Map of language aliases to their canonical names.')
+
+    pattern_help_fmt = ('A list of source root patterns for {} code. Use a "*" wildcard path '
+                        'segment to match the language name, which will be canonicalized.')
     register('--source-root-patterns', metavar='<list>', type=list,
              default=cls._DEFAULT_SOURCE_ROOT_PATTERNS, advanced=True,
-             help='A list of source root patterns. Use a "*" wildcard path segment to match the '
-                  'language name, which will be canonicalized.')
+             help=pattern_help_fmt.format('source'))
     register('--test-root-patterns', metavar='<list>', type=list,
              default=cls._DEFAULT_TEST_ROOT_PATTERNS, advanced=True,
-             help='A list of source root patterns. Use a "*" wildcard path segment to match the '
-                  'language name, which will be canonicalized.')
+             help=pattern_help_fmt.format('test'))
+    register('--thirdparty-root-patterns', metavar='<list>', type=list,
+             default=cls._DEFAULT_THIRDPARTY_ROOT_PATTERNS, advanced=True,
+             help=pattern_help_fmt.format('third-party'))
 
+    fixed_help_fmt = ('A map of source roots for {} code to list of languages. '
+                      'Useful when you want to enumerate fixed source roots explicitly, '
+                      'instead of relying on patterns.')
     register('--source-roots', metavar='<map>', type=dict,
              default=cls._DEFAULT_SOURCE_ROOTS, advanced=True,
-             help='A map of source roots to list of languages.  Useful when you want to enumerate '
-                  'fixed source roots explicitly, instead of relying on patterns.')
+             help=fixed_help_fmt.format('source'))
     register('--test-roots', metavar='<map>', type=dict,
              default=cls._DEFAULT_TEST_ROOTS, advanced=True,
-             help='A map of test roots to list of languages.  Useful when you want to enumerate '
-                  'fixed test roots explicitly, instead of relying on patterns.')
+             help=fixed_help_fmt.format('test'))
+    register('--thirdparty-roots', metavar='<map>', type=dict,
+             default=cls._DEFAULT_THIRDPARTY_ROOTS, advanced=True,
+             help=fixed_help_fmt.format('third-party'))
 
   @memoized_method
   def get_source_roots(self):
@@ -229,17 +247,13 @@ class SourceRootConfig(Subsystem):
     trie = SourceRootTrie(self.source_root_factory)
     options = self.get_options()
 
-    # Add patterns.
-    for pattern in options.source_root_patterns or []:
-      trie.add_pattern(pattern)
-    for pattern in options.test_root_patterns or []:
-      trie.add_pattern(pattern)
-
-    # Now add all fixed source roots.
-    for path, langs in (options.source_roots or {}).items():
-      trie.add_fixed(path, langs)
-    for path, langs in (options.test_roots or {}).items():
-      trie.add_fixed(path, langs)
+    for category in SourceRootCategories.ALL:
+      # Add patterns.
+      for pattern in options.get('{}_root_patterns'.format(category), []):
+        trie.add_pattern(pattern, category)
+      # Add fixed source roots.
+      for path, langs in options.get('{}_roots'.format(category), {}).items():
+        trie.add_fixed(path, langs, category)
 
     return trie
 
@@ -266,6 +280,7 @@ class SourceRootTrie(object):
     def __init__(self):
       self.children = {}
       self.langs = tuple()
+      self.category = None  # One of SourceRootCategories, or None if this isn't a terminal node.
       self.is_terminal = False
       # We need an explicit terminal flag because not all terminals are leaf nodes,  e.g.,
       # if we have patterns src/* and src/main/* then the '*' is a terminal (for the first pattern)
@@ -296,25 +311,25 @@ class SourceRootTrie(object):
     def subpatterns(self):
       if self.children:
         for key, child in self.children.items():
-          for sp, langs in child.subpatterns():
+          for sp, langs, category in child.subpatterns():
             if sp:
-              yield os.path.join(key, sp), langs
+              yield os.path.join(key, sp), langs, category
             else:
-              yield key, langs
+              yield key, langs, category
       else:
-        yield '', self.langs
+        yield '', self.langs, self.category
 
   def __init__(self, source_root_factory):
     self._source_root_factory = source_root_factory
     self._root = SourceRootTrie.Node()
 
-  def add_pattern(self, pattern):
+  def add_pattern(self, pattern, category=SourceRootCategories.UNKNOWN):
     """Add a pattern to the trie."""
-    self._do_add_pattern(pattern, tuple())
+    self._do_add_pattern(pattern, tuple(), category)
 
-  def add_fixed(self, path, langs):
+  def add_fixed(self, path, langs, category=SourceRootCategories.UNKNOWN):
     """Add a fixed source root to the trie."""
-    self._do_add_pattern(os.path.join('^', path), tuple(langs))
+    self._do_add_pattern(os.path.join('^', path), tuple(langs), category)
 
   def fixed(self):
     """Returns a list of just the fixed source roots in the trie."""
@@ -323,7 +338,7 @@ class SourceRootTrie(object):
         return list(child.subpatterns())
     return []
 
-  def _do_add_pattern(self, pattern, langs):
+  def _do_add_pattern(self, pattern, langs, category):
     keys = pattern.split(os.path.sep)
     node = self._root
     for key in keys:
@@ -332,6 +347,7 @@ class SourceRootTrie(object):
         child = node.new_child(key)
       node = child
     node.langs = langs
+    node.category = category
     node.is_terminal = True
 
   def find(self, path):
@@ -351,6 +367,6 @@ class SourceRootTrie(object):
           node = child
           j += 1
       if node.is_terminal:
-        return self._source_root_factory.create(os.path.join(*keys[1:j]), langs)
+        return self._source_root_factory.create(os.path.join(*keys[1:j]), langs, node.category)
       # Otherwise, try the next value of i.
     return None
