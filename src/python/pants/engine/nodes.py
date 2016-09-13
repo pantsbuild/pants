@@ -229,6 +229,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
   is_cacheable = False
   is_inlineable = True
 
+  _variant_selector = Select(Variants)
+
   @property
   def variant_key(self):
     if isinstance(self.selector, SelectVariant):
@@ -252,7 +254,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
     # them to task nodes.
     variants = self.variants
     if type(self.subject) is Address and self.product is not Variants:
-      variants_node = step_context.select_node(Select(Variants), self.subject, self.variants)
+      variants_node = step_context.select_node(self._variant_selector, self.subject, self.variants)
       dep_state = step_context.get(variants_node)
       if type(dep_state) is Waiting:
         return dep_state
@@ -346,11 +348,13 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
         # If a subject has literal variants for particular dependencies, they win over all else.
         dependency, literal_variants = parse_variants(dependency)
         variants = Variants.merge(variants, literal_variants)
-      yield step_context.select_node(Select(self.product), subject=dependency, variants=variants)
+      yield step_context.select_node(self.selector.projected_product_selector, subject=dependency, variants=variants)
 
   def step(self, step_context):
     # Request the product we need in order to request dependencies.
-    dep_product_node = step_context.select_node(Select(self.dep_product), self.subject, self.variants)
+    dep_product_node = step_context.select_node(self.selector.dep_product_selector,
+                                                self.subject,
+                                                self.variants)
     dep_product_state = step_context.get(dep_product_node)
     if type(dep_product_state) in (Throw, Waiting):
       return dep_product_state
@@ -410,7 +414,9 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
 
   def step(self, step_context):
     # Request the product we need to compute the subject.
-    input_node = step_context.select_node(Select(self.input_product), self.subject, self.variants)
+    input_node = step_context.select_node(self.selector.input_product_selector,
+                                          self.subject,
+                                          self.variants)
 
     input_state = step_context.get(input_node)
     if type(input_state) in (Throw, Waiting):
@@ -436,7 +442,9 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
           self.projected_subject, e)))
 
     # When the output node is available, return its result.
-    output_node = step_context.select_node(Select(self.product), projected_subject, self.variants)
+    output_node = step_context.select_node(self.selector.final_product_selector,
+                                           projected_subject,
+                                           self.variants)
     output_state = step_context.get(output_node)
     if type(output_state) in (Return, Throw, Waiting):
       return output_state

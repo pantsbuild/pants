@@ -70,7 +70,10 @@ class SelectDependencies(datatype('Dependencies',
   """
 
   def __new__(cls, product, dep_product, field=None, field_types=tuple()):
-    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
+    obj = super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
+    obj.dep_product_selector = Select(dep_product)
+    obj.projected_product_selector = Select(product)
+    return obj
 
   optional = False
 
@@ -96,6 +99,13 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
   is projected directly rather than attempting to use it to construct the projected type.
   """
   optional = False
+
+  def __new__(cls, product, projected_subject, fields, input_product):
+    obj = super(SelectProjection, cls).__new__(cls, product, projected_subject, fields,
+      input_product)
+    obj.input_product_selector = Select(input_product)
+    obj.projected_product_selector = Select(product)
+    return obj
 
   def __repr__(self):
     return '{}({}, {}, {}, {})'.format(type(self).__name__,
