@@ -19,7 +19,7 @@ from pants.base.exceptions import TaskError
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulPool
-from pants.engine.storage import Cache, Digest, Storage
+from pants.engine.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -141,35 +141,20 @@ class Engine(AbstractClass):
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
-  def _arg(self, arg, memoized):
-    if type(arg) is Digest:
-      return self._storage.get(arg)
-    else:
-      val = memoized.get(arg, None)
-      if val is Exception:
-        raise val
-      return val
-
-  def _run(self, entry, runnable, memoized):
+  def _run(self, runnable):
     func = self._storage.get(runnable.func)
-    args = [self._arg(arg, memoized) for arg in runnable.args]
-    try:
-      res = memoized[entry] = func(*args)
-    except Exception as e:
-      memoized[entry] = e
-      raise e
-    return self._storage.put_typed(res)
+    args = [self._storage.get(arg) for arg in runnable.args]
+    return storage.put_typed(func(*args))
 
   def reduce(self, execution_request):
     generator = self._scheduler.schedule(execution_request)
     for runnable_batch in generator:
-      memoized = {}
       completed = []
       for entry, runnable in runnable_batch:
         key, result = self._maybe_cache_get(entry, runnable)
         if result is None:
           try:
-            result = Return(self._run(entry, runnable, memoized))
+            result = Return(self._run(runnable))
             self._maybe_cache_put(key, result)
           except Exception as e:
             result = Throw(e)
