@@ -11,7 +11,7 @@ from xml.dom import minidom
 
 from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION, IdeaPluginGen
 from pants.base.build_environment import get_buildroot
-from pants.build_graph.address import Address
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.util.contextutil import temporary_file
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -49,7 +49,20 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     with open(output_file, 'r') as result:
       return result.readlines()[0]
 
-  def _run_and_check(self, project_path, targets):
+  def _run_and_check(self, targets):
+    """
+    Invokes idea-plugin goals and checks for target specs and project in the
+    generated project and workspace file.
+
+    :param targets: list of target specs
+    :return: n/a
+    """
+    self.assertTrue("targets are empty", targets)
+    spec_parser = CmdLineSpecParser(get_buildroot())
+    # project_path is always the directory of the first target,
+    # which is where intellij is going to zoom in under project view.
+    project_path = spec_parser.parse_spec(targets[0]).directory
+
     with self.temporary_workdir() as workdir:
       with temporary_file(root_dir=workdir, cleanup=True) as output_file:
         pants_run = self.run_pants_with_workdir(
@@ -62,25 +75,19 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
   def test_idea_plugin_single_target(self):
     target = 'examples/src/scala/org/pantsbuild/example/hello:hello'
-    project_path = "examples/src/scala/org/pantsbuild/example/hello"
 
-    self._run_and_check(project_path, [target])
+    self._run_and_check([target])
 
   def test_idea_plugin_single_directory(self):
     target = 'testprojects/src/python/antlr::'
-    project_path = "testprojects/src/python/antlr"
 
-    self._run_and_check(project_path, [target])
+    self._run_and_check([target])
 
   def test_idea_plugin_multiple_targets(self):
     target_a = 'examples/src/scala/org/pantsbuild/example/hello:'
     target_b = 'testprojects/src/python/antlr::'
 
-    # project_path is always the directory of the first target,
-    # which is where intellij is going to zoom in at project view.
-    project_path = 'examples/src/scala/org/pantsbuild/example/hello'
-
-    self._run_and_check(project_path, [target_a, target_b])
+    self._run_and_check([target_a, target_b])
 
   def test_idea_plugin_project_name(self):
     self.assertEqual(
@@ -95,11 +102,9 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
   def test_idea_plugin_long_project_name(self):
     list_run = self.run_pants(['-q', 'list', 'testprojects/tests/java/org/pantsbuild/testproject/::'])
     self.assert_success(list_run)
-
     self.assertGreater(len(list_run.stdout_data), IdeaPluginGen.PROJECT_NAME_LIMIT)
+
     a_lot_of_targets = [l for l in list_run.stdout_data.splitlines() if l]
-    # The first target is the project path.
-    spec_path = Address.parse(a_lot_of_targets[0]).spec_path
 
     self.assertEqual(IdeaPluginGen.PROJECT_NAME_LIMIT, len(IdeaPluginGen.get_project_name(a_lot_of_targets)))
-    self._run_and_check(spec_path, a_lot_of_targets)
+    self._run_and_check(a_lot_of_targets)
