@@ -81,16 +81,6 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
     self._run_and_check(project_path, [target_a, target_b])
 
-  def test_idea_plugin_many_targets(self):
-    target_a = 'examples/src/scala/org/pantsbuild/example/hello:'
-    target_b = 'testprojects/src/python/antlr::'
-
-    # project_path is always the directory of the first target,
-    # which is where intellij is going to zoom in at project view.
-    project_path = 'examples/src/scala/org/pantsbuild/example/hello'
-
-    self._run_and_check(project_path, [target_a, target_b])
-
   def test_idea_plugin_project_name(self):
     self.assertEqual(
       'examples.src.scala.org.pantsbuild.example.hello:__testprojects.src.python.antlr::',
