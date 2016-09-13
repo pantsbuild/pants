@@ -139,7 +139,14 @@ class Storage(Closable):
     self._contents = contents
     self._key_mappings = key_mappings
     self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
-    self._memo = dict()
+    self._memo_k2o = dict()
+    self._memo_o2k = dict()
+
+  def _get_o2k(self, obj):
+    try:
+      return self._memo_o2k.get(obj, None), True
+    except TypeError:
+      return None, False
 
   def put(self, obj):
     """Serialize and hash something pickleable, returning a unique key to retrieve it later.
@@ -149,6 +156,9 @@ class Storage(Closable):
     For content addressability we need equality. Use `fast` mode to turn off memo.
     Longer term see https://github.com/pantsbuild/pants/issues/2969
     """
+    digest, memoizable = self._get_o2k(obj)
+    if digest is not None:
+      return digest
     try:
       with closing(StringIO.StringIO()) as buf:
         pickler = pickle.Pickler(buf, protocol=self._protocol)
@@ -158,8 +168,8 @@ class Storage(Closable):
 
         # Hash the blob and store it if it does not exist.
         digest = Digest.create(blob)
-        if digest not in self._memo:
-          self._memo[digest] = obj
+        if digest not in self._memo_k2o:
+          self._memo_k2o[digest] = obj
           self._contents.put(digest.digest, blob)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
@@ -167,6 +177,8 @@ class Storage(Closable):
       # `Exception` type here.
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e), e)
 
+    if memoizable:
+      self._memo_o2k[obj] = digest
     return digest
 
   def put_typed(self, obj):
@@ -184,7 +196,7 @@ class Storage(Closable):
     if type(key) is not Digest:
       raise InvalidKeyError('Not a valid key: {!r}'.format(key))
 
-    obj = self._memo.get(key)
+    obj = self._memo_k2o.get(key, None)
     if obj is None:
       obj = self._contents.get(key.digest, _unpickle)
     # If the stored object was a KeyList, recurse. Note: we don't have this convenience

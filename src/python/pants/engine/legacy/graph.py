@@ -12,6 +12,7 @@ from twitter.common.collections import OrderedSet, maybe_list
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
+from pants.engine.addressable import Addresses
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -19,7 +20,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, Throw
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection
+from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -38,7 +39,7 @@ class _DestWrapper(datatype('DestWrapper', ['target_types'])):
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
-  This implementation is backed by a Scheduler that is able to resolve LegacyTargets.
+  This implementation is backed by a Scheduler that is able to resolve TargetAdaptors.
   """
 
   class InvalidCommandLineSpecError(AddressLookupError):
@@ -47,7 +48,7 @@ class LegacyBuildGraph(BuildGraph):
   def __init__(self, scheduler, engine, symbol_table_cls):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
-    :param scheduler: A Scheduler that is configured to be able to resolve LegacyTargets.
+    :param scheduler: A Scheduler that is configured to be able to resolve TargetAdaptors.
     :param engine: An Engine subclass to execute calls to `inject`.
     :param symbol_table_cls: A SymbolTable class used to instantiate Target objects. Must match
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
@@ -75,22 +76,23 @@ class LegacyBuildGraph(BuildGraph):
     new_targets = list()
 
     # Index the ProductGraph.
-    for node, state in self._graph.walk(roots=roots):
-      # Locate nodes that contain LegacyTarget values.
+    for node, state in roots.items():
       if type(state) is Throw:
         trace = '\n'.join(self._graph.trace(node))
         raise AddressLookupError(
             'Build graph construction failed for {}:\n{}'.format(node.subject, trace))
       elif type(state) is not Return:
         State.raise_unrecognized(state)
-      if node.product is not LegacyTarget:
-        continue
+      if type(state.value) is not TargetAdaptors:
+        raise TypeError('Expected roots to hold {}; got: {}'.format(
+          TargetAdaptors, type(state.value)))
 
-      # We have a successfully parsed LegacyTarget, which includes its declared dependencies.
-      address = state.value.adaptor.address
-      all_addresses.add(address)
-      if address not in self._target_by_address:
-        new_targets.append(self._index_target(state.value))
+      # We have a successful TargetAdaptors value (for a particular input Spec).
+      for target_adaptor in state.value.dependencies:
+        address = target_adaptor.address
+        all_addresses.add(address)
+        if address not in self._target_by_address:
+          new_targets.append(self._index_target(target_adaptor))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -116,16 +118,16 @@ class LegacyBuildGraph(BuildGraph):
 
     return all_addresses
 
-  def _index_target(self, legacy_target):
-    """Instantiate the given LegacyTarget, index it in the graph, and return a Target."""
+  def _index_target(self, target_adaptor):
+    """Instantiate the given TargetAdaptor, index it in the graph, and return a Target."""
     # Instantiate the target.
-    address = legacy_target.adaptor.address
-    target = self._instantiate_target(legacy_target.adaptor)
+    address = target_adaptor.address
+    target = self._instantiate_target(target_adaptor)
     self._target_by_address[address] = target
 
     # Link its declared dependencies, which will be indexed independently.
-    self._target_dependencies_by_address[address].update(legacy_target.dependencies)
-    for dependency in legacy_target.dependencies:
+    self._target_dependencies_by_address[address].update(target_adaptor.dependencies)
+    for dependency in target_adaptor.dependencies:
       self._target_dependees_by_address[dependency].add(address)
     return target
 
@@ -208,44 +210,49 @@ class LegacyBuildGraph(BuildGraph):
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
     logger.debug('Injecting to {}: {}'.format(self, subjects))
-    request = self._scheduler.execution_request([LegacyTarget], subjects)
+    request = self._scheduler.execution_request([TargetAdaptors], subjects)
 
     result = self._engine.execute(request)
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
-    self._index(request.roots)
+    self._index(self._scheduler.root_entries(request))
 
-    existing_addresses = set()
+    yielded_addresses = set()
     for root, state in self._scheduler.root_entries(request).items():
-      entries = maybe_list(state.value, expected_type=LegacyTarget)
-      if not entries:
+      if not state.value.dependencies:
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(root.subject))
-      for legacy_target in entries:
-        address = legacy_target.adaptor.address
-        if address not in existing_addresses:
-          existing_addresses.add(address)
+      # TODO! this is yielding transitive addresses rather than roots again.
+      for target_adaptor in state.value.dependencies:
+        address = target_adaptor.address
+        if address not in yielded_addresses:
+          yielded_addresses.add(address)
           yield address
-
-
-class LegacyTarget(datatype('LegacyTarget', ['adaptor', 'dependencies'])):
-  """A class to represent a node and edges in the legacy BuildGraph.
-
-  The LegacyBuildGraph implementation inspects only these entries in the ProductGraph.
-  """
 
 
 class HydratedField(datatype('HydratedField', ['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a LegacyTarget."""
 
 
-def reify_legacy_graph(target_adaptor, dependencies, hydrated_fields):
+def transitive_targets_merge(transitive_targets):
+  # TODO: need native support for avoiding redundancy during transitive merges (especially
+  # highly-duplicated transitive merges like this one).
+  merged = {target_adaptor.address: target_adaptor
+            for target_adaptors in transitive_targets
+            for target_adaptor in target_adaptors.dependencies}
+  return TargetAdaptors(tuple(merged.values()))
+
+
+def legacy_target_walk(target_adaptor, transitive_targets, hydrated_fields):
   """Construct a LegacyTarget from a TargetAdaptor, its deps, and hydrated versions of its adapted fields."""
+  # Hydrate the fields of the adaptor.
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return LegacyTarget(TargetAdaptor(**kwargs), [d.adaptor.address for d in dependencies])
+  # Prepend this target to its merged transitive dependencies.
+  merged_transitive_deps = transitive_targets_merge(transitive_targets).dependencies
+  return TargetAdaptors((TargetAdaptor(**kwargs),) + merged_transitive_deps)
 
 
 def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):
@@ -294,16 +301,22 @@ def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
   return HydratedField('bundles', bundles)
 
 
+TargetAdaptors = Collection.of(TargetAdaptor)
+
+
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
     # Recursively requests the dependencies and adapted fields of TargetAdaptors, which
     # will result in an eager, transitive graph walk.
-    (LegacyTarget,
+    (TargetAdaptors,
+     [SelectDependencies(TargetAdaptors, Addresses, field_types=(Address,))],
+     transitive_targets_merge),
+    (TargetAdaptors,
      [Select(TargetAdaptor),
-      SelectDependencies(LegacyTarget, TargetAdaptor, 'dependencies', field_types=(Address,)),
+      SelectDependencies(TargetAdaptors, TargetAdaptor, 'dependencies', field_types=(Address,)),
       SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors', field_types=(SourcesField, BundlesField, ))],
-     reify_legacy_graph),
+     legacy_target_walk),
     (HydratedField,
      [Select(SourcesField),
       SelectProjection(FilesDigest, PathGlobs, ('path_globs',), SourcesField),
