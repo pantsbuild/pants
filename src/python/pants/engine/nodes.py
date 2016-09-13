@@ -442,7 +442,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
           self.projected_subject, e)))
 
     # When the output node is available, return its result.
-    output_node = step_context.select_node(self.selector.final_product_selector,
+    output_node = step_context.select_node(self.selector.projected_product_selector,
                                            projected_subject,
                                            self.variants)
     output_state = step_context.get(output_node)
