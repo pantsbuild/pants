@@ -19,8 +19,6 @@ pub struct Staged<T> {
   pub func: Function,
   pub args: Vec<StagedArg<T>>,
   pub cacheable: bool,
-  // Indicates whether to fail if a argument Noops.
-  pub required: bool,
 }
 
 impl<T: Clone + Eq + Hash> Staged<T> {
@@ -83,8 +81,7 @@ impl<T: Clone + Eq + Hash> State<T> {
                   }
                 })
                 .collect(),
-            cacheable: s.cacheable,
-            required: s.required,
+            cacheable: s.cacheable
           }
         ),
       State::Waiting(w) => State::Waiting(w.into_iter().map(conversion).collect()),
@@ -203,12 +200,11 @@ impl<'g,'t> StepContext<'g,'t> {
   /**
    * Returns a `Staged` state that projects the given field from the given item.
    */
-  fn project(&self, item: StagedArg<Node>, field: Field, required: bool) -> Staged<Node> {
+  fn project(&self, item: StagedArg<Node>, field: Field) -> Staged<Node> {
     Staged {
       func: self.tasks.project,
       args: vec![item, StagedArg::Key(field)],
       cacheable: true,
-      required: required,
     }
   }
 
@@ -455,7 +451,7 @@ impl Step for SelectDependencies {
           return State::Waiting(vec![dep_product_node]),
       };
 
-    // The product and its dependency list are available: stage creation of the list.
+    // The product and its dependency list are available.
     let mut dependencies = Vec::new();
     let mut dep_values: Vec<&Key> = Vec::new();
     for dep_subject in context.project_multi(dep_product, &self.selector.field) {
@@ -510,7 +506,6 @@ impl Step for ProjectField {
           )
         ),
         self.selector.field.clone(),
-        false,
       )
     )
   }
@@ -599,7 +594,6 @@ impl Step for Task {
           )
           .collect(),
       cacheable: self.selector.cacheable,
-      required: false,
     })
   }
 }
