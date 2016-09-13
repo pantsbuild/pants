@@ -152,7 +152,14 @@ class Storage(Closable):
     self._contents = contents
     self._key_mappings = key_mappings
     self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
-    self._memo = dict()
+    self._memo_k2o = dict()
+    self._memo_o2k = dict()
+
+  def _get_o2k(self, obj):
+    try:
+      return self._memo_o2k.get(obj, None), True
+    except TypeError:
+      return None, False
 
   def put(self, obj):
     """Serialize and hash something pickleable, returning a unique key to retrieve it later.
@@ -162,6 +169,9 @@ class Storage(Closable):
     For content addressability we need equality. Use `fast` mode to turn off memo.
     Longer term see https://github.com/pantsbuild/pants/issues/2969
     """
+    key, memoizable = self._get_o2k(obj)
+    if key is not None:
+      return key
     try:
       with closing(StringIO.StringIO()) as buf:
         pickler = pickle.Pickler(buf, protocol=self._protocol)
@@ -171,14 +181,17 @@ class Storage(Closable):
 
         # Hash the blob and store it if it does not exist.
         key = Key.create(blob)
-        if key not in self._memo:
-          self._memo[key] = obj
+        if key not in self._memo_k2o:
+          self._memo_k2o[key] = obj
           self._contents.put(key.digest, blob)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
       # `Exception` type here.
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e), e)
+
+    if memoizable:
+      self._memo_o2k[obj] = key
 
     return key
 
@@ -191,7 +204,7 @@ class Storage(Closable):
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
 
-    obj = self._memo.get(key)
+    obj = self._memo_k2o.get(key)
     if obj is not None:
       return obj
     return self._contents.get(key.digest, _unpickle)
