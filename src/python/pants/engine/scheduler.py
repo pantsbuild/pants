@@ -282,8 +282,6 @@ class LocalScheduler(object):
         else:
           raise ValueError('Unrecognized State type `{}` on: {}'.format(root.union_tag, root))
         roots[(subject, product)] = state
-
-      print('>>> roots were: {}'.format(roots))
       return roots
 
   def invalidate_files(self, filenames):

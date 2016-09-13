@@ -18,8 +18,8 @@ from struct import Struct as StdlibStruct
 import lmdb
 import six
 
-from pants.engine.nodes import State
 from pants.engine.objects import Closable, SerializationError
+from pants.engine.selectors import Collection
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -76,14 +76,6 @@ class Digest(datatype('Digest', ['digest'])):
 
   def __str__(self):
     return repr(self)
-
-
-class KeyList(datatype('KeyList', ['keys'])):
-  """A private typed marker for a list of Keys.
-
-  KeyLists should never be created by user code, so they can be used to identify stored
-  values which are themselves lists of Keys (such as the result of a DependenciesNode).
-  """
 
 
 class InvalidKeyError(Exception):
@@ -148,7 +140,7 @@ class Storage(Closable):
     except TypeError:
       return None, False
 
-  def put(self, obj):
+  def put(self, obj, nesting=True):
     """Serialize and hash something pickleable, returning a unique key to retrieve it later.
 
     NB: pickle by default memoizes objects by id and pickle repeated objects by references,
@@ -156,6 +148,8 @@ class Storage(Closable):
     For content addressability we need equality. Use `fast` mode to turn off memo.
     Longer term see https://github.com/pantsbuild/pants/issues/2969
     """
+    obj = self._maybe_put_nested(obj) if nesting else obj
+
     digest, memoizable = self._get_o2k(obj)
     if digest is not None:
       return digest
@@ -181,11 +175,22 @@ class Storage(Closable):
       self._memo_o2k[obj] = digest
     return digest
 
+  def _maybe_put_nested(self, obj):
+    # If the stored object is a collection type, recurse.
+    if type(obj) in (tuple, list):
+      return type(obj)(self.put(inner) for inner in obj)
+    elif isinstance(obj, Collection):
+      return type(obj)(tuple(self.put(inner) for inner in obj.dependencies))
+    else:
+      return obj
+
   def put_typed(self, obj):
     return (self.put(obj), self.put(type(obj)))
 
   def put_typed_from_digests(self, digests):
-    return self.put_typed(KeyList([Digest(digest) for digest in digests]))
+    # Create a pre-nested value (and thus, disable the default nesting).
+    arg = tuple(Digest(digest) for digest in digests)
+    return (self.put(arg, nesting=False), self.put(type(arg)))
 
   def get(self, key):
     """Given a key, return its deserialized content.
@@ -199,11 +204,17 @@ class Storage(Closable):
     obj = self._memo_k2o.get(key, None)
     if obj is None:
       obj = self._contents.get(key.digest, _unpickle)
-    # If the stored object was a KeyList, recurse. Note: we don't have this convenience
-    # on the put_from_digests side, because the definition of the nesting should be explicit.
-    if type(obj) == KeyList:
-      obj = [self.get(inner) for inner in obj.keys]
-    return obj
+
+    return self._maybe_get_nested(obj)
+
+  def _maybe_get_nested(self, obj):
+    # If the stored object was a collection type, recurse.
+    if type(obj) in (tuple, list):
+      return type(obj)(self.get(inner) for inner in obj)
+    elif isinstance(obj, Collection):
+      return type(obj)(tuple(self.get(inner) for inner in obj.dependencies))
+    else:
+      return obj
 
   def get_from_digest(self, digest):
     return self.get(Digest(digest))

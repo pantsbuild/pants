@@ -18,8 +18,8 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
-from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.nodes import collect_item_of_type
+from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
