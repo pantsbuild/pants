@@ -97,8 +97,8 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(list_run)
 
     self.assertGreater(len(list_run.stdout_data), IdeaPluginGen.PROJECT_NAME_LIMIT)
-    # sorted the targets in order to determine the first target as project path.
-    a_lot_of_targets = sorted(l for l in list_run.stdout_data.splitlines() if l)
+    a_lot_of_targets = [l for l in list_run.stdout_data.splitlines() if l]
+    # The first target is the project path.
     spec_path = Address.parse(a_lot_of_targets[0]).spec_path
 
     self.assertEqual(IdeaPluginGen.PROJECT_NAME_LIMIT, len(IdeaPluginGen.get_project_name(a_lot_of_targets)))
