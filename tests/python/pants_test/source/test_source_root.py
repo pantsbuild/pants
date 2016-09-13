@@ -25,59 +25,62 @@ class SourceRootTest(BaseTest):
     }))
     self.assertIsNone(trie.find('src/java/org/pantsbuild/foo/Foo.java'))
 
+    def root(path, langs):
+      return SourceRoot(path, langs, UNKNOWN)
+
     # Wildcard at the end.
     trie.add_pattern('src/*')
-    self.assertEquals(SourceRoot('src/java', ('java',)),
+    self.assertEquals(root('src/java', ('java',)),
                       trie.find('src/java/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('my/project/src/java', ('java',)),
+    self.assertEquals(root('my/project/src/java', ('java',)),
                       trie.find('my/project/src/java/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('src/python', ('python',)),
+    self.assertEquals(root('src/python', ('python',)),
                       trie.find('src/python/pantsbuild/foo/foo.py'))
-    self.assertEquals(SourceRoot('my/project/src/python', ('python',)),
+    self.assertEquals(root('my/project/src/python', ('python',)),
                       trie.find('my/project/src/python/org/pantsbuild/foo/foo.py'))
 
     # Overlapping pattern.
     trie.add_pattern('src/main/*')
-    self.assertEquals(SourceRoot('src/main/java', ('java',)),
+    self.assertEquals(root('src/main/java', ('java',)),
                       trie.find('src/main/java/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('my/project/src/main/java', ('java',)),
+    self.assertEquals(root('my/project/src/main/java', ('java',)),
                       trie.find('my/project/src/main/java/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('src/main/python', ('python',)),
+    self.assertEquals(root('src/main/python', ('python',)),
                       trie.find('src/main/python/pantsbuild/foo/foo.py'))
-    self.assertEquals(SourceRoot('my/project/src/main/python', ('python',)),
+    self.assertEquals(root('my/project/src/main/python', ('python',)),
                       trie.find('my/project/src/main/python/org/pantsbuild/foo/foo.py'))
 
     # Wildcard in the middle.
     trie.add_pattern('src/*/code')
-    self.assertEquals(SourceRoot('src/java/code', ('java',)),
+    self.assertEquals(root('src/java/code', ('java',)),
                       trie.find('src/java/code/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('my/project/src/java/code', ('java',)),
+    self.assertEquals(root('my/project/src/java/code', ('java',)),
                       trie.find('my/project/src/java/code/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('src/python/code', ('python',)),
+    self.assertEquals(root('src/python/code', ('python',)),
                       trie.find('src/python/code/pantsbuild/foo/foo.py'))
-    self.assertEquals(SourceRoot('my/project/src/python/code', ('python',)),
+    self.assertEquals(root('my/project/src/python/code', ('python',)),
                       trie.find('my/project/src/python/code/org/pantsbuild/foo/foo.py'))
 
     # Verify that the now even-more-overlapping pattern still works.
-    self.assertEquals(SourceRoot('src/main/java', ('java',)),
+    self.assertEquals(root('src/main/java', ('java',)),
                       trie.find('src/main/java/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('my/project/src/main/java', ('java',)),
+    self.assertEquals(root('my/project/src/main/java', ('java',)),
                       trie.find('my/project/src/main/java/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('src/main/python', ('python',)),
+    self.assertEquals(root('src/main/python', ('python',)),
                       trie.find('src/main/python/pantsbuild/foo/foo.py'))
-    self.assertEquals(SourceRoot('my/project/src/main/python', ('python',)),
+    self.assertEquals(root('my/project/src/main/python', ('python',)),
                       trie.find('my/project/src/main/python/org/pantsbuild/foo/foo.py'))
 
     # Verify that we take the first matching prefix.
-    self.assertEquals(SourceRoot('src/java', ('java',)),
+    self.assertEquals(root('src/java', ('java',)),
                       trie.find('src/java/src/python/Foo.java'))
 
     # Test canonicalization.
-    self.assertEquals(SourceRoot('src/jvm', ('java', 'scala')),
+    self.assertEquals(root('src/jvm', ('java', 'scala')),
                       trie.find('src/jvm/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(SourceRoot('src/jvm', ('java', 'scala')),
+    self.assertEquals(root('src/jvm', ('java', 'scala')),
                       trie.find('src/jvm/org/pantsbuild/foo/Foo.scala'))
-    self.assertEquals(SourceRoot('src/py', ('python',)),
+    self.assertEquals(root('src/py', ('python',)),
                       trie.find('src/py/pantsbuild/foo/foo.py'))
 
     # Test fixed patterns.

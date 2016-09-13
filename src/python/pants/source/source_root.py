@@ -24,7 +24,6 @@ class SourceRootCategories(object):
 
 
 SourceRoot = namedtuple('_SourceRoot', ['path', 'langs', 'category'])
-SourceRoot.__new__.__defaults__ = (SourceRootCategories.UNKNOWN,)
 
 
 class SourceRootFactory(object):
