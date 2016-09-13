@@ -169,7 +169,8 @@ class SourceRootConfig(Subsystem):
   _DEFAULT_LANG_CANONICALIZATIONS = {
     'jvm': ('java', 'scala'),
     'protobuf': ('proto',),
-    'py': ('python',)
+    'py': ('python',),
+    'golang': ('go',),
   }
 
   _DEFAULT_SOURCE_ROOT_PATTERNS = [
