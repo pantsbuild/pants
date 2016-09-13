@@ -85,8 +85,8 @@ class GoBuildgenTest(TaskTestBase):
 
   def test_multiple_remote_roots_failure(self):
     self.create_dir('3rdparty/go')
-    self.create_dir('src/go')
-    self.create_dir('src/go_remote')
+    self.create_dir('src/go/fred')
+    self.create_dir('other/3rdparty/go')
     context = self.context(target_roots=[self.make_target('src/go/fred', GoLibrary)])
     task = self.create_task(context)
     with self.assertRaises(task.InvalidRemoteRootsError):
