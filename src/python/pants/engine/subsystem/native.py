@@ -44,6 +44,7 @@ _FFI.cdef(
     typedef UTF8Buffer  (*extern_to_str)(ExternContext*, Digest*);
     typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
     typedef Key         (*extern_store_list)(ExternContext*, Key*, uint64_t);
+    typedef Key         (*extern_project)(ExternContext*, Key*, Field*, TypeId*);
     typedef KeyBuffer   (*extern_project_multi)(ExternContext*, Key*, Field*);
 
     typedef struct {
@@ -99,7 +100,7 @@ _FFI.cdef(
                                    extern_to_str,
                                    extern_issubclass,
                                    extern_store_list,
-                                   Function,
+                                   extern_project,
                                    extern_project_multi,
                                    Field,
                                    Field,
@@ -166,6 +167,21 @@ def extern_store_list(context_handle, keys_ptr, keys_len):
   c = _FFI.from_handle(context_handle)
   digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
   return c.storage.put_typed_from_digests(digests)
+
+
+@_FFI.callback("Key(ExternContext*, Key*, Field*, TypeId*)")
+def extern_project(context_handle, key, field, type_id):
+  """Given storage, a Key for `obj`, a field name, and a type, project the field as a new Key."""
+  c = _FFI.from_handle(context_handle)
+  obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
+  field_name = c.storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
+  typ = c.storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
+
+  projected = getattr(obj, field_name)
+  if type(projected) is not typ:
+    projected = typ(projected)
+
+  return c.storage.put_typed(projected)
 
 
 @_FFI.callback("KeyBuffer(ExternContext*, Key*, Field*)")

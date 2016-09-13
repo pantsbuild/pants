@@ -244,7 +244,7 @@ def _execute_step(process_state, step):
         cache.put(runnable, result)
       return Return(result)
     except Exception as e:
-      return Throw(e)
+      return Throw(storage.put_typed(e))
 
   try:
     return runnable_id, execute()

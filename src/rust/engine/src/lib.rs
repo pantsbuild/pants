@@ -17,6 +17,8 @@ use core::{Field, Function, Key, TypeId};
 use externs::{
   IsSubClassExtern,
   IsSubClassFunction,
+  ProjectExtern,
+  ProjectFunction,
   ProjectMultiExtern,
   ProjectMultiFunction,
   ExternContext,
@@ -231,7 +233,7 @@ pub extern fn scheduler_create(
   to_str: ToStrExtern,
   issubclass: IsSubClassExtern,
   store_list: StoreListExtern,
-  project: Function,
+  project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   field_name: Field,
   field_products: Field,
@@ -251,7 +253,7 @@ pub extern fn scheduler_create(
           Tasks::new(
             IsSubClassFunction::new(issubclass, ext_context),
             StoreListFunction::new(store_list, ext_context),
-            project,
+            ProjectFunction::new(project, ext_context),
             ProjectMultiFunction::new(project_multi, ext_context),
             field_name,
             field_products,

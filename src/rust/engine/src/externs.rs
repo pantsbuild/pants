@@ -59,6 +59,27 @@ impl StoreListFunction {
   }
 }
 
+pub type ProjectExtern =
+  extern "C" fn(*const ExternContext, *const Key, *const Field, *const TypeId) -> Key;
+
+pub struct ProjectFunction {
+  project: ProjectExtern,
+  context: *const ExternContext,
+}
+
+impl ProjectFunction {
+  pub fn new(project: ProjectExtern, context: *const ExternContext) -> ProjectFunction {
+    ProjectFunction {
+      project: project,
+      context: context,
+    }
+  }
+
+  pub fn call(&self, key: &Key, field: &Field, type_id: &TypeId) -> Key {
+    (self.project)(self.context, key, field, type_id)
+  }
+}
+
 #[repr(C)]
 pub struct KeyBuffer {
   keys_ptr: *mut Key,
