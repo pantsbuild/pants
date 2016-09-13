@@ -49,29 +49,29 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     with open(output_file, 'r') as result:
       return result.readlines()[0]
 
-  def _run_and_check(self, targets):
+  def _run_and_check(self, target_specs):
     """
-    Invokes idea-plugin goals and checks for target specs and project in the
+    Invoke idea-plugin goal and check for target specs and project in the
     generated project and workspace file.
 
-    :param targets: list of target specs
+    :param target_specs: list of target specs
     :return: n/a
     """
-    self.assertTrue("targets are empty", targets)
+    self.assertTrue("targets are empty", target_specs)
     spec_parser = CmdLineSpecParser(get_buildroot())
     # project_path is always the directory of the first target,
     # which is where intellij is going to zoom in under project view.
-    project_path = spec_parser.parse_spec(targets[0]).directory
+    project_path = spec_parser.parse_spec(target_specs[0]).directory
 
     with self.temporary_workdir() as workdir:
       with temporary_file(root_dir=workdir, cleanup=True) as output_file:
         pants_run = self.run_pants_with_workdir(
-          ['idea-plugin', '--output-file={}'.format(output_file.name), '--no-open'] + targets, workdir)
+          ['idea-plugin', '--output-file={}'.format(output_file.name), '--no-open'] + target_specs, workdir)
         self.assert_success(pants_run)
 
         project_dir = self._get_project_dir(output_file.name)
         self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
-        self._do_check(project_dir, project_path, targets)
+        self._do_check(project_dir, project_path, target_specs)
 
   def test_idea_plugin_single_target(self):
     target = 'examples/src/scala/org/pantsbuild/example/hello:hello'
