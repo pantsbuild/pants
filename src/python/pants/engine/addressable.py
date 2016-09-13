@@ -29,12 +29,13 @@ class TypeConstraint(AbstractClass):
   :class:`SubclassesOf`.
   """
 
-  def __init__(self, *types):
+  def __init__(self, *types, **kwargs):
     """Creates a type constraint centered around the given types.
 
     The type constraint is satisfied as a whole if satisfied for at least one of the given types.
 
     :param type *types: The focus of this type constraint.
+    :param str description: A description for this constraint if the list of types is too long.
     """
     if not types:
       raise ValueError('Must supply at least one type')
@@ -42,6 +43,7 @@ class TypeConstraint(AbstractClass):
       raise TypeError('Supplied types must be types. {!r}'.format(types))
 
     self._types = types
+    self._desc = kwargs.get('description', None)
 
   @property
   def types(self):
@@ -68,12 +70,21 @@ class TypeConstraint(AbstractClass):
     return not (self == other)
 
   def __str__(self):
+    if self._desc:
+      constrained_type = '({})'.format(self._desc)
+    else:
+      constrained_type = ', '.join(t.__name__ for t in self._types)
     return '{variance_symbol}{constrained_type}'.format(variance_symbol=self._variance_symbol,
-                                                        constrained_type=self._types)
+                                                        constrained_type=constrained_type)
 
   def __repr__(self):
+    if self._desc:
+      constrained_type = self._desc
+    else:
+      constrained_type = ', '.join(t.__name__ for t in self._types)
     return ('{type_constraint_type}({constrained_type})'
-            .format(type_constraint_type=type(self).__name__, constrained_type=self._types))
+      .format(type_constraint_type=type(self).__name__,
+                    constrained_type=constrained_type))
 
 
 class SuperclassesOf(TypeConstraint):
