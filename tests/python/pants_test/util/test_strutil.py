@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.strutil import camelcase, ensure_binary, ensure_text, pluralize
+from pants.util.strutil import camelcase, ensure_binary, ensure_text, pluralize, strip_prefix
 
 
 # TODO(Eric Ayers): Backfill tests for other methods in strutil.py
@@ -49,3 +49,12 @@ class StrutilTest(unittest.TestCase):
     self.assertEquals(bytearray([0xe5, 0xbf, 0xab]), ensure_binary(unicode_val))
     with self.assertRaises(TypeError):
       ensure_binary(45)
+
+  def test_strip_prefix(self):
+    self.assertEquals('testString', strip_prefix('testString', '//'))
+    self.assertEquals('/testString', strip_prefix('/testString', '//'))
+    self.assertEquals('testString', strip_prefix('//testString', '//'))
+    self.assertEquals('/testString', strip_prefix('///testString', '//'))
+    self.assertEquals('//testString', strip_prefix('////testString', '//'))
+    self.assertEquals('test//String', strip_prefix('test//String', '//'))
+    self.assertEquals('testString//', strip_prefix('testString//', '//'))
