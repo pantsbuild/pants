@@ -73,7 +73,10 @@ class TypeConstraint(AbstractClass):
     if self._desc:
       constrained_type = '({})'.format(self._desc)
     else:
-      constrained_type = ', '.join(t.__name__ for t in self._types)
+      if len(self._types) == 1:
+        constrained_type = self._types[0].__name__
+      else:
+        constrained_type = '({})'.format(', '.join(t.__name__ for t in self._types))
     return '{variance_symbol}{constrained_type}'.format(variance_symbol=self._variance_symbol,
                                                         constrained_type=constrained_type)
 

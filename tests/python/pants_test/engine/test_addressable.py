@@ -84,7 +84,7 @@ class ExactlyTest(TypeConstraintTestBase):
     self.assertEquals("Exactly(B)", repr(exactly_b))
 
     exactly_multiple = Exactly(self.A, self.B)
-    self.assertEquals("=A, B", str(exactly_multiple))
+    self.assertEquals("=(A, B)", str(exactly_multiple))
     self.assertEquals("Exactly(A, B)", repr(exactly_multiple))
 
 
