@@ -248,7 +248,7 @@ class GoBuildgen(GoTask):
     def gather_go_buildfiles(rel_path):
       address_mapper = self.context.address_mapper
       for build_file in address_mapper.scan_build_files(base_path=rel_path):
-        existing_go_buildfiles.add(build_file.relpath)
+        existing_go_buildfiles.add(build_file)
 
     gather_go_buildfiles(generation_result.local_root)
     if remote and generation_result.remote_root != generation_result.local_root:
@@ -274,7 +274,7 @@ class GoBuildgen(GoTask):
       for existing_go_buildfile in existing_go_buildfiles:
         spec_path = os.path.dirname(existing_go_buildfile)
         for address in self.context.address_mapper.addresses_in_spec_path(spec_path):
-          target = self.context.address_mapper.resolve(address)
+          target = self.context.build_graph.resolve_address(address)
           if isinstance(target, GoLocalSource):
             os.unlink(existing_go_buildfile)
             deleted.append(existing_go_buildfile)

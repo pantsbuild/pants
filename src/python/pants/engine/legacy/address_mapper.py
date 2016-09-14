@@ -8,13 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from twitter.common.collections import OrderedSet
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
-from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.address import Address
 from pants.build_graph.address_mapper import AddressMapper
-from pants.engine.fs import Files
+from pants.engine.fs import Dir
+from pants.engine.graph import BuildDirs, BuildFiles
+from pants.engine.nodes import Throw
+from pants.engine.selectors import SelectDependencies
 from pants.util.dirutil import fast_relpath
 
 
@@ -27,24 +30,27 @@ class LegacyAddressMapper(AddressMapper):
   This allows tasks to use the context's address_mapper when the v2 engine is enabled.
   """
 
-  def __init__(self, scheduler, engine, graph, build_root):
+  def __init__(self, scheduler, engine, build_root):
     self._scheduler = scheduler
     self._engine = engine
     self._product_graph = scheduler.product_graph
     self._build_root = build_root
-    self._graph = graph
 
   def scan_build_files(self, base_path):
-    """"""
-    request = self._scheduler.execution_request([Files], [DescendantAddresses(base_path)])
-    import pdb;pdb.set_trace()
+    subject = DescendantAddresses(base_path)
+    selector = SelectDependencies(BuildFiles, BuildDirs, field_types=(Dir,))
+    request = self._scheduler.custom_execution_request(subject, selector)
+
     result = self._engine.execute(request)
     if result.error:
       raise result.error
-    import pdb;pdb.set_trace()
-    return self._scheduler.root_entries(request).items()
-    for root, state in self._scheduler.root_entries(request).items():
-      import pdb;pdb.set_trace()
+
+    build_files_set = set()
+    for _, state in result.root_products.items():
+      for build_files in state.value:
+        build_files_set.update(f.path for f in build_files.files)
+
+    return OrderedSet(sorted(build_files_set))
 
   def is_declaring_file(self, address, file_path):
     # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
@@ -56,31 +62,25 @@ class LegacyAddressMapper(AddressMapper):
             BuildFile._is_buildfile_name(os.path.basename(file_path)))
 
   def addresses_in_spec_path(self, spec_path):
-    try:
-      return set(self._graph.inject_specs_closure([SiblingAddresses(spec_path)]))
-    except AddressLookupError as e:
-      raise self.BuildFileScanError(str(e))
+    return self.scan_specs([SiblingAddresses(spec_path)])
 
   def scan_specs(self, specs, fail_fast=True):
-    try:
-      return OrderedSet(self._graph.inject_specs_closure(specs, fail_fast))
-    except AddressLookupError as e:
-      raise self.BuildFileScanError(str(e))
+    request = self._scheduler.execution_request([Address], specs)
+    result = self._engine.execute(request)
 
-  def resolve(self, address):
-    try:
-      target = self._graph.get_target(address)
-      if not target:
-        try:
-          addresses = self.addresses_in_spec_path(address.spec_path)
-        except AddressLookupError:
-          addresses = set()
+    if result.error:
+      raise result.error
 
-        raise self._raise_incorrect_address_error(address.spec_path, address.target_name, addresses)
-      return address, target
+    addresses = set()
+    for node, state in result.root_products.items():
+      if type(state) is Throw:
+        trace = '\n'.join(self._product_graph.trace(node))
+        raise self.BuildFileScanError(
+          'Address scan failed for {}:\n{}'.format(node.subject, trace))
 
-    except AddressLookupError as e:
-      raise self.BuildFileScanError(str(e))
+      addresses.update(maybe_list(state.value, expected_type=Address))
+
+    return addresses
 
   def scan_addresses(self, root=None):
     if root:
@@ -91,7 +91,4 @@ class LegacyAddressMapper(AddressMapper):
     else:
       base_path = ''
 
-    addresses = set()
-    for address in self._graph.inject_specs_closure([DescendantAddresses(base_path)]):
-      addresses.add(address)
-    return addresses
+    return self.scan_specs([DescendantAddresses(base_path)])
