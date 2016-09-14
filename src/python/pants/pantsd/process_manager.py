@@ -52,7 +52,7 @@ class ProcessGroup(object):
     """Yields processes from psutil.process_iter with an optional filter and swallows psutil errors.
 
     If a psutil exception is raised during execution of the filter, that process will not be
-    yielded but subsequent process will. On the other hand, if psutil.process_iter raises
+    yielded but subsequent processes will. On the other hand, if psutil.process_iter raises
     an exception, no more processes will be yielded.
     """
     with swallow_psutil_exceptions():  # process_iter may raise
