@@ -49,10 +49,17 @@ class ProcessGroup(object):
                           metadata_base_dir=self._metadata_base_dir)
 
   def iter_processes(self, proc_filter=None):
-    proc_filter = proc_filter or (lambda x: True)
-    with swallow_psutil_exceptions():
-      for proc in (x for x in psutil.process_iter() if proc_filter(x)):
-        yield proc
+    """Yields processes from psutil.process_iter with an optional filter and swallows psutil errors.
+
+    If a psutil exception is raised during execution of the filter, that process will not be
+    yielded but subsequent processes will. On the other hand, if psutil.process_iter raises
+    an exception, no more processes will be yielded.
+    """
+    with swallow_psutil_exceptions():  # process_iter may raise
+      for proc in psutil.process_iter():
+        with swallow_psutil_exceptions():  # proc_filter may raise
+          if (proc_filter is None) or proc_filter(proc):
+            yield proc
 
   def iter_instances(self, *args, **kwargs):
     for item in self.iter_processes(*args, **kwargs):

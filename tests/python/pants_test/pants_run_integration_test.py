@@ -18,6 +18,7 @@ from colors import strip_color
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
+from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
@@ -91,6 +92,11 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return True
     except OSError:
       return False
+
+  def setUp(self):
+    super(PantsRunIntegrationTest, self).setUp()
+    # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
+    Subsystem.reset()
 
   def temporary_workdir(self, cleanup=True):
     # We can hard-code '.pants.d' here because we know that will always be its value

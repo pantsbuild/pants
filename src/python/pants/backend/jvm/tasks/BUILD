@@ -366,6 +366,7 @@ python_library(
     'src/python/pants/util:argutil',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',
+    'src/python/pants/util:iterators',
     'src/python/pants/util:strutil',
     'src/python/pants/util:xml_parser',
   ],

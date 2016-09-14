@@ -45,6 +45,39 @@ class TestProcessGroup(BaseTest):
       items = [item for item in self.pg.iter_processes()]
       self.assertEqual(items, [5, 4, 3, 2, 1])
 
+  def test_iter_processes_filter_raises_psutil_exception(self):
+    """If the filter triggers a psutil exception, skip the proc and continue."""
+    with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
+      def noop():
+        return True
+      def raises():
+        raise psutil.NoSuchProcess('a_test')
+
+      mock_process_iter.return_value = [
+        noop,
+        raises,
+        noop
+      ]
+
+      items = [item for item in self.pg.iter_processes(proc_filter=lambda p: p())]
+      self.assertEqual([noop, noop], items)
+
+  def test_iter_processes_process_iter_raises_psutil_exception(self):
+    """If psutil.process_iter raises the exception, silently stop iteration."""
+    def id_or_raise(o):
+      if isinstance(o, Exception):
+        raise o
+      else:
+        return o
+    with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
+      mock_process_iter.return_value= (id_or_raise(i)
+                                       for i in ['first',
+                                                 psutil.NoSuchProcess('The Exception'),
+                                                 'never seen'])
+
+      items = [item for item in self.pg.iter_processes()]
+      self.assertEqual(['first'], items)
+
   def test_iter_processes_filtered(self):
     with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
       mock_process_iter.return_value = [5, 4, 3, 2, 1]

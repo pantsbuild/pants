@@ -59,6 +59,14 @@ python_tests(
 )
 
 python_tests(
+  name = 'iterators',
+  sources = ['test_iterators.py'],
+  dependencies = [
+    'src/python/pants/util:iterators',
+  ]
+)
+
+python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
@@ -80,6 +88,16 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/util:netrc',
+  ]
+)
+
+python_tests(
+  name = 'objects',
+  sources = ['test_objects.py'],
+  coverage = ['pants.util.objects'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:objects',
   ]
 )
 

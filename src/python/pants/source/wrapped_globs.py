@@ -207,7 +207,8 @@ class FilesetRelPathWrapper(AbstractClass):
   @staticmethod
   def process_raw_excludes(raw_excludes):
     if isinstance(raw_excludes, string_types):
-      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings,"
+                       " but was a string: {}".format(raw_excludes))
 
     # You can't subtract raw strings from globs
     def ensure_string_wrapped_in_list(element):

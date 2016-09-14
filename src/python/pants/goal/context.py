@@ -272,6 +272,7 @@ class Context(object):
       # method will go away entirely under the new engine. It's primarily used for injecting
       # synthetic codegen targets, and that isn't how codegen will work in the future.
     if not self.source_roots.find_by_path(rel_target_base):
+      # TODO: Set the lang and root category (source/test/thirdparty) based on the target type?
       self.source_roots.add_source_root(rel_target_base)
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
