@@ -11,7 +11,7 @@ from abc import abstractproperty
 import six
 
 from pants.engine.addressable import Exactly
-from pants.util.memo import memoized
+from pants.util.memo import memoized, memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -24,19 +24,17 @@ def type_or_constraint_repr(constraint):
     return repr(constraint)
 
 
-def _as_type_constraint(a_type):
-  """If a constraint for a selector isn't already a """
-  if isinstance(a_type, Exactly):
-    return a_type
-  elif isinstance(a_type, type):
-    return Exactly(a_type)
-  else:
-    raise TypeError("unexpected product_type type for selector: {}".format(a_type))
-
-
 class Selector(AbstractClass):
   # The type constraint for the product type for this selector.
-  type_constraint = None
+
+  @memoized_property
+  def type_constraint(self):
+    if isinstance(self.product, Exactly):
+      return self.product
+    elif isinstance(self.product, type):
+      return Exactly(self.product)
+    else:
+      raise TypeError("unexpected product_type type for selector: {}".format(self.product))
 
   @abstractproperty
   def optional(self):
@@ -55,7 +53,6 @@ class Select(datatype('Select', ['product', 'optional']), Selector):
 
   def __new__(cls, product, optional=False):
     obj = super(Select, cls).__new__(cls, product, optional)
-    obj.type_constraint = _as_type_constraint(product)
     return obj
 
   def __repr__(self):
@@ -77,7 +74,6 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
     if not isinstance(variant_key, six.string_types):
       raise ValueError('Expected variant_key to be a string, but was {!r}'.format(variant_key))
     obj = super(SelectVariant, cls).__new__(cls, product, variant_key)
-    obj.type_constraint = _as_type_constraint(product)
     return obj
 
   def __repr__(self):
@@ -103,7 +99,6 @@ class SelectDependencies(datatype('Dependencies',
 
   def __new__(cls, product, dep_product, field=None, field_types=tuple()):
     obj = super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
-    obj.type_constraint = _as_type_constraint(product)
     return obj
 
   def __repr__(self):
@@ -129,11 +124,6 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
   """
   optional = False
 
-  def __new__(cls, *args, **kwargs):
-    obj = super(SelectProjection, cls).__new__(cls, *args, **kwargs)
-    obj.type_constraint = _as_type_constraint(obj.product)
-    return obj
-
   def __repr__(self):
     return '{}({}, {}, {}, {})'.format(type(self).__name__,
                                        type_or_constraint_repr(self.product),
@@ -145,11 +135,6 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
 class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
   optional = False
-
-  def __new__(cls, subject, product):
-    obj = super(SelectLiteral, cls).__new__(cls, subject, product)
-    obj.type_constraint = _as_type_constraint(product)
-    return obj
 
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__,

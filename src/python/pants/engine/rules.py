@@ -19,14 +19,19 @@ from pants.engine.nodes import (DependenciesNode, FilesystemNode, ProjectionNode
 from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, type_or_constraint_repr)
+from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-class Rule(object):
-  """Marker class for rules."""
+class Rule(AbstractClass):
+  """Rules declare how to produce products for the product graph.
+
+  A rule describes what dependencies must be provided to produce a particular product. They also act
+  as factories for constructing the nodes within the graph.
+  """
 
   @abstractproperty
   def input_selectors(self):

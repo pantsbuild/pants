@@ -452,11 +452,11 @@ def _run_func_and_check_type(product_type, type_check, func, *args):
 
 
 class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
-  """A Node representing execution of a non-blocking python function.
+  """A Node representing execution of a non-blocking python function contained by a TaskRule.
 
-  All dependencies of the function are declared ahead of time in the dependency `clause` of the
-  function, so the TaskNode will determine whether the dependencies are available before
-  executing the function, and provides a satisfied argument per clause entry to the function.
+  All dependencies of the function are declared ahead of time by the `input_selectors` of the
+  rule. The TaskNode will determine whether the dependencies are available before executing the
+  function, and provide a satisfied argument per clause entry to the function.
   """
 
   is_cacheable = True
