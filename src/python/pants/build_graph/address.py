@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import namedtuple
 
+from pants.util.strutil import strip_prefix
+
 
 def parse_spec(spec, relative_to=None):
   """Parses a target address spec and returns the path from the root of the repo to this Target
@@ -50,7 +52,7 @@ def parse_spec(spec, relative_to=None):
     )
   """
   def normalize_absolute_refs(ref):
-    return ref.lstrip('//')
+    return strip_prefix(ref, '//')
 
   def check_path(path):
     # A root or relative spec is OK
@@ -65,6 +67,9 @@ def parse_spec(spec, relative_to=None):
     if components[-1].startswith('BUILD'):
       raise ValueError('Spec {spec} has {trailing} as the last path part and BUILD is '
                        'reserved files'.format(spec=spec, trailing=components[-1]))
+    if os.path.isabs(path):
+      raise ValueError('Spec {spec} has absolute path {path}; expected a path relative '
+                       'to the build root.'.format(spec=spec, path=path))
 
   def check_target_name(name):
     if not name:
