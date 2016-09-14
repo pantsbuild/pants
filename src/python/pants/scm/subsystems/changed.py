@@ -71,9 +71,9 @@ class Changed(object):
       options = cls.global_instance().get_options()
       # N.B. This chaining is purely to support the `changed` tests until deprecation.
       ordered_options = [option for option in (alternate_options, options) if option is not None]
-      chained_options = _ChainedOptions(ordered_options)
       # TODO: Kill this chaining (in favor of outright options replacement) as part of the `changed`
       # task removal (post-deprecation cycle).
+      chained_options = _ChainedOptions(ordered_options)
       changed_request = ChangedRequest.from_options(chained_options)
       return Changed(changed_request)
 
@@ -96,7 +96,7 @@ class Changed(object):
     """
     scm = scm or get_scm()
     if scm is None:
-      raise TaskError('A `changed` goal or --changed option was specified, '
+      raise TaskError('A `changed` goal or `--changed` option was specified, '
                       'but no SCM is available to satisfy the request.')
     workspace = workspace or ScmWorkspace(scm)
 

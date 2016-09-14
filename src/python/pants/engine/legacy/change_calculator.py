@@ -95,7 +95,7 @@ class EngineChangeCalculator(ChangeCalculator):
     self._spec_parser = spec_parser
     self._mapper = EngineSourceMapper(engine, spec_parser)
 
-  def changed_target_addresses(self, changed_request):
+  def iter_changed_target_addresses(self, changed_request):
     """Given a `ChangedRequest`, compute and yield all affected target addresses."""
     changed_files = self.changed_files(changed_request.changes_since, changed_request.diffspec)
     logger.debug('changed files: %s', changed_files)
@@ -121,3 +121,6 @@ class EngineChangeCalculator(ChangeCalculator):
     elif changed_request.include_dependees == 'transitive':
       for address in graph.transitive_dependents_of_addresses(changed_addresses):
         yield address
+
+  def changed_target_addresses(self, changed_request):
+    return list(self.iter_changed_target_addresses(changed_request))

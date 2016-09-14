@@ -15,6 +15,7 @@ from pants.base.project_tree_factory import get_project_tree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.engine_initializer import EngineInitializer
 from pants.bin.repro import Reproducer
+from pants.bin.target_roots import TargetRoots
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
@@ -115,15 +116,15 @@ class GoalRunnerFactory(object):
     """
     # N.B. Use of the daemon implies use of the v2 engine.
     if graph_helper or use_engine:
-      changed_request = Changed.Factory.global_instance().create().changed_request
-      root_specs = EngineInitializer.parse_commandline_to_spec_roots(options=self._options,
-                                                                     build_root=self._root_dir)
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
       graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(
         pants_ignore_patterns,
         build_ignore_patterns=build_ignore_patterns,
         exclude_target_regexps=exclude_target_regexps)
-      return graph_helper.create_build_graph(root_specs, self._root_dir, changed_request)
+      target_roots = TargetRoots.create(options=self._options,
+                                        build_root=self._root_dir,
+                                        change_calculator=graph_helper.change_calculator)
+      return graph_helper.create_build_graph(target_roots, self._root_dir)
     else:
       address_mapper = BuildFileAddressMapper(
         self._build_file_parser,
