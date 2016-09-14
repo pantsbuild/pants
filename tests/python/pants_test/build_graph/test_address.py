@@ -68,6 +68,8 @@ class ParseSpecTest(unittest.TestCase):
 
     self.do_test_bad_spec('a/')
     self.do_test_bad_spec('a/b/')
+
+  def test_parse_bad_spec_bad_path(self):
     self.do_test_bad_spec('/a')
     self.do_test_bad_spec('///a')
 
