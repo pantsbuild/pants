@@ -388,7 +388,9 @@ def generate_fs_subjects(cls, filenames):
 
 def create_fs_intrinsics(project_tree):
   def ptree(func):
-    return functools.partial(func, project_tree)
+    p = functools.partial(func, project_tree)
+    p.__name__ = '{}_partial'.format(func.__name__)
+    return p
   return [
     (ptree(scan_directory), Dir, DirectoryListing),
     (ptree(file_content), File, FileContent),

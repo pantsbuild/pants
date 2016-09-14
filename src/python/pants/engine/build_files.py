@@ -253,7 +253,9 @@ def coerce_fn(klass):
   """Returns a one arg function that returns the passed object iff it is of the type
   klass, or returns a product of the object if it has products of the right type.
   """
-  return functools.partial(collect_item_of_type, product=klass, variant_value=None)
+  c = functools.partial(collect_item_of_type, product=klass, variant_value=None)
+  c.__name__ = 'coerce'
+  return c
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):
