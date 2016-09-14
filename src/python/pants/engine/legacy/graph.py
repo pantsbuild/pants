@@ -7,11 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
+from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -39,7 +40,7 @@ class _DestWrapper(datatype('DestWrapper', ['target_types'])):
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
-  This implementation is backed by a Scheduler that is able to resolve TargetAdaptors.
+  This implementation is backed by a Scheduler that is able to resolve HydratedTargets.
   """
 
   class InvalidCommandLineSpecError(AddressLookupError):
@@ -48,7 +49,7 @@ class LegacyBuildGraph(BuildGraph):
   def __init__(self, scheduler, engine, symbol_table_cls):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
-    :param scheduler: A Scheduler that is configured to be able to resolve TargetAdaptors.
+    :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
     :param engine: An Engine subclass to execute calls to `inject`.
     :param symbol_table_cls: A SymbolTable class used to instantiate Target objects. Must match
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
@@ -78,19 +79,19 @@ class LegacyBuildGraph(BuildGraph):
     # Index the ProductGraph.
     for node, state in roots.items():
       if type(state) is Throw:
-        trace = '\n'.join(self._graph.trace(node))
+        trace = "TODO: restore trace." #'\n'.join(self._graph.trace(node))
         raise AddressLookupError(
-            'Build graph construction failed for {}:\n{}'.format(node.subject, trace))
+            'Build graph construction failed for {}:\n{}'.format(node, trace))
       elif type(state) is not Return:
         State.raise_unrecognized(state)
 
-      # We have a list of TargetAdaptors (for a particular input Spec).
-      for target_adaptors in state.value:
-        for target_adaptor in target_adaptors.dependencies:
-          address = target_adaptor.address
+      # We have HydratedTargets (for a particular input Spec).
+      for hydrated_targets in state.value:
+        for hydrated_target in hydrated_targets.dependencies:
+          address = hydrated_target.adaptor.address
           all_addresses.add(address)
           if address not in self._target_by_address:
-            new_targets.append(self._index_target(target_adaptor))
+            new_targets.append(self._index_target(hydrated_target.adaptor))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -188,16 +189,15 @@ class LegacyBuildGraph(BuildGraph):
                        synthetic=True)
 
   def inject_address_closure(self, address):
-    if address in self._target_by_address:
-      return
-    for _ in self._inject([address]):
-      pass
+    self.inject_addresses_closure([address])
 
   def inject_addresses_closure(self, addresses):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject(addresses):
+    print('>>> injecting addresses: {}'.format(addresses))
+    for out in self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
+      print('>>>   got: {}'.format(out))
       pass
 
   def inject_specs_closure(self, specs, fail_fast=None):
@@ -208,23 +208,24 @@ class LegacyBuildGraph(BuildGraph):
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
     logger.debug('Injecting to {}: {}'.format(self, subjects))
-    request = self._scheduler.execution_request([TargetAdaptors], subjects)
+    request = self._scheduler.execution_request([HydratedTargets], subjects)
 
     result = self._engine.execute(request)
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
-    self._index(self._scheduler.root_entries(request))
+    root_entries = self._scheduler.root_entries(request)
+    self._index(root_entries)
 
     yielded_addresses = set()
-    for root, state in self._scheduler.root_entries(request).items():
+    for root, state in root_entries.items():
       if not state.value:
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(root.subject))
       # TODO! this is yielding transitive addresses rather than roots again.
-      for target_adaptors in state.value:
-        for target_adaptor in target_adaptors.dependencies:
-          address = target_adaptor.address
+      for hydrated_targets in state.value:
+        for hydrated_target in hydrated_targets.dependencies:
+          address = hydrated_target.adaptor.address
           if address not in yielded_addresses:
             yielded_addresses.add(address)
             yield address
@@ -234,24 +235,28 @@ class HydratedField(datatype('HydratedField', ['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a LegacyTarget."""
 
 
-def transitive_targets_merge(transitive_targets):
-  # TODO: need native support for avoiding redundancy during transitive merges (especially
-  # highly-duplicated transitive merges like this one).
-  merged = {target_adaptor.address: target_adaptor
-            for target_adaptors in transitive_targets
-            for target_adaptor in target_adaptors.dependencies}
-  return TargetAdaptors(tuple(merged.values()))
+class HydratedTarget(datatype('HydratedTarget', ['adaptor', 'dependencies'])):
+  """A wrapper for a fully hydrated TargetAdaptor object."""
 
 
-def legacy_target_walk(target_adaptor, transitive_targets, hydrated_fields):
-  """Construct a LegacyTarget from a TargetAdaptor, its deps, and hydrated versions of its adapted fields."""
+HydratedTargets = Collection.of(HydratedTarget)
+
+
+def transitive_targets_merge(hydrated_target, transitive_deps_list):
+  merged = {}
+  for hydrated_targets_list in ([HydratedTargets([hydrated_target])], transitive_deps_list):
+    for hydrated_targets in hydrated_targets_list:
+      merged.update((ht.adaptor.address, ht) for ht in hydrated_targets.dependencies)
+  return HydratedTargets(tuple(merged.values()))
+
+
+def hydrate_target(target_adaptor, hydrated_fields):
+  """Hydrate a TargetAdaptor given its deps and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor.
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  # Prepend this target to its merged transitive dependencies.
-  merged_transitive_deps = transitive_targets_merge(transitive_targets).dependencies
-  return TargetAdaptors((TargetAdaptor(**kwargs),) + merged_transitive_deps)
+  return HydratedTarget(TargetAdaptor(**kwargs), target_adaptor.dependencies)
 
 
 def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):
@@ -300,22 +305,17 @@ def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
   return HydratedField('bundles', bundles)
 
 
-TargetAdaptors = Collection.of(TargetAdaptor)
-
-
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
-    # Recursively requests the dependencies and adapted fields of TargetAdaptors, which
-    # will result in an eager, transitive graph walk.
-    (TargetAdaptors,
-     [SelectDependencies(TargetAdaptors, Addresses, field_types=(Address,))],
+    (HydratedTargets,
+     [Select(HydratedTarget),
+      SelectDependencies(HydratedTargets, HydratedTarget, field_types=(Address,))],
      transitive_targets_merge),
-    (TargetAdaptors,
+    (HydratedTarget,
      [Select(TargetAdaptor),
-      SelectDependencies(TargetAdaptors, TargetAdaptor, 'dependencies', field_types=(Address,)),
       SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors', field_types=(SourcesField, BundlesField, ))],
-     legacy_target_walk),
+      hydrate_target),
     (HydratedField,
      [Select(SourcesField),
       SelectProjection(FilesDigest, PathGlobs, ('path_globs',), SourcesField),

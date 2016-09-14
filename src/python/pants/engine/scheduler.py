@@ -251,7 +251,7 @@ class LocalScheduler(object):
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-    return ExecutionRequest((s, p) for s in subjects for p in products)
+    return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
 
   @contextmanager
   def locked(self):
