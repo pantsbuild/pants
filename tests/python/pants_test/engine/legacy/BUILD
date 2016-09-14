@@ -7,9 +7,11 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/base:specs',
+    'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:address_mapper',
-    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 

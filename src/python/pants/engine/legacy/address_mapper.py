@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import maybe_list
 
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
@@ -50,7 +50,7 @@ class LegacyAddressMapper(AddressMapper):
       for build_files in state.value:
         build_files_set.update(f.path for f in build_files.files)
 
-    return OrderedSet(sorted(build_files_set))
+    return build_files_set
 
   def is_declaring_file(self, address, file_path):
     # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
