@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
+from pants.engine.addressable import Exactly
 from pants.util.meta import AbstractClass
 
 
@@ -25,6 +26,13 @@ class SymbolTable(AbstractClass):
   @abstractmethod
   def table(cls):
     """Returns a dict of name to implementation class."""
+
+  @classmethod
+  def constraint(cls):
+    """Returns the typeconstraint for the symbol table"""
+    # NB Sort types so that multiple calls get the same tuples.
+    symbol_table_types = sorted(set(cls.table().values()))
+    return Exactly(*symbol_table_types, description='symbol table types')
 
 
 class Parser(AbstractClass):
