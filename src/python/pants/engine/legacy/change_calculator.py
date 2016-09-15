@@ -63,10 +63,10 @@ class _LegacyTargetDependentGraph(object):
     """Given an iterable of addresses, yield all of those addresses dependents."""
     seen = set(addresses)
     for address in addresses:
-      for dependency_address in self._dependent_address_map[address]:
-        if dependency_address not in seen:
-          seen.add(dependency_address)
-          yield dependency_address
+      for dependent_address in self._dependent_address_map[address]:
+        if dependent_address not in seen:
+          seen.add(dependent_address)
+          yield dependent_address
 
   def transitive_dependents_of_addresses(self, addresses):
     """Given an iterable of addresses, yield all of those addresses dependents, transitively."""
