@@ -80,10 +80,6 @@ class Changed(object):
   def __init__(self, changed_request):
     self._changed_request = changed_request
 
-  @property
-  def changed_request(self):
-    return self._changed_request
-
   def change_calculator(self, build_graph, address_mapper, scm=None, workspace=None,
                         exclude_target_regexp=None):
     """Constructs and returns a BuildGraphChangeCalculator.
