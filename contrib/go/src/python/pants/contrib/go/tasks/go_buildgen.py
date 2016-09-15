@@ -277,7 +277,7 @@ class GoBuildgen(GoTask):
         for address in self.context.address_mapper.addresses_in_spec_path(spec_path):
           target = self.context.build_graph.resolve_address(address)
           if isinstance(target, GoLocalSource):
-            os.unlink(existing_go_buildfile)
+            os.unlink(os.path.join(get_buildroot(), existing_go_buildfile))
             deleted.append(existing_go_buildfile)
       if deleted:
         self.context.log.info('Deleted the following obsolete BUILD files:\n\t{}'
