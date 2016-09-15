@@ -11,7 +11,7 @@ from abc import abstractproperty
 import six
 
 from pants.engine.addressable import Exactly
-from pants.util.memo import memoized, memoized_property
+from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -27,7 +27,7 @@ def type_or_constraint_repr(constraint):
 class Selector(AbstractClass):
   # The type constraint for the product type for this selector.
 
-  @memoized_property
+  @property
   def type_constraint(self):
     if isinstance(self.product, Exactly):
       return self.product
