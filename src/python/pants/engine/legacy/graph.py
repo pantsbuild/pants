@@ -12,7 +12,6 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.engine.addressable import Addresses
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -22,7 +21,7 @@ from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.selectors import (Collection, Select, SelectDependencies, SelectProjection,
-                                    SelectTransitive)
+                                    SelectTraversal)
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -305,7 +304,7 @@ def create_legacy_graph_tasks():
   return [
     # Recursively requests HydratedTargets, which will result in an eager, transitive graph walk.
     (HydratedTargets,
-     [SelectTransitive(HydratedTarget, Addresses, field_types=(Address,))],
+     [SelectTraversal(HydratedTarget, Addresses, field_types=(Address,))],
      HydratedTargets),
     (HydratedTarget,
      [Select(TargetAdaptor),

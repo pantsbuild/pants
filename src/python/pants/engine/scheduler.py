@@ -18,7 +18,7 @@ from pants.engine.isolated_process import create_snapshot_intrinsics
 from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant)
+                                    SelectTraversal, SelectVariant)
 from pants.engine.storage import Digest
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import (ExternContext, extern_issubclass, extern_project,
@@ -184,6 +184,12 @@ class LocalScheduler(object):
                                                         self._to_type_key(selector.projected_subject),
                                                         self._to_key(field),
                                                         self._to_type_key(selector.input_product))
+          elif selector_type is SelectTraversal:
+            self._native.lib.task_add_select_traversal(self._scheduler,
+                                                       self._to_type_key(selector.product),
+                                                       self._to_type_key(selector.dep_product),
+                                                       self._to_key(selector.field),
+                                                       self._to_type_key(selector.product if selector.concat else None))
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)

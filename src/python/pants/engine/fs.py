@@ -20,7 +20,7 @@ from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.selectors import (Collection, Select, SelectDependencies, SelectProjection,
-                                    SelectTransitive)
+                                    SelectTraversal)
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -430,7 +430,7 @@ def create_fs_tasks():
     # Glob execution: to avoid memoizing lots of incremental results, we recursively expand PathGlobs, and then
     # convert them to Paths independently.
     (Paths,
-     [SelectTransitive(PathsExpansion, PathGlobs, field_types=(PathWildcard, PathDirWildcard, PathRoot))],
+     [SelectTraversal(PathsExpansion, PathGlobs, field_types=(PathWildcard, PathDirWildcard, PathRoot))],
      finalize_path_expansion),
     (PathsExpansion,
      [Select(PathRoot)],

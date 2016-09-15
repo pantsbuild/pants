@@ -80,7 +80,7 @@ class Runnable(datatype('Runnable', ['func', 'args', 'cacheable']), State):
   """
 
 
-class TransitiveNode(datatype('TransitiveNode', ['subject', 'variants', 'selector']), Node):
+class TransitiveNode(datatype('TransitiveNode', ['subject', 'variants', 'selector'])):
   """TODO"""
   is_cacheable = False
   is_inlineable = True

@@ -12,7 +12,7 @@ from collections import defaultdict
 from pants.engine.isolated_process import ProcessExecutionNode
 from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectTransitive, SelectVariant)
+                                    SelectTraversal, SelectVariant)
 from pants.util.objects import datatype
 
 
@@ -93,7 +93,7 @@ class RulesetValidator(object):
             projected_subject_types.add(select.projected_subject)
           elif type(select) is SelectDependencies:
             dependency_subject_types.update(select.field_types)
-          elif type(select) is SelectTransitive:
+          elif type(select) is SelectTraversal:
             transitive_subject_types.update(select.field_types)
 
     type_collections = {
@@ -138,7 +138,7 @@ class RulesetValidator(object):
             selection_products = [select.product]
           elif type(select) is SelectDependencies:
             selection_products = [select.dep_product, select.product]
-          elif type(select) is SelectTransitive:
+          elif type(select) is SelectTraversal:
             selection_products = [select.product]
           elif type(select) is SelectProjection:
             selection_products = [select.input_product, select.product]

@@ -86,25 +86,25 @@ class SelectDependencies(datatype('Dependencies',
                                    field_types_portion)
 
 
-class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field_types', 'field']),
+class SelectTraversal(datatype('Transitive', ['product', 'dep_product', 'field_types', 'field']),
                        Selector):
   """Recursively requests the given product for each member of the given field of the dep_product.
 
   While recursive aggregation of fields can be implemented directly by tasks, in many cases
   the intermediate, unmerged collections of values need not be memoized as Nodes. Use of
-  SelectTransitive causes the entire recursive loop to be represented as a single Node.
+  SelectTraversal causes the entire recursive loop to be represented as a single Node.
 
   TODO: `field` is currently assumed to match on both dep_product and product.
   """
 
   def __new__(cls, product, dep_product, field_types, field=None):
     if not issubclass(dep_product, Collection):
-      raise TypeError('SelectTransitive requires a subtype of {} as the dep_product. Got: {}'.format(
+      raise TypeError('SelectTraversal requires a subtype of {} as the dep_product. Got: {}'.format(
         Collection, dep_product))
     if not set(dep_product.element_types) <= set(field_types):
       raise TypeError('The root element types {} are not a subset of the field types: {}'.format(
         dep_product.element_types, field_types))
-    return super(SelectTransitive, cls).__new__(cls, product, dep_product, field_types, field)
+    return super(SelectTraversal, cls).__new__(cls, product, dep_product, field_types, field)
 
   optional = False
 
