@@ -117,7 +117,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator, JUnit)
 
   @classmethod
   def request_classes_by_source(cls, test_specs):
@@ -405,7 +405,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               executor=SubprocessExecutor(distribution),
               distribution=distribution,
               classpath=complete_classpath,
-              main=JUnit._RUNNER_MAIN,
+              main=JUnit.RUNNER_MAIN,
               jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
               args=args + batch_tests,
               workunit_factory=self.context.new_workunit,
@@ -430,7 +430,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
             error_message_lines.append('{0}{1}'.format(' '*8, test))
       error_message_lines.append(
         '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
-          .format(main=JUnit._RUNNER_MAIN, code=result, failed=len(failed_targets),
+          .format(main=JUnit.RUNNER_MAIN, code=result, failed=len(failed_targets),
                   targets=pluralize(len(failed_targets), 'target'))
       )
       raise TestFailedTaskError('\n'.join(error_message_lines), failed_targets=list(failed_targets))

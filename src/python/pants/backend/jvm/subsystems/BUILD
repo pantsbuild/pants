@@ -41,6 +41,7 @@ python_library(
     ':jvm_tool_mixin',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/util:memo',
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
   ],

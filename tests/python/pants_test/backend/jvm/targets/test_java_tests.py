@@ -58,3 +58,17 @@ class JavaTestsTest(BaseTest):
     # timeout parameter
     timeout = self.make_target('//:testtimeout1', JavaTests, sources=["Test.java"], timeout=999)
     self.assertEquals(999, timeout.timeout)
+
+  def test_implicit_junit_dep(self):
+    init_subsystem(JUnit)
+    # Check that the implicit dep is added, and doesn't replace other deps.
+    target = self.make_target('//:target', Target)
+    test1 = self.make_target('//:test1', JavaTests, dependencies=[target])
+    self.assertEquals(['JarLibrary(//:junit_library)', 'Target(//:target)'],
+                      sorted(str(x) for x in test1.dependencies))
+
+    # Check that having an explicit dep doesn't cause problems.
+    junit_target = self.build_graph.get_target_from_spec('//:junit_library')
+    test2 = self.make_target('//:test2', JavaTests, dependencies=[junit_target, target])
+    self.assertEquals(['JarLibrary(//:junit_library)', 'Target(//:target)'],
+                      sorted(str(x) for x in test2.dependencies))
