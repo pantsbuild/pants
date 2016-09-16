@@ -15,7 +15,6 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
