@@ -618,6 +618,11 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     try:
       yield output_dir, do_report, coverage
     finally:
+      # NB: Deposit of the "current" test output in the root workdir (.pants.d/test/junit) is a
+      # defacto public API and so we implement that behavior here to maintain backwards
+      # compatibility for non-pants report file consumers.
+      # TODO(John Sirois): Deprecate this ~API and provide a stable directory solution for test
+      # output: https://github.com/pantsbuild/pants/issues/3879
       lock_file = '.file_lock'
       with OwnerPrintingInterProcessFileLock(os.path.join(self.workdir, lock_file)):
         # Kill everything except the isolated runs/ dir.
