@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import sys
+from abc import abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -41,50 +42,38 @@ from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method
+from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
 
-def _interpret_test_spec(test_spec):
-  """Parses a test spec string.
+class _Test(datatype('Test', ['classname', 'methodname'])):
+  """Describes a junit-style test or collection of tests."""
 
-  Returns either a (sourcefile,method) on the left, or a (classname,method) on the right.
-  """
-  components = test_spec.split('#', 2)
-  classname_or_srcfile = components[0]
-  methodname = components[1] if len(components) == 2 else None
-
-  if os.path.exists(classname_or_srcfile):
-    # It's a source file.
-    return (classname_or_srcfile, methodname), None
-  else:
-    # It's a classname.
-    return None, (classname_or_srcfile, methodname)
-
-
-class _Test(datatype('Test', ['classname', 'name'])):
-  """Describes a junit-style test."""
-
-  def __new__(cls, classname, name=None):
-    # We deliberately normalize an empty name ('') to None.
-    return super(_Test, cls).__new__(cls, classname, name or None)
+  def __new__(cls, classname, methodname=None):
+    # We deliberately normalize an empty methodname ('') to None.
+    return super(_Test, cls).__new__(cls, classname, methodname or None)
 
   def enclosing(self):
-    """Return the test enclosing this test.
+    """Return a test representing all the tests in this test's enclosing class.
 
-    :returns: This test's enclosing test or else this test if there is no enclosing test.
+    :returns: A test representing this test's enclosing test class if this test represents a test
+              method or else just this test if it specifies no method.
     :rtype: :class:`_Test`
     """
-    return self if self.name is None else _Test(self.classname)
+    return self if self.methodname is None else _Test(classname=self.classname)
 
-  def render(self):
-    """Renders this test in `classname#methodname` format.
+  def render_test_spec(self):
+    """Renders this test in `[classname]#[methodname]` test specification format.
 
     :returns: A rendering of this test in the semi-standard test specification format.
     :rtype: string
     """
-    return self.classname if self.name is None else '{}#{}'.format(self.classname, self.name)
+    if self.methodname is None:
+      return self.classname
+    else:
+      return '{}#{}'.format(self.classname, self.methodname)
 
 
 class _TestRegistry(object):
@@ -102,7 +91,7 @@ class _TestRegistry(object):
     """
     return len(self._test_to_target) == 0
 
-  def get_target(self, test):
+  def get_owning_target(self, test):
     """Return the target that owns the given test.
 
     :param test: The test to find an owning target for.
@@ -129,6 +118,88 @@ class _TestRegistry(object):
     for test, target in self._test_to_target.items():
       properties[combined_indexer(target)].add(test)
     return {prop: tuple(tests) for prop, tests in properties.items()}
+
+
+class _TestSpecification(AbstractClass):
+  """Models the string format used to specify which tests to run."""
+
+  @classmethod
+  def parse(cls, buildroot, test_spec):
+    """Parses a test specification string into an object that can yield corresponding tests.
+
+    Tests can be specified in one of four forms:
+
+    * [classname]
+    * [filename]
+    * [classname]#[methodname]
+    * [filename]#[methodname]
+
+    The first two forms target one or more individual tests contained within a class or file whereas
+    the final two forms specify an individual test method to execute.
+
+    :param string buildroot: The path of the current build root directory.
+    :param string test_spec: A test specification.
+    :returns: A test specification object.
+    :rtype: :class:`_TestSpecification`
+    """
+    components = test_spec.split('#', 2)
+    classname_or_sourcefile = components[0]
+    methodname = components[1] if len(components) == 2 else None
+
+    if os.path.exists(classname_or_sourcefile):
+      sourcefile = os.path.relpath(classname_or_sourcefile, buildroot)
+      return _SourcefileSpec(sourcefile=sourcefile, methodname=methodname)
+    else:
+      return _ClassnameSpec(classname=classname_or_sourcefile, methodname=methodname)
+
+  @abstractmethod
+  def iter_possible_tests(self, context):
+    """Return an iterator over the possible tests this test specification indicates.
+
+    NB: At least one test yielded by the returned iterator will correspond to an available test,
+    but other yielded tests may not exist.
+
+    :param context: The pants execution context.
+    :type context: :class:`pants.goal.context.Context`
+    :returns: An iterator over possible tests.
+    :rtype: iter of :class:`_Test`
+    """
+
+
+class _SourcefileSpec(_TestSpecification):
+  """Models a test specification in [sourcefile]#[methodnme] format."""
+
+  def __init__(self, sourcefile, methodname):
+    self._sourcefile = sourcefile
+    self._methodname = methodname
+
+  def iter_possible_tests(self, context):
+    for classname in self._classnames_from_source_file(context):
+      # Tack the methodname onto all classes in the source file, as we
+      # can't know which method the user intended.
+      yield _Test(classname=classname, methodname=self._methodname)
+
+  def _classnames_from_source_file(self, context):
+    source_products = context.products.get_data('classes_by_source').get(self._sourcefile)
+    if not source_products:
+      # It's valid - if questionable - to have a source file with no classes when, for
+      # example, the source file has all its code commented out.
+      context.log.warn('Source file {0} generated no classes'.format(self._sourcefile))
+    else:
+      for _, classes in source_products.rel_paths():
+        for cls in classes:
+          yield ClasspathUtil.classname_for_rel_classfile(cls)
+
+
+class _ClassnameSpec(_TestSpecification):
+  """Models a test specification in [classname]#[methodnme] format."""
+
+  def __init__(self, classname, methodname):
+    self._classname = classname
+    self._methodname = methodname
+
+  def iter_possible_tests(self, context):
+    yield _Test(classname=self._classname, methodname=self._methodname)
 
 
 class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
@@ -211,9 +282,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   @classmethod
   def request_classes_by_source(cls, test_specs):
     """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
+    buildroot = get_buildroot()
     for test_spec in test_specs:
-      src_spec, _ = _interpret_test_spec(test_spec)
-      if src_spec:
+      if isinstance(_TestSpecification.parse(buildroot, test_spec), _SourcefileSpec):
         return True
     return False
 
@@ -225,7 +296,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     round_manager.require_data('runtime_classpath')
 
     # If the given test specs require the classes_by_source product, request it.
-    if cls.request_classes_by_source(options.test or []):
+    if cls.request_classes_by_source(options.test or ()):
       round_manager.require_data('classes_by_source')
 
   def __init__(self, *args, **kwargs):
@@ -367,37 +438,36 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if targets and self._tests_to_run:
       # If there are some junit_test targets in the graph, find ones that match the requested
       # test(s).
-      test_to_target = {}
+      possible_test_to_target = {}
       unknown_tests = []
-      for test in self._get_tests_to_run():
-        # A test might contain #specific_method, which is not needed to find a target.
-        target = test_registry.get_target(test)
+      for possible_test in self._get_possible_tests_to_run():
+        target = test_registry.get_owning_target(possible_test)
         if target is None:
-          unknown_tests.append(test)
+          unknown_tests.append(possible_test)
         else:
-          test_to_target[test] = target
+          possible_test_to_target[possible_test] = target
 
       if len(unknown_tests) > 0:
         raise TaskError("No target found for test specifier(s):\n\n  '{}'\n\nPlease change "
                         "specifier or bring in the proper target(s)."
-                        .format("'\n  '".join(t.render() for t in unknown_tests)))
+                        .format("'\n  '".join(t.render_test_spec() for t in unknown_tests)))
 
-      return _TestRegistry(test_to_target)
+      return _TestRegistry(possible_test_to_target)
     else:
       return test_registry
 
   _JUNIT_XML_MATCHER = re.compile(r'^TEST-.+\.xml$')
 
   def _get_failed_targets(self, test_registry, output_dir):
-    """Return a mapping of target -> set of individual test cases that failed.
+    """Return a mapping from targets to the set of individual tests that failed.
 
     Targets with no failed tests are omitted.
 
-    Analyzes JUnit XML files to figure out which test had failed.
-
-    The individual test cases are formatted strings of the form org.foo.bar.classname#methodName.
-
-    :tests_and_targets: {test: target} mapping.
+    :param test_registry: A registry of tests that were run.
+    :type test_registry: :class:`_TestRegistry`
+    :param string output_dir: A path to a directory containing test junit xml reports to analyze.
+    :returns: A mapping from targets to the set of individual tests that failed.
+    :rtype: dict from :class:`pants.build_graph.target.Target` to a set of :class:`_Test`
     """
     failed_targets = defaultdict(set)
     for path in os.listdir(output_dir):
@@ -411,8 +481,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               test_failed = testcase.getElementsByTagName('failure')
               test_errored = testcase.getElementsByTagName('error')
               if test_failed or test_errored:
-                test = _Test(testcase.getAttribute('classname'), testcase.getAttribute('name'))
-                target = test_registry.get_target(test)
+                test = _Test(classname=testcase.getAttribute('classname'),
+                             methodname=testcase.getAttribute('name'))
+                target = test_registry.get_owning_target(test)
                 failed_targets[target].add(test)
         except (XmlParser.XmlError, ValueError) as e:
           self.context.log.error('Error parsing test result file {0}: {1}'.format(path, e))
@@ -445,7 +516,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       (workdir, platform, target_jvm_options, target_env_vars, concurrency, threads) = properties
       for batch in self._partition(tests):
         # Batches of test classes will likely exist within the same targets: dedupe them.
-        relevant_targets = {test_registry.get_target(t) for t in batch}
+        relevant_targets = {test_registry.get_owning_target(t) for t in batch}
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
         complete_classpath.update(self.tool_classpath('junit'))
@@ -482,7 +553,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               classpath=complete_classpath,
               main=JUnitRun._MAIN,
               jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
-              args=args + [test.render() for test in batch_tests],
+              args=args + [test.render_test_spec() for test in batch_tests],
               workunit_factory=self.context.new_workunit,
               workunit_name='run',
               workunit_labels=[WorkUnitLabel.TEST],
@@ -503,9 +574,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           error_message_lines.append('\n{indent}{address}'.format(indent=' ' * 4,
                                                                   address=target.address.spec))
           for test in sorted(target_to_failed_test[target]):
-            error_message_lines.append('{indent}{classname}#{name}'.format(indent=' ' * 8,
-                                                                           classname=test.classname,
-                                                                           name=test.name))
+            error_message_lines.append('{indent}{classname}#{methodname}'
+                                       .format(indent=' ' * 8,
+                                               classname=test.classname,
+                                               methodname=test.methodname))
       error_message_lines.append(
         '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
           .format(main=JUnitRun._MAIN, code=result, failed=len(failed_targets),
@@ -518,18 +590,11 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     for i in range(0, len(tests), stride):
       yield tests[i:i + stride]
 
-  def _get_tests_to_run(self):
+  def _get_possible_tests_to_run(self):
+    buildroot = get_buildroot()
     for test_spec in self._tests_to_run:
-      src_spec, cls_spec = _interpret_test_spec(test_spec)
-      if src_spec:
-        sourcefile, methodname = src_spec
-        for classname in self._classnames_from_source_file(sourcefile):
-          # Tack the methodname onto all classes in the source file, as we
-          # can't know which method the user intended.
-          yield _Test(classname, methodname)
-      else:
-        classname, methodname = cls_spec
-        yield _Test(classname, methodname)
+      for test in _TestSpecification.parse(buildroot, test_spec).iter_possible_tests(self.context):
+        yield test
 
   def _calculate_tests_from_targets(self, targets):
     """
@@ -542,19 +607,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       for f in contents:
         classname = ClasspathUtil.classname_for_rel_classfile(f)
         if classname:
-          yield _Test(classname), target
-
-  def _classnames_from_source_file(self, srcfile):
-    relsrc = os.path.relpath(srcfile, get_buildroot())
-    source_products = self.context.products.get_data('classes_by_source').get(relsrc)
-    if not source_products:
-      # It's valid - if questionable - to have a source file with no classes when, for
-      # example, the source file has all its code commented out.
-      self.context.log.warn('Source file {0} generated no classes'.format(srcfile))
-    else:
-      for _, classes in source_products.rel_paths():
-        for cls in classes:
-          yield ClasspathUtil.classname_for_rel_classfile(cls)
+          yield _Test(classname=classname), target
 
   def _test_target_filter(self):
     def target_filter(target):
