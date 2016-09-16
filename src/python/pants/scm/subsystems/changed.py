@@ -19,7 +19,7 @@ class _ChainedOptions(object):
 
   def __getattr__(self, attr):
     for options in self._options_seq:
-      option_value = getattr(options, attr)
+      option_value = getattr(options, attr, None)
       if option_value is not None:
         return option_value
     return None
