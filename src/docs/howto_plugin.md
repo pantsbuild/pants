@@ -33,7 +33,7 @@ can consume it specifically but disregard regular `JvmBinary` instances (using `
   this is not special.
 
 - Create an empty `plugins/hadoop/targets/__init__.py` to define a python package structure
-  for your custom hadoop target type plugin. Also create empty `__init__.py` files in each 
+  for your custom hadoop target type plugin. Also create empty `__init__.py` files in each
   directory up to but not including the root directory of your python package layout; in this case,
   just `plugins/hadoop/__init__.py`.
 
@@ -48,9 +48,8 @@ can consume it specifically but disregard regular `JvmBinary` instances (using `
           pass
 
 
-- When registering a backend in `pants.ini`, `register.py` is a special module looked for by the
-  pants plugin system in each registered backend package. Create `plugins/hadoop/register.py` to
-  register the elements exposed by your plugin to BUILD file authors:
+- Create `plugins/hadoop/register.py` to register the elements exposed by your plugin to BUILD file
+  authors:
 
         :::python
         # plugins/hadoop/register.py
@@ -81,7 +80,10 @@ can consume it specifically but disregard regular `JvmBinary` instances (using `
           ]
 
 Note that you can also set the PYTHONPATH in your `./pants` wrapper script, instead of in
-`pants.ini`, if you have other reasons to do so.
+`pants.ini`, if you have other reasons to do so. Either way, pants will look for a `register.py`
+file for each backend package you list by prefixing that package with the python path; ie roughly
+`pythonpath + backend package + register.py` is tried for each pythonpath prefix until a
+`register.py` is found, in this example `plugins/hadoop/register.py`.
 
 Examples from `twitter/commons`
 -------------------------------
