@@ -5,7 +5,13 @@ python_tests(
   name = 'address_mapper',
   sources = ['test_address_mapper.py'],
   dependencies = [
-    'src/python/pants/engine/legacy:structs',
+    '3rdparty/python:mock',
+    'src/python/pants/base:specs',
+    'src/python/pants/bin',
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:address_mapper',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 
