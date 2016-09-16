@@ -127,7 +127,7 @@ class EngineInitializer(object):
     # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     tasks = (
-      create_legacy_graph_tasks() +
+      create_legacy_graph_tasks(symbol_table_cls) +
       create_fs_tasks() +
       create_graph_tasks(address_mapper, symbol_table_cls)
     )

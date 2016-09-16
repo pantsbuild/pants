@@ -12,7 +12,7 @@ import subprocess
 from abc import abstractproperty
 from hashlib import sha1
 
-from pants.engine.fs import Files, PathGlobs
+from pants.engine.fs import Files
 from pants.engine.nodes import Node, Noop, Return, Runnable, State, Throw, Waiting
 from pants.engine.selectors import Select, SelectDependencies
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
@@ -239,13 +239,7 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
   product = Snapshot
 
   @classmethod
-  def as_intrinsics(cls):
-    return {(Files, Snapshot): cls.create,
-            (PathGlobs, Snapshot): cls.create}
-
-  @classmethod
-  def create(cls, subject, product_type, variants):
-    assert product_type == Snapshot
+  def create(cls, subject, variants):
     return SnapshotNode(subject, variants)
 
   def step(self, step_context):

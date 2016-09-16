@@ -18,7 +18,7 @@ from pants.engine.fs import PathGlobs
 from pants.engine.nodes import (FilesystemNode, Node, Noop, Return, Runnable, SelectNode,
                                 StepContext, TaskNode, Throw, Waiting)
 from pants.engine.rules import NodeBuilder, RulesetValidator
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import Select, SelectDependencies, type_or_constraint_repr
 from pants.util.objects import datatype
 
 
@@ -303,7 +303,7 @@ class ProductGraph(object):
 
     def _format(level, entry, state):
       output = '{}Computing {} for {}'.format('  ' * level,
-                                              entry.node.product.__name__,
+                                              type_or_constraint_repr(entry.node.product),
                                               entry.node.subject)
       if is_one_level_above_bottom(entry):
         output += '\n{}{}'.format('  ' * (level + 1), state)
