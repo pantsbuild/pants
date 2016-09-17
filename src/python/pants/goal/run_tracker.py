@@ -340,7 +340,6 @@ class RunTracker(Subsystem):
     outcome = self._main_root_workunit.outcome()
     if self._background_root_workunit:
       outcome = min(outcome, self._background_root_workunit.outcome())
-
     outcome_str = WorkUnit.outcome_string(outcome)
     log_level = RunTracker._log_levels[outcome]
     self.log(log_level, outcome_str)
