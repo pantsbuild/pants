@@ -92,12 +92,12 @@ class LocalPantsRunner(object):
                                        self._daemon_build_graph,
                                        self._exiter).setup()
 
-      result = goal_runner.run()
+      goal_runner_result = goal_runner.run()
 
       if repro:
         # TODO: Have Repro capture the 'after' state (as a diff) as well?
         repro.log_location_of_repro_file()
     finally:
-      run_tracker.end()
+      worker_pool_result = run_tracker.end()
 
-    self._exiter.exit(result)
+    self._exiter.exit(max(goal_runner_result, worker_pool_result))

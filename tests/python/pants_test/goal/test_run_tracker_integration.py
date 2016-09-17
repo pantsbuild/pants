@@ -35,4 +35,4 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
       '--backend-packages={}'.format('pants_test.goal.data'),
       'do-some-work'
     ])
-    self.assert_success(pants_run)
+    self.assert_failure(pants_run)

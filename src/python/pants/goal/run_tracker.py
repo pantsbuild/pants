@@ -317,6 +317,8 @@ class RunTracker(Subsystem):
     """This pants run is over, so stop tracking it.
 
     Note: If end() has been called once, subsequent calls are no-ops.
+
+    :return 0 for success, 1 for failure.
     """
     if self._background_worker_pool:
       if self._aborted:
@@ -338,6 +340,7 @@ class RunTracker(Subsystem):
     outcome = self._main_root_workunit.outcome()
     if self._background_root_workunit:
       outcome = min(outcome, self._background_root_workunit.outcome())
+
     outcome_str = WorkUnit.outcome_string(outcome)
     log_level = RunTracker._log_levels[outcome]
     self.log(log_level, outcome_str)
@@ -348,6 +351,11 @@ class RunTracker(Subsystem):
 
     self.report.close()
     self.store_stats()
+
+    if outcome == WorkUnit.FAILURE:
+      return 1
+    else:
+      return 0
 
   def end_workunit(self, workunit):
     self.report.end_workunit(workunit)
