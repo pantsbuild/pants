@@ -15,9 +15,15 @@ def register_goals():
 
 
 class TestWorkUnitTask(NailgunTask):
+  @classmethod
+  def register_options(cls, register):
+    register('--do-nothing', default=False, type=bool)
 
   def execute(self):
     # This run is going to fail.
+    if self.get_options().do_nothing:
+      return
+
     self.runjava(
       classpath=[],
       main='non.existent.main.class',

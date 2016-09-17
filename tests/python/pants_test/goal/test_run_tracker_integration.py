@@ -29,10 +29,19 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('self_timings', stats_json)
         self.assertIn('cumulative_timings', stats_json)
 
-  def test_workunit_result(self):
+  def test_workunit_failure(self):
     pants_run = self.run_pants([
       '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
       '--backend-packages={}'.format('pants_test.goal.data'),
       'do-some-work'
     ])
     self.assert_failure(pants_run)
+
+  def test_workunit_success(self):
+    pants_run = self.run_pants([
+      '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
+      '--backend-packages={}'.format('pants_test.goal.data'),
+      'do-some-work',
+      '--do-nothing'
+    ])
+    self.assert_success(pants_run)
