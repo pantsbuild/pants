@@ -38,7 +38,7 @@ impl IsSubClassFunction {
 }
 
 pub type StoreListExtern =
-  extern "C" fn(*const ExternContext, *const Key, u64) -> Key;
+  extern "C" fn(*const ExternContext, *const Key, u64, bool) -> Key;
 
 pub struct StoreListFunction {
   store_list: StoreListExtern,
@@ -53,9 +53,9 @@ impl StoreListFunction {
     }
   }
 
-  pub fn call(&self, keys: Vec<&Key>) -> Key {
+  pub fn call(&self, keys: Vec<&Key>, concat: bool) -> Key {
     let keys_clone: Vec<Key> = keys.into_iter().map(|&k| k).collect();
-    (self.store_list)(self.context, keys_clone.as_ptr(), keys_clone.len() as u64)
+    (self.store_list)(self.context, keys_clone.as_ptr(), keys_clone.len() as u64, concat)
   }
 }
 

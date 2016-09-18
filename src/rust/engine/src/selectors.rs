@@ -37,20 +37,6 @@ pub struct Task {
   pub cacheable: bool,
 }
 
-impl Task {
-  pub fn cacheable(&self) -> bool {
-    self.cacheable
-  }
-
-  pub fn func(&self) -> &Function {
-    &self.func
-  }
-
-  pub fn clause(&self) -> &Vec<Selector> {
-    &self.clause
-  }
-}
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Selector {
   Select(Select),

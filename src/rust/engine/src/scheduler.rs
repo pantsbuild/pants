@@ -127,8 +127,6 @@ impl Scheduler {
     id: EntryId,
     staged: &Staged<EntryId>
   ) -> Option<Result<Staged<EntryId>, Complete>> {
-    let entry = self.graph.entry_for_id(id);
-
     // Determine whether all of the runnable's deps are complete or outstanding.
     let mut args = Vec::new();
     for arg in &staged.args {

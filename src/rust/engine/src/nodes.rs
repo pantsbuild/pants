@@ -182,8 +182,8 @@ impl<'g,'t> StepContext<'g,'t> {
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
-  fn store_list(&self, items: Vec<&Key>) -> Key {
-    (self.tasks.store_list).call(items)
+  fn store_list(&self, items: Vec<&Key>, concat: bool) -> Key {
+    (self.tasks.store_list).call(items, concat)
   }
 
   /**
@@ -423,7 +423,7 @@ impl SelectDependencies {
     &self.selector.product
   }
 
-  fn dep_product(&self, context: StepContext) -> Result<Key, State<Node>> {
+  fn dep_product(&self, context: &StepContext) -> Result<Key, State<Node>> {
     // Short circuit for traversal if the subject is already the result type,
     // indicating that recursion has already begun.
     if self.selector.traversal && self.subject.type_id() == &self.selector.dep_product {
@@ -456,17 +456,13 @@ impl SelectDependencies {
   fn dep_node(&self, dep_subject: Key) -> Node {
     if self.selector.traversal {
       // Continue traversal.
-      Node::create(Selector::SelectDependencies(self.selector), dep_subject, self.variants.clone())
+      Node::create(
+        Selector::SelectDependencies(self.selector.clone()),
+        dep_subject,
+        self.variants.clone()
+      )
     } else {
       Node::create(Selector::select(self.selector.product), dep_subject, self.variants.clone())
-    }
-  }
-
-  fn store(&self, context: StepContext, keys: Vec<&Key>) -> Key {
-    if self.selector.traversal {
-      context.concat_list(keys)
-    } else {
-      context.store_list(keys)
     }
   }
 }
@@ -475,7 +471,7 @@ impl Step for SelectDependencies {
   fn step(&self, context: StepContext) -> State<Node> {
     // Select the product holding the dependency list.
     let dep_product =
-      match self.dep_product(context) {
+      match self.dep_product(&context) {
         Ok(dep_product) => dep_product,
         Err(state) => return state,
       };
@@ -505,7 +501,7 @@ impl Step for SelectDependencies {
     if dependencies.len() > 0 {
       State::Waiting(dependencies)
     } else {
-      State::Complete(Complete::Return(self.store(context, dep_values)))
+      State::Complete(Complete::Return(context.store_list(dep_values, self.selector.traversal)))
     }
   }
 }

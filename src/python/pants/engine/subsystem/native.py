@@ -43,7 +43,7 @@ _FFI.cdef(
 
     typedef UTF8Buffer  (*extern_to_str)(ExternContext*, Digest*);
     typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
-    typedef Key         (*extern_store_list)(ExternContext*, Key*, uint64_t);
+    typedef Key         (*extern_store_list)(ExternContext*, Key*, uint64_t, bool);
     typedef Key         (*extern_project)(ExternContext*, Key*, Field*, TypeId*);
     typedef KeyBuffer   (*extern_project_multi)(ExternContext*, Key*, Field*);
 
