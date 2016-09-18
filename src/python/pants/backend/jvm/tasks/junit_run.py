@@ -167,7 +167,7 @@ class _TestSpecification(AbstractClass):
 
 
 class _SourcefileSpec(_TestSpecification):
-  """Models a test specification in [sourcefile]#[methodnme] format."""
+  """Models a test specification in [sourcefile]#[methodname] format."""
 
   def __init__(self, sourcefile, methodname):
     self._sourcefile = sourcefile
