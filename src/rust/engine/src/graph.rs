@@ -1,9 +1,8 @@
 
-use std::collections::{hash_set, HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::io;
-use std::iter;
 use std::path::Path;
 
 use externs::ToStrFunction;
@@ -117,10 +116,6 @@ impl Graph {
 
   pub fn len(&self) -> usize {
     self.entries.len()
-  }
-
-  fn is_complete(&self, node: &Node) -> bool {
-    self.entry(node).map(|entry| entry.is_complete()).unwrap_or(false)
   }
 
   fn is_complete_entry(&self, id: EntryId) -> bool {

@@ -1,11 +1,11 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 use std::io;
 use std::path::Path;
 
 use externs::ToStrFunction;
-use core::{FNV, Field, Function, Key, TypeId};
-use graph::{Entry, EntryId, Graph};
+use core::{FNV, Field, Key, TypeId};
+use graph::{EntryId, Graph};
 use nodes::{Complete, Node, Staged, StagedArg, State};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
@@ -124,14 +124,13 @@ impl Scheduler {
    */
   fn attempt_stage(
     &self,
-    id: EntryId,
     staged: &Staged<EntryId>
   ) -> Option<Result<Staged<EntryId>, Complete>> {
     // Determine whether all of the runnable's deps are complete or outstanding.
     let mut args = Vec::new();
     for arg in &staged.args {
       match arg {
-        &StagedArg::Key(k) =>
+        &StagedArg::Key(_) =>
           args.push(arg.clone()),
         &StagedArg::Promise(dep_id) => {
           let dep_entry = self.graph.entry_for_id(dep_id);
@@ -210,7 +209,7 @@ impl Scheduler {
             },
           &State::Staged(ref input_staged) =>
             // See whether the staged Node is runnable.
-            match self.attempt_stage(entry_id, input_staged) {
+            match self.attempt_stage(input_staged) {
               Some(Result::Ok(staged)) => {
                 // Success! Ready to run.
                 ready.push((entry_id, staged));
@@ -236,7 +235,7 @@ impl Scheduler {
       // The Node's state has changed! Determine which nodes are affected.
       // TODO: hold the Entry for the length of this block.
       match self.graph.entry_for_id(entry_id).state() {
-        &State::Staged(ref s) => {
+        &State::Staged(_) => {
           // If all dependencies of the Node are staged, the node is still a candidate.
           let ref graph = self.graph;
           let mut incomplete_deps =

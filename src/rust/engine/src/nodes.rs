@@ -1,8 +1,7 @@
-use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 use graph::{Entry, Graph};
-use core::{FNV, Field, Function, Key, TypeId, Variants};
+use core::{Field, Function, Key, TypeId, Variants};
 use externs::ToStrFunction;
 use selectors::Selector;
 use selectors;
@@ -96,7 +95,7 @@ pub enum Complete {
   Throw(String),
 }
 
-static Cyclic: Complete = Complete::Noop("Dep would be cyclic.", None);
+static CYCLIC: Complete = Complete::Noop("Dep would be cyclic.", None);
 
 pub struct StepContext<'g,'t> {
   entry: &'g Entry,
@@ -142,7 +141,7 @@ impl<'g,'t> StepContext<'g,'t> {
         }
       } else if self.entry.cyclic_dependencies().contains(&dep_entry.id()) {
         // Declared, but cyclic.
-        Some(&Cyclic)
+        Some(&CYCLIC)
       } else {
         // Undeclared. In theory we could still immediately return the dep here, but unfortunately
         // that occasionally allows Nodes to finish executing before all of their declared deps are
@@ -305,7 +304,7 @@ impl Step for Select {
             self.variants.clone(),
           );
         match context.get(&variants_node) {
-          Some(&Complete::Return(ref value)) =>
+          Some(&Complete::Return(_)) =>
             panic!("TODO: merging variants is not yet implemented"),
           Some(&Complete::Noop(_, _)) =>
             &self.variants,
@@ -419,10 +418,6 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn product(&self) -> &TypeId {
-    &self.selector.product
-  }
-
   fn dep_product(&self, context: &StepContext) -> Result<Key, State<Node>> {
     // Short circuit for traversal if the subject is already the result type,
     // indicating that recursion has already begun.
@@ -578,7 +573,7 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn step(&self, _: StepContext) -> State<Node> {
     // Stage the Node to run immediately.
     State::Staged(Staged {
       func: self.selector.func,
