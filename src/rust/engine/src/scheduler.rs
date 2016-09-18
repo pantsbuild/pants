@@ -82,11 +82,12 @@ impl Scheduler {
     product: TypeId,
     dep_product: TypeId,
     field: Field,
+    traversal: bool,
   ) {
     self.add_root(
       Node::create(
         Selector::SelectDependencies(
-          SelectDependencies { product: product, dep_product: dep_product, field: field }),
+          SelectDependencies { product: product, dep_product: dep_product, field: field, traversal: traversal }),
         subject,
         Vec::new(),
       )

@@ -116,9 +116,9 @@ impl Tasks {
     ));
   }
 
-  pub fn add_select_dependencies(&mut self, product: TypeId, dep_product: TypeId, field: Field) {
+  pub fn add_select_dependencies(&mut self, product: TypeId, dep_product: TypeId, field: Field, traversal: bool) {
     self.clause(Selector::SelectDependencies(
-      SelectDependencies { product: product, dep_product: dep_product, field: field }
+      SelectDependencies { product: product, dep_product: dep_product, field: field, traversal: traversal }
     ));
   }
 

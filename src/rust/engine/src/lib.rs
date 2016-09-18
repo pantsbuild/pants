@@ -300,6 +300,7 @@ pub extern fn execution_add_root_select_dependencies(
   product: TypeId,
   dep_product: TypeId,
   field: Field,
+  traversal: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.add_root_select_dependencies(
@@ -307,6 +308,7 @@ pub extern fn execution_add_root_select_dependencies(
       product,
       dep_product,
       field,
+      traversal,
     );
   })
 }
@@ -411,9 +413,10 @@ pub extern fn task_add_select_dependencies(
   product: TypeId,
   dep_product: TypeId,
   field: Field,
+  traversal: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select_dependencies(product, dep_product, field);
+    raw.scheduler.tasks.add_select_dependencies(product, dep_product, field, traversal);
   })
 }
 

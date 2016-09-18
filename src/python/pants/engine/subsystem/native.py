@@ -116,7 +116,7 @@ _FFI.cdef(
     void task_add_select(RawScheduler*, TypeId);
     void task_add_select_variant(RawScheduler*, TypeId, Key);
     void task_add_select_literal(RawScheduler*, Key, TypeId);
-    void task_add_select_dependencies(RawScheduler*, TypeId, TypeId, Field);
+    void task_add_select_dependencies(RawScheduler*, TypeId, TypeId, Field, bool);
     void task_add_select_projection(RawScheduler*, TypeId, TypeId, Field, TypeId);
     void task_end(RawScheduler*);
 
@@ -129,7 +129,8 @@ _FFI.cdef(
                                                 Key,
                                                 TypeId,
                                                 TypeId,
-                                                Field);
+                                                Field,
+                                                bool);
     void execution_next(RawScheduler*,
                         EntryId*,
                         Key*,

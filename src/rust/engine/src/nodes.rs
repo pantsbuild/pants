@@ -422,10 +422,14 @@ impl SelectDependencies {
   fn product(&self) -> &TypeId {
     &self.selector.product
   }
-}
 
-impl Step for SelectDependencies {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn dep_product(&self, context: StepContext) -> Result<Key, State<Node>> {
+    // Short circuit for traversal if the subject is already the result type,
+    // indicating that recursion has already begun.
+    if self.selector.traversal && self.subject.type_id() == &self.selector.dep_product {
+      return Ok(self.subject);
+    }
+
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
@@ -433,30 +437,54 @@ impl Step for SelectDependencies {
         self.subject,
         self.variants.clone()
       );
+    match context.get(&dep_product_node) {
+      Some(&Complete::Return(ref value)) =>
+        Ok(value.clone()),
+      Some(&Complete::Noop(_, _)) =>
+        Err(
+          State::Complete(
+          Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
+          )
+        ),
+      Some(&Complete::Throw(ref msg)) =>
+        Err(State::Complete(Complete::Throw(msg.clone()))),
+      None =>
+        Err(State::Waiting(vec![dep_product_node])),
+    }
+  }
+
+  fn dep_node(&self, dep_subject: Key) -> Node {
+    if self.selector.traversal {
+      // Continue traversal.
+      Node::create(Selector::SelectDependencies(self.selector), dep_subject, self.variants.clone())
+    } else {
+      Node::create(Selector::select(self.selector.product), dep_subject, self.variants.clone())
+    }
+  }
+
+  fn store(&self, context: StepContext, keys: Vec<&Key>) -> Key {
+    if self.selector.traversal {
+      context.concat_list(keys)
+    } else {
+      context.store_list(keys)
+    }
+  }
+}
+
+impl Step for SelectDependencies {
+  fn step(&self, context: StepContext) -> State<Node> {
+    // Select the product holding the dependency list.
     let dep_product =
-      match context.get(&dep_product_node) {
-        Some(&Complete::Return(ref value)) =>
-          value,
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(msg.clone())),
-        None =>
-          return State::Waiting(vec![dep_product_node]),
+      match self.dep_product(context) {
+        Ok(dep_product) => dep_product,
+        Err(state) => return state,
       };
 
     // The product and its dependency list are available.
     let mut dependencies = Vec::new();
     let mut dep_values: Vec<&Key> = Vec::new();
-    for dep_subject in context.project_multi(dep_product, &self.selector.field) {
-      let dep_node =
-        Node::create(
-          Selector::select(self.selector.product),
-          dep_subject,
-          self.variants.clone()
-        );
+    for dep_subject in context.project_multi(&dep_product, &self.selector.field) {
+      let dep_node = self.dep_node(dep_subject);
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
           dep_values.push(&value),
@@ -477,7 +505,7 @@ impl Step for SelectDependencies {
     if dependencies.len() > 0 {
       State::Waiting(dependencies)
     } else {
-      State::Complete(Complete::Return(context.store_list(dep_values)))
+      State::Complete(Complete::Return(self.store(context, dep_values)))
     }
   }
 }

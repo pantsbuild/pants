@@ -11,6 +11,7 @@ pub struct SelectDependencies {
   pub product: TypeId,
   pub dep_product: TypeId,
   pub field: Field,
+  pub traversal: bool,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
