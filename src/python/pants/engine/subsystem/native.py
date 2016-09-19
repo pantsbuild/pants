@@ -166,14 +166,16 @@ def extern_issubclass(context_handle, cls_id, super_cls_id):
 def extern_store_list(context_handle, keys_ptr, keys_len, concat):
   """Given storage and an array of Keys, return a new Key to represent the list."""
   c = _FFI.from_handle(context_handle)
-  digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
+  raw_digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
   if concat:
     # Expect each digest to represent a list: deserialize without nesting to get a list
     # of inner digests per outer digest, and concatenate.
-    digests = tuple(inner
-                    for digest in digests
-                    for inner in c.storage.get_from_digest(digest, nesting=False))
-  return c.storage.put_typed_from_digests(digests)
+    digests = tuple(digest
+                    for raw_digest in raw_digests
+                    for digest in c.storage.get_from_digest(raw_digest, nesting=False))
+    return c.storage.put_typed(digests, nesting=False)
+  else:
+    return c.storage.put_typed_from_digests(raw_digests)
 
 
 @_FFI.callback("Key(ExternContext*, Key*, Field*, TypeId*)")
