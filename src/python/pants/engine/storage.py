@@ -184,15 +184,15 @@ class Storage(Closable):
     else:
       return obj
 
-  def put_typed(self, obj):
-    return (self.put(obj), self.put(type(obj)))
+  def put_typed(self, obj, nesting=True):
+    return (self.put(obj, nesting=nesting), self.put(type(obj)))
 
   def put_typed_from_digests(self, digests):
     # Create a pre-nested value (and thus, disable the default nesting).
     arg = tuple(Digest(digest) for digest in digests)
     return (self.put(arg, nesting=False), self.put(type(arg)))
 
-  def get(self, key):
+  def get(self, key, nesting=True):
     """Given a key, return its deserialized content.
 
     Note that since this is not a cache, if we do not have the content for the object, this
@@ -205,7 +205,7 @@ class Storage(Closable):
     if obj is None:
       obj = self._contents.get(key.digest, _unpickle)
 
-    return self._maybe_get_nested(obj)
+    return self._maybe_get_nested(obj) if nesting else obj
 
   def _maybe_get_nested(self, obj):
     # If the stored object was a collection type, recurse.
@@ -216,8 +216,8 @@ class Storage(Closable):
     else:
       return obj
 
-  def get_from_digest(self, digest):
-    return self.get(Digest(digest))
+  def get_from_digest(self, digest, nesting=True):
+    return self.get(Digest(digest), nesting=nesting)
 
   def add_mapping(self, from_key, to_key):
     """Establish one to one relationship from one Key to another Key.

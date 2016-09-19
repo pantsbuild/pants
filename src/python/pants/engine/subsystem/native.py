@@ -168,7 +168,11 @@ def extern_store_list(context_handle, keys_ptr, keys_len, concat):
   c = _FFI.from_handle(context_handle)
   digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
   if concat:
-    raise ValueError('TODO!: implement concat')
+    # Expect each digest to represent a list: deserialize without nesting to get a list
+    # of inner digests per outer digest, and concatenate.
+    digests = tuple(inner
+                    for digest in digests
+                    for inner in c.storage.get_from_digest(digest, nesting=False))
   return c.storage.put_typed_from_digests(digests)
 
 
