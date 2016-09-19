@@ -53,9 +53,9 @@ impl StoreListFunction {
     }
   }
 
-  pub fn call(&self, keys: Vec<&Key>, concat: bool) -> Key {
+  pub fn call(&self, keys: Vec<&Key>, merge: bool) -> Key {
     let keys_clone: Vec<Key> = keys.into_iter().map(|&k| k).collect();
-    (self.store_list)(self.context, keys_clone.as_ptr(), keys_clone.len() as u64, concat)
+    (self.store_list)(self.context, keys_clone.as_ptr(), keys_clone.len() as u64, merge)
   }
 }
 

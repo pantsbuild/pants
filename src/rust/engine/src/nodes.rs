@@ -181,8 +181,8 @@ impl<'g,'t> StepContext<'g,'t> {
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
-  fn store_list(&self, items: Vec<&Key>, concat: bool) -> Key {
-    (self.tasks.store_list).call(items, concat)
+  fn store_list(&self, items: Vec<&Key>, merge: bool) -> Key {
+    (self.tasks.store_list).call(items, merge)
   }
 
   /**
@@ -457,10 +457,10 @@ impl SelectDependencies {
     }
   }
 
-  fn store(&self, context: &StepContext, dep_product: &Key, mut dep_values: Vec<&Key>) -> Key {
+  fn store(&self, context: &StepContext, dep_product: &Key, dep_values: Vec<&Key>) -> Key {
     if self.selector.traversal && dep_product.type_id() == &self.selector.product {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
-      // items to be concatenated.
+      // items to be merged.
       // TODO: would be nice to do this in one operation.
       let prepend = context.store_list(vec![dep_product], false);
       let mut prepended = dep_values;
