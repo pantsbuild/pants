@@ -702,7 +702,7 @@ class JvmCompile(NailgunTaskBase):
 
       if not hit_cache:
         # Compute the compile classpath for this target.
-        cp_entries = []
+        cp_entries = [ctx.classes_dir]
         cp_entries.extend(ClasspathUtil.compute_classpath(ctx.dependencies(self._dep_context),
                                                           classpath_products,
                                                           extra_compile_time_classpath,
