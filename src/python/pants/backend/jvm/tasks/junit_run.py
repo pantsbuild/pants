@@ -17,9 +17,8 @@ from six.moves import range
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm import argfile
+from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -207,8 +206,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   :API: public
   """
 
-  _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
-
   @classmethod
   def register_options(cls, register):
     super(JUnitRun, cls).register_options(register)
@@ -254,30 +251,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='If true, generate an html summary report of tests that were run.')
     register('--open', type=bool,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
-    cls.register_jvm_tool(register,
-                          'junit',
-                          classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.13'),
-                          ],
-                          main=JUnitRun._MAIN,
-                          # TODO(John Sirois): Investigate how much less we can get away with.
-                          # Clearly both tests and the runner need access to the same @Test,
-                          # @Before, as well as other annotations, but there is also the Assert
-                          # class and some subset of the @Rules, @Theories and @RunWith APIs.
-                          custom_rules=[
-                            Shader.exclude_package('junit.framework', recursive=True),
-                            Shader.exclude_package('org.junit', recursive=True),
-                            Shader.exclude_package('org.hamcrest', recursive=True),
-                            Shader.exclude_package('org.pantsbuild.junit.annotations',
-                                                   recursive=True),
-                          ])
     # TODO: Yuck, but will improve once coverage steps are in their own tasks.
     for c in [Coverage, Cobertura]:
       c.register_options(register, cls.register_jvm_tool)
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator, JUnit)
 
   @classmethod
   def request_classes_by_source(cls, test_specs):
@@ -519,7 +499,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         relevant_targets = {test_registry.get_owning_target(t) for t in batch}
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
-        complete_classpath.update(self.tool_classpath('junit'))
+        complete_classpath.update(JUnit.global_instance().runner_classpath(self.context))
         complete_classpath.update(self.classpath(relevant_targets,
                                                  classpath_product=classpath_product))
         complete_classpath.update(classpath_append)
@@ -551,7 +531,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               executor=SubprocessExecutor(distribution),
               distribution=distribution,
               classpath=complete_classpath,
-              main=JUnitRun._MAIN,
+              main=JUnit.RUNNER_MAIN,
               jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
               args=args + [test.render_test_spec() for test in batch_tests],
               workunit_factory=self.context.new_workunit,
@@ -580,7 +560,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                                                methodname=test.methodname))
       error_message_lines.append(
         '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
-          .format(main=JUnitRun._MAIN, code=result, failed=len(failed_targets),
+          .format(main=JUnit.RUNNER_MAIN, code=result, failed=len(failed_targets),
                   targets=pluralize(len(failed_targets), 'target'))
       )
       raise TestFailedTaskError('\n'.join(error_message_lines), failed_targets=list(failed_targets))

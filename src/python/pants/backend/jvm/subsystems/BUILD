@@ -35,6 +35,19 @@ python_library(
 )
 
 python_library(
+  name = 'junit',
+  sources = ['junit.py'],
+  dependencies = [
+    ':jvm_tool_mixin',
+    'src/python/pants/backend/jvm/subsystems:shader',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/util:memo',
+    'src/python/pants/build_graph',
+    'src/python/pants/subsystem',
+  ],
+)
+
+python_library(
   name = 'jvm',
   sources = ['jvm.py'],
   dependencies = [

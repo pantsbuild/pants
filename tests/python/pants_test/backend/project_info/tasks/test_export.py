@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_dependency import JarDependency
@@ -34,7 +35,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.subsystem.subsystem_util import init_subsystems
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -56,7 +57,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         'version': 'custom'
       }
     }
-    init_subsystem(ScalaPlatform, scala_options)
+    init_subsystems([JUnit, ScalaPlatform], scala_options)
 
     self.make_target(':scala-library',
                      JarLibrary,
@@ -307,7 +308,9 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def test_java_test(self):
     result = self.execute_export_json('project_info:java_test')
     self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
+    # Note that the junit dep gets auto-injected via the JUnit subsystem.
+    self.assertEqual(['org.apache:apache-jar:12.12.2012',
+                      'junit:junit:{}'.format(JUnit.LIBRARY_REV)],
                      result['targets']['project_info:java_test']['libraries'])
     self.assertEqual('TEST_RESOURCE',
                      result['targets']['project_info:test_resource']['target_type'])

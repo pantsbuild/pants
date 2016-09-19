@@ -11,6 +11,7 @@ from textwrap import dedent
 
 from mock import patch
 
+from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.python.targets.python_tests import PythonTests
@@ -25,7 +26,7 @@ from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_file_dump
 from pants.util.timeout import TimeoutReached
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
 
 
 class JUnitRunnerTest(JvmToolTaskTestBase):
@@ -57,6 +58,10 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         }
       """)
     )
+
+  def setUp(self):
+    super(JUnitRunnerTest, self).setUp()
+    init_subsystem(JUnit)
 
   def test_junit_runner_failure(self):
     with self.assertRaises(TaskError) as cm:
@@ -173,7 +178,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     subprocess.check_call(
       [javac, '-d', test_classes_abs_path, '-cp', classpath, test_java_file_abs_path])
 
-    # If a target_name is specified, create a target with it, otherwise create a java_tests target.
+    # If a target_name is specified create a target with it, otherwise create a java_tests target.
     if 'target_name' in kwargs:
       target = self.target(kwargs['target_name'])
     else:
@@ -205,24 +210,24 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     """Run pants against a `python_tests` target, but set an option for the `test.junit` task. This
     should execute without error.
     """
-    self.add_to_build_file('foo', dedent('''
+    self.add_to_build_file('foo', dedent("""
         python_tests(
           name='hello',
           sources=['some_file.py'],
         )
-        '''
+        """
     ))
     self.set_options(test='#abc')
     task = self.create_task(self.context(target_roots=[self.target('foo:hello')]))
     task.execute()
 
   def test_empty_sources(self):
-    self.add_to_build_file('foo', dedent('''
+    self.add_to_build_file('foo', dedent("""
         java_tests(
           name='empty',
           sources=[],
         )
-        '''
+        """
     ))
     task = self.create_task(self.context(target_roots=[self.target('foo:empty')]))
     with self.assertRaisesRegexp(TargetDefinitionException,
@@ -230,12 +235,12 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       task.execute()
 
   def test_allow_empty_sources(self):
-    self.add_to_build_file('foo', dedent('''
+    self.add_to_build_file('foo', dedent("""
         java_tests(
           name='empty',
           sources=[],
         )
-        '''
+        """
     ))
     self.set_options(allow_empty_sources=True)
     context = self.context(target_roots=[self.target('foo:empty')])
