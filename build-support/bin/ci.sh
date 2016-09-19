@@ -182,7 +182,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests${shard_desc}"
   (
     targets=$(
-      ./pants.pex --enable-v2-engine list tests/python:: | \
+      ./pants.pex list tests/python:: | \
       xargs ./pants.pex --tag='-integration' filter --filter-type=python_tests
     ) && \
     ./pants.pex ${PANTS_ARGS[@]} test.pytest \
@@ -210,7 +210,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests${shard_desc}"
   (
     targets=$(
-      ./pants.pex --enable-v2-engine list tests/python:: | \
+      ./pants.pex list tests/python:: | \
       xargs ./pants.pex --tag='+integration' filter --filter-type=python_tests
     ) && \
     ./pants.pex ${PANTS_ARGS[@]} test.pytest --test-pytest-test-shard=${python_intg_shard} ${targets}
