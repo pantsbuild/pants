@@ -9,22 +9,12 @@ import java.io.{
   File,
   IOException
 }
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption._
 
-import sbt.{
-  CompileSetup,
-  Logger
-}
-import sbt.inc.{
-  Analysis,
-  AnalysisStore,
-  FileBasedStore,
-  Locate
-}
-
-import org.pantsbuild.zinc.cache.{
-  Cache,
-  FileFPrint
-}
+import sbt.{CompileSetup, Logger}
+import sbt.inc.{Analysis, AnalysisStore, FileBasedStore, Locate}
+import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
 import org.pantsbuild.zinc.cache.Cache.Implicits
 
 /**
@@ -106,7 +96,7 @@ object AnalysisMap {
    * Create an analysis store backed by analysisCache.
    */
   def cachedStore(cacheFile: File): AnalysisStore = {
-    val fileStore = AnalysisStore.cached(FileBasedStore(cacheFile))
+    val fileStore = AnalysisStore.cached(SafeFileBasedStore(cacheFile))
 
     val fprintStore = new AnalysisStore {
       def set(analysis: Analysis, setup: CompileSetup) {
@@ -123,5 +113,20 @@ object AnalysisMap {
     }
 
     AnalysisStore.sync(AnalysisStore.cached(fprintStore))
+  }
+}
+
+object SafeFileBasedStore {
+  def apply(file: File): AnalysisStore = new AnalysisStore {
+    private val actualAnalysisStore = FileBasedStore(file)
+    def set(analysis: Analysis, setup: CompileSetup) {
+      val analysisFile = File.createTempFile(file.getName, ".tmp")
+      val analysisStore = FileBasedStore(analysisFile)
+      analysisStore.set(analysis, setup)
+      Files.move(analysisFile.toPath, file.toPath, REPLACE_EXISTING)
+    }
+
+    def get(): Option[(Analysis, CompileSetup)] =
+      actualAnalysisStore.get()
   }
 }

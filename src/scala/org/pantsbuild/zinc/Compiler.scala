@@ -9,17 +9,14 @@ import java.net.URLClassLoader
 import sbt.compiler.javac
 import sbt.{
   ClasspathOptions,
-  CompileOptions,
   Logger,
-  LoggerReporter,
   ScalaInstance
 }
 import sbt.compiler.{
   AnalyzingCompiler,
   CompileOutput,
   CompilerCache,
-  IC,
-  MixedAnalyzingCompiler
+  IC
 }
 import sbt.inc.ZincPrivateAnalysis
 import sbt.Path._

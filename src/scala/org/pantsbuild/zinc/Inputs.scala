@@ -9,8 +9,7 @@ import java.util.{ List => JList, Map => JMap }
 
 import sbt.Logger
 import sbt.Path._
-import sbt.compiler.IC
-import sbt.inc.{ Analysis, Locate, ZincPrivateAnalysis }
+import sbt.inc.{ Analysis, ZincPrivateAnalysis }
 import scala.collection.JavaConverters._
 import xsbti.compile.CompileOrder
 
