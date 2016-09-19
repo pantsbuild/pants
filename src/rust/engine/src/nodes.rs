@@ -456,6 +456,21 @@ impl SelectDependencies {
       Node::create(Selector::select(self.selector.product), dep_subject, self.variants.clone())
     }
   }
+
+  fn store(&self, context: &StepContext, dep_product: &Key, mut dep_values: Vec<&Key>) -> Key {
+    if self.selector.traversal && dep_product.type_id() == &self.selector.product {
+      // If the dep_product is an inner node in the traversal, prepend it to the list of
+      // items to be concatenated.
+      // TODO: would be nice to do this in one operation.
+      let prepend = context.store_list(vec![dep_product], false);
+      let mut prepended = dep_values;
+      prepended.insert(0, &prepend);
+      context.store_list(prepended, self.selector.traversal)
+    } else {
+      // Not an inner node, or not a traversal.
+      context.store_list(dep_values, self.selector.traversal)
+    }
+  }
 }
 
 impl Step for SelectDependencies {
@@ -492,7 +507,7 @@ impl Step for SelectDependencies {
     if dependencies.len() > 0 {
       State::Waiting(dependencies)
     } else {
-      State::Complete(Complete::Return(context.store_list(dep_values, self.selector.traversal)))
+      State::Complete(Complete::Return(self.store(&context, &dep_product, dep_values)))
     }
   }
 }
