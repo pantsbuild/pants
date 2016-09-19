@@ -146,5 +146,47 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
   def test_changed_with_changes_since_transitive(self):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
 
+  def test_changed_options_scope_shadowing(self):
+    """Tests that the `test-changed` scope overrides `changed` scope."""
+    changed_src = 'testprojects/src/python/python_targets/test_library.py'
+    expected_target = self.TEST_MAPPING[changed_src]['none'][0]
+    expected_set = set([expected_target])
+    not_expected_set = set(self.TEST_MAPPING[changed_src]['transitive']).difference(expected_set)
+
+    with mutated_working_copy([changed_src]):
+      pants_run = self.run_pants([
+        '-ldebug',   # This ensures the changed target name shows up in the pants output.
+        'test-changed',
+        '--test-changed-changes-since=HEAD',
+        '--test-changed-include-dependees=none',     # This option should be used.
+        '--changed-include-dependees=transitive'     # This option should be stomped on.
+      ])
+
+    self.assert_success(pants_run)
+
+    for expected_item in expected_set:
+      self.assertIn(expected_item, pants_run.stdout_data)
+
+    for not_expected_item in not_expected_set:
+      if expected_target.startswith(not_expected_item):
+        continue  # Ignore subset matches.
+      self.assertNotIn(not_expected_item, pants_run.stdout_data)
+
+  def test_changed_options_scope_positional(self):
+    changed_src = 'testprojects/src/python/python_targets/test_library.py'
+    expected_set = set(self.TEST_MAPPING[changed_src]['transitive'])
+
+    with mutated_working_copy([changed_src]):
+      pants_run = self.run_pants([
+        '-ldebug',   # This ensures the changed target names show up in the pants output.
+        'test-changed',
+        '--changes-since=HEAD',
+        '--include-dependees=transitive'
+      ])
+
+    self.assert_success(pants_run)
+    for expected_item in expected_set:
+      self.assertIn(expected_item, pants_run.stdout_data)
+
 
 ChangedIntegrationTest.generate_tests()
