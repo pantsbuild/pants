@@ -14,7 +14,7 @@ from twitter.common.collections import OrderedDict, OrderedSet
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
-from pants.engine.fs import FileDigest, PathGlobs, create_fs_tasks
+from pants.engine.fs import PathGlobs, create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import NodeBuilder, Rule, RulesetValidator
@@ -186,12 +186,15 @@ class RulesetValidatorTest(unittest.TestCase):
 #
 
 
-class Graph(datatype('Graph', ['root_subject', 'root_rules', 'rule_dependencies'])):
+class Graph(datatype('Graph', ['root_subject', 'root_rules', 'rule_dependencies', 'failure_reasons'])):
   # TODO constructing nodes from the resulting graph
   # method, walk out from root nodes, constructing each node
   # when hit a node that can't be constructed yet, ie changes subject, collect those for later
   # inject the nodes into the product graph
   # schedule leaves from walk
+
+  def diagnostic(self):
+    return '\n'.join('{}:\n  {}'.format(rule, diagnostic.reason) for rule, diagnostic in self.failure_reasons.items())
 
   def __str__(self):
     if not self.root_rules:
@@ -264,6 +267,10 @@ class WithSubject(datatype('WithSubject', ['subject_type', 'rule'])):
     return '{} of {}'.format(self.rule, self.subject_type.__name__)
 
 
+class Diagnostic(datatype('Diagnostic', ['rule', 'reason', 'other_rules'])):
+  """"""
+
+
 class GraphMaker(object):
 
   def __init__(self, nodebuilder, goal_to_product=None, root_subject_types=None):
@@ -301,7 +308,7 @@ class GraphMaker(object):
 
     rule_dependency_edges = OrderedDict()
 
-    unfulfillable_rules = OrderedSet()
+    unfulfillable_rules = OrderedDict()
     rules_to_traverse = deque(root_rules)
 
     def add_rules_to_graph(rule, dep_rules):
@@ -310,7 +317,6 @@ class GraphMaker(object):
         rule_dependency_edges[rule] = dep_rules
       else:
         rule_dependency_edges[rule] += dep_rules
-        #raise ValueError('not sure what to do with this case, but I should write a test case for it')
 
     while rules_to_traverse:
       rule = rules_to_traverse.popleft()
@@ -318,7 +324,6 @@ class GraphMaker(object):
         continue
 
       if type(rule) is WithSubject:
-        #subject = rule.subject
         subject_type = rule.subject_type
       else:
         raise TypeError("rules must all be WithSubject'ed")
@@ -334,8 +339,9 @@ class GraphMaker(object):
           if not rules_or_literals_for_selector:
             # NB rule is not fulfillable with this subject / product
             # - if the rule is not in rule_dependency_edges,
-            print('rule not fulfillable by way of selector {}. rule {}'.format(selector, rule))
-            unfulfillable_rules.add(rule)
+
+            #print('rule not fulfillable by way of selector {}. rule {}'.format(selector, rule))
+            unfulfillable_rules[rule] = Diagnostic(rule, 'no matches for {} with subject type {}'.format(selector, subject_type.__name__), None)
             was_unfulfillable = True
             break # from the selector loop
           add_rules_to_graph(rule, rules_or_literals_for_selector)
@@ -344,18 +350,18 @@ class GraphMaker(object):
           initial_selector = Select(selector.dep_product)
           initial_rules_or_literals = self._blah_for_select(subject_type, initial_selector)
           if not initial_rules_or_literals:
-            print('initial selector for select dependencies cannot be fulfilled {}'.format(initial_selector))
-            unfulfillable_rules.add(rule)
+            unfulfillable_rules[rule] = Diagnostic(rule, 'initial selector for select dependencies cannot be fulfilled {}'.format(initial_selector), None)
+            #print('initial selector for select dependencies cannot be fulfilled {}'.format(initial_selector))
+            #unfulfillable_rules.add(rule)
             was_unfulfillable = True
             break # from the selector loop
           synth_rules = self._synth_rules_for_select_deps(selector)
 
-          print('synth_rules')
-          print(synth_rules)
+          #print('synth_rules')
+          #print(synth_rules)
 
           if not synth_rules:
-            print('no rules available for any field types used by {}'.format(selector))
-            unfulfillable_rules.add(rule)
+            unfulfillable_rules[rule]=Diagnostic(rule, 'no rules available for any field types used by {}'.format(selector), None)
             was_unfulfillable = True
             break # from selector loop
 
@@ -369,7 +375,7 @@ class GraphMaker(object):
           initial_projection_selector = Select(selector.input_product)
           initial_projection_rules_or_literals = self._blah_for_select(subject_type, initial_projection_selector)
           if not initial_projection_rules_or_literals:
-            unfulfillable_rules.add(rule)
+            unfulfillable_rules[rule]=Diagnostic(rule, 'no matches for {} with subject type {} when resolving {}'.format(initial_projection_selector, subject_type.__name__, selector), None)
             was_unfulfillable = True
             break
 
@@ -377,7 +383,7 @@ class GraphMaker(object):
           synth_rules_for_projection = self._blah_for_select(selector.projected_subject, projected_selector)
 
           if not synth_rules_for_projection:
-            unfulfillable_rules.add(rule)
+            unfulfillable_rules[rule]=Diagnostic(rule, 'no matches for {} with subject type {} when resolving {}'.format(projected_selector, selector.projected_subject.__name__, selector), None)
             was_unfulfillable = True
             break
 
@@ -391,7 +397,7 @@ class GraphMaker(object):
     root_rules, rule_dependency_edges = self._remove_unfulfillable_rules_and_dependents(root_rules,
       rule_dependency_edges, unfulfillable_rules)
 
-    return root_rules, rule_dependency_edges
+    return root_rules, rule_dependency_edges, unfulfillable_rules
 
   def _synth_rules_for_select_deps(self, selector):
     synth_rules = []
@@ -408,15 +414,15 @@ class GraphMaker(object):
 
   def _remove_unfulfillable_rules_and_dependents(self, root_rules, rule_dependency_edges,
     unfulfillable_rules):
-    removal_traversal = deque(unfulfillable_rules)
+    removal_traversal = deque(unfulfillable_rules.keys())
     while removal_traversal:
       rule = removal_traversal.pop()
       for cur, deps in rule_dependency_edges.items():
         if cur in unfulfillable_rules:
           continue
         if rule in deps:
-          print('  removing {} because it depends on {}'.format(cur, rule))
-          unfulfillable_rules.add(cur)
+          unfulfillable_rules[cur] = Diagnostic(cur,
+            'removing {} because it depends on {}'.format(cur, rule), None)
           removal_traversal.append(cur)
 
           # this doesn't hold, so don't do it
@@ -434,13 +440,15 @@ class GraphMaker(object):
   def full_graph(self):
     full_root_rules = OrderedSet()
     full_dependency_edges = OrderedDict()
+    full_unfulfillable_rules = OrderedDict()
     for r in self.root_subject_types:
       for p in self.all_produced_product_types(r):
         # TODO might want to pass the current root rules / dependency edges through.
-        root_rules, rule_dependency_edges = self._get(r, p)
+        root_rules, rule_dependency_edges, unfulfillable_rules = self._get(r, p)
         full_root_rules.update(root_rules)
         full_dependency_edges.update(rule_dependency_edges)
-    return FullGraph(self.root_subject_types, list(full_root_rules), full_dependency_edges)
+        full_unfulfillable_rules.update(unfulfillable_rules)
+    return FullGraph(self.root_subject_types, list(full_root_rules), full_dependency_edges, full_unfulfillable_rules)
 
   def all_produced_product_types(self, subject_type):
     intrinsic_products = [prod for subj, prod in self.nodebuilder._intrinsics.keys() if subj == subject_type]
@@ -449,6 +457,8 @@ class GraphMaker(object):
 
 
 class PremadeGraphTest(unittest.TestCase):
+  # TODO something with variants
+  # TODO HasProducts?
 
   def test_smallest_full_test(self):
     rules = [
@@ -476,7 +486,6 @@ class PremadeGraphTest(unittest.TestCase):
 
     rule_index = NodeBuilder.create(tasks)
     graphmaker = GraphMaker(rule_index,
-      #goal_to_product={'goal-name': AGoal},
       root_subject_types=(Address,
                           PathGlobs,
                           SingleAddress,
@@ -492,7 +501,6 @@ class PremadeGraphTest(unittest.TestCase):
     self.assertEquals(set(real_values.union(set(str(r) for r in rule_index._intrinsics.values()))),
       s
     )
-    #subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
     self.assert_blah(dedent("""
                                {
@@ -512,7 +520,6 @@ class PremadeGraphTest(unittest.TestCase):
       goal_to_product={'goal-name': AGoal},
       root_subject_types=(SubA, A))
     fullgraph = graphmaker.full_graph()
-    #subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
     self.assert_blah(dedent("""
                                {
@@ -524,7 +531,6 @@ class PremadeGraphTest(unittest.TestCase):
 
                                }""").strip(), fullgraph)
 
-  # TODO something with variants
   def test_smallest_test(self):
     rules = [
       (Exactly(A), (Select(SubA),), noop)
@@ -639,14 +645,16 @@ class PremadeGraphTest(unittest.TestCase):
     # ah! intrinsics aren't fully covered by the validator. I'm betting
     # this one is just a direct one, not a transitive one
     rules = [
-      (Exactly(B), (Select(FileDigest),), noop),
+      (Exactly(B), (Select(C),), noop),
       (Exactly(A), (Select(B),), noop),
       (Exactly(A), tuple(), noop),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules),
+    graphmaker = GraphMaker(NodeBuilder.create(rules, IntrinsicProvider({(D, C): BoringRule(C)})),
       goal_to_product={'goal-name': AGoal},
-      root_subject_types=tuple())
+      root_subject_types=tuple(),
+
+    )
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
     self.assert_blah(dedent("""
@@ -872,6 +880,37 @@ class PremadeGraphTest(unittest.TestCase):
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
     self.assert_blah('{empty graph}', subgraph)
+
+  def test_diagnostic_graph_select_projection(self):
+    rules = [
+      (Exactly(A), (SelectProjection(B, D, ('some',), C),), noop),
+      (C, tuple(), noop)
+    ]
+
+    graphmaker = GraphMaker(NodeBuilder.create(rules),
+      goal_to_product={'goal-name': AGoal},
+      root_subject_types=tuple())
+    subgraph = graphmaker.get(subject=SubA(), requested_product=A)
+
+    self.assert_blah(dedent("""
+                               (Exactly(A), (SelectProjection(B, D, (u'some',), C),), noop) of SubA:
+                                 no matches for Select(B) with subject type D when resolving SelectProjection(B, D, (u'some',), C)
+                               """).strip(), subgraph.diagnostic())
+
+  def test_diagnostic_graph_simple_select_failure(self):
+    rules = [
+      (Exactly(A), (Select(C),), noop),
+    ]
+
+    graphmaker = GraphMaker(NodeBuilder.create(rules),
+      goal_to_product={'goal-name': AGoal},
+      root_subject_types=tuple())
+    subgraph = graphmaker.get(subject=SubA(), requested_product=A)
+
+    self.assert_blah(dedent("""
+                        (Exactly(A), (Select(C),), noop) of SubA:
+                          no matches for Select(C) with subject type SubA
+                          """).strip(), subgraph.diagnostic())
 
   def assert_blah(self, strip, subgraph):
 

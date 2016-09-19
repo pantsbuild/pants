@@ -251,6 +251,9 @@ class SnapshotIntrinsicRule(Rule):
       (PathGlobs, Snapshot): snapshot_intrinsic_rule
     }
 
+  def __repr__(self):
+    return '{}()'.format(type(self).__name__)
+
 
 class NodeBuilder(Closable):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
