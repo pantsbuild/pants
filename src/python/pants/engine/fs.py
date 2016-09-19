@@ -19,8 +19,7 @@ import six
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import Dir, File, Link
-from pants.engine.selectors import (Collection, Select, SelectDependencies, SelectProjection,
-                                    SelectTraversal)
+from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -216,7 +215,7 @@ class PathDirWildcard(datatype('PathDirWildcard', ['canonical_stat', 'symbolic_p
   """
 
 
-class PathGlobs(datatype('PathGlobs', ['dependencies']), Collection):
+class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   """A set of 'PathGlob' objects.
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
@@ -261,7 +260,7 @@ class PathGlobs(datatype('PathGlobs', ['dependencies']), Collection):
     return cls(tuple(chain.from_iterable(path_globs)))
 
 
-class PathsExpansion(datatype('PathsExpansion', ['paths', 'dependencies']), Collection):
+class PathsExpansion(datatype('PathsExpansion', ['paths', 'dependencies'])):
   """Represents the (in-progress) expansion of one or more PathGlob objects.
 
   The dependencies of a PathsExpansion are additional PathGlob objects to be expanded.
@@ -430,7 +429,10 @@ def create_fs_tasks():
     # Glob execution: to avoid memoizing lots of incremental results, we recursively expand PathGlobs, and then
     # convert them to Paths independently.
     (Paths,
-     [SelectTraversal(PathsExpansion, PathGlobs, field_types=(PathWildcard, PathDirWildcard, PathRoot))],
+     [SelectDependencies(PathsExpansion,
+                         PathGlobs,
+                         field_types=(PathWildcard, PathDirWildcard, PathRoot),
+                         traversal=True)],
      finalize_path_expansion),
     (PathsExpansion,
      [Select(PathRoot)],

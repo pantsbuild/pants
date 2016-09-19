@@ -162,11 +162,13 @@ def extern_issubclass(context_handle, cls_id, super_cls_id):
   return issubclass(cls, super_cls)
 
 
-@_FFI.callback("Key(ExternContext*, Key*, uint64_t)")
-def extern_store_list(context_handle, keys_ptr, keys_len):
+@_FFI.callback("Key(ExternContext*, Key*, uint64_t, bool)")
+def extern_store_list(context_handle, keys_ptr, keys_len, concat):
   """Given storage and an array of Keys, return a new Key to represent the list."""
   c = _FFI.from_handle(context_handle)
   digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
+  if concat:
+    raise ValueError('TODO!: implement concat')
   return c.storage.put_typed_from_digests(digests)
 
 

@@ -419,12 +419,6 @@ pub struct SelectDependencies {
 
 impl SelectDependencies {
   fn dep_product(&self, context: &StepContext) -> Result<Key, State<Node>> {
-    // Short circuit for traversal if the subject is already the result type,
-    // indicating that recursion has already begun.
-    if self.selector.traversal && self.subject.type_id() == &self.selector.dep_product {
-      return Ok(self.subject);
-    }
-
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
@@ -450,9 +444,11 @@ impl SelectDependencies {
 
   fn dep_node(&self, dep_subject: Key) -> Node {
     if self.selector.traversal {
-      // Continue traversal.
+      // After the root has been expanded, a traversal continues with dep_product == product.
+      let mut selector = self.selector.clone();
+      selector.dep_product = selector.product;
       Node::create(
-        Selector::SelectDependencies(self.selector.clone()),
+        Selector::SelectDependencies(selector),
         dep_subject,
         self.variants.clone()
       )

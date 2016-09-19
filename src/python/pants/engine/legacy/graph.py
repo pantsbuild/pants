@@ -20,8 +20,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, Throw
-from pants.engine.selectors import (Collection, Select, SelectDependencies, SelectProjection,
-                                    SelectTraversal)
+from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -304,7 +303,7 @@ def create_legacy_graph_tasks():
   return [
     # Recursively requests HydratedTargets, which will result in an eager, transitive graph walk.
     (HydratedTargets,
-     [SelectTraversal(HydratedTarget, Addresses, field_types=(Address,))],
+     [SelectDependencies(HydratedTarget, Addresses, field_types=(Address,), traversal=True)],
      HydratedTargets),
     (HydratedTarget,
      [Select(TargetAdaptor),

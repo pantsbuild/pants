@@ -12,7 +12,7 @@ from collections import defaultdict
 from pants.engine.isolated_process import ProcessExecutionNode
 from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectTraversal, SelectVariant)
+                                    SelectVariant)
 from pants.util.objects import datatype
 
 
@@ -85,7 +85,6 @@ class RulesetValidator(object):
 
     projected_subject_types = set()
     dependency_subject_types = set()
-    transitive_subject_types = set()
     for rules_of_type_x in serializable_tasks.values():
       for rule in rules_of_type_x:
         for select in rule.input_selects:
@@ -93,15 +92,12 @@ class RulesetValidator(object):
             projected_subject_types.add(select.projected_subject)
           elif type(select) is SelectDependencies:
             dependency_subject_types.update(select.field_types)
-          elif type(select) is SelectTraversal:
-            transitive_subject_types.update(select.field_types)
 
     type_collections = {
       'product types': task_and_intrinsic_product_types,
       'root subject types': root_subject_types,
       'projected subject types': projected_subject_types,
       'dependency subject types': dependency_subject_types,
-      'transitive subject types': transitive_subject_types,
     }
 
     for goal, goal_product in self._goal_to_product.items():
@@ -138,8 +134,6 @@ class RulesetValidator(object):
             selection_products = [select.product]
           elif type(select) is SelectDependencies:
             selection_products = [select.dep_product, select.product]
-          elif type(select) is SelectTraversal:
-            selection_products = [select.product]
           elif type(select) is SelectProjection:
             selection_products = [select.input_product, select.product]
           elif type(select) is SelectVariant:

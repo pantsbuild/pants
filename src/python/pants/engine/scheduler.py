@@ -18,7 +18,7 @@ from pants.engine.isolated_process import create_snapshot_intrinsics
 from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectTraversal, SelectVariant)
+                                    SelectVariant)
 from pants.engine.storage import Digest
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import (ExternContext, extern_issubclass, extern_project,
@@ -174,7 +174,8 @@ class LocalScheduler(object):
             self._native.lib.task_add_select_dependencies(self._scheduler,
                                                           self._to_type_key(selector.product),
                                                           self._to_type_key(selector.dep_product),
-                                                          self._to_key(selector.field))
+                                                          self._to_key(selector.field),
+                                                          selector.traversal)
           elif selector_type is SelectProjection:
             if len(selector.fields) != 1:
               raise ValueError("TODO: remove support for projecting multiple fields at once.")
@@ -184,12 +185,6 @@ class LocalScheduler(object):
                                                         self._to_type_key(selector.projected_subject),
                                                         self._to_key(field),
                                                         self._to_type_key(selector.input_product))
-          elif selector_type is SelectTraversal:
-            self._native.lib.task_add_select_traversal(self._scheduler,
-                                                       self._to_type_key(selector.product),
-                                                       self._to_type_key(selector.dep_product),
-                                                       self._to_key(selector.field),
-                                                       self._to_type_key(selector.product if selector.concat else None))
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)
@@ -340,11 +335,7 @@ class LocalScheduler(object):
       self._native.lib.execution_reset(self._scheduler)
     self._execution_request = execution_request
     for subject, product in execution_request.roots:
-      selector_fn = self._root_selector_fns.get(type(subject), None)
-      if not selector_fn:
-        raise TypeError('Unsupported root subject type: {} for {!r}'
-                        .format(type(subject), subject))
-      selector_fn(subject, product)
+      self._select_product(subject, product)
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
