@@ -702,7 +702,7 @@ class JvmCompile(NailgunTaskBase):
 
       if not hit_cache:
         # Compute the compile classpath for this target.
-        cp_entries = [ctx.classes_dir]
+        cp_entries = []
         cp_entries.extend(ClasspathUtil.compute_classpath(ctx.dependencies(self._dep_context),
                                                           classpath_products,
                                                           extra_compile_time_classpath,
@@ -710,22 +710,11 @@ class JvmCompile(NailgunTaskBase):
         # TODO: always provide transitive analysis, but not always all classpath entries?
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
-        # Write analysis to a temporary file, and move it to the final location on success.
-        tmp_analysis_file = "{}.tmp".format(ctx.analysis_file)
-        if should_compile_incrementally(vts, ctx):
-          # If this is an incremental compile, rebase the analysis to our new classes directory.
-          self._analysis_tools.rebase_from_path(ctx.analysis_file,
-                                                tmp_analysis_file,
-                                                vts.previous_results_dir,
-                                                vts.results_dir)
-        else:
-          # Otherwise, simply ensure that it is empty.
-          safe_delete(tmp_analysis_file)
         tgt, = vts.targets
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         self._compile_vts(vts,
                           ctx.sources,
-                          tmp_analysis_file,
+                          ctx.analysis_file,
                           upstream_analysis,
                           cp_entries,
                           ctx.classes_dir,
@@ -734,7 +723,6 @@ class JvmCompile(NailgunTaskBase):
                           tgt.platform,
                           fatal_warnings,
                           counter)
-        os.rename(tmp_analysis_file, ctx.analysis_file)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.
