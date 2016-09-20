@@ -275,11 +275,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
     # Else, attempt to use a configured task to compute the value.
     dependencies = []
     matches = []
-    nodes = list(step_context.gen_nodes(self.subject, self.product, variants))
-#    if len(nodes) == 0:
-#      print('node size {} sel {} subj {}'.format(len(nodes), self.selector, self.subject))
-
-    for dep in nodes:
+    for dep in step_context.get_nodes_and_states_for(self.subject, self.product, variants):
       dep_state = step_context.get(dep)
       if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
@@ -348,10 +344,6 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
       yield dependency, variants
 
   def step(self, step_context):
-
-    # will noop if
-    # - select for dep_product noop'd
-
     # Request the product we need in order to request dependencies.
     dep_product_selector = Select(self.dep_product)
     dep_product_state = step_context.select_for(dep_product_selector, self.subject, self.variants)
@@ -601,6 +593,11 @@ class StepContext(object):
   def gen_nodes(self, subject, product, variants):
     """Yields Node instances which might be able to provide a value for the given inputs."""
     return self._node_builder.gen_nodes(subject, product, variants)
+
+  def get_nodes_and_states_for(self, subject, product, variants):
+    for node in self._node_builder.gen_nodes(subject, product, variants):
+      state = self.get(node)
+      yield node, state
 
   def select_for(self, selector, subject, variants):
     """Returns the state for selecting a product via the provided selector."""

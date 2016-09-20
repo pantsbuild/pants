@@ -426,6 +426,7 @@ class GraphMaker(object):
 
       if type(rule) is not WithSubject:
         raise TypeError("rules must all be WithSubject'ed")
+
       subject_type = rule.subject_type
       was_unfulfillable = False
       # TODO it might be good to note which selectors deps are attached to,
@@ -433,7 +434,7 @@ class GraphMaker(object):
       for selector in rule.input_selectors:
         # TODO cycles, because it should handle that
         if type(selector) is Select:
-          # TODO, handle Address / Variant weirdness
+          # TODO, handle Addresses / Variants
           rules_or_literals_for_selector = self._find_rhs_for_select(subject_type,
             selector)
 
@@ -450,11 +451,11 @@ class GraphMaker(object):
             unfulfillable_rules[rule] = Diagnostic(rule, subject_type, 'no matches for {} when resolving {}'.format(initial_selector, selector), None)
             was_unfulfillable = True
             break # from the selector loop
-          synth_rules = self._synth_rules_for_select_deps(selector)
 
+          synth_rules = self._synth_rules_for_select_deps(selector)
           if not synth_rules:
             selector_for_product = Select(selector.product)
-            unfulfillable_rules[rule]=Diagnostic(rule, selector.field_types, 'no matches for {} when resolving {}'.format(selector_for_product, selector), None)
+            unfulfillable_rules[rule] = Diagnostic(rule, selector.field_types, 'no matches for {} when resolving {}'.format(selector_for_product, selector), None)
             was_unfulfillable = True
             break # from selector loop
 
@@ -474,7 +475,6 @@ class GraphMaker(object):
 
           projected_selector = Select(selector.product)
           synth_rules_for_projection = self._find_rhs_for_select(selector.projected_subject, projected_selector)
-
           if not synth_rules_for_projection:
             unfulfillable_rules[rule]=Diagnostic(rule, selector.projected_subject, 'no matches for {} when resolving {}'.format(projected_selector, selector), None)
             was_unfulfillable = True
@@ -501,8 +501,6 @@ class GraphMaker(object):
           'Hm. this type cant be fulfilled for this dependency {} {}'.format(field_type, selector))
         continue
       synth_rules.extend(rules_or_literals_for_field_type)
-      # for r in rules_or_literals_for_field_type:
-      #  synth_rules.append(WithSubject(field_type, r))
     return synth_rules
 
   def _remove_unfulfillable_rules_and_dependents(self, root_rules, rule_dependency_edges,
@@ -516,7 +514,8 @@ class GraphMaker(object):
         if rule in deps:
           # If there are no other potential providers of the type
           # that rule provided, then also mark the current rule as unfulfillable
-          if all(d.output_product_type is not rule.output_product_type for d in deps if d is not rule and type(d) not in (Literal, SubjectIsProduct) ):
+          if all(d.output_product_type is not rule.output_product_type
+                 for d in deps if d is not rule and type(d) not in (Literal, SubjectIsProduct)):
             unfulfillable_rules[cur] = Diagnostic(cur,
               cur.subject_type,
               'depends on unfulfillable {}'.format(rule), None)
@@ -524,16 +523,9 @@ class GraphMaker(object):
           else:
             rule_dependency_edges[cur]= tuple(d for d in deps if d != rule)
 
-            # this doesn't hold, so don't do it
-            #for dep in deps:
-            #  if dep not in unfulfillable_rules:
-            #    print('  removing {} because it was a dependency ')
-            #    unfulfillable_rules.add(dep)
-            #    removal_traversal.append(dep)
     rule_dependency_edges = OrderedDict(
       (k, v) for k, v in rule_dependency_edges.items() if k not in unfulfillable_rules)
     root_rules = tuple(r for r in root_rules if r not in unfulfillable_rules)
-    #print('final unfillable rule list:\n  {}'.format('\n  '.join(str(r) for r in unfulfillable_rules)))
     return root_rules, rule_dependency_edges
 
   def full_graph(self):

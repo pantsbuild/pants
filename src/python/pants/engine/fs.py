@@ -379,17 +379,13 @@ def create_fs_tasks():
     (Paths,
      [SelectDependencies(Paths, PathGlobs, field_types=(PathWildcard, PathDirWildcard, PathRoot))],
      merge_paths),
-
     (Paths,
      [Select(PathRoot)],
      apply_path_root),
-
     (Paths,
      [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathWildcard),
       Select(PathWildcard)],
      apply_path_wildcard),
-
-    # can construct a PathGlobs which contains a PathRoot
     (PathGlobs,
      [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
       Select(PathDirWildcard)],
