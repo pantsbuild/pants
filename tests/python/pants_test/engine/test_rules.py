@@ -288,7 +288,7 @@ class WithSubject(datatype('WithSubject', ['subject_type', 'rule'])):
 
 
 class Diagnostic(datatype('Diagnostic', ['rule', 'subject_type', 'reason', 'other_rules'])):
-  """"""
+  """Holds on to error reasons for problems with the build graph."""
 
 
 class GraphMaker(object):
@@ -309,13 +309,9 @@ class GraphMaker(object):
     original_genned_rules = tuple(WithSubject(subject_type, r) for r in self.nodebuilder.gen_rules(subject_type, selector.product))
     if selector.type_constraint.type_satisfies(subject_type):
       # if the subject will match, it's always picked first and we ignore other possible rules.
-      #genned_rules = (SubjectIsProduct(subject_type),) + original_genned_rules
       return (SubjectIsProduct(subject_type),)
     else:
       return original_genned_rules
-    ##if not genned_rules:
-     # return # something
-    #return genned_rules
 
   def get(self, subject, requested_product):
     root_subject = subject
@@ -347,6 +343,8 @@ class GraphMaker(object):
         raise TypeError("rules must all be WithSubject'ed")
       subject_type = rule.subject_type
       was_unfulfillable = False
+      # TODO it might be good to note which selectors deps are attached to,
+      # TODO then when eliminating nodes, we can be sure that the right things are eliminated
       for selector in rule.input_selectors:
         # TODO cycles, because it should handle that
         if type(selector) is Select:
@@ -355,10 +353,6 @@ class GraphMaker(object):
             selector)
 
           if not rules_or_literals_for_selector:
-            # NB rule is not fulfillable with this subject / product
-            # - if the rule is not in rule_dependency_edges,
-
-            #print('rule not fulfillable by way of selector {}. rule {}'.format(selector, rule))
             unfulfillable_rules[rule] = Diagnostic(rule, subject_type, 'no matches for {}'.format(selector), None)
             was_unfulfillable = True
             break # from the selector loop
@@ -374,7 +368,8 @@ class GraphMaker(object):
           synth_rules = self._synth_rules_for_select_deps(selector)
 
           if not synth_rules:
-            unfulfillable_rules[rule]=Diagnostic(rule, selector.field_types, 'no matches for {}'.format(selector), None)
+            selector_for_product = Select(selector.product)
+            unfulfillable_rules[rule]=Diagnostic(rule, selector.field_types, 'no matches for {} when resolving {}'.format(selector_for_product, selector), None)
             was_unfulfillable = True
             break # from selector loop
 
@@ -498,7 +493,7 @@ class PremadeGraphTest(unittest.TestCase):
 
                                }""").strip(), fullgraph)
 
-  def test_hugest_full_test(self):
+  def test_full_graph_for_planner_example(self):
     symbol_table_cls = TargetTable
     address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
     tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks()
@@ -514,6 +509,9 @@ class PremadeGraphTest(unittest.TestCase):
     print('---diagnostic------')
     print(fullgraph.diagnostic())
     print('/---diagnostic------')
+
+
+    # Assert that all of the rules specified the various task fns are present
     real_values = set()
     values = rule_index._tasks.values()
     for v in values:
@@ -524,13 +522,8 @@ class PremadeGraphTest(unittest.TestCase):
       s
     )
 
-    self.assert_blah(dedent("""
-                               {
-                                 root_subject_types: (SubA,)
-                                 root_rules: "(Exactly(A), (Select(SubA),), noop) of SubA"
-                                 (Exactly(A), (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
-
-                               }""").strip(), fullgraph)
+    # statically assert that the number of dependency keys is fixed
+    self.assertEquals(65, len(fullgraph.rule_dependencies))
 
   def test_smallest_full_test_multiple_root_subject_types(self):
     rules = [
@@ -672,7 +665,7 @@ class PremadeGraphTest(unittest.TestCase):
       (Exactly(A), tuple(), noop),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, IntrinsicProvider({(D, C): BoringRule(C)})),
+    graphmaker = GraphMaker(NodeBuilder.create(rules, (IntrinsicProvider({(D, C): BoringRule(C)}),)),
       goal_to_product={'goal-name': AGoal},
       root_subject_types=tuple(),
 
