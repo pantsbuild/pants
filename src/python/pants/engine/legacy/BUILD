@@ -62,10 +62,10 @@ python_library(
   name='source_mapper',
   sources=['source_mapper.py'],
   dependencies=[
-    ':graph',
     ':address_mapper',
-    'src/python/pants/base:specs',
+    ':graph',
     'src/python/pants/base:build_file',
+    'src/python/pants/base:specs',
   ]
 )
 
