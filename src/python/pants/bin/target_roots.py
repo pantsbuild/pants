@@ -46,9 +46,8 @@ class TargetRoots(object):
     changed_options = options.for_scope('changed')
     changed_request = ChangedRequest.from_options(changed_options)
 
-    logger.debug('options is: %s', changed_options)
-    logger.debug('args is: %s', args)
-    logger.debug('spec_roots is: %s', spec_roots)
+    logger.debug('args are: %s', args)
+    logger.debug('spec_roots are: %s', spec_roots)
     logger.debug('changed_request is: %s', changed_request)
 
     if change_calculator and changed_request and changed_request.is_actionable():
