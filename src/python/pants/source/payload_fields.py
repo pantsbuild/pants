@@ -6,12 +6,56 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
 from pants.source.source_root import SourceRootConfig
-from pants.source.wrapped_globs import Files, FilesetWithSpec, matches_filespec
+from pants.source.wrapped_globs import Files, FilesetWithSpec
 from pants.util.memo import memoized_property
+
+
+def convert(pattern):
+  # Convert a filespec pattern to the corresponding regular expression
+  # "**" matches 0 or more dirs recursively.
+  # "*" only matches patterns in a single dir.
+  out = ''
+  components = pattern.split(os.path.sep)
+  doublestar = False
+  for component in components:
+    if out and not doublestar:
+      out += '/'
+
+    if '**' in component:
+      if component != '**':
+        raise ValueError('Invalid usage of "**", use "*" instead.')
+
+      if not doublestar:
+        out += '(([^/]+/)*)'
+        doublestar = True
+    else:
+      out += component.replace('*', '[^/]*')
+      doublestar = False
+
+  if doublestar:
+    out += '[^/]*'
+
+  return '^{}$'.format(out)
+
+
+def globs_matches(path, patterns):
+  return any(re.match(convert(pattern), path) for pattern in patterns)
+
+
+def matches_filespec(path, spec):
+  if spec is None:
+    return False
+  if not globs_matches(path, spec.get('globs', [])):
+    return False
+  for spec in spec.get('exclude', []):
+    if matches_filespec(path, spec):
+      return False
+  return True
 
 
 class SourcesField(PayloadField):

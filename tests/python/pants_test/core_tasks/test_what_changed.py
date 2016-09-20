@@ -171,6 +171,13 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
       )
     """))
 
+    self.add_to_build_file('root/src/java/b', dedent("""
+          java_library(
+            name='b_java',
+            sources=globs("*.java"),
+          )
+        """))
+
     self.add_to_build_file('root/3rdparty/BUILD.twitter', dedent("""
       jar_library(
         name='dummy',
@@ -394,6 +401,27 @@ class WhatChangedTest(WhatChangedTestBasic):
       'root/proto:external-source',
       'root/proto:external-source-jars',
       workspace=self.workspace(files=['root/proto/BUILD'])
+    )
+
+  def test_rglobs_in_sources(self):
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      workspace=self.workspace(files=['root/src/java/a/foo.java'])
+    )
+
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      workspace=self.workspace(files=['root/src/java/a/b/foo.java'])
+    )
+
+  def test_globs_in_sources(self):
+    self.assert_console_output(
+      'root/src/java/b:b_java',
+      workspace=self.workspace(files=['root/src/java/b/foo.java'])
+    )
+
+    self.assert_console_output(
+      workspace=self.workspace(files=['root/src/java/b/b/foo.java'])
     )
 
   def test_globs_in_resources(self):
