@@ -54,6 +54,8 @@ class IdeaPluginGen(ConsoleTask):
   existing skeleton project into a Pants project as if user is importing these targets.
   """
 
+  PROJECT_NAME_LIMIT = 200
+
   @classmethod
   def register_options(cls, register):
     super(IdeaPluginGen, cls).register_options(register)
@@ -105,7 +107,8 @@ class IdeaPluginGen(ConsoleTask):
 
   @classmethod
   def get_project_name(cls, target_specs):
-    return re.sub('[^0-9a-zA-Z:_]+', '.', '__'.join(target_specs))
+    # take up to PROJECT_NAME_LIMIT chars as project file name due to filesystem constraint.
+    return re.sub('[^0-9a-zA-Z:_]+', '.', '__'.join(target_specs))[:cls.PROJECT_NAME_LIMIT]
 
   # TODO: https://github.com/pantsbuild/pants/issues/3198
   def generate_project(self):

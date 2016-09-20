@@ -39,6 +39,7 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
+    'src/python/pants/source',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

@@ -19,6 +19,7 @@ import six
 
 from pants.util.dirutil import safe_open
 from pants.util.meta import AbstractClass
+from pants.util.strutil import strip_prefix
 
 
 class Fetcher(object):
@@ -295,7 +296,7 @@ class Fetcher(object):
       self._fp.close()
 
   def _as_local_file_path(self, url):
-    path = re.sub(r'^//', '', url.lstrip('file:'))
+    path = re.sub(r'^//', '', strip_prefix(url, 'file:'))
     if path.startswith('/'):
       return path
     elif url.startswith('file:'):

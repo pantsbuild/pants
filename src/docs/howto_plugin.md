@@ -29,16 +29,18 @@ load it from.
 In the example below, the stock `JvmBinary` target will subclassed so that a custom task (not shown)
 can consume it specifically but disregard regular `JvmBinary` instances (using `isinstance()`).
 
-- Define a home for your plugins. In this example we'll use a directory named 'plugins'
+- Define a home for your plugins. In this example we'll use a top-level `plugins/` directory but
+  this is not special.
 
-- Create an empty  `plugins/hadoop_binary/target/__init__.py` to define your python package.
-  Also create empty `__init__.py` files in each directory up to but not including the root
-  directory of your python package layout.
+- Create an empty `plugins/hadoop/targets/__init__.py` to define a python package structure
+  for your custom hadoop target type plugin. Also create empty `__init__.py` files in each
+  directory up to but not including the root directory of your python package layout; in this case,
+  just `plugins/hadoop/__init__.py`.
 
-- Create a python module `plugins/hadoop_binary/target/hadoop_binary.py`:
+- Create a python module for your custom target type in `plugins/hadoop/targets/hadoop_binary.py`:
 
         :::python
-        # plugins/target/hadoop_binary.py
+        # plugins/hadoop/targets/hadoop_binary.py
         from pants.backend.jvm.targets.jvm_binary import JvmBinary
 
 
@@ -46,38 +48,42 @@ can consume it specifically but disregard regular `JvmBinary` instances (using `
           pass
 
 
-- Create `src/python/yourorg/pants/hadoop_binary/register.py` to register the functions in your plugin.  When registering a
-backend in `pants.ini`, register.py is used by the pants plugin api to register new functions
-exposed in build files, targets, tasks and goals:
+- Create `plugins/hadoop/register.py` to register the elements exposed by your plugin to BUILD file
+  authors:
 
         :::python
-        # src/python/yourorg/pants/hadoop_binary/register.py
+        # plugins/hadoop/register.py
 
         from pants.build_graph.build_file_aliases import BuildFileAliases
-        from hadoop_binary.target import HadoopBinary
+        from hadoop.targets.hadoop_binary import HadoopBinary
 
         def build_file_aliases():
           return BuildFileAliases(
             targets={
+              # NB: This allows a HadoopBinary target to be created in a BUILD file using the
+              # hadoop_binary alias.
               'hadoop_binary': HadoopBinary,
             },
           )
 
 
 - In `pants.ini`, add your new plugin package to the list of backends to load when pants starts.
-This instructs pants to load a module named `yourorg.pants.hadoop_binary.register`.
+  This instructs pants to load a module named `hadoop.register`.
 
-        :::python
+        :::ini
         [GLOBAL]
         pythonpath: [
-          "%(buildroot)s/src/python",
-        ]
+            '%(buildroot)s/plugins',
+          ]
         backend_packages: [
-            "yourorg.pants.hadoop_binary",
+            'hadoop',
           ]
 
 Note that you can also set the PYTHONPATH in your `./pants` wrapper script, instead of in
-`pants.ini`, if you have other reasons to do so.
+`pants.ini`, if you have other reasons to do so. Either way, pants will look for a `register.py`
+file for each backend package you list by prefixing that package with the python path; ie roughly
+`pythonpath + backend package + register.py` is tried for each pythonpath prefix until a
+`register.py` is found, in this example `plugins/hadoop/register.py`.
 
 Examples from `twitter/commons`
 -------------------------------

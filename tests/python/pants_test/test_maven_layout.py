@@ -5,12 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.source_root import SourceRootConfig
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.subsystem.subsystem_util import init_subsystems
 
 
 # Note: There is no longer any special maven_layout directive.  Maven layouts should just
@@ -27,7 +28,7 @@ class MavenLayoutTest(BaseTest):
 
   def setUp(self):
     super(MavenLayoutTest, self).setUp()
-    init_subsystem(SourceRootConfig)
+    init_subsystems([SourceRootConfig, JUnit])
     self.add_to_build_file('projectB/src/test/scala',
                            'junit_tests(name="test", sources=["a/source"])')
 

@@ -138,7 +138,6 @@ class GoFetchTest(TaskTestBase):
         }
         self._init_dep_graph_files(src, zipdir, dep_graph)
 
-        self.set_options_for_scope('source', source_roots={'3rdparty/go': ['go_remote']})
         r1 = self.target('3rdparty/go/localzip/r1')
 
         context = self._create_fetch_context(zipdir)
@@ -160,7 +159,6 @@ class GoFetchTest(TaskTestBase):
         }
         self._init_dep_graph_files(src, zipdir, dep_graph)
 
-        self.set_options_for_scope('source', source_roots={'3rdparty/go': ['go_remote']})
         r1 = self.target('3rdparty/go/localzip/r1')
         r2 = self.target('3rdparty/go/localzip/r2')
 
@@ -182,7 +180,6 @@ class GoFetchTest(TaskTestBase):
         }
         self._init_dep_graph_files(src, zipdir, dep_graph)
 
-        self.set_options_for_scope('source', source_roots={'3rdparty/go': ['go_remote']})
         r1 = self.target('3rdparty/go/localzip/r1')
         r2 = self.target('3rdparty/go/localzip/r2')
 
