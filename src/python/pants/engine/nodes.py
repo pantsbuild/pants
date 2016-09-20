@@ -209,6 +209,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
   is_cacheable = False
   is_inlineable = True
 
+  _variant_selector = Select(Variants)
+
   @property
   def variant_key(self):
     if isinstance(self.selector, SelectVariant):
@@ -248,7 +250,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
     # them to task nodes.
     variants = self.variants
     if type(self.subject) is Address and self.product is not Variants:
-      dep_state = step_context.select_for(Select(Variants), self.subject, self.variants)
+      dep_state = step_context.select_for(self._variant_selector, self.subject, self.variants)
       if type(dep_state) is Waiting:
         return dep_state
       elif type(dep_state) is Return:
@@ -345,8 +347,10 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
 
   def step(self, step_context):
     # Request the product we need in order to request dependencies.
-    dep_product_selector = Select(self.dep_product)
-    dep_product_state = step_context.select_for(dep_product_selector, self.subject, self.variants)
+    dep_product_selector = self.selector.dep_product_selector
+    dep_product_state = step_context.select_for(dep_product_selector,
+                                                self.subject,
+                                                self.variants)
     if type(dep_product_state) in (Throw, Waiting):
       return dep_product_state
     elif type(dep_product_state) is Noop:
@@ -362,7 +366,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
         return Throw(TypeError('Unexpected type "{}" for {}: {!r}'
                                .format(type(dep_subject), self.selector, dep_subject)))
 
-      product_selector = Select(self.product)
+      product_selector = self.selector.projected_product_selector
       dep_state = step_context.select_for(product_selector, subject=dep_subject, variants=variants)
       if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
@@ -407,9 +411,8 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
     return self.selector.input_product
 
   def step(self, step_context):
-
     # Request the product we need to compute the subject.
-    input_selector = Select(self.input_product)
+    input_selector = self.selector.input_product_selector
     input_state = step_context.select_for(input_selector, self.subject, self.variants)
     if type(input_state) in (Throw, Waiting):
       return input_state
@@ -434,7 +437,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
           self.projected_subject, e)))
 
     # When the output node is available, return its result.
-    output_selector = Select(self.product)
+    output_selector = self.selector.projected_product_selector
     output_state = step_context.select_for(output_selector, projected_subject, self.variants)
     if type(output_state) in (Return, Throw, Waiting):
       return output_state
