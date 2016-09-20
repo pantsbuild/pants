@@ -115,7 +115,11 @@ class EngineTest(unittest.TestCase):
       with self.assertRaises(ExecutionError) as e:
         for _ in engine.product_request(UnpickleableResult, [self.java]):
           pass
-      self.assertIn('Computing UnpickleableResult', str(e.exception))
+
+    exc_str = str(e.exception)
+    self.assertIn('Computing UnpickleableResult', exc_str)
+    self.assertRegexpMatches(exc_str, 'Throw.*SerializationError')
+    self.assertIn('Failed to pickle', exc_str)
 
   def test_product_request_return(self):
     with self.serial_engine() as engine:
