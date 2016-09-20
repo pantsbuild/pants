@@ -194,7 +194,23 @@ class Graph(datatype('Graph', ['root_subject', 'root_rules', 'rule_dependencies'
   # schedule leaves from walk
 
   def diagnostic(self):
-    return '\n'.join('{}:\n  {}'.format(rule, diagnostic.reason) for rule, diagnostic in self.failure_reasons.items())
+    """Prints list of errors for each errored rule with attribution."""
+    collated_errors = OrderedDict()
+    for wrapped_rule, diagnostic in self.failure_reasons.items():
+
+      if wrapped_rule.rule not in collated_errors:
+        collated_errors[wrapped_rule.rule] = OrderedDict()
+      if diagnostic.reason not in collated_errors[wrapped_rule.rule]:
+        collated_errors[wrapped_rule.rule][diagnostic.reason] = set()
+
+      collated_errors[wrapped_rule.rule][diagnostic.reason].add(diagnostic.subject_type)
+
+    used_rule_lookup = set(r.rule for r in self.rule_dependencies.keys())
+    def format_messages(r, subject_types_by_reasons):
+      errors = '\n  '.join('{} with subject types: {}'.format(reason, ', '.join(t.__name__ for t in subject_types))
+                           for reason, subject_types in subject_types_by_reasons.items())
+      return '{}:\n  {}'.format(r, errors)
+    return '\n'.join(format_messages(r, subject_types_by_reasons) for r, subject_types_by_reasons in collated_errors.items() if r not in used_rule_lookup)
 
   def __str__(self):
     if not self.root_rules:
@@ -260,6 +276,10 @@ class WithSubject(datatype('WithSubject', ['subject_type', 'rule'])):
   def input_selectors(self):
     return self.rule.input_selectors
 
+  @property
+  def output_product_type(self):
+    return self.rule.output_product_type
+
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__, self.subject_type.__name__, self.rule)
 
@@ -267,7 +287,7 @@ class WithSubject(datatype('WithSubject', ['subject_type', 'rule'])):
     return '{} of {}'.format(self.rule, self.subject_type.__name__)
 
 
-class Diagnostic(datatype('Diagnostic', ['rule', 'reason', 'other_rules'])):
+class Diagnostic(datatype('Diagnostic', ['rule', 'subject_type', 'reason', 'other_rules'])):
   """"""
 
 
@@ -323,11 +343,9 @@ class GraphMaker(object):
       if type(rule) in (Literal, SubjectIsProduct):
         continue
 
-      if type(rule) is WithSubject:
-        subject_type = rule.subject_type
-      else:
+      if type(rule) is not WithSubject:
         raise TypeError("rules must all be WithSubject'ed")
-
+      subject_type = rule.subject_type
       was_unfulfillable = False
       for selector in rule.input_selectors:
         # TODO cycles, because it should handle that
@@ -341,7 +359,7 @@ class GraphMaker(object):
             # - if the rule is not in rule_dependency_edges,
 
             #print('rule not fulfillable by way of selector {}. rule {}'.format(selector, rule))
-            unfulfillable_rules[rule] = Diagnostic(rule, 'no matches for {} with subject type {}'.format(selector, subject_type.__name__), None)
+            unfulfillable_rules[rule] = Diagnostic(rule, subject_type, 'no matches for {}'.format(selector), None)
             was_unfulfillable = True
             break # from the selector loop
           add_rules_to_graph(rule, rules_or_literals_for_selector)
@@ -350,18 +368,13 @@ class GraphMaker(object):
           initial_selector = Select(selector.dep_product)
           initial_rules_or_literals = self._blah_for_select(subject_type, initial_selector)
           if not initial_rules_or_literals:
-            unfulfillable_rules[rule] = Diagnostic(rule, 'initial selector for select dependencies cannot be fulfilled {}'.format(initial_selector), None)
-            #print('initial selector for select dependencies cannot be fulfilled {}'.format(initial_selector))
-            #unfulfillable_rules.add(rule)
+            unfulfillable_rules[rule] = Diagnostic(rule, subject_type, 'no matches for {} when resolving {}'.format(initial_selector, selector), None)
             was_unfulfillable = True
             break # from the selector loop
           synth_rules = self._synth_rules_for_select_deps(selector)
 
-          #print('synth_rules')
-          #print(synth_rules)
-
           if not synth_rules:
-            unfulfillable_rules[rule]=Diagnostic(rule, 'no rules available for any field types used by {}'.format(selector), None)
+            unfulfillable_rules[rule]=Diagnostic(rule, selector.field_types, 'no matches for {}'.format(selector), None)
             was_unfulfillable = True
             break # from selector loop
 
@@ -375,7 +388,7 @@ class GraphMaker(object):
           initial_projection_selector = Select(selector.input_product)
           initial_projection_rules_or_literals = self._blah_for_select(subject_type, initial_projection_selector)
           if not initial_projection_rules_or_literals:
-            unfulfillable_rules[rule]=Diagnostic(rule, 'no matches for {} with subject type {} when resolving {}'.format(initial_projection_selector, subject_type.__name__, selector), None)
+            unfulfillable_rules[rule]=Diagnostic(rule, subject_type, 'no matches for {} when resolving {}'.format(initial_projection_selector, selector), None)
             was_unfulfillable = True
             break
 
@@ -383,7 +396,7 @@ class GraphMaker(object):
           synth_rules_for_projection = self._blah_for_select(selector.projected_subject, projected_selector)
 
           if not synth_rules_for_projection:
-            unfulfillable_rules[rule]=Diagnostic(rule, 'no matches for {} with subject type {} when resolving {}'.format(projected_selector, selector.projected_subject.__name__, selector), None)
+            unfulfillable_rules[rule]=Diagnostic(rule, selector.projected_subject, 'no matches for {} when resolving {}'.format(projected_selector, selector), None)
             was_unfulfillable = True
             break
 
@@ -417,13 +430,19 @@ class GraphMaker(object):
     removal_traversal = deque(unfulfillable_rules.keys())
     while removal_traversal:
       rule = removal_traversal.pop()
-      for cur, deps in rule_dependency_edges.items():
+      for cur, deps in tuple(rule_dependency_edges.items()):
         if cur in unfulfillable_rules:
           continue
         if rule in deps:
-          unfulfillable_rules[cur] = Diagnostic(cur,
-            'removing {} because it depends on {}'.format(cur, rule), None)
-          removal_traversal.append(cur)
+          # If there are no other potential providers of the type
+          # that rule provided, then also mark the current rule as unfulfillable
+          if all(d.output_product_type is not rule.output_product_type for d in deps if d is not rule and type(d) not in (Literal, SubjectIsProduct) ):
+            unfulfillable_rules[cur] = Diagnostic(cur,
+              cur.subject_type,
+              'removed due to dependency on {}'.format(rule), None)
+            removal_traversal.append(cur)
+          else:
+            rule_dependency_edges[cur]= tuple(d for d in deps if d != rule)
 
           # this doesn't hold, so don't do it
           #for dep in deps:
@@ -434,7 +453,7 @@ class GraphMaker(object):
     rule_dependency_edges = OrderedDict(
       (k, v) for k, v in rule_dependency_edges.items() if k not in unfulfillable_rules)
     root_rules = tuple(r for r in root_rules if r not in unfulfillable_rules)
-    print('final unfillable rule list:\n  {}'.format('\n  '.join(str(r) for r in unfulfillable_rules)))
+    #print('final unfillable rule list:\n  {}'.format('\n  '.join(str(r) for r in unfulfillable_rules)))
     return root_rules, rule_dependency_edges
 
   def full_graph(self):
@@ -492,6 +511,9 @@ class PremadeGraphTest(unittest.TestCase):
                           SiblingAddresses,
                           DescendantAddresses,))
     fullgraph = graphmaker.full_graph()
+    print('---diagnostic------')
+    print(fullgraph.diagnostic())
+    print('/---diagnostic------')
     real_values = set()
     values = rule_index._tasks.values()
     for v in values:
@@ -817,6 +839,27 @@ class PremadeGraphTest(unittest.TestCase):
 
                                }""").strip(), subgraph)
 
+  def test_depends_on_multiple_one_noop(self):
+    rules = [
+      (B, (Select(A),), noop),
+      (A, (Select(C),), noop),
+      (A, (Select(SubA),), noop)
+    ]
+
+    graphmaker = GraphMaker(NodeBuilder.create(rules),
+      goal_to_product={'goal-name': AGoal},
+      root_subject_types=tuple())
+    subgraph = graphmaker.get(subject=SubA(), requested_product=B)
+
+    self.assert_blah(dedent("""
+                               {
+                                 root_subject: SubA()
+                                 root_rules: "(B, (Select(A),), noop) of SubA"
+                                 (B, (Select(A),), noop) of SubA => ((A, (Select(SubA),), noop) of SubA,)
+                                 (A, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
+
+                               }""").strip(), subgraph)
+
   def test_select_literal(self):
     literally_a = A()
     rules = [
@@ -893,9 +936,9 @@ class PremadeGraphTest(unittest.TestCase):
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
     self.assert_blah(dedent("""
-                               (Exactly(A), (SelectProjection(B, D, (u'some',), C),), noop) of SubA:
-                                 no matches for Select(B) with subject type D when resolving SelectProjection(B, D, (u'some',), C)
-                               """).strip(), subgraph.diagnostic())
+                     (Exactly(A), (SelectProjection(B, D, (u'some',), C),), noop):
+                       no matches for Select(B) when resolving SelectProjection(B, D, (u'some',), C) with subject types: D
+                     """).strip(), subgraph.diagnostic())
 
   def test_diagnostic_graph_simple_select_failure(self):
     rules = [
@@ -908,8 +951,8 @@ class PremadeGraphTest(unittest.TestCase):
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
     self.assert_blah(dedent("""
-                        (Exactly(A), (Select(C),), noop) of SubA:
-                          no matches for Select(C) with subject type SubA
+                          (Exactly(A), (Select(C),), noop):
+                            no matches for Select(C) with subject types: SubA
                           """).strip(), subgraph.diagnostic())
 
   def assert_blah(self, strip, subgraph):
