@@ -36,8 +36,9 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
       'run-dummy-workunit'
       '--no-success'
     ])
-    # Make sure the task actually happens.
+    # Make sure the task actually happens and of no exception.
     self.assertIn('[run-dummy-workunit]', pants_run.stdout_data)
+    self.assertNotIn('Exception', pants_run.stderr_data)
     self.assert_failure(pants_run)
 
   def test_workunit_success(self):
