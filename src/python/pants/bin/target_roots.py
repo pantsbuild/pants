@@ -50,7 +50,7 @@ class TargetRoots(object):
     logger.debug('spec_roots are: %s', spec_roots)
     logger.debug('changed_request is: %s', changed_request)
 
-    if change_calculator and changed_request and changed_request.is_actionable():
+    if change_calculator and changed_request.is_actionable():
       if spec_roots:
         # We've been provided spec roots (e.g. `./pants list ::`) AND a changed request. Error out.
         raise InvalidSpecConstraint('cannot provide changed parameters and target specs!')
