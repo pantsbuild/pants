@@ -18,12 +18,12 @@ def register_goals():
 class TestWorkUnitTask(NailgunTask):
   @classmethod
   def register_options(cls, register):
-    register('--do-nothing', default=False, type=bool)
+    register('--success', default=False, type=bool)
 
   def execute(self):
-    if self.get_options().do_nothing:
+    if self.get_options().success:
       return
 
-    # This workunit is going to fail.
+    # This create workunit and mark it failed.
     with self.context.new_workunit('dummy') as workunit:
       workunit.set_outcome(WorkUnit.FAILURE)
