@@ -66,10 +66,10 @@ class TestCoverageEngine(Coverage):
     assert clean == True
     self.safe_makedir_calls += dir
 
-  def instrument(self, targets, tests, compute_junit_classpath, execute_java_for_targets):
+  def instrument(self, targets, compute_junit_classpath, execute_java_for_targets):
     pass
 
-  def report(self, targets, tests, execute_java_for_targets, tests_failed_exception):
+  def report(self, targets, execute_java_for_targets, tests_failed_exception):
     pass
 
   def classpath_prepend(self):
@@ -93,8 +93,8 @@ class TestBase(BaseTest):
     """
     super(TestBase, self).setUp()
 
-    self.pants_workdir = "workdir"
-    self.conf = "default"
+    self.pants_workdir = 'workdir'
+    self.conf = 'default'
 
     self.jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
                                     target_type=JarLibrary,
@@ -124,7 +124,8 @@ class TestBase(BaseTest):
   def _assert_calls(self, call_collection, frm, to):
     calls_for_target = call_collection[self.pants_workdir + frm]
     self.assertEquals(len(calls_for_target), 1, "Should be 1 call for the_target's path.")
-    self.assertEquals(calls_for_target[0], self.pants_workdir + to, "Should copy from/to correct paths.")
+    self.assertEquals(calls_for_target[0], self.pants_workdir + to,
+                      'Should copy from/to correct paths.')
 
   def _assert_target_copy(self, coverage, frm, to):
     self._assert_calls(coverage.copy2_calls, frm, to)
@@ -152,10 +153,11 @@ class TestBase(BaseTest):
       classpath_products)
 
     self.assertEquals(len(coverage.copy2_calls), 1,
-                      "Should only be 1 call for the single java_library target.")
-    self._assert_target_copy(coverage, '/java/target/classpath.jar', '/coverage/classes/foo.foo-java/0')
+                      'Should only be 1 call for the single java_library target.')
+    self._assert_target_copy(coverage, '/java/target/classpath.jar',
+                             '/coverage/classes/foo.foo-java/0')
     self.assertEquals(len(coverage.copytree_calls), 0,
-                      "Should be no copytree calls when targets are not coverage targets.")
+                      'Should be no copytree calls when targets are not coverage targets.')
 
   def test_target_with_multiple_path_entries(self):
     """
@@ -174,13 +176,15 @@ class TestBase(BaseTest):
     coverage.initialize_instrument_classpath([self.java_target], classpath_products)
 
     self.assertEquals(len(coverage.copy2_calls), 3,
-                      "Should be 3 call for the single java_library target.")
+                      'Should be 3 call for the single java_library target.')
     self._assert_target_copy(coverage, '/java/target/first.jar', '/coverage/classes/foo.foo-java/0')
-    self._assert_target_copy(coverage, '/java/target/second.jar', '/coverage/classes/foo.foo-java/1')
-    self._assert_target_copy(coverage, '/java/target/third.jar', '/coverage/classes/foo.foo-java/2')
+    self._assert_target_copy(coverage, '/java/target/second.jar',
+                             '/coverage/classes/foo.foo-java/1')
+    self._assert_target_copy(coverage, '/java/target/third.jar',
+                             '/coverage/classes/foo.foo-java/2')
 
     self.assertEquals(len(coverage.copytree_calls), 0,
-                      "Should be no copytree calls when targets are not coverage targets.")
+                      'Should be no copytree calls when targets are not coverage targets.')
 
   def test_target_annotation_processor(self):
     """
@@ -196,5 +200,6 @@ class TestBase(BaseTest):
 
     coverage.initialize_instrument_classpath([self.annotation_target], classpath_products)
 
-    self.assertEquals(len(coverage.copy2_calls), 0, "Should be 0 call for the single annotation target.")
+    self.assertEquals(len(coverage.copy2_calls), 0,
+                      'Should be 0 call for the single annotation target.')
     self._assert_target_copytree(coverage, '/anno/target/dir', '/coverage/classes/foo.foo-anno/0')

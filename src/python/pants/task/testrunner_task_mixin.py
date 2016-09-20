@@ -24,19 +24,22 @@ class TestRunnerTaskMixin(object):
     super(TestRunnerTaskMixin, cls).register_options(register)
     register('--skip', type=bool, help='Skip running tests.')
     register('--timeouts', type=bool, default=True,
-             help='Enable test target timeouts. If timeouts are enabled then tests with a timeout= parameter '
-             'set on their target will time out after the given number of seconds if not completed. '
-             'If no timeout is set, then either the default timeout is used or no timeout is configured. '
-             'In the current implementation, all the timeouts for the test targets to be run are summed and '
-             'all tests are run with the total timeout covering the entire run of tests. If a single target '
-             'in a test run has no timeout and there is no default, the entire run will have no timeout. This '
-             'should change in the future to provide more granularity.')
+             help='Enable test target timeouts. If timeouts are enabled then tests with a'
+                  'timeout= parameter set on their target will time out after the given number of '
+                  'seconds if not completed. If no timeout is set, then either the default timeout '
+                  'is used or no timeout is configured. In the current implementation, all the '
+                  'timeouts for the test targets to be run are summed and all tests are run with '
+                  'the total timeout covering the entire run of tests. If a single target in a '
+                  'test run has no timeout and there is no default, the entire run will have no '
+                  'timeout. This should change in the future to provide more granularity.')
     register('--timeout-default', type=int, advanced=True,
-             help='The default timeout (in seconds) for a test if timeout is not set on the target.')
+             help='The default timeout (in seconds) for a test if timeout is not set on the '
+                  'target.')
     register('--timeout-maximum', type=int, advanced=True,
              help='The maximum timeout (in seconds) that can be set on a test target.')
     register('--timeout-terminate-wait', type=int, advanced=True, default=10,
-             help='If a test does not terminate on a SIGTERM, how long to wait (in seconds) before sending a SIGKILL.')
+             help='If a test does not terminate on a SIGTERM, how long to wait (in seconds) before '
+                  'sending a SIGKILL.')
 
   def execute(self):
     """Run the task."""
@@ -54,10 +57,10 @@ class TestRunnerTaskMixin(object):
 
     if not self.get_options().skip:
       test_targets = self._get_test_targets()
-      all_targets = self._get_targets()
       for target in test_targets:
         self._validate_target(target)
 
+      all_targets = self._get_targets()
       self._execute(all_targets)
 
   def _get_test_targets_for_spawn(self):
@@ -92,7 +95,8 @@ class TestRunnerTaskMixin(object):
             # We can't use the context logger because it might not exist.
             import logging
             logger = logging.getLogger(__name__)
-            logger.warn("Timed out test did not terminate gracefully after %s seconds, killing..." % wait_time)
+            logger.warn('Timed out test did not terminate gracefully after {} seconds, killing...'
+                        .format(wait_time))
             handler.kill()
 
         timer = Timer(wait_time, kill_if_not_terminated)
@@ -103,7 +107,8 @@ class TestRunnerTaskMixin(object):
     try:
       with Timeout(timeout,
                    threading_timer=Timer,
-                   abort_handler=_graceful_terminate(process_handler, self.get_options().timeout_terminate_wait)):
+                   abort_handler=_graceful_terminate(process_handler,
+                                                     self.get_options().timeout_terminate_wait)):
         return process_handler.wait()
     except TimeoutReached as e:
       raise TestFailedTaskError(str(e), failed_targets=test_targets)
@@ -135,14 +140,15 @@ class TestRunnerTaskMixin(object):
     """Calculate the total timeout based on the timeout configuration for all the targets.
 
     Because the timeout wraps all the test targets rather than individual tests, we have to somehow
-    aggregate all the target specific timeouts into one value that will cover all the tests. If some targets
-    have no timeout configured (or set to 0), their timeout will be set to the default timeout.
-    If there is no default timeout, or if it is set to zero, there will be no timeout, if any of the test targets
-    have a timeout set to 0 or no timeout configured.
+    aggregate all the target specific timeouts into one value that will cover all the tests. If some
+    targets have no timeout configured (or set to 0), their timeout will be set to the default
+    timeout. If there is no default timeout, or if it is set to zero, there will be no timeout, if
+    any of the test targets have a timeout set to 0 or no timeout configured.
 
-    TODO(sbrenn): This behavior where timeout=0 is the same as timeout=None has turned out to be very confusing,
-    and should change so that timeout=0 actually sets the timeout to 0, and only timeout=None
-    should set the timeout to the default timeout. This will require a deprecation cycle.
+    TODO(sbrenn): This behavior where timeout=0 is the same as timeout=None has turned out to be
+    very confusing, and should change so that timeout=0 actually sets the timeout to 0, and only
+    timeout=None should set the timeout to the default timeout. This will require a deprecation
+    cycle.
 
     :param targets: list of test targets
     :return: timeout to cover all the targets, in seconds
