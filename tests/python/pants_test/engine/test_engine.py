@@ -10,12 +10,12 @@ import unittest
 from contextlib import closing, contextmanager
 
 from pants.build_graph.address import Address
-from pants.engine.engine import (LocalMultiprocessEngine, LocalSerialEngine, SerializationError,
-                                 ThreadHybridEngine)
+from pants.engine.engine import (ExecutionError, LocalMultiprocessEngine, LocalSerialEngine,
+                                 SerializationError, ThreadHybridEngine)
 from pants.engine.nodes import FilesystemNode, Return, SelectNode, Throw
 from pants.engine.selectors import Select
 from pants.engine.storage import Cache, Storage
-from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
+from pants_test.engine.examples.planners import Classpath, UnpickleableResult, setup_json_scheduler
 
 
 class EngineTest(unittest.TestCase):
@@ -37,6 +37,11 @@ class EngineTest(unittest.TestCase):
     self.assertIsNone(result.error)
 
   @contextmanager
+  def serial_engine(self):
+    with closing(LocalSerialEngine(self.scheduler)) as e:
+      yield e
+
+  @contextmanager
   def multiprocessing_engine(self, pool_size=None):
     storage = Storage.create(in_memory=False)
     cache = Cache.create(storage=storage)
@@ -55,7 +60,7 @@ class EngineTest(unittest.TestCase):
       yield e
 
   def test_serial_engine_simple(self):
-    with closing(LocalSerialEngine(self.scheduler)) as engine:
+    with self.serial_engine() as engine:
       self.assert_engine(engine)
 
   def test_multiprocess_engine_multi(self):
@@ -104,3 +109,18 @@ class EngineTest(unittest.TestCase):
       # Second run hits have increaed, and there are no more misses.
       self.assertEquals(misses, cache_stats.misses)
       self.assertTrue(hits < cache_stats.hits)
+
+  def test_product_request_throw(self):
+    with self.serial_engine() as engine:
+      with self.assertRaises(ExecutionError) as e:
+        for _ in engine.product_request(UnpickleableResult, [self.java]):
+          pass
+      self.assertIn('Computing UnpickleableResult', str(e.exception))
+
+  def test_product_request_return(self):
+    with self.serial_engine() as engine:
+      count = 0
+      for computed_product in engine.product_request(Classpath, [self.java]):
+        self.assertIsInstance(computed_product, Classpath)
+        count += 1
+      self.assertGreater(count, 0)
