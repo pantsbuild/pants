@@ -111,31 +111,30 @@ class RulesetValidatorTest(unittest.TestCase):
     rules = [(A, (Select(B),), noop)]
     validator = RulesetValidator(NodeBuilder.create(rules),
       goal_to_product=dict(),
-      root_subject_types=tuple())
+      root_subject_types=(SubA,))
     with self.assertRaises(ValueError) as cm:
       validator.validate()
 
-    self.assertEquals(dedent("""
-                                Found 1 rules with errors:
-                                  (A, (Select(B),), noop)
-                                    There is no producer of Select(B)
-                             """).strip(),
-      str(cm.exception))
+    self.assert_equal_with_printing(dedent("""
+                     Rules with errors: 1
+                       (A, (Select(B),), noop):
+                         no matches for Select(B) with subject types: SubA
+                     """).strip(),
+                                    str(cm.exception))
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
     rules = [(A, (Select(B), Select(B)), noop)]
     validator = RulesetValidator(NodeBuilder.create(rules),
       goal_to_product=dict(),
-      root_subject_types=tuple())
+      root_subject_types=(SubA,))
     with self.assertRaises(ValueError) as cm:
       validator.validate()
 
-    self.assertEquals(dedent("""
-                                Found 1 rules with errors:
-                                  (A, (Select(B), Select(B)), noop)
-                                    There is no producer of Select(B)
-                                    There is no producer of Select(B)
-                             """).strip(),
+    self.assert_equal_with_printing(dedent("""
+                     Rules with errors: 1
+                       (A, (Select(B), Select(B)), noop):
+                         no matches for Select(B) with subject types: SubA
+                     """).strip(),
       str(cm.exception))
 
   def test_ruleset_with_with_selector_only_provided_as_root_subject(self):
@@ -146,36 +145,52 @@ class RulesetValidatorTest(unittest.TestCase):
 
     validator.validate()
 
-  def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
+  def test_fails_if_root_subject_types_empty(self):
+    rules = [
+      (A, (Select(B),), noop),
+    ]
+    with self.assertRaises(ValueError) as cm:
+      RulesetValidator(NodeBuilder.create(rules),
+      goal_to_product=dict(),
+      root_subject_types=tuple())
+    self.assertEquals(dedent("""
+                                root_subject_types must not be empty
+                             """).strip(), str(cm.exception))
 
+  def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
     rules = [
       (A, (Select(B),), noop),
       (B, (Select(SubA),), noop)
     ]
     validator = RulesetValidator(NodeBuilder.create(rules),
       goal_to_product=dict(),
-      root_subject_types=tuple())
+      root_subject_types=(C,))
 
     with self.assertRaises(ValueError) as cm:
       validator.validate()
-    self.assertEquals(dedent("""
-                                Found 1 rules with errors:
-                                  (B, (Select(SubA),), noop)
-                                    There is no producer of Select(SubA)
-                             """).strip(), str(cm.exception))
+    self.assert_equal_with_printing(dedent("""
+                     Rules with errors: 2
+                       (B, (Select(SubA),), noop):
+                         no matches for Select(SubA) with subject types: C
+                       (A, (Select(B),), noop):
+                         depends on unfulfillable (B, (Select(SubA),), noop) of C with subject types: C
+                     """).strip(),
+                                     str(cm.exception))
 
   def test_ruleset_with_goal_not_produced(self):
+    # The graph is complete, but the goal 'goal-name' requests A,
+    # which is not produced by any rule.
     rules = [
       (B, (Select(SubA),), noop)
     ]
 
     validator = RulesetValidator(NodeBuilder.create(rules),
       goal_to_product={'goal-name': AGoal},
-      root_subject_types=tuple())
+      root_subject_types=(SubA,))
     with self.assertRaises(ValueError) as cm:
       validator.validate()
 
-    self.assertEquals("no task for product used by goal \"goal-name\": <class 'pants_test.engine.test_rules.AGoal'>",
+    self.assert_equal_with_printing("no task for product used by goal \"goal-name\": AGoal",
                       str(cm.exception))
 
   def test_ruleset_with_explicit_type_constraint(self):
@@ -185,7 +200,7 @@ class RulesetValidatorTest(unittest.TestCase):
     ]
     validator = RulesetValidator(NodeBuilder.create(rules),
       goal_to_product=dict(),
-      root_subject_types=tuple())
+      root_subject_types=(SubA,))
 
     validator.validate()
 
