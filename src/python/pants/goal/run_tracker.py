@@ -86,8 +86,8 @@ class RunTracker(Subsystem):
     # run_id is safe for use in paths.
     millis = int((run_timestamp * 1000) % 1000)
     run_id = 'pants_run_{}_{}_{}'.format(
-               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
-               uuid.uuid4().hex)
+      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
+      uuid.uuid4().hex)
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
@@ -248,6 +248,7 @@ class RunTracker(Subsystem):
 
     :return: True if upload was successful, False otherwise.
     """
+
     def error(msg):
       # Report aleady closed, so just print error.
       print('WARNING: Failed to upload stats to {} due to {}'.format(url, msg),
@@ -318,7 +319,7 @@ class RunTracker(Subsystem):
 
     Note: If end() has been called once, subsequent calls are no-ops.
 
-    :return 0 for success, 1 for failure.
+    :return: 0 for success, 1 for failure.
     """
     if self._background_worker_pool:
       if self._aborted:
@@ -351,10 +352,7 @@ class RunTracker(Subsystem):
     self.report.close()
     self.store_stats()
 
-    if outcome == WorkUnit.FAILURE:
-      return 1
-    else:
-      return 0
+    return 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
 
   def end_workunit(self, workunit):
     self.report.end_workunit(workunit)

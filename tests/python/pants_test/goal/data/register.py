@@ -6,12 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.workunit import WorkUnit
 from pants.goal.task_registrar import TaskRegistrar as task
 from pants.task.task import Task
 
 
 def register_goals():
-  task(name='do-some-work', action=TestWorkUnitTask).install()
+  task(name='run-dummy-workunit', action=TestWorkUnitTask).install()
 
 
 class TestWorkUnitTask(NailgunTask):
@@ -20,11 +21,9 @@ class TestWorkUnitTask(NailgunTask):
     register('--do-nothing', default=False, type=bool)
 
   def execute(self):
-    # This run is going to fail.
     if self.get_options().do_nothing:
       return
 
-    self.runjava(
-      classpath=[],
-      main='non.existent.main.class',
-    )
+    # This workunit is going to fail.
+    with self.context.new_workunit('dummy') as workunit:
+      workunit.set_outcome(WorkUnit.FAILURE)

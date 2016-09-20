@@ -33,15 +33,17 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
       '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
       '--backend-packages={}'.format('pants_test.goal.data'),
-      'do-some-work'
+      'run-dummy-workunit'
     ])
     self.assert_failure(pants_run)
+    # make sure the task actually happens
+    self.assertIn('[run-dummy-workunit]', pants_run.stdout_data)
 
   def test_workunit_success(self):
     pants_run = self.run_pants([
       '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
       '--backend-packages={}'.format('pants_test.goal.data'),
-      'do-some-work',
+      'run-dummy-workunit',
       '--do-nothing'
     ])
     self.assert_success(pants_run)
