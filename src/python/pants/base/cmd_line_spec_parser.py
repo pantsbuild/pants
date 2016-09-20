@@ -64,9 +64,6 @@ class CmdLineSpecParser(object):
     if spec.endswith('::'):
       spec_path = spec[:-len('::')]
       return DescendantAddresses(self._normalize_spec_path(spec_path))
-    elif spec.endswith('^'):
-      spec_path = spec[:-len('^')]
-      return AscendantAddresses(self._normalize_spec_path(spec_path))
     elif spec.endswith(':'):
       spec_path = spec[:-len(':')]
       return SiblingAddresses(self._normalize_spec_path(spec_path))
