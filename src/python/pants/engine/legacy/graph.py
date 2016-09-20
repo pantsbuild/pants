@@ -12,7 +12,7 @@ from twitter.common.collections import OrderedSet, maybe_list
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
@@ -307,7 +307,7 @@ def create_legacy_graph_tasks(symbol_table_cls):
       SelectDependencies(LegacyTarget,
                          symbol_table_constraint,
                          'dependencies',
-                         field_types=(Address,)),
+                         field_types=(Address, BuildFileAddress,)),
       SelectDependencies(HydratedField,
                          symbol_table_constraint,
                          'field_adaptors',

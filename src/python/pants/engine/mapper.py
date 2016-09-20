@@ -12,7 +12,8 @@ from collections import OrderedDict
 from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
 
-from pants.build_graph.address import Address
+from pants.base.build_file import BuildFile
+from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
@@ -30,7 +31,7 @@ class DuplicateNameError(MappingError):
   """Indicates more than one top-level object was found with the same name."""
 
 
-class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
+class AddressMap(datatype('AddressMap', ['path', 'objects_by_name', 'project_tree'])):
   """Maps addressable Serializable objects from a byte source.
 
   To construct an AddressMap, use `parse`.
@@ -48,7 +49,7 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
     return False
 
   @classmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls, parser_cls, exclude_patterns=None):
+  def parse(cls, filepath, filecontent, symbol_table_cls, parser_cls, project_tree, exclude_patterns=None):
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
@@ -84,14 +85,14 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
       target_address = '{}:{}'.format(os.path.dirname(filepath), name)
       if not AddressMap.exclude_target(target_address, exclude_patterns):
         objects_by_name[name] = obj
-    return cls(filepath, OrderedDict(sorted(objects_by_name.items())))
+    return cls(filepath, OrderedDict(sorted(objects_by_name.items())), project_tree)
 
 
 class DifferingFamiliesError(MappingError):
   """Indicates an attempt was made to merge address maps from different families together."""
 
 
-class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name'])):
+class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name', 'project_tree'])):
   """Represents the family of addressed objects in a namespace.
 
   To create an AddressFamily, use `create`.
@@ -105,7 +106,7 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
   """
 
   @classmethod
-  def create(cls, spec_path, address_maps):
+  def create(cls, spec_path, address_maps, address_mapper):
     """Creates an address family from the given set of address maps.
 
     :param spec_path: The directory prefix shared by all address_maps.
@@ -140,17 +141,24 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
                                            current_path=current_path))
         objects_by_name[name] = (current_path, obj)
     return AddressFamily(namespace=spec_path,
-                         objects_by_name=OrderedDict((name, obj) for name, (_, obj)
-                                                     in sorted(objects_by_name.items())))
+                         objects_by_name=OrderedDict((name, (path, obj)) for name, (path, obj)
+                                                      in sorted(objects_by_name.items())),
+                         project_tree=address_mapper.project_tree)
 
   @memoized_property
   def addressables(self):
-    """Return a mapping from address to thin addressable objects in this namespace.
+    """Return a mapping from BuildFileAddress to thin addressable objects in this namespace.
 
-    :rtype: dict from :class:`pants.build_graph.address.Address` to thin addressable objects.
+    :rtype: dict from :class:`pants.build_graph.address.BuildFileAddress` to thin addressable
+            objects.
     """
-    return {Address(spec_path=self.namespace, target_name=name): obj
-            for name, obj in self.objects_by_name.items()}
+    addressables = {}
+    for (name, value) in self.objects_by_name.items():
+      path, obj = value
+      addressables[BuildFileAddress(
+          build_file=BuildFile(self.project_tree, relpath=path),
+          target_name=name)] = obj
+    return addressables
 
   def __eq__(self, other):
     if not type(other) == type(self):
@@ -164,8 +172,8 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
     return hash(self.namespace)
 
   def __repr__(self):
-    return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(self.namespace,
-                                                                        self.objects_by_name.keys())
+    return 'AddressFamily(namespace={!r}, objects_by_name={!r}), project_tree={!r}'.format(
+        self.namespace, self.objects_by_name.keys(), self.project_tree)
 
 
 class ResolveError(MappingError):
@@ -178,6 +186,7 @@ class AddressMapper(object):
   def __init__(self,
                symbol_table_cls,
                parser_cls,
+               project_tree,
                build_pattern=None,
                build_ignore_patterns=None,
                exclude_target_regexps=None):
@@ -197,8 +206,9 @@ class AddressMapper(object):
     """
     self.symbol_table_cls = symbol_table_cls
     self.parser_cls = parser_cls
-    self.build_pattern = build_pattern or 'BUILD*'
+    self.project_tree = project_tree
 
+    self.build_pattern = build_pattern or 'BUILD*'
     self.build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
     self._exclude_target_regexps = exclude_target_regexps or []
     self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]

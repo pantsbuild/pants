@@ -118,6 +118,7 @@ class EngineInitializer(object):
     # TODO: Replace with `Subsystems`.
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=LegacyPythonCallbacksParser,
+                                   project_tree=project_tree,
                                    build_ignore_patterns=build_ignore_patterns,
                                    exclude_target_regexps=exclude_target_regexps)
 
