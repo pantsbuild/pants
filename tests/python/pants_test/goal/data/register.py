@@ -24,6 +24,6 @@ class TestWorkUnitTask(NailgunTask):
     if self.get_options().success:
       return
 
-    # This create workunit and mark it failed.
+    # This creates workunit and marks it as failure.
     with self.context.new_workunit('dummy') as workunit:
       workunit.set_outcome(WorkUnit.FAILURE)

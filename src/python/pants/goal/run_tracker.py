@@ -248,7 +248,6 @@ class RunTracker(Subsystem):
 
     :return: True if upload was successful, False otherwise.
     """
-
     def error(msg):
       # Report aleady closed, so just print error.
       print('WARNING: Failed to upload stats to {} due to {}'.format(url, msg),

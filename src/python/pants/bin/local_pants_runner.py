@@ -99,6 +99,7 @@ class LocalPantsRunner(object):
         repro.log_location_of_repro_file()
     finally:
       run_tracker_result = run_tracker.end()
-    # take the exit code with higher abs value in case of negative values.
+
+    # Take the exit code with higher abs value in case of negative values.
     final_exit_code = goal_runner_result if abs(goal_runner_result) > abs(run_tracker_result) else run_tracker_result
     self._exiter.exit(final_exit_code)
