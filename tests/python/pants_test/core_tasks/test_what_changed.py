@@ -433,8 +433,12 @@ class WhatChangedTest(WhatChangedTestBasic):
     """))
 
     self.assert_console_output(
-      'root/resources:resources',
       workspace=self.workspace(files=['root/resources/foo/bar/baz.yml'])
+    )
+
+    self.assert_console_output(
+      'root/resources:resources',
+      workspace=self.workspace(files=['root/resources/baz.yml'])
     )
 
   def test_root_config(self):
