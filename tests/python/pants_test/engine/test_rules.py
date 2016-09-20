@@ -21,7 +21,7 @@ from pants_test.engine.examples.planners import Goal
 from pants_test.engine.test_mapper import TargetTable
 
 
-def assert_blah(test_case, strip, subgraph):
+def assert_equal_with_printing(test_case, strip, subgraph):
 
   s = str(subgraph)
   print('Expected:')
@@ -200,13 +200,13 @@ class RulesetValidatorTest(unittest.TestCase):
     with self.assertRaises(ValueError) as cm:
       validator.validate()
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                              Rules with errors: 1
                                (D, (Select(C),), noop):
                                  no matches for Select(C) with subject types: A
                              """).strip(),
                      str(cm.exception))
-  assert_blah = assert_blah
+  assert_equal_with_printing = assert_equal_with_printing
 # and now the in progress graph creation
 # TODO should raise if a particular root type can't get to a particular rule?
 #      that's the thing that bit Ity with her change.
@@ -228,7 +228,7 @@ class PremadeGraphTest(unittest.TestCase):
     fullgraph = graphmaker.full_graph()
     #subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject_types: (SubA,)
                                  root_rules: "(Exactly(A), (Select(SubA),), noop) of SubA"
@@ -279,7 +279,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=(SubA, A))
     fullgraph = graphmaker.full_graph()
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject_types: (SubA, A,)
                                  root_rules: "(Exactly(A), (Select(SubA),), noop) of SubA", "(Exactly(B), (Select(A),), noop) of SubA", "(Exactly(B), (Select(A),), noop) of A"
@@ -299,7 +299,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (Select(SubA),), noop) of SubA"
@@ -318,7 +318,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (Select(SubA), Select(B)), noop) of SubA"
@@ -339,7 +339,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (Select(B),), noop) of SubA"
@@ -365,7 +365,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (), noop) of SubA"
@@ -390,7 +390,7 @@ class PremadeGraphTest(unittest.TestCase):
         root_subject_types=tuple([SubA]))
       fullgraph = graphmaker.full_graph()
 
-      self.assert_blah(dedent("""
+      self.assert_equal_with_printing(dedent("""
                                  {
                                    root_subject_types: SubA
                                    root_rules: "(Exactly(A), (), noop) of SubA"
@@ -415,7 +415,7 @@ class PremadeGraphTest(unittest.TestCase):
     )
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (), noop) of SubA"
@@ -435,7 +435,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (SelectDependencies(B, C, field_types=(D,)),), noop) of SubA"
@@ -456,7 +456,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop) of SubA"
@@ -476,7 +476,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                  {
                                    root_subject: SubA()
                                    root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"
@@ -499,7 +499,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                  {
                                    root_subject: SubA()
                                    root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"
@@ -525,7 +525,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"
@@ -552,7 +552,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah('{empty graph}', subgraph)
+    self.assert_equal_with_printing('{empty graph}', subgraph)
 
   def test_select_dependencies_with_matching_intrinsic(self):
     rules = [
@@ -566,7 +566,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(C,)),), noop) of SubA"
@@ -587,7 +587,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=B)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(B, (Select(A),), noop) of SubA"
@@ -607,7 +607,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=B)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(B, (SelectLiteral(A(), A),), noop) of SubA"
@@ -626,7 +626,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
                                  root_rules: "(Exactly(A), (SelectProjection(B, D, (u'some',), SubA),), noop) of SubA"
@@ -645,7 +645,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah('{empty graph}', subgraph)
+    self.assert_equal_with_printing('{empty graph}', subgraph)
 
   def test_secondary_select_projection_failure(self):
     rules = [
@@ -658,7 +658,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah('{empty graph}', subgraph)
+    self.assert_equal_with_printing('{empty graph}', subgraph)
 
   def test_diagnostic_graph_select_projection(self):
     rules = [
@@ -671,7 +671,7 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (Exactly(A), (SelectProjection(B, D, (u'some',), C),), noop):
                          no matches for Select(B) when resolving SelectProjection(B, D, (u'some',), C) with subject types: D
@@ -687,10 +687,10 @@ class PremadeGraphTest(unittest.TestCase):
       root_subject_types=tuple())
     subgraph = graphmaker.get(subject=SubA(), requested_product=A)
 
-    self.assert_blah(dedent("""
+    self.assert_equal_with_printing(dedent("""
                                Rules with errors: 1
                                  (Exactly(A), (Select(C),), noop):
                                    no matches for Select(C) with subject types: SubA
                           """).strip(), subgraph.error_message())
 
-  assert_blah = assert_blah
+  assert_equal_with_printing = assert_equal_with_printing

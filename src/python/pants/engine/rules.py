@@ -473,13 +473,8 @@ class GraphMaker(object):
     self.nodebuilder = nodebuilder
     if root_subject_types is None:
       raise ValueError("TODO")
-      # naive
-      # take the node builder index,
-      # do another pass where we make a map of rule -> initial set of dependencies
-      # then when generating a subgraph, follow all the dep to dep lists until have to give up
-      #
 
-  def _blah_for_select(self, subject_type, selector):
+  def _find_rhs_for_select(self, subject_type, selector):
     original_genned_rules = tuple(WithSubject(subject_type, r) for r in self.nodebuilder.gen_rules(subject_type, selector.product))
     if selector.type_constraint.type_satisfies(subject_type):
       # if the subject will match, it's always picked first and we ignore other possible rules.
@@ -523,7 +518,7 @@ class GraphMaker(object):
         # TODO cycles, because it should handle that
         if type(selector) is Select:
           # TODO, handle Address / Variant weirdness
-          rules_or_literals_for_selector = self._blah_for_select(subject_type,
+          rules_or_literals_for_selector = self._find_rhs_for_select(subject_type,
             selector)
 
           if not rules_or_literals_for_selector:
@@ -534,7 +529,7 @@ class GraphMaker(object):
 
         elif type(selector) is SelectDependencies:
           initial_selector = Select(selector.dep_product)
-          initial_rules_or_literals = self._blah_for_select(subject_type, initial_selector)
+          initial_rules_or_literals = self._find_rhs_for_select(subject_type, initial_selector)
           if not initial_rules_or_literals:
             unfulfillable_rules[rule] = Diagnostic(rule, subject_type, 'no matches for {} when resolving {}'.format(initial_selector, selector), None)
             was_unfulfillable = True
@@ -555,14 +550,14 @@ class GraphMaker(object):
           # TODO, could validate that input product has fields
 
           initial_projection_selector = Select(selector.input_product)
-          initial_projection_rules_or_literals = self._blah_for_select(subject_type, initial_projection_selector)
+          initial_projection_rules_or_literals = self._find_rhs_for_select(subject_type, initial_projection_selector)
           if not initial_projection_rules_or_literals:
             unfulfillable_rules[rule]=Diagnostic(rule, subject_type, 'no matches for {} when resolving {}'.format(initial_projection_selector, selector), None)
             was_unfulfillable = True
             break
 
           projected_selector = Select(selector.product)
-          synth_rules_for_projection = self._blah_for_select(selector.projected_subject, projected_selector)
+          synth_rules_for_projection = self._find_rhs_for_select(selector.projected_subject, projected_selector)
 
           if not synth_rules_for_projection:
             unfulfillable_rules[rule]=Diagnostic(rule, selector.projected_subject, 'no matches for {} when resolving {}'.format(projected_selector, selector), None)
@@ -584,7 +579,7 @@ class GraphMaker(object):
   def _synth_rules_for_select_deps(self, selector):
     synth_rules = []
     for field_type in selector.field_types:
-      rules_or_literals_for_field_type = self._blah_for_select(field_type, Select(selector.product))
+      rules_or_literals_for_field_type = self._find_rhs_for_select(field_type, Select(selector.product))
       if not rules_or_literals_for_field_type:
         print(
           'Hm. this type cant be fulfilled for this dependency {} {}'.format(field_type, selector))
