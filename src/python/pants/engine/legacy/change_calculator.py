@@ -12,7 +12,7 @@ from collections import defaultdict
 from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
 from pants.engine.legacy.graph import LegacyTarget
-from pants.engine.legacy.source_mapper import EngineSourceMapper
+from pants.engine.legacy.source_mapper import EngineSourceMapper, resolve_and_parse_specs
 from pants.scm.change_calculator import ChangeCalculator
 
 
@@ -47,10 +47,9 @@ class _LegacyTargetDependentGraph(object):
     if not resource_specs:
       return
 
-    parsed_resource_specs = self._spec_parser.resolve_and_parse_specs(
-      legacy_target.adaptor.address.spec_path,
-      resource_specs
-    )
+    parsed_resource_specs = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
+                                                    resource_specs,
+                                                    self._spec_parser)
     for spec in parsed_resource_specs:
       yield Address.parse(spec.to_spec_string())
 

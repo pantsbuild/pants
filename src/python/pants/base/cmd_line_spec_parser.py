@@ -71,18 +71,3 @@ class CmdLineSpecParser(object):
       spec_parts = spec.rsplit(':', 1)
       return SingleAddress(self._normalize_spec_path(spec_parts[0]),
                            spec_parts[1] if len(spec_parts) > 1 else None)
-
-  def _iter_resolve_and_parse_specs(self, rel_path, specs):
-    for spec in specs:
-      if spec.startswith(':'):
-        yield self.parse_spec(''.join((rel_path, spec)))
-      else:
-        yield self.parse_spec(spec)
-
-  def resolve_and_parse_specs(self, rel_path, specs):
-    """Given a relative path and set of input specs, produce a list of proper `Spec` objects.
-
-    :param string rel_path: The relative path to the input specs from the build root.
-    :param iterable specs: An iterable of specs.
-    """
-    return list(self._iter_resolve_and_parse_specs(rel_path, specs))

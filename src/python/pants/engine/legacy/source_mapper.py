@@ -14,6 +14,23 @@ from pants.engine.legacy.graph import LegacyTarget
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 
 
+def iter_resolve_and_parse_specs(rel_path, specs, spec_parser):
+  """Given a relative path and set of input specs, produce a list of proper `Spec` objects.
+
+  :param string rel_path: The relative path to the input specs from the build root.
+  :param iterable specs: An iterable of specs.
+  """
+  for spec in specs:
+    if spec.startswith(':'):
+      yield spec_parser.parse_spec(''.join((rel_path, spec)))
+    else:
+      yield spec_parser.parse_spec(spec)
+
+
+def resolve_and_parse_specs(*args, **kwargs):
+  return list(iter_resolve_and_parse_specs(*args, **kwargs))
+
+
 class EngineSourceMapper(SourceMapper):
   """A v2 engine backed SourceMapper that supports pre-`BuildGraph` cache warming in the daemon."""
 
@@ -67,10 +84,9 @@ class EngineSourceMapper(SourceMapper):
       #
       #    which is closer in premise to the `resource_targets` param.
       else:
-        resource_dep_subjects = self._spec_parser.resolve_and_parse_specs(
-          legacy_target.adaptor.address.spec_path,
-          target_resources
-        )
+        resource_dep_subjects = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
+                                                        target_resources,
+                                                        self._spec_parser)
         # Fetch `LegacyTarget` products for all of the resources.
         for resource_target in self._engine.product_request(LegacyTarget, resource_dep_subjects):
           resource_sources = resource_target.adaptor.kwargs().get('sources')
