@@ -7,8 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress)
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 
 
 class CmdLineSpecParser(object):
