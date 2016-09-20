@@ -25,8 +25,8 @@ class _ChainedOptions(object):
     return None
 
 
-class ChangedRequest(datatype('ChangedRequest', ['changes_since', 'diffspec', 'include_dependees',
-                                                   'fast'])):
+class ChangedRequest(datatype('ChangedRequest',
+                              ['changes_since', 'diffspec', 'include_dependees', 'fast'])):
   """Parameters required to compute a changed file/target set."""
 
   @classmethod
