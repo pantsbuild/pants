@@ -38,3 +38,37 @@ def create_size_estimators():
     'nosize': lambda srcs: 0,
     'random': lambda srcs: random.randint(0, 10000),
   }
+
+
+def glob_to_regex(pattern):
+  """Given a glob pattern, return an equivalent regex expression.
+
+  :param string glob: The glob pattern. "**" matches 0 or more dirs recursively.
+                      "*" only matches patterns in a single dir.
+  :returns: A regex string that matches same paths as the input glob does.
+  """
+  out = ''
+  components = pattern.rstrip('/').replace('.', '[.]').split('/')
+  doublestar = False
+  for component in components:
+    if out and not doublestar:
+      out += '/'
+
+    if '**' in component:
+      if component != '**':
+        raise ValueError('Invalid usage of "**", use "*" instead.')
+
+      if not doublestar:
+        out += '(([^/]+/)*)'
+        doublestar = True
+    else:
+      out += component.replace('*', '[^/]*')
+      doublestar = False
+
+  if doublestar:
+    out += '[^/]*'
+
+  if pattern.startswith('/'):
+    out = '/' + out
+
+  return '^{}$'.format(out)

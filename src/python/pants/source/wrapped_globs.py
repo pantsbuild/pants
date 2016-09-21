@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from abc import abstractmethod, abstractproperty
 from hashlib import sha1
 
@@ -14,8 +15,24 @@ from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import fast_relpath
+from pants.util.fileutil import glob_to_regex
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
+
+
+def globs_matches(path, patterns):
+  return any(re.match(glob_to_regex(pattern), path) for pattern in patterns)
+
+
+def matches_filespec(path, spec):
+  if spec is None:
+    return False
+  if not globs_matches(path, spec.get('globs', [])):
+    return False
+  for spec in spec.get('exclude', []):
+    if matches_filespec(path, spec):
+      return False
+  return True
 
 
 class FilesetWithSpec(AbstractClass):
