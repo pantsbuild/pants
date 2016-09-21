@@ -10,7 +10,6 @@ import java.io.{
   IOException
 }
 import java.nio.file.Files
-import java.nio.file.StandardCopyOption._
 
 import sbt.{CompileSetup, Logger}
 import sbt.inc.{Analysis, AnalysisStore, FileBasedStore, Locate}
@@ -116,22 +115,23 @@ object AnalysisMap {
   }
 }
 
+/**
+ * Safely update analysis file by writing to a temp file first
+ * and only rename to the original file upon successful write.
+ *
+ * TODO: merge this upstream https://github.com/sbt/zinc/issues/178
+ */
 object SafeFileBasedStore {
   def apply(file: File): AnalysisStore = new AnalysisStore {
-    private val readStableAnalysis = FileBasedStore(file).get
-
-    /**
-     * Safely update analysis file by writing to a temp file first
-     * and only rename to the original file upon successful write.
-     */
     def set(analysis: Analysis, setup: CompileSetup) {
+      import java.nio.file.StandardCopyOption
       val tmpAnalysisFile = File.createTempFile(file.getName, ".tmp")
       val analysisStore = FileBasedStore(tmpAnalysisFile)
       analysisStore.set(analysis, setup)
-      Files.move(tmpAnalysisFile.toPath, file.toPath, REPLACE_EXISTING)
+      Files.move(tmpAnalysisFile.toPath, file.toPath, StandardCopyOption.REPLACE_EXISTING)
     }
 
     def get(): Option[(Analysis, CompileSetup)] =
-      readStableAnalysis
+      FileBasedStore(file).get
   }
 }

@@ -7,7 +7,8 @@ junit_tests(name='zinc',
     '3rdparty:junit',
     '3rdparty:scalatest',
     'src/scala/org/pantsbuild/zinc',
-    # TODO fix zinc unused deps false positives
+    # TODO fix zinc unused deps false positives due to zinc not recording
+    # dependencies of erased generic types: https://github.com/sbt/zinc/issues/147
     scoped('3rdparty:guava', scope='forced'),
     scoped('src/scala/org/pantsbuild/zinc/cache', scope='forced'),
   ],
