@@ -7,7 +7,42 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 
-from pants.util.fileutil import glob_to_regex
+
+def glob_to_regex(pattern):
+  """Given a glob pattern, return an equivalent regex expression.
+
+  :param string glob: The glob pattern. "**" matches 0 or more dirs recursively.
+                      "*" only matches patterns in a single dir.
+  :returns: A regex string that matches same paths as the input glob does.
+  """
+  out = ['^']
+  components = pattern.strip('/').replace('.', '[.]').split('/')
+  doublestar = False
+  for component in components:
+    if len(out) == 1:
+      if pattern.startswith('/'):
+        out.append('/')
+    else:
+      if not doublestar:
+        out.append('/')
+
+    if '**' in component:
+      if component != '**':
+        raise ValueError('Invalid usage of "**", use "*" instead.')
+
+      if not doublestar:
+        out.append('(([^/]+/)*)')
+        doublestar = True
+    else:
+      out.append(component.replace('*', '[^/]*'))
+      doublestar = False
+
+  if doublestar:
+    out.append('[^/]*')
+
+  out.append('$')
+
+  return ''.join(out)
 
 
 def globs_matches(path, patterns):
