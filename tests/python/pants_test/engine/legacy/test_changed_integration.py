@@ -85,7 +85,11 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       none=['testprojects/tests/scala/org/pantsbuild/testproject/cp-directories:cp-directories'],
       direct=['testprojects/tests/scala/org/pantsbuild/testproject/cp-directories:cp-directories'],
       transitive=['testprojects/tests/scala/org/pantsbuild/testproject/cp-directories:cp-directories']
-    )
+    ),
+    # An unclaimed source file.
+    'testprojects/src/python/python_targets/test_unclaimed_src.py': dict(none=[],
+                                                                         direct=[],
+                                                                         transitive=[])
   }
 
   @classmethod
