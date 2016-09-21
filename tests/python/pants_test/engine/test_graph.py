@@ -111,7 +111,8 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
-    request = scheduler.execution_request([self._product], [address])
+    # NB: requesting any of the possible types that come from parsing a BUILD file
+    request = scheduler.execution_request([TestTable.constraint()], [address])
     LocalSerialEngine(scheduler).reduce(request)
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
@@ -124,13 +125,19 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def resolve_failure(self, scheduler, address):
     root, state = self._populate(scheduler, address)
-    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
+    self.assert_throw(state)
     return state.exc
 
   def resolve(self, scheduler, address):
     root, state = self._populate(scheduler, address)
-    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
+    self.assert_return(state)
     return state.value
+
+  def assert_return(self, state):
+    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
+
+  def assert_throw(self, state):
+    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
 
 
 class InlinedGraphTest(GraphTestBase):
@@ -198,7 +205,7 @@ class InlinedGraphTest(GraphTestBase):
     walk = self.walk(scheduler, parsed_address)
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     root, state = walk[0]
-    self.assertEqual(type(state), Throw)
+    self.assert_throw(state)
     trace_message = '\n'.join(scheduler.product_graph.trace(root))
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)

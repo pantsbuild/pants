@@ -48,8 +48,8 @@ class GoLocalSourceTestBase(AbstractClass):
 
     go_local_source_target = self.target('src/go/src/foo')
     self.assertIsNotNone(go_local_source_target)
-    self.assertEqual('src/foo', go_local_source_target.import_path)
-    self.assertEqual(['src/foo/jake.go'],
+    self.assertEqual('foo', go_local_source_target.import_path)
+    self.assertEqual(['foo/jake.go'],
                      list(go_local_source_target.sources_relative_to_source_root()))
 
   def test_cannot_name(self):
@@ -93,16 +93,16 @@ class GoLocalSourceTestBase(AbstractClass):
     self.create_file('src/go/src/foo/jake.hxx')
     target = self.make_target(spec='src/go/src/foo', target_type=self.target_type)
 
-    self.assertEqual(sorted(['src/foo/jake.go',
-                             'src/foo/jake.c',
-                             'src/foo/jake.s',
-                             'src/foo/jake.cc',
-                             'src/foo/jake.cpp',
-                             'src/foo/jake.cxx',
-                             'src/foo/jake.h',
-                             'src/foo/jake.hh',
-                             'src/foo/jake.hpp',
-                             'src/foo/jake.hxx']),
+    self.assertEqual(sorted(['foo/jake.go',
+                             'foo/jake.c',
+                             'foo/jake.s',
+                             'foo/jake.cc',
+                             'foo/jake.cpp',
+                             'foo/jake.cxx',
+                             'foo/jake.h',
+                             'foo/jake.hh',
+                             'foo/jake.hpp',
+                             'foo/jake.hxx']),
                      sorted(target.sources_relative_to_source_root()))
 
   def test_globs_resources(self):
@@ -116,6 +116,6 @@ class GoLocalSourceTestBase(AbstractClass):
     self.create_file('src/go/src/foo/jake.png')
     target = self.make_target(spec='src/go/src/foo', target_type=self.target_type)
 
-    self.assertEqual(sorted(['src/foo/jake.go',
-                             'src/foo/jake.png']),
+    self.assertEqual(sorted(['foo/jake.go',
+                             'foo/jake.png']),
                      sorted(target.sources_relative_to_source_root()))

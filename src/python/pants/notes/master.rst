@@ -4,7 +4,68 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0dev10 (9/20/2016)
+----------------------
+Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.
+
+Bugfixes
+~~~~~~~~
+* Correct Pants's incorrect guesses for go source roots.
+  `RB #4247 <https://rbcommons.com/s/twitter/r/4247>`_
+
+* Fix ng-killall by swallowing psutil exceptions in filter
+  `RB #4237 <https://rbcommons.com/s/twitter/r/4237>`_
+
+* Fix for idea-plugin goal that generates too long project filename
+  `RB #4231 <https://rbcommons.com/s/twitter/r/4231>`_
+
+* wrapped globs excludes - include incorrect arg in error message
+  `RB #4232 <https://rbcommons.com/s/twitter/r/4232>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Inject an automatic dep on junit for all junit_tests targets.
+  `RB #4228 <https://rbcommons.com/s/twitter/r/4228>`_
+
+* Simplify failed test reporting.
+  `RB #4240 <https://rbcommons.com/s/twitter/r/4240>`_
+
+* Fixup the simple plugin setup docs.
+  `RB #4241 <https://rbcommons.com/s/twitter/r/4241>`_
+
+* Add description to type constraints
+  `RB #4233 <https://rbcommons.com/s/twitter/r/4233>`_
+
+* Differentiate between source root categories.
+  `RB #4230 <https://rbcommons.com/s/twitter/r/4230>`_
+
+* Restore ChangedTargetGoalsIntegrationTest.
+  `RB #4227 <https://rbcommons.com/s/twitter/r/4227>`_
+
+* Deprecate the `subsystem_instance` utility function.
+  `RB #4220 <https://rbcommons.com/s/twitter/r/4220>`_
+
+New Features
+~~~~~~~~~~~~
+* Add a timeout to scalajs tests
+  `RB #4229 <https://rbcommons.com/s/twitter/r/4229>`_
+
+* Disallow absolute file paths in specs in BUILD files
+  `RB #4221 <https://rbcommons.com/s/twitter/r/4221>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+* [engine] Convert all isinstance product checks to using Exactly type constraints
+  `RB #4236 <https://rbcommons.com/s/twitter/r/4236>`_
+
+* [engine] Check that types passed to TypeConstraint inits are in fact types
+  `RB #4209 <https://rbcommons.com/s/twitter/r/4209>`_
+
 1.2.0dev9 (9/12/2016)
+----------------------
+Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.
 
 Bugfixes
 ~~~~~~~~
