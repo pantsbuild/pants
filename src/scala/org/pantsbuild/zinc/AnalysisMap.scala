@@ -10,6 +10,7 @@ import java.io.{
   IOException
 }
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 import sbt.{CompileSetup, Logger}
 import sbt.inc.{Analysis, AnalysisStore, FileBasedStore, Locate}
@@ -124,7 +125,6 @@ object AnalysisMap {
 object SafeFileBasedStore {
   def apply(file: File): AnalysisStore = new AnalysisStore {
     def set(analysis: Analysis, setup: CompileSetup) {
-      import java.nio.file.StandardCopyOption
       val tmpAnalysisFile = File.createTempFile(file.getName, ".tmp")
       val analysisStore = FileBasedStore(tmpAnalysisFile)
       analysisStore.set(analysis, setup)
