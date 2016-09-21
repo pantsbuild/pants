@@ -18,7 +18,6 @@ from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConst
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.rules import CoercionRule
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
@@ -254,11 +253,12 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   :param address_mapper_key: The subject key for an AddressMapper instance.
   :param symbol_table_cls: A SymbolTable class to provide symbols for Address lookups.
   """
+  symbol_table_constraint = symbol_table_cls.constraint()
   return [
     # Support for resolving Structs from Addresses
-    (Struct,
+    (symbol_table_constraint,
      [Select(UnhydratedStruct),
-      SelectDependencies(Struct, UnhydratedStruct, field_types=(Address,))],
+      SelectDependencies(symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
      hydrate_struct),
     (UnhydratedStruct,
      [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
@@ -275,11 +275,6 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      [SelectLiteral(address_mapper, AddressMapper),
       Select(DirectoryListing)],
      filter_buildfile_paths),
-  ] + [
-    # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
-    # define that lookup for coercing a struct into each literal product.
-    CoercionRule(product, Struct)
-    for product in set(symbol_table_cls.table().values()) if product is not Struct
   ] + [
     # Simple spec handling.
     (Addresses,

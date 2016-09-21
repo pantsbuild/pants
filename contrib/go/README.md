@@ -48,37 +48,44 @@ before continuing.
 
 ## Codebase setup
 
-Pants has tooling to help maintain your Go BUILD files, but it needs some configuration and seeding
-to work.
+Pants has tooling to help maintain your Go BUILD files, but it may need
+some configuration and seeding to work.
 
 ### Source root configuration
 
 Internally, pants uses the concept of a "source root" to determine the portion of a source file's
-path that represents the package for the language in question. For Go code in a standard layout, the
-source root is `$GOPATH/src`, but pants may not guess this correctly. Suppose we're setting up Pants
-for a multi-language repo layed out with Java code under `src/java/com/yourcompany/...` and Go code
-under `src/go/src/...`. You can inspect Pants' source root guesses for this layout with:
-```
-./pants roots
-src/go: go
-src/java: java
-```
+path that represents the package for the language in question. 
 
-In this example the Java guess is correct but the Go guess is not, we need `src/go/src`. We can
-explicitly set the source root for Go with this addition to `pants.ini`:
+Pants attempts to guess where your source roots are via pattern matching.  For example, it assumes
+by default that `src/*` and `src/main/*`, where `*` is some language name, are possible source 
+roots for that language. 
+
+However when it comes to Go, `src/go` is probably not the correct source root. For Go code in a 
+standard multi-language repo layout, `src/go` is probably on the $GOPATH, which means that 
+`src/go/src` is the actual source root. 
+
+Pants corrects for this in the case of its default patterns: It will correctly detect
+that `src/go/src` and `src/main/go/src` are the possible source roots for Go. 
+
+But if your Go code does not live in one of these locations then you'll need to tell Pants where
+to find it, e.g., by adding this to `pants.ini`:
+
 ```ini
 [source]
 source_roots: {
-    'src/go/src': ['go']
+    'my/custom/path/go/src': ['go']
   }
 ```
 
-This tells pants that the `src/go/src` source root houses one type of code, Go code. We can verify
-the setting:
+This tells pants that the `src/go/src` source root houses one type of code, Go code.
+
+You can inspect Pants' source root guesses with:
+
 ```
 ./pants roots
 src/go/src: go
 src/java: java
+...
 ```
 
 Unless your Go code has no 3rdparty dependencies, we also need to seed a source root where 3rdparty
