@@ -47,28 +47,31 @@ def glob_to_regex(pattern):
                       "*" only matches patterns in a single dir.
   :returns: A regex string that matches same paths as the input glob does.
   """
-  out = ''
-  components = pattern.rstrip('/').replace('.', '[.]').split('/')
+  out = ['^']
+  components = pattern.strip('/').replace('.', '[.]').split('/')
   doublestar = False
   for component in components:
-    if out and not doublestar:
-      out += '/'
+    if len(out) == 1:
+      if pattern.startswith('/'):
+        out.append('/')
+    else:
+      if not doublestar:
+        out.append('/')
 
     if '**' in component:
       if component != '**':
         raise ValueError('Invalid usage of "**", use "*" instead.')
 
       if not doublestar:
-        out += '(([^/]+/)*)'
+        out.append('(([^/]+/)*)')
         doublestar = True
     else:
-      out += component.replace('*', '[^/]*')
+      out.append(component.replace('*', '[^/]*'))
       doublestar = False
 
   if doublestar:
-    out += '[^/]*'
+    out.append('[^/]*')
 
-  if pattern.startswith('/'):
-    out = '/' + out
+  out.append('$')
 
-  return '^{}$'.format(out)
+  return ''.join(out)
