@@ -32,7 +32,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_walk
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_property
 
@@ -709,6 +709,12 @@ class JvmCompile(NailgunTaskBase):
                                                           self._confs))
         # TODO: always provide transitive analysis, but not always all classpath entries?
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
+
+        if not should_compile_incrementally(vts, ctx):
+          # Purge existing analysis file in non-incremental mode.
+          safe_delete(ctx.analysis_file)
+          # Work around https://github.com/pantsbuild/pants/issues/3670
+          safe_rmtree(ctx.classes_dir)
 
         tgt, = vts.targets
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
