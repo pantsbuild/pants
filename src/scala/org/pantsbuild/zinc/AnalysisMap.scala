@@ -118,20 +118,20 @@ object AnalysisMap {
 
 object SafeFileBasedStore {
   def apply(file: File): AnalysisStore = new AnalysisStore {
-    private val actualAnalysisStore = FileBasedStore(file)
+    private val readStableAnalysis = FileBasedStore(file).get
 
     /**
      * Safely update analysis file by writing to a temp file first
      * and only rename to the original file upon successful write.
      */
     def set(analysis: Analysis, setup: CompileSetup) {
-      val analysisFile = File.createTempFile(file.getName, ".tmp")
-      val analysisStore = FileBasedStore(analysisFile)
+      val tmpAnalysisFile = File.createTempFile(file.getName, ".tmp")
+      val analysisStore = FileBasedStore(tmpAnalysisFile)
       analysisStore.set(analysis, setup)
-      Files.move(analysisFile.toPath, file.toPath, REPLACE_EXISTING)
+      Files.move(tmpAnalysisFile.toPath, file.toPath, REPLACE_EXISTING)
     }
 
     def get(): Option[(Analysis, CompileSetup)] =
-      actualAnalysisStore.get()
+      readStableAnalysis
   }
 }
