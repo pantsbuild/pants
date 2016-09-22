@@ -50,7 +50,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
     safe_file_dump(os.path.join(dir_a_subdir, 'BUILD'), 'target(name="a")')
 
   def create_address_mapper(self, build_root):
-    scheduler, engine, _ = EngineInitializer.setup_legacy_graph([], build_root=build_root)
+    scheduler, engine, _, _ = EngineInitializer.setup_legacy_graph([], build_root=build_root)
     return LegacyAddressMapper(scheduler, engine, build_root)
 
   def test_scan_build_files(self):
