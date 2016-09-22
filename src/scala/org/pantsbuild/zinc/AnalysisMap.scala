@@ -9,22 +9,12 @@ import java.io.{
   File,
   IOException
 }
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
-import sbt.{
-  CompileSetup,
-  Logger
-}
-import sbt.inc.{
-  Analysis,
-  AnalysisStore,
-  FileBasedStore,
-  Locate
-}
-
-import org.pantsbuild.zinc.cache.{
-  Cache,
-  FileFPrint
-}
+import sbt.{CompileSetup, Logger}
+import sbt.inc.{Analysis, AnalysisStore, FileBasedStore, Locate}
+import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
 import org.pantsbuild.zinc.cache.Cache.Implicits
 
 /**
@@ -106,7 +96,7 @@ object AnalysisMap {
    * Create an analysis store backed by analysisCache.
    */
   def cachedStore(cacheFile: File): AnalysisStore = {
-    val fileStore = AnalysisStore.cached(FileBasedStore(cacheFile))
+    val fileStore = AnalysisStore.cached(SafeFileBasedStore(cacheFile))
 
     val fprintStore = new AnalysisStore {
       def set(analysis: Analysis, setup: CompileSetup) {
@@ -123,5 +113,25 @@ object AnalysisMap {
     }
 
     AnalysisStore.sync(AnalysisStore.cached(fprintStore))
+  }
+}
+
+/**
+ * Safely update analysis file by writing to a temp file first
+ * and only rename to the original file upon successful write.
+ *
+ * TODO: merge this upstream https://github.com/sbt/zinc/issues/178
+ */
+object SafeFileBasedStore {
+  def apply(file: File): AnalysisStore = new AnalysisStore {
+    def set(analysis: Analysis, setup: CompileSetup) {
+      val tmpAnalysisFile = File.createTempFile(file.getName, ".tmp")
+      val analysisStore = FileBasedStore(tmpAnalysisFile)
+      analysisStore.set(analysis, setup)
+      Files.move(tmpAnalysisFile.toPath, file.toPath, StandardCopyOption.REPLACE_EXISTING)
+    }
+
+    def get(): Option[(Analysis, CompileSetup)] =
+      FileBasedStore(file).get
   }
 }

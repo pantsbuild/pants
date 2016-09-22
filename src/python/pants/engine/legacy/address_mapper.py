@@ -52,7 +52,8 @@ class LegacyAddressMapper(AddressMapper):
 
     return build_files_set
 
-  def is_declaring_file(self, address, file_path):
+  @staticmethod
+  def is_declaring_file(address, file_path):
     # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
     # considered the one that declared it. That's ok though, because the spec path should be enough
     # information for debugging most of the time.

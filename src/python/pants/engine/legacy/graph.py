@@ -214,7 +214,7 @@ class LegacyBuildGraph(BuildGraph):
 
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
-    logger.debug('Injecting to {}: {}'.format(self, subjects))
+    logger.debug('Injecting to %s: %s', self, subjects)
     request = self._scheduler.execution_request([LegacyTarget], subjects)
 
     result = self._engine.execute(request)

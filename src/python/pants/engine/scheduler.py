@@ -11,7 +11,8 @@ import time
 from collections import deque
 from contextlib import contextmanager
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
+                              SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
@@ -438,6 +439,7 @@ class LocalScheduler(object):
       PathGlobs: select_product,
       SingleAddress: select_dep_addrs,
       SiblingAddresses: select_dep_addrs,
+      AscendantAddresses: select_dep_addrs,
       DescendantAddresses: select_dep_addrs,
     }
 

@@ -18,21 +18,21 @@ from pants.pantsd.service.pants_service import PantsService
 class PailgunService(PantsService):
   """A service that runs the Pailgun server."""
 
-  def __init__(self, bind_addr, exiter_class, runner_class, scheduler_service, spec_parser):
+  def __init__(self, bind_addr, exiter_class, runner_class, target_roots_class, scheduler_service):
     """
     :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
-    :param class exiter_class: The Exiter class to be used for Pailgun runs.
-    :param class runner_class: The PantsRunner class to be used for Pailgun runs.
+    :param class exiter_class: The `Exiter` class to be used for Pailgun runs.
+    :param class runner_class: The `PantsRunner` class to be used for Pailgun runs.
+    :param class target_roots_class: The `TargetRoots` class to be used for target root parsing.
     :param SchedulerService scheduler_service: The SchedulerService instance for access to the
                                                resident scheduler.
-    :param func spec_parser: The function for parsing commandline arguments to spec roots.
     """
     super(PailgunService, self).__init__()
     self._bind_addr = bind_addr
     self._exiter_class = exiter_class
     self._runner_class = runner_class
+    self._target_roots_class = target_roots_class
     self._scheduler_service = scheduler_service
-    self._parse_commandline_to_spec_roots = spec_parser
 
     self._logger = logging.getLogger(__name__)
     self._pailgun = None
@@ -58,14 +58,16 @@ class PailgunService(PantsService):
       self._logger.debug('execution commandline: %s', arguments)
       if self._scheduler_service:
         # N.B. This parses sys.argv by way of OptionsInitializer/OptionsBootstrapper prior to
-        # the main pants run to derive spec_roots for caching in the underlying scheduler.
-        spec_roots = self._parse_commandline_to_spec_roots(args=arguments)
-        self._logger.debug('parsed spec_roots: %s', spec_roots)
+        # the main pants run to derive target roots for caching in the underlying product graph.
+        target_roots = self._target_roots_class.create(
+          args=arguments,
+          change_calculator=self._scheduler_service.change_calculator
+        )
         try:
           self._logger.debug('warming the product graph via %s', self._scheduler_service)
           # N.B. This call is made in the pre-fork daemon context for reach and reuse of the
           # resident scheduler.
-          graph_helper = self._scheduler_service.warm_product_graph(spec_roots)
+          graph_helper = self._scheduler_service.warm_product_graph(target_roots)
         except Exception:
           deferred_exc = sys.exc_info()
           self._logger.warning(

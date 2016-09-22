@@ -9,6 +9,7 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.bin.target_roots import TargetRoots
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
@@ -130,13 +131,11 @@ class PantsDaemonLauncher(object):
       scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
       services.extend((fs_event_service, scheduler_service))
 
-    pailgun_service = PailgunService(
-      bind_addr=(self._pailgun_host, self._pailgun_port),
-      exiter_class=DaemonExiter,
-      runner_class=DaemonPantsRunner,
-      scheduler_service=scheduler_service,
-      spec_parser=self._engine_initializer.parse_commandline_to_spec_roots
-    )
+    pailgun_service = PailgunService(bind_addr=(self._pailgun_host, self._pailgun_port),
+                                     exiter_class=DaemonExiter,
+                                     runner_class=DaemonPantsRunner,
+                                     target_roots_class=TargetRoots,
+                                     scheduler_service=scheduler_service)
     services.append(pailgun_service)
 
     # Construct a mapping of named ports used by the daemon's services. In the default case these

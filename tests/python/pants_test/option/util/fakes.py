@@ -27,7 +27,11 @@ class _FakeOptionValues(object):
     return default
 
   def __getattr__(self, key):
-    value = self._option_values[key]
+    try:
+      value = self._option_values[key]
+    except KeyError:
+      # Instead of letting KeyError raise here, re-raise an AttributeError to not break getattr().
+      raise AttributeError(key)
     return value.value if isinstance(value, RankedValue) else value
 
   def get_rank(self, key):
