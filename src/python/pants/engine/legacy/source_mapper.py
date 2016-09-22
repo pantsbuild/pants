@@ -7,24 +7,23 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.specs import AscendantAddresses
+from pants.base.specs import AscendantAddresses, SingleAddress
+from pants.build_graph.address import parse_spec
 from pants.build_graph.source_mapper import SourceMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyTarget
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 
 
-def iter_resolve_and_parse_specs(rel_path, specs, spec_parser):
+def iter_resolve_and_parse_specs(rel_path, specs):
   """Given a relative path and set of input specs, produce a list of proper `Spec` objects.
 
   :param string rel_path: The relative path to the input specs from the build root.
   :param iterable specs: An iterable of specs.
   """
   for spec in specs:
-    if spec.startswith(':'):
-      yield spec_parser.parse_spec(''.join((rel_path, spec)))
-    else:
-      yield spec_parser.parse_spec(spec)
+    spec_path, target_name = parse_spec(spec, rel_path)
+    yield SingleAddress(spec_path, target_name)
 
 
 def resolve_and_parse_specs(*args, **kwargs):
@@ -34,9 +33,8 @@ def resolve_and_parse_specs(*args, **kwargs):
 class EngineSourceMapper(SourceMapper):
   """A v2 engine backed SourceMapper that supports pre-`BuildGraph` cache warming in the daemon."""
 
-  def __init__(self, engine, spec_parser):
+  def __init__(self, engine):
     self._engine = engine
-    self._spec_parser = spec_parser
 
   def _unique_dirs_for_sources(self, sources):
     """Given an iterable of sources, yield unique dirname'd paths."""
@@ -85,8 +83,7 @@ class EngineSourceMapper(SourceMapper):
       #    which is closer in premise to the `resource_targets` param.
       else:
         resource_dep_subjects = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
-                                                        target_resources,
-                                                        self._spec_parser)
+                                                        target_resources)
         # Fetch `LegacyTarget` products for all of the resources.
         for resource_target in self._engine.product_request(LegacyTarget, resource_dep_subjects):
           resource_sources = resource_target.adaptor.kwargs().get('sources')

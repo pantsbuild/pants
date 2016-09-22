@@ -9,7 +9,6 @@ import logging
 from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.options_initializer import OptionsInitializer
 from pants.engine.engine import LocalSerialEngine
@@ -138,7 +137,6 @@ class EngineInitializer(object):
     scheduler = LocalScheduler(dict(), tasks, project_tree)
     # TODO: Do not use the cache yet, as it incurs a high overhead.
     engine = LocalSerialEngine(scheduler, Storage.create(), use_cache=False)
-    spec_parser = CmdLineSpecParser(build_root)
-    change_calculator = EngineChangeCalculator(engine, spec_parser, scm) if scm else None
+    change_calculator = EngineChangeCalculator(engine, scm) if scm else None
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)

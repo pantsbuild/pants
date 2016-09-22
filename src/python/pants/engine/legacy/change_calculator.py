@@ -23,15 +23,14 @@ class _LegacyTargetDependentGraph(object):
   """A graph for walking dependent addresses of LegacyTarget objects."""
 
   @classmethod
-  def from_iterable(cls, spec_parser, iterable):
+  def from_iterable(cls, iterable):
     """Create a new LegacyTargetDependentGraph from an iterable of LegacyTarget instances."""
-    inst = cls(spec_parser)
+    inst = cls()
     for legacy_target in iterable:
       inst.inject_target(legacy_target)
     return inst
 
-  def __init__(self, spec_parser):
-    self._spec_parser = spec_parser
+  def __init__(self):
     self._dependent_address_map = defaultdict(set)
 
   def _resources_addresses(self, legacy_target):
@@ -48,8 +47,7 @@ class _LegacyTargetDependentGraph(object):
       return
 
     parsed_resource_specs = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
-                                                    resource_specs,
-                                                    self._spec_parser)
+                                                    resource_specs)
     for spec in parsed_resource_specs:
       yield Address.parse(spec.to_spec_string())
 
@@ -88,11 +86,14 @@ class _LegacyTargetDependentGraph(object):
 class EngineChangeCalculator(ChangeCalculator):
   """A ChangeCalculator variant that uses the v2 engine for source mapping."""
 
-  def __init__(self, engine, spec_parser, scm, fast=False):
+  def __init__(self, engine, scm):
+    """
+    :param Engine engine: The `Engine` instance to use for computing file to target mappings.
+    :param Scm engine: The `Scm` instance to use for computing changes.
+    """
     super(EngineChangeCalculator, self).__init__(scm)
     self._engine = engine
-    self._spec_parser = spec_parser
-    self._mapper = EngineSourceMapper(engine, spec_parser)
+    self._mapper = EngineSourceMapper(engine)
 
   def iter_changed_target_addresses(self, changed_request):
     """Given a `ChangedRequest`, compute and yield all affected target addresses."""
@@ -112,7 +113,7 @@ class EngineChangeCalculator(ChangeCalculator):
 
     # For dependee finding, we need to parse all build files.
     product_iter = self._engine.product_request(LegacyTarget, [DescendantAddresses('')])
-    graph = _LegacyTargetDependentGraph.from_iterable(self._spec_parser, product_iter)
+    graph = _LegacyTargetDependentGraph.from_iterable(product_iter)
 
     if changed_request.include_dependees == 'direct':
       for address in graph.dependents_of_addresses(changed_addresses):
