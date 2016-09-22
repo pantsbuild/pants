@@ -88,11 +88,12 @@ class TestArtifactCache(unittest.TestCase):
         yield LocalArtifactCache(artifact_root, cache_root, compression=0)
 
   @contextmanager
-  def setup_server(self, return_failed=False):
+  def setup_server(self, return_failed=False, cache_root=None):
     httpd = None
     httpd_thread = None
     try:
-      with temporary_dir() as cache_root:
+      with temporary_dir() as tmpdir:
+        cache_root = cache_root if cache_root else tmpdir
         with pushd(cache_root):  # SimpleRESTHandler serves from the cwd.
           if return_failed:
             handler = FailRESTHandler
@@ -221,6 +222,39 @@ class TestArtifactCache(unittest.TestCase):
           self.assertTrue(local.has(key))
           self.assertTrue(bool(local.use_cached_files(key)))
 
+  def test_local_backed_remote_cache_corrupt_artifact(self):
+    """Ensure that a combined cache clears outputs after a failure to extract an artifact."""
+    with temporary_dir() as remote_cache_dir:
+      with self.setup_server(cache_root=remote_cache_dir) as url:
+        with self.setup_local_cache() as local:
+          tmp = TempLocalArtifactCache(local.artifact_root, 0)
+          remote = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), tmp)
+          combined = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), local)
+
+          key = CacheKey('muppet_key', 'fake_hash')
+
+          results_dir = os.path.join(local.artifact_root, 'a/sub/dir')
+          safe_mkdir(results_dir)
+          self.assertTrue(os.path.exists(results_dir))
+
+          with self.setup_test_file(results_dir) as path:
+            # Add to only the remote cache.
+            remote.insert(key, [path])
+
+            # Replace the data in the remote storage.
+            remote_artifact = os.path.join(remote_cache_dir, remote._url_suffix_for_key(key))
+            self.assertTrue(os.path.exists(remote_artifact))
+            with open(remote_artifact, 'w') as outfile:
+              outfile.write(b'this is not valid tar data.')
+
+            # An attempt to read the corrupt artifact should fail.
+            self.assertFalse(combined.use_cached_files(key, results_dir=results_dir))
+
+            # The local artifact should not have been stored, and the results_dir should have
+            # been cleared.
+            self.assertFalse(local.has(key))
+            self.assertFalse(os.path.exists(results_dir))
+
   def test_multiproc(self):
     key = CacheKey('muppet_key', 'fake_hash')
 
@@ -280,7 +314,7 @@ class TestArtifactCache(unittest.TestCase):
             [False])
           self.assertTrue(os.path.exists(canary))
 
-  def test_corruptted_cached_file_cleaned_up(self):
+  def test_corrupted_cached_file_cleaned_up(self):
     key = CacheKey('muppet_key', 'fake_hash')
 
     with self.setup_local_cache() as artifact_cache:
