@@ -72,7 +72,7 @@ class Changed(object):
       # N.B. This chaining is purely to support the `changed` tests until deprecation.
       ordered_options = [option for option in (alternate_options, options) if option is not None]
       # TODO: Kill this chaining (in favor of outright options replacement) as part of the `changed`
-      # task removal (post-deprecation cycle).
+      # task removal (post-deprecation cycle). See https://github.com/pantsbuild/pants/issues/3893
       chained_options = _ChainedOptions(ordered_options)
       changed_request = ChangedRequest.from_options(chained_options)
       return Changed(changed_request)

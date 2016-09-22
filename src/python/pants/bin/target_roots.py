@@ -70,6 +70,7 @@ class TargetRoots(object):
   def as_string_specs(self):
     """Returns the current target roots as stringified specs for v1 compatibility."""
     # TODO: Kill this once `LegacyAddressMapper.specs_to_addresses()` exists.
+    # See: https://github.com/pantsbuild/pants/issues/3798
 
     def _to_addresses(spec_roots):
       for spec in spec_roots:
