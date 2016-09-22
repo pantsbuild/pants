@@ -25,11 +25,11 @@ major_version_info = namedtuple('major_version_info', ['full_version', 'style_ve
 scala_build_info = {
   '2.10':
     major_version_info(
-      full_version='2.10.4',
+      full_version='2.10.6',
       style_version='0.3.2'),
   '2.11':
     major_version_info(
-      full_version='2.11.7',
+      full_version='2.11.8',
       style_version='0.8.0'),
 }
 
