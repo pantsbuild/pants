@@ -52,3 +52,10 @@ class DescendantAddresses(datatype('DescendantAddresses', ['directory']), Spec):
 
   def to_spec_string(self):
     return '{}::'.format(self.directory)
+
+
+class AscendantAddresses(datatype('AscendantAddresses', ['directory']), Spec):
+  """A Spec representing all addresses located recursively _above_ the given directory."""
+
+  def to_spec_string(self):
+    return '{}^'.format(self.directory)
