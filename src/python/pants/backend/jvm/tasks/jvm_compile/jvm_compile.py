@@ -707,7 +707,6 @@ class JvmCompile(NailgunTaskBase):
                                                           classpath_products,
                                                           extra_compile_time_classpath,
                                                           self._confs))
-        # TODO: always provide transitive analysis, but not always all classpath entries?
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
         if not should_compile_incrementally(vts, ctx):
