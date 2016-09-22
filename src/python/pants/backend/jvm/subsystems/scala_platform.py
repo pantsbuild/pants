@@ -99,8 +99,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                   'and must exist.  Otherwise, defaults for the specified version will be used.')
 
     register('--suffix-version', advanced=True, default=None,
-             help='Scala suffix to be used in `scala_jar` definitions.  For example, specifying'
-                  '`2.12.0-RC1` would result in ivy  ending with `_2.12.0-RC1`.')
+             help='Scala suffix to be used in `scala_jar` definitions. For example, specifying '
+                  '`2.11` or `2.12.0-RC1` would cause `scala_jar` lookups for artifacts with '
+                  'those suffixes.')
 
     # Register the fixed version tools.
     register_scala_compiler_tool('2.10')
