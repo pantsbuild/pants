@@ -92,14 +92,15 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                             classpath=[jardep])
 
     super(ScalaPlatform, cls).register_options(register)
-    register('--version', advanced=True, default='2.10',
+    register('--version', advanced=True, default='2.11',
              choices=['2.10', '2.11', 'custom'], fingerprint=True,
              help='The scala platform version. If --version=custom, the targets '
                   '//:scala-library, //:scalac, //:scala-repl and //:scalastyle will be used, '
                   'and must exist.  Otherwise, defaults for the specified version will be used.')
 
     register('--suffix-version', advanced=True, default=None,
-             help='Scala suffix to be used when a custom version is specified.  For example 2.10.')
+             help='Scala suffix to be used in `scala_jar` definitions.  For example, specifying'
+                  '`2.12.0-RC1` would result in ivy  ending with `_2.12.0-RC1`.')
 
     # Register the fixed version tools.
     register_scala_compiler_tool('2.10')
