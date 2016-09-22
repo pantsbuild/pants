@@ -92,10 +92,10 @@ object Util {
   }
 
   /**
-   * Check a file is writable, create it if it doesn't exist.
+   * Check a file is writable.
    */
   def checkWritable(file: File) = {
-    try { IO.touch(file); true } catch { case e: Exception => false }
+    if (file.exists) file.canWrite else file.getParentFile.canWrite
   }
 
   /**
