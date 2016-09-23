@@ -95,10 +95,11 @@ class LocalScheduler(object):
     self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
 
-    # Create a handle for Storage (which must be kept alive as long as this object), and
+    # Create a handle for the ExternContext (which must be kept alive as long as this object), and
     # the native Scheduler.
-    self._extern_context = native.new_handle(ExternContext(storage))
-    scheduler = native.lib.scheduler_create(self._extern_context,
+    self._context = ExternContext()
+    self._context_handle = native.new_handle(self._context)
+    scheduler = native.lib.scheduler_create(self._context_handle,
                                             extern_to_str,
                                             extern_issubclass,
                                             extern_store_list,
@@ -129,6 +130,18 @@ class LocalScheduler(object):
     RulesetValidator(node_builder, goals, input_types).validate()
     self._register_tasks(node_builder.tasks)
     self._register_intrinsics(node_builder.intrinsics)
+
+  def _to_type_key(self, typ):
+    return self._context.to_type_key(typ)
+
+  def _to_key(self, obj):
+    return self._context.to_key(obj)
+
+  def _from_type_key(self, cdata):
+    return self._context.from_type_key(cdata)
+
+  def _from_key(self, cdata):
+    return self._context.from_key(cdata)
 
   def _select_product(self, subject, product):
     self._native.lib.execution_add_root_select(
@@ -188,21 +201,6 @@ class LocalScheduler(object):
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)
-
-  def _digest(self, cdata):
-    return Digest(self._native.buffer(cdata.digest)[:])
-
-  def _to_type_key(self, typ):
-    return self._storage.put(typ)
-
-  def _to_key(self, obj):
-    return self._storage.put_typed(obj)
-
-  def _from_type_key(self, cdata):
-    return self._storage.get(self._digest(cdata))
-
-  def _from_key(self, cdata):
-    return self._storage.get(self._digest(cdata.digest))
 
   @property
   def storage(self):
@@ -308,7 +306,7 @@ class LocalScheduler(object):
     def decode_arg(raw):
       if raw.tag is 0:
         # Is a literal key: decode.
-        return self._digest(raw.key.digest)
+        return self._from_key(raw.key)
       elif raw.tag is 1:
         # Is the id of another outstanding runnable.
         raise AssertionError('TODO! implement pipelining to run: {}'.format(raw.promise))
@@ -318,7 +316,7 @@ class LocalScheduler(object):
     def decode_runnable(raw):
       return (
           raw.id,
-          Runnable(self._digest(raw.func),
+          Runnable(self._from_type_key(raw.func),
                    tuple(decode_arg(arg)
                          for arg in self._native.unpack(raw.args_ptr, raw.args_len)),
                    bool(raw.cacheable))

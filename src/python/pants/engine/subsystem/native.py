@@ -9,20 +9,21 @@ from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
+from pants.util.objects import datatype
 
 
 _FFI = FFI()
 _FFI.cdef(
     '''
     typedef struct {
-      char digest[32];
-    } Digest;
+      uint64_t key;
+    } Id;
 
-    typedef Digest TypeId;
-    typedef Digest Function;
+    typedef Id TypeId;
+    typedef Id Function;
 
     typedef struct {
-      Digest   digest;
+      Id       key;
       TypeId   type_id;
     } Key;
 
@@ -41,7 +42,7 @@ _FFI.cdef(
 
     typedef void ExternContext;
 
-    typedef UTF8Buffer  (*extern_to_str)(ExternContext*, Digest*);
+    typedef UTF8Buffer  (*extern_to_str)(ExternContext*, Id*);
     typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
     typedef Key         (*extern_store_list)(ExternContext*, Key*, uint64_t, bool);
     typedef Key         (*extern_project)(ExternContext*, Key*, Field*, TypeId*);
@@ -144,9 +145,9 @@ _FFI.cdef(
   )
 
 
-@_FFI.callback("UTF8Buffer(ExternContext*, Digest*)")
+@_FFI.callback("UTF8Buffer(ExternContext*, Id*)")
 def extern_to_str(context_handle, digest):
-  """Given storage and a Digest for `obj`, write str(obj) and return it."""
+  """Given storage and a Id for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
   obj = c.storage.get_from_digest(_FFI.buffer(digest.digest)[:])
   str_bytes = str(obj).encode('utf-8')
@@ -204,14 +205,31 @@ def extern_project_multi(context_handle, key, field):
   return (c.keys_buf(projected), len(projected))
 
 
-class ExternContext(object):
-  """A wrapper around python objects used in static extern functions in this module."""
+class Id(datatype('Id', ['value'])):
+  """Wraps around an unsigned-integer id for an object."""
 
-  def __init__(self, storage):
-    self._storage = storage
+
+class ExternContext(object):
+  """A wrapper around python objects used in static extern functions in this module.
+  
+  In the native context, python objects are identified by an unsigned-integer Id which is
+  assigned and memoized here. Note that this is independent-from and much-lighter-than
+  the Digest computed when an object is stored via storage.py (which is generally only necessary
+  for multi-processing or cache lookups).
+  """
+
+  def __init__(self):
+    # NB: These two dictionaries are not always the same size, because un-hashable objects will
+    # not be memoized in `_obj_to_id`, but will still have unique ids assigned in `_id_to_obj`.
+    # TODO: disallow non-hashable objects.
+    self._obj_to_id = dict()
+    self._id_to_obj = dict()
+    self._id_generator = 0
+
+    # Buffers for transferring strings and arrays of Keys.
     self._resize_utf8(256)
     self._resize_keys(64)
-
+ 
   def _resize_utf8(self, size):
     self._utf8_cap = size
     self._utf8_buf = _FFI.new('char[]', self._utf8_cap)
@@ -219,10 +237,6 @@ class ExternContext(object):
   def _resize_keys(self, size):
     self._keys_cap = size
     self._keys_buf = _FFI.new('Key[]', self._keys_cap)
-
-  @property
-  def storage(self):
-    return self._storage
 
   def utf8_buf(self, utf8):
     if self._utf8_cap < len(utf8):
@@ -235,6 +249,43 @@ class ExternContext(object):
       self._resize_keys(max(len(keys), 2 * self._keys_cap))
     self._keys_buf[0:len(keys)] = keys
     return self._keys_buf
+
+  def _id_from_native(self, cdata):
+    return Id(cdata.key)
+
+  def _put(self, obj):
+    # See whether the object is already stored.
+    try:
+      _id = self._obj_to_id.get(obj, None)
+      if _id is not None:
+        return _id
+      hashable = True
+    except TypeError:
+      hashable = False
+
+    # Otherwise, store it.
+    _id = Id(self._id_generator)
+    self._id_generator += 1
+    if hashable:
+      self._obj_to_id[obj] = _id
+    self._id_to_obj[_id] = obj
+
+    return _id
+
+  def _get(self, _id):
+    return self._id_to_obj[_id]
+
+  def to_type_key(self, typ):
+    return self._put(typ)
+
+  def to_key(self, obj):
+    return (self._put(obj), self._put(type(obj)))
+
+  def from_type_key(self, cdata):
+    return self._get(self._id_from_native(cdata))
+
+  def from_key(self, cdata):
+    return self._get(self._id_from_native(cdata.key))
 
 
 class Native(object):

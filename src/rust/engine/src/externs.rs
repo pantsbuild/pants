@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::mem;
 
-use core::{Digest, Field, Key, TypeId};
+use core::{Field, Id, Key, TypeId};
 
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = libc::c_void;
@@ -116,7 +116,7 @@ pub struct UTF8Buffer {
 }
 
 pub type ToStrExtern =
-  extern "C" fn(*const ExternContext, *const Digest) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, *const Id) -> UTF8Buffer;
 
 pub struct ToStrFunction {
   to_str: ToStrExtern,
@@ -131,7 +131,7 @@ impl ToStrFunction {
     }
   }
 
-  pub fn call(&self, digest: &Digest) -> String {
+  pub fn call(&self, digest: &Id) -> String {
     let buf = (self.to_str)(self.context, digest);
     let str =
       with_vec(buf.str_ptr, buf.str_len as usize, |char_vec| {

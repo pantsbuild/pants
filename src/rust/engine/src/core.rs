@@ -1,19 +1,18 @@
 use fnv::FnvHasher;
 
-use std::fmt;
 use std::hash;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
 // The type of a python object (which itself has a type, but which is not
 // represented by a Key, because that would result in a recursive structure.)
-pub type TypeId = Digest;
+pub type TypeId = Id;
 
 // An identifier for a python function.
-pub type Function = Digest;
+pub type Function = Id;
 
 // The name of a field.
-// TODO: Change to just a Digest... we don't need type information here.
+// TODO: Change to just a Id... we don't need type information here.
 pub type Field = Key;
 
 // On the python side this is string->string; but to allow for equality checks
@@ -22,48 +21,32 @@ pub type Variants = Vec<(Field, Field)>;
 
 // NB: These structs are fairly small, so we allow copying them by default.
 #[repr(C)]
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub struct Digest {
-  digest: [u8;32],
-}
-
-impl fmt::Debug for Digest {
-  fn fmt(&self, fmtr: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    for byte in self.digest.iter().take(4) {
-      try!(fmtr.write_fmt(format_args!("{:02x}", byte)));
-    }
-    Ok(())
-  }
-}
-
-impl hash::Hash for Digest {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    // The digest is already a very strong hash, so the first 4 bytes are sufficient.
-    state.write(&self.digest[0 .. 4])
-  }
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct Id {
+  key: u64,
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Key {
-  digest: Digest,
+  key: Id,
   type_id: TypeId,
 }
 
 impl Key {
   pub fn empty() -> Key {
     Key {
-      digest: Digest {
-        digest: [0;32]
+      key: Id {
+        key: 0
       },
       type_id: TypeId {
-        digest: [0;32]
+        key: 0
       },
     }
   }
 
-  pub fn digest(&self) -> &Digest {
-    &self.digest
+  pub fn key(&self) -> &Id {
+    &self.key
   }
 
   pub fn type_id(&self) -> &TypeId {

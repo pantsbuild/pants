@@ -80,13 +80,13 @@ impl Entry {
   fn format(&self, to_str: &ToStrFunction) -> String {
     let state =
       match self.state {
-        State::Complete(Complete::Return(r)) => to_str.call(r.digest()),
+        State::Complete(Complete::Return(r)) => to_str.call(r.key()),
         ref x => format!("{:?}", x),
       };
     format!(
       "{}:{}:{} == {}",
       self.node.format(to_str),
-      to_str.call(self.node.subject().digest()),
+      to_str.call(self.node.subject().key()),
       to_str.call(self.node.selector().product()),
       state,
     ).replace("\"", "\\\"")

@@ -131,14 +131,6 @@ class Storage(Closable):
     self._contents = contents
     self._key_mappings = key_mappings
     self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
-    self._memo_k2o = dict()
-    self._memo_o2k = dict()
-
-  def _get_o2k(self, obj):
-    try:
-      return self._memo_o2k.get(obj, None), True
-    except TypeError:
-      return None, False
 
   def put(self, obj, nesting=True):
     """Serialize and hash something pickleable, returning a unique key to retrieve it later.
