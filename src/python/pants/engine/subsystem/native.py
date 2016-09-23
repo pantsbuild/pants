@@ -9,6 +9,7 @@ from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
+from pants.engine.selectors import Collection
 from pants.util.objects import datatype
 
 
@@ -165,15 +166,15 @@ def extern_issubclass(context_handle, cls_id, super_cls_id):
 def extern_store_list(context_handle, keys_ptr, keys_len, merge):
   """Given storage and an array of Keys, return a new Key to represent the list."""
   c = _FFI.from_handle(context_handle)
-  ids = tuple(c.key_from_native(key).key for key in _FFI.unpack(keys_ptr, keys_len))
+  keys = tuple(c.key_from_native(key).key for key in _FFI.unpack(keys_ptr, keys_len))
   if merge:
     # Expect each Id to represent a list: deserialize without nesting to get a list
     # of inner Ids per outer Id, then merge.
-    merged = {_id
-              for outer_id in ids
-              for _id in c.from_id(outer_id, nesting=False)}
-    ids = tuple(merged)
-  return c.to_key(ids, nesting=False)
+    merged = {key
+              for outer_key in keys
+              for key in c.get(outer_key, nesting=False)}
+    keys = tuple(merged)
+  return c.to_key(keys, nesting=False)
 
 
 @_FFI.callback("Key(ExternContext*, Key*, Field*, TypeId*)")
@@ -257,7 +258,27 @@ class ExternContext(object):
   def _id_from_native(self, cdata):
     return Id(cdata.key)
 
-  def _put(self, obj):
+  def _maybe_put_nested(self, obj):
+    # If the stored object is a collection type, recurse.
+    if type(obj) in (tuple, list):
+      return type(obj)(self.put(inner) for inner in obj)
+    elif isinstance(obj, Collection):
+      return type(obj)(tuple(self.put(inner) for inner in obj.dependencies))
+    else:
+      return obj
+
+  def _maybe_get_nested(self, obj):
+    # If the stored object was a collection type, recurse.
+    if type(obj) in (tuple, list):
+      return type(obj)(self.get(inner) for inner in obj)
+    elif isinstance(obj, Collection):
+      return type(obj)(tuple(self.get(inner) for inner in obj.dependencies))
+    else:
+      return obj
+
+  def put(self, obj, nesting=True):
+    obj = self._maybe_put_nested(obj) if nesting else obj
+
     # See whether the object is already stored.
     try:
       _id = self._obj_to_id.get(obj, None)
@@ -276,20 +297,21 @@ class ExternContext(object):
 
     return _id
 
-  def _get(self, _id):
-    return self._id_to_obj[_id]
+  def get(self, _id, nesting=True):
+    obj = self._id_to_obj[_id]
+    return self._maybe_get_nested(obj) if nesting else obj
 
   def to_id(self, typ):
-    return self._put(typ)
+    return self.put(typ)
 
-  def to_key(self, obj):
-    return Key(self._put(obj), self._put(type(obj)))
+  def to_key(self, obj, nesting=True):
+    return Key(self.put(obj, nesting=nesting), self.put(type(obj)))
 
-  def from_id(self, cdata):
-    return self._get(self._id_from_native(cdata))
+  def from_id(self, cdata, nesting=True):
+    return self.get(self._id_from_native(cdata), nesting=nesting)
 
   def from_key(self, cdata):
-    return self._get(self._id_from_native(cdata.key))
+    return self.get(self._id_from_native(cdata.key))
 
 
 class Native(object):
