@@ -67,23 +67,6 @@ class TargetRoots(object):
   def __init__(self, spec_roots):
     self._spec_roots = spec_roots
 
-  def as_string_specs(self):
-    """Returns the current target roots as stringified specs for v1 compatibility."""
-    # TODO: Kill this once `LegacyAddressMapper.specs_to_addresses()` exists.
-    # See: https://github.com/pantsbuild/pants/issues/3798
-
-    def _to_addresses(spec_roots):
-      for spec in spec_roots:
-        if isinstance(spec, Spec):
-          yield spec.to_spec_string()
-        elif isinstance(spec, Address):
-          yield spec.spec
-        else:
-          raise TypeError('unsupported spec type `{}` when converting {!r} to string spec'
-                          .format(type(spec), spec))
-
-    return [address for address in _to_addresses(self._spec_roots)]
-
   def as_specs(self):
     """Returns the current target roots as Specs."""
     return self._spec_roots
