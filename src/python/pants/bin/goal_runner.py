@@ -185,7 +185,7 @@ class GoalRunnerFactory(object):
         self._daemon_graph_helper
       )
       goals, is_quiet = self._determine_goals(self._requested_goals)
-      targets = self._specs_to_targets(spec_roots)
+      target_roots = self._specs_to_targets(spec_roots)
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()
@@ -197,7 +197,7 @@ class GoalRunnerFactory(object):
 
       context = Context(options=self._options,
                         run_tracker=self._run_tracker,
-                        target_roots=targets,
+                        target_roots=target_roots,
                         requested_goals=self._requested_goals,
                         build_graph=self._build_graph,
                         build_file_parser=self._build_file_parser,
