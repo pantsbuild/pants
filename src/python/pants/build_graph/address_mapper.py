@@ -59,7 +59,7 @@ class AddressMapper(AbstractClass):
     """Execute a collection of `specs.Spec` objects and return an ordered set of Addresses."""
 
   def is_valid_single_address(self, single_address):
-    """Check if a single address spec really exists.
+    """Check if a potentially ambiguous single address spec really exists.
 
     :param single_address: A SingleAddress spec.
     :return: True if given spec exists, False otherwise.
