@@ -44,7 +44,7 @@ class LegacyAddressMapper(AddressMapper):
       raise result.error
 
     build_files_set = set()
-    for _, state in result.root_products.items():
+    for state in result.root_products.values():
       for build_files in state.value:
         build_files_set.update(f.path for f in build_files.files)
 
