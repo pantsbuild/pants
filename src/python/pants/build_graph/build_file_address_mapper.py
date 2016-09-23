@@ -122,9 +122,9 @@ class BuildFileAddressMapper(AddressMapper):
                                            .format(message=e, spec=spec))
 
   def scan_build_files(self, base_path):
-    buildFiles = BuildFile.scan_build_files(self._project_tree, base_path,
-                                      build_ignore_patterns=self._build_ignore_patterns)
-    return OrderedSet(bf.relpath for bf in buildFiles)
+    build_files = BuildFile.scan_build_files(self._project_tree, base_path,
+                                             build_ignore_patterns=self._build_ignore_patterns)
+    return OrderedSet(bf.relpath for bf in build_files)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.

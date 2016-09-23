@@ -53,6 +53,16 @@ class LegacyAddressMapperTest(unittest.TestCase):
     scheduler, engine, _, _ = EngineInitializer.setup_legacy_graph([], build_root=build_root)
     return LegacyAddressMapper(scheduler, engine, build_root)
 
+  def test_is_valid_single_address(self):
+    with temporary_dir() as build_root:
+      self.create_build_files(build_root)
+      mapper = self.create_address_mapper(build_root)
+
+      self.assertFalse(mapper.is_valid_single_address(SingleAddress('dir_a', 'foo')))
+      self.assertTrue(mapper.is_valid_single_address(SingleAddress('dir_a', 'a')))
+      with self.assertRaises(TypeError):
+        mapper.is_valid_single_address('foo')
+
   def test_scan_build_files(self):
     with temporary_dir() as build_root:
       self.create_build_files(build_root)

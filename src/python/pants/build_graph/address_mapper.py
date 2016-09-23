@@ -9,7 +9,6 @@ import logging
 from abc import abstractmethod
 
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.meta import AbstractClass
 
@@ -59,18 +58,19 @@ class AddressMapper(AbstractClass):
   def scan_specs(self, specs, fail_fast=True):
     """Execute a collection of `specs.Spec` objects and return an ordered set of Addresses."""
 
-  def check_valid_spec(self, spec_str):
-    """Check if a spec str is valid.
+  def is_valid_single_address(self, single_address):
+    """Check if a single address spec really exists.
 
-    :param spec_str: A string representing an address.
-    :return: True if given spec_str is valid, False otherwise.
+    :param single_address: A SingleAddress spec.
+    :return: True if given spec exists, False otherwise.
     """
+    if not isinstance(single_address, SingleAddress):
+      raise TypeError(
+        'Expecting parameter type to be {}, got {}.'.format(SingleAddress, type(single_address)))
+
     try:
-      address = Address.parse(spec_str)
-      self.scan_specs([SingleAddress(address.spec_path, address._target_name)])
+      self.scan_specs([single_address])
       return True
-    except ValueError:
-      return False
     except AddressLookupError:
       return False
 
@@ -84,10 +84,12 @@ class AddressMapper(AbstractClass):
     :raises AddressLookupError: if there is a problem parsing a BUILD file
     """
 
-  @abstractmethod
-  def is_declaring_file(self, address, file_path):
+  @staticmethod
+  def is_declaring_file(address, file_path):
     """Returns True if the address could be declared in the file at file_path.
 
     :param Address address: The address to check for.
     :param string file_path: The path of the file that may contain a declaration for the address.
     """
+    # Subclass should implement this method.
+    raise NotImplementedError()

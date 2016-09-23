@@ -8,15 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from twitter.common.collections import maybe_list
-
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address import Address
 from pants.build_graph.address_mapper import AddressMapper
+from pants.engine.engine import ExecutionError
 from pants.engine.fs import Dir
 from pants.engine.graph import BuildDirs, BuildFiles
-from pants.engine.nodes import Throw
 from pants.engine.selectors import SelectDependencies
 from pants.util.dirutil import fast_relpath
 
@@ -66,21 +64,10 @@ class LegacyAddressMapper(AddressMapper):
     return self.scan_specs([SiblingAddresses(spec_path)])
 
   def scan_specs(self, specs, fail_fast=True):
-    request = self._scheduler.execution_request([Address], specs)
-    result = self._engine.execute(request)
-
-    if result.error:
-      raise result.error
-
-    addresses = set()
-    for node, state in result.root_products.items():
-      if type(state) is Throw:
-        trace = '\n'.join(self._product_graph.trace(node))
-        raise self.BuildFileScanError(
-          'Address scan failed for {}:\n{}'.format(node.subject, trace))
-
-      addresses.update(maybe_list(state.value, expected_type=Address))
-
+    try:
+      addresses = set(self._engine.product_request(Address, specs))
+    except ExecutionError as e:
+      raise self.BuildFileScanError(str(e))
     return addresses
 
   def scan_addresses(self, root=None):

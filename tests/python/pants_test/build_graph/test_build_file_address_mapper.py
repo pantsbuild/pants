@@ -10,7 +10,7 @@ import re
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import DescendantAddresses
+from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -31,14 +31,14 @@ class BuildFileAddressMapperTest(BaseTest):
     self.assertEqual(address.target_name, addressable.addressed_name)
     self.assertEqual(addressable.addressed_type, Target)
 
-  def test_check_valid_spec(self):
+  def test_is_valid_single_address(self):
     self.add_to_build_file('BUILD', dedent("""
       target(name='foozle')
       target(name='baz')
       """))
 
-    self.assertFalse(self.address_mapper.check_valid_spec('//:bad_spec'))
-    self.assertTrue(self.address_mapper.check_valid_spec('//:foozle'))
+    self.assertFalse(self.address_mapper.is_valid_single_address(SingleAddress('', 'bad_spec')))
+    self.assertTrue(self.address_mapper.is_valid_single_address(SingleAddress('', 'foozle')))
 
   def test_scan_addresses(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
