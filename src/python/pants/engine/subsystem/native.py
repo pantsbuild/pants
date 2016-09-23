@@ -146,67 +146,68 @@ _FFI.cdef(
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id*)")
-def extern_to_str(context_handle, digest):
-  """Given storage and a Id for `obj`, write str(obj) and return it."""
+def extern_to_str(context_handle, _id):
+  """Given an Id for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
-  obj = c.storage.get_from_digest(_FFI.buffer(digest.digest)[:])
+  obj = c.from_id(_id)
   str_bytes = str(obj).encode('utf-8')
   return (c.utf8_buf(str_bytes), len(str_bytes))
 
 
 @_FFI.callback("bool(ExternContext*, TypeId*, TypeId*)")
 def extern_issubclass(context_handle, cls_id, super_cls_id):
-  """Given storage and two TypeIds, return issubclass(left, right)."""
+  """Given two TypeIds, return issubclass(cls, super_cls)."""
   c = _FFI.from_handle(context_handle)
-  cls = c.storage.get_from_digest(_FFI.buffer(cls_id.digest)[:])
-  super_cls = c.storage.get_from_digest(_FFI.buffer(super_cls_id.digest)[:])
-  return issubclass(cls, super_cls)
+  return issubclass(c.from_id(cls_id), c.from_id(super_cls_id))
 
 
 @_FFI.callback("Key(ExternContext*, Key*, uint64_t, bool)")
 def extern_store_list(context_handle, keys_ptr, keys_len, merge):
   """Given storage and an array of Keys, return a new Key to represent the list."""
   c = _FFI.from_handle(context_handle)
-  raw_digests = [_FFI.buffer(key.digest.digest)[:] for key in _FFI.unpack(keys_ptr, keys_len)]
+  ids = tuple(c.key_from_native(key).key for key in _FFI.unpack(keys_ptr, keys_len))
   if merge:
-    # Expect each digest to represent a list: deserialize without nesting to get a list
-    # of inner digests per outer digest, and merge.
-    digests = {digest
-               for raw_digest in raw_digests
-               for digest in c.storage.get_from_digest(raw_digest, nesting=False)}
-    return c.storage.put_typed(tuple(digests), nesting=False)
-  else:
-    return c.storage.put_typed_from_digests(raw_digests)
+    # Expect each Id to represent a list: deserialize without nesting to get a list
+    # of inner Ids per outer Id, then merge.
+    merged = {_id
+              for outer_id in ids
+              for _id in c.from_id(outer_id, nesting=False)}
+    ids = tuple(merged)
+  return c.to_key(ids, nesting=False)
 
 
 @_FFI.callback("Key(ExternContext*, Key*, Field*, TypeId*)")
 def extern_project(context_handle, key, field, type_id):
-  """Given storage, a Key for `obj`, a field name, and a type, project the field as a new Key."""
+  """Given a Key for `obj`, a field name, and a type, project the field as a new Key."""
   c = _FFI.from_handle(context_handle)
-  obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
-  field_name = c.storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
-  typ = c.storage.get_from_digest(_FFI.buffer(type_id.digest)[:])
+  obj = c.from_key(key)
+  field_name = c.from_key(field)
+  typ = c.from_id(type_id)
 
   projected = getattr(obj, field_name)
   if type(projected) is not typ:
     projected = typ(projected)
 
-  return c.storage.put_typed(projected)
+  return c.to_key(projected)
 
 
 @_FFI.callback("KeyBuffer(ExternContext*, Key*, Field*)")
 def extern_project_multi(context_handle, key, field):
-  """Given storage, a Key for `obj`, and a field name, project the field as a list of Keys."""
+  """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
   c = _FFI.from_handle(context_handle)
-  obj = c.storage.get_from_digest(_FFI.buffer(key.digest.digest)[:])
-  field_name = c.storage.get_from_digest(_FFI.buffer(field.digest.digest)[:])
+  obj = c.from_key(key)
+  field_name = c.from_key(field)
 
-  projected = [c.storage.put_typed(p) for p in getattr(obj, field_name)]
+  projected = [c.to_key(p) for p in getattr(obj, field_name)]
   return (c.keys_buf(projected), len(projected))
 
 
+class Key(datatype('Key', ['key', 'type_id'])):
+  """Corresponds to the native object of the same name, and holds two Id objects."""
+
+
 class Id(datatype('Id', ['value'])):
-  """Wraps around an unsigned-integer id for an object."""
+  """Corresponds to the native object of the same name."""
 
 
 class ExternContext(object):
@@ -250,6 +251,9 @@ class ExternContext(object):
     self._keys_buf[0:len(keys)] = keys
     return self._keys_buf
 
+  def key_from_native(self, cdata):
+    return Key(self._id_from_native(cdata.key), self._id_from_native(cdata.type_id))
+
   def _id_from_native(self, cdata):
     return Id(cdata.key)
 
@@ -275,13 +279,13 @@ class ExternContext(object):
   def _get(self, _id):
     return self._id_to_obj[_id]
 
-  def to_type_key(self, typ):
+  def to_id(self, typ):
     return self._put(typ)
 
   def to_key(self, obj):
-    return (self._put(obj), self._put(type(obj)))
+    return Key(self._put(obj), self._put(type(obj)))
 
-  def from_type_key(self, cdata):
+  def from_id(self, cdata):
     return self._get(self._id_from_native(cdata))
 
   def from_key(self, cdata):

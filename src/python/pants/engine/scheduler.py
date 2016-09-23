@@ -108,9 +108,9 @@ class LocalScheduler(object):
                                             self._to_key('name'),
                                             self._to_key('products'),
                                             self._to_key('default'),
-                                            self._to_type_key(Address),
-                                            self._to_type_key(HasProducts),
-                                            self._to_type_key(Variants))
+                                            self._to_id(Address),
+                                            self._to_id(HasProducts),
+                                            self._to_id(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     self._execution_request = None
 
@@ -131,14 +131,14 @@ class LocalScheduler(object):
     self._register_tasks(node_builder.tasks)
     self._register_intrinsics(node_builder.intrinsics)
 
-  def _to_type_key(self, typ):
-    return self._context.to_type_key(typ)
+  def _to_id(self, typ):
+    return self._context.to_id(typ)
 
   def _to_key(self, obj):
     return self._context.to_key(obj)
 
-  def _from_type_key(self, cdata):
-    return self._context.from_type_key(cdata)
+  def _from_id(self, cdata):
+    return self._context.from_id(cdata)
 
   def _from_key(self, cdata):
     return self._context.from_key(cdata)
@@ -147,7 +147,7 @@ class LocalScheduler(object):
     self._native.lib.execution_add_root_select(
         self._scheduler,
         self._to_key(subject),
-        self._to_type_key(product))
+        self._to_id(product))
 
   def _register_intrinsics(self, intrinsics):
     """Register the given intrinsics dict.
@@ -157,9 +157,9 @@ class LocalScheduler(object):
     """
     for (subject_type, product_type), func in intrinsics.items():
       self._native.lib.intrinsic_task_add(self._scheduler,
-                                          self._to_type_key(func),
-                                          self._to_type_key(subject_type),
-                                          self._to_type_key(product_type))
+                                          self._to_id(func),
+                                          self._to_id(subject_type),
+                                          self._to_id(product_type))
 
   def _register_tasks(self, tasks):
     """Register the given tasks dict with the native scheduler."""
@@ -167,26 +167,26 @@ class LocalScheduler(object):
       for rule in rules:
         _, input_selects, func = rule.as_triple()
         self._native.lib.task_add(self._scheduler,
-                                  self._to_type_key(func),
-                                  self._to_type_key(output_type))
+                                  self._to_id(func),
+                                  self._to_id(output_type))
         for selector in input_selects:
           selector_type = type(selector)
           if selector_type is Select:
             self._native.lib.task_add_select(self._scheduler,
-                                            self._to_type_key(selector.product))
+                                            self._to_id(selector.product))
           elif selector_type is SelectVariant:
             self._native.lib.task_add_select_variant(self._scheduler,
-                                                    self._to_type_key(selector.product),
+                                                    self._to_id(selector.product),
                                                     self._to_key(selector.variant_key))
           elif selector_type is SelectLiteral:
             # NB: Intentionally ignores subject parameter to provide a literal subject.
             self._native.lib.task_add_select_literal(self._scheduler,
                                                     self._to_key(selector.subject),
-                                                    self._to_type_key(selector.product))
+                                                    self._to_id(selector.product))
           elif selector_type is SelectDependencies:
             self._native.lib.task_add_select_dependencies(self._scheduler,
-                                                          self._to_type_key(selector.product),
-                                                          self._to_type_key(selector.dep_product),
+                                                          self._to_id(selector.product),
+                                                          self._to_id(selector.dep_product),
                                                           self._to_key(selector.field),
                                                           selector.traversal)
           elif selector_type is SelectProjection:
@@ -194,10 +194,10 @@ class LocalScheduler(object):
               raise ValueError("TODO: remove support for projecting multiple fields at once.")
             field = selector.fields[0]
             self._native.lib.task_add_select_projection(self._scheduler,
-                                                        self._to_type_key(selector.product),
-                                                        self._to_type_key(selector.projected_subject),
+                                                        self._to_id(selector.product),
+                                                        self._to_id(selector.projected_subject),
                                                         self._to_key(field),
-                                                        self._to_type_key(selector.input_product))
+                                                        self._to_id(selector.input_product))
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)
@@ -264,7 +264,7 @@ class LocalScheduler(object):
       roots = {}
       for root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
         subject = self._from_key(root.subject)
-        product = self._from_type_key(root.product)
+        product = self._from_id(root.product)
         if root.union_tag is 0:
           state = None
         elif root.union_tag is 1:
@@ -290,7 +290,7 @@ class LocalScheduler(object):
     for cid, c in completed:
       if type(c) is Return:
         returns_ids.append(cid)
-        returns_states.append(c.value)
+        returns_states.append(self._to_key(c.value))
       elif type(c) is Throw:
         throws_ids.append(cid)
       else:
@@ -316,7 +316,7 @@ class LocalScheduler(object):
     def decode_runnable(raw):
       return (
           raw.id,
-          Runnable(self._from_type_key(raw.func),
+          Runnable(self._from_id(raw.func),
                    tuple(decode_arg(arg)
                          for arg in self._native.unpack(raw.args_ptr, raw.args_len)),
                    bool(raw.cacheable))

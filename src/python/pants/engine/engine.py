@@ -142,9 +142,7 @@ class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
   def _run(self, runnable):
-    func = self._storage.get(runnable.func)
-    args = tuple(self._storage.get(arg) for arg in runnable.args)
-    return self._storage.put_typed(func(*args))
+    return runnable.func(*runnable.args)
 
   def reduce(self, execution_request):
     generator = self._scheduler.schedule(execution_request)
