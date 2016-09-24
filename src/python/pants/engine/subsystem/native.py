@@ -274,22 +274,21 @@ class ExternContext(object):
   def put(self, obj, nesting=True):
     obj = self._maybe_put_nested(obj) if nesting else obj
 
-    # See whether the object is already stored.
+    # Attempt to memoize the object, and if we encounter an existing id, return it.
+    new_id = Id(self._id_generator)
     try:
-      _id = self._obj_to_id.get(obj, None)
-      if _id is not None:
+      _id = self._obj_to_id.setdefault(obj, new_id)
+      if _id is not new_id:
+        # Object already existed.
         return _id
-      hashable = True
+      # Object was newly stored.
     except TypeError:
-      hashable = False
+      # Object was not hashable.
+      _id = new_id
 
-    # Otherwise, store it.
-    _id = Id(self._id_generator)
-    self._id_generator += 1
-    if hashable:
-      self._obj_to_id[obj] = _id
+    # Object is new/unique.
     self._id_to_obj[_id] = obj
-
+    self._id_generator += 1
     return _id
 
   def get(self, _id, nesting=True):
