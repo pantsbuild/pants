@@ -173,8 +173,6 @@ class GoalRunnerFactory(object):
         pantsd_launcher.maybe_launch()
 
   def _setup_context(self):
-    self._maybe_launch_pantsd()
-
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._build_graph, self._address_mapper, spec_roots = self._init_graph(
         self._global_options.enable_v2_engine,
@@ -207,6 +205,7 @@ class GoalRunnerFactory(object):
 
   def setup(self):
     self._handle_ignore_patterns()
+    self._maybe_launch_pantsd()
     self._handle_help(self._help_request)
 
     goals, context = self._setup_context()
