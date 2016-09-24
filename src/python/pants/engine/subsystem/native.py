@@ -9,7 +9,6 @@ from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
-from pants.engine.selectors import Collection
 from pants.util.objects import datatype
 
 
@@ -262,8 +261,6 @@ class ExternContext(object):
     # If the stored object is a collection type, recurse.
     if type(obj) in (tuple, list):
       return type(obj)(self.put(inner) for inner in obj)
-    elif isinstance(obj, Collection):
-      return type(obj)(tuple(self.put(inner) for inner in obj.dependencies))
     else:
       return obj
 
@@ -271,8 +268,6 @@ class ExternContext(object):
     # If the stored object was a collection type, recurse.
     if type(obj) in (tuple, list):
       return type(obj)(self.get(inner) for inner in obj)
-    elif isinstance(obj, Collection):
-      return type(obj)(tuple(self.get(inner) for inner in obj.dependencies))
     else:
       return obj
 
