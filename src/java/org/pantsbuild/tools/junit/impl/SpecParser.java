@@ -5,12 +5,10 @@ package org.pantsbuild.tools.junit.impl;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.Optional;
 
 import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 
 /**
@@ -20,8 +18,7 @@ import com.google.common.collect.Iterables;
  */
 class SpecParser {
   private final Iterable<String> testSpecStrings;
-  private final LoadingCache<Class<?>, Spec> specs =
-      CacheBuilder.newBuilder().build(CacheLoader.from(Spec::new));
+  private final LinkedHashMap<Class<?>, Spec> specs = new LinkedHashMap<>();
 
   /**
    * Parses the list of incoming test specs from the command line.
@@ -58,14 +55,14 @@ class SpecParser {
       } else {
         Optional<Spec> spec = getOrCreateSpec(specString, specString);
         spec.ifPresent(s -> {
-          if (specs.asMap().containsKey(s.getSpecClass()) && !s.getMethods().isEmpty()) {
+          if (specs.containsKey(s.getSpecClass()) && !s.getMethods().isEmpty()) {
             throw new SpecException(specString,
                 "Request for entire class already requesting individual methods");
           }
         });
       }
     }
-    return specs.asMap().values();
+    return specs.values();
   }
 
   /**
@@ -80,7 +77,7 @@ class SpecParser {
     try {
       Class<?> clazz = getClass().getClassLoader().loadClass(className);
       if (Util.isTestClass(clazz)) {
-        return Optional.of(specs.getUnchecked(clazz));
+        return Optional.of(specs.computeIfAbsent(clazz, Spec::new));
       } else {
         return Optional.empty();
       }
