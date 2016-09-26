@@ -531,8 +531,17 @@ class LocalScheduler(object):
 
     return ExecutionRequest(tuple(roots()))
 
-  def custom_execution_request(self, subject, selector):
-    return ExecutionRequest((self._node_builder.select_node(selector, subject, None),))
+  def selection_request(self, requests):
+    """Create and return an ExecutionRequest for the given (selector, subject) tuples.
+
+    This method allows users to specify their own selectors. It has the potential to replace
+    execution_request, which is a subset of this method, because it uses default selectors.
+    :param requests: A list of (selector, subject) tuples.
+    :return: An ExecutionRequest for the given selectors and subjects.
+    """
+    #TODO: Think about how to deprecate the existing execution_request API.
+    roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
+    return ExecutionRequest(tuple(roots))
 
   @property
   def product_graph(self):

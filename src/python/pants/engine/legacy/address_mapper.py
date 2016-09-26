@@ -37,7 +37,7 @@ class LegacyAddressMapper(AddressMapper):
   def scan_build_files(self, base_path):
     subject = DescendantAddresses(base_path)
     selector = SelectDependencies(BuildFiles, BuildDirs, field_types=(Dir,))
-    request = self._scheduler.custom_execution_request(subject, selector)
+    request = self._scheduler.selection_request([(selector, subject)])
 
     result = self._engine.execute(request)
     if result.error:
