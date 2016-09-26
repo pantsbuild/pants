@@ -6,10 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import os
 from abc import abstractmethod
 
-from pants.build_graph.address import Address
+from pants.base.specs import SingleAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.meta import AbstractClass
 
@@ -39,6 +38,14 @@ class AddressMapper(AbstractClass):
     """Indicates an invalid scan root was supplied."""
 
   @abstractmethod
+  def scan_build_files(self, base_path):
+    """Recursively gather all BUILD files under base_path.
+
+    :param base_path: The path to start scanning, relative to build_root.
+    :return: OrderedSet of BUILD file paths relative to build_root.
+    """
+
+  @abstractmethod
   def addresses_in_spec_path(self, spec_path):
     """Returns the addresses of targets defined at spec_path.
 
@@ -51,29 +58,21 @@ class AddressMapper(AbstractClass):
   def scan_specs(self, specs, fail_fast=True):
     """Execute a collection of `specs.Spec` objects and return an ordered set of Addresses."""
 
-  @abstractmethod
-  def resolve(self, address):
-    """Maps an address in the virtual address space to an object.
+  def is_valid_single_address(self, single_address):
+    """Check if a potentially ambiguous single address spec really exists.
 
-    :param Address address: the address to lookup in a BUILD file
-    :raises AddressLookupError: if the path to the address is not found.
-    :returns: A tuple of the natively mapped BuildFileAddress and the Addressable it points to.
+    :param single_address: A SingleAddress spec.
+    :return: True if given spec exists, False otherwise.
     """
+    if not isinstance(single_address, SingleAddress):
+      raise TypeError(
+        'Expecting parameter type to be {}, got {}.'.format(SingleAddress, type(single_address)))
 
-  def resolve_spec(self, spec):
-    """Converts a spec to an address and maps it to an addressable using `resolve`.
-
-    :param spec: A string representing an address.
-    :raises InvalidAddressError: if there is a problem parsing the spec.
-    :raises AddressLookupError: if the address is not found.
-    :return: An addressable. Usually a target.
-    """
     try:
-      address = Address.parse(spec)
-    except ValueError as e:
-      raise self.InvalidAddressError(e)
-    _, addressable = self.resolve(address)
-    return addressable
+      self.scan_specs([single_address])
+      return True
+    except AddressLookupError:
+      return False
 
   @abstractmethod
   def scan_addresses(self, root=None):
@@ -85,42 +84,12 @@ class AddressMapper(AbstractClass):
     :raises AddressLookupError: if there is a problem parsing a BUILD file
     """
 
-  @abstractmethod
-  def is_declaring_file(self, address, file_path):
+  @staticmethod
+  def is_declaring_file(address, file_path):
     """Returns True if the address could be declared in the file at file_path.
 
     :param Address address: The address to check for.
     :param string file_path: The path of the file that may contain a declaration for the address.
     """
-
-  def _raise_incorrect_address_error(self, spec_path, wrong_target_name, addresses):
-    """Search through the list of targets and return those which originate from the same folder
-    which wrong_target_name resides in.
-
-    :raises: A helpful error message listing possible correct target addresses.
-    """
-    was_not_found_message = '{target_name} was not found in BUILD files from {spec_path}'.format(
-      target_name=wrong_target_name, spec_path=spec_path)
-
-    if not addresses:
-      raise self.EmptyBuildFileError(
-        '{was_not_found_message}, because that directory contains no BUILD files defining addressable entities.'
-          .format(was_not_found_message=was_not_found_message))
-    # Print BUILD file extensions if there's more than one BUILD file with targets only.
-    if (any(not hasattr(address, 'build_file') for address in addresses) or
-        len(set([address.build_file for address in addresses])) == 1):
-      specs = [':{}'.format(address.target_name) for address in addresses]
-    else:
-      specs = [':{} (from {})'.format(address.target_name, os.path.basename(address.build_file.relpath))
-               for address in addresses]
-
-    # Might be neat to sort by edit distance or something, but for now alphabetical is fine.
-    specs = [''.join(pair) for pair in sorted(specs)]
-
-    # Give different error messages depending on whether BUILD file was empty.
-    one_of = ' one of' if len(specs) > 1 else ''  # Handle plurality, just for UX.
-    raise self.AddressNotInBuildFile(
-      '{was_not_found_message}. Perhaps you '
-      'meant{one_of}: \n  {specs}'.format(was_not_found_message=was_not_found_message,
-                                          one_of=one_of,
-                                          specs='\n  '.join(specs)))
+    # Subclass should implement this method.
+    raise NotImplementedError()
