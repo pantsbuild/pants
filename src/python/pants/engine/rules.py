@@ -24,13 +24,6 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-<<<<<<< HEAD
-=======
->>>>>>> nhoward/inject_instrinsic_providers
-
-
-
-
 logger = logging.getLogger(__name__)
 
 
