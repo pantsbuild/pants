@@ -53,8 +53,15 @@ class TypeConstraint(AbstractClass):
     """
     return self._types
 
-  @abstractmethod
   def satisfied_by(self, obj):
+    """Return `True` if the given object satisfies this type constraint.
+
+    :rtype: bool
+    """
+    return self.type_satisfies(type(obj))
+
+  @abstractmethod
+  def type_satisfies(self, obj_type):
     """Return `True` if the given object satisfies this type constraint.
 
     :rtype: bool
@@ -95,12 +102,8 @@ class SuperclassesOf(TypeConstraint):
 
   _variance_symbol = '-'
 
-  def satisfied_by(self, obj):
-    obj_type = type(obj)
-    for type_ in self._types:
-      if issubclass(type_, obj_type):
-        return True
-    return False
+  def type_satisfies(self, obj_type):
+    return any(issubclass(t, obj_type) for t in self._types)
 
 
 class Exactly(TypeConstraint):
@@ -108,8 +111,8 @@ class Exactly(TypeConstraint):
 
   _variance_symbol = '='
 
-  def satisfied_by(self, obj):
-    return type(obj) in self._types
+  def type_satisfies(self, obj_type):
+    return obj_type in self._types
 
 
 class SubclassesOf(TypeConstraint):
@@ -117,8 +120,8 @@ class SubclassesOf(TypeConstraint):
 
   _variance_symbol = '+'
 
-  def satisfied_by(self, obj):
-    return issubclass(type(obj), self._types)
+  def type_satisfies(self, obj_type):
+    return issubclass(obj_type, self._types)
 
 
 class NotSerializableError(TypeError):
