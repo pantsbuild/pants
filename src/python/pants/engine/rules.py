@@ -577,7 +577,7 @@ class GraphMaker(object):
     return root_rules, rule_dependency_edges, unfulfillable_rules
 
   def _find_rhs_for_select(self, subject_type, selector):
-    if selector.type_constraint.type_satisfies(subject_type):
+    if selector.type_constraint.satisfied_by_type(subject_type):
       # NB a matching subject is always picked first
       return (SubjectIsProduct(subject_type),)
     else:

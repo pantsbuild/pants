@@ -4,6 +4,50 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0dev11 (9/23/2016)
+----------------------
+
+Regularly scheduled unstable release.
+
+Heads up!: this release contains a change to an important default value for those who
+use pants to build scala codebases. The default ``--scala-platform-version`` has changed
+from ``2.10`` to ``2.11``. If you do not set this value in your pants.ini (highly recommended!)
+this may result in a surprise scala upgrade for you.
+
+Thanks to the contributors!
+
+API Changes
+~~~~~~~~~~~
+
+* Bump default scala platform version to 2.11
+  `RB #4256 <https://rbcommons.com/s/twitter/r/4256>`_
+
+Bugfixes
+~~~~~~~~
+
+* Clean up analysis.tmp usage between pants and zinc wrapper (Part 1)
+  `Issue #3667 <https://github.com/pantsbuild/pants/issues/3667>`_
+  `RB #4245 <https://rbcommons.com/s/twitter/r/4245>`_
+
+* Clean up analysis.tmp usage between pants and zinc wrapper (Part 2)
+  `RB #4246 <https://rbcommons.com/s/twitter/r/4246>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update minimum JDK requirements.
+  `RB #4127 <https://rbcommons.com/s/twitter/r/4127>`_
+  `RB #4253 <https://rbcommons.com/s/twitter/r/4253>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Move subselectors to selector properties
+  `RB #4235 <https://rbcommons.com/s/twitter/r/4235>`_
+
+* [engine] Daemon cacheable `changed`.
+  `RB #4207 <https://rbcommons.com/s/twitter/r/4207>`_
+
 1.2.0dev10 (9/20/2016)
 ----------------------
 Regularly scheduled unstable release. Thanks to the contributors!
