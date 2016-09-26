@@ -25,11 +25,11 @@ major_version_info = namedtuple('major_version_info', ['full_version', 'style_ve
 scala_build_info = {
   '2.10':
     major_version_info(
-      full_version='2.10.4',
+      full_version='2.10.6',
       style_version='0.3.2'),
   '2.11':
     major_version_info(
-      full_version='2.11.7',
+      full_version='2.11.8',
       style_version='0.8.0'),
 }
 
@@ -92,14 +92,16 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                             classpath=[jardep])
 
     super(ScalaPlatform, cls).register_options(register)
-    register('--version', advanced=True, default='2.10',
+    register('--version', advanced=True, default='2.11',
              choices=['2.10', '2.11', 'custom'], fingerprint=True,
              help='The scala platform version. If --version=custom, the targets '
                   '//:scala-library, //:scalac, //:scala-repl and //:scalastyle will be used, '
                   'and must exist.  Otherwise, defaults for the specified version will be used.')
 
     register('--suffix-version', advanced=True, default=None,
-             help='Scala suffix to be used when a custom version is specified.  For example 2.10.')
+             help='Scala suffix to be used in `scala_jar` definitions. For example, specifying '
+                  '`2.11` or `2.12.0-RC1` would cause `scala_jar` lookups for artifacts with '
+                  'those suffixes.')
 
     # Register the fixed version tools.
     register_scala_compiler_tool('2.10')
