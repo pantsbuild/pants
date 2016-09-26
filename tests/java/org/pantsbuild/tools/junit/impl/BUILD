@@ -14,6 +14,5 @@ java_tests(
     'tests/java/org/pantsbuild/tools/junit/lib:test-dep',
   ],
   sources=globs('*Test.java'),
-  strict_deps=False,
   timeout=180,
 )
