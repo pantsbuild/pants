@@ -38,7 +38,13 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
     else:
       return False
     try:
-      locator = global_subsystem_instance(DistributionLocator)
+      options = {
+        DistributionLocator.options_scope: {
+          'minimum_version': cls.JAVA_MIN,
+          'maximum_version': cls.JAVA_MAX,
+        }
+      }
+      locator = global_subsystem_instance(DistributionLocator, options=options)
       locator.cached(minimum_version=cls.JAVA_MIN, maximum_version=cls.JAVA_MAX)
     except Distribution.Error:
       return False
