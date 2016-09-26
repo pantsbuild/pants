@@ -635,8 +635,12 @@ class JvmCompile(NailgunTaskBase):
       # the current target's.
       upstream_analysis = {current_context.classes_dir: current_context.analysis_file}
     else:
-      dep_contexts = [compile_contexts[dep_target] for dep_target in dependencies_for_compiling]
-      upstream_analysis = {dep_cc.classes_dir: dep_cc.analysis_file for dep_cc in dep_contexts}
+      # NB: targets without compile contexts that are dependencies don't have class directories.
+      #     eg JarLibrary targets.
+      dep_contexts = [compile_contexts.get(dep_target, None)
+                      for dep_target in dependencies_for_compiling]
+      upstream_analysis = {dep_cc.classes_dir: dep_cc.analysis_file
+                           for dep_cc in dep_contexts if dep_cc}
       upstream_analysis[current_context.classes_dir] = current_context.analysis_file
 
     return upstream_analysis
@@ -700,14 +704,15 @@ class JvmCompile(NailgunTaskBase):
 
       if not hit_cache:
         # Compute the compile classpath for this target.
-        dependencies_for_compiling = ctx.dependencies(self._dep_context)
+        dependencies_for_compiling = list(ctx.dependencies(self._dep_context))
         cp_entries = [ctx.classes_dir]
         cp_entries.extend(ClasspathUtil.compute_classpath(dependencies_for_compiling,
                                                           classpath_products,
                                                           extra_compile_time_classpath,
                                                           self._confs))
 
-        upstream_analysis = self._collect_upstream_analysis(ctx, dependencies_for_compiling,
+        upstream_analysis = self._collect_upstream_analysis(ctx,
+                                                            dependencies_for_compiling,
                                                             compile_contexts)
 
         if not should_compile_incrementally(vts, ctx):
