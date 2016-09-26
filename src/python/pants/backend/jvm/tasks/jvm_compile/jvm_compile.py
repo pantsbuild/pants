@@ -32,7 +32,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_walk
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_property
 
@@ -710,22 +710,17 @@ class JvmCompile(NailgunTaskBase):
         upstream_analysis = self._collect_upstream_analysis(ctx, dependencies_for_compiling,
                                                             compile_contexts)
 
-        # Write analysis to a temporary file, and move it to the final location on success.
-        tmp_analysis_file = "{}.tmp".format(ctx.analysis_file)
-        if should_compile_incrementally(vts, ctx):
-          # If this is an incremental compile, rebase the analysis to our new classes directory.
-          self._analysis_tools.rebase_from_path(ctx.analysis_file,
-                                                tmp_analysis_file,
-                                                vts.previous_results_dir,
-                                                vts.results_dir)
-        else:
-          # Otherwise, simply ensure that it is empty.
-          safe_delete(tmp_analysis_file)
+        if not should_compile_incrementally(vts, ctx):
+          # Purge existing analysis file in non-incremental mode.
+          safe_delete(ctx.analysis_file)
+          # Work around https://github.com/pantsbuild/pants/issues/3670
+          safe_rmtree(ctx.classes_dir)
+
         tgt, = vts.targets
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         self._compile_vts(vts,
                           ctx.sources,
-                          tmp_analysis_file,
+                          ctx.analysis_file,
                           upstream_analysis,
                           cp_entries,
                           ctx.classes_dir,
@@ -734,7 +729,6 @@ class JvmCompile(NailgunTaskBase):
                           tgt.platform,
                           fatal_warnings,
                           counter)
-        os.rename(tmp_analysis_file, ctx.analysis_file)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.

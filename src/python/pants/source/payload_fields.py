@@ -9,8 +9,9 @@ import os
 from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
+from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
-from pants.source.wrapped_globs import Files, FilesetWithSpec, matches_filespec
+from pants.source.wrapped_globs import Files, FilesetWithSpec
 from pants.util.memo import memoized_property
 
 

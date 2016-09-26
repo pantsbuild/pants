@@ -40,6 +40,11 @@ class SchedulerService(PantsService):
     """Surfaces the scheduler's `locked` method as part of the service's public API."""
     return self._scheduler.locked
 
+  @property
+  def change_calculator(self):
+    """Surfaces the change calculator."""
+    return self._graph_helper.change_calculator
+
   def setup(self):
     """Service setup."""
     # Register filesystem event handlers on an FSEventService instance.

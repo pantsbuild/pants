@@ -76,6 +76,8 @@ class ListTargets(ConsoleTask):
         yield result
 
   def _targets(self):
+    # TODO: Replace the context.scan() below with self.context.target_roots entirely.
+    # See: https://github.com/pantsbuild/pants/issues/3798
     if self.context.target_roots:
       return self.context.target_roots
     else:

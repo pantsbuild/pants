@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
@@ -26,6 +27,10 @@ class JavaTests(JvmTarget):
                             CONCURRENCY_PARALLEL_CLASSES,
                             CONCURRENCY_PARALLEL_METHODS,
                             CONCURRENCY_PARALLEL_CLASSES_AND_METHODS]
+
+  @classmethod
+  def subsystems(cls):
+    return super(JavaTests, cls).subsystems() + (JUnit, )
 
   def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None,
                extra_jvm_options=None, extra_env_vars=None, concurrency=None,
@@ -84,6 +89,12 @@ class JavaTests(JvmTarget):
     # TODO(John Sirois): These could be scala, clojure, etc.  'jvm' and 'tests' are the only truly
     # applicable labels - fixup the 'java' misnomer.
     self.add_labels('java', 'tests')
+
+  @property
+  def traversable_dependency_specs(self):
+    for spec in super(JavaTests, self).traversable_dependency_specs:
+      yield spec
+    yield JUnit.global_instance().library_spec(self._build_graph)
 
   @property
   def test_platform(self):

@@ -7,25 +7,26 @@ package org.pantsbuild.example.hello.greet;
 
 import org.junit.Test;
 
-import static org.junit.Assert.assertTrue;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.junit.Assert.assertThat;
 
 /* Ensure our greetings are polite */
 public class GreetingTest {
   @Test
   public void mentionGreetee() {
     String greetingForFoo = Greeting.greet("Foo");
-    assertTrue(greetingForFoo.contains("Foo"));
+    assertThat(greetingForFoo, containsString("Foo"));
   }
 
   @Test
   public void mentionGreeteeFromResource() throws Exception {
     String greeting = Greeting.greetFromResource("org/pantsbuild/example/hello/world.txt");
-    assertTrue(greeting.contains("Resource World"));
+    assertThat(greeting, containsString("Resource World"));
   }
 
   @Test
   public void shouldSayHello() {
     String greetingForFoo = Greeting.greet("Foo");
-    assertTrue(greetingForFoo.contains("Hello"));
+    assertThat(greetingForFoo, containsString("Hello"));
   }
 }

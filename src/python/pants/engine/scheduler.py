@@ -11,14 +11,15 @@ import time
 from collections import deque
 from contextlib import contextmanager
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
+                              SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.nodes import (FilesystemNode, Node, Noop, Return, Runnable, SelectNode,
                                 StepContext, TaskNode, Throw, Waiting)
 from pants.engine.rules import NodeBuilder, RulesetValidator
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import Select, SelectDependencies, type_or_constraint_repr
 from pants.util.objects import datatype
 
 
@@ -303,7 +304,7 @@ class ProductGraph(object):
 
     def _format(level, entry, state):
       output = '{}Computing {} for {}'.format('  ' * level,
-                                              entry.node.product.__name__,
+                                              type_or_constraint_repr(entry.node.product),
                                               entry.node.subject)
       if is_one_level_above_bottom(entry):
         output += '\n{}{}'.format('  ' * (level + 1), state)
@@ -438,6 +439,7 @@ class LocalScheduler(object):
       PathGlobs: select_product,
       SingleAddress: select_dep_addrs,
       SiblingAddresses: select_dep_addrs,
+      AscendantAddresses: select_dep_addrs,
       DescendantAddresses: select_dep_addrs,
     }
 

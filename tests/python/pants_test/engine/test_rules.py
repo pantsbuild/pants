@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from textwrap import dedent
 
+from pants.engine.addressable import Exactly
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import Select
 from pants_test.engine.examples.planners import Goal
@@ -21,11 +22,15 @@ class AGoal(Goal):
 
 
 class A(object):
-  pass
+
+  def __repr__(self):
+    return 'A()'
 
 
 class B(object):
-  pass
+
+  def __repr__(self):
+    return 'B()'
 
 
 def noop(*args):
@@ -33,7 +38,9 @@ def noop(*args):
 
 
 class SubA(A):
-  pass
+
+  def __repr__(self):
+    return 'SubA()'
 
 
 class NodeBuilderTest(unittest.TestCase):
@@ -57,7 +64,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assertEquals(dedent("""
                                 Found 1 rules with errors:
                                   (A, (Select(B),), noop)
-                                    There is no producer of Select(B) or a super/subclass of it
+                                    There is no producer of Select(B)
                              """).strip(),
       str(cm.exception))
 
@@ -72,8 +79,8 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assertEquals(dedent("""
                                 Found 1 rules with errors:
                                   (A, (Select(B), Select(B)), noop)
-                                    There is no producer of Select(B) or a super/subclass of it
-                                    There is no producer of Select(B) or a super/subclass of it
+                                    There is no producer of Select(B)
+                                    There is no producer of Select(B)
                              """).strip(),
       str(cm.exception))
 
@@ -85,7 +92,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
     validator.validate()
 
-  def test_ruleset_with_superclass_of_selected_type_produced(self):
+  def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
 
     rules = [
       (A, (Select(B),), noop),
@@ -95,13 +102,19 @@ class RulesetValidatorTest(unittest.TestCase):
       goal_to_product=dict(),
       root_subject_types=tuple())
 
-    validator.validate()
+    with self.assertRaises(ValueError) as cm:
+      validator.validate()
+    self.assertEquals(dedent("""
+                                Found 1 rules with errors:
+                                  (B, (Select(SubA),), noop)
+                                    There is no producer of Select(SubA)
+                             """).strip(), str(cm.exception))
 
   def test_ruleset_with_goal_not_produced(self):
-
     rules = [
       (B, (Select(SubA),), noop)
     ]
+
     validator = RulesetValidator(NodeBuilder.create(rules),
       goal_to_product={'goal-name': AGoal},
       root_subject_types=tuple())
@@ -110,3 +123,14 @@ class RulesetValidatorTest(unittest.TestCase):
 
     self.assertEquals("no task for product used by goal \"goal-name\": <class 'pants_test.engine.test_rules.AGoal'>",
                       str(cm.exception))
+
+  def test_ruleset_with_explicit_type_constraint(self):
+    rules = [
+      (Exactly(A), (Select(B),), noop),
+      (B, (Select(A),), noop)
+    ]
+    validator = RulesetValidator(NodeBuilder.create(rules),
+      goal_to_product=dict(),
+      root_subject_types=tuple())
+
+    validator.validate()

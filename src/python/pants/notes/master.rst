@@ -4,6 +4,145 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.2.0dev11 (9/23/2016)
+----------------------
+
+Regularly scheduled unstable release.
+
+Heads up!: this release contains a change to an important default value for those who
+use pants to build scala codebases. The default ``--scala-platform-version`` has changed
+from ``2.10`` to ``2.11``. If you do not set this value in your pants.ini (highly recommended!)
+this may result in a surprise scala upgrade for you.
+
+Thanks to the contributors!
+
+API Changes
+~~~~~~~~~~~
+
+* Bump default scala platform version to 2.11
+  `RB #4256 <https://rbcommons.com/s/twitter/r/4256>`_
+
+Bugfixes
+~~~~~~~~
+
+* Clean up analysis.tmp usage between pants and zinc wrapper (Part 1)
+  `Issue #3667 <https://github.com/pantsbuild/pants/issues/3667>`_
+  `RB #4245 <https://rbcommons.com/s/twitter/r/4245>`_
+
+* Clean up analysis.tmp usage between pants and zinc wrapper (Part 2)
+  `RB #4246 <https://rbcommons.com/s/twitter/r/4246>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update minimum JDK requirements.
+  `RB #4127 <https://rbcommons.com/s/twitter/r/4127>`_
+  `RB #4253 <https://rbcommons.com/s/twitter/r/4253>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Move subselectors to selector properties
+  `RB #4235 <https://rbcommons.com/s/twitter/r/4235>`_
+
+* [engine] Daemon cacheable `changed`.
+  `RB #4207 <https://rbcommons.com/s/twitter/r/4207>`_
+
+1.2.0dev10 (9/20/2016)
+----------------------
+Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.
+
+Bugfixes
+~~~~~~~~
+* Correct Pants's incorrect guesses for go source roots.
+  `RB #4247 <https://rbcommons.com/s/twitter/r/4247>`_
+
+* Fix ng-killall by swallowing psutil exceptions in filter
+  `RB #4237 <https://rbcommons.com/s/twitter/r/4237>`_
+
+* Fix for idea-plugin goal that generates too long project filename
+  `RB #4231 <https://rbcommons.com/s/twitter/r/4231>`_
+
+* wrapped globs excludes - include incorrect arg in error message
+  `RB #4232 <https://rbcommons.com/s/twitter/r/4232>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Inject an automatic dep on junit for all junit_tests targets.
+  `RB #4228 <https://rbcommons.com/s/twitter/r/4228>`_
+
+* Simplify failed test reporting.
+  `RB #4240 <https://rbcommons.com/s/twitter/r/4240>`_
+
+* Fixup the simple plugin setup docs.
+  `RB #4241 <https://rbcommons.com/s/twitter/r/4241>`_
+
+* Add description to type constraints
+  `RB #4233 <https://rbcommons.com/s/twitter/r/4233>`_
+
+* Differentiate between source root categories.
+  `RB #4230 <https://rbcommons.com/s/twitter/r/4230>`_
+
+* Restore ChangedTargetGoalsIntegrationTest.
+  `RB #4227 <https://rbcommons.com/s/twitter/r/4227>`_
+
+* Deprecate the `subsystem_instance` utility function.
+  `RB #4220 <https://rbcommons.com/s/twitter/r/4220>`_
+
+New Features
+~~~~~~~~~~~~
+* Add a timeout to scalajs tests
+  `RB #4229 <https://rbcommons.com/s/twitter/r/4229>`_
+
+* Disallow absolute file paths in specs in BUILD files
+  `RB #4221 <https://rbcommons.com/s/twitter/r/4221>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+* [engine] Convert all isinstance product checks to using Exactly type constraints
+  `RB #4236 <https://rbcommons.com/s/twitter/r/4236>`_
+
+* [engine] Check that types passed to TypeConstraint inits are in fact types
+  `RB #4209 <https://rbcommons.com/s/twitter/r/4209>`_
+
+1.2.0dev9 (9/12/2016)
+----------------------
+Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.
+
+Bugfixes
+~~~~~~~~
+* Re-enable test_junit_tests_using_cucumber.
+  `RB #4212 <https://rbcommons.com/s/twitter/r/4212>`_
+
+* Reset subsystem state for integration tests.
+  `RB #4219 <https://rbcommons.com/s/twitter/r/4219>`_
+
+* Remove spurious pants.pex file that somehow ended up in the repo.
+  `RB #4214 <https://rbcommons.com/s/twitter/r/4214>`_
+  `RB #4218 <https://rbcommons.com/s/twitter/r/4218>`_
+
+* Fix a non-determinism I added in the ANTLR support
+  `RB #4187 <https://rbcommons.com/s/twitter/r/4187>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Edit Greeting{,Test}.java to get a known edit sha for tests.
+  `RB #4217 <https://rbcommons.com/s/twitter/r/4217>`_
+
+* Refactor memoization of the global distribution locator.
+  `RB #4214 <https://rbcommons.com/s/twitter/r/4214>`_
+
+* Clean up junit xml report file location logic.
+  `RB #4211 <https://rbcommons.com/s/twitter/r/4211>`_
+
+* Upgrade default go to 1.7.1.
+  `RB #4210 <https://rbcommons.com/s/twitter/r/4210>`_
+
+* Make util.objects.datatype classes not iterable
+  `RB #4163 <https://rbcommons.com/s/twitter/r/4163>`_
+
 1.2.0dev8 (09/02/2016)
 ----------------------
 

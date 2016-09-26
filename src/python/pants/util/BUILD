@@ -51,7 +51,6 @@ python_library(
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
-  dependencies = [],
 )
 
 python_library(
