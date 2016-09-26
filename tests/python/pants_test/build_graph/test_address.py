@@ -64,7 +64,6 @@ class ParseSpecTest(unittest.TestCase):
 
     self.do_test_bad_spec('a/.')
     self.do_test_bad_spec('a/..')
-    self.do_test_bad_spec('../a')
     self.do_test_bad_spec('a/../a')
 
     self.do_test_bad_spec('a/')

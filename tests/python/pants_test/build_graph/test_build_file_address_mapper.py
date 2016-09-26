@@ -31,14 +31,17 @@ class BuildFileAddressMapperTest(BaseTest):
     self.assertEqual(address.target_name, addressable.addressed_name)
     self.assertEqual(addressable.addressed_type, Target)
 
-  def test_check_valid_spec(self):
+  def test_resolve_spec(self):
     self.add_to_build_file('BUILD', dedent("""
       target(name='foozle')
       target(name='baz')
       """))
 
-    self.assertFalse(self.address_mapper.check_valid_spec('//:bad_spec'))
-    self.assertTrue(self.address_mapper.check_valid_spec('//:foozle'))
+    with self.assertRaises(AddressLookupError):
+      self.address_mapper.resolve_spec('//:bad_spec')
+
+    dependencies_addressable = self.address_mapper.resolve_spec('//:foozle')
+    self.assertEqual(dependencies_addressable.addressed_type, Target)
 
   def test_scan_addresses(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
@@ -98,13 +101,14 @@ class BuildFileAddressMapperTest(BaseTest):
                                  '\s+:foo2 \(from BUILD.2\)$'):
       self.address_mapper.resolve(address)
 
-  def test_raises_empty_build_file_error(self):
-    # Create a BUILD that does not define any addresses
-    self.add_to_build_file('BUILD', 'pass')
+  def test_raises_address_invalid_address_error(self):
+    with self.assertRaises(BuildFileAddressMapper.InvalidAddressError):
+      self.address_mapper.resolve_spec("../foo")
 
-    address = Address.parse('//:foo')
+  def test_raises_empty_build_file_error(self):
+    self.add_to_build_file('BUILD', 'pass')
     with self.assertRaises(BuildFileAddressMapper.EmptyBuildFileError):
-      self.address_mapper.resolve(address)
+      self.address_mapper.resolve_spec('//:foo')
 
   def test_address_lookup_error_hierarchy(self):
     self.assertIsInstance(BuildFileAddressMapper.AddressNotInBuildFile(), AddressLookupError)

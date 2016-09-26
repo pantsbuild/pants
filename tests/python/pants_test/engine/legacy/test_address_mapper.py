@@ -5,154 +5,72 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import unittest
 
 import mock
+from twitter.common.collections import OrderedSet
 
-from pants.base.specs import SiblingAddresses, SingleAddress
-from pants.bin.engine_initializer import EngineInitializer
+from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address import Address
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_file_dump, safe_mkdir
+from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget
 
 
 class LegacyAddressMapperTest(unittest.TestCase):
-  def create_build_files(self, build_root):
-    # Create BUILD files
-    # build_root:
-    #   BUILD
-    #   BUILD.other
-    #   dir_a:
-    #     BUILD
-    #     BUILD.other
-    #     subdir:
-    #       BUILD
-    #   dir_b:
-    #     BUILD
-    dir_a = os.path.join(build_root, 'dir_a')
-    dir_b = os.path.join(build_root, 'dir_b')
-    dir_a_subdir = os.path.join(dir_a, 'subdir')
-    safe_mkdir(dir_a)
-    safe_mkdir(dir_b)
-    safe_mkdir(dir_a_subdir)
 
-    safe_file_dump(os.path.join(build_root, 'BUILD'), 'target(name="a")\ntarget(name="b")')
-    safe_file_dump(os.path.join(build_root, 'BUILD.other'), 'target(name="c")')
+  def test_addresses_in_spec_path_wraps_error_in_buildfile_scan_error(self):
+    graph_mock = mock.Mock()
+    graph_mock.inject_specs_closure = mock.Mock(side_effect=LegacyBuildGraph.InvalidCommandLineSpecError('some msg'))
 
-    safe_file_dump(os.path.join(dir_a, 'BUILD'), 'target(name="a")\ntarget(name="b")')
-    safe_file_dump(os.path.join(dir_a, 'BUILD.other'), 'target(name="c")')
+    mapper = LegacyAddressMapper(graph_mock, '')
+    with self.assertRaises(AddressMapper.BuildFileScanError) as cm:
+      mapper.addresses_in_spec_path('some/path')
+    self.assertEqual('some msg', str(cm.exception))
 
-    safe_file_dump(os.path.join(dir_b, 'BUILD'), 'target(name="a")')
+  def test_scan_specs_returns_ordered_set(self):
+    address = Address('a', 'b')
 
-    safe_file_dump(os.path.join(dir_a_subdir, 'BUILD'), 'target(name="a")')
+    graph_mock = mock.Mock()
+    graph_mock.inject_specs_closure = mock.Mock(return_value=[address, address])
 
-  def create_address_mapper(self, build_root):
-    scheduler, engine, _ = EngineInitializer.setup_legacy_graph([], build_root=build_root)
-    return LegacyAddressMapper(scheduler, engine, build_root)
+    mapper = LegacyAddressMapper(graph_mock, '')
+    self.assertEqual(OrderedSet([address]), mapper.scan_specs([SiblingAddresses('any')]))
 
-  def test_scan_build_files(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
+  def test_scan_addresses_with_root_specified(self):
+    address = Address('a', 'b')
 
-      build_files = mapper.scan_build_files('')
-      self.assertEqual(build_files,
-                       {'BUILD', 'BUILD.other',
-                        'dir_a/BUILD', 'dir_a/BUILD.other',
-                        'dir_b/BUILD', 'dir_a/subdir/BUILD'})
+    graph_mock = mock.Mock()
+    graph_mock.inject_specs_closure = mock.Mock(return_value=[address])
 
-      build_files = mapper.scan_build_files('dir_a/subdir')
-      self.assertEqual(build_files, {'dir_a/subdir/BUILD'})
+    mapper = LegacyAddressMapper(graph_mock, '/some/build/root')
+    absolute_root_path = '/some/build/root/a'
+    mapper.scan_addresses(absolute_root_path)
 
-  def test_scan_build_files_edge_cases(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
+    graph_mock.inject_specs_closure.assert_called_with([DescendantAddresses('a')])
 
-      # A non-existent dir.
-      build_files = mapper.scan_build_files('foo')
-      self.assertEqual(build_files, set())
+  def test_resolve_with_a_target(self):
+    target = LegacyTarget(None, None)
+    address = Address('a', 'a')
 
-      # A dir with no BUILD files.
-      safe_mkdir(os.path.join(build_root, 'empty'))
-      build_files = mapper.scan_build_files('empty')
-      self.assertEqual(build_files, set())
+    graph_mock = mock.Mock()
+    graph_mock.get_target = mock.Mock(return_value=target)
+
+    mapper = LegacyAddressMapper(graph_mock, '')
+    self.assertEqual((address, target), mapper.resolve(address))
+
+  def test_resolve_without_a_matching_target(self):
+    graph_mock = mock.Mock()
+    graph_mock.get_target = mock.Mock(return_value=None)
+    graph_mock.inject_specs_closure = mock.Mock(return_value=[Address('a','different')])
+
+    mapper = LegacyAddressMapper(graph_mock, '')
+    with self.assertRaises(AddressMapper.BuildFileScanError):
+      mapper.resolve(Address('a', 'address'))
 
   def test_is_declaring_file(self):
-    scheduler = mock.Mock()
-    mapper = LegacyAddressMapper(scheduler, None, '')
+    mapper = LegacyAddressMapper(None, '')
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD'))
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD.suffix'))
     self.assertFalse(mapper.is_declaring_file(Address('path', 'name'), 'path/not_a_build_file'))
     self.assertFalse(mapper.is_declaring_file(Address('path', 'name'), 'differing-path/BUILD'))
-
-  def test_addresses_in_spec_path(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
-      addresses = mapper.addresses_in_spec_path('dir_a')
-      self.assertEqual(addresses,
-                       {Address('dir_a', 'a'), Address('dir_a', 'b'), Address('dir_a', 'c')})
-
-  def test_addresses_in_spec_path_no_dir(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
-      with self.assertRaises(AddressMapper.BuildFileScanError) as cm:
-        mapper.addresses_in_spec_path('foo')
-      self.assertIn('Directory "foo" does not exist.', str(cm.exception))
-
-  def test_addresses_in_spec_path_no_build_files(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      safe_mkdir(os.path.join(build_root, 'foo'))
-      mapper = self.create_address_mapper(build_root)
-      with self.assertRaises(AddressMapper.BuildFileScanError) as cm:
-        mapper.addresses_in_spec_path('foo')
-      self.assertIn('does not contain build files.', str(cm.exception))
-
-  def test_scan_specs(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
-      addresses = mapper.scan_specs([SingleAddress('dir_a', 'a'), SiblingAddresses('')])
-      self.assertEqual(addresses,
-                       {Address('', 'a'), Address('', 'b'), Address('', 'c'), Address('dir_a', 'a')})
-
-  def test_scan_specs_bad_spec(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
-      with self.assertRaises(AddressMapper.BuildFileScanError) as cm:
-        mapper.scan_specs([SingleAddress('dir_a', 'd')])
-      self.assertIn('not found in namespace dir_a for name "d".', str(cm.exception))
-
-  def test_scan_addresses(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
-      addresses = mapper.scan_addresses()
-      self.assertEqual(addresses,
-                       {Address('', 'a'), Address('', 'b'), Address('', 'c'),
-                        Address('dir_a', 'a'), Address('dir_a', 'b'), Address('dir_a', 'c'),
-                        Address('dir_b', 'a'), Address('dir_a/subdir', 'a')})
-
-  def test_scan_addresses_with_root_specified(self):
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
-      addresses = mapper.scan_addresses(os.path.join(build_root, 'dir_a'))
-      self.assertEqual(addresses,
-                       {Address('dir_a', 'a'), Address('dir_a', 'b'), Address('dir_a', 'c'),
-                        Address('dir_a/subdir', 'a')})
-
-  def test_scan_addresses_bad_dir(self):
-    # scan_addresses() should not raise an error.
-    with temporary_dir() as build_root:
-      self.create_build_files(build_root)
-      mapper = self.create_address_mapper(build_root)
-      addresses = mapper.scan_addresses(os.path.join(build_root, 'foo'))
-      self.assertEqual(addresses, set())

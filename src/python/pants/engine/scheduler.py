@@ -529,9 +529,6 @@ class LocalScheduler(object):
 
     return ExecutionRequest(tuple(roots()))
 
-  def custom_execution_request(self, subject, selector):
-    return ExecutionRequest((self._node_builder.select_node(selector, subject, None),))
-
   @property
   def product_graph(self):
     return self._product_graph
