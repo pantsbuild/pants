@@ -58,10 +58,10 @@ class TypeConstraint(AbstractClass):
 
     :rtype: bool
     """
-    return self.type_satisfies(type(obj))
+    return self.satisfied_by_type(type(obj))
 
   @abstractmethod
-  def type_satisfies(self, obj_type):
+  def satisfied_by_type(self, obj_type):
     """Return `True` if the given object satisfies this type constraint.
 
     :rtype: bool
@@ -102,7 +102,7 @@ class SuperclassesOf(TypeConstraint):
 
   _variance_symbol = '-'
 
-  def type_satisfies(self, obj_type):
+  def satisfied_by_type(self, obj_type):
     return any(issubclass(t, obj_type) for t in self._types)
 
 
@@ -111,7 +111,7 @@ class Exactly(TypeConstraint):
 
   _variance_symbol = '='
 
-  def type_satisfies(self, obj_type):
+  def satisfied_by_type(self, obj_type):
     return obj_type in self._types
 
 
@@ -120,7 +120,7 @@ class SubclassesOf(TypeConstraint):
 
   _variance_symbol = '+'
 
-  def type_satisfies(self, obj_type):
+  def satisfied_by_type(self, obj_type):
     return issubclass(obj_type, self._types)
 
 
