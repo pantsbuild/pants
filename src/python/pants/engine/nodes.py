@@ -157,6 +157,12 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   but all returned dependencies are recorded for the lifetime of a Node.
   """
 
+  def __new__(self, dependencies):
+    obj = super(Waiting, self).__new__(self, dependencies)
+    if any(not isinstance(n, Node) for n in dependencies):
+      raise TypeError('Included non-Node dependencies {}'.format(dependencies))
+    return obj
+
 
 class Node(AbstractClass):
   @classmethod
@@ -590,10 +596,6 @@ class StepContext(object):
       return state
     else:
       return Waiting([node])
-
-  def gen_nodes(self, subject, product, variants):
-    """Yields Node instances which might be able to provide a value for the given inputs."""
-    return self._node_builder.gen_nodes(subject, product, variants)
 
   def get_nodes_and_states_for(self, subject, product, variants):
     for node in self._node_builder.gen_nodes(subject, product, variants):
