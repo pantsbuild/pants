@@ -88,8 +88,8 @@ class ExactlyTest(TypeConstraintTestBase):
     self.assertEquals("Exactly(A, B)", repr(exactly_multiple))
 
   def test_checking_via_bare_type(self):
-    self.assertTrue(Exactly(self.B).type_satisfies(self.B))
-    self.assertFalse(Exactly(self.B).type_satisfies(self.C))
+    self.assertTrue(Exactly(self.B).satisfied_by_type(self.B))
+    self.assertFalse(Exactly(self.B).satisfied_by_type(self.C))
 
 
 class SubclassesOfTest(TypeConstraintTestBase):
