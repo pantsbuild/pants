@@ -114,7 +114,7 @@ class GoalRunnerFactory(object):
     :returns: A tuple of (BuildGraph, AddressMapper, spec_roots).
     """
     # N.B. Use of the daemon implies use of the v2 engine.
-    if graph_helper or use_engine:
+    if True: #graph_helper or use_engine:
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
       graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(
         pants_ignore_patterns,

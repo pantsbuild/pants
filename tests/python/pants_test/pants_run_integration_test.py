@@ -172,7 +172,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       env = os.environ.copy()
     if extra_env:
       env.update(extra_env)
-    env.update({'PANTS_ENABLE_V2_ENGINE':'true'})
+    #env.update({'PANTS_ENABLE_V2_ENGINE':'true'})
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
