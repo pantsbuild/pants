@@ -173,7 +173,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     if type(binary_state) is Throw:
       return binary_state
     elif type(binary_state) is Waiting:
-      waiting_nodes.append(binary_state.dependencies)
+      waiting_nodes.extend(binary_state.dependencies)
     elif type(binary_state) is Noop:
       return Noop("Couldn't find binary: {}".format(binary_state))
     elif type(binary_state) is not Return:
