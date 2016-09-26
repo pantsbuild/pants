@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class LegacyAddressMapper(AddressMapper):
-  """Provides a facade over the engine backed build graph.
+  """Provides an implementation of AddressMapper using v2 engine.
 
   This allows tasks to use the context's address_mapper when the v2 engine is enabled.
   """
