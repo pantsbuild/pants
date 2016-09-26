@@ -9,7 +9,6 @@ import logging
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import DescendantAddresses
 from pants.bin.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import ChangedRequest
@@ -60,8 +59,7 @@ class TargetRoots(object):
       logger.debug('changed addresses: %s', changed_addresses)
       return ChangedTargetRoots(changed_addresses)
 
-    # If no spec roots are passed, assume `::` as the intended target.
-    return LiteralTargetRoots(spec_roots if spec_roots else [DescendantAddresses('')])
+    return LiteralTargetRoots(spec_roots)
 
   def __init__(self, spec_roots):
     self._spec_roots = spec_roots

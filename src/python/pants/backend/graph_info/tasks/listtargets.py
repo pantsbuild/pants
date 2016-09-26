@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.task.console_task import ConsoleTask
 
@@ -77,6 +78,14 @@ class ListTargets(ConsoleTask):
         yield result
 
   def _target_roots(self):
-    if not self._enable_v2_engine and not self.context.target_roots:
-      return self.context.scan().targets(predicate=lambda target: not target.is_synthetic)
+    if not self.context.target_roots:
+      if self._enable_v2_engine:
+        raise TaskError('No targets specified. To list all targets use: ./pants list ::')
+      else:
+        deprecated_conditional(lambda: not self.context.target_roots,
+                               '1.4.0',
+                               '`./pants list` (no explicit targets)',
+                               '\nSpecify at least one explicit target instead. To list '
+                               'all targets use: ./pants list ::\n')
+        return self.context.scan().targets(predicate=lambda target: not target.is_synthetic)
     return self.context.target_roots
