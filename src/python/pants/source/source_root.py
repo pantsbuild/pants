@@ -180,7 +180,7 @@ class SourceRootConfig(Subsystem):
   _DEFAULT_TEST_ROOT_PATTERNS = [
     'test/*',
     'tests/*',
-    'src/test/*'
+    'src/test/*',
   ]
 
   _DEFAULT_THIRDPARTY_ROOT_PATTERNS = [
@@ -191,6 +191,12 @@ class SourceRootConfig(Subsystem):
   ]
 
   _DEFAULT_SOURCE_ROOTS = {
+    # Our default patterns will detect src/go as a go source root.
+    # However a typical repo might have src/go in the GOPATH, meaning src/go/src is the
+    # actual source root (the root of the package namespace).
+    # These fixed source roots will correct the patterns' incorrect guess.
+    'src/go/src': ('go',),
+    'src/main/go/src': ('go',),
   }
 
   _DEFAULT_TEST_ROOTS = {
@@ -355,7 +361,7 @@ class SourceRootTrie(object):
     keys = ['^'] + path.split(os.path.sep)
     for i in range(len(keys)):
       # See if we have a match at position i.  We have such a match if following the path
-      # segments into the trie, from the root, leads us to a leaf.
+      # segments into the trie, from the root, leads us to a terminal.
       node = self._root
       langs = set()
       j = i

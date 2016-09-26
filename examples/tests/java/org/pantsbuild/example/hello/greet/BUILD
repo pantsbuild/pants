@@ -6,7 +6,6 @@
 junit_tests(name='greet',
   sources=globs('*.java'),
   dependencies=[
-    '3rdparty:junit',
     'examples/src/java/org/pantsbuild/example/hello/greet',
   ],
   resources=[

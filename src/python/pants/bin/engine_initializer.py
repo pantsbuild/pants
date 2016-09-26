@@ -8,14 +8,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 from collections import namedtuple
 
-from pants.base.build_environment import get_buildroot
-from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.options_initializer import OptionsInitializer
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
 from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
+from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, RemoteSourcesAdaptor,
@@ -58,40 +58,44 @@ class LegacySymbolTable(SymbolTable):
     return aliases
 
 
-class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 'symbol_table_cls'])):
+class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 'symbol_table_cls',
+                                                         'change_calculator'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
-  def warm_product_graph(self, spec_roots):
-    """Warm the scheduler's `ProductGraph` with `LegacyTarget` products."""
-    request = self.scheduler.execution_request([LegacyTarget], spec_roots)
+  def warm_product_graph(self, target_roots):
+    """Warm the scheduler's `ProductGraph` with `LegacyTarget` products.
+
+    :param TargetRoots target_roots: The targets root of the request.
+    """
+    logger.debug('warming target_roots for: %r', target_roots)
+    request = self.scheduler.execution_request([LegacyTarget], target_roots.as_specs())
     result = self.engine.execute(request)
     if result.error:
       raise result.error
 
-  def create_build_graph(self, spec_roots, build_root=None):
-    """Construct and return a `BuildGraph` given a set of input specs."""
+  def create_build_graph(self, target_roots, build_root=None):
+    """Construct and return a `BuildGraph` given a set of input specs.
+
+    :param TargetRoots target_roots: The targets root of the request.
+    :param string build_root: The build root.
+    :returns: A tuple of (BuildGraph, AddressMapper, list[string specs]).
+    """
+    logger.debug('target_roots are: %r', target_roots)
     graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
+    logger.debug('build_graph is: %s', graph)
     with self.scheduler.locked():
       # Ensure the entire generator is unrolled.
-      for _ in graph.inject_specs_closure(spec_roots):
+      for _ in graph.inject_specs_closure(target_roots.as_specs()):
         pass
+
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
     address_mapper = LegacyAddressMapper(graph, build_root or get_buildroot())
-    logger.debug('build_graph is: %s', graph)
     logger.debug('address_mapper is: %s', address_mapper)
-    return graph, address_mapper
+    return graph, address_mapper, target_roots.as_string_specs()
 
 
 class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
-
-  @staticmethod
-  def parse_commandline_to_spec_roots(options=None, args=None, build_root=None):
-    if not options:
-      options, _ = OptionsInitializer(OptionsBootstrapper(args=args)).setup(init_logging=False)
-    cmd_line_spec_parser = CmdLineSpecParser(build_root or get_buildroot())
-    spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
-    return spec_roots
 
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
@@ -111,6 +115,7 @@ class EngineInitializer(object):
     """
 
     build_root = get_buildroot()
+    scm = get_scm()
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
     symbol_table_cls = symbol_table_cls or LegacySymbolTable
 
@@ -132,5 +137,6 @@ class EngineInitializer(object):
     scheduler = LocalScheduler(dict(), tasks, project_tree)
     # TODO: Do not use the cache yet, as it incurs a high overhead.
     engine = LocalSerialEngine(scheduler, Storage.create(), use_cache=False)
+    change_calculator = EngineChangeCalculator(engine, scm) if scm else None
 
-    return LegacyGraphHelper(scheduler, engine, symbol_table_cls)
+    return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)

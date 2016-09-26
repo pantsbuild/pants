@@ -54,11 +54,6 @@ python_library(
 )
 
 python_library(
-  name = 'iterators',
-  sources = ['iterators.py'],
-)
-
-python_library(
   name = 'memo',
   sources = ['memo.py'],
 )

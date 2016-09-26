@@ -83,11 +83,17 @@ class SourceRootTest(BaseTest):
     self.assertEquals(root('src/py', ('python',)),
                       trie.find('src/py/pantsbuild/foo/foo.py'))
 
-    # Test fixed patterns.
+    # Test fixed roots.
     trie.add_fixed('mysrc/scalastuff', ('scala',))
     self.assertEquals(('mysrc/scalastuff', ('scala',), UNKNOWN),
                       trie.find('mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
     self.assertIsNone(trie.find('my/project/mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
+
+    # Verify that a fixed root wins over a pattern that is a prefix of it
+    # (e.g., that src/go/src wins over src/go).
+    trie.add_fixed('src/go/src', ('go',))
+    self.assertEquals(root('src/go/src', ('go',)),
+                      trie.find('src/go/src/foo/bar/baz.go'))
 
   def test_trie_traversal(self):
     trie = SourceRootTrie(SourceRootFactory({}))
