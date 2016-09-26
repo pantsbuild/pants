@@ -73,8 +73,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   def __new__(cls, product, variant_key):
     if not isinstance(variant_key, six.string_types):
       raise ValueError('Expected variant_key to be a string, but was {!r}'.format(variant_key))
-    obj = super(SelectVariant, cls).__new__(cls, product, variant_key)
-    return obj
+    return super(SelectVariant, cls).__new__(cls, product, variant_key)
 
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__,
@@ -98,8 +97,15 @@ class SelectDependencies(datatype('Dependencies',
   optional = False
 
   def __new__(cls, product, dep_product, field=None, field_types=tuple()):
-    obj = super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
-    return obj
+    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
+
+  @property
+  def dep_product_selector(self):
+    return Select(self.dep_product)
+
+  @property
+  def projected_product_selector(self):
+    return Select(self.product)
 
   def __repr__(self):
     if self.field_types:
@@ -123,6 +129,14 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
   is projected directly rather than attempting to use it to construct the projected type.
   """
   optional = False
+
+  @property
+  def input_product_selector(self):
+    return Select(self.input_product)
+
+  @property
+  def projected_product_selector(self):
+    return Select(self.product)
 
   def __repr__(self):
     return '{}({}, {}, {}, {})'.format(type(self).__name__,
