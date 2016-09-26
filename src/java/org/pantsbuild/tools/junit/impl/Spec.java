@@ -43,7 +43,7 @@ class Spec {
    * @param method The method to add to the class spec.
    * @return A new spec that includes the added method.
    */
-  Spec addMethod(String method) {
+  Spec withMethod(String method) {
     return new Spec(clazz, ImmutableSet.<String>builder().addAll(methods).add(method).build());
   }
 

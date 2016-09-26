@@ -21,9 +21,9 @@ public class SpecTest {
     assertEquals("org.pantsbuild.tools.junit.lib.UnannotatedTestClass",
         spec.getSpecName());
     assertThat(spec.getMethods(), emptyCollectionOf(String.class));
-    Spec specWithMethodAdded = spec.addMethod("testMethod");
+    Spec specWithMethodAdded = spec.withMethod("testMethod");
     assertThat(specWithMethodAdded.getMethods(), contains("testMethod"));
-    assertThat(specWithMethodAdded.addMethod("foo").getMethods(), contains("testMethod", "foo"));
+    assertThat(specWithMethodAdded.withMethod("foo").getMethods(), contains("testMethod", "foo"));
   }
 
   @Test public void testDefaultConcurrency() {

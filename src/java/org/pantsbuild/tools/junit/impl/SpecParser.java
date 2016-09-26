@@ -113,7 +113,7 @@ class SpecParser {
     spec.ifPresent(s -> {
       for (Method clazzMethod : s.getSpecClass().getMethods()) {
         if (clazzMethod.getName().equals(methodName)) {
-          Spec specWithMethod = s.addMethod(methodName);
+          Spec specWithMethod = s.withMethod(methodName);
           specs.put(s.getSpecClass(), specWithMethod);
           return;
         }
