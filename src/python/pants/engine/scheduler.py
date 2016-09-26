@@ -443,7 +443,7 @@ class LocalScheduler(object):
       DescendantAddresses: select_dep_addrs,
     }
 
-    RulesetValidator(self._node_builder, goals, self._root_selector_fns.keys()).validate()
+    RulesetValidator(self._node_builder, goals, self._root_selector_fns).validate()
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.

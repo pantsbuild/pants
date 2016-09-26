@@ -277,8 +277,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
     # Else, attempt to use a configured task to compute the value.
     dependencies = []
     matches = []
-    for dep in step_context.get_nodes_and_states_for(self.subject, self.product, variants):
-      dep_state = step_context.get(dep)
+    for dep, dep_state in step_context.get_nodes_and_states_for(self.subject, self.product, variants):
       if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) is Return:

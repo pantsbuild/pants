@@ -82,14 +82,12 @@ class RulesetValidator(object):
 
   """
 
-  def __init__(self, node_builder, goal_to_product, root_subject_types):
-    if not root_subject_types:
-      raise ValueError('root_subject_types must not be empty')
-    self._root_subject_types = root_subject_types
-    self._node_builder = node_builder
+  def __init__(self, node_builder, goal_to_product, root_subject_fns):
+    if not root_subject_fns:
+      raise ValueError('root_subject_fns must not be empty')
     self._goal_to_product = goal_to_product
 
-    self._graph = GraphMaker(node_builder, goal_to_product, root_subject_types).full_graph()
+    self._graph = GraphMaker(node_builder, goal_to_product, root_subject_fns).full_graph()
 
   def validate(self):
     """ Validates that all tasks can be executed based on the declared product types and selectors.
@@ -271,18 +269,15 @@ class NodeBuilder(Closable):
       raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
-class Graph(datatype('Graph', ['root_subject', 'root_rules', 'rule_dependencies', 'failure_reasons'])):
-  # TODO constructing nodes from the resulting graph
-  # method, walk out from root nodes, constructing each node
-  # when hit a node that can't be constructed yet, ie changes subject, collect those for later
-  # inject the nodes into the product graph
-  # schedule leaves from walk
-
+class RuleGraph(datatype('RuleGraph', ['root_subject', 'root_rules', 'rule_dependencies', 'failure_reasons'])):
   def error_message(self):
     """Prints list of errors for each errored rule with attribution."""
     collated_errors = OrderedDict()
     for wrapped_rule, diagnostic in self.failure_reasons.items():
-
+      # don't include the root rules in the error
+      # message since they aren't real.
+      if type(wrapped_rule) is RootRule:
+        continue
       if wrapped_rule.rule not in collated_errors:
         collated_errors[wrapped_rule.rule] = OrderedDict()
       if diagnostic.reason not in collated_errors[wrapped_rule.rule]:
@@ -297,10 +292,19 @@ class Graph(datatype('Graph', ['root_subject', 'root_rules', 'rule_dependencies'
       return '{}:\n    {}'.format(r, errors)
 
     formatted_messages = tuple(format_messages(r, subject_types_by_reasons) for r, subject_types_by_reasons in
-    collated_errors.items() if r not in used_rule_lookup)
+      collated_errors.items() if r not in used_rule_lookup)
     if not formatted_messages:
       return None
     return 'Rules with errors: {}\n  {}'.format(len(formatted_messages), '\n  '.join(formatted_messages))
+
+
+class RuleSubGraph(RuleGraph):
+  """A rule graph with a concrete root_subject."""
+  # TODO constructing nodes from the resulting graph
+  # method, walk out from root nodes, constructing each node
+  # when hit a node that can't be constructed yet, ie changes subject, collect those for later
+  # inject the nodes into the product graph
+  # schedule leaves from walk
 
   def __str__(self):
     if not self.root_rules:
@@ -319,7 +323,10 @@ class Graph(datatype('Graph', ['root_subject', 'root_rules', 'rule_dependencies'
     )).strip()
 
 
-class FullGraph(Graph):
+class FullRuleGraph(RuleGraph):
+  """A rule graph with no concrete root subject.
+
+  Instead the root subject is the list of root subject types."""
   # TODO as a validation thing, go through the dependency edges keys.
   # if a rule in the declared rule set doesn't show up, then that means it is unreachable.
   # What's cool now, is that we could show that intrinsics are unreachable
@@ -344,6 +351,10 @@ class FullGraph(Graph):
 
 class SubjectIsProduct(datatype('SubjectIsProduct', ['value'])):
   """Wrapper for when the dependency is the subject."""
+
+  @property
+  def output_product_type(self):
+    return self.value
 
   def __repr__(self):
     if isinstance(self.value, type):
@@ -377,151 +388,229 @@ class WithSubject(datatype('WithSubject', ['subject_type', 'rule'])):
     return '{} of {}'.format(self.rule, self.subject_type.__name__)
 
 
-class Diagnostic(datatype('Diagnostic', ['rule', 'subject_type', 'reason', 'other_rules'])):
+class RootRule(datatype('RootRule', ['subject_type', 'selector'])):
+  """A synthetic rule representing a root selector."""
+
+  @property
+  def input_selectors(self):
+    return (self.selector,)
+
+  @property
+  def output_product_type(self):
+    return self.selector.product
+
+  @property
+  def rule(self):
+    return self # might work
+
+  def __str__(self):
+    return '{} for {}'.format(self.selector, self.subject_type.__name__)
+
+
+class Diagnostic(datatype('Diagnostic', ['subject_type', 'reason'])):
   """Holds on to error reasons for problems with the build graph."""
+
+
+class RuleEdges(object):
+  """Represents the edges from a rule to its dependencies via selectors."""
+  # TODO add a highwater mark count to count how many branches are eliminated
+  #
+
+  def __init__(self, dependencies=tuple()):
+    self._dependencies = dependencies
+
+  def add_edges_via(self, selector, other_rules):
+    self._dependencies += tuple(other_rules)
+
+  def has_edges_for(self, selector, other_rules):
+    return all(r in self._dependencies for r in other_rules)
+
+  def __contains__(self, rule):
+    return rule in self._dependencies
+
+  def __iter__(self):
+    return self._dependencies.__iter__()
+
+  def would_make_unfulfillable(self, rule):
+    # If there are no other potential providers of the type
+    # that rule provided, then the rule that owns these edges is also unfulfillable.
+    return all(d.output_product_type is not rule.output_product_type
+      for d in self._dependencies if d != rule and type(d) not in (Literal, SubjectIsProduct))
+
+  def without_rule(self, rule):
+    return RuleEdges(tuple(d for d in self._dependencies if d != rule))
 
 
 class GraphMaker(object):
 
-  def __init__(self, nodebuilder, goal_to_product=None, root_subject_types=None):
-    self.root_subject_types = root_subject_types
+  def __init__(self, nodebuilder, goal_to_product=None, root_subject_fns=None):
+    self.root_subject_selector_fns = root_subject_fns
     self.goal_to_product = goal_to_product
     self.nodebuilder = nodebuilder
-    if root_subject_types is None:
+    if root_subject_fns is None:
       raise ValueError("TODO")
 
-  def _find_rhs_for_select(self, subject_type, selector):
-    original_genned_rules = tuple(WithSubject(subject_type, r) for r in self.nodebuilder.gen_rules(subject_type, selector.product))
-    if selector.type_constraint.type_satisfies(subject_type):
-      # if the subject will match, it's always picked first and we ignore other possible rules.
-      return (SubjectIsProduct(subject_type),)
-    else:
-      return original_genned_rules
-
-  def get(self, subject, requested_product):
-    root_subject = subject
+  def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
-    return Graph(root_subject, *self._get(root_subject_type, requested_product))
+    return RuleSubGraph(root_subject, *self._construct_graph(RootRule(root_subject_type,
+      self.root_subject_selector_fns[root_subject_type](requested_product))))
 
-  def _get(self, root_subject_type, requested_product):
-    root_rules = tuple(WithSubject(root_subject_type, r)
-      for r in self.nodebuilder.gen_rules(root_subject_type, requested_product))
-
+  def _construct_graph(self, root_rule):
+    root_rules = []
     rule_dependency_edges = OrderedDict()
-
     unfulfillable_rules = OrderedDict()
-    rules_to_traverse = deque(root_rules)
+    rules_to_traverse = deque([root_rule])
 
-    def add_rules_to_graph(rule, dep_rules):
-      rules_to_traverse.extend(g for g in dep_rules if g not in rule_dependency_edges)
+    def add_rules_to_graph(rule, selector, dep_rules):
+      rules_to_traverse.extend(g for g in dep_rules if g not in rule_dependency_edges and g not in unfulfillable_rules)
+      if type(rule) is RootRule:
+        root_rules.extend(dep_rules)
+        return
       if rule not in rule_dependency_edges:
-        rule_dependency_edges[rule] = dep_rules
+        new_edges = RuleEdges()
+        rule_dependency_edges[rule] = new_edges
+        new_edges.add_edges_via(selector, dep_rules)
       else:
-        rule_dependency_edges[rule] += dep_rules
+        existing_deps = rule_dependency_edges[rule]
+        if existing_deps.has_edges_for(selector, dep_rules):
+          return
+        existing_deps.add_edges_via(selector, dep_rules)
 
     while rules_to_traverse:
       rule = rules_to_traverse.popleft()
       if type(rule) in (Literal, SubjectIsProduct):
         continue
-
-      if type(rule) is not WithSubject:
+      if type(rule) not in (RootRule, WithSubject):
         raise TypeError("rules must all be WithSubject'ed")
+      if rule in unfulfillable_rules:
+        # TODO a test that covers a case where if this were to eliminate a rule too early, that
+        # the rule would still show up
+        continue
+
+      if rule in rule_dependency_edges:
+        # TODO add test that ensures if a rule is a dep of multiple other rules
+        # if a rule will get visited multiple times, it should only have one copy of its dependencies
+        continue
 
       subject_type = rule.subject_type
       was_unfulfillable = False
       # TODO it might be good to note which selectors deps are attached to,
       # TODO then when eliminating nodes, we can be sure that the right things are eliminated
+
+      # I think that we don't need to break in the below loop.
+      # delay the check for unfulfillability until the end
       for selector in rule.input_selectors:
         # TODO cycles, because it should handle that
-        if type(selector) is Select:
+        if type(selector) is Select or type(selector) is SelectVariant:
           # TODO, handle Addresses / Variants
           rules_or_literals_for_selector = self._find_rhs_for_select(subject_type,
             selector)
 
           if not rules_or_literals_for_selector:
-            unfulfillable_rules[rule] = Diagnostic(rule, subject_type, 'no matches for {}'.format(selector), None)
+            unfulfillable_rules[rule] = Diagnostic(subject_type, 'no matches for {}'.format(selector))
             was_unfulfillable = True
             break # from the selector loop
-          add_rules_to_graph(rule, rules_or_literals_for_selector)
+          add_rules_to_graph(rule, selector, rules_or_literals_for_selector)
 
         elif type(selector) is SelectDependencies:
-          initial_selector = Select(selector.dep_product)
+          initial_selector = selector.dep_product_selector
           initial_rules_or_literals = self._find_rhs_for_select(subject_type, initial_selector)
           if not initial_rules_or_literals:
-            unfulfillable_rules[rule] = Diagnostic(rule, subject_type, 'no matches for {} when resolving {}'.format(initial_selector, selector), None)
+            unfulfillable_rules[rule] = Diagnostic(subject_type,
+                                                   'no matches for {} when resolving {}'.
+                                                   format(initial_selector, selector))
             was_unfulfillable = True
             break # from the selector loop
 
-          synth_rules = self._synth_rules_for_select_deps(selector)
-          if not synth_rules:
-            selector_for_product = Select(selector.product)
-            unfulfillable_rules[rule] = Diagnostic(rule, selector.field_types, 'no matches for {} when resolving {}'.format(selector_for_product, selector), None)
+          rules_for_dependencies = []
+          for field_type in selector.field_types:
+            rules_for_field_subjects = self._find_rhs_for_select(field_type,
+                                                                 selector.projected_product_selector)
+            if not rules_for_field_subjects:
+              continue
+            rules_for_dependencies.extend(rules_for_field_subjects)
+
+          if not rules_for_dependencies:
+            unfulfillable_rules[rule] = Diagnostic(selector.field_types,
+              'no matches for {} when resolving {}'.format(
+
+                selector.projected_product_selector, selector))
             was_unfulfillable = True
             break # from selector loop
 
-          add_rules_to_graph(rule, initial_rules_or_literals)
-          add_rules_to_graph(rule, tuple(synth_rules))
+          add_rules_to_graph(rule, selector.dep_product_selector, initial_rules_or_literals)
+          add_rules_to_graph(rule, selector.projected_product_selector, tuple(rules_for_dependencies))
         elif type(selector) is SelectLiteral:
-          add_rules_to_graph(rule, (Literal(selector.subject, selector.product),))
+          add_rules_to_graph(rule, selector, (Literal(selector.subject, selector.product),))
         elif type(selector) is SelectProjection:
           # TODO, could validate that input product has fields
 
-          initial_projection_selector = Select(selector.input_product)
-          initial_projection_rules_or_literals = self._find_rhs_for_select(subject_type, initial_projection_selector)
-          if not initial_projection_rules_or_literals:
-            unfulfillable_rules[rule]=Diagnostic(rule, subject_type, 'no matches for {} when resolving {}'.format(initial_projection_selector, selector), None)
+          initial_rules_or_literals = self._find_rhs_for_select(subject_type,
+                                                                selector.input_product_selector)
+          if not initial_rules_or_literals:
+            unfulfillable_rules[rule] = Diagnostic(subject_type,
+                                                   'no matches for {} when resolving {}'
+                                                   .format(selector.input_product_selector, selector))
             was_unfulfillable = True
             break
 
-          projected_selector = Select(selector.product)
-          synth_rules_for_projection = self._find_rhs_for_select(selector.projected_subject, projected_selector)
-          if not synth_rules_for_projection:
-            unfulfillable_rules[rule]=Diagnostic(rule, selector.projected_subject, 'no matches for {} when resolving {}'.format(projected_selector, selector), None)
+          projected_rules = self._find_rhs_for_select(selector.projected_subject,
+                                                      selector.projected_product_selector)
+          if not projected_rules:
+            unfulfillable_rules[rule] = Diagnostic(selector.projected_subject,
+                                                   'no matches for {} when resolving {}'
+                                                   .format(selector.projected_product_selector, selector))
             was_unfulfillable = True
             break
 
-          add_rules_to_graph(rule, initial_projection_rules_or_literals)
-          add_rules_to_graph(rule, synth_rules_for_projection)
+          add_rules_to_graph(rule, selector.input_product_selector, initial_rules_or_literals)
+          add_rules_to_graph(rule, selector.projected_product_selector, projected_rules)
         else:
           raise TypeError('cant handle a {} selector yet'.format(selector))
       if not was_unfulfillable and rule not in rule_dependency_edges:
-        rule_dependency_edges[rule] = tuple()
+        # not sure if this is the best way to handle this case
+        add_rules_to_graph(rule, None, tuple())
 
     root_rules, rule_dependency_edges = self._remove_unfulfillable_rules_and_dependents(root_rules,
       rule_dependency_edges, unfulfillable_rules)
 
     return root_rules, rule_dependency_edges, unfulfillable_rules
 
-  def _synth_rules_for_select_deps(self, selector):
-    synth_rules = []
-    for field_type in selector.field_types:
-      rules_or_literals_for_field_type = self._find_rhs_for_select(field_type, Select(selector.product))
-      if not rules_or_literals_for_field_type:
-        print(
-          'Hm. this type cant be fulfilled for this dependency {} {}'.format(field_type, selector))
-        continue
-      synth_rules.extend(rules_or_literals_for_field_type)
-    return synth_rules
+  def _find_rhs_for_select(self, subject_type, selector):
+    if selector.type_constraint.type_satisfies(subject_type):
+      # NB a matching subject is always picked first
+      return (SubjectIsProduct(subject_type),)
+    else:
+      return tuple(WithSubject(subject_type, r)
+        for r in self.nodebuilder.gen_rules(subject_type, selector.product))
 
-  def _remove_unfulfillable_rules_and_dependents(self, root_rules, rule_dependency_edges,
-    unfulfillable_rules):
+  def _remove_unfulfillable_rules_and_dependents(self,
+                                                 root_rules,
+                                                 rule_dependency_edges,
+                                                 unfulfillable_rules):
+    """Removes all non-transitively fulfillable rules from the roots and the dependency edges.
+
+
+    Takes the current root rule set and dependency table and removes all rules that are not
+    transitively fulfillable.
+
+    Deforestation. Leaping from tree to tree."""
+    # could experiment with doing this for each rule added and deduping the traversal list
     removal_traversal = deque(unfulfillable_rules.keys())
     while removal_traversal:
       rule = removal_traversal.pop()
-      for cur, deps in tuple(rule_dependency_edges.items()):
+      for cur, dependency_edges in tuple(rule_dependency_edges.items()):
         if cur in unfulfillable_rules:
+          # NB these are removed at the end
           continue
-        if rule in deps:
-          # If there are no other potential providers of the type
-          # that rule provided, then also mark the current rule as unfulfillable
-          if all(d.output_product_type is not rule.output_product_type
-                 for d in deps if d is not rule and type(d) not in (Literal, SubjectIsProduct)):
-            unfulfillable_rules[cur] = Diagnostic(cur,
-              cur.subject_type,
-              'depends on unfulfillable {}'.format(rule), None)
+
+        if rule in dependency_edges:
+          if dependency_edges.would_make_unfulfillable(rule):
+            unfulfillable_rules[cur] = Diagnostic(cur.subject_type,
+                                                  'depends on unfulfillable {}'.format(rule))
             removal_traversal.append(cur)
           else:
-            rule_dependency_edges[cur]= tuple(d for d in deps if d != rule)
+            rule_dependency_edges[cur] = dependency_edges.without_rule(rule)
 
     rule_dependency_edges = OrderedDict(
       (k, v) for k, v in rule_dependency_edges.items() if k not in unfulfillable_rules)
@@ -529,17 +618,20 @@ class GraphMaker(object):
     return root_rules, rule_dependency_edges
 
   def full_graph(self):
+    """Produces a full graph based on the root subjects and all of the products produced by rules."""
     full_root_rules = OrderedSet()
     full_dependency_edges = OrderedDict()
     full_unfulfillable_rules = OrderedDict()
-    for r in self.root_subject_types:
-      for p in self.all_produced_product_types(r):
+    for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
+      for product in self.all_produced_product_types(root_subject_type):
+        root_rule = RootRule(root_subject_type, selector_fn(product))
         # TODO might want to pass the current root rules / dependency edges through.
-        root_rules, rule_dependency_edges, unfulfillable_rules = self._get(r, p)
-        full_root_rules.update(root_rules)
+        # we could probably speed things up that way
+        root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(root_rule)
+        full_root_rules.update(root_dependencies)
         full_dependency_edges.update(rule_dependency_edges)
         full_unfulfillable_rules.update(unfulfillable_rules)
-    return FullGraph(self.root_subject_types, list(full_root_rules), full_dependency_edges, full_unfulfillable_rules)
+    return FullRuleGraph(self.root_subject_selector_fns, list(full_root_rules), full_dependency_edges, full_unfulfillable_rules)
 
   def all_produced_product_types(self, subject_type):
     intrinsic_products = [prod for subj, prod in self.nodebuilder._intrinsics.keys() if subj == subject_type]
