@@ -157,8 +157,8 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   but all returned dependencies are recorded for the lifetime of a Node.
   """
 
-  def __new__(self, dependencies):
-    obj = super(Waiting, self).__new__(self, dependencies)
+  def __new__(cls, dependencies):
+    obj = super(Waiting, cls).__new__(cls, dependencies)
     if any(not isinstance(n, Node) for n in dependencies):
       raise TypeError('Included non-Node dependencies {}'.format(dependencies))
     return obj
