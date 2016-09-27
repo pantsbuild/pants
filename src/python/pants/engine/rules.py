@@ -131,67 +131,6 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
 
 
 class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type', 'product_type']),
-                              Rule):
-  """Intrinsic rule for filesystem operations."""
-
-  @classmethod
-  def as_intrinsics(cls):
-    """Returns a dict of tuple(sbj type, product type) -> functions returning a fs node for that subject product type tuple."""
-    return {(subject_type, product_type): FilesystemIntrinsicRule(subject_type, product_type)
-      for product_type, subject_type in FilesystemNode._FS_PAIRS}
-
-  def as_node(self, subject, variants):
-    assert type(subject) is self.subject_type
-    return FilesystemNode.create(subject, self.product_type, variants)
-
-  @property
-  def input_selectors(self):
-    return tuple()
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-
-class SnapshotIntrinsicRule(Rule):
-  """Intrinsic rule for snapshot process execution."""
-
-  output_product_type = Snapshot
-  input_selectors = (Select(Files),)
-
-  def as_node(self, subject, variants):
-    assert type(subject) in (Files, PathGlobs)
-    return SnapshotNode.create(subject, variants)
-
-  @classmethod
-  def as_intrinsics(cls):
-    snapshot_intrinsic_rule = cls()
-    return {
-      (Files, Snapshot): snapshot_intrinsic_rule,
-      (PathGlobs, Snapshot): snapshot_intrinsic_rule
-    }
-
-  def __repr__(self):
-    return '{}()'.format(type(self).__name__)
-
-
-class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
-  'binary_type',
-  'input_selectors',
-  'input_conversion',
-  'output_conversion']),
-  Rule):
-  """A rule type for defining execution of snapshotted processes."""
-
-  def as_node(self, subject, variants):
-    return ProcessExecutionNode(subject, variants, self)
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-
-class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type', 'product_type']),
   Rule):
   """Intrinsic rule for filesystem operations."""
 
@@ -264,8 +203,8 @@ class NodeBuilder(Closable):
 
         factory = TaskRule(tuple(input_selectors), task, output_type, constraint)
         for kind in constraint.types:
-          # NB Ensure that interior types from SelectDependencies / SelectProjections work by indexing
-          # on the list of types in the constraint.
+          # NB Ensure that interior types from SelectDependencies / SelectProjections work by
+          # indexing on the list of types in the constraint.
           add_task(kind, factory)
         add_task(constraint, factory)
       else:
@@ -329,7 +268,8 @@ class NodeBuilder(Closable):
       raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
-class RuleGraph(datatype('RuleGraph', ['root_subject', 'root_rules', 'rule_dependencies', 'failure_reasons'])):
+class RuleGraph(datatype('RuleGraph',
+                         ['root_subject', 'root_rules', 'rule_dependencies', 'failure_reasons'])):
   def error_message(self):
     """Prints list of errors for each errored rule with attribution."""
     collated_errors = OrderedDict()
@@ -338,21 +278,27 @@ class RuleGraph(datatype('RuleGraph', ['root_subject', 'root_rules', 'rule_depen
       # message since they aren't real.
       if type(wrapped_rule) is RootRule:
         continue
-      if wrapped_rule.rule not in collated_errors:
-        collated_errors[wrapped_rule.rule] = OrderedDict()
-      if diagnostic.reason not in collated_errors[wrapped_rule.rule]:
-        collated_errors[wrapped_rule.rule][diagnostic.reason] = set()
+      subjects_by_diagnostic_reason = collated_errors.get(wrapped_rule.rule, None)
+      if subjects_by_diagnostic_reason is None:
+        collated_errors[wrapped_rule.rule] = subjects_by_diagnostic_reason = OrderedDict()
 
-      collated_errors[wrapped_rule.rule][diagnostic.reason].add(diagnostic.subject_type)
+      subjects = subjects_by_diagnostic_reason.get(diagnostic.reason, None)
+      if subjects is None:
+        subjects_by_diagnostic_reason[diagnostic.reason] = subjects = set()
 
-    used_rule_lookup = set(r.rule for r in self.rule_dependencies.keys())
-    def format_messages(r, subject_types_by_reasons):
-      errors = '\n    '.join('{} with subject types: {}'.format(reason, ', '.join(t.__name__ for t in subject_types))
-        for reason, subject_types in subject_types_by_reasons.items())
-      return '{}:\n    {}'.format(r, errors)
+      subjects.add(diagnostic.subject_type)
 
-    formatted_messages = tuple(format_messages(r, subject_types_by_reasons) for r, subject_types_by_reasons in
-      collated_errors.items() if r not in used_rule_lookup)
+
+    def format_messages(rule, subject_types_by_reasons):
+      errors = '\n    '.join('{} with subject types: {}'.format(reason,
+                                                                ', '.join(t.__name__ for t in subject_types))
+                             for reason, subject_types in subject_types_by_reasons.items())
+      return '{}:\n    {}'.format(rule, errors)
+
+    used_rule_lookup = set(wrapped_rule.rule for wrapped_rule in self.rule_dependencies.keys())
+    formatted_messages = tuple(format_messages(rule, subject_types_by_reasons)
+                               for rule, subject_types_by_reasons in collated_errors.items()
+                               if rule not in used_rule_lookup)
     if not formatted_messages:
       return None
     return 'Rules with errors: {}\n  {}'.format(len(formatted_messages), '\n  '.join(formatted_messages))
@@ -571,7 +517,8 @@ class GraphMaker(object):
             was_unfulfillable = True
             break # from the selector loop
           add_rules_to_graph(rule, selector, rules_or_literals_for_selector)
-
+        elif type(selector) is SelectLiteral:
+          add_rules_to_graph(rule, selector, (Literal(selector.subject, selector.product),))
         elif type(selector) is SelectDependencies:
           initial_selector = selector.dep_product_selector
           initial_rules_or_literals = self._find_rhs_for_select(subject_type, initial_selector)
@@ -600,8 +547,6 @@ class GraphMaker(object):
 
           add_rules_to_graph(rule, selector.dep_product_selector, initial_rules_or_literals)
           add_rules_to_graph(rule, selector.projected_product_selector, tuple(rules_for_dependencies))
-        elif type(selector) is SelectLiteral:
-          add_rules_to_graph(rule, selector, (Literal(selector.subject, selector.product),))
         elif type(selector) is SelectProjection:
           # TODO, could validate that input product has fields
 
