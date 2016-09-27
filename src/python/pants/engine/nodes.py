@@ -481,7 +481,6 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
     return self.rule.task_func
 
   def step(self, step_context):
-    # noops if a
     # Compute dependencies for the Node, or determine whether it is a Noop.
     dependencies = []
     dep_values = []
