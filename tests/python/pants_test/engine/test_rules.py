@@ -98,31 +98,6 @@ class SubA(A):
     return 'SubA()'
 
 
-class IntrinsicProvider(object):
-  def __init__(self, intrinsics):
-    self.intrinsics = intrinsics
-
-  def as_intrinsics(self):
-    return self.intrinsics
-
-
-class BoringRule(Rule):
-  input_selectors = tuple()
-
-  def __init__(self, product_type):
-    self._output_product_type = product_type
-
-  @property
-  def output_product_type(self):
-    return self._output_product_type
-
-  def as_node(self, subject, variants):
-    raise Exception('do not expect to be constructed')
-
-  def __repr__(self):
-    return '{}({})'.format(type(self).__name__, self.output_product_type.__name__)
-
-
 class NodeBuilderTest(unittest.TestCase):
   def test_creation_fails_with_bad_declaration_type(self):
     with self.assertRaises(TypeError) as cm:
