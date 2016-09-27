@@ -66,7 +66,7 @@ class BaseLocalArtifactCache(ArtifactCache):
       artifact = self._artifact(tarball)
 
       if results_dir is not None:
-        safe_rmtree(results_dir)
+        safe_mkdir(results_dir, clean=True)
 
       try:
         artifact.extract()
@@ -75,7 +75,7 @@ class BaseLocalArtifactCache(ArtifactCache):
         # specified, it is "expected" to represent the output destination of the extracted
         # artifact, and so removing it should clear any partially extracted state.
         if results_dir is not None:
-          safe_rmtree(results_dir)
+          safe_mkdir(results_dir, clean=True)
         safe_delete(tarball)
         raise
 

@@ -85,7 +85,7 @@ class TestArtifactCache(unittest.TestCase):
   def setup_local_cache(self):
     with temporary_dir() as artifact_root:
       with temporary_dir() as cache_root:
-        yield LocalArtifactCache(artifact_root, cache_root, compression=0)
+        yield LocalArtifactCache(artifact_root, cache_root, compression=1)
 
   @contextmanager
   def setup_server(self, return_failed=False, cache_root=None):
@@ -227,7 +227,7 @@ class TestArtifactCache(unittest.TestCase):
     with temporary_dir() as remote_cache_dir:
       with self.setup_server(cache_root=remote_cache_dir) as url:
         with self.setup_local_cache() as local:
-          tmp = TempLocalArtifactCache(local.artifact_root, 0)
+          tmp = TempLocalArtifactCache(local.artifact_root, compression=1)
           remote = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), tmp)
           combined = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), local)
 
@@ -241,19 +241,21 @@ class TestArtifactCache(unittest.TestCase):
             # Add to only the remote cache.
             remote.insert(key, [path])
 
-            # Replace the data in the remote storage.
+            # Corrupt the tail end of the data in the remote storage.
             remote_artifact = os.path.join(remote_cache_dir, remote._url_suffix_for_key(key))
             self.assertTrue(os.path.exists(remote_artifact))
-            with open(remote_artifact, 'w') as outfile:
-              outfile.write(b'this is not valid tar data.')
+            artifact_size = os.path.getsize(remote_artifact)
+            with open(remote_artifact, 'r+w') as outfile:
+              outfile.truncate(artifact_size // 2)
 
             # An attempt to read the corrupt artifact should fail.
             self.assertFalse(combined.use_cached_files(key, results_dir=results_dir))
 
-            # The local artifact should not have been stored, and the results_dir should have
-            # been cleared.
+            # The local artifact should not have been stored, and the results_dir should exist,
+            # but be empty.
             self.assertFalse(local.has(key))
-            self.assertFalse(os.path.exists(results_dir))
+            self.assertTrue(os.path.exists(results_dir))
+            self.assertTrue(len(os.listdir(results_dir)) == 0)
 
   def test_multiproc(self):
     key = CacheKey('muppet_key', 'fake_hash')
