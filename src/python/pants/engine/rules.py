@@ -87,7 +87,7 @@ class RulesetValidator(object):
       raise ValueError('root_subject_fns must not be empty')
     self._goal_to_product = goal_to_product
 
-    self._graph = GraphMaker(node_builder, goal_to_product, root_subject_fns).full_graph()
+    self._graph = GraphMaker(node_builder, root_subject_fns).full_graph()
 
   def validate(self):
     """ Validates that all tasks can be executed based on the declared product types and selectors.
@@ -120,67 +120,6 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
                                                          'input_conversion',
                                                          'output_conversion']),
                          Rule):
-  """A rule type for defining execution of snapshotted processes."""
-
-  def as_node(self, subject, variants):
-    return ProcessExecutionNode(subject, variants, self)
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-
-class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type', 'product_type']),
-  Rule):
-  """Intrinsic rule for filesystem operations."""
-
-  @classmethod
-  def as_intrinsics(cls):
-    """Returns a dict of tuple(sbj type, product type) -> functions returning a fs node for that subject product type tuple."""
-    return {(subject_type, product_type): FilesystemIntrinsicRule(subject_type, product_type)
-      for product_type, subject_type in FilesystemNode._FS_PAIRS}
-
-  def as_node(self, subject, variants):
-    assert type(subject) is self.subject_type
-    return FilesystemNode.create(subject, self.product_type, variants)
-
-  @property
-  def input_selectors(self):
-    return tuple()
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-
-class SnapshotIntrinsicRule(Rule):
-  """Intrinsic rule for snapshot process execution."""
-
-  output_product_type = Snapshot
-  input_selectors = (Select(Files),)
-
-  def as_node(self, subject, variants):
-    assert type(subject) in (Files, PathGlobs)
-    return SnapshotNode.create(subject, variants)
-
-  @classmethod
-  def as_intrinsics(cls):
-    snapshot_intrinsic_rule = cls()
-    return {
-      (Files, Snapshot): snapshot_intrinsic_rule,
-      (PathGlobs, Snapshot): snapshot_intrinsic_rule
-    }
-
-  def __repr__(self):
-    return '{}()'.format(type(self).__name__)
-
-
-class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
-  'binary_type',
-  'input_selectors',
-  'input_conversion',
-  'output_conversion']),
-  Rule):
   """A rule type for defining execution of snapshotted processes."""
 
   def as_node(self, subject, variants):
@@ -419,7 +358,7 @@ class FullRuleGraph(RuleGraph):
     )).strip()
 
 
-class SubjectIsProduct(datatype('SubjectIsProduct', ['value'])):
+class RuleGraphSubjectIsProduct(datatype('RuleGraphSubjectIsProduct', ['value'])):
   """Wrapper for when the dependency is the subject."""
 
   @property
@@ -432,15 +371,21 @@ class SubjectIsProduct(datatype('SubjectIsProduct', ['value'])):
     else:
       return '{}({})'.format(type(self).__name__, self.value)
 
+  def __str__(self):
+    return 'SubjectIsProduct({})'.format(self.value.__name__)
 
-class Literal(datatype('Literal', ['value', 'product_type'])):
+
+class RuleGraphLiteral(datatype('RuleGraphLiteral', ['value', 'product_type'])):
   """The dependency is the literal value held by SelectLiteral."""
 
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__, self.value, self.product_type.__name__)
 
+  def __str__(self):
+    return 'Literal({}, {})'.format(self.value, self.product_type.__name__)
 
-class WithSubject(datatype('WithSubject', ['subject_type', 'rule'])):
+
+class RuleGraphEntry(datatype('RuleGraphEntry', ['subject_type', 'rule'])):
   """A synthetic rule with a specified subject type"""
 
   @property
@@ -484,7 +429,8 @@ class Diagnostic(datatype('Diagnostic', ['subject_type', 'reason'])):
 class RuleEdges(object):
   """Represents the edges from a rule to its dependencies via selectors."""
   # TODO add a highwater mark count to count how many branches are eliminated
-  #
+  # TODO it would be good to note which selectors deps are attached to,
+  #      so that eliminations happen within a selector
 
   def __init__(self, dependencies=tuple()):
     self._dependencies = dependencies
@@ -505,7 +451,7 @@ class RuleEdges(object):
     # If there are no other potential providers of the type
     # that rule provided, then the rule that owns these edges is also unfulfillable.
     return all(d.output_product_type is not rule.output_product_type
-      for d in self._dependencies if d != rule and type(d) not in (Literal, SubjectIsProduct))
+      for d in self._dependencies if d != rule and type(d) not in (RuleGraphLiteral, RuleGraphSubjectIsProduct))
 
   def without_rule(self, rule):
     return RuleEdges(tuple(d for d in self._dependencies if d != rule))
@@ -513,12 +459,9 @@ class RuleEdges(object):
 
 class GraphMaker(object):
 
-  def __init__(self, nodebuilder, goal_to_product=None, root_subject_fns=None):
+  def __init__(self, nodebuilder, root_subject_fns):
     self.root_subject_selector_fns = root_subject_fns
-    self.goal_to_product = goal_to_product
     self.nodebuilder = nodebuilder
-    if root_subject_fns is None:
-      raise ValueError("TODO")
 
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
@@ -548,9 +491,9 @@ class GraphMaker(object):
 
     while rules_to_traverse:
       rule = rules_to_traverse.popleft()
-      if type(rule) in (Literal, SubjectIsProduct):
+      if type(rule) in (RuleGraphLiteral, RuleGraphSubjectIsProduct):
         continue
-      if type(rule) not in (RootRule, WithSubject):
+      if type(rule) not in (RootRule, RuleGraphEntry):
         raise TypeError("rules must all be WithSubject'ed")
       if rule in unfulfillable_rules:
         # TODO a test that covers a case where if this were to eliminate a rule too early, that
@@ -564,7 +507,6 @@ class GraphMaker(object):
 
       subject_type = rule.subject_type
       was_unfulfillable = False
-      # TODO it might be good to note which selectors deps are attached to,
       # TODO then when eliminating nodes, we can be sure that the right things are eliminated
 
       # I think that we don't need to break in the below loop.
@@ -582,7 +524,7 @@ class GraphMaker(object):
             break # from the selector loop
           add_rules_to_graph(rule, selector, rules_or_literals_for_selector)
         elif type(selector) is SelectLiteral:
-          add_rules_to_graph(rule, selector, (Literal(selector.subject, selector.product),))
+          add_rules_to_graph(rule, selector, (RuleGraphLiteral(selector.subject, selector.product),))
         elif type(selector) is SelectDependencies:
           initial_selector = selector.dep_product_selector
           initial_rules_or_literals = self._find_rhs_for_select(subject_type, initial_selector)
@@ -648,9 +590,9 @@ class GraphMaker(object):
   def _find_rhs_for_select(self, subject_type, selector):
     if selector.type_constraint.satisfied_by_type(subject_type):
       # NB a matching subject is always picked first
-      return (SubjectIsProduct(subject_type),)
+      return (RuleGraphSubjectIsProduct(subject_type),)
     else:
-      return tuple(WithSubject(subject_type, rule)
+      return tuple(RuleGraphEntry(subject_type, rule)
                    for rule in self.nodebuilder.gen_rules(subject_type, selector.product))
 
   def _remove_unfulfillable_rules_and_dependents(self,

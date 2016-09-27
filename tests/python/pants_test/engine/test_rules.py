@@ -248,7 +248,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
     fullgraph = graphmaker.full_graph()
 
@@ -302,7 +301,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
     select_p = lambda p: Select(p)
     graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsic_providers=tuple()),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=OrderedDict([(SubA, select_p), (A, select_p)]))
     fullgraph = graphmaker.full_graph()
 
@@ -322,7 +320,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -341,7 +338,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -361,7 +357,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -384,7 +379,6 @@ class PremadeGraphTest(unittest.TestCase):
 
     graphmaker = GraphMaker(NodeBuilder.create(rules,
                                                intrinsic_providers=(IntrinsicProvider(intrinsics),)),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -406,7 +400,6 @@ class PremadeGraphTest(unittest.TestCase):
 
     graphmaker = GraphMaker(NodeBuilder.create(rules,
       intrinsic_providers=(IntrinsicProvider(intrinsics),)),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     fullgraph = graphmaker.full_graph()
 
@@ -428,7 +421,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules, (IntrinsicProvider({(D, C): BoringRule(C)}),)),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns,
 
     )
@@ -450,7 +442,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -471,7 +462,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -491,7 +481,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -514,7 +503,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -538,7 +526,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -564,7 +551,6 @@ class PremadeGraphTest(unittest.TestCase):
     graphmaker = GraphMaker(NodeBuilder.create(rules,
       intrinsic_providers=(IntrinsicProvider({(C, B): BoringRule(B)}),)
     ),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -579,7 +565,6 @@ class PremadeGraphTest(unittest.TestCase):
     graphmaker = GraphMaker(NodeBuilder.create(rules,
       intrinsic_providers=(IntrinsicProvider(intrinsics),)
     ),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -600,7 +585,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=B)
 
@@ -620,7 +604,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=B)
 
@@ -639,7 +622,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -658,7 +640,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -671,7 +652,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -684,7 +664,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -700,7 +679,6 @@ class PremadeGraphTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules),
-      goal_to_product={'goal-name': AGoal},
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
