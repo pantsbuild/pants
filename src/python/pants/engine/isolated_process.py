@@ -167,26 +167,22 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
   def step(self, step_context):
     waiting_nodes = []
     # Get the binary.
-    binary_select_node = step_context.select_node(Select(self.snapshotted_process.binary_type),
-                                    subject=self.subject,
-                                    variants=self.variants)
-    binary_state = step_context.get(binary_select_node)
+    binary_state = step_context.select_for(Select(self.snapshotted_process.binary_type),
+                                           subject=self.subject,
+                                           variants=self.variants)
     if type(binary_state) is Throw:
       return binary_state
     elif type(binary_state) is Waiting:
-      waiting_nodes.append(binary_select_node)
+      waiting_nodes.extend(binary_state.dependencies)
     elif type(binary_state) is Noop:
       return Noop("Couldn't find binary: {}".format(binary_state))
     elif type(binary_state) is not Return:
       State.raise_unrecognized(binary_state)
 
     # Create the request from the request callback after resolving its input clauses.
-    input_select_nodes = [step_context.select_node(s, self.subject, self.variants)
-                          for s in self.snapshotted_process.input_selectors]
-
     input_values = []
-    for input_selector, input_select_node in zip(self.snapshotted_process.input_selectors, input_select_nodes):
-      sn_state = step_context.get(input_select_node)
+    for input_selector in self.snapshotted_process.input_selectors:
+      sn_state = step_context.select_for(input_selector, self.subject, self.variants)
       if type(sn_state) is Waiting:
         waiting_nodes.extend(sn_state.dependencies)
       elif type(sn_state) is Return:
@@ -195,7 +191,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
         if input_selector.optional:
           input_values.append(None)
         else:
-          return Noop('Was missing value for (at least) input {}'.format(input_select_node))
+          return Noop('Was missing value for (at least) input {}'.format(input_selector))
       elif type(sn_state) is Throw:
         return sn_state
       else:
@@ -213,13 +209,12 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     # Request snapshots for the snapshot_subjects from the process request.
     snapshot_subjects_value = []
     if process_request.snapshot_subjects:
-      snapshot_subjects_node = step_context.select_node(SelectDependencies(Snapshot,
+      snapshot_subjects_state = step_context.select_for(SelectDependencies(Snapshot,
                                                                            SnapshottedProcessRequest,
                                                                            'snapshot_subjects',
                                                                            field_types=(Files,)),
                                                         process_request,
                                                         self.variants)
-      snapshot_subjects_state = step_context.get(snapshot_subjects_node)
       if type(snapshot_subjects_state) is not Return:
         return snapshot_subjects_state
       snapshot_subjects_value = snapshot_subjects_state.value
@@ -243,9 +238,7 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
     return SnapshotNode(subject, variants)
 
   def step(self, step_context):
-    selector = Select(Files)
-    node = step_context.select_node(selector, self.subject, self.variants)
-    select_state = step_context.get(node)
+    select_state = step_context.select_for(Select(Files), self.subject, self.variants)
 
     if type(select_state) in {Waiting, Noop, Throw}:
       return select_state

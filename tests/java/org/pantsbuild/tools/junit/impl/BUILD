@@ -4,9 +4,15 @@
 java_tests(
   name='junit',
   dependencies=[
+    '3rdparty:guava',
+    '3rdparty:junit',
+    '3rdparty/jvm/commons-io',
+    '3rdparty/jvm/org/hamcrest:hamcrest-core',
+    '3rdparty/jvm/org/hamcrest:hamcrest-library',
+    'src/java/org/pantsbuild/junit/annotations',
+    'src/java/org/pantsbuild/tools/junit',
     'tests/java/org/pantsbuild/tools/junit/lib:test-dep',
   ],
   sources=globs('*Test.java'),
-  strict_deps=False,
   timeout=180,
 )
