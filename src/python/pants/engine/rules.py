@@ -293,7 +293,7 @@ class RuleGraph(datatype('RuleGraph',
   # - inject the constructed nodes into the product graph.
 
   def error_message(self):
-    """Prints list of errors for rules with errors."""
+    """Returns a nice error message for errors in the rule graph."""
     collated_errors = OrderedDict()
     for wrapped_rule, diagnostics in self.failure_reasons.items():
       # don't include the root rules in the error
@@ -318,8 +318,8 @@ class RuleGraph(datatype('RuleGraph',
         return ', '.join(x.__name__ for x in t)
 
     def format_messages(rule, subject_types_by_reasons):
-      errors = '\n    '.join('{} with subject types: {}'.format(reason,
-                                                                ', '.join(subject_type_str(t) for t in subject_types))
+      errors = '\n    '.join('{} with subject types: {}'
+                             .format(reason, ', '.join(subject_type_str(t) for t in subject_types))
                              for reason, subject_types in subject_types_by_reasons.items())
       return '{}:\n    {}'.format(rule, errors)
 
@@ -329,7 +329,8 @@ class RuleGraph(datatype('RuleGraph',
                                if rule not in used_rule_lookup)
     if not formatted_messages:
       return None
-    return 'Rules with errors: {}\n  {}'.format(len(formatted_messages), '\n  '.join(formatted_messages))
+    return 'Rules with errors: {}\n  {}'.format(len(formatted_messages),
+                                                '\n  '.join(formatted_messages))
 
 
 class RuleSubGraph(RuleGraph):
@@ -338,8 +339,6 @@ class RuleSubGraph(RuleGraph):
   def __str__(self):
     if not self.root_rules:
       return '{empty graph}'
-    def key(r):
-      return '"{}"'.format(r)
 
     return dedent("""
               {{
@@ -347,7 +346,7 @@ class RuleSubGraph(RuleGraph):
                 root_rules: {}
                 {}
 
-              }}""".format(self.root_subject, ', '.join(key(r) for r in self.root_rules),
+              }}""".format(self.root_subject, ', '.join(str(r) for r in self.root_rules),
       '\n                '.join('{} => ({},)'.format(rule, ', '.join(str(d) for d in deps)) for rule, deps in self.rule_dependencies.items())
     )).strip()
 
@@ -364,8 +363,6 @@ class FullRuleGraph(RuleGraph):
   def __str__(self):
     if not self.root_rules:
       return '{empty graph}'
-    def key(r):
-      return '"{}"'.format(r)
 
     return dedent("""
               {{
@@ -373,7 +370,7 @@ class FullRuleGraph(RuleGraph):
                 root_rules: {}
                 {}
 
-              }}""".format(', '.join(x.__name__ for x in self.root_subject), ', '.join(key(r) for r in self.root_rules),
+              }}""".format(', '.join(x.__name__ for x in self.root_subject), ', '.join(str(r) for r in self.root_rules),
       '\n                '.join('{} => ({},)'.format(rule, ', '.join(str(d) for d in deps)) for rule, deps in self.rule_dependencies.items())
     )).strip()
 
@@ -516,7 +513,7 @@ class GraphMaker(object):
     full_dependency_edges = OrderedDict()
     full_unfulfillable_rules = OrderedDict()
     for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
-      for product in self.nodebuilder.all_produced_product_types(root_subject_type):
+      for product in sorted(self.nodebuilder.all_produced_product_types(root_subject_type)):
         root_rule = RootRule(root_subject_type, selector_fn(product))
         # TODO consider passing the current edge set through as a perf improvement.
         root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(root_rule)

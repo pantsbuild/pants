@@ -279,7 +279,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject_types: (SubA,)
-                                 root_rules: "(Exactly(A), (Select(SubA),), noop) of SubA"
+                                 root_rules: (Exactly(A), (Select(SubA),), noop) of SubA
                                  (Exactly(A), (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
 
                                }""").strip(), fullgraph)
@@ -330,7 +330,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject_types: (SubA, A,)
-                                 root_rules: "(Exactly(A), (Select(SubA),), noop) of SubA", "(Exactly(B), (Select(A),), noop) of SubA", "SubjectIsProduct(A)", "(Exactly(B), (Select(A),), noop) of A"
+                                 root_rules: (Exactly(A), (Select(SubA),), noop) of SubA, (Exactly(B), (Select(A),), noop) of SubA, SubjectIsProduct(A), (Exactly(B), (Select(A),), noop) of A
                                  (Exactly(A), (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
                                  (Exactly(B), (Select(A),), noop) of SubA => ((Exactly(A), (Select(SubA),), noop) of SubA,)
                                  (Exactly(B), (Select(A),), noop) of A => (SubjectIsProduct(A),)
@@ -349,7 +349,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (Select(SubA),), noop) of SubA"
+                                 root_rules: (Exactly(A), (Select(SubA),), noop) of SubA
                                  (Exactly(A), (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
 
                                }""").strip(), subgraph)
@@ -367,7 +367,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (Select(SubA), Select(B)), noop) of SubA"
+                                 root_rules: (Exactly(A), (Select(SubA), Select(B)), noop) of SubA
                                  (Exactly(A), (Select(SubA), Select(B)), noop) of SubA => (SubjectIsProduct(SubA), (B, (), noop) of SubA,)
                                  (B, (), noop) of SubA => (,)
 
@@ -386,7 +386,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (Select(B),), noop) of SubA"
+                                 root_rules: (Exactly(A), (Select(B),), noop) of SubA
                                  (Exactly(A), (Select(B),), noop) of SubA => ((B, (Select(SubA),), noop) of SubA,)
                                  (B, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
 
@@ -408,7 +408,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (), noop) of SubA"
+                                 root_rules: (Exactly(A), (), noop) of SubA
                                  (Exactly(A), (), noop) of SubA => (,)
 
                                }""").strip(), subgraph)
@@ -429,7 +429,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject_types: (SubA,)
-                                 root_rules: "(Exactly(A), (), noop) of SubA"
+                                 root_rules: (Exactly(A), (), noop) of SubA
                                  (Exactly(A), (), noop) of SubA => (,)
 
                                }""").strip(), fullgraph)
@@ -452,7 +452,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (), noop) of SubA"
+                                 root_rules: (Exactly(A), (), noop) of SubA
                                  (Exactly(A), (), noop) of SubA => (,)
 
                                }""").strip(), subgraph)
@@ -471,7 +471,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (SelectDependencies(B, C, field_types=(D,)),), noop) of SubA"
+                                 root_rules: (Exactly(A), (SelectDependencies(B, C, field_types=(D,)),), noop) of SubA
                                  (Exactly(A), (SelectDependencies(B, C, field_types=(D,)),), noop) of SubA => ((C, (Select(SubA),), noop) of SubA, (B, (Select(D),), noop) of D,)
                                  (C, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
                                  (B, (Select(D),), noop) of D => (SubjectIsProduct(D),)
@@ -491,7 +491,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop) of SubA"
+                                 root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop) of SubA
                                  (Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(D),), noop) of D,)
                                  (B, (Select(D),), noop) of D => (SubjectIsProduct(D),)
 
@@ -510,7 +510,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                  {
                                    root_subject: SubA()
-                                   root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"
+                                   root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA
                                    (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(Exactly(C, D)),), noop) of C, (B, (Select(Exactly(C, D)),), noop) of D,)
                                    (B, (Select(Exactly(C, D)),), noop) of C => (SubjectIsProduct(C),)
                                    (B, (Select(Exactly(C, D)),), noop) of D => (SubjectIsProduct(D),)
@@ -532,7 +532,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                  {
                                    root_subject: SubA()
-                                   root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"
+                                   root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA
                                    (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(C),), noop) of C, (B, (Select(C),), noop) of D,)
                                    (B, (Select(C),), noop) of C => (SubjectIsProduct(C),)
                                    (B, (Select(C),), noop) of D => ((C, (Select(D),), noop) of D,)
@@ -555,7 +555,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"
+                                 root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA
                                  (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(A),), noop) of C, (B, (Select(A),), noop) of D,)
                                  (B, (Select(A),), noop) of C => ((Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of C,)
                                  (B, (Select(A),), noop) of D => ((Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of D,)
@@ -599,7 +599,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (SelectDependencies(B, SubA, field_types=(C,)),), noop) of SubA"
+                                 root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(C,)),), noop) of SubA
                                  (Exactly(A), (SelectDependencies(B, SubA, field_types=(C,)),), noop) of SubA => (SubjectIsProduct(SubA), BoringRule(B) of C,)
                                  BoringRule(B) of C => (,)
 
@@ -619,7 +619,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(B, (Select(A),), noop) of SubA"
+                                 root_rules: (B, (Select(A),), noop) of SubA
                                  (B, (Select(A),), noop) of SubA => ((A, (Select(SubA),), noop) of SubA,)
                                  (A, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
 
@@ -638,7 +638,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(B, (SelectLiteral(A(), A),), noop) of SubA"
+                                 root_rules: (B, (SelectLiteral(A(), A),), noop) of SubA
                                  (B, (SelectLiteral(A(), A),), noop) of SubA => (Literal(A(), A),)
 
                                }""").strip(), subgraph)
@@ -656,7 +656,7 @@ class PremadeGraphTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                {
                                  root_subject: SubA()
-                                 root_rules: "(Exactly(A), (SelectProjection(B, D, (u'some',), SubA),), noop) of SubA"
+                                 root_rules: (Exactly(A), (SelectProjection(B, D, (u'some',), SubA),), noop) of SubA
                                  (Exactly(A), (SelectProjection(B, D, (u'some',), SubA),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(D),), noop) of D,)
                                  (B, (Select(D),), noop) of D => (SubjectIsProduct(D),)
 
