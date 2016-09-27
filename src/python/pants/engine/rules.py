@@ -272,6 +272,7 @@ class NodeBuilder(Closable):
 
 class RuleGraph(datatype('RuleGraph',
                          ['root_subject', 'root_rules', 'rule_dependencies', 'failure_reasons'])):
+
   def error_message(self):
     """Prints list of errors for each errored rule with attribution."""
     collated_errors = OrderedDict()
@@ -588,8 +589,8 @@ class GraphMaker(object):
       # NB a matching subject is always picked first
       return (SubjectIsProduct(subject_type),)
     else:
-      return tuple(WithSubject(subject_type, r)
-        for r in self.nodebuilder.gen_rules(subject_type, selector.product))
+      return tuple(WithSubject(subject_type, rule)
+                   for rule in self.nodebuilder.gen_rules(subject_type, selector.product))
 
   def _remove_unfulfillable_rules_and_dependents(self,
                                                  root_rules,
@@ -638,9 +639,13 @@ class GraphMaker(object):
         full_root_rules.update(root_dependencies)
         full_dependency_edges.update(rule_dependency_edges)
         full_unfulfillable_rules.update(unfulfillable_rules)
-    return FullRuleGraph(self.root_subject_selector_fns, list(full_root_rules), full_dependency_edges, full_unfulfillable_rules)
+    return FullRuleGraph(self.root_subject_selector_fns,
+                         list(full_root_rules),
+                         full_dependency_edges,
+                         full_unfulfillable_rules)
 
   def all_produced_product_types(self, subject_type):
-    intrinsic_products = [prod for subj, prod in self.nodebuilder._intrinsics.keys() if subj == subject_type]
+    intrinsic_products = [prod for subj, prod in self.nodebuilder._intrinsics.keys()
+                          if subj == subject_type]
     task_products = self.nodebuilder._tasks.keys()
     return intrinsic_products + task_products
