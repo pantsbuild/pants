@@ -227,6 +227,13 @@ class NodeBuilder(Closable):
     self._tasks = tasks
     self._intrinsics = intrinsics
 
+  def all_rules(self):
+    """Returns a set containing all rules including instrinsics."""
+    declared_rules = set(rule for rules_for_product in self._tasks.values()
+                         for rule in rules_for_product)
+    declared_intrinsics = set(rule for rule in self._intrinsics.values())
+    return declared_rules.union(declared_intrinsics)
+
   def gen_rules(self, subject_type, product_type):
     # Intrinsics that provide the requested product for the current subject type.
     intrinsic_node_factory = self._lookup_intrinsic(product_type, subject_type)
@@ -292,9 +299,15 @@ class RuleGraph(datatype('RuleGraph',
       subjects.add(diagnostic.subject_type)
 
 
+    def subject_type_str(t):
+      if type(t) is type:
+        return t.__name__
+      elif type(t) is tuple:
+        return ', '.join(x.__name__ for x in t)
+
     def format_messages(rule, subject_types_by_reasons):
       errors = '\n    '.join('{} with subject types: {}'.format(reason,
-                                                                ', '.join(t.__name__ for t in subject_types))
+                                                                ', '.join(subject_type_str(t) for t in subject_types))
                              for reason, subject_types in subject_types_by_reasons.items())
       return '{}:\n    {}'.format(rule, errors)
 
@@ -378,6 +391,10 @@ class RuleGraphSubjectIsProduct(datatype('RuleGraphSubjectIsProduct', ['value'])
 class RuleGraphLiteral(datatype('RuleGraphLiteral', ['value', 'product_type'])):
   """The dependency is the literal value held by SelectLiteral."""
 
+  @property
+  def output_product_type(self):
+    return self.product_type
+
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__, self.value, self.product_type.__name__)
 
@@ -426,6 +443,17 @@ class Diagnostic(datatype('Diagnostic', ['subject_type', 'reason'])):
   """Holds on to error reasons for problems with the build graph."""
 
 
+class Any(object):
+  pass
+
+
+class UnreachableRule(object):
+  """A rule entry that can't be reached."""
+
+  def __init__(self, rule):
+    self.rule = rule
+
+
 class RuleEdges(object):
   """Represents the edges from a rule to its dependencies via selectors."""
   # TODO add a highwater mark count to count how many branches are eliminated
@@ -450,8 +478,24 @@ class RuleEdges(object):
   def would_make_unfulfillable(self, rule):
     # If there are no other potential providers of the type
     # that rule provided, then the rule that owns these edges is also unfulfillable.
-    return all(d.output_product_type is not rule.output_product_type
-      for d in self._dependencies if d != rule and type(d) not in (RuleGraphLiteral, RuleGraphSubjectIsProduct))
+
+    # if there is not a rule that has the same subj, product left in the dependencies.
+    if len(self._dependencies) == 1 and self._dependencies[0] == rule:
+      return True
+
+    for d in self._dependencies:
+      if d == rule:
+        continue
+      if d.output_product_type == rule.output_product_type and d.subject_type == rule.subject_type:
+        return False
+    else:
+      return True
+
+
+    return all(d.output_product_type is not rule.output_product_type and
+               d.subject is not rule.subject
+               for d in self._dependencies
+               if d != rule and type(d) not in (RuleGraphLiteral, RuleGraphSubjectIsProduct))
 
   def without_rule(self, rule):
     return RuleEdges(tuple(d for d in self._dependencies if d != rule))
@@ -490,11 +534,12 @@ class GraphMaker(object):
         existing_deps.add_edges_via(selector, dep_rules)
 
     while rules_to_traverse:
+      # TODO cycles, because it should handle that
       rule = rules_to_traverse.popleft()
       if type(rule) in (RuleGraphLiteral, RuleGraphSubjectIsProduct):
         continue
       if type(rule) not in (RootRule, RuleGraphEntry):
-        raise TypeError("rules must all be WithSubject'ed")
+        raise TypeError("rules to traverse must all be RuleGraphEntrys")
       if rule in unfulfillable_rules:
         # TODO a test that covers a case where if this were to eliminate a rule too early, that
         # the rule would still show up
@@ -512,12 +557,10 @@ class GraphMaker(object):
       # I think that we don't need to break in the below loop.
       # delay the check for unfulfillability until the end
       for selector in rule.input_selectors:
-        # TODO cycles, because it should handle that
-        if type(selector) is Select or type(selector) is SelectVariant:
-          # TODO, handle Addresses / Variants
-          rules_or_literals_for_selector = self._find_rhs_for_select(subject_type,
-            selector)
+        if type(selector) in (Select, SelectVariant):
 
+          # TODO, handle the Addresses / Variants case
+          rules_or_literals_for_selector = self._find_rhs_for_select(subject_type, selector)
           if not rules_or_literals_for_selector:
             unfulfillable_rules[rule] = Diagnostic(subject_type, 'no matches for {}'.format(selector))
             was_unfulfillable = True
@@ -642,6 +685,17 @@ class GraphMaker(object):
         full_root_rules.update(root_dependencies)
         full_dependency_edges.update(rule_dependency_edges)
         full_unfulfillable_rules.update(unfulfillable_rules)
+
+
+    rules_in_graph = set(entry.rule for entry in rule_dependency_edges.keys())
+    rules_eliminated_during_construction = set(entry.rule for entry in full_unfulfillable_rules.keys())
+
+    declared_rules = self.nodebuilder.all_rules()
+    unreachable_rules = declared_rules.difference(rules_in_graph,
+                                                  rules_eliminated_during_construction)
+    for rule in sorted(unreachable_rules):
+      full_unfulfillable_rules[UnreachableRule(rule)] = Diagnostic(Any, 'Unreachable')
+
     return FullRuleGraph(self.root_subject_selector_fns,
                          list(full_root_rules),
                          full_dependency_edges,
