@@ -175,6 +175,67 @@ class SnapshotIntrinsicRule(Rule):
     return '{}()'.format(type(self).__name__)
 
 
+class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
+  'binary_type',
+  'input_selectors',
+  'input_conversion',
+  'output_conversion']),
+  Rule):
+  """A rule type for defining execution of snapshotted processes."""
+
+  def as_node(self, subject, variants):
+    return ProcessExecutionNode(subject, variants, self)
+
+  @property
+  def output_product_type(self):
+    return self.product_type
+
+
+class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type', 'product_type']),
+  Rule):
+  """Intrinsic rule for filesystem operations."""
+
+  @classmethod
+  def as_intrinsics(cls):
+    """Returns a dict of tuple(sbj type, product type) -> functions returning a fs node for that subject product type tuple."""
+    return {(subject_type, product_type): FilesystemIntrinsicRule(subject_type, product_type)
+      for product_type, subject_type in FilesystemNode._FS_PAIRS}
+
+  def as_node(self, subject, variants):
+    assert type(subject) is self.subject_type
+    return FilesystemNode.create(subject, self.product_type, variants)
+
+  @property
+  def input_selectors(self):
+    return tuple()
+
+  @property
+  def output_product_type(self):
+    return self.product_type
+
+
+class SnapshotIntrinsicRule(Rule):
+  """Intrinsic rule for snapshot process execution."""
+
+  output_product_type = Snapshot
+  input_selectors = (Select(Files),)
+
+  def as_node(self, subject, variants):
+    assert type(subject) in (Files, PathGlobs)
+    return SnapshotNode.create(subject, variants)
+
+  @classmethod
+  def as_intrinsics(cls):
+    snapshot_intrinsic_rule = cls()
+    return {
+      (Files, Snapshot): snapshot_intrinsic_rule,
+      (PathGlobs, Snapshot): snapshot_intrinsic_rule
+    }
+
+  def __repr__(self):
+    return '{}()'.format(type(self).__name__)
+
+
 class NodeBuilder(Closable):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
