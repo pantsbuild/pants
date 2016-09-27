@@ -56,7 +56,7 @@ class AddressMapper(AbstractClass):
 
   @abstractmethod
   def scan_specs(self, specs, fail_fast=True):
-    """Execute a collection of `specs.Spec` objects and return an ordered set of Addresses."""
+    """Execute a collection of `specs.Spec` objects and return a set of Addresses."""
 
   def is_valid_single_address(self, single_address):
     """Check if a potentially ambiguous single address spec really exists.

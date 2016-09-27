@@ -166,7 +166,7 @@ class BuildFileAddressMapper(AddressMapper):
     return addresses
 
   def scan_specs(self, specs, fail_fast=True):
-    """Execute a collection of `specs.Spec` objects and return an ordered set of Addresses."""
+    """Execute a collection of `specs.Spec` objects and return a set of Addresses."""
     excluded_target_map = defaultdict(set)  # pattern -> targets (for debugging)
 
     def exclude_spec(spec):
