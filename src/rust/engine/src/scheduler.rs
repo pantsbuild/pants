@@ -31,7 +31,7 @@ impl Scheduler {
   /**
    * Creates a Scheduler with an initially empty set of roots.
    */
-  pub fn new(Externs: Externs, graph: Graph, tasks: Tasks) -> Scheduler {
+  pub fn new(graph: Graph, tasks: Tasks) -> Scheduler {
     Scheduler {
       graph: graph,
       tasks: tasks,

@@ -95,8 +95,6 @@ pub enum Complete {
   Throw(String),
 }
 
-static CYCLIC: Complete = Complete::Noop("Dep would be cyclic.", None);
-
 pub struct StepContext<'g,'t> {
   entry: &'g Entry,
   graph: &'g Graph,
@@ -140,7 +138,7 @@ impl<'g,'t> StepContext<'g,'t> {
         }
       } else if self.entry.cyclic_dependencies().contains(&dep_entry.id()) {
         // Declared, but cyclic.
-        Some(&CYCLIC)
+        Some(self.graph.cyclic_singleton())
       } else {
         // Undeclared. In theory we could still immediately return the dep here, but unfortunately
         // that occasionally allows Nodes to finish executing before all of their declared deps are

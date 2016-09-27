@@ -60,35 +60,18 @@ impl Key {
 /**
  * Represents a handle to a python object, explicitly without equality or hashing. Whenever
  * the equality/identity of a Value matters, a Key should be computed for it and used instead.
- *
- * We manually implement Copy/Clone, because despite being opaque, c_void is not Clone/Copy for
- * some reason.
  */
 #[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct Value {
-  handle: libc::c_void,
+  handle: *const libc::c_void,
   type_id: TypeId,
-}
-
-impl Clone for Value {
-  fn clone(&self) -> Value {
-    Value {
-      handle: self.handle,
-      type_id: self.type_id
-    }
-  }
-}
-
-impl fmt::Debug for Value {
-  fn fmt(&self, fmtr: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    fmtr.write_fmt(format_args!("Value {{ type_id: {:?} }}", self.type_id))
-  }
 }
 
 impl Value {
   pub fn empty() -> Value {
     Value {
-      handle: ptr::null(),
+      handle: ptr::null() as *const libc::c_void,
       type_id: TypeId {
         key: 0
       },

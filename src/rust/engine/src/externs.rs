@@ -25,6 +25,27 @@ pub struct Externs {
 }
 
 impl Externs {
+  pub fn new(
+    ext_context: *const ExternContext,
+    id_to_str: IdToStrExtern,
+    val_to_str: ValToStrExtern,
+    issubclass: IsSubClassExtern,
+    store_list: StoreListExtern,
+    project: ProjectExtern,
+    project_multi: ProjectMultiExtern,
+  ) -> Externs {
+    Externs {
+      context: ext_context,
+      issubclass: issubclass,
+      issubclass_cache: RefCell::new(HashMap::new()),
+      store_list: store_list,
+      project: project,
+      project_multi: project_multi,
+      id_to_str: id_to_str,
+      val_to_str: val_to_str,
+    }
+  }
+
   pub fn issubclass(&self, cls: &TypeId, super_cls: &TypeId) -> bool {
     if cls == super_cls {
       true

@@ -103,6 +103,7 @@ pub struct Graph {
   id_generator: EntryId,
   nodes: Nodes,
   entries: Entries,
+  cyclic_singleton: Complete,
 }
 
 impl Graph {
@@ -111,7 +112,12 @@ impl Graph {
       id_generator: 0,
       nodes: HashMap::default(),
       entries: Vec::new(),
+      cyclic_singleton: Complete::Noop("Dep would be cyclic.", None),
     }
+  }
+
+  pub fn cyclic_singleton(&self) -> &Complete {
+    &(self.cyclic_singleton)
   }
 
   pub fn len(&self) -> usize {

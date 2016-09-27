@@ -9,8 +9,6 @@ mod tasks;
 extern crate libc;
 extern crate fnv;
 
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
@@ -244,22 +242,20 @@ pub extern fn scheduler_create(
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let externs = 
-    Externs {
-      context: ext_context,
-      issubclass: issubclass,
-      issubclass_cache: RefCell::new(HashMap::new()),
-      store_list: store_list,
-      project: project,
-      project_multi: project_multi,
-      id_to_str: id_to_str, 
-      val_to_str: val_to_str,
-    };
+    Externs::new(
+      ext_context,
+      id_to_str,
+      val_to_str,
+      issubclass,
+      store_list,
+      project,
+      project_multi,
+    );
   Box::into_raw(
     Box::new(
       RawScheduler {
         execution: RawExecution::new(),
         scheduler: Scheduler::new(
-          externs.clone(),
           Graph::new(),
           Tasks::new(
             externs,
