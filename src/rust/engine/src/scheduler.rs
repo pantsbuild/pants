@@ -3,7 +3,7 @@ use std::collections::{HashSet, VecDeque};
 use std::io;
 use std::path::Path;
 
-use externs::ToStrFunction;
+use externs::Externs;
 use core::{FNV, Field, Key, TypeId};
 use graph::{EntryId, Graph};
 use nodes::{Complete, Node, Staged, StagedArg, State};
@@ -14,7 +14,6 @@ use tasks::Tasks;
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
 pub struct Scheduler {
-  pub to_str: ToStrFunction,
   pub graph: Graph,
   pub tasks: Tasks,
   // Initial set of roots for the execution, in the order they were declared.
@@ -32,9 +31,8 @@ impl Scheduler {
   /**
    * Creates a Scheduler with an initially empty set of roots.
    */
-  pub fn new(to_str: ToStrFunction, graph: Graph, tasks: Tasks) -> Scheduler {
+  pub fn new(Externs: Externs, graph: Graph, tasks: Tasks) -> Scheduler {
     Scheduler {
-      to_str: to_str,
       graph: graph,
       tasks: tasks,
       roots: Vec::new(),
@@ -45,7 +43,7 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, path: &Path) -> io::Result<()> {
-    self.graph.visualize(&self.roots, path, &self.to_str)
+    self.graph.visualize(&self.roots, path, &self.tasks.externs)
   }
 
   pub fn reset(&mut self) {
@@ -110,7 +108,7 @@ impl Scheduler {
 
     // Run a step.
     let entry = self.graph.entry_for_id(id);
-    Some(entry.node().step(entry, &self.graph, &self.tasks, &self.to_str))
+    Some(entry.node().step(entry, &self.graph, &self.tasks))
   }
 
   /**
@@ -130,7 +128,7 @@ impl Scheduler {
     let mut args = Vec::new();
     for arg in &staged.args {
       match arg {
-        &StagedArg::Key(_) =>
+        &StagedArg::Value(_) =>
           args.push(arg.clone()),
         &StagedArg::Promise(dep_id) => {
           let dep_entry = self.graph.entry_for_id(dep_id);
@@ -147,7 +145,7 @@ impl Scheduler {
               ),
             &State::Complete(Complete::Return(k)) =>
               // Dep completed successfully.
-              args.push(StagedArg::Key(k)),
+              args.push(StagedArg::Value(k)),
             &State::Staged(_) if self.outstanding.contains(&dep_id) =>
               // Dep is staged and already outstanding.
               args.push(arg.clone()),

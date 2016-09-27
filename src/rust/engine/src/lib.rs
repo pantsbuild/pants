@@ -9,23 +9,22 @@ mod tasks;
 extern crate libc;
 extern crate fnv;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
 
-use core::{Field, Function, Key, TypeId};
+use core::{Field, Function, Key, TypeId, Value};
 use externs::{
-  IsSubClassExtern,
-  IsSubClassFunction,
-  ProjectExtern,
-  ProjectFunction,
-  ProjectMultiExtern,
-  ProjectMultiFunction,
   ExternContext,
+  Externs,
+  IdToStrExtern,
+  IsSubClassExtern,
+  ProjectExtern,
+  ProjectMultiExtern,
   StoreListExtern,
-  StoreListFunction,
-  ToStrExtern,
-  ToStrFunction,
+  ValToStrExtern,
   with_vec,
 };
 use graph::{Graph, EntryId};
@@ -104,32 +103,32 @@ impl RawExecution {
 
 #[repr(C)]
 enum RawArgTag {
-  Key = 0,
+  Value = 0,
   Promise = 1,
 }
 
 #[repr(C)]
 pub struct RawArg {
-  // A union of either a Key to represent a value, or an EntryId to represent the return
+  // A union of either a Value to represent a value, or an EntryId to represent the return
   // value of another Runnable within this batch.
   tag: u8,
-  key: Key,
+  value: Value,
   promise: EntryId,
 }
 
 impl RawArg {
   fn from(arg: &StagedArg<EntryId>) -> RawArg {
     match arg {
-      &StagedArg::Key(k) =>
+      &StagedArg::Value(v) =>
         RawArg {
-          tag: RawArgTag::Key as u8,
-          key: k,
+          tag: RawArgTag::Value as u8,
+          value: v,
           promise: 0,
         },
       &StagedArg::Promise(id) =>
         RawArg {
           tag: RawArgTag::Promise as u8,
-          key: Key::empty(),
+          value: Value::empty(),
           promise: id,
         },
     }
@@ -164,7 +163,7 @@ pub struct RawNode {
   // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
   // a stable release.
   state_tag: u8,
-  state_return: Key,
+  state_return: Value,
   // TODO: expose as cstrings.
   state_throw: bool,
   state_noop: bool,
@@ -183,8 +182,8 @@ impl RawNode {
           Some(&Complete::Noop(_, _)) => RawStateTag::Noop as u8,
         },
       state_return: match state {
-        Some(&Complete::Return(ref r)) => r.clone(),
-        _ => Key::empty(),
+        Some(&Complete::Return(ref v)) => v.clone(),
+        _ => Value::empty(),
       },
       state_throw: match state {
         Some(&Complete::Throw(_)) => true,
@@ -230,7 +229,8 @@ impl RawNodes {
 #[no_mangle]
 pub extern fn scheduler_create(
   ext_context: *const ExternContext,
-  to_str: ToStrExtern,
+  id_to_str: IdToStrExtern,
+  val_to_str: ValToStrExtern,
   issubclass: IsSubClassExtern,
   store_list: StoreListExtern,
   project: ProjectExtern,
@@ -243,18 +243,26 @@ pub extern fn scheduler_create(
   type_has_variants: TypeId,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
+  let externs = 
+    Externs {
+      context: ext_context,
+      issubclass: issubclass,
+      issubclass_cache: RefCell::new(HashMap::new()),
+      store_list: store_list,
+      project: project,
+      project_multi: project_multi,
+      id_to_str: id_to_str, 
+      val_to_str: val_to_str,
+    };
   Box::into_raw(
     Box::new(
       RawScheduler {
         execution: RawExecution::new(),
         scheduler: Scheduler::new(
-          ToStrFunction::new(to_str, ext_context),
+          externs.clone(),
           Graph::new(),
           Tasks::new(
-            IsSubClassFunction::new(issubclass, ext_context),
-            StoreListFunction::new(store_list, ext_context),
-            ProjectFunction::new(project, ext_context),
-            ProjectMultiFunction::new(project_multi, ext_context),
+            externs,
             field_name,
             field_products,
             field_variants,
@@ -317,7 +325,7 @@ pub extern fn execution_add_root_select_dependencies(
 pub extern fn execution_next(
   scheduler_ptr: *mut RawScheduler,
   returns_ptr: *mut EntryId,
-  returns_states_ptr: *mut Key,
+  returns_states_ptr: *mut Value,
   returns_len: u64,
   throws_ptr: *mut EntryId,
   // TODO: empty strings at the moment.
@@ -330,7 +338,7 @@ pub extern fn execution_next(
         with_vec(throws_ptr, throws_len as usize, |throws_ids| {
           let returns =
             returns_ids.iter().zip(returns_states.iter())
-              .map(|(&id, key)| (id, Complete::Return(key.clone())));
+              .map(|(&id, value)| (id, Complete::Return(value.clone())));
           let throws =
             throws_ids.iter()
               .map(|&id| (id, Complete::Throw(format!("{} failed!", id))));

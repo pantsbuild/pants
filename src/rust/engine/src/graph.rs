@@ -5,7 +5,7 @@ use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
 
-use externs::ToStrFunction;
+use externs::Externs;
 use core::FNV;
 use nodes::{Node, Complete, State};
 
@@ -77,17 +77,17 @@ impl Entry {
     }
   }
 
-  fn format(&self, to_str: &ToStrFunction) -> String {
+  fn format(&self, externs: &Externs) -> String {
     let state =
       match self.state {
-        State::Complete(Complete::Return(r)) => to_str.call(r.key()),
+        State::Complete(Complete::Return(ref v)) => externs.val_to_str(v),
         ref x => format!("{:?}", x),
       };
     format!(
       "{}:{}:{} == {}",
-      self.node.format(to_str),
-      to_str.call(self.node.subject().key()),
-      to_str.call(self.node.selector().product()),
+      self.node.format(externs),
+      externs.id_to_str(self.node.subject().key()),
+      externs.id_to_str(self.node.selector().product()),
       state,
     ).replace("\"", "\\\"")
   }
@@ -320,7 +320,7 @@ impl Graph {
     entries.len()
   }
 
-  pub fn visualize(&self, roots: &Vec<Node>, path: &Path, to_str: &ToStrFunction) -> io::Result<()> {
+  pub fn visualize(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
@@ -351,7 +351,7 @@ impl Graph {
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
-      let node_str = entry.format(to_str);
+      let node_str = entry.format(externs);
 
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
@@ -365,7 +365,7 @@ impl Graph {
           }
 
           // Write an entry per edge.
-          let dep_str = dep_entry.format(to_str);
+          let dep_str = dep_entry.format(externs);
           try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_str, style)));
         }
       }

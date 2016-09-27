@@ -1,12 +1,7 @@
 use std::collections::HashMap;
 
 use core::{Field, Function, Key, TypeId};
-use externs::{
-  IsSubClassFunction,
-  ProjectFunction,
-  ProjectMultiFunction,
-  StoreListFunction,
-};
+use externs::Externs;
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
 
 /**
@@ -16,10 +11,7 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
 pub struct Tasks {
   intrinsics: HashMap<(TypeId,TypeId), Vec<Task>>,
   tasks: HashMap<TypeId, Vec<Task>>,
-  pub issubclass: IsSubClassFunction,
-  pub store_list: StoreListFunction,
-  pub project: ProjectFunction,
-  pub project_multi: ProjectMultiFunction,
+  pub externs: Externs,
   pub field_name: Field,
   pub field_products: Field,
   pub field_variants: Field,
@@ -43,10 +35,7 @@ pub struct Tasks {
  */
 impl Tasks {
   pub fn new(
-    issubclass: IsSubClassFunction,
-    store_list: StoreListFunction,
-    project: ProjectFunction,
-    project_multi: ProjectMultiFunction,
+    externs: Externs,
     field_name: Field,
     field_products: Field,
     field_variants: Field,
@@ -57,10 +46,7 @@ impl Tasks {
     Tasks {
       intrinsics: HashMap::new(),
       tasks: HashMap::new(),
-      issubclass: issubclass,
-      store_list: store_list,
-      project: project,
-      project_multi: project_multi,
+      externs: externs,
       field_name: field_name,
       field_products: field_products,
       field_variants: field_variants,

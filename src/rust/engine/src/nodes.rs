@@ -1,19 +1,19 @@
 use std::hash::Hash;
 
 use graph::{Entry, Graph};
-use core::{Field, Function, Key, TypeId, Variants};
-use externs::ToStrFunction;
+use core::{Field, Function, Key, TypeId, Value, Variants};
+use externs::Externs;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum StagedArg<T> {
-  Key(Key),
+  Value(Value),
   Promise(T),
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Staged<T> {
   pub func: Function,
   pub args: Vec<StagedArg<T>>,
@@ -29,14 +29,14 @@ impl<T: Clone + Eq + Hash> Staged<T> {
       .filter_map(|arg|
         match arg {
           &StagedArg::Promise(ref t) => Some(t.clone()),
-          &StagedArg::Key(_) => None,
+          &StagedArg::Value(_) => None,
         }
       )
       .collect()
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum State<T> {
   Waiting(Vec<T>),
   Complete(Complete),
@@ -75,7 +75,7 @@ impl<T: Clone + Eq + Hash> State<T> {
               s.args.into_iter()
                 .map(|a| {
                   match a {
-                    StagedArg::Key(k) => StagedArg::Key(k),
+                    StagedArg::Value(v) => StagedArg::Value(v),
                     StagedArg::Promise(p) => StagedArg::Promise(conversion(p)),
                   }
                 })
@@ -88,10 +88,10 @@ impl<T: Clone + Eq + Hash> State<T> {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Complete {
   Noop(&'static str, Option<Node>),
-  Return(Key),
+  Return(Value),
   Throw(String),
 }
 
@@ -101,7 +101,6 @@ pub struct StepContext<'g,'t> {
   entry: &'g Entry,
   graph: &'g Graph,
   tasks: &'t Tasks,
-  to_str: &'t ToStrFunction,
 }
 
 impl<'g,'t> StepContext<'g,'t> {
@@ -159,59 +158,61 @@ impl<'g,'t> StepContext<'g,'t> {
     &self.tasks.type_has_variants
   }
 
-  fn has_products(&self, item: &Key) -> bool {
-    self.isinstance(item, &self.tasks.type_has_products)
+  fn has_products(&self, item: &Value) -> bool {
+    self.tasks.externs.issubclass(item.type_id(), &self.tasks.type_has_products)
   }
 
-  fn field_name(&self, item: &Key) -> Key {
+  fn field_name(&self, item: &Value) -> Key {
     panic!("TODO: Not implemented");
     //self.project(item, &self.tasks.field_name)
   }
 
-  fn field_variants(&self, item: &Key) -> Key {
+  fn field_variants(&self, item: &Value) -> Key {
     panic!("TODO: Not implemented");
     //self.project(item, &self.tasks.field_variants)
   }
 
-  fn field_products(&self, item: &Key) -> Vec<Key> {
+  fn field_products(&self, item: &Value) -> Vec<Value> {
     panic!("TODO: Not implemented");
     //self.project_multi(item, &self.tasks.field_products)
+  }
+
+  fn value_for(&self, key: &Key) -> Value {
+    // TODO: memoize
+    panic!("TODO: Not implemented");
+  }
+
+  fn key_for(&self, value: &Value) -> Key {
+    // TODO: memoize
+    panic!("TODO: Not implemented");
   }
 
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
-  fn store_list(&self, items: Vec<&Key>, merge: bool) -> Key {
-    (self.tasks.store_list).call(items, merge)
+  fn store_list(&self, items: Vec<&Value>, merge: bool) -> Value {
+    self.tasks.externs.store_list(items, merge)
   }
 
   /**
    * Calls back to Python for an issubclass check.
    */
-  fn isinstance(&self, item: &Key, superclass: &TypeId) -> bool {
-    if item.type_id() == superclass {
-      true
-    } else {
-      (self.tasks.issubclass).call(item.type_id(), superclass)
-    }
+  fn issubclass(&self, cls: &TypeId, supercls: &TypeId) -> bool {
+    self.tasks.externs.issubclass(cls, supercls)
   }
 
   /**
    * Calls back to Python to project a field.
    */
-  fn project(&self, item: &Key, field: &Field, type_id: &TypeId) -> Key {
-    (self.tasks.project).call(item, field, type_id)
+  fn project(&self, item: &Value, field: &Field, type_id: &TypeId) -> Value {
+    self.tasks.externs.project(item, field, type_id)
   }
 
   /**
    * Calls back to Python to project a field representing a collection.
    */
-  fn project_multi(&self, item: &Key, field: &Field) -> Vec<Key> {
-    (self.tasks.project_multi).call(item, field)
-  }
-
-  fn to_str(&self) -> &ToStrFunction {
-    self.to_str
+  fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
+    self.tasks.externs.project_multi(item, field)
   }
 }
 
@@ -245,10 +246,10 @@ impl Select {
   fn select_literal_single<'a>(
     &self,
     context: &StepContext,
-    candidate: &'a Key,
+    candidate: &'a Value,
     variant_value: Option<&Key>
-  ) -> Option<&'a Key> {
-    if !context.isinstance(candidate, &self.selector.product) {
+  ) -> Option<&'a Value> {
+    if !context.issubclass(candidate.type_id(), &self.selector.product) {
       return None;
     }
     match variant_value {
@@ -268,9 +269,9 @@ impl Select {
   fn select_literal(
     &self,
     context: &StepContext,
-    candidate: &Key,
+    candidate: &Value,
     variant_value: Option<&Key>
-  ) -> Option<Key> {
+  ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
     if let Some(&candidate) = self.select_literal_single(context, candidate, variant_value) {
       return Some(candidate)
@@ -336,13 +337,14 @@ impl Step for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, &self.subject, variant_value) {
+    let subject_value = context.value_for(&self.subject);
+    if let Some(literal_value) = self.select_literal(&context, &subject_value, variant_value) {
       return State::Complete(Complete::Return(literal_value));
     }
 
     // Else, attempt to use a configured task to compute the value.
     let mut dependencies = Vec::new();
-    let mut matches: Vec<Key> = Vec::new();
+    let mut matches: Vec<Value> = Vec::new();
     for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) => {
@@ -396,8 +398,8 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, _: StepContext) -> State<Node> {
-    State::Complete(Complete::Return(self.selector.subject))
+  fn step(&self, context: StepContext) -> State<Node> {
+    State::Complete(Complete::Return(context.value_for(&self.selector.subject)))
   }
 }
 
@@ -418,7 +420,7 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_product(&self, context: &StepContext) -> Result<Key, State<Node>> {
+  fn dep_product(&self, context: &StepContext) -> Result<Value, State<Node>> {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
@@ -442,22 +444,23 @@ impl SelectDependencies {
     }
   }
 
-  fn dep_node(&self, dep_subject: Key) -> Node {
+  fn dep_node(&self, context: &StepContext, dep_subject: &Value) -> Node {
+    let dep_subject_key = context.key_for(dep_subject);
     if self.selector.traversal {
       // After the root has been expanded, a traversal continues with dep_product == product.
       let mut selector = self.selector.clone();
       selector.dep_product = selector.product;
       Node::create(
         Selector::SelectDependencies(selector),
-        dep_subject,
+        dep_subject_key,
         self.variants.clone()
       )
     } else {
-      Node::create(Selector::select(self.selector.product), dep_subject, self.variants.clone())
+      Node::create(Selector::select(self.selector.product), dep_subject_key, self.variants.clone())
     }
   }
 
-  fn store(&self, context: &StepContext, dep_product: &Key, dep_values: Vec<&Key>) -> Key {
+  fn store(&self, context: &StepContext, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
     if self.selector.traversal && dep_product.type_id() == &self.selector.product {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
@@ -484,16 +487,19 @@ impl Step for SelectDependencies {
 
     // The product and its dependency list are available.
     let mut dependencies = Vec::new();
-    let mut dep_values: Vec<&Key> = Vec::new();
+    let mut dep_values: Vec<&Value> = Vec::new();
     for dep_subject in context.project_multi(&dep_product, &self.selector.field) {
-      let dep_node = self.dep_node(dep_subject);
+      let dep_node = self.dep_node(&context, &dep_subject);
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
           dep_values.push(&value),
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
             Complete::Throw(
-              format!("No source of explicit dep {}", dep_node.format(context.to_str()))
+              format!(
+                "No source of explicit dep {}",
+                dep_node.format(&context.tasks.externs)
+              )
             )
           ),
         Some(&Complete::Throw(ref msg)) =>
@@ -554,7 +560,7 @@ impl Step for SelectProjection {
     let output_node =
       Node::create(
         Selector::select(self.selector.product),
-        projected_subject,
+        context.key_for(&projected_subject),
         self.variants.clone()
       );
     match context.get(&output_node) {
@@ -563,7 +569,10 @@ impl Step for SelectProjection {
       Some(&Complete::Noop(_, _)) =>
         return State::Complete(
           Complete::Throw(
-            format!("No source of projected dependency {}", output_node.format(context.to_str()))
+            format!(
+              "No source of projected dependency {}",
+              output_node.format(&context.tasks.externs)
+            )
           )
         ),
       Some(&Complete::Throw(ref msg)) =>
@@ -615,13 +624,13 @@ pub enum Node {
 }
 
 impl Node {
-  pub fn format(&self, to_str: &ToStrFunction) -> String {
+  pub fn format(&self, externs: &Externs) -> String {
     match self {
       &Node::Select(_) => "Select".to_string(),
       &Node::SelectLiteral(_) => "Literal".to_string(),
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
-      &Node::Task(ref t) => format!("Task({})", to_str.call(&t.selector.func)),
+      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(&t.selector.func)),
     }
   }
 
@@ -692,13 +701,12 @@ impl Node {
     }
   }
 
-  pub fn step(&self, entry: &Entry, graph: &Graph, tasks: &Tasks, to_str: &ToStrFunction) -> State<Node> {
+  pub fn step(&self, entry: &Entry, graph: &Graph, tasks: &Tasks) -> State<Node> {
     let context =
       StepContext {
         entry: entry,
         graph: graph,
         tasks: tasks,
-        to_str: to_str
       };
     match self {
       &Node::Select(ref n) => n.step(context),

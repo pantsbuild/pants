@@ -1,6 +1,9 @@
 use fnv::FnvHasher;
+use libc;
 
+use std::fmt;
 use std::hash;
+use std::ptr;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -47,6 +50,49 @@ impl Key {
 
   pub fn key(&self) -> &Id {
     &self.key
+  }
+
+  pub fn type_id(&self) -> &TypeId {
+    &self.type_id
+  }
+}
+
+/**
+ * Represents a handle to a python object, explicitly without equality or hashing. Whenever
+ * the equality/identity of a Value matters, a Key should be computed for it and used instead.
+ *
+ * We manually implement Copy/Clone, because despite being opaque, c_void is not Clone/Copy for
+ * some reason.
+ */
+#[repr(C)]
+pub struct Value {
+  handle: libc::c_void,
+  type_id: TypeId,
+}
+
+impl Clone for Value {
+  fn clone(&self) -> Value {
+    Value {
+      handle: self.handle,
+      type_id: self.type_id
+    }
+  }
+}
+
+impl fmt::Debug for Value {
+  fn fmt(&self, fmtr: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fmtr.write_fmt(format_args!("Value {{ type_id: {:?} }}", self.type_id))
+  }
+}
+
+impl Value {
+  pub fn empty() -> Value {
+    Value {
+      handle: ptr::null(),
+      type_id: TypeId {
+        key: 0
+      },
+    }
   }
 
   pub fn type_id(&self) -> &TypeId {
