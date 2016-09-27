@@ -133,7 +133,7 @@ class RulesetValidatorTest(unittest.TestCase):
                                     str(cm.exception))
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
-    rules = [(A, (Select(B), Select(B)), noop)]
+    rules = [(A, (Select(B), Select(C)), noop)]
     validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
       goal_to_product=dict(),
       root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
@@ -142,8 +142,9 @@ class RulesetValidatorTest(unittest.TestCase):
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
-                       (A, (Select(B), Select(B)), noop):
+                       (A, (Select(B), Select(C)), noop):
                          no matches for Select(B) with subject types: SubA
+                         no matches for Select(C) with subject types: SubA
                      """).strip(),
       str(cm.exception))
 
