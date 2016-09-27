@@ -214,10 +214,12 @@ class NodeBuilder(Closable):
     intrinsics = dict()
     for provider in intrinsic_providers:
       as_intrinsics = provider.as_intrinsics()
-      for k in as_intrinsics.keys():
-        if k in intrinsics:
-          raise ValueError('intrinsic with subject-type, product-type {} defined by {} would '
-                           'overwrite a previous intrinsic'.format(k, provider))
+      duplicate_keys = [k for k in as_intrinsics.keys() if k in intrinsics]
+      if duplicate_keys:
+        key_list = '\n  '.join('{}, {}'.format(sub.__name__, prod.__name__)
+                                for sub, prod in duplicate_keys)
+        raise ValueError('intrinsics provided by {} have already provided subject-type, '
+                         'product-type keys:\n  {}'.format(provider, key_list))
       intrinsics.update(as_intrinsics)
     return cls(serializable_tasks, intrinsics)
 
