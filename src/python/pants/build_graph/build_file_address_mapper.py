@@ -179,7 +179,7 @@ class BuildFileAddressMapper(AddressMapper):
     def exclude_address(address):
       return exclude_spec(address.spec)
 
-    addresses = OrderedSet()
+    addresses = set()
     for spec in specs:
       for address in self._scan_spec(spec, fail_fast, exclude_spec):
         if not exclude_address(address):
