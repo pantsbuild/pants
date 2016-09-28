@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
+from twitter.common.collections import OrderedSet
+
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.bin.options_initializer import OptionsInitializer
@@ -38,7 +40,7 @@ class TargetRoots(object):
 
     # Determine the literal target roots.
     cmd_line_spec_parser = CmdLineSpecParser(build_root or get_buildroot())
-    spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
+    spec_roots = OrderedSet(cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs)
 
     # Determine `Changed` arguments directly from options to support pre-`Subsystem` initialization paths.
     changed_options = options.for_scope('changed')
