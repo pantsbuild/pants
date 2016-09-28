@@ -27,6 +27,18 @@ class TargetRoots(object):
   """Determines the target roots for a given pants run."""
 
   @classmethod
+  def parse_specs(cls, target_specs, build_root=None):
+    """Parse string specs into unique `Spec` objects.
+
+    :param iterable target_specs: An iterable of string specs.
+    :param string build_root: The path to the build root.
+    :returns: An `OrderedSet` of `Spec` objects.
+    """
+    build_root = build_root or get_buildroot()
+    spec_parser = CmdLineSpecParser(build_root)
+    return OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs)
+
+  @classmethod
   def create(cls, options=None, args=None, build_root=None, change_calculator=None):
     """
     :param Options options: An `Options` instance to use, if available.
@@ -39,8 +51,7 @@ class TargetRoots(object):
       options, _ = OptionsInitializer(OptionsBootstrapper(args=args)).setup(init_logging=False)
 
     # Determine the literal target roots.
-    cmd_line_spec_parser = CmdLineSpecParser(build_root or get_buildroot())
-    spec_roots = OrderedSet(cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs)
+    spec_roots = cls.parse_specs(options.target_specs, build_root)
 
     # Determine `Changed` arguments directly from options to support pre-`Subsystem` initialization paths.
     changed_options = options.for_scope('changed')

@@ -69,6 +69,8 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
+    self._handle_ignore_patterns()
+
   # TODO: Remove this once we have better support of option renaming in option.parser
   def _handle_ignore_patterns(self):
     ignore_patterns_explicit = not self._global_options.is_default('ignore_patterns')
@@ -122,17 +124,12 @@ class GoalRunnerFactory(object):
       graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir)
       return graph, address_mapper, target_roots.as_specs()
     else:
-      spec_roots = self._parse_specs(target_specs)
+      spec_roots = TargetRoots.parse_specs(target_specs, self._root_dir)
       address_mapper = BuildFileAddressMapper(self._build_file_parser,
                                               get_project_tree(self._global_options),
                                               build_ignore_patterns,
                                               exclude_target_regexps)
       return MutableBuildGraph(address_mapper), address_mapper, spec_roots
-
-  def _parse_specs(self, specs):
-    """Parse string specs into unique `Spec` objects."""
-    spec_parser = CmdLineSpecParser(self._root_dir)
-    return OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in specs)
 
   def _determine_goals(self, requested_goals):
     """Check and populate the requested goals for a given run."""
@@ -162,7 +159,7 @@ class GoalRunnerFactory(object):
           if tag_filter(target):
             yield target
 
-    return [target for target in generate_targets(specs)]
+    return list(generate_targets(specs))
 
   def _maybe_launch_pantsd(self):
     """Launches pantsd if configured to do so."""
@@ -204,7 +201,6 @@ class GoalRunnerFactory(object):
       return goals, context
 
   def setup(self):
-    self._handle_ignore_patterns()
     self._maybe_launch_pantsd()
     self._handle_help(self._help_request)
 
