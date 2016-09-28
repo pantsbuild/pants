@@ -284,7 +284,10 @@ class NodeBuilder(Closable):
 
 
 class RuleGraph(datatype('RuleGraph',
-                         ['root_subject_types', 'root_rules', 'rule_dependencies', 'failure_reasons'])):
+                         ['root_subject_types',
+                          'root_rules',
+                          'rule_dependencies',
+                          'unfulfillable_rules'])):
   # TODO constructing nodes from the resulting graph.
   # Possible approach:
   # - walk out from root nodes, constructing each node.
@@ -295,7 +298,7 @@ class RuleGraph(datatype('RuleGraph',
   def error_message(self):
     """Returns a nice error message for errors in the rule graph."""
     collated_errors = defaultdict(lambda : defaultdict(set))
-    for wrapped_rule, diagnostics in self.failure_reasons.items():
+    for wrapped_rule, diagnostics in self.unfulfillable_rules.items():
       # don't include the root rules in the error
       # message since they aren't real.
       if type(wrapped_rule) is RootRule:
