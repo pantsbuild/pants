@@ -89,7 +89,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
         pass
 
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
-    address_mapper = LegacyAddressMapper(graph, build_root or get_buildroot())
+    address_mapper = LegacyAddressMapper(self.scheduler, self.engine, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
     return graph, address_mapper, target_roots.as_string_specs()
 
@@ -99,6 +99,7 @@ class EngineInitializer(object):
 
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
+                         build_root=None,
                          symbol_table_cls=None,
                          build_ignore_patterns=None,
                          exclude_target_regexps=None):
@@ -106,6 +107,7 @@ class EngineInitializer(object):
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
+    :param str build_root: A path to be used as the build root. If None, then default is used.
     :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
                                          None to use the default.
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
@@ -114,10 +116,11 @@ class EngineInitializer(object):
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 
-    build_root = get_buildroot()
+    build_root = build_root or get_buildroot()
     scm = get_scm()
-    project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
     symbol_table_cls = symbol_table_cls or LegacySymbolTable
+
+    project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
     # Register "literal" subjects required for these tasks.
     # TODO: Replace with `Subsystems`.
