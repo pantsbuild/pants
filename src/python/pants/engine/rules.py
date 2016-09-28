@@ -528,7 +528,6 @@ class GraphMaker(object):
       unfulfillable_rules[rule].append(Diagnostic(subject_type, reason))
 
     def add_rules_to_graph(rule, selector, dep_rules):
-      seen_rules = [d for d in dep_rules if d in rule_dependency_edges or d in unfulfillable_rules]
       unseen_dep_rules = [g for g in dep_rules
                           if g not in rule_dependency_edges and g not in unfulfillable_rules]
       rules_to_traverse.extend(unseen_dep_rules)
