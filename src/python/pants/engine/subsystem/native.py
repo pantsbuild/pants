@@ -153,7 +153,7 @@ _FFI.cdef(
 def extern_key_for(context_handle, val):
   """Return a Key for a Value."""
   c = _FFI.from_handle(context_handle)
-  return c.to_key(c.from_value(val))
+  return c.value_to_key(val)
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id*)")
@@ -188,8 +188,10 @@ def extern_store_list(context_handle, vals_ptr, vals_len, merge):
   vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr, vals_len))
   if merge:
     # Expect each obj to represent a list, and do a de-duping merge.
-    merged = {val for outer_val in vals for val in outer_val}
-    vals = tuple(merged)
+    merged = set()
+    for outer_val in vals:
+      merged.update(outer_val)
+    vals = merged
   return c.to_value(vals)
 
 
@@ -307,6 +309,10 @@ class ExternContext(object):
   def to_id(self, typ):
     return self.put(typ)
 
+  def value_to_key(self, val):
+    obj = self.from_value(val)
+    return Key(self.put(obj), Value(val.handle, val.type_id), self._id_from_native(val.type_id))
+
   def to_key(self, obj):
     type_id = self.put(type(obj))
     return Key(self.put(obj), self.to_value(obj, type_id=type_id), type_id)
@@ -315,7 +321,7 @@ class ExternContext(object):
     return self.get(self._id_from_native(cdata))
 
   def from_key(self, cdata):
-    return self.get(self._id_from_native(cdata.key))
+    return self.from_value(cdata.value)
 
 
 class Native(object):
