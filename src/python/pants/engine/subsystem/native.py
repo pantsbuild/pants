@@ -28,29 +28,35 @@ _FFI.cdef(
     } Key;
 
     typedef struct {
+      void*    handle;
+      TypeId   type_id;
+    } Value;
+
+    typedef struct {
       char*    str_ptr;
       uint64_t str_len;
     } UTF8Buffer;
 
     typedef struct {
-      Key*     keys_ptr;
-      uint64_t keys_len;
-    } KeyBuffer;
+      Value*     values_ptr;
+      uint64_t   values_len;
+    } ValueBuffer;
 
     typedef uint64_t EntryId;
     typedef Key Field;
 
     typedef void ExternContext;
 
-    typedef UTF8Buffer  (*extern_to_str)(ExternContext*, Id*);
+    typedef UTF8Buffer  (*extern_id_to_str)(ExternContext*, Id*);
+    typedef UTF8Buffer  (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
-    typedef Key         (*extern_store_list)(ExternContext*, Key*, uint64_t, bool);
-    typedef Key         (*extern_project)(ExternContext*, Key*, Field*, TypeId*);
-    typedef KeyBuffer   (*extern_project_multi)(ExternContext*, Key*, Field*);
+    typedef Value       (*extern_store_list)(ExternContext*, Value*, uint64_t, bool);
+    typedef Value       (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
+    typedef ValueBuffer (*extern_project_multi)(ExternContext*, Value*, Field*);
 
     typedef struct {
       uint8_t  tag;
-      Key      key;
+      Value    value;
       EntryId  promise;
     } RawArg;
 
@@ -61,12 +67,6 @@ _FFI.cdef(
       uint64_t    args_len;
       bool        cacheable;
     } RawRunnable;
-
-    typedef struct {
-      Key*        func;
-      Key*        args_ptr;
-      uint64_t    args_len;
-    } Complete;
 
     typedef struct {
       RawRunnable*          runnables_ptr;
@@ -85,7 +85,7 @@ _FFI.cdef(
       Key      subject;
       TypeId   product;
       uint8_t  union_tag;
-      Key      union_return;
+      Value    union_return;
       bool     union_throw;
       bool     union_noop;
     } RawNode;
@@ -98,7 +98,8 @@ _FFI.cdef(
     } RawNodes;
 
     RawScheduler* scheduler_create(ExternContext*,
-                                   extern_to_str,
+                                   extern_id_to_str,
+                                   extern_val_to_str,
                                    extern_issubclass,
                                    extern_store_list,
                                    extern_project,
@@ -134,7 +135,7 @@ _FFI.cdef(
                                                 bool);
     void execution_next(RawScheduler*,
                         EntryId*,
-                        Key*,
+                        Value*,
                         uint64_t,
                         EntryId*,
                         uint64_t);
@@ -146,10 +147,19 @@ _FFI.cdef(
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id*)")
-def extern_to_str(context_handle, _id):
+def extern_id_to_str(context_handle, _id):
   """Given an Id for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
   obj = c.from_id(_id)
+  str_bytes = str(obj).encode('utf-8')
+  return (c.utf8_buf(str_bytes), len(str_bytes))
+
+
+@_FFI.callback("UTF8Buffer(ExternContext*, Value*)")
+def extern_val_to_str(context_handle, val):
+  """Given a Value for `obj`, write str(obj) and return it."""
+  c = _FFI.from_handle(context_handle)
+  obj = _FFI.from_handle(val.handle)
   str_bytes = str(obj).encode('utf-8')
   return (c.utf8_buf(str_bytes), len(str_bytes))
 
@@ -161,26 +171,22 @@ def extern_issubclass(context_handle, cls_id, super_cls_id):
   return issubclass(c.from_id(cls_id), c.from_id(super_cls_id))
 
 
-@_FFI.callback("Key(ExternContext*, Key*, uint64_t, bool)")
-def extern_store_list(context_handle, keys_ptr, keys_len, merge):
-  """Given storage and an array of Keys, return a new Key to represent the list."""
-  c = _FFI.from_handle(context_handle)
-  keys = tuple(c.key_from_native(key).key for key in _FFI.unpack(keys_ptr, keys_len))
+@_FFI.callback("Value(ExternContext*, Value*, uint64_t, bool)")
+def extern_store_list(context_handle, vals_ptr, vals_len, merge):
+  """Given storage and an array of Values, return a new Value to represent the list."""
+  vals = tuple(_FFI.from_handle(val.handle) for val in _FFI.unpack(vals_ptr, vals_len))
   if merge:
-    # Expect each Id to represent a list: deserialize without nesting to get a list
-    # of inner Ids per outer Id, then merge.
-    merged = {key
-              for outer_key in keys
-              for key in c.get(outer_key, nesting=False)}
-    keys = tuple(merged)
-  return c.to_key(keys, nesting=False)
+    # Expect each obj to represent a list, and do a de-duping merge.
+    merged = {val for outer_val in vals for val in outer_val}
+    vals = tuple(merged)
+  return c.new_value(vals)
 
 
-@_FFI.callback("Key(ExternContext*, Key*, Field*, TypeId*)")
-def extern_project(context_handle, key, field, type_id):
+@_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
+def extern_project(context_handle, val, field, type_id):
   """Given a Key for `obj`, a field name, and a type, project the field as a new Key."""
   c = _FFI.from_handle(context_handle)
-  obj = c.from_key(key)
+  obj = _FFI.from_handle(val.handle)
   field_name = c.from_key(field)
   typ = c.from_id(type_id)
 
@@ -188,18 +194,22 @@ def extern_project(context_handle, key, field, type_id):
   if type(projected) is not typ:
     projected = typ(projected)
 
-  return c.to_key(projected)
+  return c.new_value(projected)
 
 
-@_FFI.callback("KeyBuffer(ExternContext*, Key*, Field*)")
-def extern_project_multi(context_handle, key, field):
+@_FFI.callback("ValueBuffer(ExternContext*, Value*, Field*)")
+def extern_project_multi(context_handle, val, field):
   """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
   c = _FFI.from_handle(context_handle)
-  obj = c.from_key(key)
+  obj = _FFI.from_handle(val.handle)
   field_name = c.from_key(field)
 
-  projected = [c.to_key(p) for p in getattr(obj, field_name)]
-  return (c.keys_buf(projected), len(projected))
+  projected = [c.new_value(p) for p in getattr(obj, field_name)]
+  return (c.vals_buf(projected), len(projected))
+
+
+class Value(datatype('Value', ['handle', 'type_id'])):
+  """Corresponds to the native object of the same name, and holds one FFI handle, and one Id."""
 
 
 class Key(datatype('Key', ['key', 'type_id'])):
@@ -220,12 +230,13 @@ class ExternContext(object):
   """
 
   def __init__(self):
-    # NB: These two dictionaries are not always the same size, because un-hashable objects will
-    # not be memoized in `_obj_to_id`, but will still have unique ids assigned in `_id_to_obj`.
-    # TODO: disallow non-hashable objects.
-    self._obj_to_id = dict()
-    self._id_to_obj = dict()
+    # Memoized object Ids.
     self._id_generator = 0
+    self._id_to_obj = dict()
+    self._obj_to_id = dict()
+
+    # Outstanding FFI object handles.
+    self._handles = set()
 
     # Buffers for transferring strings and arrays of Keys.
     self._resize_utf8(256)
@@ -237,7 +248,7 @@ class ExternContext(object):
 
   def _resize_keys(self, size):
     self._keys_cap = size
-    self._keys_buf = _FFI.new('Key[]', self._keys_cap)
+    self._vals_buf = _FFI.new('Value[]', self._keys_cap)
 
   def utf8_buf(self, utf8):
     if self._utf8_cap < len(utf8):
@@ -245,11 +256,16 @@ class ExternContext(object):
     self._utf8_buf[0:len(utf8)] = utf8
     return self._utf8_buf
 
-  def keys_buf(self, keys):
+  def vals_buf(self, keys):
     if self._keys_cap < len(keys):
       self._resize_keys(max(len(keys), 2 * self._keys_cap))
-    self._keys_buf[0:len(keys)] = keys
-    return self._keys_buf
+    self._vals_buf[0:len(keys)] = keys
+    return self._vals_buf
+
+  def new_value(self, obj):
+    handle = _FFI.new_handle(obj)
+    self._handles.add(handle)
+    return Value(handle, self.to_id(type(obj)))
 
   def key_from_native(self, cdata):
     return Key(self._id_from_native(cdata.key), self._id_from_native(cdata.type_id))
@@ -257,52 +273,30 @@ class ExternContext(object):
   def _id_from_native(self, cdata):
     return Id(cdata.key)
 
-  def _maybe_put_nested(self, obj):
-    # If the stored object is a collection type, recurse.
-    if type(obj) in (tuple, list):
-      return type(obj)(self.put(inner) for inner in obj)
-    else:
-      return obj
-
-  def _maybe_get_nested(self, obj):
-    # If the stored object was a collection type, recurse.
-    if type(obj) in (tuple, list):
-      return type(obj)(self.get(inner) for inner in obj)
-    else:
-      return obj
-
-  def put(self, obj, nesting=True):
-    obj = self._maybe_put_nested(obj) if nesting else obj
-
-    # Attempt to memoize the object, and if we encounter an existing id, return it.
+  def put(self, obj):
+    # If we encounter an existing id, return it.
     new_id = Id(self._id_generator)
-    try:
-      _id = self._obj_to_id.setdefault(obj, new_id)
-      if _id is not new_id:
-        # Object already existed.
-        return _id
-      # Object was newly stored.
-    except TypeError:
-      # Object was not hashable.
-      _id = new_id
+    _id = self._obj_to_id.setdefault(obj, new_id)
+    if _id is not new_id:
+      # Object already existed.
+      return _id
 
     # Object is new/unique.
     self._id_to_obj[_id] = obj
     self._id_generator += 1
     return _id
 
-  def get(self, _id, nesting=True):
-    obj = self._id_to_obj[_id]
-    return self._maybe_get_nested(obj) if nesting else obj
+  def get(self, _id):
+    return self._id_to_obj[_id]
 
   def to_id(self, typ):
     return self.put(typ)
 
-  def to_key(self, obj, nesting=True):
-    return Key(self.put(obj, nesting=nesting), self.put(type(obj)))
+  def to_key(self, obj):
+    return Key(self.put(obj), self.put(type(obj)))
 
-  def from_id(self, cdata, nesting=True):
-    return self.get(self._id_from_native(cdata), nesting=nesting)
+  def from_id(self, cdata):
+    return self.get(self._id_from_native(cdata))
 
   def from_key(self, cdata):
     return self.get(self._id_from_native(cdata.key))
