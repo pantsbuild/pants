@@ -175,10 +175,6 @@ impl<'g,'t> StepContext<'g,'t> {
     //self.project_multi(item, &self.tasks.field_products)
   }
 
-  fn val_for(&self, key: &Key) -> Value {
-    self.tasks.externs.val_for(key)
-  }
-
   fn key_for(&self, val: &Value) -> Key {
     self.tasks.externs.key_for(val)
   }
@@ -333,8 +329,7 @@ impl Step for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    let subject_value = context.val_for(&self.subject);
-    if let Some(literal_value) = self.select_literal(&context, &subject_value, variant_value) {
+    if let Some(literal_value) = self.select_literal(&context, self.subject.value(), variant_value) {
       return State::Complete(Complete::Return(literal_value));
     }
 
@@ -395,7 +390,7 @@ pub struct SelectLiteral {
 
 impl Step for SelectLiteral {
   fn step(&self, context: StepContext) -> State<Node> {
-    State::Complete(Complete::Return(context.val_for(&self.selector.subject)))
+    State::Complete(Complete::Return(self.selector.subject.value().clone()))
   }
 }
 

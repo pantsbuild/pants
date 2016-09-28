@@ -29,10 +29,25 @@ pub struct Id {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub struct Key {
   key: Id,
+  value: Value,
   type_id: TypeId,
+}
+
+impl Eq for Key {}
+
+impl PartialEq for Key {
+  fn eq(&self, other: &Key) -> bool {
+    self.key == other.key
+  }
+}
+
+impl hash::Hash for Key {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    self.key.hash(state);
+  }
 }
 
 impl Key {
@@ -41,6 +56,7 @@ impl Key {
       key: Id {
         key: 0
       },
+      value: Value::empty(),
       type_id: TypeId {
         key: 0
       },
@@ -49,6 +65,10 @@ impl Key {
 
   pub fn key(&self) -> &Id {
     &self.key
+  }
+
+  pub fn value(&self) -> &Value {
+    &self.value
   }
 
   pub fn type_id(&self) -> &TypeId {

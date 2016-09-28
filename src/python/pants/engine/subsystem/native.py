@@ -23,14 +23,15 @@ _FFI.cdef(
     typedef Id Function;
 
     typedef struct {
-      Id       key;
-      TypeId   type_id;
-    } Key;
-
-    typedef struct {
       void*    handle;
       TypeId   type_id;
     } Value;
+
+    typedef struct {
+      Id       key;
+      Value    value;
+      TypeId   type_id;
+    } Key;
 
     typedef struct {
       char*    str_ptr;
@@ -48,7 +49,6 @@ _FFI.cdef(
     typedef void ExternContext;
 
     typedef Key         (*extern_key_for)(ExternContext*, Value*);
-    typedef Value       (*extern_val_for)(ExternContext*, Key*);
     typedef UTF8Buffer  (*extern_id_to_str)(ExternContext*, Id*);
     typedef UTF8Buffer  (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
@@ -101,7 +101,6 @@ _FFI.cdef(
 
     RawScheduler* scheduler_create(ExternContext*,
                                    extern_key_for,
-                                   extern_val_for,
                                    extern_id_to_str,
                                    extern_val_to_str,
                                    extern_issubclass,
@@ -155,16 +154,6 @@ def extern_key_for(context_handle, val):
   """Return a Key for a Value."""
   c = _FFI.from_handle(context_handle)
   return c.to_key(c.from_value(val))
-
-
-@_FFI.callback("Value(ExternContext*, Key*)")
-def extern_val_for(context_handle, key):
-  """Return a Value for the given Key."""
-  # TODO: It seems like in all cases we could attach a Value to a Key, since we always
-  # start from a Value and later lift it to a Key. Instead, we're potentially creating
-  # too many handles to the same python object.
-  c = _FFI.from_handle(context_handle)
-  return c.to_value(c.from_key(key))
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id*)")
@@ -231,11 +220,11 @@ def extern_project_multi(context_handle, val, field):
 
 
 class Value(datatype('Value', ['handle', 'type_id'])):
-  """Corresponds to the native object of the same name, and holds one FFI handle, and one Id."""
+  """Corresponds to the native object of the same name."""
 
 
-class Key(datatype('Key', ['key', 'type_id'])):
-  """Corresponds to the native object of the same name, and holds two Id objects."""
+class Key(datatype('Key', ['key', 'value', 'type_id'])):
+  """Corresponds to the native object of the same name."""
 
 
 class Id(datatype('Id', ['value'])):
@@ -284,10 +273,11 @@ class ExternContext(object):
     self._vals_buf[0:len(keys)] = keys
     return self._vals_buf
 
-  def to_value(self, obj):
+  def to_value(self, obj, type_id=None):
     handle = _FFI.new_handle(obj)
     self._handles.add(handle)
-    return Value(handle, self.to_id(type(obj)))
+    type_id = type_id or self.to_id(type(obj))
+    return Value(handle, type_id)
 
   def from_value(self, val):
     return _FFI.from_handle(val.handle)
@@ -318,7 +308,8 @@ class ExternContext(object):
     return self.put(typ)
 
   def to_key(self, obj):
-    return Key(self.put(obj), self.put(type(obj)))
+    type_id = self.put(type(obj))
+    return Key(self.put(obj), self.to_value(obj, type_id=type_id), type_id)
 
   def from_id(self, cdata):
     return self.get(self._id_from_native(cdata))

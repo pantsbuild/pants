@@ -16,7 +16,6 @@ pub type IsSubClassExtern =
 pub struct Externs {
   context: *const ExternContext,
   key_for: KeyForExtern,
-  val_for: ValForExtern,
   issubclass: IsSubClassExtern,
   issubclass_cache: RefCell<HashMap<(TypeId,TypeId),bool>>,
   store_list: StoreListExtern,
@@ -30,7 +29,6 @@ impl Externs {
   pub fn new(
     ext_context: *const ExternContext,
     key_for: KeyForExtern,
-    val_for: ValForExtern,
     id_to_str: IdToStrExtern,
     val_to_str: ValToStrExtern,
     issubclass: IsSubClassExtern,
@@ -41,7 +39,6 @@ impl Externs {
     Externs {
       context: ext_context,
       key_for: key_for,
-      val_for: val_for,
       issubclass: issubclass,
       issubclass_cache: RefCell::new(HashMap::new()),
       store_list: store_list,
@@ -54,10 +51,6 @@ impl Externs {
 
   pub fn key_for(&self, val: &Value) -> Key {
     (self.key_for)(self.context, val)
-  }
-
-  pub fn val_for(&self, key: &Key) -> Value {
-    (self.val_for)(self.context, key)
   }
 
   pub fn issubclass(&self, cls: &TypeId, super_cls: &TypeId) -> bool {
@@ -113,9 +106,6 @@ impl Externs {
 
 pub type KeyForExtern =
   extern "C" fn(*const ExternContext, *const Value) -> Key;
-
-pub type ValForExtern =
-  extern "C" fn(*const ExternContext, *const Key) -> Value;
 
 pub type StoreListExtern =
   extern "C" fn(*const ExternContext, *const Value, u64, bool) -> Value;
