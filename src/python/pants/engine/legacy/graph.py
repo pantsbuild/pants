@@ -207,6 +207,11 @@ class LegacyBuildGraph(BuildGraph):
     for address in self._inject(specs):
       yield address
 
+  def resolve_address(self, address):
+    if not self.contains_address(address):
+      self.inject_address_closure(address)
+    return self.get_target(address)
+
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
     logger.debug('Injecting to %s: %s', self, subjects)
