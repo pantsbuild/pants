@@ -66,7 +66,8 @@ class AddressMapper(AbstractClass):
     """
     if not isinstance(single_address, SingleAddress):
       raise TypeError(
-        'Expecting parameter type to be {}, got {}.'.format(SingleAddress, type(single_address)))
+        'Parameter "{}" is of type {}, expecting type {}.'.format(
+          single_address, type(single_address), SingleAddress))
 
     try:
       self.scan_specs([single_address])
