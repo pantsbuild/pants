@@ -123,3 +123,10 @@ class MutableBuildGraph(BuildGraph):
                                name=addressable.addressed_name,
                                address=address))
       raise
+
+  def resolve_address(self, address):
+    if self.contains_address(address):
+      return self.get_target(address)
+    else:
+      _, addressable = self._address_mapper.resolve(address)
+      return addressable
