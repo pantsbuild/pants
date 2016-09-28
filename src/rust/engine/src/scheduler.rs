@@ -3,7 +3,6 @@ use std::collections::{HashSet, VecDeque};
 use std::io;
 use std::path::Path;
 
-use externs::Externs;
 use core::{FNV, Field, Key, TypeId};
 use graph::{EntryId, Graph};
 use nodes::{Complete, Node, Staged, StagedArg, State};

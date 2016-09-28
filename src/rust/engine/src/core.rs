@@ -1,7 +1,6 @@
 use fnv::FnvHasher;
 use libc;
 
-use std::fmt;
 use std::hash;
 use std::ptr;
 

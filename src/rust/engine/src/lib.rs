@@ -19,9 +19,11 @@ use externs::{
   Externs,
   IdToStrExtern,
   IsSubClassExtern,
+  KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
   StoreListExtern,
+  ValForExtern,
   ValToStrExtern,
   with_vec,
 };
@@ -227,6 +229,8 @@ impl RawNodes {
 #[no_mangle]
 pub extern fn scheduler_create(
   ext_context: *const ExternContext,
+  key_for: KeyForExtern,
+  val_for: ValForExtern,
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   issubclass: IsSubClassExtern,
@@ -244,6 +248,8 @@ pub extern fn scheduler_create(
   let externs = 
     Externs::new(
       ext_context,
+      key_for,
+      val_for,
       id_to_str,
       val_to_str,
       issubclass,

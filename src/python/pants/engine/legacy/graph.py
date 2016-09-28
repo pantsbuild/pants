@@ -250,7 +250,7 @@ def hydrate_target(target_adaptor, hydrated_fields):
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(TargetAdaptor(**kwargs), target_adaptor.dependencies)
+  return HydratedTarget(TargetAdaptor(**kwargs), tuple(target_adaptor.dependencies))
 
 
 def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):

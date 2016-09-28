@@ -47,6 +47,8 @@ _FFI.cdef(
 
     typedef void ExternContext;
 
+    typedef Key         (*extern_key_for)(ExternContext*, Value*);
+    typedef Value       (*extern_val_for)(ExternContext*, Key*);
     typedef UTF8Buffer  (*extern_id_to_str)(ExternContext*, Id*);
     typedef UTF8Buffer  (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
@@ -98,6 +100,8 @@ _FFI.cdef(
     } RawNodes;
 
     RawScheduler* scheduler_create(ExternContext*,
+                                   extern_key_for,
+                                   extern_val_for,
                                    extern_id_to_str,
                                    extern_val_to_str,
                                    extern_issubclass,
@@ -146,6 +150,23 @@ _FFI.cdef(
   )
 
 
+@_FFI.callback("Key(ExternContext*, Value*)")
+def extern_key_for(context_handle, val):
+  """Return a Key for a Value."""
+  c = _FFI.from_handle(context_handle)
+  return c.to_key(c.from_value(val))
+
+
+@_FFI.callback("Value(ExternContext*, Key*)")
+def extern_val_for(context_handle, key):
+  """Return a Value for the given Key."""
+  # TODO: It seems like in all cases we could attach a Value to a Key, since we always
+  # start from a Value and later lift it to a Key. Instead, we're potentially creating
+  # too many handles to the same python object.
+  c = _FFI.from_handle(context_handle)
+  return c.to_value(c.from_key(key))
+
+
 @_FFI.callback("UTF8Buffer(ExternContext*, Id*)")
 def extern_id_to_str(context_handle, _id):
   """Given an Id for `obj`, write str(obj) and return it."""
@@ -159,7 +180,7 @@ def extern_id_to_str(context_handle, _id):
 def extern_val_to_str(context_handle, val):
   """Given a Value for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
-  obj = _FFI.from_handle(val.handle)
+  obj = c.from_value(val)
   str_bytes = str(obj).encode('utf-8')
   return (c.utf8_buf(str_bytes), len(str_bytes))
 
@@ -174,19 +195,20 @@ def extern_issubclass(context_handle, cls_id, super_cls_id):
 @_FFI.callback("Value(ExternContext*, Value*, uint64_t, bool)")
 def extern_store_list(context_handle, vals_ptr, vals_len, merge):
   """Given storage and an array of Values, return a new Value to represent the list."""
-  vals = tuple(_FFI.from_handle(val.handle) for val in _FFI.unpack(vals_ptr, vals_len))
+  c = _FFI.from_handle(context_handle)
+  vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr, vals_len))
   if merge:
     # Expect each obj to represent a list, and do a de-duping merge.
     merged = {val for outer_val in vals for val in outer_val}
     vals = tuple(merged)
-  return c.new_value(vals)
+  return c.to_value(vals)
 
 
 @_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
 def extern_project(context_handle, val, field, type_id):
   """Given a Key for `obj`, a field name, and a type, project the field as a new Key."""
   c = _FFI.from_handle(context_handle)
-  obj = _FFI.from_handle(val.handle)
+  obj = c.from_value(val)
   field_name = c.from_key(field)
   typ = c.from_id(type_id)
 
@@ -194,17 +216,17 @@ def extern_project(context_handle, val, field, type_id):
   if type(projected) is not typ:
     projected = typ(projected)
 
-  return c.new_value(projected)
+  return c.to_value(projected)
 
 
 @_FFI.callback("ValueBuffer(ExternContext*, Value*, Field*)")
 def extern_project_multi(context_handle, val, field):
   """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
   c = _FFI.from_handle(context_handle)
-  obj = _FFI.from_handle(val.handle)
+  obj = c.from_value(val)
   field_name = c.from_key(field)
 
-  projected = [c.new_value(p) for p in getattr(obj, field_name)]
+  projected = tuple(c.to_value(p) for p in getattr(obj, field_name))
   return (c.vals_buf(projected), len(projected))
 
 
@@ -262,10 +284,13 @@ class ExternContext(object):
     self._vals_buf[0:len(keys)] = keys
     return self._vals_buf
 
-  def new_value(self, obj):
+  def to_value(self, obj):
     handle = _FFI.new_handle(obj)
     self._handles.add(handle)
     return Value(handle, self.to_id(type(obj)))
+
+  def from_value(self, val):
+    return _FFI.from_handle(val.handle)
 
   def key_from_native(self, cdata):
     return Key(self._id_from_native(cdata.key), self._id_from_native(cdata.type_id))

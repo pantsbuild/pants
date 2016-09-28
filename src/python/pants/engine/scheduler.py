@@ -21,8 +21,9 @@ from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, S
                                     SelectVariant)
 from pants.engine.storage import Digest
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import (ExternContext, extern_issubclass, extern_project,
-                                           extern_project_multi, extern_store_list, extern_val_to_str, extern_id_to_str)
+from pants.engine.subsystem.native import (ExternContext, extern_id_to_str, extern_issubclass,
+                                           extern_key_for, extern_project, extern_project_multi,
+                                           extern_store_list, extern_val_for, extern_val_to_str)
 from pants.util.objects import datatype
 
 
@@ -100,6 +101,8 @@ class LocalScheduler(object):
     self._context = ExternContext()
     self._context_handle = native.new_handle(self._context)
     scheduler = native.lib.scheduler_create(self._context_handle,
+                                            extern_key_for,
+                                            extern_val_for,
                                             extern_id_to_str,
                                             extern_val_to_str,
                                             extern_issubclass,
@@ -131,6 +134,12 @@ class LocalScheduler(object):
     RulesetValidator(node_builder, goals, input_types).validate()
     self._register_tasks(node_builder.tasks)
     self._register_intrinsics(node_builder.intrinsics)
+
+  def _to_value(self, obj):
+    return self._context.to_value(obj)
+
+  def _from_value(self, val):
+    return self._context.from_value(val)
 
   def _to_id(self, typ):
     return self._context.to_id(typ)
@@ -269,7 +278,7 @@ class LocalScheduler(object):
         if root.union_tag is 0:
           state = None
         elif root.union_tag is 1:
-          state = Return(self._from_key(root.union_return))
+          state = Return(self._from_value(root.union_return))
         elif root.union_tag is 2:
           state = Throw("Failed")
         elif root.union_tag is 3:
@@ -291,7 +300,7 @@ class LocalScheduler(object):
     for cid, c in completed:
       if type(c) is Return:
         returns_ids.append(cid)
-        returns_states.append(self._to_key(c.value))
+        returns_states.append(self._to_value(c.value))
       elif type(c) is Throw:
         throws_ids.append(cid)
       else:
@@ -306,8 +315,8 @@ class LocalScheduler(object):
                                     len(throws_ids))
     def decode_arg(raw):
       if raw.tag is 0:
-        # Is a literal key: decode.
-        return self._from_key(raw.key)
+        # Is a literal Value: decode.
+        return self._from_value(raw.value)
       elif raw.tag is 1:
         # Is the id of another outstanding runnable.
         raise AssertionError('TODO! implement pipelining to run: {}'.format(raw.promise))
