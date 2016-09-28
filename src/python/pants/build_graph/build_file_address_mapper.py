@@ -180,6 +180,7 @@ class BuildFileAddressMapper(AddressMapper):
     def exclude_address(address):
       return exclude_spec(address.spec)
 
+    #TODO: Investigate why using set will break ci. May help migration to v2 engine.
     addresses = OrderedSet()
     for spec in specs:
       for address in self._scan_spec(spec, fail_fast):
