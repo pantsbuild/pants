@@ -33,7 +33,7 @@ class LegacyPythonCallbacksParser(Parser):
 
   @classmethod
   @memoized_method
-  def _get_symbols(cls, symbol_table_cls):
+  def _get_symbols(cls, symbol_table_cls, rel_path):
     symbol_table = symbol_table_cls.table()
     # TODO: Nasty escape hatch: see https://github.com/pantsbuild/pants/issues/3561
     aliases = symbol_table_cls.aliases()
@@ -49,6 +49,9 @@ class LegacyPythonCallbacksParser(Parser):
         return [self._object_type]
 
       def __call__(self, *args, **kwargs):
+        # Target names default to the name of the directory their BUILD file is in.
+        if 'name' not in kwargs and issubclass(self._object_type, TargetAdaptor):
+          kwargs['name'] = os.path.basename(rel_path)
         name = kwargs.get('name')
         if name and self._serializable:
           kwargs.setdefault('type_alias', self._type_alias)
@@ -70,7 +73,7 @@ class LegacyPythonCallbacksParser(Parser):
 
     # Compute "per path" symbols (which will all use the same mutable ParseContext).
     # TODO: See https://github.com/pantsbuild/pants/issues/3561
-    parse_context = ParseContext(rel_path='', type_aliases=symbols)
+    parse_context = ParseContext(rel_path=rel_path, type_aliases=symbols)
     for alias, object_factory in aliases.context_aware_object_factories.items():
       symbols[alias] = object_factory(parse_context)
 
@@ -97,11 +100,12 @@ class LegacyPythonCallbacksParser(Parser):
 
   @classmethod
   def parse(cls, filepath, filecontent, symbol_table_cls):
-    symbols, parse_context = cls._get_symbols(symbol_table_cls)
+    rel_path = os.path.dirname(filepath)
+    symbols, parse_context = cls._get_symbols(symbol_table_cls, rel_path)
     python = filecontent
 
     # Mutate the parse context for the new path.
-    parse_context._rel_path = os.path.dirname(filepath)
+    #parse_context._rel_path = rel_path
 
     with cls._lock:
       del cls._objects[:]

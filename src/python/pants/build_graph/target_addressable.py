@@ -35,7 +35,8 @@ class TargetAddressable(Addressable):
 
   def __init__(self, alias, target_type, *args, **kwargs):
     super(TargetAddressable, self).__init__(alias, target_type)
-
+    # We assert this here even though the name keyword now defaults to the directory
+    # name, as an extra check that this defaulting did in fact happen.
     if 'name' not in kwargs:
       raise Addressable.AddressableInitError(
         'name is a required parameter to all Targets specified within a BUILD file.'

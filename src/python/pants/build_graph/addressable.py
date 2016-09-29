@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from abc import abstractmethod
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
@@ -28,6 +29,12 @@ class AddressableCallProxy(BuildFileTargetFactory):
     return self._addressable_factory.target_types
 
   def __call__(self, *args, **kwargs):
+    # Let the name default to the name of the directory the BUILD file is in, as
+    # this is a very common idiom.  If there are multiple targets in the BUILD file,
+    # we'll issue an error saying as much, and the author will have to name all
+    # but one of them explicitly.
+    if 'name' not in kwargs:
+      kwargs['name'] = os.path.basename(self._build_file.spec_path)
     addressable = self._addressable_factory.capture(*args, **kwargs)
     addressable_name = addressable.addressed_name
     if addressable_name:

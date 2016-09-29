@@ -3,7 +3,7 @@
 
 # Like Hello World, but built with Pants.
 
-jvm_app(name='main',
+jvm_app(
   basename = 'hello-example',
   dependencies = [
     ':main-bin'
