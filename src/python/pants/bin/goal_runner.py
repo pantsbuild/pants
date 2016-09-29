@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import sys
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.project_tree_factory import get_project_tree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
