@@ -55,7 +55,6 @@ class LegacyBuildGraph(BuildGraph):
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
     """
     self._scheduler = scheduler
-    self._graph = None # TODO scheduler.product_graph
     self._target_types = self._get_target_types(symbol_table_cls)
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
