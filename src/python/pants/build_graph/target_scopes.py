@@ -128,7 +128,7 @@ class ScopedDependencyFactory(object):
 
   def __init__(self, parse_context):
     self._parse_context = parse_context
-    self.__index = 0
+    self._scope_seen = set()
 
   def __call__(self, address, scope=None):
     """
@@ -141,18 +141,21 @@ class ScopedDependencyFactory(object):
                                       .format(type(address)))
     scope = Scope(scope)
     address = Address.parse(address, self._parse_context.rel_path)
-    self.__index += 1
     # NB(gmalmquist): Ideally we should hide this from `./pants list` etc somehow (see note in
     # intransitive_dependency.py dealing with the same issue).
-    name = '{name}-unstable-{scope}-{index}'.format(
+    import pdb;pdb.set_trace()
+    name = '{name}-unstable-{scope}'.format(
       name=address.target_name,
       scope=str(scope).replace(' ', '.'),
-      index=self.__index,
     )
-    self._parse_context.create_object(
-      'target',
-       name=name,
-       scope=str(scope),
-       dependencies=[address.spec],
-    )
+
+    if name not in self._scope_seen:
+      self._parse_context.create_object(
+        'target',
+         name=name,
+         scope=str(scope),
+         dependencies=[address.spec],
+      )
+      self._scope_seen.add(name)
+
     return ':{}'.format(name)
