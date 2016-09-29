@@ -432,7 +432,7 @@ def create_fs_tasks():
      [SelectDependencies(PathsExpansion,
                          PathGlobs,
                          field_types=(PathWildcard, PathDirWildcard, PathRoot),
-                         traversal=True)],
+                         transitive=True)],
      finalize_path_expansion),
     (PathsExpansion,
      [Select(PathRoot)],

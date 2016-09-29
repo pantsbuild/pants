@@ -19,7 +19,6 @@ from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant)
-from pants.engine.storage import Digest
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import (ExternContext, extern_id_to_str, extern_issubclass,
                                            extern_key_for, extern_project, extern_project_multi,
@@ -160,7 +159,7 @@ class LocalScheduler(object):
 
   def _register_intrinsics(self, intrinsics):
     """Register the given intrinsics dict.
-    
+
     Intrinsic tasks are those that are the default for a particular type(subject), type(product)
     pair. By default, intrinsic tasks create Runnables that are not cacheable.
     """
@@ -168,7 +167,7 @@ class LocalScheduler(object):
       self._native.lib.intrinsic_task_add(self._scheduler,
                                           self._to_id(func),
                                           self._to_id(subject_type),
-                                          self._to_id(product_type))
+                                           self._to_id(product_type))
 
   def _register_tasks(self, tasks):
     """Register the given tasks dict with the native scheduler."""
@@ -197,7 +196,7 @@ class LocalScheduler(object):
                                                           self._to_id(selector.product),
                                                           self._to_id(selector.dep_product),
                                                           self._to_key(selector.field),
-                                                          selector.traversal)
+                                                          selector.transitive)
           elif selector_type is SelectProjection:
             if len(selector.fields) != 1:
               raise ValueError("TODO: remove support for projecting multiple fields at once.")

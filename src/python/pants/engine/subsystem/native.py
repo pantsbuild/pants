@@ -235,7 +235,7 @@ class Id(datatype('Id', ['value'])):
 
 class ExternContext(object):
   """A wrapper around python objects used in static extern functions in this module.
-  
+
   In the native context, python objects are identified by an unsigned-integer Id which is
   assigned and memoized here. Note that this is independent-from and much-lighter-than
   the Digest computed when an object is stored via storage.py (which is generally only necessary
@@ -254,7 +254,7 @@ class ExternContext(object):
     # Buffers for transferring strings and arrays of Keys.
     self._resize_utf8(256)
     self._resize_keys(64)
- 
+
   def _resize_utf8(self, size):
     self._utf8_cap = size
     self._utf8_buf = _FFI.new('char[]', self._utf8_cap)

@@ -198,9 +198,7 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    print('>>> injecting addresses: {}'.format(addresses))
-    for out in self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
-      print('>>>   got: {}'.format(out))
+    for _ in self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
       pass
 
   def inject_specs_closure(self, specs, fail_fast=None):
@@ -304,7 +302,7 @@ def create_legacy_graph_tasks():
   return [
     # Recursively requests HydratedTargets, which will result in an eager, transitive graph walk.
     (HydratedTargets,
-     [SelectDependencies(HydratedTarget, Addresses, field_types=(Address,), traversal=True)],
+     [SelectDependencies(HydratedTarget, Addresses, field_types=(Address,), transitive=True)],
      HydratedTargets),
     (HydratedTarget,
      [Select(TargetAdaptor),

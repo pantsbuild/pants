@@ -1,7 +1,7 @@
 [project]
 version = "0.0.1"
 name = "engine"
-authors = [ "Stu Hood <stuhood@gmail.com>" ]
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [lib]
 crate-type = ["dylib"]

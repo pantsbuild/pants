@@ -437,7 +437,7 @@ impl SelectDependencies {
 
   fn dep_node(&self, context: &StepContext, dep_subject: &Value) -> Node {
     let dep_subject_key = context.key_for(dep_subject);
-    if self.selector.traversal {
+    if self.selector.transitive {
       // After the root has been expanded, a traversal continues with dep_product == product.
       let mut selector = self.selector.clone();
       selector.dep_product = selector.product;
@@ -452,17 +452,17 @@ impl SelectDependencies {
   }
 
   fn store(&self, context: &StepContext, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if self.selector.traversal && dep_product.type_id() == &self.selector.product {
+    if self.selector.transitive && dep_product.type_id() == &self.selector.product {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
       // TODO: would be nice to do this in one operation.
       let prepend = context.store_list(vec![dep_product], false);
       let mut prepended = dep_values;
       prepended.insert(0, &prepend);
-      context.store_list(prepended, self.selector.traversal)
+      context.store_list(prepended, self.selector.transitive)
     } else {
       // Not an inner node, or not a traversal.
-      context.store_list(dep_values, self.selector.traversal)
+      context.store_list(dep_values, self.selector.transitive)
     }
   }
 }

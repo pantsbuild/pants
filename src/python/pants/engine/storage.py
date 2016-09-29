@@ -12,24 +12,23 @@ from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
 from contextlib import closing
-from hashlib import sha256
+from hashlib import sha1
 from struct import Struct as StdlibStruct
 
 import lmdb
 import six
 
+from pants.engine.nodes import State
 from pants.engine.objects import Closable, SerializationError
-from pants.engine.selectors import Collection
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
 
 
 def _unpickle(value):
-  if type(value) is six.binary_type:
+  if isinstance(value, six.binary_type):
     # Deserialize string values.
     return pickle.loads(value)
-  # Deserialize values with file interface.
+  # Deserialize values with file interface,
   return pickle.load(value)
 
 
@@ -41,38 +40,60 @@ def _copy_bytes(value):
   return bytes(value)
 
 
-# The digest implementation used for Digests.
-_DIGEST_IMPL = sha256
-_DIGEST_SIZE = _DIGEST_IMPL().digest_size
-# A struct.Struct definition for grabbing the first 4 bytes off of a digest of
-# size DIGEST_SIZE, and discarding the rest.
-_32_BIT_STRUCT = StdlibStruct(b'<l' + (b'x' * (_DIGEST_SIZE - 4)))
-
-
-class Digest(datatype('Digest', ['digest'])):
+class Key(object):
   """Holds the digest for the object, which uniquely identifies it.
 
-  Extends datatype (and thus tuple) to allow for destructuring with CFFI.
+  The `_hash` is a memoized 32 bit integer hashcode computed from the digest.
   """
 
-  def __new__(cls, digest):
-    if type(digest) is not six.binary_type:
-      raise ValueError('Cannot create digest object from type {}'.format(type(digest)))
-    return super(Digest, cls).__new__(cls, digest)
+  __slots__ = ['_digest', '_hash']
+
+  # The digest implementation used for Keys.
+  _DIGEST_IMPL = sha1
+  _DIGEST_SIZE = _DIGEST_IMPL().digest_size
+
+  # A struct.Struct definition for grabbing the first 4 bytes off of a digest of
+  # size DIGEST_SIZE, and discarding the rest.
+  _32_BIT_STRUCT = StdlibStruct(b'<l' + (b'x' * (_DIGEST_SIZE - 4)))
 
   @classmethod
   def create(cls, blob):
-    """Given a blob, hash it to construct a Digest.
+    """Given a blob, hash it to construct a Key.
 
     :param blob: Binary content to hash.
+    :param type_: Type of the object to be hashed.
     """
-    return cls(_DIGEST_IMPL(blob).digest())
+    return cls.create_from_digest(cls._DIGEST_IMPL(blob).digest())
+
+  @classmethod
+  def create_from_digest(cls, digest):
+    """Given the digest for a key, create a Key.
+
+    :param digest: The digest for the Key.
+    """
+    hash_ = cls._32_BIT_STRUCT.unpack(digest)[0]
+    return cls(digest, hash_)
+
+  def __init__(self, digest, hash_):
+    """Not for direct use: construct a Key via `create` instead."""
+    self._digest = digest
+    self._hash = hash_
+
+  @property
+  def digest(self):
+    return self._digest
 
   def __hash__(self):
-    return _32_BIT_STRUCT.unpack(self.digest)[0]
+    return self._hash
+
+  def __eq__(self, other):
+    return self._digest == other._digest
+
+  def __ne__(self, other):
+    return not (self == other)
 
   def __repr__(self):
-    return 'Digest({})'.format(hexlify(self.digest[:4]))
+    return 'Key({})'.format(hexlify(self._digest))
 
   def __str__(self):
     return repr(self)
@@ -88,8 +109,8 @@ class Storage(Closable):
   Storage as `Closable`, `close()` can be called either explicitly or through the `with`
   statement in a context.
 
-  Besides contents indexed by their hashed Digests, a secondary index is also provided
-  for mappings between Digests. This allows to establish links between contents that
+  Besides contents indexed by their hashed Keys, a secondary index is also provided
+  for mappings between Keys. This allows to establish links between contents that
   are represented by those keys. Cache for example is such a use case.
 
   Convenience methods to translate nodes and states in
@@ -131,8 +152,9 @@ class Storage(Closable):
     self._contents = contents
     self._key_mappings = key_mappings
     self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
+    self._memo = dict()
 
-  def put(self, obj, nesting=True):
+  def put(self, obj):
     """Serialize and hash something pickleable, returning a unique key to retrieve it later.
 
     NB: pickle by default memoizes objects by id and pickle repeated objects by references,
@@ -140,11 +162,6 @@ class Storage(Closable):
     For content addressability we need equality. Use `fast` mode to turn off memo.
     Longer term see https://github.com/pantsbuild/pants/issues/2969
     """
-    obj = self._maybe_put_nested(obj) if nesting else obj
-
-    digest, memoizable = self._get_o2k(obj)
-    if digest is not None:
-      return digest
     try:
       with closing(StringIO.StringIO()) as buf:
         pickler = pickle.Pickler(buf, protocol=self._protocol)
@@ -153,63 +170,39 @@ class Storage(Closable):
         blob = buf.getvalue()
 
         # Hash the blob and store it if it does not exist.
-        digest = Digest.create(blob)
-        if digest not in self._memo_k2o:
-          self._memo_k2o[digest] = obj
-          self._contents.put(digest.digest, blob)
+        key = Key.create(blob)
+        if key not in self._memo:
+          self._memo[key] = obj
+          self._contents.put(key.digest, blob)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
       # `Exception` type here.
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e), e)
 
-    if memoizable:
-      self._memo_o2k[obj] = digest
-    return digest
+    return key
 
-  def _maybe_put_nested(self, obj):
-    # If the stored object is a collection type, recurse.
-    if type(obj) in (tuple, list):
-      return type(obj)(self.put(inner) for inner in obj)
-    elif isinstance(obj, Collection):
-      return type(obj)(tuple(self.put(inner) for inner in obj.dependencies))
-    else:
-      return obj
-
-  def put_typed(self, obj, nesting=True):
-    return (self.put(obj, nesting=nesting), self.put(type(obj)))
-
-  def put_typed_from_digests(self, digests):
-    # Create a pre-nested value (and thus, disable the default nesting).
-    arg = tuple(Digest(digest) for digest in digests)
-    return (self.put(arg, nesting=False), self.put(type(arg)))
-
-  def get(self, key, nesting=True):
+  def get(self, key):
     """Given a key, return its deserialized content.
 
     Note that since this is not a cache, if we do not have the content for the object, this
     operation fails noisily.
     """
-    if type(key) is not Digest:
-      raise InvalidKeyError('Not a valid key: {!r}'.format(key))
+    if not isinstance(key, Key):
+      raise InvalidKeyError('Not a valid key: {}'.format(key))
 
-    obj = self._memo_k2o.get(key, None)
-    if obj is None:
-      obj = self._contents.get(key.digest, _unpickle)
-
-    return self._maybe_get_nested(obj) if nesting else obj
-
-  def _maybe_get_nested(self, obj):
-    # If the stored object was a collection type, recurse.
-    if type(obj) in (tuple, list):
-      return type(obj)(self.get(inner) for inner in obj)
-    elif isinstance(obj, Collection):
-      return type(obj)(tuple(self.get(inner) for inner in obj.dependencies))
-    else:
+    obj = self._memo.get(key)
+    if obj is not None:
       return obj
+    return self._contents.get(key.digest, _unpickle)
 
-  def get_from_digest(self, digest, nesting=True):
-    return self.get(Digest(digest), nesting=nesting)
+  def put_state(self, state):
+    """Put the components of the State individually in storage, then put the aggregate."""
+    return self.put(tuple(self.put(r).digest for r in state.to_components()))
+
+  def get_state(self, state_key):
+    """The inverse of put_state: get a State given its Key."""
+    return State.from_components(tuple(self.get(Key.create_from_digest(d)) for d in self.get(state_key)))
 
   def add_mapping(self, from_key, to_key):
     """Establish one to one relationship from one Key to another Key.
@@ -233,12 +226,20 @@ class Storage(Closable):
     if to_key is None:
       return None
 
-    if type(to_key) is six.binary_type:
+    if isinstance(to_key, six.binary_type):
       return pickle.loads(to_key)
     return pickle.load(to_key)
 
   def close(self):
     self._contents.close()
+
+  def _assert_type_matches(self, value, key_type):
+    """Ensure the type of deserialized object matches the type from key."""
+    value_type = type(value)
+    if key_type and value_type is not key_type:
+      raise ValueError('Mismatch types, key: {}, value: {}'
+                       .format(key_type, value_type))
+    return value
 
 
 class Cache(Closable):
@@ -292,7 +293,7 @@ class Cache(Closable):
   def items(self):
     """Iterate over all cached request, result for testing purpose."""
     for digest, _ in self._storage._key_mappings.items():
-      request_key = Digest(digest)
+      request_key = Key.create_from_digest(digest)
       request = self._storage.get(request_key)
       yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
 
@@ -375,7 +376,7 @@ class InMemoryDb(KeyValueStore):
     self._storage = dict()
 
   def get(self, key, transform=_identity):
-    return transform(self._storage[key])
+    return transform(self._storage.get(key))
 
   def put(self, key, value, transform=_copy_bytes):
     if key in self._storage:
@@ -443,9 +444,9 @@ class Lmdb(KeyValueStore):
     """
     with self._env.begin(db=self._db, buffers=True) as txn:
       value = txn.get(key)
-      if value is None:
-        raise KeyError('Unknown key: {}'.format(key))
-      return transform(StringIO.StringIO(value))
+      if value is not None:
+        return transform(StringIO.StringIO(value))
+      return None
 
   def put(self, key, value, transform=_identity):
     """Returning True if the key/value are actually written to the storage.
