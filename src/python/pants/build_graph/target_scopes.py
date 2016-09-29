@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from hashlib import sha1
+
 import six
 
 from pants.build_graph.address import Address
@@ -122,13 +124,13 @@ class ScopedDependencyFactory(object):
 
   The syntax for this feature is experimental and may change in the future.
   """
+  _scope_target_seen = set()
 
   class ExpectedAddressError(Exception):
     """Thrown if an object that is not an address is used as the dependency spec."""
 
   def __init__(self, parse_context):
     self._parse_context = parse_context
-    self._scope_seen = set()
 
   def __call__(self, address, scope=None):
     """
@@ -143,19 +145,22 @@ class ScopedDependencyFactory(object):
     address = Address.parse(address, self._parse_context.rel_path)
     # NB(gmalmquist): Ideally we should hide this from `./pants list` etc somehow (see note in
     # intransitive_dependency.py dealing with the same issue).
-    import pdb;pdb.set_trace()
-    name = '{name}-unstable-{scope}'.format(
+    hasher = sha1()
+    hasher.update(str(address))
+    hasher.update(str(scope))
+    name = '{name}-unstable-{scope}-{index}'.format(
       name=address.target_name,
       scope=str(scope).replace(' ', '.'),
+      index=hasher.hexdigest(),
     )
 
-    if name not in self._scope_seen:
+    if name not in ScopedDependencyFactory._scope_target_seen:
       self._parse_context.create_object(
         'target',
          name=name,
          scope=str(scope),
          dependencies=[address.spec],
       )
-      self._scope_seen.add(name)
+      ScopedDependencyFactory._scope_target_seen.add(name)
 
     return ':{}'.format(name)
