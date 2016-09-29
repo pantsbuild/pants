@@ -5,13 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 
 from pants.base.exceptions import TaskError
 from pants.task.console_task import ConsoleTask
-
-
-logger = logging.getLogger(__name__)
 
 
 class ListTargets(ConsoleTask):
@@ -38,7 +34,6 @@ class ListTargets(ConsoleTask):
     self._provides = options.provides
     self._provides_columns = options.provides_columns
     self._documented = options.documented
-    self._enable_v2_engine = options.enable_v2_engine
 
   def console_output(self, targets):
     if self._provides:
@@ -75,20 +70,8 @@ class ListTargets(ConsoleTask):
       print_fn = lambda target: target.address.spec
 
     visited = set()
-    for target in self._target_roots():
+    for target in self.determine_target_roots('list', lambda target: not target.is_synthetic):
       result = print_fn(target)
       if result and result not in visited:
         visited.add(result)
         yield result
-
-  def _target_roots(self):
-    if not self.context.target_roots and not self._enable_v2_engine:
-      logger.warn('The behavior of `./pants list` (no explicit targets) will soon become a no-op. '
-                  'To remove this warning, please specify one or more explicit target specs (e.g. '
-                  '`./pants list ::`).')
-      # For the v1 path, continue the behavior of `./pants list` implies `./pants list ::`.
-      return self.context.scan().targets(predicate=lambda target: not target.is_synthetic)
-
-    # For the v2 path, `./pants list` is a functional no-op. This matches the v2 mode behavior of
-    # `./pants --changed-parent=HEAD list` (w/ no changes) returning an empty result.
-    return self.context.target_roots
