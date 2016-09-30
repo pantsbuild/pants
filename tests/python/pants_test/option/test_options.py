@@ -756,8 +756,17 @@ class OptionsTest(unittest.TestCase):
 
   def test_deprecated_option_past_removal(self):
     """Ensure that expired options raise CodeRemovedError on attempted use."""
+    # Test option past removal from flag
     with self.assertRaises(CodeRemovedError):
       self._parse('./pants --global-crufty-expired=way2crufty').for_global_scope()
+
+    # Test option past removal from env
+    with self.assertRaises(CodeRemovedError):
+      self._parse('./pants', env={'PANTS_GLOBAL_CRUFTY_EXPIRED':'way2crufty'}).for_global_scope()
+
+    #Test option past removal from config
+    with self.assertRaises(CodeRemovedError):
+      self._parse('./pants', config={'GLOBAL':{'global_crufty_expired':'way2crufty'}}).for_global_scope()
 
   @contextmanager
   def warnings_catcher(self):
@@ -774,6 +783,9 @@ class OptionsTest(unittest.TestCase):
                     warning_message)
       self.assertIn(option_string, warning_message)
 
+    # --------------------------------
+    # Test deprecate optons from flag.
+    # --------------------------------
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty=crufty1')
       self.assertEquals('crufty1', options.for_global_scope().global_crufty)
@@ -813,6 +825,32 @@ class OptionsTest(unittest.TestCase):
       options = self._parse('./pants --stale-crufty-boolean')
       self.assertTrue(options.for_scope('stale').crufty_boolean)
       assertWarning(w, 'crufty_boolean')
+
+    # --------------------------------
+    # Test deprecate options from env.
+    # --------------------------------
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants', env={'PANTS_GLOBAL_CRUFTY':'crufty1'})
+      self.assertEquals('crufty1', options.for_global_scope().global_crufty)
+      assertWarning(w, 'global_crufty')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants', env={'PANTS_STALE_CRUFTY':'stale_and_crufty'})
+      self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
+      assertWarning(w, 'crufty')
+
+    # --------------------------------
+    # Test deprecate options from config.
+    # --------------------------------
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants', config={'GLOBAL':{'global_crufty':'crufty1'}})
+      self.assertEquals('crufty1', options.for_global_scope().global_crufty)
+      assertWarning(w, 'global_crufty')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants', config={'stale':{'crufty':'stale_and_crufty'}})
+      self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
+      assertWarning(w, 'crufty')
 
     # Make sure the warnings don't come out for regular options.
     with self.warnings_catcher() as w:
