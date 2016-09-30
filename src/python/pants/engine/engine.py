@@ -129,6 +129,7 @@ class Engine(AbstractClass):
       State.raise_unrecognized(unknown_state_types)
 
     # Throw handling.
+    #TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_roots = tuple(root for root, state in result_items if type(state) is Throw)
     if throw_roots:
       cumulative_trace = '\n'.join(
