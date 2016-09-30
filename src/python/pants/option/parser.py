@@ -144,10 +144,6 @@ class Parser(object):
       self._validate(args, kwargs)
       dest = kwargs.get('dest') or self._select_dest(args)
 
-      def consume_flag(flag):
-        self._check_deprecated(dest, kwargs)
-        del flag_value_map[flag]
-
       # Compute the values provided on the command line for this option.  Note that there may be
       # multiple values, for any combination of the following reasons:
       #   - The user used the same flag multiple times.
@@ -186,7 +182,7 @@ class Parser(object):
         if arg in flag_value_map:
           for v in flag_value_map[arg]:
             add_flag_val(v)
-          consume_flag(arg)
+          del flag_value_map[arg]
 
       # Get the value for this option, falling back to defaults as needed.
       try:
@@ -200,6 +196,9 @@ class Parser(object):
           '\nCaused by:\n{}'.format(', '.join(args), self._scope_str(), traceback.format_exc())
         )
 
+      # If the option is explicitly given, check deprecation.
+      if val.rank > RankedValue.HARDCODED:
+        self._check_deprecated(dest, kwargs)
       setattr(namespace, dest, val)
 
     # See if there are any unconsumed flags remaining.
