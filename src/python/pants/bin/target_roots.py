@@ -7,11 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
+from twitter.common.collections import OrderedSet
+
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import DescendantAddresses, Spec
 from pants.bin.options_initializer import OptionsInitializer
-from pants.build_graph.address import Address
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import ChangedRequest
 
@@ -27,6 +27,18 @@ class TargetRoots(object):
   """Determines the target roots for a given pants run."""
 
   @classmethod
+  def parse_specs(cls, target_specs, build_root=None):
+    """Parse string specs into unique `Spec` objects.
+
+    :param iterable target_specs: An iterable of string specs.
+    :param string build_root: The path to the build root.
+    :returns: An `OrderedSet` of `Spec` objects.
+    """
+    build_root = build_root or get_buildroot()
+    spec_parser = CmdLineSpecParser(build_root)
+    return OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs)
+
+  @classmethod
   def create(cls, options=None, args=None, build_root=None, change_calculator=None):
     """
     :param Options options: An `Options` instance to use, if available.
@@ -39,8 +51,7 @@ class TargetRoots(object):
       options, _ = OptionsInitializer(OptionsBootstrapper(args=args)).setup(init_logging=False)
 
     # Determine the literal target roots.
-    cmd_line_spec_parser = CmdLineSpecParser(build_root or get_buildroot())
-    spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in options.target_specs]
+    spec_roots = cls.parse_specs(options.target_specs, build_root)
 
     # Determine `Changed` arguments directly from options to support pre-`Subsystem` initialization paths.
     changed_options = options.for_scope('changed')
@@ -61,28 +72,10 @@ class TargetRoots(object):
       logger.debug('changed addresses: %s', changed_addresses)
       return ChangedTargetRoots(changed_addresses)
 
-    # If no spec roots are passed, assume `::` as the intended target.
-    return LiteralTargetRoots(spec_roots if spec_roots else [DescendantAddresses('')])
+    return LiteralTargetRoots(spec_roots)
 
   def __init__(self, spec_roots):
     self._spec_roots = spec_roots
-
-  def as_string_specs(self):
-    """Returns the current target roots as stringified specs for v1 compatibility."""
-    # TODO: Kill this once `LegacyAddressMapper.specs_to_addresses()` exists.
-    # See: https://github.com/pantsbuild/pants/issues/3798
-
-    def _to_addresses(spec_roots):
-      for spec in spec_roots:
-        if isinstance(spec, Spec):
-          yield spec.to_spec_string()
-        elif isinstance(spec, Address):
-          yield spec.spec
-        else:
-          raise TypeError('unsupported spec type `{}` when converting {!r} to string spec'
-                          .format(type(spec), spec))
-
-    return [address for address in _to_addresses(self._spec_roots)]
 
   def as_specs(self):
     """Returns the current target roots as Specs."""
