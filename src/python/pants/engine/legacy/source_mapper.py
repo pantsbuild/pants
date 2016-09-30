@@ -60,9 +60,8 @@ class EngineSourceMapper(SourceMapper):
     # Handle `sources`-declaring targets.
     target_sources = target_kwargs.get('sources', [])
     if target_sources:
-      # Use the iterative functionality of `EagerFilesetWithSpec`.
-      for f in target_sources:
-        yield os.path.join(target_sources.rel_root, f)
+      for f in target_sources.iter_relative_paths():
+        yield f
 
     # Handle `resources`-declaring targets.
     target_resources = target_kwargs.get('resources')
@@ -74,8 +73,8 @@ class EngineSourceMapper(SourceMapper):
       #      python_library(..., resources=['file.txt', 'file2.txt'])
       #
       if isinstance(target_resources, EagerFilesetWithSpec):
-        for f in target_resources:
-          yield os.path.join(target_resources.rel_root, f)
+        for f in target_resources.iter_relative_paths():
+          yield f
       # 2) Strings of addresses, which are represented in kwargs by a list of strings:
       #
       #      java_library(..., resources=['testprojects/src/resources/...:resource'])
@@ -88,8 +87,8 @@ class EngineSourceMapper(SourceMapper):
         for resource_target in self._engine.product_request(LegacyTarget, resource_dep_subjects):
           resource_sources = resource_target.adaptor.kwargs().get('sources')
           if resource_sources:
-            for f in resource_sources:
-              yield os.path.join(resource_sources.rel_root, f)
+            for f in resource_sources.iter_relative_paths():
+              yield f
 
   def iter_target_addresses_for_sources(self, sources):
     """Bulk, iterable form of `target_addresses_for_source`."""

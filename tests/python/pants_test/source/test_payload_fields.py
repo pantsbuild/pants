@@ -76,3 +76,4 @@ class PayloadTest(BaseTest):
 
     self.assertIs(fileset, sf.sources)
     self.assertEqual(['foo/a.txt'], list(sf.source_paths))
+    self.assertEqual(['foo/foo/a.txt'], list(sf.relative_to_buildroot()))
