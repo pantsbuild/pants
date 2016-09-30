@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from abc import abstractproperty
 from hashlib import sha1
 
 import six
@@ -25,9 +24,10 @@ class IntermediateTargetFactoryBase(AbstractClass):
     self._parse_context = parse_context
     self._intermediate_target_seen = dict()
 
-  @abstractproperty
+  @property
   def extra_target_arguments(self):
     """Extra keyword arguments to pass to the target constructor."""
+    return dict()
 
   def __call__(self, address, scope_str='intransitive'):
     """
