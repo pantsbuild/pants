@@ -13,14 +13,8 @@ class Filemap(ConsoleTask):
 
   def console_output(self, _):
     visited = set()
-    for target in self._find_targets():
+    for target in self.determine_target_roots('filemap'):
       if target not in visited:
         visited.add(target)
         for rel_source in target.sources_relative_to_buildroot():
           yield '{} {}'.format(rel_source, target.address.spec)
-
-  def _find_targets(self):
-    if len(self.context.target_roots) > 0:
-      return self.context.target_roots
-    else:
-      return self.context.scan().targets()
