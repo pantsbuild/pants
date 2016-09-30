@@ -23,7 +23,7 @@ class IntermediateTargetFactoryBase(AbstractClass):
 
   def __init__(self, parse_context):
     self._parse_context = parse_context
-    self._intermediate_target_seen = set()
+    self._intermediate_target_seen = dict()
 
   @abstractproperty
   def extra_target_arguments(self):
@@ -60,7 +60,7 @@ class IntermediateTargetFactoryBase(AbstractClass):
         dependencies=[address.spec],
         **self.extra_target_arguments
       )
-      self._intermediate_target_seen.add(name)
+      self._intermediate_target_seen[name] = self._parse_context.rel_path
 
-    spec_path = address.spec_path if address.spec_path != self._parse_context.rel_path else ''
+    spec_path = self._intermediate_target_seen[name]
     return '{}:{}'.format(spec_path, name)
