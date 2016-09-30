@@ -33,6 +33,7 @@ _DEFAULT_PATH_BY_ID = {
   ('darwin', '13'): ('mac', '10.9'),
   ('darwin', '14'): ('mac', '10.10'),
   ('darwin', '15'): ('mac', '10.11'),
+  ('darwin', '16'): ('mac', '10.12'),
 }
 
 
