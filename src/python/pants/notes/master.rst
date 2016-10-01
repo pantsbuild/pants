@@ -4,6 +4,53 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.2.0dev12 (9/30/2016)
+----------------------
+
+Regularly scheduled unstable release, highlighted by engine work and OSX 10.12 support.
+Thanks to the contributors!
+
+Bugfixes
+~~~~~~~~
+* Remove deprecated `from_target` usage in examples.
+  `RB #4262 <https://rbcommons.com/s/twitter/r/4262>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* show deprecation warning for options given in env and config
+  `RB #4272 <https://rbcommons.com/s/twitter/r/4272>`_
+
+* Update binary_util OS map for OSX Sierra.
+  `RB #4266 <https://rbcommons.com/s/twitter/r/4266>`_
+
+* Make LegacyAddressMapper v2 engine backed
+  `RB #4239 <https://rbcommons.com/s/twitter/r/4239>`_
+
+* Upgrade to junit-runner 1.0.14.
+  `RB #4264 <https://rbcommons.com/s/twitter/r/4264>`_
+
+* Fix handling of method specs.
+  `RB #4258 <https://rbcommons.com/s/twitter/r/4258>`_
+
+* Factor workunit failure into final exit code.
+  `RB #4244 <https://rbcommons.com/s/twitter/r/4244>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+* [engine] Iterative improvements for`changed` and friends.
+  `RB #4269 <https://rbcommons.com/s/twitter/r/4269>`_
+
+* [engine] Allow injecting of intrinsic providers to ease testing
+  `RB #4263 <https://rbcommons.com/s/twitter/r/4263>`_
+
+* [engine] When requesting select nodes or regular nodes, return state values rather than requiring a separate call
+  `RB #4261 <https://rbcommons.com/s/twitter/r/4261>`_
+
+* [engine] Introduce TypeConstraint#satisfied_by_type
+  `RB #4260 <https://rbcommons.com/s/twitter/r/4260>`_
+
+
 1.2.0dev11 (9/23/2016)
 ----------------------
 
