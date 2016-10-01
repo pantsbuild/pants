@@ -23,13 +23,14 @@ pub type DepSet = Vec<EntryId>;
  * not too crazy (although maintaining sorted order and then binary-searching in sufficiently
  * large Vecs would make sense).
  */
+#[derive(Debug)]
 pub struct Entry {
   id: EntryId,
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  state: State<EntryId>,
+  state: Option<Complete>,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
   dependents: DepSet,
@@ -46,8 +47,8 @@ impl Entry {
     &self.node
   }
 
-  pub fn state(&self) -> &State<EntryId> {
-    &self.state
+  pub fn state(&self) -> Option<&Complete> {
+    self.state.as_ref()
   }
 
   pub fn dependencies(&self) -> &DepSet {
@@ -62,25 +63,14 @@ impl Entry {
     &self.cyclic_dependencies
   }
 
-  pub fn is_staged(&self) -> bool {
-    match &self.state {
-      &State::Staged(_) => true,
-      &State::Complete(_) => true,
-      _ => false,
-    }
-  }
-
   pub fn is_complete(&self) -> bool {
-    match &self.state {
-      &State::Complete(_) => true,
-      _ => false,
-    }
+    self.state.is_some()
   }
 
   fn format(&self, externs: &Externs) -> String {
     let state =
       match self.state {
-        State::Complete(Complete::Return(ref v)) => externs.val_to_str(v),
+        Some(Complete::Return(ref v)) => externs.val_to_str(v),
         ref x => format!("{:?}", x),
       };
     format!(
@@ -124,8 +114,12 @@ impl Graph {
     self.entries.len()
   }
 
-  fn is_complete_entry(&self, id: EntryId) -> bool {
+  pub fn is_complete_entry(&self, id: EntryId) -> bool {
     self.entry_for_id(id).is_complete()
+  }
+
+  pub fn is_ready_entry(&self, id: EntryId) -> bool {
+    !self.is_complete_entry(id) && self.dependencies_all(id, |e| e.is_complete())
   }
 
   pub fn dependencies_all<P>(&self, id: EntryId, predicate: P) -> bool
@@ -138,11 +132,11 @@ impl Graph {
   }
 
   pub fn entry_for_id(&self, id: EntryId) -> &Entry {
-    &self.entries[&id]
+    self.entries.get(&id).unwrap_or_else(|| panic!("Invalid EntryId: {}", id))
   }
 
   pub fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    self.entries.get_mut(&id).expect("Invalid EntryId!")
+    self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {}", id))
   }
 
   pub fn ensure_entry(&mut self, node: Node) -> EntryId {
@@ -180,7 +174,7 @@ impl Graph {
       Entry {
         id: id,
         node: entry_node,
-        state: State::empty_waiting(),
+        state: None,
         dependencies: Vec::new(),
         dependents: Vec::new(),
         cyclic_dependencies: Vec::new(),
@@ -190,27 +184,10 @@ impl Graph {
     id
   }
 
-  pub fn set_state(&mut self, id: EntryId, next_state: State<Node>) {
-    // Validate the State change.
-    match (self.entry_for_id(id).state(), &next_state) {
-      (&State::Waiting(_), &State::Complete(_)) =>
-        assert!(self.dependencies_all(id, Entry::is_complete), "Node {:?} has incomplete deps.", id),
-      (&State::Waiting(_), &State::Staged(_)) =>
-        (),
-      (&State::Waiting(_), &State::Waiting(_)) =>
-        (),
-      (&State::Staged(_), &State::Complete(_)) =>
-        (),
-      (&State::Staged(ref s), t) =>
-        panic!("A staged Node may only complete!: from {:?} to {:?}", s, t),
-      (&State::Complete(ref c), t) =>
-        panic!("Cannot change the State of a completed Node!: from {:?} to {:?}", c, t),
-    };
+  pub fn complete(&mut self, id: EntryId, state: Complete) {
+    assert!(self.is_ready_entry(id), "Node {:?} is already completed, or has incomplete deps.", self.entry_for_id(id));
 
-    // The change is valid! Add all dependencies from the state, and then store it.
-    let state = next_state.map(|n| self.ensure_entry(n));
-    state.dependencies().map(|dst_ids| self.add_dependencies(id, dst_ids));
-    self.entry_for_id_mut(id).state = state;
+    self.entry_for_id_mut(id).state = Some(state);
   }
 
   /**
@@ -219,13 +196,15 @@ impl Graph {
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  fn add_dependencies(&mut self, src_id: EntryId, dsts: DepSet) {
+  pub fn add_dependencies(&mut self, src_id: EntryId, dst_nodes: Vec<Node>) {
     assert!(
       !self.is_complete_entry(src_id),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
       src_id,
-      dsts,
+      dst_nodes,
     );
+
+    let dsts: Vec<EntryId> = dst_nodes.into_iter().map(|n| self.ensure_entry(n)).collect();
 
     // Determine whether each awaited dep is cyclic.
     let (deps, cyclic_deps): (DepSet, DepSet) = {
@@ -331,16 +310,15 @@ impl Graph {
     let mut format_color =
       |entry: &Entry| {
         match entry.state {
-          State::Complete(Complete::Noop(_, _)) => "white".to_string(),
-          State::Complete(Complete::Throw(_)) => "tomato".to_string(),
-          State::Complete(Complete::Return(_)) => {
+          None => "white".to_string(),
+          Some(Complete::Noop(_, _)) => "white".to_string(),
+          Some(Complete::Throw(_)) => "tomato".to_string(),
+          Some(Complete::Return(_)) => {
             let viz_colors_len = viz_colors.len();
             viz_colors.entry(entry.node.selector().product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
             }).clone()
           },
-          State::Staged(_) => "limegreen".to_string(),
-          State::Waiting(_) => "lightyellow".to_string(),
         }
       };
 

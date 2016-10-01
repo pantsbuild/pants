@@ -27,7 +27,7 @@ use externs::{
   with_vec,
 };
 use graph::{Graph, EntryId};
-use nodes::{Complete, Staged, StagedArg};
+use nodes::{Complete, Runnable};
 use scheduler::Scheduler;
 use tasks::Tasks;
 
@@ -53,8 +53,7 @@ impl RawScheduler {
 pub struct RawExecution {
   runnables_ptr: *const RawRunnable,
   runnables_len: u64,
-  runnables: Vec<Staged<EntryId>>,
-  runnable_args: Vec<Vec<RawArg>>,
+  runnables: Vec<(EntryId,Runnable)>,
   raw_runnables: Vec<RawRunnable>,
 }
 
@@ -65,7 +64,6 @@ impl RawExecution {
         runnables_ptr: Vec::new().as_ptr(),
         runnables_len: 0,
         runnables: Vec::new(),
-        runnable_args: Vec::new(),
         raw_runnables: Vec::new(),
       };
     // Update immediately to make the pointers above (likely dangling!) valid.
@@ -73,24 +71,18 @@ impl RawExecution {
     execution
   }
 
-  fn update(&mut self, ready_entries: Vec<(EntryId, Staged<EntryId>)>) {
-    let (ids, runnables): (Vec<_>, Vec<_>) = ready_entries.into_iter().unzip();
-    self.runnables = runnables;
-
-    self.runnable_args =
-      self.runnables.iter()
-        .map(|runnable| runnable.args.iter().map(RawArg::from).collect())
-        .collect();
+  fn update(&mut self, ready_entries: Vec<(EntryId, Runnable)>) {
+    self.runnables = ready_entries;
 
     self.raw_runnables =
-      ids.into_iter().zip(self.runnables.iter().zip(self.runnable_args.iter()))
-        .map(|(id, (runnable, raw_args))| {
+      self.runnables.iter()
+        .map(|&(id, ref runnable)| {
           RawRunnable {
             id: id,
-            func: &runnable.func as *const Function,
-            args_ptr: raw_args.as_ptr(),
-            args_len: raw_args.len() as u64,
-            cacheable: runnable.cacheable,
+            func: runnable.func() as *const Function,
+            args_ptr: runnable.args().as_ptr(),
+            args_len: runnable.args().len() as u64,
+            cacheable: runnable.cacheable(),
           }
         })
         .collect();
@@ -101,46 +93,12 @@ impl RawExecution {
 }
 
 #[repr(C)]
-enum RawArgTag {
-  Value = 0,
-  Promise = 1,
-}
-
-#[repr(C)]
-pub struct RawArg {
-  // A union of either a Value to represent a value, or an EntryId to represent the return
-  // value of another Runnable within this batch.
-  tag: u8,
-  value: Value,
-  promise: EntryId,
-}
-
-impl RawArg {
-  fn from(arg: &StagedArg<EntryId>) -> RawArg {
-    match arg {
-      &StagedArg::Value(v) =>
-        RawArg {
-          tag: RawArgTag::Value as u8,
-          value: v,
-          promise: 0,
-        },
-      &StagedArg::Promise(id) =>
-        RawArg {
-          tag: RawArgTag::Promise as u8,
-          value: Value::empty(),
-          promise: id,
-        },
-    }
-  }
-}
-
-#[repr(C)]
 pub struct RawRunnable {
   id: EntryId,
   // Single Key.
   func: *const Function,
   // Array of args.
-  args_ptr: *const RawArg,
+  args_ptr: *const Value,
   args_len: u64,
   // Boolean value indicating whether the runnable is cacheable.
   cacheable: bool,

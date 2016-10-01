@@ -311,21 +311,12 @@ class LocalScheduler(object):
                                     len(returns_ids),
                                     throws_ids,
                                     len(throws_ids))
-    def decode_arg(raw):
-      if raw.tag is 0:
-        # Is a literal Value: decode.
-        return self._from_value(raw.value)
-      elif raw.tag is 1:
-        # Is the id of another outstanding runnable.
-        raise AssertionError('TODO! implement pipelining to run: {}'.format(raw.promise))
-      else:
-        raise ValueError('Unrecognized RawArg tag `{}` for: {}'.format(raw.tag, raw))
 
     def decode_runnable(raw):
       return (
           raw.id,
           Runnable(self._from_id(raw.func),
-                   tuple(decode_arg(arg)
+                   tuple(self._from_value(arg)
                          for arg in self._native.unpack(raw.args_ptr, raw.args_len)),
                    bool(raw.cacheable))
         )

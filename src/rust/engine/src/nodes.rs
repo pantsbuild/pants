@@ -7,85 +7,33 @@ use selectors::Selector;
 use selectors;
 use tasks::Tasks;
 
-#[derive(Debug, Clone)]
-pub enum StagedArg<T> {
-  Value(Value),
-  Promise(T),
+
+#[derive(Clone, Debug)]
+pub struct Runnable {
+  func: Function,
+  args: Vec<Value>,
+  cacheable: bool,
 }
 
-#[derive(Debug, Clone)]
-pub struct Staged<T> {
-  pub func: Function,
-  pub args: Vec<StagedArg<T>>,
-  pub cacheable: bool,
-}
+impl Runnable {
+  pub fn func(&self) -> &Function {
+    &self.func
+  }
 
-impl<T: Clone + Eq + Hash> Staged<T> {
-  /**
-   * Return all dependencies declared by this state.
-   */
-  pub fn dependencies(&self) -> Vec<T> {
-    self.args.iter()
-      .filter_map(|arg|
-        match arg {
-          &StagedArg::Promise(ref t) => Some(t.clone()),
-          &StagedArg::Value(_) => None,
-        }
-      )
-      .collect()
+  pub fn args(&self) -> &Vec<Value> {
+    &self.args
+  }
+
+  pub fn cacheable(&self) -> bool {
+    self.cacheable
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum State<T> {
   Waiting(Vec<T>),
   Complete(Complete),
-  Staged(Staged<T>),
-}
-
-impl<T: Clone + Eq + Hash> State<T> {
-  pub fn empty_waiting() -> State<T> {
-    State::Waiting(Vec::new())
-  }
-
-  /**
-   * Return all dependencies declared by this state.
-   */
-  pub fn dependencies(&self) -> Option<Vec<T>> {
-    match self {
-      &State::Complete(_) => None,
-      &State::Staged(ref s) => Some(s.dependencies()),
-      &State::Waiting(ref w) if w.is_empty() => None,
-      &State::Waiting(ref w) => Some(w.iter().map(|s| s.clone()).collect()),
-    }
-  }
-
-  /**
-   * Converts a State of type T to a State of type O.
-   */
-  pub fn map<O,F>(self, mut conversion: F) -> State<O>
-      where F: FnMut(T)->O {
-    match self {
-      State::Complete(c) => State::Complete(c),
-      State::Staged(s) =>
-        State::Staged(
-          Staged {
-            func: s.func,
-            args:
-              s.args.into_iter()
-                .map(|a| {
-                  match a {
-                    StagedArg::Value(v) => StagedArg::Value(v),
-                    StagedArg::Promise(p) => StagedArg::Promise(conversion(p)),
-                  }
-                })
-                .collect(),
-            cacheable: s.cacheable
-          }
-        ),
-      State::Waiting(w) => State::Waiting(w.into_iter().map(conversion).collect()),
-    }
-  }
+  Runnable(Runnable),
 }
 
 #[derive(Debug, Clone)]
@@ -131,11 +79,7 @@ impl<'g,'t> StepContext<'g,'t> {
     self.graph.entry(node).and_then(|dep_entry| {
       // The entry exists. If it's a declared dep, return it immediately.
       if self.entry.dependencies().contains(&dep_entry.id()) {
-        // Declared.
-        match dep_entry.state() {
-          &State::Complete(ref c) => Some(c),
-          _ => None,
-        }
+        dep_entry.state()
       } else if self.entry.cyclic_dependencies().contains(&dep_entry.id()) {
         // Declared, but cyclic.
         Some(self.graph.cyclic_singleton())
@@ -584,24 +528,43 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, _: StepContext) -> State<Node> {
-    // Stage the Node to run immediately.
-    State::Staged(Staged {
-      func: self.selector.func,
-      args:
-        self.selector.clause.iter()
-          .map(|selector|
-            StagedArg::Promise(
-              Node::create(
-                selector.clone(),
-                self.subject,
-                self.variants.clone()
-              )
-            )
-          )
-          .collect(),
-      cacheable: self.selector.cacheable,
-    })
+  fn step(&self, context: StepContext) -> State<Node> {
+    // Compute dependencies for the Node, or determine whether it is a Noop.
+    let mut dependencies = Vec::new();
+    let mut dep_values: Vec<&Value> = Vec::new();
+    for selector in &self.selector.clause {
+      let dep_node =
+        Node::create(
+          selector.clone(),
+          self.subject,
+          self.variants.clone()
+        );
+      match context.get(&dep_node) {
+        Some(&Complete::Return(ref value)) =>
+          dep_values.push(&value),
+        Some(&Complete::Noop(_, _)) =>
+          return State::Complete(
+            Complete::Noop("Was missing (at least) input {}.", Some(dep_node))
+          ),
+        Some(&Complete::Throw(ref msg)) =>
+          // NB: propagate thrown exception directly.
+          return State::Complete(Complete::Throw(msg.clone())),
+        None =>
+          dependencies.push(dep_node),
+      }
+    }
+
+    if !dependencies.is_empty() {
+      // A clause was still waiting on dependencies.
+      State::Waiting(dependencies)
+    } else {
+      // Ready to run!
+      State::Runnable(Runnable {
+        func: self.selector.func,
+        args: dep_values.into_iter().cloned().collect(),
+        cacheable: self.selector.cacheable,
+      })
+    }
   }
 }
 

@@ -57,15 +57,9 @@ _FFI.cdef(
     typedef ValueBuffer (*extern_project_multi)(ExternContext*, Value*, Field*);
 
     typedef struct {
-      uint8_t  tag;
-      Value    value;
-      EntryId  promise;
-    } RawArg;
-
-    typedef struct {
       EntryId     id;
       Function*   func;
-      RawArg*     args_ptr;
+      Value*      args_ptr;
       uint64_t    args_len;
       bool        cacheable;
     } RawRunnable;
