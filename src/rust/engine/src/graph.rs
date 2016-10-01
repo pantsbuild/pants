@@ -94,7 +94,7 @@ impl Entry {
 }
 
 type Nodes = HashMap<Node, EntryId, FNV>;
-type Entries = Vec<Entry>;
+type Entries = HashMap<EntryId, Entry, FNV>;
 
 /**
  * A DAG (enforced on mutation) of Entries.
@@ -111,7 +111,7 @@ impl Graph {
     Graph {
       id_generator: 0,
       nodes: HashMap::default(),
-      entries: Vec::new(),
+      entries: HashMap::default(),
       cyclic_singleton: Complete::Noop("Dep would be cyclic.", None),
     }
   }
@@ -138,11 +138,11 @@ impl Graph {
   }
 
   pub fn entry_for_id(&self, id: EntryId) -> &Entry {
-    &self.entries[id]
+    &self.entries[&id]
   }
 
   pub fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    &mut self.entries[id]
+    self.entries.get_mut(&id).expect("Invalid EntryId!")
   }
 
   pub fn ensure_entry(&mut self, node: Node) -> EntryId {
@@ -175,11 +175,8 @@ impl Graph {
     }
 
     // New entry.
-    assert!(
-      id == entries.len(),
-      "Entry id generator mismatched entries length: {} vs {}", id, entries.len()
-    );
-    entries.push(
+    entries.insert(
+      id,
       Entry {
         id: id,
         node: entry_node,
@@ -299,21 +296,20 @@ impl Graph {
 
   fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: HashSet<EntryId, FNV>) -> usize {
     // Remove the roots from their dependencies' dependents lists.
-    panic!("FIXME: Needs updating for Entries-as-array.");
     for &id in &ids {
       // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
       // I can't figure out how to iterate over one immutable Entry while mutating a different
       // mutable Entry... so I clone() here. Perhaps this is completely sane, because what's to say
       // they're not the same Entry after all? But regardless, less efficient than it could be.
-      let dep_ids = entries[id].dependencies.clone();
+      let dep_ids = entries[&id].dependencies.clone();
       for dep_id in dep_ids {
-        match entries.get_mut(dep_id) {
+        match entries.get_mut(&dep_id) {
           Some(entry) => { entry.dependents.retain(|&dependent| dependent != id); () },
           _ => {},
         }
       }
 
-      entries.remove(id);
+      entries.remove(&id);
     }
 
     // Filter the Nodes to delete any with matching keys.
