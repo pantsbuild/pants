@@ -87,7 +87,6 @@ class Scopes(object):
 
 class ScopedDependencyFactory(IntermediateTargetFactoryBase):
 
-
   _targets = dict()
 
   def __init__(self, parse_context):

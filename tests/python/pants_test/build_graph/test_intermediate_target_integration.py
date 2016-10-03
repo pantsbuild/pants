@@ -80,7 +80,7 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     }
 
     # The below is because in v2 engine, the execution order is undetermined.
-    # If 2 targets with different spec_path have same "provided" field,
+    # If 2 targets with different spec_paths have same "provided" field,
     # then the intermediate target can be created under either spec paths.
     try:
       self.assertEqual(
