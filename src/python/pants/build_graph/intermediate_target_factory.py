@@ -14,7 +14,44 @@ from pants.util.meta import AbstractClass
 
 
 class IntermediateTargetFactoryBase(AbstractClass):
-  """Base class for factories to create intermediate targets for inclusion in a dependencies list.
+  """Convenience factory which constructs an intermediate target with the appropriate attributes.
+
+  For example, this makes the syntax:
+
+  ```
+      jar_library(name='gson',
+        jars=[...],
+      )
+
+      target(name='foo',
+        dependencies=[
+          scoped(':gson', scope='runtime'),
+        ],
+      )
+  ```
+
+  Equivalent to:
+
+  ```
+      jar_library(name='gson',
+        jars=[...],
+      )
+
+      target(name='gson-runtime',
+        dependencies=[
+          ':gson',
+        ],
+        scope='runtime',
+      )
+
+      target(name='foo',
+        dependencies=[
+          ':gson-runtime',
+        ],
+      )
+  ```
+
+  The syntax for this feature is experimental and may change in the future.
   """
 
   class ExpectedAddressError(Exception):
@@ -22,7 +59,15 @@ class IntermediateTargetFactoryBase(AbstractClass):
 
   def __init__(self, parse_context):
     self._parse_context = parse_context
-    self._intermediate_target_seen = dict()
+
+  @property
+  def intermediate_targets(self):
+    if getattr(self.__class__, '_targets') is not None:
+      return self.__class__._targets
+    else:
+      raise AttributeError('Subclass of {} should have class variable "{}"'.format(
+        IntermediateTargetFactoryBase, '_targets'
+      ))
 
   @property
   def extra_target_arguments(self):
@@ -53,14 +98,14 @@ class IntermediateTargetFactoryBase(AbstractClass):
       index=hasher.hexdigest(),
     )
 
-    if name not in self._intermediate_target_seen:
+    if name not in self.intermediate_targets:
       self._parse_context.create_object(
         'target',
         name=name,
         dependencies=[address.spec],
         **self.extra_target_arguments
       )
-      self._intermediate_target_seen[name] = self._parse_context.rel_path
+      self.intermediate_targets[name] = self._parse_context.rel_path
 
-    spec_path = self._intermediate_target_seen[name]
+    spec_path = self.intermediate_targets[name]
     return '{}:{}'.format(spec_path, name)

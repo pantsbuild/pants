@@ -15,6 +15,8 @@ class IntransitiveDependencyFactory(IntermediateTargetFactoryBase):
   experimental and may change in the future.
   """
 
+  _targets = dict()
+
   @property
   def extra_target_arguments(self):
     return dict(_transitive=False)
@@ -28,6 +30,8 @@ class ProvidedDependencyFactory(IntermediateTargetFactoryBase):
 
   The syntax for this feature is experimental and may change in the future.
   """
+
+  _targets = dict()
 
   @property
   def extra_target_arguments(self):

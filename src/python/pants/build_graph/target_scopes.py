@@ -86,45 +86,9 @@ class Scopes(object):
 
 
 class ScopedDependencyFactory(IntermediateTargetFactoryBase):
-  """Convenience factory which constructs an intermediary target with the appropriate attributes.
 
-  This makes the syntax:
 
-  ```
-      jar_library(name='gson',
-        jars=[...],
-      )
-
-      target(name='foo',
-        dependencies=[
-          scoped(':gson', scope='runtime'),
-        ],
-      )
-  ```
-
-  Equivalent to:
-
-  ```
-      jar_library(name='gson',
-        jars=[...],
-      )
-
-      target(name='gson-runtime',
-        dependencies=[
-          ':gson',
-        ],
-        scope='runtime',
-      )
-
-      target(name='foo',
-        dependencies=[
-          ':gson-runtime',
-        ],
-      )
-  ```
-
-  The syntax for this feature is experimental and may change in the future.
-  """
+  _targets = dict()
 
   def __init__(self, parse_context):
     super(ScopedDependencyFactory, self).__init__(parse_context)

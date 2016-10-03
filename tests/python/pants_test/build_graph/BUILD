@@ -73,6 +73,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'intermediate_target_integration',
+  sources = ['test_intermediate_target_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'scopes',
   sources = ['test_scopes.py'],
   dependencies = [
