@@ -12,15 +12,14 @@ from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
 from contextlib import closing
-from functools import total_ordering
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
 import lmdb
 import six
 
+from pants.engine.nodes import State
 from pants.engine.objects import Closable, SerializationError
-from pants.engine.scheduler import StepRequest, StepResult
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
@@ -41,19 +40,13 @@ def _copy_bytes(value):
   return bytes(value)
 
 
-@total_ordering
 class Key(object):
   """Holds the digest for the object, which uniquely identifies it.
 
   The `_hash` is a memoized 32 bit integer hashcode computed from the digest.
-
-  The `string` field holds the string representation of the object, but is optional (usually only
-  used when debugging is enabled).
-
-  NB: Because `string` is not included in equality comparisons, we cannot just use `datatype` here.
   """
 
-  __slots__ = ['_digest', '_type', '_hash', '_string']
+  __slots__ = ['_digest', '_hash']
 
   # The digest implementation used for Keys.
   _DIGEST_IMPL = sha1
@@ -64,54 +57,43 @@ class Key(object):
   _32_BIT_STRUCT = StdlibStruct(b'<l' + (b'x' * (_DIGEST_SIZE - 4)))
 
   @classmethod
-  def create(cls, blob, type_, string=None):
+  def create(cls, blob):
     """Given a blob, hash it to construct a Key.
 
     :param blob: Binary content to hash.
     :param type_: Type of the object to be hashed.
-    :param string: An optional human-readable representation of the blob for debugging purposes.
     """
-    digest = cls._DIGEST_IMPL(blob).digest()
-    hash_ = cls.compute_hash_from_digest(digest)
-    return cls(digest, hash_, type_, string)
+    return cls.create_from_digest(cls._DIGEST_IMPL(blob).digest())
 
   @classmethod
-  def compute_hash_from_digest(cls, digest):
-    """Extract 32 bit hash from digest."""
-    return cls._32_BIT_STRUCT.unpack(digest)[0]
+  def create_from_digest(cls, digest):
+    """Given the digest for a key, create a Key.
 
-  def __init__(self, digest, hash_, type_, string):
+    :param digest: The digest for the Key.
+    """
+    hash_ = cls._32_BIT_STRUCT.unpack(digest)[0]
+    return cls(digest, hash_)
+
+  def __init__(self, digest, hash_):
     """Not for direct use: construct a Key via `create` instead."""
     self._digest = digest
     self._hash = hash_
-    self._type = type_
-    self._string = string
-
-  @property
-  def string(self):
-    return self._string
 
   @property
   def digest(self):
     return self._digest
 
-  @property
-  def type(self):
-    return self._type
-
   def __hash__(self):
     return self._hash
 
   def __eq__(self, other):
-    return type(other) == Key and self._digest == other._digest
+    return self._digest == other._digest
 
-  def __lt__(self, other):
-    return self._digest < other._digest
+  def __ne__(self, other):
+    return not (self == other)
 
   def __repr__(self):
-    return 'Key({}{})'.format(
-        hexlify(self._digest),
-        '' if self._string is None else ':[{}]'.format(self._string))
+    return 'Key({})'.format(hexlify(self._digest))
 
   def __str__(self):
     return repr(self)
@@ -122,7 +104,7 @@ class InvalidKeyError(Exception):
 
 
 class Storage(Closable):
-  """Stores and creates unique keys for input Serializable objects.
+  """Stores and creates unique keys for input pickleable objects.
 
   Storage as `Closable`, `close()` can be called either explicitly or through the `with`
   statement in a context.
@@ -139,12 +121,11 @@ class Storage(Closable):
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
-  def create(cls, path=None, in_memory=True, debug=True, protocol=None):
+  def create(cls, path=None, in_memory=True, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
     :param path: If in_memory=False, the path to store the database in.
     :param in_memory: Indicate whether to use the in-memory kvs or an embeded database.
-    :param debug: A flag to store debug information in the key.
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
     """
     if in_memory:
@@ -153,7 +134,7 @@ class Storage(Closable):
       content, key_mappings = Lmdb.create(path=path,
                                           child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
 
-    return Storage(content, key_mappings, debug=debug, protocol=protocol)
+    return Storage(content, key_mappings, protocol=protocol)
 
   @classmethod
   def clone(cls, storage):
@@ -164,17 +145,17 @@ class Storage(Closable):
       contents, key_mappings = Lmdb.create(path=storage._contents.path,
                                            child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
 
-    return Storage(contents, key_mappings, debug=storage._debug, protocol=storage._protocol)
+    return Storage(contents, key_mappings, protocol=storage._protocol)
 
-  def __init__(self, contents, key_mappings, debug=True, protocol=None):
+  def __init__(self, contents, key_mappings, protocol=None):
     """Not for direct use: construct a Storage via either `create` or `clone`."""
     self._contents = contents
     self._key_mappings = key_mappings
-    self._debug = debug
     self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
+    self._memo = dict()
 
   def put(self, obj):
-    """Serialize and hash a Serializable, returning a unique key to retrieve it later.
+    """Serialize and hash something pickleable, returning a unique key to retrieve it later.
 
     NB: pickle by default memoizes objects by id and pickle repeated objects by references,
     for example, (A, A) uses less space than (A, A'), A and A' are equal but not identical.
@@ -187,10 +168,12 @@ class Storage(Closable):
         pickler.fast = 1
         pickler.dump(obj)
         blob = buf.getvalue()
-        # Hash the blob and store it if it does not exist.
-        key = Key.create(blob, type(obj), str(obj) if self._debug else None)
 
-        self._contents.put(key.digest, blob)
+        # Hash the blob and store it if it does not exist.
+        key = Key.create(blob)
+        if key not in self._memo:
+          self._memo[key] = obj
+          self._contents.put(key.digest, blob)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
@@ -198,16 +181,6 @@ class Storage(Closable):
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e), e)
 
     return key
-
-  def puts(self, objs):
-    """Save objects to storage in bulk.
-
-    Keys are returned as a list, ordering is preserved.
-    """
-    keys = []
-    for obj in objs:
-      keys.append(self.put(obj))
-    return keys
 
   def get(self, key):
     """Given a key, return its deserialized content.
@@ -218,8 +191,18 @@ class Storage(Closable):
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
 
-    value = self._contents.get(key.digest, _unpickle)
-    return self._assert_type_matches(value, key.type)
+    obj = self._memo.get(key)
+    if obj is not None:
+      return obj
+    return self._contents.get(key.digest, _unpickle)
+
+  def put_state(self, state):
+    """Put the components of the State individually in storage, then put the aggregate."""
+    return self.put(tuple(self.put(r).digest for r in state.to_components()))
+
+  def get_state(self, state_key):
+    """The inverse of put_state: get a State given its Key."""
+    return State.from_components(tuple(self.get(Key.create_from_digest(d)) for d in self.get(state_key)))
 
   def add_mapping(self, from_key, to_key):
     """Establish one to one relationship from one Key to another Key.
@@ -258,63 +241,9 @@ class Storage(Closable):
                        .format(key_type, value_type))
     return value
 
-  def key_for_request(self, step_request):
-    """Make keys for the dependency nodes as well as their states in step_request.
-
-    step_request.node isn't keyed is only for convenience because it is used
-    in a subsequent is_cacheable check.
-
-    TODO: It is supremely odd that this creates a StepRequest.
-    """
-    dependencies = {}
-    for dep, state in step_request.dependencies.items():
-      dependencies[self._to_key(dep)] = self._to_key(state)
-    return StepRequest(step_request.step_id,
-                       step_request.node,
-                       dependencies,
-                       step_request.inline_nodes,
-                       step_request.project_tree)
-
-  def key_for_result(self, step_result):
-    """Make key for result state."""
-    return StepResult(state=self._to_key(step_result.state))
-
-  def resolve_request(self, step_request):
-    """Resolve keys in step_request.
-
-    TODO: It is supremely odd that this creates a StepRequest.
-    """
-    dependencies = {}
-    for dep, state in step_request.dependencies.items():
-      dependencies[self._from_key(dep)] = self._from_key(state)
-
-    return StepRequest(step_request.step_id,
-                       step_request.node,
-                       dependencies,
-                       step_request.inline_nodes,
-                       step_request.project_tree)
-
-  def resolve_result(self, step_result):
-    """Resolve state key in step_result."""
-    return StepResult(state=self._from_key(step_result.state))
-
-  def _to_key(self, obj):
-    if isinstance(obj, Key):
-      return obj
-    return self.put(obj)
-
-  def _from_key(self, obj):
-    if isinstance(obj, Key):
-      return self.get(obj)
-    return obj
-
 
 class Cache(Closable):
-  """Cache StepResult for a given StepRequest.
-
-  NB: since Subjects in Nodes can be anything, comparison among them are usually N/A,
-  both cache get and put are for a keyed `StepRequest`.
-  """
+  """Cache the State resulting from a given Runnable."""
 
   @classmethod
   def create(cls, storage=None, cache_stats=None):
@@ -333,9 +262,14 @@ class Cache(Closable):
     self._storage = storage
     self._cache_stats = cache_stats
 
-  def get(self, step_request):
-    """Get the cached StepResult for a given StepRequest."""
-    result_key = self._storage.get_mapping(self._storage.put(self._keyable_fields(step_request)))
+  def get(self, runnable):
+    """Get the request key and hopefully a cached result for a given Runnable."""
+    request_key = self._storage.put_state(runnable)
+    return request_key, self.get_for_key(request_key)
+
+  def get_for_key(self, request_key):
+    """Given a request_key (for a Runnable), get the cached result."""
+    result_key = self._storage.get_mapping(request_key)
     if result_key is None:
       self._cache_stats.add_miss()
       return None
@@ -343,11 +277,15 @@ class Cache(Closable):
     self._cache_stats.add_hit()
     return self._storage.get(result_key)
 
-  def put(self, step_request, step_result):
-    """Save the StepResult for a given StepResult."""
-    request_key = self._storage.put(self._keyable_fields(step_request))
-    result_key = self._storage.put(step_result)
-    return self._storage.add_mapping(from_key=request_key, to_key=result_key)
+  def put(self, request_key, result):
+    """Save the State for a given Runnable and return a key for the result."""
+    result_key = self._storage.put(result)
+    self.put_for_key(request_key, result_key)
+    return result_key
+
+  def put_for_key(self, request_key, result_key):
+    """Save the State for a given Runnable and return a key for the result."""
+    self._storage.add_mapping(from_key=request_key, to_key=result_key)
 
   def get_stats(self):
     return self._cache_stats
@@ -355,27 +293,13 @@ class Cache(Closable):
   def items(self):
     """Iterate over all cached request, result for testing purpose."""
     for digest, _ in self._storage._key_mappings.items():
-      # Construct request key from digest directly because we do not have the
-      # request blob.  Type check is intentionally skipped because we do not
-      # want to introduce a dependency from `storage` to `scheduler`
-      request_key = Key(digest=digest, hash_=Key.compute_hash_from_digest(digest),
-                        type_=None, string=None)
+      request_key = Key.create_from_digest(digest)
       request = self._storage.get(request_key)
       yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
 
-  def _keyable_fields(self, step_request):
-    """Return fields for the purpose of computing the cache key of this step request.
-
-    Some special handling is needed to compute cache key for step request.
-    First step_id should be dropped, because it's only an identifier not part
-    of the input for execution. We also want to sort the dependencies map by
-    keys, i.e, node_keys, to eliminate non-determinism.
-    """
-    sorted_deps = sorted(step_request.dependencies.items(), key=lambda t: (type(t[0]), t[0]))
-    return (step_request.node, sorted_deps, step_request.project_tree)
-
   def close(self):
-    self._storage.close()
+    # NB: This is a facade above a Storage instance, which is always closed independently.
+    pass
 
 
 class CacheStats(Counter):

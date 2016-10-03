@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import inspect
+
 from twitter.common.collections import OrderedSet
 
 from pants.option.optionable import Optionable
@@ -53,6 +55,10 @@ class Subsystem(SubsystemClientMixin, Optionable):
       message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
           '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
       super(Subsystem.CycleException, self).__init__(message)
+
+  @classmethod
+  def is_subsystem_type(cls, obj):
+    return inspect.isclass(obj) and issubclass(obj, cls)
 
   @classmethod
   def scoped(cls, optionable):
@@ -171,8 +177,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     TODO: We'd like that to be true of Tasks some day. Subsystems will help with that.
 
-    Task code should call scoped_instance() or global_instance() to get a subsystem instance.
-    Tests can call this constructor directly though.
+    Code should call scoped_instance() or global_instance() to get a subsystem instance.
+    It should not invoke this constructor directly.
 
     :API: public
     """

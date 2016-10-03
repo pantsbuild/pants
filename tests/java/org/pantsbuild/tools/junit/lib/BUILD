@@ -7,7 +7,7 @@ java_library(
     '3rdparty/jvm/com/squareup/burst:burst-junit4',
     '3rdparty:guava',
     '3rdparty:junit',
-    '3rdparty/jvm/commons-io',
+    '3rdparty/jvm/org/hamcrest:hamcrest-core',
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit',
   ],

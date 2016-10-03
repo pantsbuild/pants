@@ -560,6 +560,12 @@ class Target(AbstractTarget):
     """
     return self._sources_field.filespec
 
+  def sources_relative_to_target_base(self):
+    """
+    :API: public
+    """
+    return self.payload.sources.sources
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.

@@ -452,8 +452,7 @@ public class ConsoleRunnerImpl {
 
     int failures = 0;
     try {
-      List<Spec> parsedTests = new SpecParser(tests).parse();
-
+      Collection<Spec> parsedTests = new SpecParser(tests).parse();
       if (useExperimentalRunner) {
         failures = runExperimental(parsedTests, core);
       } else {
@@ -495,7 +494,7 @@ public class ConsoleRunnerImpl {
     };
   }
 
-  private int runExperimental(List<Spec> parsedTests, JUnitCore core)
+  private int runExperimental(Collection<Spec> parsedTests, JUnitCore core)
       throws InitializationError {
     Preconditions.checkNotNull(core);
 
@@ -527,10 +526,8 @@ public class ConsoleRunnerImpl {
     return core.run(junitComputer, classes).getFailureCount();
   }
 
-  private int runLegacy(List<Spec> parsedTests, JUnitCore core) throws InitializationError {
-    List<Request> requests =
-        legacyParseRequests(swappableOut.getOriginal(), swappableErr.getOriginal(), parsedTests);
-
+  private int runLegacy(Collection<Spec> parsedTests, JUnitCore core) throws InitializationError {
+    List<Request> requests = legacyParseRequests(swappableErr.getOriginal(), parsedTests);
     if (numTestShards > 0) {
       requests = setFilterForTestShard(requests);
     }
@@ -558,9 +555,7 @@ public class ConsoleRunnerImpl {
     return failures;
   }
 
-  private List<Request> legacyParseRequests(PrintStream out, PrintStream err,
-      List<Spec> specs) {
-
+  private List<Request> legacyParseRequests(PrintStream err, Collection<Spec> specs) {
     Set<TestMethod> testMethods = Sets.newLinkedHashSet();
     Set<Class<?>> classes = Sets.newLinkedHashSet();
     for (Spec spec: specs) {

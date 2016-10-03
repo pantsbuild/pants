@@ -86,8 +86,8 @@ class RunTracker(Subsystem):
     # run_id is safe for use in paths.
     millis = int((run_timestamp * 1000) % 1000)
     run_id = 'pants_run_{}_{}_{}'.format(
-               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
-               uuid.uuid4().hex)
+      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
+      uuid.uuid4().hex)
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
@@ -317,6 +317,8 @@ class RunTracker(Subsystem):
     """This pants run is over, so stop tracking it.
 
     Note: If end() has been called once, subsequent calls are no-ops.
+
+    :return: 0 for success, 1 for failure.
     """
     if self._background_worker_pool:
       if self._aborted:
@@ -348,6 +350,8 @@ class RunTracker(Subsystem):
 
     self.report.close()
     self.store_stats()
+
+    return 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
 
   def end_workunit(self, workunit):
     self.report.end_workunit(workunit)

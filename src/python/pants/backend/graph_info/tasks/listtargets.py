@@ -29,10 +29,10 @@ class ListTargets(ConsoleTask):
 
   def __init__(self, *args, **kwargs):
     super(ListTargets, self).__init__(*args, **kwargs)
-
-    self._provides = self.get_options().provides
-    self._provides_columns = self.get_options().provides_columns
-    self._documented = self.get_options().documented
+    options = self.get_options()
+    self._provides = options.provides
+    self._provides_columns = options.provides_columns
+    self._documented = options.documented
 
   def console_output(self, targets):
     if self._provides:
@@ -69,14 +69,8 @@ class ListTargets(ConsoleTask):
       print_fn = lambda target: target.address.spec
 
     visited = set()
-    for target in self._targets():
+    for target in self.determine_target_roots('list', lambda target: not target.is_synthetic):
       result = print_fn(target)
       if result and result not in visited:
         visited.add(result)
         yield result
-
-  def _targets(self):
-    if self.context.target_roots:
-      return self.context.target_roots
-    else:
-      return self.context.scan().targets(predicate=lambda target: not target.is_synthetic)

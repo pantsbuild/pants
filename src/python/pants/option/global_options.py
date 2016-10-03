@@ -173,15 +173,19 @@ class GlobalOptionsRegistrar(Optionable):
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
-             help='Glob patterns for ignoring files when reading BUILD files. '
-                  'Use to ignore unneeded directories or BUILD files. '
-                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
-    # TODO: Clarify in the help msgs the difference between --ignore-patterns and --pants-ignore.
-    # See https://github.com/pantsbuild/pants/issues/3671.
+             removal_version='1.3.0', removal_hint='Use --build-ignore instead.',
+             help='See help for --build-ignore.')
+    register('--build-ignore', advanced=True, type=list, fromfile=True,
+             default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
+             help='Paths to ignore when identifying BUILD files. '
+                  'This does not affect any other filesystem operations. '
+                  'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*', rel_distdir],
-             help='Ignore files that match the specified patterns. '
-                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore). '
-                  'This option is currently experimental.')
+             help='Paths to ignore for all filesystem operations performed by pants '
+                  '(e.g. BUILD file scanning, glob matching, etc). '
+                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
+                  'This currently only affects the v2 engine. '
+                  'To experiment with v2 engine, try --enable-v2-engine option.')
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')

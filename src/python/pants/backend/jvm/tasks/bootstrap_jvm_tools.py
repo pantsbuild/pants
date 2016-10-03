@@ -122,7 +122,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       if dep_address not in processed:
         processed.add(dep_address)
         try:
-          if build_graph.contains_address(dep_address) or address_mapper.resolve(dep_address):
+          if build_graph.resolve_address(dep_address):
             # The user has defined a tool classpath override - we let that stand.
             continue
         except AddressLookupError as e:

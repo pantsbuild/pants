@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 import sys
-import tarfile
 import tempfile
 import time
 import uuid
@@ -18,6 +17,7 @@ from contextlib import closing, contextmanager
 from six import string_types
 
 from pants.util.dirutil import safe_delete
+from pants.util.tarutil import TarFile
 
 
 @contextmanager
@@ -188,7 +188,7 @@ def open_tar(path_or_file, *args, **kwargs):
   """
   (path, fileobj) = ((path_or_file, None) if isinstance(path_or_file, string_types)
                      else (None, path_or_file))
-  with closing(tarfile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
+  with closing(TarFile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
     yield tar
 
 

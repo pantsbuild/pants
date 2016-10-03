@@ -14,11 +14,10 @@ from pants.fs.archive import ZIP
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class ShaderIntegrationTest(PantsRunIntegrationTest):
-
   def test_shader_project(self):
     """Test that the binary target at the ``shading_project`` can be built and run.
 
@@ -48,12 +47,12 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
     }
 
     path = os.path.join('dist', 'shading.jar')
-    with subsystem_instance(DistributionLocator):
-      execute_java = DistributionLocator.cached(minimum_version='1.6').execute_java
-      self.assertEquals(0, execute_java(classpath=[path],
-                                        main='org.pantsbuild.testproject.shading.Main'))
-      self.assertEquals(0, execute_java(classpath=[path],
-                                        main='org.pantsbuild.testproject.foo.bar.MyNameIsDifferentNow'))
+    init_subsystem(DistributionLocator)
+    execute_java = DistributionLocator.cached(minimum_version='1.6').execute_java
+    self.assertEquals(0, execute_java(classpath=[path],
+                                      main='org.pantsbuild.testproject.shading.Main'))
+    self.assertEquals(0, execute_java(classpath=[path],
+                                      main='org.pantsbuild.testproject.foo.bar.MyNameIsDifferentNow'))
 
     received_classes = set()
     with temporary_dir() as tempdir:

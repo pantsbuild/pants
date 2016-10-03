@@ -46,15 +46,11 @@ class Checkstyle(NailgunTask):
              help='Add the user classpath to the checkstyle classpath')
     cls.register_jvm_tool(register,
                           'checkstyle',
+                          # Note that checkstyle 7.0 does not run on Java 7 runtimes or below.
                           classpath=[
-                            # Pants still officially supports java 6 as a tool; the supported
-                            # development environment for a pants hacker is based on that.  As
-                            # such, we use 6.1.1 here since its the last checkstyle version
-                            # compiled to java 6.  See the release notes here:
-                            # http://checkstyle.sourceforge.net/releasenotes.html
                             JarDependency(org='com.puppycrawl.tools',
                                           name='checkstyle',
-                                          rev='6.1.1'),
+                                          rev='6.19'),
                           ],
                           main=cls._CHECKSTYLE_MAIN,
                           custom_rules=[
@@ -111,8 +107,12 @@ class Checkstyle(NailgunTask):
         union_classpath.update(jar for conf, jar in runtime_classpath
                                if conf in self.get_options().confs)
 
+    configuration_file = self.get_options().configuration
+    if not configuration_file:
+      raise TaskError('No checkstyle configuration file provided.')
+
     args = [
-      '-c', self.get_options().configuration,
+      '-c', configuration_file,
       '-f', 'plain'
     ]
 

@@ -11,8 +11,7 @@ from contextlib import contextmanager
 
 from pants.base.revision import Revision
 from pants.scm.git import Git
-from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants.util.contextutil import environment_as, temporary_dir
 
 
 MIN_REQUIRED_GIT_VERSION = Revision.semver('1.7.10')
@@ -29,16 +28,30 @@ def git_version():
 
 
 @contextmanager
-def initialize_repo(worktree):
-  """Initialize git repository for the given worktree."""
-  gitdir = safe_mkdtemp()
-  with environment_as(GIT_DIR=gitdir, GIT_WORK_TREE=worktree):
+def initialize_repo(worktree, gitdir=None):
+  """Initialize a git repository for the given `worktree`.
+
+  NB: The given `worktree` must contain at least one file which will be committed to form an initial
+  commit.
+
+  :param string worktree: The path to the git work tree.
+  :param string gitdir: An optional path to the `.git` dir to use.
+  :returns: A `Git` repository object that can be used to interact with the repo.
+  :rtype: :class:`pants.scm.git.Git`
+  """
+  @contextmanager
+  def use_gitdir():
+    if gitdir:
+      yield gitdir
+    else:
+      with temporary_dir() as d:
+        yield d
+
+  with use_gitdir() as git_dir, environment_as(GIT_DIR=git_dir, GIT_WORK_TREE=worktree):
     subprocess.check_call(['git', 'init'])
     subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
     subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
     subprocess.check_call(['git', 'add', '.'])
     subprocess.check_call(['git', 'commit', '-am', 'Add project files.'])
 
-    yield Git(gitdir=gitdir, worktree=worktree)
-
-    safe_rmtree(gitdir)
+    yield Git(gitdir=git_dir, worktree=worktree)

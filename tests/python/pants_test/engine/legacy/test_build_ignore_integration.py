@@ -8,12 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import tempfile
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 
 class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
   """Tests the functionality of the build_ignore_patterns option in pants.ini ."""
 
+  @ensure_engine
   def test_build_ignore_patterns_pants_ini(self):
     def output_to_list(output_filename):
       with open(output_filename, 'r') as results_file:
@@ -44,7 +45,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                                  '--minimize-output-file={0}'.format(tmp_output)],
                                 config={
                                     'DEFAULT': {
-                                        'ignore_patterns': [
+                                        'build_ignore': [
                                             'testprojects/src/java/org/pantsbuild/testproject/phrases'
                                         ]
                                     }
@@ -59,3 +60,34 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                      results)
     self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
                      results)
+
+  @ensure_engine
+  def test_build_ignore_dependency(self):
+    run_result = self.run_pants(['-q',
+                                 'list',
+                                 'testprojects/tests/python/pants::'],
+                                config={
+                                  'DEFAULT': {
+                                    'build_ignore': [
+                                      'testprojects/src/'
+                                    ]
+                                  }
+                                })
+
+    self.assert_failure(run_result)
+    # Error message complains dependency dir has no BUILD files.
+    self.assertIn('testprojects/src/thrift/org/pantsbuild/constants_only', run_result.stderr_data)
+
+    run_result = self.run_pants(['-q',
+                                 'list',
+                                 'testprojects/tests/python/pants::'],
+                                config={
+                                  'DEFAULT': {
+                                    'build_ignore': [
+                                      'testprojects/src/antlr'
+                                    ]
+                                  }
+                                })
+
+    self.assert_success(run_result)
+    self.assertIn('testprojects/tests/python/pants/constants_only:constants_only', run_result.stdout_data)

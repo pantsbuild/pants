@@ -171,7 +171,7 @@ class LegacyBuildGraph(BuildGraph):
 
   def _instantiate_remote_sources(self, kwargs):
     """For RemoteSources target, convert "dest" field to its real target type."""
-    kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']._type_alias],))
+    kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']],))
     return RemoteSources(build_graph=self, **kwargs)
 
   def inject_synthetic_target(self,
@@ -207,9 +207,14 @@ class LegacyBuildGraph(BuildGraph):
     for address in self._inject(specs):
       yield address
 
+  def resolve_address(self, address):
+    if not self.contains_address(address):
+      self.inject_address_closure(address)
+    return self.get_target(address)
+
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
-    logger.debug('Injecting to {}: {}'.format(self, subjects))
+    logger.debug('Injecting to %s: %s', self, subjects)
     request = self._scheduler.execution_request([LegacyTarget], subjects)
 
     result = self._engine.execute(request)
@@ -296,15 +301,22 @@ def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
   return HydratedField('bundles', bundles)
 
 
-def create_legacy_graph_tasks():
+def create_legacy_graph_tasks(symbol_table_cls):
   """Create tasks to recursively parse the legacy graph."""
+  symbol_table_constraint = symbol_table_cls.constraint()
   return [
     # Recursively requests the dependencies and adapted fields of TargetAdaptors, which
     # will result in an eager, transitive graph walk.
     (LegacyTarget,
-     [Select(TargetAdaptor),
-      SelectDependencies(LegacyTarget, TargetAdaptor, 'dependencies'),
-      SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors')],
+     [Select(symbol_table_constraint),
+      SelectDependencies(LegacyTarget,
+                         symbol_table_constraint,
+                         'dependencies',
+                         field_types=(Address,)),
+      SelectDependencies(HydratedField,
+                         symbol_table_constraint,
+                         'field_adaptors',
+                         field_types=(SourcesField, BundlesField,))],
      reify_legacy_graph),
     (HydratedField,
      [Select(SourcesField),
@@ -313,7 +325,7 @@ def create_legacy_graph_tasks():
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),
-      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list'),
-      SelectDependencies(Files, BundlesField, 'excluded_path_globs_list')],
+      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list', field_types=(PathGlobs,)),
+      SelectDependencies(Files, BundlesField, 'excluded_path_globs_list', field_types=(PathGlobs,))],
      hydrate_bundles),
   ]

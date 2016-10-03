@@ -511,6 +511,15 @@ class BuildGraph(AbstractClass):
     self.inject_address_closure(address)
     return self.transitive_subgraph_of_addresses([address])
 
+  @abstractmethod
+  def resolve_address(self, address):
+    """Maps an address in the virtual address space to an object.
+
+    :param Address address: the address to lookup in a BUILD file
+    :raises AddressLookupError: if the path to the address is not found.
+    :returns: The Addressable which address points to.
+    """
+
 
 class CycleException(Exception):
   """Thrown when a circular dependency is detected.

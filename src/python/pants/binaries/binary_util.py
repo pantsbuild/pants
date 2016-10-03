@@ -33,6 +33,7 @@ _DEFAULT_PATH_BY_ID = {
   ('darwin', '13'): ('mac', '10.9'),
   ('darwin', '14'): ('mac', '10.10'),
   ('darwin', '15'): ('mac', '10.11'),
+  ('darwin', '16'): ('mac', '10.12'),
 }
 
 
@@ -155,7 +156,10 @@ class BinaryUtil(object):
       try:
         with temporary_file() as dest:
           fetcher = fetcher or Fetcher(get_buildroot())
-          fetcher.download(url, listener=Fetcher.ProgressListener(), path_or_fd=dest)
+          fetcher.download(url,
+                           listener=Fetcher.ProgressListener(),
+                           path_or_fd=dest,
+                           timeout_secs=self._timeout_secs)
           logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
           downloaded_successfully = True
           dest.seek(0)

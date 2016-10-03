@@ -5,27 +5,38 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.task.changed_file_task_mixin import ChangedFileTaskMixin
+from pants.scm.subsystems.changed import Changed
 from pants.task.console_task import ConsoleTask
 
 
-class WhatChanged(ChangedFileTaskMixin, ConsoleTask):
+class WhatChanged(ConsoleTask):
   """Emits the targets that have been modified since a given commit."""
 
   @classmethod
   def register_options(cls, register):
     super(WhatChanged, cls).register_options(register)
-    cls.register_change_file_options(register)
+    # N.B. The bulk of options relevant to this task now come from the `Changed` subsystem.
     register('--files', type=bool,
              help='Show changed files instead of the targets that own them.')
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(WhatChanged, cls).subsystem_dependencies() + (Changed.Factory,)
+
   def console_output(self, _):
-    change_calculator = self.change_calculator(self.get_options(),
-                                               self.context.address_mapper,
-                                               self.context.build_graph,
-                                               scm=self.context.scm,
-                                               workspace=self.context.workspace)
-    if self.get_options().files:
+    # N.B. This task shares an options scope ('changed') with the `Changed` subsystem.
+    options = self.get_options()
+    changed = Changed.Factory.global_instance().create(options)
+    change_calculator = changed.change_calculator(
+      build_graph=self.context.build_graph,
+      address_mapper=self.context.address_mapper,
+      scm=self.context.scm,
+      workspace=self.context.workspace,
+      # N.B. `exclude_target_regexp` is a global scope option registered elsewhere.
+      exclude_target_regexp=options.exclude_target_regexp
+    )
+
+    if options.files:
       for f in sorted(change_calculator.changed_files()):
         yield f
     else:

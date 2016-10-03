@@ -8,17 +8,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.project_info.tasks.ide_gen import Project, SourceSet
 from pants.source.source_root import SourceRootConfig
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import create_subsystem
 
 
 class IdeGenTest(BaseTest):
-
   def test_collapse_source_root(self):
-    source_roots = create_subsystem(SourceRootConfig, source_roots={
-      '/src/java': [],
-      '/tests/java': [],
-      '/some/other': []
-    }, unmatched='fail').get_source_roots()
+    self.context(for_subsystems=[SourceRootConfig], options={
+      SourceRootConfig.options_scope: {
+        'source_roots': {
+          '/src/java': [],
+          '/tests/java': [],
+          '/some/other': []
+        },
+        'unmatched': 'fail'
+      }
+    })
+    source_roots = SourceRootConfig.global_instance().get_source_roots()
     source_set_list = []
     self.assertEquals([], Project._collapse_by_source_root(source_roots, source_set_list))
 

@@ -92,6 +92,7 @@ class DeferredSourcesMapper(Task):
       sources, rel_unpack_dir = unpacked_sources[sources_target]
       # We have no idea if rel_unpack_dir matches any of our source root patterns, so
       # we explicitly register it here.
+      # TODO: Is there any way to know the lang and/or the category and provide it here?
       self.context.source_roots.add_source_root(rel_unpack_dir)
       payload_field.populate(sources, rel_unpack_dir)
 

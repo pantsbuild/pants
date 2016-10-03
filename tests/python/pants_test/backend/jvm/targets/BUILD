@@ -33,9 +33,11 @@ python_tests(
   name='java_tests',
   sources=['test_java_tests.py'],
   dependencies=[
+    'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
 

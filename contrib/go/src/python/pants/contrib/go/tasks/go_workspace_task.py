@@ -9,7 +9,7 @@ import os
 from itertools import chain
 
 from pants.base.build_environment import get_buildroot
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 
 from pants.contrib.go.targets.go_target import GoTarget
 from pants.contrib.go.tasks.go_task import GoTask
@@ -74,8 +74,10 @@ class GoWorkspaceTask(GoTask):
 
     Adds the symlinks to the source files to required_links.
     """
-    source_iter = (os.path.join(get_buildroot(), src)
-                   for src in go_local_src.sources_relative_to_buildroot())
+    source_list = [os.path.join(get_buildroot(), src)
+                   for src in go_local_src.sources_relative_to_buildroot()]
+    rel_list = go_local_src.sources_relative_to_target_base()
+    source_iter = zip(source_list, rel_list)
     return self._symlink_lib(gopath, go_local_src, source_iter, required_links)
 
   def _symlink_remote_lib(self, gopath, go_remote_lib, required_links):
@@ -93,14 +95,15 @@ class GoWorkspaceTask(GoTask):
         # We grab any file since a go package might have .go, .c, .cc, etc files - all needed for
         # installation.
         if os.path.isfile(remote_src):
-          yield remote_src
+          yield (remote_src, os.path.basename(path))
     return self._symlink_lib(gopath, go_remote_lib, source_iter(), required_links)
 
   def _symlink_lib(self, gopath, lib, source_iter, required_links):
     src_dir = os.path.join(gopath, 'src', lib.import_path)
     safe_mkdir(src_dir)
-    for path in source_iter:
-      src_link = os.path.join(src_dir, os.path.basename(path))
+    for path, dest in source_iter:
+      src_link = os.path.join(src_dir, dest)
+      safe_mkdir_for(src_link)
       if not os.path.islink(src_link):
         os.symlink(path, src_link)
       required_links.add(src_link)

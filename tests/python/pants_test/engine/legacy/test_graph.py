@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
 import unittest
 from contextlib import contextmanager
@@ -12,9 +13,56 @@ from contextlib import contextmanager
 import mock
 
 from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
+from pants.bin.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
+
+
+# Macro that adds the specified tag.
+def macro(target_cls, tag, parse_context, tags=None, **kwargs):
+  tags = tags or set()
+  tags.add(tag)
+  parse_context.create_object(target_cls, tags=tags, **kwargs)
+
+
+# SymbolTable that extends the legacy table to apply the macro.
+class TaggingSymbolTable(LegacySymbolTable):
+  tag = 'tag_added_by_macro'
+  target_cls = Target
+
+  @classmethod
+  def aliases(cls):
+    tag_macro = functools.partial(macro, cls.target_cls, cls.tag)
+    return super(TaggingSymbolTable, cls).aliases().merge(
+        BuildFileAliases(
+          targets={'target': TargetMacro.Factory.wrap(tag_macro, cls.target_cls),}
+        )
+      )
+
+
+@contextmanager
+def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=None):
+  """A context manager that yields a usable, legacy LegacyBuildGraph by way of the v2 scheduler.
+
+  :param Options options: An Options object to use for this run.
+  :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
+                                    usually taken from the `--pants-ignore` global option.
+                                    Defaults to: ['.*']
+  :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
+                                       None to use the default.
+  :yields: A tuple of (graph, addresses, scheduler).
+  """
+  path_ignore_patterns = path_ignore_patterns or ['.*']
+  target_roots = TargetRoots.create(options=options)
+  graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
+                                                      symbol_table_cls=symbol_table_cls)
+  try:
+    graph = graph_helper.create_build_graph(target_roots)[0]
+    addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
+    yield graph, addresses, graph_helper.scheduler
+  finally:
+    graph_helper.engine.close()
 
 
 class GraphInvalidationTest(unittest.TestCase):
@@ -26,7 +74,7 @@ class GraphInvalidationTest(unittest.TestCase):
   @contextmanager
   def open_scheduler(self, specs, symbol_table_cls=None):
     kwargs = self._make_setup_args(specs, symbol_table_cls=symbol_table_cls)
-    with EngineInitializer.open_legacy_graph(**kwargs) as triple:
+    with open_legacy_graph(**kwargs) as triple:
       yield triple
 
   @contextmanager
@@ -44,15 +92,17 @@ class GraphInvalidationTest(unittest.TestCase):
       self.assertLess(len(product_graph), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
-    with self.open_pg(['3rdparty::']) as product_graph:
+    with self.open_pg(['//:', '3rdparty/::']) as product_graph:
       node_count = len(product_graph)
       self.assertGreater(node_count, 0)
 
-      # Invalidate the '3rdparty/python' DirectoryListing, and then the `3rdparty` DirectoryListing.
-      # by "touching" random files.
-      for filename in ('3rdparty/python/BUILD', '3rdparty/CHANGED_RANDOM_FILE'):
+      # Invalidate the '3rdparty/python' DirectoryListing, the `3rdparty` DirectoryListing,
+      # and then the root DirectoryListing by "touching" files/dirs.
+      for filename in ('3rdparty/python/BUILD', '3rdparty/python', 'non_existing_file'):
         invalidated_count = product_graph.invalidate_files([filename])
-        self.assertGreater(invalidated_count, 0)
+        self.assertGreater(invalidated_count,
+                           0,
+                           'File {} did not invalidate any Nodes.'.format(filename))
         node_count, last_node_count = len(product_graph), node_count
         self.assertLess(node_count, last_node_count)
 
@@ -69,28 +119,10 @@ class GraphInvalidationTest(unittest.TestCase):
 
     Installs an additional TargetMacro that wraps `target` aliases to add a tag to all definitions.
     """
-    tag = 'tag_added_by_macro'
-    target_cls = Target
     spec = 'testprojects/tests/python/pants/build_parsing:'
-
-    # Macro that adds the specified tag.
-    def macro(parse_context, tags=None, **kwargs):
-      tags = tags or set()
-      tags.add(tag)
-      parse_context.create_object(target_cls, tags=tags, **kwargs)
-
-    # SymbolTable that extends the legacy table to apply the macro.
-    class TaggingSymbolTable(LegacySymbolTable):
-      @classmethod
-      def aliases(cls):
-        return super(TaggingSymbolTable, cls).aliases().merge(
-            BuildFileAliases(
-              targets={'target': TargetMacro.Factory.wrap(macro, target_cls),}
-            )
-          )
 
     # Confirm that python_tests in a small directory are marked.
     with self.open_scheduler([spec], symbol_table_cls=TaggingSymbolTable) as (graph, addresses, _):
       self.assertTrue(len(addresses) > 0, 'No targets matched by {}'.format(addresses))
       for address in addresses:
-        self.assertIn(tag, graph.get_target(address).tags)
+        self.assertIn(TaggingSymbolTable.tag, graph.get_target(address).tags)
