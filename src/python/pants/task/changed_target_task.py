@@ -7,14 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.task.changed_file_task_mixin import ChangedFileTaskMixin
+from pants.scm.subsystems.changed import Changed
 from pants.task.noop_exec_task import NoopExecTask
 
 
 logger = logging.getLogger(__name__)
 
 
-class ChangedTargetTask(ChangedFileTaskMixin, NoopExecTask):
+class ChangedTargetTask(NoopExecTask):
   """A base class for tasks that find changed targets to act on.
 
   Frequently other tasks already exist that actually do the desired work eg "compile" or "test".
@@ -37,16 +37,19 @@ class ChangedTargetTask(ChangedFileTaskMixin, NoopExecTask):
   """
 
   @classmethod
+  def subsystem_dependencies(cls):
+    return super(ChangedTargetTask, cls).subsystem_dependencies() + (Changed.Factory,)
+
+  @classmethod
   def register_options(cls, register):
     super(ChangedTargetTask, cls).register_options(register)
-    cls.register_change_file_options(register)
+    Changed.Factory.register_options(register)
 
   @classmethod
   def alternate_target_roots(cls, options, address_mapper, build_graph):
-    change_calculator = cls.change_calculator(
-      options,
-      address_mapper,
-      build_graph)
+    changed = Changed.Factory.global_instance().create(options)
+    change_calculator = changed.change_calculator(build_graph=build_graph,
+                                                  address_mapper=address_mapper)
     changed_addresses = change_calculator.changed_target_addresses()
     readable = ''.join(sorted('\n\t* {}'.format(addr.reference()) for addr in changed_addresses))
     logger.info('Operating on changed {} target(s): {}'.format(len(changed_addresses), readable))

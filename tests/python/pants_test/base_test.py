@@ -32,6 +32,38 @@ from pants_test.base.context_utils import create_context
 from pants_test.option.util.fakes import create_options_for_optionables
 
 
+class TestGenerator(object):
+  """A mixin that facilitates test generation at runtime."""
+
+  @classmethod
+  def generate_tests(cls):
+    """Generate tests for a given class.
+
+    This should be called against the composing class in it's defining module, e.g.
+
+      class ThingTest(TestGenerator):
+        ...
+
+      ThingTest.generate_tests()
+
+    """
+    raise NotImplementedError()
+
+  @classmethod
+  def add_test(cls, method_name, method):
+    """A classmethod that adds dynamic test methods to a given class.
+
+    :param string method_name: The name of the test method (e.g. `test_thing_x`).
+    :param callable method: A callable representing the method. This should take a 'self' argument
+                            as its first parameter for instance method binding.
+    """
+    assert not hasattr(cls, method_name), (
+      'a test with name `{}` already exists on `{}`!'.format(method_name, cls.__name__)
+    )
+    assert method_name.startswith('test_'), '{} is not a valid test name!'.format(method_name)
+    setattr(cls, method_name, method)
+
+
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
 # for tests, not a test of a thing called 'Base'.
 class BaseTest(unittest.TestCase):

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 from abc import abstractmethod, abstractproperty
-from collections import defaultdict
+from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
@@ -194,94 +194,12 @@ class RulesetValidator(object):
     return flattened_products
 
 
-class NodeBuilder(Closable):
-  """Holds an index of tasks and intrinsics used to instantiate Nodes."""
-
-  @classmethod
-  def create(cls, task_entries):
-    """Creates a NodeBuilder with tasks indexed by their output type."""
-    # NB make tasks ordered so that gen ordering is deterministic.
-    serializable_tasks = defaultdict(OrderedSet)
-    for entry in task_entries:
-      if isinstance(entry, Rule):
-        serializable_tasks[entry.output_product_type].add(entry)
-      elif isinstance(entry, (tuple, list)) and len(entry) == 3:
-        output_type, input_selectors, task = entry
-        if isinstance(output_type, Exactly):
-          constraint = output_type
-        elif isinstance(output_type, type):
-          constraint = Exactly(output_type)
-        else:
-          raise TypeError("Unexpected product_type type {}, for rule {}".format(output_type, entry))
-
-        factory = TaskRule(tuple(input_selectors), task, output_type, constraint)
-        for kind in constraint.types:
-          # NB Ensure that interior types from SelectDependencies / SelectProjections work by indexing
-          # on the list of types in the constraint.
-          serializable_tasks[kind].add(factory)
-        serializable_tasks[constraint].add(factory)
-      else:
-        raise TypeError("Unexpected rule type: {}."
-                        " Rules either extend Rule, or are 3 elem tuples.".format(type(entry)))
-
-    intrinsics = dict()
-    intrinsics.update(FilesystemIntrinsicRule.as_intrinsics())
-    intrinsics.update(SnapshotIntrinsicRule.as_intrinsics())
-    return cls(serializable_tasks, intrinsics)
-
-  def __init__(self, tasks, intrinsics):
-    self._tasks = tasks
-    self._intrinsics = intrinsics
-
-  def gen_rules(self, subject, product_type):
-    # Intrinsics that provide the requested product for the current subject type.
-    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject)
-    if intrinsic_node_factory:
-      yield intrinsic_node_factory
-    else:
-      # Tasks that provide the requested product.
-      for node_factory in self._lookup_tasks(product_type):
-        yield node_factory
-
-  def gen_nodes(self, subject, product_type, variants):
-    for rule in self.gen_rules(subject, product_type):
-      yield rule.as_node(subject, variants)
-
-  def _lookup_tasks(self, product_type):
-    for entry in self._tasks[product_type]:
-      yield entry
-
-  def _lookup_intrinsic(self, product_type, subject):
-    return self._intrinsics.get((type(subject), product_type))
-
-  def select_node(self, selector, subject, variants):
-    """Constructs a Node for the given Selector and the given Subject/Variants.
-
-    This method is decoupled from Selector classes in order to allow the `selector` package to not
-    need a dependency on the `nodes` package.
-    """
-    selector_type = type(selector)
-    if selector_type is Select:
-      return SelectNode(subject, variants, selector)
-    if selector_type is SelectVariant:
-      return SelectNode(subject, variants, selector)
-    elif selector_type is SelectLiteral:
-      # NB: Intentionally ignores subject parameter to provide a literal subject.
-      return SelectNode(selector.subject, variants, selector)
-    elif selector_type is SelectDependencies:
-      return DependenciesNode(subject, variants, selector)
-    elif selector_type is SelectProjection:
-      return ProjectionNode(subject, variants, selector)
-    else:
-      raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
-
-
 class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
-                                                         'binary_type',
-                                                         'input_selectors',
-                                                         'input_conversion',
-                                                         'output_conversion']),
-                         Rule):
+  'binary_type',
+  'input_selectors',
+  'input_conversion',
+  'output_conversion']),
+  Rule):
   """A rule type for defining execution of snapshotted processes."""
 
   def as_node(self, subject, variants):
@@ -293,7 +211,7 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
 
 
 class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type', 'product_type']),
-                              Rule):
+  Rule):
   """Intrinsic rule for filesystem operations."""
 
   @classmethod
@@ -332,3 +250,101 @@ class SnapshotIntrinsicRule(Rule):
       (Files, Snapshot): snapshot_intrinsic_rule,
       (PathGlobs, Snapshot): snapshot_intrinsic_rule
     }
+
+  def __repr__(self):
+    return '{}()'.format(type(self).__name__)
+
+
+class NodeBuilder(Closable):
+  """Holds an index of tasks and intrinsics used to instantiate Nodes."""
+
+  @classmethod
+  def create(cls, task_entries, intrinsic_providers=(FilesystemIntrinsicRule, SnapshotIntrinsicRule)):
+    """Creates a NodeBuilder with tasks indexed by their output type."""
+    # NB make tasks ordered so that gen ordering is deterministic.
+    serializable_tasks = OrderedDict()
+
+    def add_task(product_type, rule):
+      if product_type not in serializable_tasks:
+        serializable_tasks[product_type] = OrderedSet()
+      serializable_tasks[product_type].add(rule)
+
+    for entry in task_entries:
+      if isinstance(entry, Rule):
+        add_task(entry.output_product_type, entry)
+      elif isinstance(entry, (tuple, list)) and len(entry) == 3:
+        output_type, input_selectors, task = entry
+        if isinstance(output_type, Exactly):
+          constraint = output_type
+        elif isinstance(output_type, type):
+          constraint = Exactly(output_type)
+        else:
+          raise TypeError("Unexpected product_type type {}, for rule {}".format(output_type, entry))
+
+        factory = TaskRule(tuple(input_selectors), task, output_type, constraint)
+        for kind in constraint.types:
+          # NB Ensure that interior types from SelectDependencies / SelectProjections work by indexing
+          # on the list of types in the constraint.
+          add_task(kind, factory)
+        add_task(constraint, factory)
+      else:
+        raise TypeError("Unexpected rule type: {}."
+                        " Rules either extend Rule, or are 3 elem tuples.".format(type(entry)))
+
+    intrinsics = dict()
+    for provider in intrinsic_providers:
+      as_intrinsics = provider.as_intrinsics()
+      duplicate_keys = [k for k in as_intrinsics.keys() if k in intrinsics]
+      if duplicate_keys:
+        key_list = '\n  '.join('{}, {}'.format(sub.__name__, prod.__name__)
+                                for sub, prod in duplicate_keys)
+        raise ValueError('intrinsics provided by {} have already provided subject-type, '
+                         'product-type keys:\n  {}'.format(provider, key_list))
+      intrinsics.update(as_intrinsics)
+    return cls(serializable_tasks, intrinsics)
+
+  def __init__(self, tasks, intrinsics):
+    self._tasks = tasks
+    self._intrinsics = intrinsics
+
+  def gen_rules(self, subject_type, product_type):
+    # Intrinsics that provide the requested product for the current subject type.
+    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject_type)
+    if intrinsic_node_factory:
+      yield intrinsic_node_factory
+    else:
+      # Tasks that provide the requested product.
+      for node_factory in self._lookup_tasks(product_type):
+        yield node_factory
+
+  def gen_nodes(self, subject, product_type, variants):
+    for rule in self.gen_rules(type(subject), product_type):
+      yield rule.as_node(subject, variants)
+
+  def _lookup_tasks(self, product_type):
+    for entry in self._tasks.get(product_type, tuple()):
+      yield entry
+
+  def _lookup_intrinsic(self, product_type, subject_type):
+    return self._intrinsics.get((subject_type, product_type))
+
+  def select_node(self, selector, subject, variants):
+    """Constructs a Node for the given Selector and the given Subject/Variants.
+
+    This method is decoupled from Selector classes in order to allow the `selector` package to not
+    need a dependency on the `nodes` package.
+    """
+    selector_type = type(selector)
+    if selector_type is Select:
+      return SelectNode(subject, variants, selector)
+    if selector_type is SelectVariant:
+      return SelectNode(subject, variants, selector)
+    elif selector_type is SelectLiteral:
+      # NB: Intentionally ignores subject parameter to provide a literal subject.
+      return SelectNode(selector.subject, variants, selector)
+    elif selector_type is SelectDependencies:
+      return DependenciesNode(subject, variants, selector)
+    elif selector_type is SelectProjection:
+      return ProjectionNode(subject, variants, selector)
+    else:
+      raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))

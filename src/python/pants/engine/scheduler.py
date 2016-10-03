@@ -11,7 +11,8 @@ import time
 from collections import deque
 from contextlib import contextmanager
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
+                              SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
@@ -438,6 +439,7 @@ class LocalScheduler(object):
       PathGlobs: select_product,
       SingleAddress: select_dep_addrs,
       SiblingAddresses: select_dep_addrs,
+      AscendantAddresses: select_dep_addrs,
       DescendantAddresses: select_dep_addrs,
     }
 
@@ -528,6 +530,18 @@ class LocalScheduler(object):
           yield self._node_builder.select_node(selector_fn(product), subject, None)
 
     return ExecutionRequest(tuple(roots()))
+
+  def selection_request(self, requests):
+    """Create and return an ExecutionRequest for the given (selector, subject) tuples.
+
+    This method allows users to specify their own selectors. It has the potential to replace
+    execution_request, which is a subset of this method, because it uses default selectors.
+    :param requests: A list of (selector, subject) tuples.
+    :return: An ExecutionRequest for the given selectors and subjects.
+    """
+    #TODO: Think about how to deprecate the existing execution_request API.
+    roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
+    return ExecutionRequest(tuple(roots))
 
   @property
   def product_graph(self):

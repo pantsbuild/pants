@@ -36,7 +36,12 @@ class ListIntegrationTest(PantsRunIntegrationTest):
     )
 
   def test_list_all(self):
-    self.do_command('list', '::', success=True, enable_v2_engine=True)
+    pants_run = self.do_command('list', '::', success=True, enable_v2_engine=True)
+    self.assertGreater(len(pants_run.stdout_data.strip().split()), 1)
+
+  def test_list_none(self):
+    pants_run = self.do_command('list', success=True, enable_v2_engine=True)
+    self.assertEqual(len(pants_run.stdout_data.strip().split()), 0)
 
   def test_list_invalid_dir(self):
     pants_run = self.do_command('list', 'abcde::', success=False, enable_v2_engine=True)

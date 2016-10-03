@@ -5,12 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
+from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
-from pants.source.wrapped_globs import Files, FilesetWithSpec, matches_filespec
+from pants.source.wrapped_globs import Files, FilesetWithSpec
 from pants.util.memo import memoized_property
 
 
@@ -63,8 +63,8 @@ class SourcesField(PayloadField):
     return any(source.endswith(extension) for source in self.source_paths)
 
   def relative_to_buildroot(self):
-    """All sources joined with ``self.rel_path``."""
-    return [os.path.join(self.rel_path, source) for source in self.source_paths]
+    """All sources joined with their relative paths."""
+    return list(self.sources.iter_relative_paths())
 
   def _compute_fingerprint(self):
     hasher = sha1()

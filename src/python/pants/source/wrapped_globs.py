@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import fnmatch
 import os
 from abc import abstractmethod, abstractproperty
 from hashlib import sha1
@@ -17,21 +16,6 @@ from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
-
-
-def globs_matches(path, patterns):
-  return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
-
-
-def matches_filespec(path, spec):
-  if spec is None:
-    return False
-  if not globs_matches(path, spec.get('globs', [])):
-    return False
-  for spec in spec.get('exclude', []):
-    if matches_filespec(path, spec):
-      return False
-  return True
 
 
 class FilesetWithSpec(AbstractClass):
@@ -75,10 +59,15 @@ class FilesetWithSpec(AbstractClass):
     """Given a path (which should be a member of self.files), returns a unique hash for that file."""
 
   def __iter__(self):
-    return self.files.__iter__()
+    return iter(self.files)
 
   def __getitem__(self, index):
     return self.files[index]
+
+  def iter_relative_paths(self):
+    """An alternative `__iter__` that joins files with the relative root."""
+    for f in self:
+      yield os.path.join(self.rel_root, f)
 
 
 class EagerFilesetWithSpec(FilesetWithSpec):

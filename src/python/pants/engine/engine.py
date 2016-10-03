@@ -14,9 +14,10 @@ from collections import OrderedDict
 from Queue import Queue
 
 from concurrent.futures import ThreadPoolExecutor
+from twitter.common.collections import maybe_list
 
 from pants.base.exceptions import TaskError
-from pants.engine.nodes import Return, Throw
+from pants.engine.nodes import Noop, Return, State, Throw
 from pants.engine.objects import SerializationError
 from pants.engine.processing import StatefulPool
 from pants.engine.storage import Cache, Storage
@@ -37,6 +38,10 @@ class InFlightException(Exception):
 
 
 class StepBatchException(Exception):
+  pass
+
+
+class ExecutionError(Exception):
   pass
 
 
@@ -101,6 +106,50 @@ class Engine(AbstractClass):
       return self.Result.finished(self._scheduler.root_entries(execution_request))
     except TaskError as e:
       return self.Result.failure(e)
+
+  def product_request(self, product, subjects):
+    """Executes a request for a singular product type from the scheduler for one or more subjects
+    and yields the products.
+
+    :param class product: A product type for the request.
+    :param list subjects: A list of subjects for the request.
+    :yields: The requested products.
+    """
+    request = self._scheduler.execution_request([product], subjects)
+    result = self.execute(request)
+    if result.error:
+      raise result.error
+    result_items = self._scheduler.root_entries(request).items()
+
+    # State validation.
+    unknown_state_types = tuple(
+      type(state) for _, state in result_items if type(state) not in (Throw, Return, Noop)
+    )
+    if unknown_state_types:
+      State.raise_unrecognized(unknown_state_types)
+
+    # Throw handling.
+    #TODO: See https://github.com/pantsbuild/pants/issues/3912
+    throw_roots = tuple(root for root, state in result_items if type(state) is Throw)
+    if throw_roots:
+      cumulative_trace = '\n'.join(
+        '\n'.join(self._scheduler.product_graph.trace(root)) for root in throw_roots
+      )
+      stringified_throw_roots = ', '.join(str(x) for x in throw_roots)
+      raise ExecutionError('received unexpected Throw state(s) for root(s): {}\n{}'
+                           .format(stringified_throw_roots, cumulative_trace))
+
+    # Noop handling.
+    noop_roots = tuple(root for root, state in result_items if type(state) is Noop)
+    if noop_roots:
+      raise ExecutionError('received unexpected Noop state(s) for the following root(s): {}'
+                           .format(noop_roots))
+
+    # Return handling.
+    returns = tuple(state.value for _, state in result_items if type(state) is Return)
+    for return_value in returns:
+      for computed_product in maybe_list(return_value, expected_type=product):
+        yield computed_product
 
   def close(self):
     """Shutdown this engine instance, releasing resources it was using."""
