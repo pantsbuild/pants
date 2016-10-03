@@ -3,6 +3,8 @@
 
 # Like Hello World, but built with Pants.
 
+# Note that the target has no explicit name, so it defaults to the name
+# of the directory, in this case 'main'.
 jvm_app(
   basename = 'hello-example',
   dependencies = [

@@ -18,7 +18,8 @@ python_library(
     ':structs',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
-    'src/python/pants/engine:fs',
+    'src/python/pants/engine:mapper',
+    'src/python/pants/engine:objects',
     'src/python/pants/engine:parser',
   ],
 )

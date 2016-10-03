@@ -54,6 +54,12 @@ class BuildFileParserBasicsTest(BaseTest):
     self.add_to_build_file('foo/bar/BUILD', '\njvm_binary()\n')
     self.assert_parser_error(build_file, "defines address 'bar' more than once")
 
+    # Test that omitting the name in a target at the build root is disallowed.
+    self.add_to_build_file('BUILD', '\njava_library()\n')
+    build_file = self.create_buildfile('BUILD')
+    self.assert_parser_error(build_file,
+                             "Targets in root-level BUILD files must be named explicitly")
+
   def test_addressable_exceptions(self):
     self.add_to_build_file('b/BUILD', 'java_library(name="foo", "bad_arg")')
     build_file_b = self.create_buildfile('b/BUILD')
