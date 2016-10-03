@@ -60,6 +60,8 @@ python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/subsystems:junit',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -117,7 +119,6 @@ python_tests(
     'src/python/pants/backend/project_info/tasks:ide_gen',
     'src/python/pants/source',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
@@ -138,6 +139,7 @@ python_tests(
   name = 'idea_plugin_integration',
   sources = ['test_idea_plugin_integration.py'],
   dependencies = [
+    'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

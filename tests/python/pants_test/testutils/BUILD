@@ -24,5 +24,6 @@ python_library(
   dependencies = [
     'src/python/pants/base:revision',
     'src/python/pants/scm:git',
+    'src/python/pants/util:contextutil',
   ],
 )

@@ -53,7 +53,9 @@ class SchedulerTest(unittest.TestCase):
     variants = tuple(variants.items()) if variants else None
     self.assertEqual({node_type(subject, variants, selector) for subject in subjects},
                      {node for node, _ in walk
-                      if node.product == selector.product and isinstance(node, node_type) and node.variants == variants})
+                       if node.product == selector.product and
+                          isinstance(node, node_type) and
+                          node.variants == variants})
 
   def build_and_walk(self, build_request):
     """Build and then walk the given build_request, returning the walked graph as a list."""
@@ -91,6 +93,12 @@ class SchedulerTest(unittest.TestCase):
     dependencies = [(d, self.pg.state(d)) for d in self.pg.dependencies_of(root)]
     self.assertIn((node, thrown_type), [(k, type(v.exc))
                                         for k, v in dependencies if type(v) is Throw])
+
+  def test_type_error_on_unexpected_subject_type(self):
+    with self.assertRaises(TypeError) as cm:
+      self.scheduler.build_request(goals={}, subjects=['string'])
+    self.assertEquals("Unsupported root subject type: <type 'unicode'> for u'string'",
+                      str(cm.exception))
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
@@ -225,7 +233,10 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec, None, SelectDependencies(Address, Addresses)), root)
+    self.assertEqual(DependenciesNode(spec,
+                                      None,
+                                      SelectDependencies(Address, Addresses, field_types=(Address,))),
+                     root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that a few expected addresses are in the list.
@@ -242,7 +253,10 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec, None, SelectDependencies(Address, Addresses)), root)
+    self.assertEqual(DependenciesNode(spec,
+                                      None,
+                                      SelectDependencies(Address, Addresses, field_types=(Address,))),
+                     root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that an expected address is in the list.
@@ -279,30 +293,33 @@ class ProductGraphTest(unittest.TestCase):
     for state in states:
       dest = None
       for src in reversed(sequence):
-        graph.update_state(src, state([dest] if dest else []))
+        if state is Waiting:
+          graph.add_dependencies(src, [dest] if dest else [])
+        else:
+          graph.complete_node(src, state([dest]))
         dest = src
     return sequence
 
   def test_disallow_completed_state_change(self):
-    self.pg.update_state('A', Return('done!'))
+    self.pg.complete_node('A', Return('done!'))
     with self.assertRaises(CompletedNodeException):
-      self.pg.update_state('A', Waiting(['B']))
+      self.pg.add_dependencies('A', ['B'])
 
   def test_disallow_completing_with_incomplete_deps(self):
-    self.pg.update_state('A', Waiting(['B']))
-    self.pg.update_state('B', Waiting(['C']))
+    self.pg.add_dependencies('A', ['B'])
+    self.pg.add_dependencies('B', ['C'])
     with self.assertRaises(IncompleteDependencyException):
-      self.pg.update_state('A', Return('done!'))
+      self.pg.complete_node('A', Return('done!'))
 
   def test_dependency_edges(self):
-    self.pg.update_state('A', Waiting(['B', 'C']))
+    self.pg.add_dependencies('A', ['B', 'C'])
     self.assertEquals({'B', 'C'}, set(self.pg.dependencies_of('A')))
     self.assertEquals({'A'}, set(self.pg.dependents_of('B')))
     self.assertEquals({'A'}, set(self.pg.dependents_of('C')))
 
   def test_cycle_simple(self):
-    self.pg.update_state('A', Waiting(['B']))
-    self.pg.update_state('B', Waiting(['A']))
+    self.pg.add_dependencies('A', ['B'])
+    self.pg.add_dependencies('B', ['A'])
     # NB: Order matters: the second insertion is the one tracked as a cycle.
     self.assertEquals({'B'}, set(self.pg.dependencies_of('A')))
     self.assertEquals(set(), set(self.pg.dependencies_of('B')))
@@ -310,9 +327,9 @@ class ProductGraphTest(unittest.TestCase):
     self.assertEquals({'A'}, set(self.pg.cyclic_dependencies_of('B')))
 
   def test_cycle_indirect(self):
-    self.pg.update_state('A', Waiting(['B']))
-    self.pg.update_state('B', Waiting(['C']))
-    self.pg.update_state('C', Waiting(['A']))
+    self.pg.add_dependencies('A', ['B'])
+    self.pg.add_dependencies('B', ['C'])
+    self.pg.add_dependencies('C', ['A'])
 
     self.assertEquals({'B'}, set(self.pg.dependencies_of('A')))
     self.assertEquals({'C'}, set(self.pg.dependencies_of('B')))
@@ -330,7 +347,7 @@ class ProductGraphTest(unittest.TestCase):
 
     # Closing the chain is not.
     begin, end = nodes[0], nodes[-1]
-    self.pg.update_state(end, Waiting([begin]))
+    self.pg.add_dependencies(end, [begin])
     self.assertEquals(set(), set(self.pg.dependencies_of(end)))
     self.assertEquals({begin}, set(self.pg.cyclic_dependencies_of(end)))
 

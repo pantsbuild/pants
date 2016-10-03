@@ -6,6 +6,6 @@ python_tests(
   sources=['test_jvm.py'],
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:jvm',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:base_test',
   ]
 )

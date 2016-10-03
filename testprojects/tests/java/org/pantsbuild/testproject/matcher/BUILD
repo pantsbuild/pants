@@ -6,5 +6,6 @@ junit_tests(name='matcher',
   sources=['MatcherTest.java'],
   dependencies=[
     '3rdparty:junit',
+    '3rdparty/jvm/org/hamcrest:hamcrest-library',
   ],
 )

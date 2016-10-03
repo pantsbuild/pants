@@ -8,6 +8,7 @@ python_library(
     ':binary_create',
     ':bootstrap_jvm_tools',
     ':bundle_create',
+    ':consolidate_classpath',
     ':check_published_deps',
     ':checkstyle',
     ':detect_duplicates',
@@ -58,6 +59,16 @@ python_library(
 python_library(
   name = 'binary_create',
   sources = ['binary_create.py'],
+  dependencies = [
+    ':jvm_binary_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'consolidate_classpath',
+  sources = ['consolidate_classpath.py'],
   dependencies = [
     ':jvm_binary_task',
     'src/python/pants/base:build_environment',
@@ -341,8 +352,8 @@ python_library(
     ':jvm_tool_task_mixin',
     ':reports',
     'src/python/pants/backend/jvm:argfile',
+    'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
-    'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
@@ -351,10 +362,15 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
+    'src/python/pants/process',
     'src/python/pants/task',
     'src/python/pants/util:argutil',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
     'src/python/pants/util:strutil',
     'src/python/pants/util:xml_parser',
   ],

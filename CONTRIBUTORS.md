@@ -1,4 +1,4 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
 + Alan Paulin
@@ -75,6 +75,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Larry Hosken
 + Lei Wang
 + Leo Kim
++ Lex Spoon
 + Luc Cary
 + Luca Clementi
 + Marc Abramowitz
@@ -83,6 +84,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Mark McBride
 + Mateo Rodriguez
 + Mathew Jennings
++ Matt Dee
 + Matt Landis
 + Matt Olsen
 + Matthew Jeffryes

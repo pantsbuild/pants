@@ -19,7 +19,7 @@ from pants.java.distribution.distribution import (Distribution, DistributionLoca
                                                   _OSXEnvironment, _UnknownEnvironment)
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class EXE(object):
@@ -398,12 +398,12 @@ class LiveDistributionTest(unittest.TestCase):
     Distribution(bin_path=os.path.dirname(self.JAVA), maximum_version='999.999.999').validate()
     Distribution(bin_path=os.path.dirname(self.JAVA), minimum_version='1.3.1',
                  maximum_version='999.999.999').validate()
-    with subsystem_instance(DistributionLocator) as locator:
-      locator.cached(jdk=False)
+    locator = global_subsystem_instance(DistributionLocator)
+    locator.cached(jdk=False)
 
   @unittest.skipIf(not JAVAC, reason='No javac executable on the PATH.')
   def test_validate_live_jdk(self):
     Distribution(bin_path=os.path.dirname(self.JAVAC), jdk=True).validate()
     Distribution(bin_path=os.path.dirname(self.JAVAC), jdk=True).binary('javap')
-    with subsystem_instance(DistributionLocator) as locator:
-      locator.cached(jdk=True)
+    locator = global_subsystem_instance(DistributionLocator)
+    locator.cached(jdk=True)

@@ -26,7 +26,7 @@ from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def coord(org, name, classifier=None, rev=None, ext=None):
@@ -147,8 +147,8 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_force_override(self):
     jars = list(self.a.payload.jars)
     with temporary_file_path() as ivyxml:
-      with subsystem_instance(JarDependencyManagement):
-        IvyUtils.generate_ivy([self.a], jars=jars, excludes=[], ivyxml=ivyxml, confs=['default'])
+      init_subsystem(JarDependencyManagement)
+      IvyUtils.generate_ivy([self.a], jars=jars, excludes=[], ivyxml=ivyxml, confs=['default'])
 
       doc = ET.parse(ivyxml).getroot()
 
@@ -400,9 +400,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.set_options_for_scope(IvySubsystem.options_scope,
                                cache_dir='DOES_NOT_EXIST',
                                use_nailgun=False)
-
-    # Hack to initialize Ivy subsystem
-    self.context()
 
     with self.assertRaises(IvyUtils.IvyResolveReportError):
       IvyUtils.parse_xml_report('default', IvyUtils.xml_report_path('INVALID_CACHE_DIR',

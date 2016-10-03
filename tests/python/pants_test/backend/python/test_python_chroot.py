@@ -15,9 +15,6 @@ from pex.platforms import Platform
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
-# TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
-# in pants java since non-jvm backends depend on it to run things.
-from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
@@ -25,13 +22,14 @@ from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.binaries.binary_util import BinaryUtil
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.source.source_root import SourceRootConfig
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import create_subsystem, subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 def test_get_current_platform():
@@ -43,41 +41,46 @@ class PythonChrootTest(BaseTest):
 
   def setUp(self):
     # Capture PythonSetup with the real BUILD_ROOT before that is reset to a tmpdir by super.
-    with subsystem_instance(PythonSetup) as python_setup:
-      self.python_setup = python_setup
+    self.python_setup = global_subsystem_instance(PythonSetup)
     super(PythonChrootTest, self).setUp()
 
   @contextmanager
   def dumped_chroot(self, targets):
-    python_repos = create_subsystem(PythonRepos)
+    # TODO(benjy): We shouldn't need to mention DistributionLocator here, as IvySubsystem
+    # declares it as a dependency. However if we don't then test_antlr() below fails on
+    # uninitialized options for that subsystem.  Hopefully my pending (as of 9/2016) change
+    # to clean up how we initialize and create instances of subsystems in tests will make
+    # this problem go away.
+    self.context(for_subsystems=[PythonRepos, PythonSetup, IvySubsystem,
+                                 DistributionLocator, ThriftBinary.Factory, BinaryUtil.Factory])
+    python_repos = PythonRepos.global_instance()
+    ivy_bootstrapper = Bootstrapper(ivy_subsystem=IvySubsystem.global_instance())
+    thrift_binary_factory = ThriftBinary.Factory.global_instance().create
 
-    with subsystem_instance(IvySubsystem) as ivy_subsystem:
-      ivy_bootstrapper = Bootstrapper(ivy_subsystem=ivy_subsystem)
+    interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
+    interpreter_cache.setup()
+    interpreters = list(interpreter_cache.matched_interpreters([
+      self.python_setup.interpreter_requirement
+    ]))
+    self.assertGreater(len(interpreters), 0)
+    interpreter = interpreters[0]
 
-      with subsystem_instance(ThriftBinary.Factory) as thrift_binary_factory:
-        interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
-        interpreter_cache.setup()
-        interpreters = list(interpreter_cache.matched_interpreters([
-          self.python_setup.interpreter_requirement]))
-        self.assertGreater(len(interpreters), 0)
-        interpreter = interpreters[0]
+    with temporary_dir() as chroot:
+      pex_builder = PEXBuilder(path=chroot, interpreter=interpreter)
 
-        with temporary_dir() as chroot:
-          pex_builder = PEXBuilder(path=chroot, interpreter=interpreter)
-
-          python_chroot = PythonChroot(python_setup=self.python_setup,
-                                       python_repos=python_repos,
-                                       ivy_bootstrapper=ivy_bootstrapper,
-                                       thrift_binary_factory=thrift_binary_factory.create,
-                                       interpreter=interpreter,
-                                       builder=pex_builder,
-                                       targets=targets,
-                                       platforms=['current'])
-          try:
-            python_chroot.dump()
-            yield pex_builder, python_chroot
-          finally:
-            python_chroot.delete()
+      python_chroot = PythonChroot(python_setup=self.python_setup,
+                                   python_repos=python_repos,
+                                   ivy_bootstrapper=ivy_bootstrapper,
+                                   thrift_binary_factory=thrift_binary_factory,
+                                   interpreter=interpreter,
+                                   builder=pex_builder,
+                                   targets=targets,
+                                   platforms=['current'])
+      try:
+        python_chroot.dump()
+        yield pex_builder, python_chroot
+      finally:
+        python_chroot.delete()
 
   def test_antlr(self):
     self.create_file(relpath='src/antlr/word/word.g', contents=dedent("""
@@ -127,83 +130,70 @@ class PythonChrootTest(BaseTest):
                               source='main.py',
                               dependencies=[antlr_target, antlr3])
 
-    # TODO(John Sirois): This hacks around a direct but undeclared dependency
-    # `pants.java.distribution.distribution.Distribution` gained in
-    # https://rbcommons.com/s/twitter/r/2657
-    # Remove this once proper Subsystem dependency chains are re-established.
-    with subsystem_instance(JVM):
-      # TODO(benjy): This hacks around PythonChroot's dependency on source roots.
-      # See do_test_thrift() for more details. Remove this when we have a better way.
-      with subsystem_instance(SourceRootConfig):
-        with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
-          pex_builder.set_entry_point('test.main:word_up')
-          pex_builder.freeze()
-          pex = python_chroot.pex()
+    with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
+      pex_builder.set_entry_point('test.main:word_up')
+      pex_builder.freeze()
+      pex = python_chroot.pex()
 
-          process = pex.run(blocking=False, stdout=subprocess.PIPE)
-          stdout, _ = process.communicate()
+      process = pex.run(blocking=False, stdout=subprocess.PIPE)
+      stdout, _ = process.communicate()
 
-          self.assertEqual(0, process.returncode)
-          self.assertEqual(['Hello', ' ', 'World!'], stdout.splitlines())
+      self.assertEqual(0, process.returncode)
+      self.assertEqual(['Hello', ' ', 'World!'], stdout.splitlines())
 
   @contextmanager
   def do_test_thrift(self, inspect_chroot=None):
-    # TODO(benjy): This hacks around PythonChroot's dependency on source roots.
-    # Most tests get SourceRoot functionality set up for them by their test context.
-    # However PythonChroot isn't a task and doesn't use context. Rather it accesses source roots
-    # directly via Target.target_base.  Remove this when we have a better way.
-    with subsystem_instance(SourceRootConfig):
-      self.create_file(relpath='src/thrift/core/identifiers.thrift', contents=dedent("""
-        namespace py core
+    self.create_file(relpath='src/thrift/core/identifiers.thrift', contents=dedent("""
+      namespace py core
 
-        const string HELLO = "Hello"
-        const string WORLD = "World!"
-      """))
-      core_const = self.make_target(spec='src/thrift/core',
-                                    target_type=PythonThriftLibrary,
-                                    sources=['identifiers.thrift'])
+      const string HELLO = "Hello"
+      const string WORLD = "World!"
+    """))
+    core_const = self.make_target(spec='src/thrift/core',
+                                  target_type=PythonThriftLibrary,
+                                  sources=['identifiers.thrift'])
 
-      self.create_file(relpath='src/thrift/test/const.thrift', contents=dedent("""
-        namespace py test
+    self.create_file(relpath='src/thrift/test/const.thrift', contents=dedent("""
+      namespace py test
 
-        include "core/identifiers.thrift"
+      include "core/identifiers.thrift"
 
-        const list<string> MESSAGE = [identifiers.HELLO, identifiers.WORLD]
-      """))
-      test_const = self.make_target(spec='src/thrift/test',
-                                    target_type=PythonThriftLibrary,
-                                    sources=['const.thrift'],
-                                    dependencies=[core_const])
+      const list<string> MESSAGE = [identifiers.HELLO, identifiers.WORLD]
+    """))
+    test_const = self.make_target(spec='src/thrift/test',
+                                  target_type=PythonThriftLibrary,
+                                  sources=['const.thrift'],
+                                  dependencies=[core_const])
 
-      self.create_file(relpath='src/python/test/main.py', contents=dedent("""
-        from test.constants import MESSAGE
+    self.create_file(relpath='src/python/test/main.py', contents=dedent("""
+      from test.constants import MESSAGE
 
 
-        def say_hello():
-          print(' '.join(MESSAGE))
-      """))
-      binary = self.make_target(spec='src/python/test',
-                                target_type=PythonBinary,
-                                source='main.py',
-                                dependencies=[test_const])
+      def say_hello():
+        print(' '.join(MESSAGE))
+    """))
+    binary = self.make_target(spec='src/python/test',
+                              target_type=PythonBinary,
+                              source='main.py',
+                              dependencies=[test_const])
 
-      yield binary, test_const
+    yield binary, test_const
 
-      with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
-        pex_builder.set_entry_point('test.main:say_hello')
-        pex_builder.freeze()
-        pex = python_chroot.pex()
+    with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
+      pex_builder.set_entry_point('test.main:say_hello')
+      pex_builder.freeze()
+      pex = python_chroot.pex()
 
-        process = pex.run(blocking=False, stdout=subprocess.PIPE)
-        stdout, _ = process.communicate()
+      process = pex.run(blocking=False, stdout=subprocess.PIPE)
+      stdout, _ = process.communicate()
 
-        self.assertEqual(0, process.returncode)
-        self.assertEqual('Hello World!', stdout.strip())
+      self.assertEqual(0, process.returncode)
+      self.assertEqual('Hello World!', stdout.strip())
 
-        if inspect_chroot:
-          # Snap a clean copy of the chroot with just the chroots added files.
-          chroot = pex_builder.clone().path()
-          inspect_chroot(chroot)
+      if inspect_chroot:
+        # Snap a clean copy of the chroot with just the chroots added files.
+        chroot = pex_builder.clone().path()
+        inspect_chroot(chroot)
 
   def test_thrift(self):
     with self.do_test_thrift():

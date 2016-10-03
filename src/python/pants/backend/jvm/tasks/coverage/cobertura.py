@@ -20,7 +20,6 @@ from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch
 
 class CoberturaTaskSettings(CoverageTaskSettings):
   """A class that holds task settings for cobertura coverage."""
-  pass
 
 
 class Cobertura(Coverage):
@@ -72,10 +71,11 @@ class Cobertura(Coverage):
     self._exclude_classes = options.coverage_cobertura_exclude_classes
     self._nothing_to_instrument = True
 
-  def instrument(self, targets, tests, compute_junit_classpath, execute_java_for_targets):
+  def instrument(self, targets, compute_junit_classpath, execute_java_for_targets):
     # Setup an instrumentation classpath based on the existing runtime classpath.
     runtime_classpath = self._context.products.get_data('runtime_classpath')
-    instrumentation_classpath = self._context.products.safe_create_data('instrument_classpath', runtime_classpath.copy)
+    instrumentation_classpath = self._context.products.safe_create_data('instrument_classpath',
+                                                                        runtime_classpath.copy)
     self.initialize_instrument_classpath(targets, instrumentation_classpath)
 
     cobertura_cp = self._settings.tool_classpath('cobertura-instrument')
@@ -140,7 +140,7 @@ class Cobertura(Coverage):
   def extra_jvm_options(self):
     return ['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile]
 
-  def report(self, targets, tests, execute_java_for_targets, tests_failed_exception=None):
+  def report(self, targets, execute_java_for_targets, tests_failed_exception=None):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping report...')
       return

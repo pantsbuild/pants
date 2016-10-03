@@ -205,10 +205,10 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       dedent("""
       {
           "common/b:b": [
+              "overlaps:five",
               "overlaps:four",
-              "overlaps:three",
               "overlaps:one",
-              "overlaps:five"
+              "overlaps:three"
           ]
       }""").lstrip('\n'),
       targets=[self.target('common/b')],
@@ -220,9 +220,9 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       dedent("""
       {
           "common/a:a": [
-              "overlaps:two",
+              "overlaps:one",
               "overlaps:three",
-              "overlaps:one"
+              "overlaps:two"
           ],
           "overlaps:one": [
               "overlaps:three"

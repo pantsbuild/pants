@@ -12,6 +12,7 @@ python_library(
    dependencies = [
      '3rdparty/python:six',
      ':dirutil',
+     ':tarutil',
    ],
 )
 
@@ -50,7 +51,6 @@ python_library(
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
-  dependencies = [],
 )
 
 python_library(
@@ -104,6 +104,14 @@ python_library(
 python_library(
   name = 'strutil',
   sources = ['strutil.py'],
+  dependencies = [
+    '3rdparty/python:six',
+  ],
+)
+
+python_library(
+  name = 'tarutil',
+  sources = ['tarutil.py'],
   dependencies = [
     '3rdparty/python:six',
   ],

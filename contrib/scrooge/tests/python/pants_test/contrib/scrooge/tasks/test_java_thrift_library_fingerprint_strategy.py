@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import create_subsystem
 
 from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
   JavaThriftLibraryFingerprintStrategy
@@ -21,8 +20,10 @@ class JavaThriftLibraryFingerprintStrategyTest(BaseTest):
               'rpc_style': 'async'}
 
   def create_strategy(self, option_values):
-    thrift_defaults = create_subsystem(ThriftDefaults, **option_values)
-    return JavaThriftLibraryFingerprintStrategy(thrift_defaults)
+    self.context(for_subsystems=[ThriftDefaults], options={
+      ThriftDefaults.options_scope: option_values
+    })
+    return JavaThriftLibraryFingerprintStrategy(ThriftDefaults.global_instance())
 
   def test_fp_diffs_due_to_option(self):
     option_values = {'compiler': 'scrooge',

@@ -10,8 +10,8 @@ import warnings
 from functools import wraps
 
 import six
+from packaging.version import InvalidVersion, Version
 
-from pants.base.revision import Revision
 from pants.version import PANTS_SEMVER
 
 
@@ -43,7 +43,7 @@ class BadDecoratorNestingError(DeprecationApplicationError):
 
 def get_deprecated_tense(removal_version, future_tense='will be', past_tense='was'):
   """Provides the grammatical tense for a given deprecated version vs the current version."""
-  return future_tense if (Revision.semver(removal_version) >= PANTS_SEMVER) else past_tense
+  return future_tense if (Version(removal_version) >= PANTS_SEMVER) else past_tense
 
 
 def validate_removal_semver(removal_version):
@@ -52,17 +52,23 @@ def validate_removal_semver(removal_version):
   If so, returns that semver.  Raises an error otherwise.
 
   :param str removal_version: The pantsbuild.pants version which will remove the deprecated entity.
-  :rtype: `pants.base.Revision`
+  :rtype: `packaging.version.Version`
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   """
   if removal_version is None:
     raise MissingRemovalVersionError('The removal version must be provided.')
   if not isinstance(removal_version, six.string_types):
-    raise BadRemovalVersionError('The removal_version must be a semver version string.')
+    raise BadRemovalVersionError('The removal_version must be a version string.')
   try:
-    return Revision.semver(removal_version)
-  except Revision.BadRevision as e:
-    raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
+    # NB: packaging will see versions like 1.a.0 as 1a0, and are "valid"
+    # We explicitly want our versions to be of the form x.y.z.
+    v = Version(removal_version)
+    if len(v.base_version.split('.')) != 3:
+      raise BadRemovalVersionError('The given removal version {} is not a valid version: '
+                                   '{}'.format(removal_version, removal_version))
+    return v
+  except InvalidVersion as e:
+    raise BadRemovalVersionError('The given removal version {} is not a valid version: '
                                  '{}'.format(removal_version, e))
 
 

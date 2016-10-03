@@ -29,16 +29,21 @@ class TypeConstraint(AbstractClass):
   :class:`SubclassesOf`.
   """
 
-  def __init__(self, *types):
+  def __init__(self, *types, **kwargs):
     """Creates a type constraint centered around the given types.
 
     The type constraint is satisfied as a whole if satisfied for at least one of the given types.
 
     :param type *types: The focus of this type constraint.
+    :param str description: A description for this constraint if the list of types is too long.
     """
     if not types:
       raise ValueError('Must supply at least one type')
+    if any(not isinstance(t, type) for t in types):
+      raise TypeError('Supplied types must be types. {!r}'.format(types))
+
     self._types = types
+    self._desc = kwargs.get('description', None)
 
   @property
   def types(self):
@@ -48,8 +53,15 @@ class TypeConstraint(AbstractClass):
     """
     return self._types
 
-  @abstractmethod
   def satisfied_by(self, obj):
+    """Return `True` if the given object satisfies this type constraint.
+
+    :rtype: bool
+    """
+    return self.satisfied_by_type(type(obj))
+
+  @abstractmethod
+  def satisfied_by_type(self, obj_type):
     """Return `True` if the given object satisfies this type constraint.
 
     :rtype: bool
@@ -65,12 +77,24 @@ class TypeConstraint(AbstractClass):
     return not (self == other)
 
   def __str__(self):
+    if self._desc:
+      constrained_type = '({})'.format(self._desc)
+    else:
+      if len(self._types) == 1:
+        constrained_type = self._types[0].__name__
+      else:
+        constrained_type = '({})'.format(', '.join(t.__name__ for t in self._types))
     return '{variance_symbol}{constrained_type}'.format(variance_symbol=self._variance_symbol,
-                                                        constrained_type=self._types)
+                                                        constrained_type=constrained_type)
 
   def __repr__(self):
+    if self._desc:
+      constrained_type = self._desc
+    else:
+      constrained_type = ', '.join(t.__name__ for t in self._types)
     return ('{type_constraint_type}({constrained_type})'
-            .format(type_constraint_type=type(self).__name__, constrained_type=self._types))
+      .format(type_constraint_type=type(self).__name__,
+                    constrained_type=constrained_type))
 
 
 class SuperclassesOf(TypeConstraint):
@@ -78,12 +102,8 @@ class SuperclassesOf(TypeConstraint):
 
   _variance_symbol = '-'
 
-  def satisfied_by(self, obj):
-    obj_type = type(obj)
-    for type_ in self._types:
-      if issubclass(type_, obj_type):
-        return True
-    return False
+  def satisfied_by_type(self, obj_type):
+    return any(issubclass(t, obj_type) for t in self._types)
 
 
 class Exactly(TypeConstraint):
@@ -91,8 +111,8 @@ class Exactly(TypeConstraint):
 
   _variance_symbol = '='
 
-  def satisfied_by(self, obj):
-    return type(obj) in self._types
+  def satisfied_by_type(self, obj_type):
+    return obj_type in self._types
 
 
 class SubclassesOf(TypeConstraint):
@@ -100,8 +120,8 @@ class SubclassesOf(TypeConstraint):
 
   _variance_symbol = '+'
 
-  def satisfied_by(self, obj):
-    return issubclass(type(obj), self._types)
+  def satisfied_by_type(self, obj_type):
+    return issubclass(obj_type, self._types)
 
 
 class NotSerializableError(TypeError):
