@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+from hashlib import sha1
 
 from twitter.common.collections import maybe_list
 
@@ -254,7 +255,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
       test_target = '{}:common'.format(test_path)
       json_data = self.run_export(test_target, workdir)
-      synthetic_target = '{}:shadow-unstable-intransitive-1'.format(test_path)
+      h = sha1('{}:shadow{}'.format(test_path, 'intransitive')).hexdigest()
+      synthetic_target = '{}:shadow-unstable-intransitive-{}'.format(test_path, h)
       self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
       self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])
 
