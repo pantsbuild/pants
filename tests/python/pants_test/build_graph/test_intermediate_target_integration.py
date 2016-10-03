@@ -41,10 +41,8 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     stdout_list = self.run_pants(['-q', 'list', '{}:'.format(test_path)]).stdout_data.strip().split()
     scope = 'intransitive'
 
-    scoped_address = '{}:b'.format(test_path)
-    hash_b = self.hash_target(scoped_address, scope)
-    scoped_address = '{}:c'.format(test_path)
-    hash_c = self.hash_target(scoped_address, scope)
+    hash_b = self.hash_target('{}:b'.format(test_path), scope)
+    hash_c = self.hash_target('{}:c'.format(test_path), scope)
 
     self.assertEqual(
       {'testprojects/src/java/org/pantsbuild/testproject/intransitive:intransitive',
@@ -61,12 +59,9 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     stdout_list = self.run_pants(['-q', 'list', '{}::'.format(test_path)]).stdout_data.strip().split()
     scope = 'intransitive'
 
-    scoped_address = 'testprojects/maven_layout/provided_patching/one/src/main/java:shadow'
-    hash_1 = self.hash_target(scoped_address, scope)
-    scoped_address = 'testprojects/maven_layout/provided_patching/two/src/main/java:shadow'
-    hash_2 = self.hash_target(scoped_address, scope)
-    scoped_address = 'testprojects/maven_layout/provided_patching/three/src/main/java:shadow'
-    hash_3 = self.hash_target(scoped_address, scope)
+    hash_1 = self.hash_target('testprojects/maven_layout/provided_patching/one/src/main/java:shadow', scope)
+    hash_2 = self.hash_target('testprojects/maven_layout/provided_patching/two/src/main/java:shadow', scope)
+    hash_3 = self.hash_target('testprojects/maven_layout/provided_patching/three/src/main/java:shadow', scope)
 
     match_set = {
       'testprojects/maven_layout/provided_patching/one/src/main/java:common',
