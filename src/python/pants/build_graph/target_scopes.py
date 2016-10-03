@@ -5,11 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from hashlib import sha1
-
 import six
 
-from pants.build_graph.address import Address
 from pants.build_graph.intermediate_target_factory import IntermediateTargetFactoryBase
 
 
