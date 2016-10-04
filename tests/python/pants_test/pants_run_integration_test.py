@@ -62,7 +62,7 @@ def ensure_engine(f):
   temporary environment variables."""
   def wrapper(self, *args, **kwargs):
     for env_var_value in ('false', 'true'):
-      with environment_as(PANTS_ENABLE_V2_ENGINE=env_var_value):
+      with environment_as(HERMETIC_ENV='PANTS_ENABLE_V2_ENGINE', PANTS_ENABLE_V2_ENGINE=env_var_value):
         f(self, *args, **kwargs)
   return wrapper
 
@@ -167,7 +167,11 @@ class PantsRunIntegrationTest(unittest.TestCase):
     pants_command = [pants_script] + args + command
 
     if self.hermetic():
-      env = {}
+      env = dict()
+      hermetic_env = os.getenv('HERMETIC_ENV')
+      if hermetic_env:
+        for h in hermetic_env.strip(',').split(','):
+          env[h] = os.getenv(h)
     else:
       env = os.environ.copy()
     if extra_env:

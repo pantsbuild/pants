@@ -78,7 +78,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
 
     :param TargetRoots target_roots: The targets root of the request.
     :param string build_root: The build root.
-    :returns: A tuple of (BuildGraph, AddressMapper, list[string specs]).
+    :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
     graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
@@ -91,7 +91,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
     logger.debug('engine cache stats: %s', self.engine.cache_stats())
     address_mapper = LegacyAddressMapper(self.scheduler, self.engine, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
-    return graph, address_mapper, target_roots.as_string_specs()
+    return graph, address_mapper
 
 
 class EngineInitializer(object):

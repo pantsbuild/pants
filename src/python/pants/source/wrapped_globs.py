@@ -59,10 +59,15 @@ class FilesetWithSpec(AbstractClass):
     """Given a path (which should be a member of self.files), returns a unique hash for that file."""
 
   def __iter__(self):
-    return self.files.__iter__()
+    return iter(self.files)
 
   def __getitem__(self, index):
     return self.files[index]
+
+  def iter_relative_paths(self):
+    """An alternative `__iter__` that joins files with the relative root."""
+    for f in self:
+      yield os.path.join(self.rel_root, f)
 
 
 class EagerFilesetWithSpec(FilesetWithSpec):

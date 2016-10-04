@@ -34,7 +34,10 @@ class FindBugs(NailgunTask):
   def register_options(cls, register):
     super(FindBugs, cls).register_options(register)
 
-    register('--skip', type=bool, fingerprint=True, help='Skip findbugs.')
+    register('--skip', type=bool, help='Skip findbugs.')
+    register('--transitive', default=True, type=bool,
+             help='Run findbugs against transitive dependencies. Disable to run findbugs only on '
+                  'targets specified on the command line.')
     register('--effort', default='default', fingerprint=True,
              choices=['min', 'less', 'default', 'more', 'max'],
              help='Effort of the bug finders.')
@@ -98,9 +101,15 @@ class FindBugs(NailgunTask):
     if self.get_options().skip:
       return
 
-    targets = self.context.targets(self._is_findbugs_target)
+    invalidate_deps=True
+    if self.get_options().transitive:
+      targets = self.context.targets(self._is_findbugs_target)
+    else:
+      targets = filter(self._is_findbugs_target, self.context.target_roots)
+      invalidate_deps=False
+
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
-    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
+    with self.invalidated(targets, invalidate_dependents=invalidate_deps) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
         target_bug_counts = self.findbugs(vt.target)
         if not self.get_options().fail_on_error or sum(target_bug_counts.values()) == 0:
