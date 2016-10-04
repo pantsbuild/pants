@@ -54,6 +54,8 @@ class IntermediateTargetFactoryBase(AbstractClass):
   The syntax for this feature is experimental and may change in the future.
   """
 
+  _targets = set()
+
   class ExpectedAddressError(Exception):
     """Thrown if an object that is not an address is used as the dependency spec."""
 
@@ -61,22 +63,14 @@ class IntermediateTargetFactoryBase(AbstractClass):
     self._parse_context = parse_context
 
   @property
-  def intermediate_targets(self):
-    if getattr(self.__class__, '_targets') is not None:
-      return self.__class__._targets
-    else:
-      raise AttributeError('Subclass of {} should have class variable "{}"'.format(
-        IntermediateTargetFactoryBase, '_targets'
-      ))
-
-  @property
   def extra_target_arguments(self):
     """Extra keyword arguments to pass to the target constructor."""
     return dict()
 
-  def __call__(self, address, scope_str='intransitive'):
+  def _create_intermediate_target(self, address, suffix):
     """
     :param string address: A target address.
+    :param string suffix: A string used as a suffix of the intermediate target name.
     :returns: The address of a synthetic intermediary target.
     """
     if not isinstance(address, six.string_types):
@@ -90,22 +84,21 @@ class IntermediateTargetFactoryBase(AbstractClass):
     # hint.
     hasher = sha1()
     hasher.update(str(address))
-    hasher.update(scope_str)
+    hasher.update(suffix)
 
-    name = '{name}-unstable-{scope}-{index}'.format(
+    name = '{name}-unstable-{suffix}-{index}'.format(
       name=address.target_name,
-      scope=scope_str.replace(' ', '.'),
+      suffix=suffix.replace(' ', '.'),
       index=hasher.hexdigest(),
     )
 
-    if name not in self.intermediate_targets:
+    if (name, self._parse_context.rel_path) not in self._targets:
       self._parse_context.create_object(
         'target',
         name=name,
         dependencies=[address.spec],
         **self.extra_target_arguments
       )
-      self.intermediate_targets[name] = self._parse_context.rel_path
+      self._targets.add((name, self._parse_context.rel_path))
 
-    spec_path = self.intermediate_targets[name]
-    return '{}:{}'.format(spec_path, name)
+    return ':{}'.format(name)

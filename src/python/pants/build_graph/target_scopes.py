@@ -83,9 +83,6 @@ class Scopes(object):
 
 
 class ScopedDependencyFactory(IntermediateTargetFactoryBase):
-
-  _targets = dict()
-
   def __init__(self, parse_context):
     super(ScopedDependencyFactory, self).__init__(parse_context)
     self._scope = None
@@ -97,10 +94,10 @@ class ScopedDependencyFactory(IntermediateTargetFactoryBase):
 
   def __call__(self, address, scope=None):
     """
-    :param string scope: The scope of this dependency.
     :param string address: A target address.
+    :param string scope: The scope of this dependency.
     :returns: The address of a synthetic intermediary target.
     """
     scope = Scope(scope)
     self._scope = str(scope)
-    return super(ScopedDependencyFactory, self).__call__(address, self._scope)
+    return self._create_intermediate_target(address, self._scope)

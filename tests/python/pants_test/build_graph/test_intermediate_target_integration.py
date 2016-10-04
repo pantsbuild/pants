@@ -39,29 +39,29 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
   def test_intransitive(self):
     test_path = 'testprojects/src/java/org/pantsbuild/testproject/intransitive'
     stdout_list = self.run_pants(['-q', 'list', '{}:'.format(test_path)]).stdout_data.strip().split()
-    scope = 'intransitive'
+    suffix = 'intransitive'
 
-    hash_b = self.hash_target('{}:b'.format(test_path), scope)
-    hash_c = self.hash_target('{}:c'.format(test_path), scope)
+    hash_b = self.hash_target('{}:b'.format(test_path), suffix)
+    hash_c = self.hash_target('{}:c'.format(test_path), suffix)
 
     self.assertEqual(
       {'testprojects/src/java/org/pantsbuild/testproject/intransitive:intransitive',
        'testprojects/src/java/org/pantsbuild/testproject/intransitive:diamond',
        'testprojects/src/java/org/pantsbuild/testproject/intransitive:b',
        'testprojects/src/java/org/pantsbuild/testproject/intransitive:c',
-       'testprojects/src/java/org/pantsbuild/testproject/intransitive:b-unstable-intransitive-{}'.format(hash_b),
-       'testprojects/src/java/org/pantsbuild/testproject/intransitive:c-unstable-intransitive-{}'.format(hash_c)},
+       'testprojects/src/java/org/pantsbuild/testproject/intransitive:b-unstable-{}-{}'.format(suffix, hash_b),
+       'testprojects/src/java/org/pantsbuild/testproject/intransitive:c-unstable-{}-{}'.format(suffix, hash_c)},
       set(stdout_list))
 
   @ensure_engine
   def test_provided(self):
     test_path = 'testprojects/maven_layout/provided_patching'
     stdout_list = self.run_pants(['-q', 'list', '{}::'.format(test_path)]).stdout_data.strip().split()
-    scope = 'intransitive'
+    suffix = 'provided'
 
-    hash_1 = self.hash_target('testprojects/maven_layout/provided_patching/one/src/main/java:shadow', scope)
-    hash_2 = self.hash_target('testprojects/maven_layout/provided_patching/two/src/main/java:shadow', scope)
-    hash_3 = self.hash_target('testprojects/maven_layout/provided_patching/three/src/main/java:shadow', scope)
+    hash_1 = self.hash_target('testprojects/maven_layout/provided_patching/one/src/main/java:shadow', suffix)
+    hash_2 = self.hash_target('testprojects/maven_layout/provided_patching/two/src/main/java:shadow', suffix)
+    hash_3 = self.hash_target('testprojects/maven_layout/provided_patching/three/src/main/java:shadow', suffix)
 
     match_set = {
       'testprojects/maven_layout/provided_patching/one/src/main/java:common',
@@ -75,22 +75,10 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
       'testprojects/maven_layout/provided_patching/leaf:one',
       'testprojects/maven_layout/provided_patching/leaf:three',
       'testprojects/maven_layout/provided_patching/leaf:two',
-      'testprojects/maven_layout/provided_patching/one/src/main/java:shadow-unstable-intransitive-{}'.format(hash_1),
-      'testprojects/maven_layout/provided_patching/three/src/main/java:shadow-unstable-intransitive-{}'.format(hash_3),
+      'testprojects/maven_layout/provided_patching/one/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_1),
+      'testprojects/maven_layout/provided_patching/two/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_2),
+      'testprojects/maven_layout/provided_patching/three/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_3),
+      'testprojects/maven_layout/provided_patching/leaf:shadow-unstable-{}-{}'.format(suffix, hash_2)
     }
 
-    # The below is because in v2 engine, the execution order is undetermined.
-    # If 2 targets with different spec_paths have same "provided" field,
-    # then the intermediate target can be created under either spec paths.
-    try:
-      self.assertEqual(
-        match_set.union(
-          {'testprojects/maven_layout/provided_patching/leaf:shadow-unstable-intransitive-{}'.format(hash_2)}),
-        set(stdout_list)
-      )
-    except AssertionError:
-      self.assertEqual(
-        match_set.union(
-          {'testprojects/maven_layout/provided_patching/two/src/main/java:shadow-unstable-intransitive-{}'.format(hash_2)}),
-        set(stdout_list)
-      )
+    self.assertEqual(match_set, set(stdout_list))
