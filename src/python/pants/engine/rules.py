@@ -283,11 +283,40 @@ class NodeBuilder(Closable):
       raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
+class CanHaveDependencies(object):
+  """Marker class for graph entries that can have dependencies on other graph entries."""
+  input_selectors = None
+  subject_type = None
+
+
+class CanBeDependency(object):
+  """Marker class for graph entries that are leaves, and can be depended upon."""
+
+
 class RuleGraph(datatype('RuleGraph',
                          ['root_subject_types',
                           'root_rules',
                           'rule_dependencies',
                           'unfulfillable_rules'])):
+  """A graph containing rules mapping rules to their dependencies taking into account subject types.
+
+  This is a graph of rules. It models dependencies between rules, along with the subject types for
+  those rules. This allows the resulting graph to include cases where a selector is fulfilled by the
+  subject of the graph.
+
+  Because in
+
+     `root_subject_types` the root subject types this graph was generated with.
+     `root_rules` The rule entries that can produce the root products this graph was generated
+                        with.
+     `rule_dependencies` A map from rule entries to the rule entries they depend on.
+                         The collections of dependencies are contained by RuleEdges objects.
+                         Keys must be subclasses of TODO
+                         values must be subclasses of TODO
+     `unfulfillable_rules` A map of rule entries to collections of Diagnostics
+                                 containing the reasons why they were eliminated from the graph.
+
+  """
   # TODO constructing nodes from the resulting graph.
   # Possible approach:
   # - walk out from root nodes, constructing each node.
@@ -298,19 +327,23 @@ class RuleGraph(datatype('RuleGraph',
   def error_message(self):
     """Returns a nice error message for errors in the rule graph."""
     collated_errors = defaultdict(lambda : defaultdict(set))
-    for wrapped_rule, diagnostics in self.unfulfillable_rules.items():
+    for rule_entry, diagnostics in self.unfulfillable_rules.items():
       # don't include the root rules in the error
       # message since they aren't real.
-      if type(wrapped_rule) is RootRule:
+      if type(rule_entry) is RootRule:
         continue
       for diagnostic in diagnostics:
-        collated_errors[wrapped_rule.rule][diagnostic.reason].add(diagnostic.subject_type)
+        collated_errors[rule_entry.rule][diagnostic.reason].add(diagnostic.subject_type)
 
     def subject_type_str(t):
-      if type(t) is type:
+      if t is None:
+        return 'Any'
+      elif type(t) is type:
         return t.__name__
       elif type(t) is tuple:
         return ', '.join(x.__name__ for x in t)
+      else:
+        return str(t)
 
     def format_messages(rule, subject_types_by_reasons):
       errors = '\n    '.join('{} with subject types: {}'
@@ -318,7 +351,7 @@ class RuleGraph(datatype('RuleGraph',
                              for reason, subject_types in sorted(subject_types_by_reasons.items()))
       return '{}:\n    {}'.format(rule, errors)
 
-    used_rule_lookup = set(wrapped_rule.rule for wrapped_rule in self.rule_dependencies.keys())
+    used_rule_lookup = set(rule_entry.rule for rule_entry in self.rule_dependencies.keys())
     formatted_messages = tuple(format_messages(rule, subject_types_by_reasons)
                                for rule, subject_types_by_reasons in sorted(collated_errors.items())
                                if rule not in used_rule_lookup)
@@ -348,7 +381,7 @@ class RuleGraph(datatype('RuleGraph',
       yield '{} => ({},)'.format(rule, ', '.join(str(d) for d in deps))
 
 
-class RuleGraphSubjectIsProduct(datatype('RuleGraphSubjectIsProduct', ['value'])):
+class RuleGraphSubjectIsProduct(datatype('RuleGraphSubjectIsProduct', ['value']), CanBeDependency):
   """Wrapper for when the dependency is the subject."""
 
   @property
@@ -356,16 +389,13 @@ class RuleGraphSubjectIsProduct(datatype('RuleGraphSubjectIsProduct', ['value'])
     return self.value
 
   def __repr__(self):
-    if isinstance(self.value, type):
-      return '{}({})'.format(type(self).__name__, self.value.__name__)
-    else:
-      return '{}({})'.format(type(self).__name__, self.value)
+    return '{}({})'.format(type(self).__name__, self.value.__name__)
 
   def __str__(self):
     return 'SubjectIsProduct({})'.format(self.value.__name__)
 
 
-class RuleGraphLiteral(datatype('RuleGraphLiteral', ['value', 'product_type'])):
+class RuleGraphLiteral(datatype('RuleGraphLiteral', ['value', 'product_type']), CanBeDependency):
   """The dependency is the literal value held by SelectLiteral."""
 
   @property
@@ -379,7 +409,9 @@ class RuleGraphLiteral(datatype('RuleGraphLiteral', ['value', 'product_type'])):
     return 'Literal({}, {})'.format(self.value, self.product_type.__name__)
 
 
-class RuleGraphEntry(datatype('RuleGraphEntry', ['subject_type', 'rule'])):
+class RuleGraphEntry(datatype('RuleGraphEntry', ['subject_type', 'rule']),
+                     CanBeDependency,
+                     CanHaveDependencies):
   """A synthetic rule with a specified subject type"""
 
   @property
@@ -397,7 +429,7 @@ class RuleGraphEntry(datatype('RuleGraphEntry', ['subject_type', 'rule'])):
     return '{} of {}'.format(self.rule, self.subject_type.__name__)
 
 
-class RootRule(datatype('RootRule', ['subject_type', 'selector'])):
+class RootRule(datatype('RootRule', ['subject_type', 'selector']), CanHaveDependencies):
   """A synthetic rule representing a root selector."""
 
   @property
@@ -418,10 +450,6 @@ class RootRule(datatype('RootRule', ['subject_type', 'selector'])):
 
 class Diagnostic(datatype('Diagnostic', ['subject_type', 'reason'])):
   """Holds on to error reasons for problems with the build graph."""
-
-
-class Any(object):
-  pass
 
 
 class UnreachableRule(object):
@@ -501,7 +529,7 @@ class GraphMaker(object):
     unreachable_rules = declared_rules.difference(rules_in_graph,
                                                   rules_eliminated_during_construction)
     for rule in sorted(unreachable_rules):
-      full_unfulfillable_rules[UnreachableRule(rule)] = [Diagnostic(Any, 'Unreachable')]
+      full_unfulfillable_rules[UnreachableRule(rule)] = [Diagnostic(None, 'Unreachable')]
 
     return RuleGraph(self.root_subject_selector_fns,
                          list(full_root_rules),
@@ -546,10 +574,11 @@ class GraphMaker(object):
 
     while rules_to_traverse:
       entry = rules_to_traverse.popleft()
-      if type(entry) in (RuleGraphLiteral, RuleGraphSubjectIsProduct):
+      if isinstance(entry, CanBeDependency) and not isinstance(entry, CanHaveDependencies):
         continue
-      if type(entry) not in (RootRule, RuleGraphEntry):
-        raise TypeError("rules to traverse must all have the type RuleGraphEntry")
+      if not isinstance(entry, CanHaveDependencies):
+        raise TypeError("Cannot determine dependencies of entry not of type CanHaveDependencies: {}"
+                        .format(entry))
       if entry in unfulfillable_rules:
         # TODO a test that covers a case where if this were to eliminate a rule too early, that
         # the rule would still show up
@@ -627,7 +656,7 @@ class GraphMaker(object):
           add_rules_to_graph(entry, selector.input_product_selector, initial_rules_or_literals)
           add_rules_to_graph(entry, selector.projected_product_selector, projected_rules)
         else:
-          raise TypeError('cant handle a {} selector'.format(selector))
+          raise TypeError('Unexpected type of selector: {}'.format(selector))
       if not was_unfulfillable and entry not in rule_dependency_edges:
         # NB: In this case, there are no selectors.
         add_rules_to_graph(entry, None, tuple())
