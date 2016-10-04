@@ -678,6 +678,26 @@ class RuleGraphMakerTest(unittest.TestCase):
                                  (A, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
                                }""").strip(), subgraph)
 
+  def test_multiple_depend_on_same_rule(self):
+    rules = [
+      (B, (Select(A),), noop),
+      (C, (Select(A),), noop),
+      (A, (Select(SubA),), noop)
+    ]
+
+    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+      root_subject_fns=_suba_root_subject_fns)
+    subgraph = graphmaker.full_graph()
+
+    self.assert_equal_with_printing(dedent("""
+                                      {
+                                        root_subject_types: (SubA,)
+                                        root_rules: (B, (Select(A),), noop) of SubA, (C, (Select(A),), noop) of SubA, (A, (Select(SubA),), noop) of SubA
+                                        (B, (Select(A),), noop) of SubA => ((A, (Select(SubA),), noop) of SubA,)
+                                        (C, (Select(A),), noop) of SubA => ((A, (Select(SubA),), noop) of SubA,)
+                                        (A, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
+                                      }""").strip(), subgraph)
+
   def test_select_literal(self):
     literally_a = A()
     rules = [
@@ -713,5 +733,25 @@ class RuleGraphMakerTest(unittest.TestCase):
                                         (Exactly(A), (SelectProjection(B, D, (u'some',), SubA),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(D),), noop) of D,)
                                       }""").strip(),
                                     subgraph)
+
+  def test_successful_when_one_field_type_is_unfulfillable(self):
+    # NB We may want this to be a warning, since it may not be intentional
+    rules = [
+      (B, (Select(SubA),), noop),
+      (D, (Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C))), noop)
+    ]
+
+    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+      root_subject_fns=_suba_root_subject_fns)
+    subgraph = graphmaker.generate_subgraph(SubA(), requested_product=D)
+    print(subgraph.error_message())
+    self.assert_equal_with_printing(dedent("""
+                                      {
+                                        root_subject_types: (SubA,)
+                                        root_rules: (D, (Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C,))), noop) of SubA
+                                        (D, (Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C,))), noop) of SubA => ((B, (Select(SubA),), noop) of SubA, SubjectIsProduct(SubA), (B, (Select(SubA),), noop) of SubA,)
+                                        (B, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
+                                      }""").strip(),
+      subgraph)
 
   assert_equal_with_printing = assert_equal_with_printing

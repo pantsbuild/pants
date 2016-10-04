@@ -311,8 +311,8 @@ class RuleGraph(datatype('RuleGraph',
                         with.
      `rule_dependencies` A map from rule entries to the rule entries they depend on.
                          The collections of dependencies are contained by RuleEdges objects.
-                         Keys must be subclasses of TODO
-                         values must be subclasses of TODO
+                         Keys must be subclasses of CanHaveDependencies
+                         values must be subclasses of CanBeDependency
      `unfulfillable_rules` A map of rule entries to collections of Diagnostics
                                  containing the reasons why they were eliminated from the graph.
 
@@ -465,14 +465,20 @@ class RuleEdges(object):
   # TODO it would be good to note which selectors deps are attached to,
   #      so that eliminations happen within a selector
 
-  def __init__(self, dependencies=tuple()):
+  def __init__(self, dependencies=tuple(), selector_to_deps=None):
     self._dependencies = dependencies
+    if selector_to_deps is None:
+      self._selector_to_deps = defaultdict(tuple)
+    else:
+      self._selector_to_deps = selector_to_deps
 
   def add_edges_via(self, selector, other_rules):
-    self._dependencies += tuple(other_rules)
+    tupled_other_rules = tuple(other_rules)
+    self._selector_to_deps[selector] += tupled_other_rules
+    self._dependencies += tupled_other_rules
 
   def has_edges_for(self, selector, other_rules):
-    return all(r in self._dependencies for r in other_rules)
+    return all(r in self._selector_to_deps[selector] for r in other_rules)
 
   def __contains__(self, rule):
     return rule in self._dependencies
@@ -480,21 +486,26 @@ class RuleEdges(object):
   def __iter__(self):
     return self._dependencies.__iter__()
 
-  def made_unfulfillable_by(self, rule):
-    # If there are no other potential providers of the type
-    # that rule provided, then the rule that owns these edges is also unfulfillable.
-
-    # if there is not a rule that has the same subj, product left in the dependencies.
-    if len(self._dependencies) == 1 and self._dependencies[0] == rule:
+  def makes_unfulfillable(self, dep_to_eliminate):
+    """Returns true if removing dep_to_eliminate makes this set of edges unfulfillable."""
+    if len(self._dependencies) == 1 and self._dependencies[0] == dep_to_eliminate:
       return True
+    for selector, deps in self._selector_to_deps.items():
+      if len(deps) == 1:
+        only_dep = deps[0]
+        if (only_dep.output_product_type is dep_to_eliminate.output_product_type and
+            only_dep.subject_type is dep_to_eliminate.subject_type):
+          return True
+    else:
+      return False
 
-    return not any(dependency.output_product_type is rule.output_product_type and
-                   dependency.subject_type is rule.subject_type
-                   for dependency in self._dependencies
-                   if dependency != rule)
+  def without_rule(self, dep_to_eliminate):
+    new_selector_to_deps = defaultdict(tuple)
+    for selector, deps in self._selector_to_deps.items():
+      new_selector_to_deps[selector] = tuple(d for d in deps if d != dep_to_eliminate)
 
-  def without_rule(self, rule):
-    return RuleEdges(tuple(d for d in self._dependencies if d != rule))
+    return RuleEdges(tuple(d for d in self._dependencies if d != dep_to_eliminate),
+                     new_selector_to_deps)
 
 
 class GraphMaker(object):
@@ -505,8 +516,9 @@ class GraphMaker(object):
 
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
+    root_selector = self.root_subject_selector_fns[root_subject_type](requested_product)
     return RuleGraph((root_subject_type,), *self._construct_graph(RootRule(root_subject_type,
-      self.root_subject_selector_fns[root_subject_type](requested_product))))
+                                                                           root_selector)))
 
   def full_graph(self):
     """Produces a full graph based on the root subjects and all of the products produced by rules."""
@@ -555,7 +567,7 @@ class GraphMaker(object):
         unfulfillable_rules[rule] = []
       unfulfillable_rules[rule].append(Diagnostic(subject_type, reason))
 
-    def add_rules_to_graph(rule, selector, dep_rules):
+    def add_rules_to_graph(rule, selector_path, dep_rules):
       unseen_dep_rules = [g for g in dep_rules
                           if g not in rule_dependency_edges and g not in unfulfillable_rules]
       rules_to_traverse.extend(unseen_dep_rules)
@@ -564,13 +576,13 @@ class GraphMaker(object):
         return
       if rule not in rule_dependency_edges:
         new_edges = RuleEdges()
-        new_edges.add_edges_via(selector, dep_rules)
+        new_edges.add_edges_via(selector_path, dep_rules)
         rule_dependency_edges[rule] = new_edges
       else:
         existing_deps = rule_dependency_edges[rule]
-        if existing_deps.has_edges_for(selector, dep_rules):
+        if existing_deps.has_edges_for(selector_path, dep_rules):
           return
-        existing_deps.add_edges_via(selector, dep_rules)
+        existing_deps.add_edges_via(selector_path, dep_rules)
 
     while rules_to_traverse:
       entry = rules_to_traverse.popleft()
@@ -580,13 +592,9 @@ class GraphMaker(object):
         raise TypeError("Cannot determine dependencies of entry not of type CanHaveDependencies: {}"
                         .format(entry))
       if entry in unfulfillable_rules:
-        # TODO a test that covers a case where if this were to eliminate a rule too early, that
-        # the rule would still show up
         continue
 
       if entry in rule_dependency_edges:
-        # TODO add test that ensures if a rule is a dep of multiple other rules
-        # if a rule will get visited multiple times, it should only have one copy of its dependencies
         continue
 
       was_unfulfillable = False
@@ -629,8 +637,12 @@ class GraphMaker(object):
             was_unfulfillable = True
             continue
 
-          add_rules_to_graph(entry, selector.dep_product_selector, initial_rules_or_literals)
-          add_rules_to_graph(entry, selector.projected_product_selector, tuple(rules_for_dependencies))
+          add_rules_to_graph(entry,
+                             (selector, selector.dep_product_selector),
+                             initial_rules_or_literals)
+          add_rules_to_graph(entry,
+                             (selector, selector.projected_product_selector),
+                             tuple(rules_for_dependencies))
         elif type(selector) is SelectProjection:
           # TODO, could validate that input product has fields
           initial_rules_or_literals = _find_rhs_for_select(entry.subject_type,
@@ -653,8 +665,12 @@ class GraphMaker(object):
             was_unfulfillable = True
             continue
 
-          add_rules_to_graph(entry, selector.input_product_selector, initial_rules_or_literals)
-          add_rules_to_graph(entry, selector.projected_product_selector, projected_rules)
+          add_rules_to_graph(entry,
+                             (selector, selector.input_product_selector),
+                             initial_rules_or_literals)
+          add_rules_to_graph(entry,
+                             (selector, selector.projected_product_selector),
+                             projected_rules)
         else:
           raise TypeError('Unexpected type of selector: {}'.format(selector))
       if not was_unfulfillable and entry not in rule_dependency_edges:
@@ -687,7 +703,7 @@ class GraphMaker(object):
           continue
 
         if unfulfillable_entry in dependency_edges:
-          if dependency_edges.made_unfulfillable_by(unfulfillable_entry):
+          if dependency_edges.makes_unfulfillable(unfulfillable_entry):
             unfulfillable_rules[current_entry] = [Diagnostic(current_entry.subject_type,
                                                   'depends on unfulfillable {}'.format(unfulfillable_entry))]
             removal_traversal.append(current_entry)
