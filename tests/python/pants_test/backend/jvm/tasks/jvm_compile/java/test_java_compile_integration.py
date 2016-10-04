@@ -181,6 +181,30 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # One artifact for guava 15 and one for guava 16
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
 
+  def test_java_compile_with_corrupt_remote(self):
+    """Tests that a corrupt artifact in the remote cache still results in a successful compile."""
+    with self.source_clone('testprojects/tests/java/org/pantsbuild/testproject/matcher') as base:
+      with self.temporary_workdir() as workdir:
+        with self.temporary_cachedir() as cache_root:
+          with cache_server(cache_root=cache_root) as cacheurl:
+            target = os.path.join(base, ':matcher')
+
+            # Compile to populate the cache, and actually run the tests to help verify runtime.
+            first_run = self.run_test_compile(workdir, cacheurl, target, clean_all=True, test=True)
+            self.assert_success(first_run)
+            self.assertTrue("Compiling" in first_run.stdout_data)
+
+            # Corrupt the remote artifact in the cache_root.
+            remote_artifact_path = ...
+            self.assertTrue(os.path.exists(remote_artifact_path))
+            with open(...) as remote_artifact:
+              ...
+
+            # Ensure that the second run still succeeds.
+            second_run = self.run_test_compile(workdir, cacheurl, target, clean_all=True, test=True)
+            self.assert_success(second_run)
+            self.assertTrue("Compiling" in second_run.stdout_data)
+
 
 class JavaCompileIntegrationTestWithZjar(JavaCompileIntegrationTest):
   _EXTRA_TASK_ARGS = ['--compile-zinc-use-classpath-jars']
