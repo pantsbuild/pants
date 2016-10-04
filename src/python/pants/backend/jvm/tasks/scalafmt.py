@@ -46,7 +46,11 @@ class ScalaFmt(NailgunTask):
       files = ",".join(sources)
 
       config_file = self.get_options().configuration
-      args = ['--test', '--config', config_file, '--files', files]
+
+      """If no config file is specified use default scalafmt config"""
+      args = ['--test', '--files', files]
+      if config_file != None:
+        args.extend(['--config', config_file])
 
       result = self.runjava(classpath=self.tool_classpath('scalafmt'),
                    main=self._SCALAFMT_MAIN,
@@ -54,7 +58,10 @@ class ScalaFmt(NailgunTask):
                    workunit_name='scalafmt')
 
       if result != 0:
-        scalafmt_cmd = 'scalafmt -i --config {} --files {}'.format(config_file, files)
+        scalafmt_cmd = 'scalafmt -i --files {}'.format(files)
+        if config_file != None:
+          scalafmt_cmd += ' --config {}'.format(config_file)
+        
         raise TaskError('Scalafmt failed with exit code {} to fix run: `{}`'.format(result, scalafmt_cmd), exit_code=result)
 
   def get_non_synthetic_scala_targets(self, targets):
