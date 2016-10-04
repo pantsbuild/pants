@@ -612,7 +612,6 @@ python_library(
   sources = ['scalafmt.py'],
   dependencies = [
     ':nailgun_task',
-    'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
