@@ -25,7 +25,7 @@ class ScalaFmt(NailgunTask):
     super(ScalaFmt, cls).register_options(register)
     register('--skip', type=bool, fingerprint=True, help='Skip Scalafmt Check')
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
-              help='Path to scalafmt config file.')
+              help='Path to scalafmt config file, if not specified default scalafmt config used')
     cls.register_jvm_tool(register,
                           'scalafmt',
                           classpath=[
