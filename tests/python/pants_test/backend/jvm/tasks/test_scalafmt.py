@@ -15,15 +15,15 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
   def test_scalafmt_fail(self):
     target = '{}/badscalastyle::'.format(TEST_DIR)
     # test should fail because of style error.
-    failing_test = self.run_pants(['test', target],
-      {'test.scalafmt':{'skip': 'False'}})
+    failing_test = self.run_pants(['compile', target],
+      {'compile.scalafmt':{'skip': 'False'}})
 
     self.assert_failure(failing_test)
 
   def test_scalafmt_disabled(self):
     target = '{}/badscalastyle::'.format(TEST_DIR)
     # test should pass because of scalafmt disabled.
-    failing_test = self.run_pants(['test', target],
-      {'test.scalafmt':{'skip': 'True'}})
+    failing_test = self.run_pants(['compile', target],
+      {'compile.scalafmt':{'skip': 'True'}})
 
     self.assert_success(failing_test)

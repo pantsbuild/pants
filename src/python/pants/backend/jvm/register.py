@@ -189,7 +189,7 @@ def register_goals():
   task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty')
   task(name='scala', action=ScalaRepl, serialize=False).install('repl')
   task(name='scala-dirty', action=ScalaRepl, serialize=False).install('repl-dirty')
-  task(name='scalafmt', action=ScalaFmt, serialize=False).install('test')
+  task(name='scalafmt', action=ScalaFmt, serialize=False).install('compile', first=True)
   task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)
