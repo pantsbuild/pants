@@ -12,7 +12,7 @@ from functools import update_wrapper
 
 import six
 
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Resolvable, Serializable
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -438,5 +438,8 @@ def _extract_variants(address, variants_str):
 def parse_variants(address):
   target_name, _, variants_str = address.target_name.partition('@')
   variants = _extract_variants(address, variants_str) if variants_str else None
-  normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
+  if isinstance(address, BuildFileAddress):
+    normalized_address = BuildFileAddress(rel_path=address.rel_path, target_name=target_name)
+  else:
+    normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
   return normalized_address, variants

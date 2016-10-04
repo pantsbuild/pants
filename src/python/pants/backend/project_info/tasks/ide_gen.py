@@ -607,12 +607,14 @@ class Project(object):
         candidates = OrderedSet()
         build_file = target.address.build_file
         dir_relpath = os.path.dirname(build_file.relpath)
-        for descendant in BuildFile.scan_build_files(build_file.project_tree, dir_relpath,
+        for descendant in BuildFile.scan_build_files(build_file.project_tree,
+                                                     dir_relpath,
                                                      build_ignore_patterns=self.build_ignore_patterns):
           candidates.update(self.target_util.get_all_addresses(descendant))
         if not self._is_root_relpath(dir_relpath):
-          ancestors = self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath),
-                                                         self.build_ignore_patterns)
+          ancestors = self._collect_ancestor_build_files(
+              build_file.project_tree, os.path.dirname(dir_relpath),
+              self.build_ignore_patterns)
           for ancestor in ancestors:
             candidates.update(self.target_util.get_all_addresses(ancestor))
 
@@ -710,7 +712,8 @@ class Project(object):
       yield build_file
     while not cls._is_root_relpath(dir_relpath):
       dir_relpath = os.path.dirname(dir_relpath)
-      for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath, build_ignore_patterns):
+      for build_file in BuildFile.get_build_files_family(
+          project_tree, dir_relpath, build_ignore_patterns):
         yield build_file
 
   @classmethod
