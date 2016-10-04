@@ -127,10 +127,10 @@ this, you can test out the publish in 2 ways:
      and why as well as the changelogs:
 
         :::bash
-        $ ./pants clean-all publish.jar --no-dryrun --local=/tmp/m2 src/{java,scala}::
+        $ ./pants clean-all publish.jar --no-publish-jar-dryrun --local=/tmp/m2 src/{java,scala}::
 
      Note that this "dry-run" technique somewhat confusingly passes
-     `--no-dryrun` but only because the publish is local and to a
+     `--no-publish-jar-dryrun` but only because the publish is local and to a
      temporary dir (the argument to `--local`).  You can also poke
      around in the `/tmp/m2` local maven repo if you're curious or want
      to double-check fine details of exactly what will be pushed.
@@ -151,7 +151,7 @@ to use the following command, which will publish everything that's
 changed and only those things that have changed since the last publish:
 
     :::bash
-    $ ./pants publish.jar --no-dryrun src/{java,scala}::
+    $ ./pants publish.jar --no-publish-jar-dryrun src/{java,scala}::
 
 ## Promoting to Maven Central ##
 
