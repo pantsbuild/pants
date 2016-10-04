@@ -346,14 +346,14 @@ class RuleGraph(datatype('RuleGraph',
         return str(t)
 
     def format_messages(rule, subject_types_by_reasons):
-      errors = '\n    '.join('{} with subject types: {}'
-                             .format(reason, ', '.join(subject_type_str(t) for t in sorted(subject_types)))
-                             for reason, subject_types in sorted(subject_types_by_reasons.items()))
+      errors = '\n    '.join(sorted('{} with subject types: {}'
+                             .format(reason, ', '.join(sorted(subject_type_str(t) for t in subject_types)))
+                             for reason, subject_types in subject_types_by_reasons.items()))
       return '{}:\n    {}'.format(rule, errors)
 
     used_rule_lookup = set(rule_entry.rule for rule_entry in self.rule_dependencies.keys())
-    formatted_messages = tuple(format_messages(rule, subject_types_by_reasons)
-                               for rule, subject_types_by_reasons in sorted(collated_errors.items())
+    formatted_messages = sorted(format_messages(rule, subject_types_by_reasons)
+                               for rule, subject_types_by_reasons in collated_errors.items()
                                if rule not in used_rule_lookup)
     if not formatted_messages:
       return None
@@ -365,7 +365,7 @@ class RuleGraph(datatype('RuleGraph',
       return '{empty graph}'
 
     root_subject_types_str = ', '.join(x.__name__ for x in self.root_subject_types)
-    root_rules_str = ', '.join(str(r) for r in sorted(self.root_rules))
+    root_rules_str = ', '.join(sorted(str(r) for r in self.root_rules))
     return dedent("""
               {{
                 root_subject_types: ({},)
@@ -377,8 +377,8 @@ class RuleGraph(datatype('RuleGraph',
     )).strip()
 
   def _dependency_strs(self):
-    for rule, deps in sorted(self.rule_dependencies.items()):
-      yield '{} => ({},)'.format(rule, ', '.join(str(d) for d in deps))
+    return sorted('{} => ({},)'.format(rule, ', '.join(str(d) for d in deps))
+                  for rule, deps in self.rule_dependencies.items())
 
 
 class RuleGraphSubjectIsProduct(datatype('RuleGraphSubjectIsProduct', ['value']), CanBeDependency):
