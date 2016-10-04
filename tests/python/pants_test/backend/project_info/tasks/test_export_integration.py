@@ -255,8 +255,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
       test_target = '{}:common'.format(test_path)
       json_data = self.run_export(test_target, workdir)
-      h = sha1('{}:shadow{}'.format(test_path, 'intransitive')).hexdigest()
-      synthetic_target = '{}:shadow-unstable-intransitive-{}'.format(test_path, h)
+      h = sha1('{}:shadow{}'.format(test_path, 'provided')).hexdigest()
+      synthetic_target = '{}:shadow-unstable-provided-{}'.format(test_path, h)
       self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
       self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])
 
