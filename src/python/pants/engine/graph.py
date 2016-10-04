@@ -14,8 +14,8 @@ import six
 from pants.base.project_tree import Dir, File
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address
-from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
+from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.addressable import AddressableDescriptor, Addresses, Exactly, TypeConstraintError
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
@@ -107,7 +107,8 @@ def resolve_unhydrated_struct(address_family, address):
   """
 
   struct = address_family.addressables.get(address)
-  if not struct:
+  addresses = address_family.addressables
+  if not struct or address not in addresses:
     _raise_did_you_mean(address_family, address.target_name)
 
   dependencies = []
@@ -132,7 +133,9 @@ def resolve_unhydrated_struct(address_family, address):
         maybe_append(key, value)
 
   collect_dependencies(struct)
-  return UnhydratedStruct(address, struct, dependencies)
+
+  return UnhydratedStruct(
+    filter(lambda build_address: build_address == address, addresses)[0], struct, dependencies)
 
 
 def hydrate_struct(unhydrated_struct, dependencies):
@@ -280,11 +283,12 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Support for resolving Structs from Addresses
     (symbol_table_constraint,
      [Select(UnhydratedStruct),
-      SelectDependencies(symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
-     hydrate_struct),
+      SelectDependencies(
+        symbol_table_constraint, UnhydratedStruct, field_types=(Address, BuildFileAddress,))],
+      hydrate_struct),
     (UnhydratedStruct,
-     [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
-      Select(Address)],
+     [SelectProjection(AddressFamily, Dir, ('spec_path',), Exactly(Address, BuildFileAddress)),
+      Select(Exactly(Address, BuildFileAddress))],
      resolve_unhydrated_struct),
   ] + [
     # BUILD file parsing.

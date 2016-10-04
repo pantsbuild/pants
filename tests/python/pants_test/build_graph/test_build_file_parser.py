@@ -112,7 +112,7 @@ class BuildFileParserTargetTest(BaseTest):
 
     self.assertEqual(len(address_map), 1)
     address, proxy = address_map.popitem()
-    self.assertEqual(address, BuildFileAddress(build_file, 'foozle'))
+    self.assertEqual(address, BuildFileAddress(build_file=build_file, target_name='foozle'))
     self.assertEqual(proxy.addressed_name, 'foozle')
     self.assertEqual(proxy.addressed_type, ErrorTarget)
 
