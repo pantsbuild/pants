@@ -14,45 +14,7 @@ from pants.util.meta import AbstractClass
 
 
 class IntermediateTargetFactoryBase(AbstractClass):
-  """Convenience factory which constructs an intermediate target with the appropriate attributes.
-
-  For example, this makes the syntax:
-
-  ```
-      jar_library(name='gson',
-        jars=[...],
-      )
-
-      target(name='foo',
-        dependencies=[
-          scoped(':gson', scope='runtime'),
-        ],
-      )
-  ```
-
-  Equivalent to:
-
-  ```
-      jar_library(name='gson',
-        jars=[...],
-      )
-
-      target(name='gson-runtime',
-        dependencies=[
-          ':gson',
-        ],
-        scope='runtime',
-      )
-
-      target(name='foo',
-        dependencies=[
-          ':gson-runtime',
-        ],
-      )
-  ```
-
-  The syntax for this feature is experimental and may change in the future.
-  """
+  """Convenience factory which constructs an intermediate target with the appropriate attributes."""
 
   _targets = set()
 

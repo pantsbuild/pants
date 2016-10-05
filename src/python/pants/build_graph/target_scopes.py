@@ -83,6 +83,46 @@ class Scopes(object):
 
 
 class ScopedDependencyFactory(IntermediateTargetFactoryBase):
+  """Creates a dependency with the given scope.
+
+  For example, this makes the syntax:
+
+  ```
+      jar_library(name='gson',
+        jars=[...],
+      )
+
+      target(name='foo',
+        dependencies=[
+          scoped(':gson', scope='runtime'),
+        ],
+      )
+  ```
+
+  Equivalent to:
+
+  ```
+      jar_library(name='gson',
+        jars=[...],
+      )
+
+      target(name='gson-runtime',
+        dependencies=[
+          ':gson',
+        ],
+        scope='runtime',
+      )
+
+      target(name='foo',
+        dependencies=[
+          ':gson-runtime',
+        ],
+      )
+  ```
+
+  The syntax for this feature is experimental and may change in the future.
+  """
+
   def __init__(self, parse_context):
     super(ScopedDependencyFactory, self).__init__(parse_context)
     self._scope = None
