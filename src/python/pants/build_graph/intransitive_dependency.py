@@ -14,6 +14,7 @@ class IntransitiveDependencyFactory(IntermediateTargetFactoryBase):
   This dependency will not be seen by dependees of this target. The syntax for this feature is
   experimental and may change in the future.
   """
+
   @property
   def extra_target_arguments(self):
     return dict(_transitive=False)
@@ -30,6 +31,7 @@ class ProvidedDependencyFactory(IntermediateTargetFactoryBase):
 
   The syntax for this feature is experimental and may change in the future.
   """
+
   @property
   def extra_target_arguments(self):
     return dict(_transitive=False, scope='compile test')
