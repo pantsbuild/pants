@@ -29,6 +29,10 @@ class IntermediateTargetFactoryBase(AbstractClass):
   class ExpectedAddressError(TargetDefinitionException):
     """Thrown if an object that is not an address is used as the dependency spec."""
 
+  @classmethod
+  def reset(cls):
+    cls._targets.clear()
+
   def __init__(self, parse_context):
     self._parse_context = parse_context
 

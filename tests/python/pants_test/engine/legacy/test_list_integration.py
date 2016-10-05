@@ -27,7 +27,7 @@ class ListIntegrationTest(PantsRunIntegrationTest):
     )
 
   def test_list_single(self):
-    self.assert_list_new_equals_old(True, ['3rdparty::'])
+    self.assert_list_new_equals_old(True, ['::'])
 
   def test_list_multiple(self):
     self.assert_list_new_equals_old(
