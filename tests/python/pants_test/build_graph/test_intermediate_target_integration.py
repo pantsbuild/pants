@@ -13,6 +13,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensur
 class BundleIntegrationTest(PantsRunIntegrationTest):
 
   def hash_target(self, address, scope):
+    # This matches hashing in IntermediateTargetFactoryBase._create_intermediate_target.
     hasher = sha1()
     hasher.update(address)
     hasher.update(scope)
