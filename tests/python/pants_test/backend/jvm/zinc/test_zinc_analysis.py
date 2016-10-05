@@ -64,10 +64,6 @@ class ZincAnalysisTestSimple(ZincAnalysisTestBase):
         analysis.write(buf)
         return buf.getvalue()
 
-      full_analysis = parse_analyis('simple.analysis')
-
-      # Check that they compare as text.
-      expected = get_analysis_text('simple.analysis')
 
 class ZincAnalysisTestLarge(ZincAnalysisTestBase):
 
