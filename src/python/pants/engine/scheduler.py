@@ -290,7 +290,7 @@ class LocalScheduler(object):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
     with self._product_graph_lock:
       subjects = set(generate_fs_subjects(filenames))
-      raise AssertionError('TODO: invalidation not implemented for {}'.formast(subjects))
+      raise AssertionError('TODO: invalidation not implemented for {}'.format(subjects))
 
   def _execution_next(self, completed):
     # Unzip into two arrays.

@@ -13,7 +13,7 @@ from fnmatch import fnmatch
 from hashlib import sha1
 from itertools import chain
 from os import sep as os_sep
-from os.path import basename, join, normpath
+from os.path import basename, dirname, join, normpath
 
 import six
 from twitter.common.collections.orderedset import OrderedSet
@@ -396,7 +396,7 @@ def files_digest(files, file_values):
 FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 
-def generate_fs_subjects(cls, filenames):
+def generate_fs_subjects(filenames):
   """Given filenames, generate a set of subjects for invalidation predicate matching."""
   for f in filenames:
     # ReadLink, FileContent, or DirectoryListing for the literal path.
