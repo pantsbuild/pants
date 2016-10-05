@@ -184,29 +184,29 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
   def test_java_compile_with_corrupt_remote(self):
     """Tests that a corrupt artifact in the remote cache still results in a successful compile."""
-    with self.source_clone('testprojects/tests/java/org/pantsbuild/testproject/matcher') as base:
-      with self.temporary_workdir() as workdir:
-        with self.temporary_cachedir() as cache_root:
-          with cache_server(cache_root=cache_root) as cacheurl:
-            target = os.path.join(base, ':matcher')
+    with self.temporary_workdir() as workdir, temporary_dir() as cachedir:
+      with cache_server(cache_root=cachedir) as server:
+        target = 'testprojects/tests/java/org/pantsbuild/testproject/matcher'
+        config = {
+            'cache.compile.zinc': {
+              'write_to': [server.url],
+              'read_from': [server.url],
+            },
+        }
 
-            # Compile to populate the cache, and actually run the tests to help verify runtime.
-            first_run = self.run_test_compile(workdir, cacheurl, target, clean_all=True, test=True)
-            self.assert_success(first_run)
-            self.assertTrue("Compiling" in first_run.stdout_data)
+        # Compile to populate the cache, and actually run the tests to help verify runtime.
+        first_run = self.run_pants_with_workdir(['test', target], workdir, config)
+        self.assert_success(first_run)
+        self.assertTrue("Compiling" in first_run.stdout_data)
 
-            # Corrupt the remote artifact in the cache_root.
-            remote_artifact_path = os.path.join(cache_root, 'blah')
+        # Corrupt the remote artifact.
+        self.assertTrue(server.corrupt_artifact(r'.*zinc.*matcher.*') == 1)
 
-            self.assertTrue(os.path.exists(remote_artifact_path))
-            with open(remote_artifact_path) as remote_artifact:
-              # ...
-              print('>>> {}'.format(remote_artifact))
-
-            # Ensure that the second run still succeeds.
-            second_run = self.run_test_compile(workdir, cacheurl, target, clean_all=True, test=True)
-            self.assert_success(second_run)
-            self.assertTrue("Compiling" in second_run.stdout_data)
+        # Ensure that the second run succeeds, despite a failed attempt to fetch.
+        second_run = self.run_pants_with_workdir(['clean-all', 'test', target], workdir, config)
+        self.assert_success(second_run)
+        self.assertTrue("Compiling" in second_run.stdout_data)
+        self.assertTrue("TODO: failed to extract" in second_run.stdout_data)
 
 
 class JavaCompileIntegrationTestWithZjar(JavaCompileIntegrationTest):
