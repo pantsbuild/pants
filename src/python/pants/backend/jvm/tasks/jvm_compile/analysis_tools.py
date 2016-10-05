@@ -23,30 +23,6 @@ class AnalysisTools(object):
     self._pants_workdir = pants_workdir.encode('utf-8')
     self._analysis_cls = analysis_cls
 
-  def split_to_paths(self, analysis_path, split_path_pairs, catchall_path=None):
-    """Split an analysis file.
-
-    split_path_pairs: A list of pairs (split, output_path) where split is a list of source files
-    whose analysis is to be split out into output_path. The source files may either be
-    absolute paths, or relative to the build root.
-
-    If catchall_path is specified, the analysis for any sources not mentioned in the splits is
-    split out to that path.
-    """
-    analysis = self.parser.parse_from_path(analysis_path)
-    splits, output_paths = zip(*split_path_pairs)
-    split_analyses = analysis.split(splits, catchall_path is not None)
-    if catchall_path is not None:
-      output_paths = output_paths + (catchall_path, )
-    for analysis, path in zip(split_analyses, output_paths):
-      analysis.write_to_path(path)
-
-  def merge_from_paths(self, analysis_paths, merged_analysis_path):
-    """Merge multiple analysis files into one."""
-    analyses = [self.parser.parse_from_path(path) for path in analysis_paths]
-    merged_analysis = self._analysis_cls.merge(analyses)
-    merged_analysis.write_to_path(merged_analysis_path)
-
   def rebase_from_path(self, infile_path, outfile_path, old_base, new_base):
     self.parser.rebase_from_path(infile_path, outfile_path, old_base, new_base, java_home=None)
 
