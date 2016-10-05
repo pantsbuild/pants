@@ -69,7 +69,7 @@ class ZincAnalysis(object):
   # Translate the contents of this analysis. Useful for creating anonymized test data.
   # Note that the resulting file is not a valid analysis, as the base64-encoded serialized objects
   # will be replaced with random base64 strings. So these are useful for testing analysis parsing,
-  # splitting and merging, but not for actually reading into Zinc.
+  # but not for actually reading into Zinc.
   def translate(self, token_translator):
     for element in [self.compile_setup, self.relations, self.stamps, self.apis,
                     self.source_infos, self.compilations]:
