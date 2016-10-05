@@ -23,9 +23,6 @@ class AnalysisTools(object):
     self._pants_workdir = pants_workdir.encode('utf-8')
     self._analysis_cls = analysis_cls
 
-  def rebase_from_path(self, infile_path, outfile_path, old_base, new_base):
-    self.parser.rebase_from_path(infile_path, outfile_path, old_base, new_base, java_home=None)
-
   def relativize(self, src_analysis, relativized_analysis):
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file1 = os.path.join(tmp_analysis_dir, 'analysis.relativized.1')
