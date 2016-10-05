@@ -12,6 +12,7 @@ from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
+from pants_test.cache.cache_server import cache_server
 
 
 class JavaCompileIntegrationTest(BaseCompileIT):
@@ -195,10 +196,12 @@ class JavaCompileIntegrationTest(BaseCompileIT):
             self.assertTrue("Compiling" in first_run.stdout_data)
 
             # Corrupt the remote artifact in the cache_root.
-            remote_artifact_path = ...
+            remote_artifact_path = os.path.join(cache_root, 'blah')
+
             self.assertTrue(os.path.exists(remote_artifact_path))
-            with open(...) as remote_artifact:
-              ...
+            with open(remote_artifact_path) as remote_artifact:
+              # ...
+              print('>>> {}'.format(remote_artifact))
 
             # Ensure that the second run still succeeds.
             second_run = self.run_test_compile(workdir, cacheurl, target, clean_all=True, test=True)

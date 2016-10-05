@@ -56,6 +56,7 @@ python_library(
   sources = ['cache_server.py'],
   dependencies = [
     '3rdparty/python:six',
+    'tests/python/pants_test/testutils:file_test_util',
   ]
 )
 

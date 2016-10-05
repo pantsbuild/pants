@@ -33,15 +33,15 @@ class TestArtifactCache(unittest.TestCase):
 
   @contextmanager
   def setup_server(self, return_failed=False, cache_root=None):
-    with cache_server(return_failed=return_failed, cache_root=cache_root) as url:
-      yield url
+    with cache_server(return_failed=return_failed, cache_root=cache_root) as server:
+      yield server
 
   @contextmanager
   def setup_rest_cache(self, local=None, return_failed=False):
     with temporary_dir() as artifact_root:
       local = local or TempLocalArtifactCache(artifact_root, 0)
-      with self.setup_server(return_failed=return_failed) as base_url:
-        yield RESTfulArtifactCache(artifact_root, BestUrlSelector([base_url]), local)
+      with self.setup_server(return_failed=return_failed) as server:
+        yield RESTfulArtifactCache(artifact_root, BestUrlSelector([server.url]), local)
 
   @contextmanager
   def setup_test_file(self, parent):
@@ -70,9 +70,9 @@ class TestArtifactCache(unittest.TestCase):
       local = TempLocalArtifactCache(artifact_root, 0)
 
       # With fail-over, rest call second time will succeed
-      with self.setup_server() as good_url:
+      with self.setup_server() as good_server:
         artifact_cache = RESTfulArtifactCache(artifact_root,
-                                              BestUrlSelector([bad_url, good_url], max_failures=0),
+                                              BestUrlSelector([bad_url, good_server.url], max_failures=0),
                                               local)
         with self.assertRaises(NonfatalArtifactCacheError) as ex:
           self.do_test_artifact_cache(artifact_cache)
@@ -107,11 +107,11 @@ class TestArtifactCache(unittest.TestCase):
 
   def test_local_backed_remote_cache(self):
     """make sure that the combined cache finds what it should and that it backfills"""
-    with self.setup_server() as url:
+    with self.setup_server() as server:
       with self.setup_local_cache() as local:
         tmp = TempLocalArtifactCache(local.artifact_root, 0)
-        remote = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), tmp)
-        combined = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), local)
+        remote = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([server.url]), tmp)
+        combined = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([server.url]), local)
 
         key = CacheKey('muppet_key', 'fake_hash')
 
@@ -151,11 +151,11 @@ class TestArtifactCache(unittest.TestCase):
   def test_local_backed_remote_cache_corrupt_artifact(self):
     """Ensure that a combined cache clears outputs after a failure to extract an artifact."""
     with temporary_dir() as remote_cache_dir:
-      with self.setup_server(cache_root=remote_cache_dir) as url:
+      with self.setup_server(cache_root=remote_cache_dir) as server:
         with self.setup_local_cache() as local:
           tmp = TempLocalArtifactCache(local.artifact_root, compression=1)
-          remote = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), tmp)
-          combined = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), local)
+          remote = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([server.url]), tmp)
+          combined = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([server.url]), local)
 
           key = CacheKey('muppet_key', 'fake_hash')
 
@@ -167,12 +167,8 @@ class TestArtifactCache(unittest.TestCase):
             # Add to only the remote cache.
             remote.insert(key, [path])
 
-            # Corrupt the tail end of the data in the remote storage.
-            remote_artifact = os.path.join(remote_cache_dir, remote._url_suffix_for_key(key))
-            self.assertTrue(os.path.exists(remote_artifact))
-            artifact_size = os.path.getsize(remote_artifact)
-            with open(remote_artifact, 'r+w') as outfile:
-              outfile.truncate(artifact_size // 2)
+            # Corrupt the artifact in the remote storage.
+            self.assertTrue(server.corrupt_artifacts(r'.*muppet_key.*') == 1)
 
             # An attempt to read the corrupt artifact should fail.
             self.assertFalse(combined.use_cached_files(key, results_dir=results_dir))

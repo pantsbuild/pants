@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 import SocketServer
 from contextlib import contextmanager
 from threading import Thread
@@ -14,6 +15,7 @@ from six.moves import SimpleHTTPServer
 
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir
+from pants_test.testutils.file_test_util import exact_files
 
 
 # A very trivial server that serves files under the cwd.
@@ -70,8 +72,45 @@ class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     return self._return_failed()
 
 
+class TestCacheServer(object):
+  """A wrapper class that represents the underlying REST server.
+  
+  To create a TestCacheServer, use the `cache_server` factory function.
+  """
+
+  def __init__(self, url, cache_root):
+    self.url = url
+    self._cache_root = cache_root
+
+  def corrupt_artifacts(self, pattern):
+    """Corrupts any artifacts matching the given pattern.
+    
+    Returns the number of files affected.
+    """
+    regex = re.compile(pattern)
+    count = 0
+    for f in exact_files(self._cache_root, ignore_links=True):
+      if not regex.match(f):
+        continue
+
+      # Truncate the file.
+      abspath = os.path.join(self._cache_root, f)
+      artifact_size = os.path.getsize(abspath)
+      with open(abspath, 'r+w') as outfile:
+        outfile.truncate(artifact_size // 2)
+
+      count += 1
+
+    return count
+
+
 @contextmanager
 def cache_server(return_failed=False, cache_root=None):
+  """A context manager which launches a temporary cache server on a random port.
+
+  Yields a TestCacheServer to represent the running server.
+  """
+
   httpd = None
   httpd_thread = None
   try:
@@ -86,7 +125,7 @@ def cache_server(return_failed=False, cache_root=None):
         port = httpd.server_address[1]
         httpd_thread = Thread(target=httpd.serve_forever)
         httpd_thread.start()
-        yield 'http://localhost:{0}'.format(port)
+        yield TestCacheServer('http://localhost:{0}'.format(port), cache_root)
   finally:
     if httpd:
       httpd.shutdown()
