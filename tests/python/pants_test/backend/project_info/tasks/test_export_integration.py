@@ -9,11 +9,11 @@ import json
 import os
 import re
 import subprocess
-from hashlib import sha1
 
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.intermediate_target_factory import hash_target
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
@@ -255,7 +255,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
       test_target = '{}:common'.format(test_path)
       json_data = self.run_export(test_target, workdir)
-      h = sha1('{}:shadow{}'.format(test_path, 'provided')).hexdigest()
+      h = hash_target('{}:shadow'.format(test_path), 'provided')
       synthetic_target = '{}:shadow-unstable-provided-{}'.format(test_path, h)
       self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
       self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])

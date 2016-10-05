@@ -9,8 +9,16 @@ from hashlib import sha1
 
 import six
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.util.meta import AbstractClass
+
+
+def hash_target(address, suffix):
+  hasher = sha1()
+  hasher.update(address)
+  hasher.update(suffix)
+  return hasher.hexdigest()
 
 
 class IntermediateTargetFactoryBase(AbstractClass):
@@ -18,7 +26,7 @@ class IntermediateTargetFactoryBase(AbstractClass):
 
   _targets = set()
 
-  class ExpectedAddressError(Exception):
+  class ExpectedAddressError(TargetDefinitionException):
     """Thrown if an object that is not an address is used as the dependency spec."""
 
   def __init__(self, parse_context):
@@ -27,7 +35,7 @@ class IntermediateTargetFactoryBase(AbstractClass):
   @property
   def extra_target_arguments(self):
     """Extra keyword arguments to pass to the target constructor."""
-    return dict()
+    return {}
 
   def _create_intermediate_target(self, address, suffix):
     """
@@ -44,14 +52,11 @@ class IntermediateTargetFactoryBase(AbstractClass):
     # and shouldn't show up in `./pants list` etc, because we really don't want people to write
     # handwritten dependencies on them. For now just give them names containing "-unstable-" as a
     # hint.
-    hasher = sha1()
-    hasher.update(str(address))
-    hasher.update(suffix)
-
+    hash_str = hash_target(str(address), suffix)
     name = '{name}-unstable-{suffix}-{index}'.format(
       name=address.target_name,
       suffix=suffix.replace(' ', '.'),
-      index=hasher.hexdigest(),
+      index=hash_str,
     )
 
     if (name, self._parse_context.rel_path) not in self._targets:

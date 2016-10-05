@@ -5,19 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from hashlib import sha1
-
+from pants.build_graph.intermediate_target_factory import hash_target
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 
-class BundleIntegrationTest(PantsRunIntegrationTest):
-
-  def hash_target(self, address, scope):
-    # This matches hashing in IntermediateTargetFactoryBase._create_intermediate_target.
-    hasher = sha1()
-    hasher.update(address)
-    hasher.update(scope)
-    return hasher.hexdigest()
+class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_engine
   def test_scoped(self):
@@ -25,16 +17,17 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     scoped_address = '3rdparty:gson'
     stdout_list = self.run_pants(['-q', 'list', '{}:'.format(test_path)]).stdout_data.strip().split()
 
-    hash_1 = self.hash_target(scoped_address, 'compile')
-    hash_2 = self.hash_target(scoped_address, 'runtime')
-    self.assertEqual(
-      {'testprojects/src/java/org/pantsbuild/testproject/runtime:compile-fail',
-       'testprojects/src/java/org/pantsbuild/testproject/runtime:runtime-fail',
-       'testprojects/src/java/org/pantsbuild/testproject/runtime:runtime-pass',
-       'testprojects/src/java/org/pantsbuild/testproject/runtime:compile-pass',
-       'testprojects/src/java/org/pantsbuild/testproject/runtime:gson-unstable-compile-{}'.format(hash_1),
-       'testprojects/src/java/org/pantsbuild/testproject/runtime:gson-unstable-runtime-{}'.format(hash_2)},
-      set(stdout_list))
+    hash_1 = hash_target(scoped_address, 'compile')
+    hash_2 = hash_target(scoped_address, 'runtime')
+    self.assertIn(
+      'testprojects/src/java/org/pantsbuild/testproject/runtime:gson-unstable-compile-{}'.format(hash_1),
+      stdout_list
+    )
+
+    self.assertIn(
+      'testprojects/src/java/org/pantsbuild/testproject/runtime:gson-unstable-runtime-{}'.format(hash_2),
+      stdout_list
+    )
 
   @ensure_engine
   def test_intransitive(self):
@@ -42,17 +35,18 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     stdout_list = self.run_pants(['-q', 'list', '{}:'.format(test_path)]).stdout_data.strip().split()
     suffix = 'intransitive'
 
-    hash_b = self.hash_target('{}:b'.format(test_path), suffix)
-    hash_c = self.hash_target('{}:c'.format(test_path), suffix)
+    hash_b = hash_target('{}:b'.format(test_path), suffix)
+    hash_c = hash_target('{}:c'.format(test_path), suffix)
 
-    self.assertEqual(
-      {'testprojects/src/java/org/pantsbuild/testproject/intransitive:intransitive',
-       'testprojects/src/java/org/pantsbuild/testproject/intransitive:diamond',
-       'testprojects/src/java/org/pantsbuild/testproject/intransitive:b',
-       'testprojects/src/java/org/pantsbuild/testproject/intransitive:c',
-       'testprojects/src/java/org/pantsbuild/testproject/intransitive:b-unstable-{}-{}'.format(suffix, hash_b),
-       'testprojects/src/java/org/pantsbuild/testproject/intransitive:c-unstable-{}-{}'.format(suffix, hash_c)},
-      set(stdout_list))
+    self.assertIn(
+      'testprojects/src/java/org/pantsbuild/testproject/intransitive:b-unstable-{}-{}'.format(suffix, hash_b),
+      stdout_list
+    )
+
+    self.assertIn(
+      'testprojects/src/java/org/pantsbuild/testproject/intransitive:c-unstable-{}-{}'.format(suffix, hash_c),
+      stdout_list
+    )
 
   @ensure_engine
   def test_provided(self):
@@ -60,26 +54,38 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     stdout_list = self.run_pants(['-q', 'list', '{}::'.format(test_path)]).stdout_data.strip().split()
     suffix = 'provided'
 
-    hash_1 = self.hash_target('testprojects/maven_layout/provided_patching/one/src/main/java:shadow', suffix)
-    hash_2 = self.hash_target('testprojects/maven_layout/provided_patching/two/src/main/java:shadow', suffix)
-    hash_3 = self.hash_target('testprojects/maven_layout/provided_patching/three/src/main/java:shadow', suffix)
+    hash_1 = hash_target('testprojects/maven_layout/provided_patching/one/src/main/java:shadow', suffix)
+    hash_2 = hash_target('testprojects/maven_layout/provided_patching/two/src/main/java:shadow', suffix)
+    hash_3 = hash_target('testprojects/maven_layout/provided_patching/three/src/main/java:shadow', suffix)
 
-    match_set = {
-      'testprojects/maven_layout/provided_patching/one/src/main/java:common',
-      'testprojects/maven_layout/provided_patching/one/src/main/java:shadow',
-      'testprojects/maven_layout/provided_patching/two/src/main/java:shadow',
-      'testprojects/maven_layout/provided_patching/two/src/main/java:common',
-      'testprojects/maven_layout/provided_patching/three/src/main/java:common',
-      'testprojects/maven_layout/provided_patching/three/src/main/java:shadow',
-      'testprojects/maven_layout/provided_patching/leaf:test',
-      'testprojects/maven_layout/provided_patching/leaf:fail',
-      'testprojects/maven_layout/provided_patching/leaf:one',
-      'testprojects/maven_layout/provided_patching/leaf:three',
-      'testprojects/maven_layout/provided_patching/leaf:two',
+    self.assertIn(
       'testprojects/maven_layout/provided_patching/one/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_1),
-      'testprojects/maven_layout/provided_patching/two/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_2),
-      'testprojects/maven_layout/provided_patching/three/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_3),
-      'testprojects/maven_layout/provided_patching/leaf:shadow-unstable-{}-{}'.format(suffix, hash_2)
-    }
+      stdout_list
+    )
 
-    self.assertEqual(match_set, set(stdout_list))
+    self.assertIn(
+      'testprojects/maven_layout/provided_patching/two/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_2),
+      stdout_list
+    )
+
+    self.assertIn(
+      'testprojects/maven_layout/provided_patching/three/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_3),
+      stdout_list
+    )
+
+    self.assertIn(
+      'testprojects/maven_layout/provided_patching/leaf:shadow-unstable-{}-{}'.format(suffix, hash_2),
+      stdout_list
+    )
+
+  def test_no_redundant_target(self):
+    test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
+    stdout_list = self.run_pants(['-q', 'list', '{}::'.format(test_path)]).stdout_data.strip().split()
+    suffix = 'provided'
+
+    hash = hash_target('{}:shadow'.format(test_path), suffix)
+    synthetic_target = '{}:shadow-unstable-{}-{}'.format(test_path, suffix, hash)
+    self.assertEqual(
+      stdout_list.count(synthetic_target),
+      1
+    )
