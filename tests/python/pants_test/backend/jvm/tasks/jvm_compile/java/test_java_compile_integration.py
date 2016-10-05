@@ -199,14 +199,18 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         self.assert_success(first_run)
         self.assertTrue("Compiling" in first_run.stdout_data)
 
-        # Corrupt the remote artifact.
-        self.assertTrue(server.corrupt_artifact(r'.*zinc.*matcher.*') == 1)
-
-        # Ensure that the second run succeeds, despite a failed attempt to fetch.
+        # Build again to hit the cache.
         second_run = self.run_pants_with_workdir(['clean-all', 'test', target], workdir, config)
         self.assert_success(second_run)
-        self.assertTrue("Compiling" in second_run.stdout_data)
-        self.assertTrue("TODO: failed to extract" in second_run.stdout_data)
+        self.assertFalse("Compiling" in second_run.stdout_data)
+
+        # Corrupt the remote artifact.
+        self.assertTrue(server.corrupt_artifacts(r'.*zinc.*matcher.*') == 1)
+
+        # Ensure that the third run succeeds, despite a failed attempt to fetch.
+        third_run = self.run_pants_with_workdir(['clean-all', 'test', target], workdir, config)
+        self.assert_success(third_run)
+        self.assertTrue("Compiling" in third_run.stdout_data)
 
 
 class JavaCompileIntegrationTestWithZjar(JavaCompileIntegrationTest):

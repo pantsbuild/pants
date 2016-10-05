@@ -490,7 +490,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return [], [], []
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key, vt.results_dir if self.cache_target_dirs else None)
+    items = [(read_cache, vt.cache_key, vt.current_results_dir if self.cache_target_dirs else None)
              for vt in vts]
 
     res = self.context.subproc_map(call_use_cached_files, items)

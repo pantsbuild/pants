@@ -9,7 +9,7 @@ import os
 import re
 import SocketServer
 from contextlib import contextmanager
-from threading import Thread
+from multiprocessing import Process, Queue
 
 from six.moves import SimpleHTTPServer
 
@@ -104,15 +104,12 @@ class TestCacheServer(object):
     return count
 
 
-@contextmanager
-def cache_server(return_failed=False, cache_root=None):
-  """A context manager which launches a temporary cache server on a random port.
+def _cache_server_process(queue, return_failed, cache_root):
+  """A pickleable top-level function to wrap a SimpleRESTHandler.
 
-  Yields a TestCacheServer to represent the running server.
+  We fork a separate process to avoid affecting the `cwd` of the requesting process.
   """
-
   httpd = None
-  httpd_thread = None
   try:
     with temporary_dir() as tmpdir:
       cache_root = cache_root if cache_root else tmpdir
@@ -123,11 +120,24 @@ def cache_server(return_failed=False, cache_root=None):
           handler = SimpleRESTHandler
         httpd = SocketServer.TCPServer(('localhost', 0), handler)
         port = httpd.server_address[1]
-        httpd_thread = Thread(target=httpd.serve_forever)
-        httpd_thread.start()
-        yield TestCacheServer('http://localhost:{0}'.format(port), cache_root)
+        queue.put(port)
+        httpd.serve_forever()
   finally:
     if httpd:
       httpd.shutdown()
-    if httpd_thread:
-      httpd_thread.join()
+
+
+@contextmanager
+def cache_server(return_failed=False, cache_root=None):
+  """A context manager which launches a temporary cache server on a random port.
+
+  Yields a TestCacheServer to represent the running server.
+  """
+  queue = Queue()
+  process = Process(target=_cache_server_process, args=(queue,return_failed, cache_root))
+  process.start()
+  try:
+    port = queue.get()
+    yield TestCacheServer('http://localhost:{0}'.format(port), cache_root)
+  finally:
+    process.terminate()
