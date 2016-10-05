@@ -153,6 +153,7 @@ python_tests(
   sources=['test_rules.py'],
   coverage=['pants.engine.rules'],
   dependencies=[
+    ':scheduler_test_base',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:rules',
   ]
