@@ -12,8 +12,9 @@ from collections import defaultdict
 import six
 from six.moves import range
 
-from pants.backend.jvm.zinc.zinc_analysis import (APIs, Compilations, CompileSetup, Relations,
-                                                  SourceInfos, Stamps, ZincAnalysis)
+from pants.backend.jvm.zinc.zinc_analysis import ZincAnalysis
+from pants.backend.jvm.zinc.zinc_analysis_element_types import (APIs, Compilations, CompileSetup,
+                                                                Relations, SourceInfos, Stamps)
 
 
 class ZincAnalysisParser(object):
