@@ -20,9 +20,6 @@ class ZincAnalysis(object):
     (self.compile_setup, self.relations, self.stamps, self.apis, self.source_infos, self.compilations) = \
       (compile_setup, relations, stamps, apis, source_infos, compilations)
 
-  def sources(self):
-    return self.stamps.sources.keys()
-
   def is_equal_to(self, other):
     for self_element, other_element in zip(
         (self.compile_setup, self.relations, self.stamps, self.apis,

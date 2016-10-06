@@ -30,9 +30,6 @@ class ZincAnalysis(Analysis):
   def underlying_analysis(self):
     return self._underlying_analysis
 
-  def sources(self):
-    return self._underlying_analysis.sources()
-
   def write(self, outfile):
     self.underlying_analysis.write(outfile)
 
