@@ -12,6 +12,7 @@ from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
+from pants_test.cache.cache_server import cache_server
 
 
 class JavaCompileIntegrationTest(BaseCompileIT):
@@ -180,6 +181,36 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
       # One artifact for guava 15 and one for guava 16
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
+
+  def test_java_compile_with_corrupt_remote(self):
+    """Tests that a corrupt artifact in the remote cache still results in a successful compile."""
+    with self.temporary_workdir() as workdir, temporary_dir() as cachedir:
+      with cache_server(cache_root=cachedir) as server:
+        target = 'testprojects/tests/java/org/pantsbuild/testproject/matcher'
+        config = {
+            'cache.compile.zinc': {
+              'write_to': [server.url],
+              'read_from': [server.url],
+            },
+        }
+
+        # Compile to populate the cache, and actually run the tests to help verify runtime.
+        first_run = self.run_pants_with_workdir(['test', target], workdir, config)
+        self.assert_success(first_run)
+        self.assertTrue("Compiling" in first_run.stdout_data)
+
+        # Build again to hit the cache.
+        second_run = self.run_pants_with_workdir(['clean-all', 'test', target], workdir, config)
+        self.assert_success(second_run)
+        self.assertFalse("Compiling" in second_run.stdout_data)
+
+        # Corrupt the remote artifact.
+        self.assertTrue(server.corrupt_artifacts(r'.*zinc.*matcher.*') == 1)
+
+        # Ensure that the third run succeeds, despite a failed attempt to fetch.
+        third_run = self.run_pants_with_workdir(['clean-all', 'test', target], workdir, config)
+        self.assert_success(third_run)
+        self.assertTrue("Compiling" in third_run.stdout_data)
 
 
 class JavaCompileIntegrationTestWithZjar(JavaCompileIntegrationTest):

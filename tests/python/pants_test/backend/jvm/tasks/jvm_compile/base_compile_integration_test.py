@@ -62,15 +62,16 @@ class BaseCompileIT(PantsRunIntegrationTest):
                                to_find, '\n'.join(sorted(workdir_files))))
         yield found
 
-  def run_test_compile(self, workdir, cachedir, target, clean_all=False, extra_args=None):
+  def run_test_compile(self, workdir, cacheurl, target, clean_all=False, extra_args=None, test=False):
     """
     :API: public
     """
     global_args = [
         '--cache-write',
-        '--cache-write-to=[\'{}\']'.format(cachedir),
+        '--cache-write-to=[\'{}\']'.format(cacheurl),
     ] + self._EXTRA_TASK_ARGS
-    args = ['compile', target] + (extra_args if extra_args else [])
+    task = 'test' if test else 'compile'
+    args = [task, target] + (extra_args if extra_args else [])
     # Clean-all on the first iteration.
     if clean_all:
       args.insert(0, 'clean-all')
