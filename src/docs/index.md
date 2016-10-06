@@ -30,7 +30,13 @@ Getting Started
 + [[Installing Pants|pants('src/docs:install')]]
 + [[Setting Up Pants|pants('src/docs:setup_repo')]]
 + [[Tutorial|pants('src/docs:first_tutorial')]]
-+ [[Common Tasks|pants('src/docs/common_tasks:index')]]
+
+Common Tasks
+------------
+
+The [[Common Tasks|pants('src/docs/common_tasks:index')]] documentation is a
+practical, solutions-oriented guide to some of the Pants tasks that you're most
+likely to carry out on a daily basis.
 
 Pants Reference Documentation
 -----------------------------
