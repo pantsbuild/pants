@@ -78,7 +78,10 @@ class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
       stdout_list
     )
 
+  @ensure_engine
   def test_no_redundant_target(self):
+    # TODO: Create another BUILD.other file with same provided scope,
+    # once we resolve https://github.com/pantsbuild/pants/issues/3933
     test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
     stdout_list = self.run_pants(['-q', 'list', '{}::'.format(test_path)]).stdout_data.strip().split()
     suffix = 'provided'
