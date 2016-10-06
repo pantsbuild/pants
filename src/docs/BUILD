@@ -32,7 +32,7 @@ page(
 
 page(
   name='common_tasks',
-  source='common_tasks.md'
+  source='common_tasks/index.md'
 )
 
 page(
@@ -72,6 +72,7 @@ page(
     ':1.0',
     ':announce_201409',
     ':build_files',
+    ':common_tasks',
     ':first_concepts',
     ':first_tutorial',
     ':install',

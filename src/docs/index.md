@@ -30,7 +30,7 @@ Getting Started
 + [[Installing Pants|pants('src/docs:install')]]
 + [[Setting Up Pants|pants('src/docs:setup_repo')]]
 + [[Tutorial|pants('src/docs:first_tutorial')]]
-+ [[Common Tasks|pants('src/docs:common_tasks')]]
++ [[Common Tasks|pants('src/docs/common_tasks:index')]]
 
 Pants Reference Documentation
 -----------------------------
