@@ -20,19 +20,6 @@ class ZincAnalysis(object):
     (self.compile_setup, self.relations, self.stamps, self.apis, self.source_infos, self.compilations) = \
       (compile_setup, relations, stamps, apis, source_infos, compilations)
 
-  def diff(self, other):
-    """Returns a list of element diffs, one per element where self and other differ."""
-    element_diffs = []
-    for self_elem, other_elem in zip(
-            (self.compile_setup, self.relations, self.stamps, self.apis,
-             self.source_infos, self.compilations),
-            (other.compile_setup, other.relations, other.stamps, other.apis,
-             other.source_infos, other.compilations)):
-      element_diff = self_elem.diff(other_elem)
-      if element_diff.is_different():
-        element_diffs.append(element_diff)
-    return element_diffs
-
   def sources(self):
     return self.stamps.sources.keys()
 

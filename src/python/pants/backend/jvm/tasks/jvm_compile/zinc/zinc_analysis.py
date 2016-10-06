@@ -36,9 +36,6 @@ class ZincAnalysis(Analysis):
   def write(self, outfile):
     self.underlying_analysis.write(outfile)
 
-  def diff(self, other):
-    return self.underlying_analysis.diff(other.underlying_analysis)
-
   def __eq__(self, other):
     if other is None:
       return False

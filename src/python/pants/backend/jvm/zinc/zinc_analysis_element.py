@@ -10,8 +10,6 @@ from collections import defaultdict
 
 import six
 
-from pants.backend.jvm.zinc.zinc_analysis_diff import ZincAnalysisElementDiff
-
 
 class ZincAnalysisElement(object):
   """Encapsulates one part of a Zinc analysis.
@@ -81,9 +79,6 @@ class ZincAnalysisElement(object):
         self.args.append(sorted_arg)
     else:
       self.args = args
-
-  def diff(self, other):
-    return ZincAnalysisElementDiff(self, other)
 
   def should_be_sorted(self):
     return self._always_sort or os.environ.get('ZINCUTILS_SORTED_ANALYSIS')
