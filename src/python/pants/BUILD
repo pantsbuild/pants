@@ -13,7 +13,7 @@ python_library(
   name='pants-packaged',
   provides=pants_setup_py(
     name='pantsbuild.pants',
-    description='A bottom-up build tool.',
+    description='A scalable build tool for large, complex, heterogeneous repos.',
     namespace_packages=['pants', 'pants.backend'],
   ).with_binaries(
     pants='src/python/pants/bin:pants',
