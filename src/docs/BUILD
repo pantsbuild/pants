@@ -30,6 +30,10 @@ page(
   source='committers.md',
 )
 
+page(
+  name='common_tasks',
+  source='common_tasks.md'
+)
 
 page(
     name='community',
@@ -289,4 +293,3 @@ page(
   name='why_use_pants',
   source='why_use_pants.md'
 )
-
