@@ -314,14 +314,14 @@ class RuleGraph(datatype('RuleGraph',
   Because in
 
      `root_subject_types` the root subject types this graph was generated with.
-     `root_rules` The rule entries that can produce the root products this graph was generated
-                        with.
+     `root_rules` A map from root rules, ie rules representing the expected selector / subject types
+                  for requests, to the rules that can fulfill them.
      `rule_dependencies` A map from rule entries to the rule entries they depend on.
                          The collections of dependencies are contained by RuleEdges objects.
                          Keys must be subclasses of CanHaveDependencies
                          values must be subclasses of CanBeDependency
      `unfulfillable_rules` A map of rule entries to collections of Diagnostics
-                                 containing the reasons why they were eliminated from the graph.
+                           containing the reasons why they were eliminated from the graph.
 
   """
   # TODO constructing nodes from the resulting graph.
@@ -332,8 +332,8 @@ class RuleGraph(datatype('RuleGraph',
   # - inject the constructed nodes into the product graph.
   #
 
-  def raw_root_rules_matching(self, subject_type, selector):
-    for r in self.raw_root_rules:
+  def root_rules_matching(self, subject_type, selector):
+    for r in self.root_rules:
       if r.selector == selector and r.subject_type == subject_type:
         yield r
 
@@ -532,30 +532,34 @@ class GraphMaker(object):
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
     root_selector = self.root_subject_selector_fns[root_subject_type](requested_product)
-    raw_root_rule = RootRule(root_subject_type, root_selector)
-    root_rules, edges, unfulfillable = self._construct_graph(raw_root_rule)
-    root_rules, edges = self._remove_unfulfillable_rules_and_dependents(root_rules,
+    root_rule = RootRule(root_subject_type, root_selector)
+    root_rule_dependency_edges, edges, unfulfillable = self._construct_graph(root_rule)
+    root_rule_dependency_edges, edges = self._remove_unfulfillable_rules_and_dependents(root_rule_dependency_edges,
       edges, unfulfillable)
-    return RuleGraph((root_subject_type,), {raw_root_rule}, root_rules, edges, unfulfillable)
+    return RuleGraph((root_subject_type,),
+                     {root_rule},
+                     root_rule_dependency_edges,
+                     edges,
+                     unfulfillable)
 
   def full_graph(self):
     """Produces a full graph based on the root subjects and all of the products produced by rules."""
-    raw_root_rules = set()
-    full_root_rules = dict()
+    root_rules = set()
+    full_root_rule_dependency_edges = dict()
     full_dependency_edges = {}
     full_unfulfillable_rules = {}
     for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
       for product in sorted(self.rule_index.all_produced_product_types(root_subject_type)):
         beginning_root = RootRule(root_subject_type, selector_fn(product))
-        raw_root_rules.add(beginning_root)
+        root_rules.add(beginning_root)
         root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(
           beginning_root,
-          root_rule_dependency_edges=full_root_rules,
+          root_rule_dependency_edges=full_root_rule_dependency_edges,
           rule_dependency_edges=full_dependency_edges,
           unfulfillable_rules=full_unfulfillable_rules
         )
 
-        full_root_rules = dict(root_dependencies)
+        full_root_rule_dependency_edges = dict(root_dependencies)
         full_dependency_edges = rule_dependency_edges
         full_unfulfillable_rules = unfulfillable_rules
 
@@ -569,16 +573,16 @@ class GraphMaker(object):
     for rule in sorted(unreachable_rules):
       full_unfulfillable_rules[UnreachableRule(rule)] = [Diagnostic(None, 'Unreachable')]
 
-    full_root_rules, full_dependency_edges = self._remove_unfulfillable_rules_and_dependents(
-      full_root_rules,
+    full_root_rule_dependency_edges, full_dependency_edges = self._remove_unfulfillable_rules_and_dependents(
+      full_root_rule_dependency_edges,
       full_dependency_edges,
       full_unfulfillable_rules)
 
     return RuleGraph(self.root_subject_selector_fns,
-                         raw_root_rules, #Raw root rules
-                         dict(full_root_rules),
-                         full_dependency_edges,
-                         full_unfulfillable_rules)
+                     root_rules,
+                     dict(full_root_rule_dependency_edges),
+                     full_dependency_edges,
+                     full_unfulfillable_rules)
 
   def _construct_graph(self,
                        beginning_rule,

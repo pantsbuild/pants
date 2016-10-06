@@ -534,7 +534,7 @@ class LocalScheduler(object):
           selector = selector_fn(product)
           logger.debug('matching raw root rules: product: {}, subject type: {}'.format(product, type(subject)))
           logger.debug('count of raw root rules total {}'.format(len(self._rule_graph.raw_root_rules)))
-          logger.debug(list(self._rule_graph.raw_root_rules_matching(type(subject), selector)))
+          logger.debug(list(self._rule_graph.root_rules_matching(type(subject), selector)))
           yield self._node_builder.select_node(selector, subject, None)
 
     return ExecutionRequest(tuple(roots()))
