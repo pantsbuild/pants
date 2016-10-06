@@ -17,3 +17,8 @@ page(
   name='list_targets',
   source='list_targets.md'
 )
+
+page(
+  name='run',
+  source='run.md'
+)

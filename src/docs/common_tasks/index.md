@@ -1,5 +1,9 @@
 # Common Tasks
 
+This section of the Pants documentation is devoted to helping you solve some of
+the most common day-to-day Pants tasks, from defining a Python executable to
+opening up a Scala REPL and much more.
+
 ## Tasks
 
 ### General
