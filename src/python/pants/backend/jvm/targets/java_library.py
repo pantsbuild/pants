@@ -20,6 +20,8 @@ class JavaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
+  default_sources_globs = '*.java'
+
   @classmethod
   def subsystems(cls):
     return super(JavaLibrary, cls).subsystems()

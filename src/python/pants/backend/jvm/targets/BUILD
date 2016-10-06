@@ -1,5 +1,5 @@
 
-python_library(
+target(
   name = 'all',
   dependencies = [
     ':jvm',

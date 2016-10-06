@@ -25,6 +25,10 @@ class TestDeferredSourcesTarget(Target):
     super(TestDeferredSourcesTarget, self).__init__(payload=payload, *args, **kwargs)
 
 
+class TestImplicitSourcesTarget(Target):
+  default_sources_globs = '*.foo'
+
+
 class TargetTest(BaseTest):
 
   def test_derived_from_chain(self):
@@ -100,6 +104,11 @@ class TargetTest(BaseTest):
     short_id = short_target.id
     self.assertEqual(short_id,
                      'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.foo')
+
+  def test_implicit_sources(self):
+    target = self.make_target(':a', TestImplicitSourcesTarget)
+    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
+    self.assertEqual(sources.filespec, {'globs': ['src/foo/bar/*.foo']})
 
   def test_create_sources_field_with_string_fails(self):
     target = self.make_target(':a-target', Target)

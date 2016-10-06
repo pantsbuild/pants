@@ -16,6 +16,8 @@ class PythonTests(PythonTarget):
   :API: public
   """
 
+  default_sources_globs = '*.py'
+
   def __init__(self, coverage=None, timeout=None, **kwargs):
     """
     :param coverage: the module(s) whose coverage should be generated, e.g.

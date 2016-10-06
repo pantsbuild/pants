@@ -24,7 +24,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.source.payload_fields import DeferredSourcesField, SourcesField
-from pants.source.wrapped_globs import Files, FilesetWithSpec
+from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -741,6 +741,19 @@ class Target(AbstractTarget):
     addr = self.address if hasattr(self, 'address') else 'address not yet set'
     return "{}({})".format(type(self).__name__, addr)
 
+  # Subclasses can override, typically to specify a file extension (e.g., '*.java').
+  default_sources_globs = None
+
+  def default_sources(self, sources_rel_path):
+    """Provide sources, if they weren't specified explicitly in the BUILD file.
+
+    By default this globs over self.default_sources_globs (e.g., '*.java')
+    but subclasses can override to provide more nuanced default behavior.
+    """
+    if self.default_sources_globs is not None:
+      return Globs.create_fileset_with_spec(sources_rel_path, self.default_sources_globs)
+    return None
+
   def create_sources_field(self, sources, sources_rel_path, address=None, key_arg=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.
 
@@ -752,7 +765,9 @@ class Target(AbstractTarget):
     :return: a payload field object representing the sources parameter
     :rtype: SourcesField
     """
-
+    # Make sure we don't apply the defaulting to resources.
+    if (key_arg is None or key_arg == 'sources') and sources is None:
+      sources = self.default_sources(sources_rel_path)
     if isinstance(sources, Addresses):
       # Currently, this is only created by the result of from_target() which takes a single argument
       if len(sources.addresses) != 1:
