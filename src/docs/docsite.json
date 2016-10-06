@@ -14,6 +14,7 @@
     "notes-1.1.x": "dist/markdown/html/src/python/pants/notes/1.1.x.html",
     "common_tasks": "dist/markdown/html/src/docs/common_tasks/index.html",
     "community": "dist/markdown/html/src/docs/community.html",
+    "compile": "dist/markdown/html/src/docs/common_tasks/compile.html",
     "dev": "dist/markdown/html/src/docs/dev.html",
     "dev_tasks": "dist/markdown/html/src/docs/dev_tasks.html",
     "dev_tasks_publish_extras": "dist/markdown/html/src/docs/dev_tasks_publish_extras.html",
@@ -35,6 +36,8 @@
     "internals": "dist/markdown/html/src/docs/internals.html",
     "invoking": "dist/markdown/html/src/docs/invoking.html",
     "jvm_projects": "dist/markdown/html/examples/src/java/org/pantsbuild/example/README.html",
+    "list_goals": "dist/markdown/html/src/docs/common_tasks/list_goals.html",
+    "list_targets": "dist/markdown/html/src/docs/common_tasks/list_targets.html",
     "page": "dist/markdown/html/examples/src/java/org/pantsbuild/example/page.html",
     "powered_by": "dist/markdown/html/src/docs/powered_by.html",
     "publish": "dist/markdown/html/examples/src/java/org/pantsbuild/example/publish.html",
@@ -80,11 +83,10 @@
   "tree": [
     { "page": "index",
       "children": [
-        { "heading": "Getting Started"},
+        { "heading": "Getting Started" },
         { "page": "install" },
         { "page": "setup_repo" },
         { "page": "first_tutorial" },
-        { "page": "common_tasks" },
 
         { "heading": "Pants Basics"},
         { "page": "why_use_pants" },
@@ -96,6 +98,9 @@
         { "page": "invoking" },
         { "page": "reporting_server" },
         { "page": "ide_support" },
+
+        { "heading": "Cookbook" },
+        { "page": "common_tasks" },
 
         { "heading": "JVM" },
         { "page": "jvm_projects" },

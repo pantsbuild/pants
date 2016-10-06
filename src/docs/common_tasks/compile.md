@@ -2,11 +2,11 @@
 
 ## Problem
 
-You need to compile a library or binary target that you're currently working on, either so that you can use it outside of your project or because you want to make sure that it will compile successfully.
+You need to compile a library or binary target that you're currently working on, e.g. if you want to make sure that the target will compile successfully.
 
 ## Solution
 
-The `compile` goal enables you to compile Scala or Java binaries. Here's an example:
+The `compile` goal enables you to compile Scala or Java [[binaries|]]. Here's an example:
 
     :::bash
     $ ./pants compile myproject/src/main/scala/com/square/myproject:scala

@@ -1,11 +1,6 @@
 page(
   name='index',
   source='index.md',
-  links=[
-    ':list_goals',
-    ':list_targets',
-    ':compile',
-  ]
 )
 
 page(
