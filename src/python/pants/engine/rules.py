@@ -462,8 +462,6 @@ class UnreachableRule(object):
 class RuleEdges(object):
   """Represents the edges from a rule to its dependencies via selectors."""
   # TODO add a highwater mark count to count how many branches are eliminated
-  # TODO it would be good to note which selectors deps are attached to,
-  #      so that eliminations happen within a selector
 
   def __init__(self, dependencies=tuple(), selector_to_deps=None):
     self._dependencies = dependencies
@@ -472,13 +470,15 @@ class RuleEdges(object):
     else:
       self._selector_to_deps = selector_to_deps
 
-  def add_edges_via(self, selector, other_rules):
-    tupled_other_rules = tuple(other_rules)
+  def add_edges_via(self, selector, new_dependencies):
+    if selector is None and new_dependencies:
+      raise ValueError("Cannot specify a None selector with non-empty dependencies!")
+    tupled_other_rules = tuple(new_dependencies)
     self._selector_to_deps[selector] += tupled_other_rules
     self._dependencies += tupled_other_rules
 
-  def has_edges_for(self, selector, other_rules):
-    return all(r in self._selector_to_deps[selector] for r in other_rules)
+  def has_edges_for(self, selector):
+    return selector in self._selector_to_deps
 
   def __contains__(self, rule):
     return rule in self._dependencies
@@ -491,11 +491,8 @@ class RuleEdges(object):
     if len(self._dependencies) == 1 and self._dependencies[0] == dep_to_eliminate:
       return True
     for selector, deps in self._selector_to_deps.items():
-      if len(deps) == 1:
-        only_dep = deps[0]
-        if (only_dep.output_product_type is dep_to_eliminate.output_product_type and
-            only_dep.subject_type is dep_to_eliminate.subject_type):
-          return True
+      if len(deps) == 1 and dep_to_eliminate == deps[0]:
+        return True
     else:
       return False
 
@@ -517,8 +514,10 @@ class GraphMaker(object):
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
     root_selector = self.root_subject_selector_fns[root_subject_type](requested_product)
-    return RuleGraph((root_subject_type,), *self._construct_graph(RootRule(root_subject_type,
-                                                                           root_selector)))
+    root_rules, edges, unfulfillable = self._construct_graph(RootRule(root_subject_type, root_selector))
+    root_rules, edges = self._remove_unfulfillable_rules_and_dependents(root_rules,
+      edges, unfulfillable)
+    return RuleGraph((root_subject_type,), root_rules, edges, unfulfillable)
 
   def full_graph(self):
     """Produces a full graph based on the root subjects and all of the products produced by rules."""
@@ -527,15 +526,21 @@ class GraphMaker(object):
     full_unfulfillable_rules = {}
     for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
       for product in sorted(self.nodebuilder.all_produced_product_types(root_subject_type)):
-        root_rule = RootRule(root_subject_type, selector_fn(product))
-        # TODO consider passing the current edge set through as a perf improvement.
-        root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(root_rule)
-        full_root_rules.update(root_dependencies)
-        full_dependency_edges.update(rule_dependency_edges)
-        full_unfulfillable_rules.update(unfulfillable_rules)
+        beginning_root = RootRule(root_subject_type, selector_fn(product))
+        root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(
+          beginning_root,
+          root_rules=full_root_rules,
+          rule_dependency_edges=full_dependency_edges,
+          unfulfillable_rules=full_unfulfillable_rules
+        )
+
+        full_root_rules = set(root_dependencies)
+        full_dependency_edges = rule_dependency_edges
+        full_unfulfillable_rules = unfulfillable_rules
 
     rules_in_graph = set(entry.rule for entry in full_dependency_edges.keys())
-    rules_eliminated_during_construction = set(entry.rule for entry in full_unfulfillable_rules.keys())
+    rules_eliminated_during_construction = set(entry.rule
+                                               for entry in full_unfulfillable_rules.keys())
 
     declared_rules = self.nodebuilder.all_rules()
     unreachable_rules = declared_rules.difference(rules_in_graph,
@@ -543,16 +548,25 @@ class GraphMaker(object):
     for rule in sorted(unreachable_rules):
       full_unfulfillable_rules[UnreachableRule(rule)] = [Diagnostic(None, 'Unreachable')]
 
+    full_root_rules, full_dependency_edges = self._remove_unfulfillable_rules_and_dependents(
+      full_root_rules,
+      full_dependency_edges,
+      full_unfulfillable_rules)
+
     return RuleGraph(self.root_subject_selector_fns,
                          list(full_root_rules),
                          full_dependency_edges,
                          full_unfulfillable_rules)
 
-  def _construct_graph(self, root_rule):
-    root_rules = []
-    rule_dependency_edges = OrderedDict()
-    unfulfillable_rules = OrderedDict()
-    rules_to_traverse = deque([root_rule])
+  def _construct_graph(self,
+                       beginning_rule,
+                       root_rules=None,
+                       rule_dependency_edges=None,
+                       unfulfillable_rules=None):
+    root_rules = set() if root_rules is None else root_rules
+    rule_dependency_edges = dict() if rule_dependency_edges is None else rule_dependency_edges
+    unfulfillable_rules = dict() if unfulfillable_rules is None else unfulfillable_rules
+    rules_to_traverse = deque([beginning_rule])
 
     def _find_rhs_for_select(subject_type, selector):
       if selector.type_constraint.satisfied_by_type(subject_type):
@@ -572,16 +586,18 @@ class GraphMaker(object):
                           if g not in rule_dependency_edges and g not in unfulfillable_rules]
       rules_to_traverse.extend(unseen_dep_rules)
       if type(rule) is RootRule:
-        root_rules.extend(dep_rules)
+        root_rules.update(dep_rules)
         return
-      if rule not in rule_dependency_edges:
+      elif rule not in rule_dependency_edges:
         new_edges = RuleEdges()
         new_edges.add_edges_via(selector_path, dep_rules)
         rule_dependency_edges[rule] = new_edges
       else:
         existing_deps = rule_dependency_edges[rule]
-        if existing_deps.has_edges_for(selector_path, dep_rules):
-          return
+        if existing_deps.has_edges_for(selector_path):
+          raise ValueError("rule {} already has dependencies set for selector {}"
+                           .format(rule, selector_path))
+
         existing_deps.add_edges_via(selector_path, dep_rules)
 
     while rules_to_traverse:
@@ -677,9 +693,6 @@ class GraphMaker(object):
         # NB: In this case, there are no selectors.
         add_rules_to_graph(entry, None, tuple())
 
-    root_rules, rule_dependency_edges = self._remove_unfulfillable_rules_and_dependents(root_rules,
-      rule_dependency_edges, unfulfillable_rules)
-
     return root_rules, rule_dependency_edges, unfulfillable_rules
 
   def _remove_unfulfillable_rules_and_dependents(self,
@@ -702,15 +715,14 @@ class GraphMaker(object):
           # NB: these are removed at the end
           continue
 
-        if unfulfillable_entry in dependency_edges:
-          if dependency_edges.makes_unfulfillable(unfulfillable_entry):
-            unfulfillable_rules[current_entry] = [Diagnostic(current_entry.subject_type,
-                                                  'depends on unfulfillable {}'.format(unfulfillable_entry))]
-            removal_traversal.append(current_entry)
-          else:
-            rule_dependency_edges[current_entry] = dependency_edges.without_rule(unfulfillable_entry)
+        if dependency_edges.makes_unfulfillable(unfulfillable_entry):
+          unfulfillable_rules[current_entry] = [Diagnostic(current_entry.subject_type,
+                                                'depends on unfulfillable {}'.format(unfulfillable_entry))]
+          removal_traversal.append(current_entry)
+        else:
+          rule_dependency_edges[current_entry] = dependency_edges.without_rule(unfulfillable_entry)
 
-    rule_dependency_edges = OrderedDict((k, v) for k, v in rule_dependency_edges.items()
-                                        if k not in unfulfillable_rules)
+    rule_dependency_edges = dict((k, v) for k, v in rule_dependency_edges.items()
+                                 if k not in unfulfillable_rules)
     root_rules = tuple(r for r in root_rules if r not in unfulfillable_rules)
     return root_rules, rule_dependency_edges
