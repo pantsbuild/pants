@@ -8,43 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import StringIO
 import unittest
-import zipfile
-from contextlib import contextmanager
 
 from pants.backend.jvm.zinc.zinc_analysis_element import ZincAnalysisElement
 from pants.backend.jvm.zinc.zinc_analysis_parser import ZincAnalysisParser
-from pants.util.contextutil import Timer, environment_as, temporary_dir
+from pants.util.contextutil import environment_as
 
 
-# Setting this environment variable tells the test to generate new test data (see below).
-_TEST_DATA_SOURCE_ENV_VAR = 'ZINC_ANALYSIS_TEST_DATA_SOURCE'
-
-
-@contextmanager
-def _temp_test_dir(zipfile_name):
-  """Yields a test directory containing the files in the specified zipfile."""
-  zipfile_path = os.path.join(os.path.dirname(__file__), 'testdata', zipfile_name)
-  with temporary_dir() as tmpdir:
-    zf = zipfile.ZipFile(zipfile_path, 'r')
-    zf.extractall(tmpdir)
-    yield tmpdir
-
-
-class ZincAnalysisTestBase(unittest.TestCase):
-  def setUp(self):
-    self.maxDiff = None
-    self.total_time = 0
-
-  def _time(self, work, msg):
-    with Timer() as timer:
-      ret = work()
-    elapsed = timer.elapsed
-    print('%s in %f seconds.' % (msg, elapsed))
-    self.total_time += elapsed
-    return ret
-
-
-class ZincAnalysisTestSimple(ZincAnalysisTestBase):
+class ZincAnalysisTestSimple(unittest.TestCase):
 
   # Test a simple example that is non-trivial, but still small enough to verify manually.
   def test_simple(self):
@@ -83,43 +53,7 @@ class ZincAnalysisTestSimple(ZincAnalysisTestBase):
         ])
 
 
-class ZincAnalysisTestLarge(ZincAnalysisTestBase):
-
-  # Test on a couple of large files, primarily for benchmarking.
-  # Note that we don't set ZINCUTILS_SORTED_ANALYSIS='1', as we want to benchmark production
-  # performance (without unnecessary sorting).
-  def test_large(self):
-    parser = ZincAnalysisParser()
-
-    with _temp_test_dir('large.zip') as testdir:
-      print('Operating in test dir: {}'.format(testdir))
-      # Parse analysis files.
-      analysis_file_names = [b'downstream.analysis', b'upstream.analysis']
-      analysis_files = [os.path.join(testdir, f) for f in analysis_file_names]
-
-      def msg(prefix):
-        return '{0} [{1}]'.format(prefix, ', '.join(analysis_file_names))
-
-      analyses = self._time(lambda: [parser.parse_from_path(f) for f in analysis_files],
-                            msg('Parsed'))
-
-      # Write them back out individually.
-      writeout_dir = os.path.join(testdir, b'write')
-      os.mkdir(writeout_dir)
-      def write(file_name, analysis):
-        outpath = os.path.join(writeout_dir, file_name)
-        analysis.write_to_path(outpath)
-
-      def _write_all():
-        for analysis_file, analysis in zip(analysis_files, analyses):
-          write(os.path.basename(analysis_file), analysis)
-
-      self._time(_write_all, msg('Wrote'))
-
-    print('Total time: %f seconds' % self.total_time)
-
-
-class ZincAnalysisTestSorting(ZincAnalysisTestBase):
+class ZincAnalysisTestSorting(unittest.TestCase):
   class FakeElement(ZincAnalysisElement):
     headers = ('foo', )
 
