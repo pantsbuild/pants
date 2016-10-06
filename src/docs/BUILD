@@ -32,7 +32,7 @@ page(
 
 page(
   name='common_tasks',
-  source='common_tasks/index.md'
+  source='common_tasks/index.md',
 )
 
 page(

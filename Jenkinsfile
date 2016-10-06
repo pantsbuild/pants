@@ -96,4 +96,3 @@ def Map<String, Closure<Void>> buildShards(List shards) {
 
 Map<String, Closure<Void>> shards = buildShards(shardList())
 parallel shards
-

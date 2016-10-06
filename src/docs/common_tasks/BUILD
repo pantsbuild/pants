@@ -4,7 +4,13 @@ page(
   links=[
     ':list_goals',
     ':list_targets',
+    ':compile',
   ]
+)
+
+page(
+  name='compile',
+  source='compile.md',
 )
 
 page(

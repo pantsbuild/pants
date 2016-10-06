@@ -6,7 +6,7 @@ You want to find out which Pants targets are currently available in a project or
 
 ## Solution
 
-Use the `pants list` goal and specify a folder containing a `BUILD` file.
+Use the `list` goal and specify a folder containing a `BUILD` file.
 
 This command, for example, would show all targets available in `myproject/BUILD`:
 
