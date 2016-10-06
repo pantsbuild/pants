@@ -500,9 +500,9 @@ impl Step for SelectProjection {
       );
     match context.get(&output_node) {
       Some(&Complete::Return(value)) =>
-        return State::Complete(Complete::Return(value)),
+        State::Complete(Complete::Return(value)),
       Some(&Complete::Noop(_, _)) =>
-        return State::Complete(
+        State::Complete(
           Complete::Throw(
             format!(
               "No source of projected dependency {}",
@@ -512,9 +512,9 @@ impl Step for SelectProjection {
         ),
       Some(&Complete::Throw(ref msg)) =>
         // NB: propagate thrown exception directly.
-        return State::Complete(Complete::Throw(msg.clone())),
+        State::Complete(Complete::Throw(msg.clone())),
       None =>
-        return State::Waiting(vec![output_node]),
+        State::Waiting(vec![output_node]),
     }
   }
 }
