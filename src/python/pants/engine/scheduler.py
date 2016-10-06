@@ -18,7 +18,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.nodes import (FilesystemNode, Node, Noop, Return, Runnable, SelectNode,
                                 StepContext, TaskNode, Throw, Waiting)
-from pants.engine.rules import NodeBuilder, RulesetValidator
+from pants.engine.rules import GraphMaker, NodeBuilder, RuleIndex, RulesetValidator
 from pants.engine.selectors import Select, SelectDependencies, type_or_constraint_repr
 from pants.util.objects import datatype
 
@@ -423,14 +423,6 @@ class LocalScheduler(object):
     :param graph_validator: A validator that runs over the entire graph after every scheduling
                             attempt. Very expensive, very experimental.
     """
-    self._products_by_goal = goals
-    self._project_tree = project_tree
-    self._node_builder = NodeBuilder.create(tasks)
-
-    self._graph_validator = graph_validator
-    self._product_graph = ProductGraph()
-    self._product_graph_lock = graph_lock or threading.RLock()
-    self._inline_nodes = inline_nodes
 
     select_product = lambda product: Select(product)
     select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address,))
@@ -443,7 +435,19 @@ class LocalScheduler(object):
       DescendantAddresses: select_dep_addrs,
     }
 
-    RulesetValidator(self._node_builder, goals, self._root_selector_fns).validate()
+    self._rule_index = RuleIndex.create(tasks)
+    self._node_builder = NodeBuilder(self._rule_index)
+
+    self._rule_graph = GraphMaker(self._rule_index, self._root_selector_fns).full_graph()
+    RulesetValidator(self._rule_graph, goals).validate()
+
+    self._products_by_goal = goals
+    self._project_tree = project_tree
+
+    self._graph_validator = graph_validator
+    self._product_graph = ProductGraph()
+    self._product_graph_lock = graph_lock or threading.RLock()
+    self._inline_nodes = inline_nodes
 
   def visualize_graph_to_file(self, roots, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -527,7 +531,11 @@ class LocalScheduler(object):
                           .format(type(subject), subject))
 
         for product in products:
-          yield self._node_builder.select_node(selector_fn(product), subject, None)
+          selector = selector_fn(product)
+          logger.debug('matching raw root rules: product: {}, subject type: {}'.format(product, type(subject)))
+          logger.debug('count of raw root rules total {}'.format(len(self._rule_graph.raw_root_rules)))
+          logger.debug(list(self._rule_graph.raw_root_rules_matching(type(subject), selector)))
+          yield self._node_builder.select_node(selector, subject, None)
 
     return ExecutionRequest(tuple(roots()))
 

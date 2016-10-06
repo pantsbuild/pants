@@ -17,7 +17,6 @@ from pants.engine.fs import Files, PathGlobs
 from pants.engine.isolated_process import ProcessExecutionNode, Snapshot, SnapshotNode
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, ProjectionNode, SelectNode,
                                 TaskNode)
-from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, type_or_constraint_repr)
 from pants.util.meta import AbstractClass
@@ -82,12 +81,9 @@ class RulesetValidator(object):
 
   """
 
-  def __init__(self, node_builder, goal_to_product, root_subject_fns):
-    if not root_subject_fns:
-      raise ValueError('root_subject_fns must not be empty')
+  def __init__(self, graph, goal_to_product):
     self._goal_to_product = goal_to_product
-
-    self._graph = GraphMaker(node_builder, root_subject_fns).full_graph()
+    self._graph = graph
 
   def validate(self):
     """ Validates that all tasks can be executed based on the declared product types and selectors.
@@ -175,7 +171,8 @@ class SnapshotIntrinsicRule(Rule):
     return '{}()'.format(type(self).__name__)
 
 
-class NodeBuilder(Closable):
+class RuleIndex(object):
+
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
@@ -217,7 +214,7 @@ class NodeBuilder(Closable):
       duplicate_keys = [k for k in as_intrinsics.keys() if k in intrinsics]
       if duplicate_keys:
         key_list = '\n  '.join('{}, {}'.format(sub.__name__, prod.__name__)
-                                for sub, prod in duplicate_keys)
+                               for sub, prod in duplicate_keys)
         raise ValueError('intrinsics provided by {} have already provided subject-type, '
                          'product-type keys:\n  {}'.format(provider, key_list))
       intrinsics.update(as_intrinsics)
@@ -250,16 +247,22 @@ class NodeBuilder(Closable):
       for node_factory in self._lookup_tasks(product_type):
         yield node_factory
 
-  def gen_nodes(self, subject, product_type, variants):
-    for rule in self.gen_rules(type(subject), product_type):
-      yield rule.as_node(subject, variants)
-
   def _lookup_tasks(self, product_type):
     for entry in self._tasks.get(product_type, tuple()):
       yield entry
 
   def _lookup_intrinsic(self, product_type, subject_type):
     return self._intrinsics.get((subject_type, product_type))
+
+
+class NodeBuilder(object):
+
+  def __init__(self, rule_index):
+    self._rule_index = rule_index
+
+  def gen_nodes(self, subject, product_type, variants):
+    for rule in self._rule_index.gen_rules(type(subject), product_type):
+      yield rule.as_node(subject, variants)
 
   def select_node(self, selector, subject, variants):
     """Constructs a Node for the given Selector and the given Subject/Variants.
@@ -295,6 +298,7 @@ class CanBeDependency(object):
 
 class RuleGraph(datatype('RuleGraph',
                          ['root_subject_types',
+                          'raw_root_rules',
                           'root_rules',
                           'rule_dependencies',
                           'unfulfillable_rules'])):
@@ -323,6 +327,12 @@ class RuleGraph(datatype('RuleGraph',
   # - when hit a node that can't be constructed yet, ie the subject type changes,
   #   skip and collect for later.
   # - inject the constructed nodes into the product graph.
+  #
+
+  def raw_root_rules_matching(self, subject_type, selector):
+    for r in self.raw_root_rules:
+      if r.selector == selector and r.subject_type == subject_type:
+        yield r
 
   def error_message(self):
     """Returns a nice error message for errors in the rule graph."""
@@ -369,7 +379,9 @@ class RuleGraph(datatype('RuleGraph',
     return dedent("""
               {{
                 root_subject_types: ({},)
-                root_rules: {}
+                root_rules:
+                {}
+                all_rules:
                 {}
               }}""".format(root_subject_types_str,
                            root_rules_str,
@@ -507,26 +519,31 @@ class RuleEdges(object):
 
 class GraphMaker(object):
 
-  def __init__(self, nodebuilder, root_subject_fns):
+  def __init__(self, rule_index, root_subject_fns):
+    if not root_subject_fns:
+      raise ValueError('root_subject_fns must not be empty')
     self.root_subject_selector_fns = root_subject_fns
-    self.nodebuilder = nodebuilder
+    self.rule_index = rule_index
 
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
     root_selector = self.root_subject_selector_fns[root_subject_type](requested_product)
-    root_rules, edges, unfulfillable = self._construct_graph(RootRule(root_subject_type, root_selector))
+    raw_root_rule = RootRule(root_subject_type, root_selector)
+    root_rules, edges, unfulfillable = self._construct_graph(raw_root_rule)
     root_rules, edges = self._remove_unfulfillable_rules_and_dependents(root_rules,
       edges, unfulfillable)
-    return RuleGraph((root_subject_type,), root_rules, edges, unfulfillable)
+    return RuleGraph((root_subject_type,), {raw_root_rule}, root_rules, edges, unfulfillable)
 
   def full_graph(self):
     """Produces a full graph based on the root subjects and all of the products produced by rules."""
+    raw_root_rules = set()
     full_root_rules = set()
     full_dependency_edges = {}
     full_unfulfillable_rules = {}
     for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
-      for product in sorted(self.nodebuilder.all_produced_product_types(root_subject_type)):
+      for product in sorted(self.rule_index.all_produced_product_types(root_subject_type)):
         beginning_root = RootRule(root_subject_type, selector_fn(product))
+        raw_root_rules.add(beginning_root)
         root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(
           beginning_root,
           root_rules=full_root_rules,
@@ -542,7 +559,7 @@ class GraphMaker(object):
     rules_eliminated_during_construction = set(entry.rule
                                                for entry in full_unfulfillable_rules.keys())
 
-    declared_rules = self.nodebuilder.all_rules()
+    declared_rules = self.rule_index.all_rules()
     unreachable_rules = declared_rules.difference(rules_in_graph,
                                                   rules_eliminated_during_construction)
     for rule in sorted(unreachable_rules):
@@ -554,6 +571,7 @@ class GraphMaker(object):
       full_unfulfillable_rules)
 
     return RuleGraph(self.root_subject_selector_fns,
+                         raw_root_rules, #Raw root rules
                          list(full_root_rules),
                          full_dependency_edges,
                          full_unfulfillable_rules)
@@ -574,7 +592,7 @@ class GraphMaker(object):
         return (RuleGraphSubjectIsProduct(subject_type),)
       else:
         return tuple(RuleGraphEntry(subject_type, rule)
-          for rule in self.nodebuilder.gen_rules(subject_type, selector.product))
+          for rule in self.rule_index.gen_rules(subject_type, selector.product))
 
     def mark_unfulfillable(rule, subject_type, reason):
       if rule not in unfulfillable_rules:
