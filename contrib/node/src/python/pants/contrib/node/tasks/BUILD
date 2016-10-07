@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name='tasks',
   dependencies=[
     ':node_repl',
     ':node_resolve',

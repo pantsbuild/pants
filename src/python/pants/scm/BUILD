@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'scm',
   sources = ['scm.py'],
   dependencies = [
     'src/python/pants/util:contextutil',

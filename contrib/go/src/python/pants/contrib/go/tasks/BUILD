@@ -1,5 +1,4 @@
 target(
-  name='tasks',
   dependencies=[
     ':go_binary_create',
     ':go_buildgen',

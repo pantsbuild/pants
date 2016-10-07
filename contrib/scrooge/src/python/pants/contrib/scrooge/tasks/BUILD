@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='tasks',
   dependencies=[
     ':scrooge_gen',
     ':thrift_linter',

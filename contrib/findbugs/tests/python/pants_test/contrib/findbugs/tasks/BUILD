@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name='tasks',
   sources=['test_findbugs.py'],
   dependencies=[
     'contrib/findbugs/src/python/pants/contrib/findbugs/tasks:tasks',

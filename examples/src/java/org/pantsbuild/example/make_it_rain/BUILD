@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-java_library(name='make_it_rain',
+java_library(
   sources=['MakeItRain.java',],
   dependencies=[
     '3rdparty:thrift-0.9.2',

@@ -3,7 +3,7 @@
 
 # Tests functionality of protoc generating java code.
 
-junit_tests(name='useproto',
+junit_tests(
   sources=['UseProtoTest.java',],
   dependencies=[
     '3rdparty:junit',

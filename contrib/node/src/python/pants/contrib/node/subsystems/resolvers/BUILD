@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name='resolvers',
   dependencies=[
     ':npm_resolver',
     ':node_preinstalled_module_resolver',

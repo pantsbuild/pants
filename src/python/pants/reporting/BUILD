@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='reporting',
   sources=globs('*.py', exclude=[['report.py']]),
   resource_targets=[
     ':reporting_resources',

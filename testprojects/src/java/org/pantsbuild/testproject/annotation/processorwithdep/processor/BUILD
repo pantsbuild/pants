@@ -3,7 +3,7 @@
 #
 #  annotation_processor() target to test generating java code
 
-annotation_processor(name = 'processor',
+annotation_processor(
   sources = globs('*.java'),
   processors = ['org.pantsbuild.testproject.annotation.processorwithdep.processor.ProcessorWithDep'],
   dependencies = [

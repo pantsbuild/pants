@@ -2,7 +2,7 @@
 # and jar libraries.
 # It also serves as a very simple example of how it might be used.
 
-managed_jar_libraries(name='managed',
+managed_jar_libraries(
   artifacts=[
     jar('info.cukes', 'cucumber-core', '1.2.4'),
     jar('org.eclipse.jetty', 'jetty-jsp', '9.2.9.v20150224'),

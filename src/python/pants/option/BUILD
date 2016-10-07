@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='option',
   sources=globs('*.py'),
   dependencies=[
     '3rdparty/python:ansicolors',

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name='sitegen',
   sources=['test_sitegen.py'],
   dependencies=[
     'pants-plugins/3rdparty/python:beautifulsoup4',

@@ -3,7 +3,7 @@
 #
 #  Example of annotation_processor() target
 
-java_library(name='example',
+java_library(
   sources=['Example.java'],
   # Is used by an annotation processor.
   scope='compile',

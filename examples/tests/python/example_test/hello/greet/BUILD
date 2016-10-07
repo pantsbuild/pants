@@ -3,7 +3,7 @@
 
 # The greet library doesn't do much, but we should still test it
 
-python_tests(name='greet',
+python_tests(
   dependencies=[
     'examples/src/python/example/hello/greet:greet',
     ':prep',
