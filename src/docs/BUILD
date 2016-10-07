@@ -200,6 +200,7 @@ page(
 )
 
 page(
+  name='docs',
   source='docs.md',
 )
 
