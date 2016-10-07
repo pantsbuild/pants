@@ -57,6 +57,7 @@ python_library(
   sources = ['util.py'],
   dependencies = [
     'src/python/pants/bin:options_initializer',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:goal',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/subsystem:subsystem',
