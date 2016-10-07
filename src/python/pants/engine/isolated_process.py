@@ -161,6 +161,10 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
   is_inlineable = False
 
   @property
+  def rule(self):
+    return self.snapshotted_process
+
+  @property
   def product(self):
     return self.snapshotted_process.product_type
 

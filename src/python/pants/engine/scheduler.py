@@ -388,7 +388,7 @@ class ProductGraph(object):
     yield '}'
 
 
-class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
+class ExecutionRequest(datatype('ExecutionRequest', ['roots', 'root_rules'])):
   """Holds the roots for an execution, which might have been requested by a user.
 
   To create an ExecutionRequest, see `LocalScheduler.build_request` (which performs goal
@@ -479,7 +479,9 @@ class LocalScheduler(object):
       deps[dep] = Noop.cycle(node_entry.node, dep)
 
     # Run.
-    step_context = StepContext(self.node_builder, self._project_tree, deps, self._inline_nodes)
+    step_context = StepContext(node_entry.node, self._rule_graph, self.node_builder, self._project_tree, deps, self._inline_nodes)
+    if step_context.will_noop:
+      return step_context.noop_reason
     return node_entry.node.step(step_context)
 
   @property
@@ -532,12 +534,40 @@ class LocalScheduler(object):
 
         for product in products:
           selector = selector_fn(product)
-          logger.debug('matching raw root rules: product: {}, subject type: {}'.format(product, type(subject)))
-          logger.debug('count of raw root rules total {}'.format(len(self._rule_graph.raw_root_rules)))
-          logger.debug(list(self._rule_graph.root_rules_matching(type(subject), selector)))
           yield self._node_builder.select_node(selector, subject, None)
 
-    return ExecutionRequest(tuple(roots()))
+    # we have a collection of subject, product_type tuples
+    # so, let's boil that down to subject_type, product_type tuples.
+    # then
+    #
+
+    # bits that are important
+    # brute force
+    # (subject, product_type) -> root rules that fulfill that tuple.
+    # some tuples will have no root rules
+    # if the root rule has only one dep, turn it into a node
+    # otherwise we need to do pick first on node version
+
+    #for subject in subjects:
+    #  for product in products:
+
+    def root_rules():
+      for subject in subjects:
+        selector_fn = self._root_selector_fns.get(type(subject), None)
+        if not selector_fn:
+          raise TypeError('Unsupported root subject type: {} for {!r}'
+            .format(type(subject), subject))
+
+        for product in products:
+          selector = selector_fn(product)
+          matching = list([self._rule_graph.root_rules_matching(type(subject), selector)])
+          logger.debug('matching raw root rules: product: {}, subject type: {}'.format(product, type(subject)))
+          logger.debug('count of raw root rules total {}'.format(len(self._rule_graph.raw_root_rules)))
+          logger.debug(matching)
+          for r in matching:
+            yield (subject, r) #terrible
+
+    return ExecutionRequest(tuple(roots()), tuple(root_rules()))
 
   def selection_request(self, requests):
     """Create and return an ExecutionRequest for the given (selector, subject) tuples.
@@ -549,7 +579,8 @@ class LocalScheduler(object):
     """
     #TODO: Think about how to deprecate the existing execution_request API.
     roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
-    return ExecutionRequest(tuple(roots))
+    #for (selector, subject)
+    return ExecutionRequest(tuple(roots))#, tuple(self._rule_graph.root_rules_matching(type(subject), selector)))
 
   @property
   def product_graph(self):
@@ -578,6 +609,29 @@ class LocalScheduler(object):
     by this method are intended to be executed in multiple threads, and then satisfied by the
     scheduling thread.
     """
+    #with self._product_graph_lock:
+      #deque(execution_request.root_rules)
+    # collect the root rules as candidates,
+    # then for each candidate,
+    #  - construct a node
+    #  - add it to product graph
+    #
+    # - get its edge entries
+    # -  filter out subject changers
+    # - for each of those,
+    #  - create a node
+    #  - add it to product graph as a dep of current
+    #  - add the entry to the traversal list
+    # - if  current's edges are
+    #  -    empty
+    #  -    only literals / subject as product
+    #  - add to candidates
+
+
+    # maybe add rule graph entries to the product graph entries.
+    # then we could hang on to rulegraph locations
+    # and essentially pre-gen all of the nodes at each inflection pt
+
 
     with self._product_graph_lock:
       # A dict from Node entry to a possibly executing Step. Only one Step exists for a Node at a time.

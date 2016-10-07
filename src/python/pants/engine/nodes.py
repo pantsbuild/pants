@@ -11,14 +11,12 @@ import os
 from abc import abstractmethod, abstractproperty
 from os.path import dirname
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import parse_variants
 from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
                              file_digest, read_link, scan_directory)
-from pants.engine.selectors import Select, SelectVariant
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectVariant
 from pants.engine.struct import HasProducts, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -372,7 +370,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
                                .format(type(dep_subject), self.selector, dep_subject)))
 
       product_selector = self.selector.projected_product_selector
-      dep_state = step_context.select_for(product_selector, subject=dep_subject, variants=variants)
+      dep_state = self._select_projected_deps(dep_subject, product_selector, step_context, variants)
       if type(dep_state) is Waiting:
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) is Return:
@@ -388,6 +386,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
       return Waiting(dependencies)
     # All dependencies are present!
     return Return(dep_values)
+
+  def _select_projected_deps(self, dep_subject, product_selector, step_context, variants):
+    return step_context.select_for(product_selector, subject=dep_subject, variants=variants)
 
 
 class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selector']), Node):
@@ -432,10 +433,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
 
     # If there was only one projected field and it is already of the correct type, project it.
     try:
-      if len(values) == 1 and type(values[0]) is self.projected_subject:
-        projected_subject = values[0]
-      else:
-        projected_subject = self.projected_subject(*values)
+      projected_subject = self._construct_projected_subject(values)
     except Exception as e:
       return Throw(ValueError(
         'Fields {} of {} could not be projected as {}: {}'.format(self.fields, input_product,
@@ -443,13 +441,25 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
 
     # When the output node is available, return its result.
     output_selector = self.selector.projected_product_selector
-    output_state = step_context.select_for(output_selector, projected_subject, self.variants)
+    output_state = self._select_projected_subject_state(output_selector, projected_subject,
+      step_context)
     if type(output_state) in (Return, Throw, Waiting):
       return output_state
     elif type(output_state) is Noop:
       return Throw(ValueError('No source of projected dependency {}'.format(output_selector)))
     else:
       raise State.raise_unrecognized(output_state)
+
+  def _select_projected_subject_state(self, output_selector, projected_subject, step_context):
+    output_state = step_context.select_for(output_selector, projected_subject, self.variants)
+    return output_state
+
+  def _construct_projected_subject(self, values):
+    if len(values) == 1 and type(values[0]) is self.projected_subject:
+      projected_subject = values[0]
+    else:
+      projected_subject = self.projected_subject(*values)
+    return projected_subject
 
 
 def _run_func_and_check_type(product_type, type_check, func, *args):
@@ -565,19 +575,49 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
       raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
 
 
+class LiteralNode(datatype('Literal', ['value']), Node):
+  pass
+
+
 class StepContext(object):
   """Encapsulates external state and the details of creating Nodes.
 
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, node_builder, project_tree, node_states, inline_nodes):
+  def __init__(self, current_node, graph, node_builder, project_tree, node_states, inline_nodes):
+    """
+    :type graph: RuleGraph
+    """
+    self._current_node = current_node
+    self._graph = graph
     self._node_builder = node_builder
     self.project_tree = project_tree
     self._node_states = dict(node_states)
-    self._parents = OrderedSet()
+#    self._parents = tuple()
+    self._parents = []
+    #self._parents = OrderedSet()
+
     self._inline_nodes = inline_nodes
     self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
+
+    self._rule_edges = None
+    self.will_noop = False
+    if hasattr(current_node, 'rule') and hasattr(current_node, 'subject'):
+      edges = self._graph.dependency_edges_for_rule(current_node.rule, type(current_node.subject))
+      if edges:
+        #assert len(edge_holders) == 1, "expected only one edge holder for a rule / subject pair {}".format(len(edge_holders))
+        self._rule_edges = edges
+      else:
+        #unfillable = self._graph.is_unfulfillable(current_node.rule, current_node.subject)
+        #logger.debug("no edge holders for {} {}".format('unfillable' if unfillable else 'fillable', current_node))
+        #pass
+        self.will_noop = True
+        self.noop_reason = Noop('appears to not be reachable according to the rule graph')
+        # this may mean that the node will be a noop
+    else:
+      #logger.debug("node with no rule / subject {}".format(current_node))
+      pass
 
   def get(self, node):
     """Given a Node and computed node_states, gets the current state for the Node.
@@ -590,19 +630,131 @@ class StepContext(object):
     if self._inline_nodes and node.is_inlineable:
       if node in self._parents:
         return Noop.cycle(list(self._parents)[-1], node)
-      self._parents.add(node)
+#      self._parents += (node,)
+     # self._parents.add(node)
+      self._parents.append(node)
+
       state = self._node_states[node] = node.step(self)
-      self._parents.remove(node)
+      #assert self._parents[-1] == node
+      #self._parents = self._parents[:-1]
+      #self._parents.remove(node)
+      self._parents.pop()
       return state
     else:
       return Waiting([node])
 
   def get_nodes_and_states_for(self, subject, product, variants):
+    if hasattr(self._current_node, 'rule'):
+      logger.debug('calling get_nodes_and_states_for with parents {} current rule {}'.format([p.selector for p in self._parents], self._current_node.rule))
+      # nb otherwise is a select node
+      # I think this is only called for the beginning nodes now.
+      # So, hypothesis
+    matching = self._graph.root_rules_matching(type(subject), self._current_node.selector)
+    edges = None
+    if matching:
+      edges = self._graph.root_rule_edges(matching)
+    if edges:
+      rule_entries = [e for e in edges if e.subject_type == type(subject)]
+      yielded = False
+      for rule_entry in rule_entries:
+        if type(rule_entry).__name__ == "RuleGraphSubjectIsProduct": # TODO this is crap
+          assert rule_entry.value == type(subject)
+          assert len(rule_entries) == 1, "if subject is product, it should be the only one"
+          yield LiteralNode(subject), Return(subject)
+          yielded = True
+          break
+
+        elif type(rule_entry).__name__ == "RuleGraphLiteral": # TODO this is crap
+          assert len(rule_entries) == 1, "if literal, it should be the only one"
+          yield LiteralNode(rule_entry.value), Return(rule_entry.value)
+          yielded = True
+          break
+        elif type(rule_entry).__name__ == "RuleGraphEntry": # TODO this is crap
+          node = rule_entry.rule.as_node(subject, variants)
+          #nodes.append(node)
+          yield node, self._node_states.get(node, Waiting([node]))
+          yielded = True
+      if yielded:
+        return
+
     for node in self._node_builder.gen_nodes(subject, product, variants):
       state = self.get(node)
       yield node, state
 
   def select_for(self, selector, subject, variants):
     """Returns the state for selecting a product via the provided selector."""
+    if self._rule_edges:
+      r = self._do_rule_edge_stuff(selector, subject, variants)
+      if r:
+        return r
+    else:
+      #logger.debug('no entries for {} with {} {} {}'.format(self._current_node, selector_path, subject, variants))
+      pass
+
     dep_node = self._node_builder.select_node(selector, subject, variants)
     return self.get(dep_node)
+
+  def _selector_path(self, selector):
+    if self._parents:
+      selector_path = tuple(p.selector for p in self._parents) + (selector,)
+      # logger.debug('has parents like {}'.format(self._parents))
+    else:
+      selector_path = selector
+    # logger.debug('selector path  {}'.format(selector_path))
+    return selector_path
+
+  def _do_rule_edge_stuff(self, selector, subject, variants):
+    if type(selector) is SelectDependencies:
+      # select for dep_product_selector, if it's return, return None, otherwise wait on it
+      dep_state = self._state_via_edges((selector, selector.dep_product_selector), subject, variants)
+      if type(dep_state) is Waiting:
+        return dep_state
+      else:
+        # otherwise, return None and let the DependenciesNode do its work
+        return
+    if type(selector) is SelectProjection:
+      # select for dep_product_selector, if it's return, return None, otherwise wait on it
+      dep_state = self._state_via_edges((selector, selector.input_product_selector), subject, variants)
+      if type(dep_state) is Waiting:
+        return dep_state
+      else:
+        # otherwise, return None and let the ProjectionNode do its work
+        return
+    selector_path = self._selector_path(selector)
+    if type(selector_path) is tuple and selector_path[-1] == Select(Variants):
+      # this is the nested Select(Variants)
+      #len may also be > 2 which the graph currently doesn't understand
+      return Noop('no variant support')
+    else:
+      return self._state_via_edges(selector_path, subject, variants)
+
+  def _state_via_edges(self, selector_path, subject, variants):
+    rule_entries = list(self._rule_edges.rules_for(selector_path, type(subject)))
+    if rule_entries:
+      nodes = []
+      for rule_entry in rule_entries:
+        if type(rule_entry).__name__ == "RuleGraphSubjectIsProduct": # TODO this is crap
+          assert rule_entry.value == type(subject)
+          assert len(rule_entries) == 1, "if subject is product, it should be the only one"
+          return Return(subject)
+        elif type(rule_entry).__name__ == "RuleGraphLiteral": # TODO this is crap
+          assert len(rule_entries) == 1, "if literal, it should be the only one"
+          return Return(rule_entry.value)
+        elif type(rule_entry).__name__ == "RuleGraphEntry": # TODO this is crap
+          node = rule_entry.rule.as_node(subject, variants)
+          nodes.append(node)
+      if nodes:
+        states = [self._node_states.get(n, Waiting([n])) for n in nodes]
+        if len(states) > 1:
+          logger.debug('states({}) {}'.format(len(states), states))
+        if all(type(state) is Waiting for state in states):
+          return Waiting(nodes)
+        elif (len(states) == 1 and type(states[0]) in (Return, Throw, Noop)):
+          return states[0]
+        else:
+          logger.debug('found states, but didnt know what to do {}'.format(states))
+          pass
+      else:
+        # this doesn't happen
+        logger.debug('rule entries yes, but no nodes {}'.format(rule_entries))
+        pass

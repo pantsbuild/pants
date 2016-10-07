@@ -177,7 +177,7 @@ class RuleIndex(object):
 
   @classmethod
   def create(cls, task_entries, intrinsic_providers=(FilesystemIntrinsicRule, SnapshotIntrinsicRule)):
-    """Creates a NodeBuilder with tasks indexed by their output type."""
+    """Creates a RuleIndex with tasks indexed by their output type."""
     # NB make tasks ordered so that gen ordering is deterministic.
     serializable_tasks = OrderedDict()
 
@@ -332,10 +332,23 @@ class RuleGraph(datatype('RuleGraph',
   # - inject the constructed nodes into the product graph.
   #
 
+  def dependency_edges_for_rule(self, rule, subject_type):
+    return self.rule_dependencies.get(RuleGraphEntry(subject_type, rule))
+
+  def is_unfulfillable(self, rule, subject_type):
+    return RuleGraphEntry(subject_type, rule) in self.unfulfillable_rules
+
   def root_rules_matching(self, subject_type, selector):
-    for r in self.root_rules:
-      if r.selector == selector and r.subject_type == subject_type:
-        yield r
+    root_rule = RootRule(subject_type, selector)
+    if root_rule in self.root_rules:
+      return root_rule
+
+  def root_rule_edges(self, root_rule):
+    try:
+      return self.root_rules[root_rule]
+    except KeyError:
+      logger.error('wth {}'.format(root_rule))
+      raise
 
   def error_message(self):
     """Returns a nice error message for errors in the rule graph."""
@@ -404,6 +417,10 @@ class RuleGraphSubjectIsProduct(datatype('RuleGraphSubjectIsProduct', ['value'])
   def output_product_type(self):
     return self.value
 
+  @property
+  def subject_type(self):
+    return self.value
+
   def __repr__(self):
     return '{}({})'.format(type(self).__name__, self.value.__name__)
 
@@ -413,6 +430,8 @@ class RuleGraphSubjectIsProduct(datatype('RuleGraphSubjectIsProduct', ['value'])
 
 class RuleGraphLiteral(datatype('RuleGraphLiteral', ['value', 'product_type']), CanBeDependency):
   """The dependency is the literal value held by SelectLiteral."""
+
+  subject_type = None
 
   @property
   def output_product_type(self):
@@ -485,6 +504,11 @@ class RuleEdges(object):
       self._selector_to_deps = defaultdict(tuple)
     else:
       self._selector_to_deps = selector_to_deps
+
+  def rules_for(self, selector_or_selector_path, subject_type):
+    for d in self._selector_to_deps[selector_or_selector_path]:
+      if d.subject_type == subject_type or isinstance(d, RuleGraphLiteral):
+        yield d
 
   def add_edges_via(self, selector, new_dependencies):
     if selector is None and new_dependencies:
@@ -614,11 +638,14 @@ class GraphMaker(object):
                              g not in root_rule_dependency_edges]
       rules_to_traverse.extend(unseen_dep_rules)
       if type(rule) is RootRule:
-        new_edges = RuleEdges()
-        new_edges.add_edges_via(selector_path, dep_rules)
         if rule in root_rule_dependency_edges:
-          raise ValueError('root rule already has deps {}\n  existing deps: {}\n  new deps: {}'.format(rule, list(root_rule_dependency_edges[rule]), dep_rules))
-        root_rule_dependency_edges[rule] = new_edges
+          #raise ValueError('root rule already has deps {}\n  existing deps: {}\n  new deps: {}'.format(rule, list(root_rule_dependency_edges[rule]), dep_rules))
+          root_rule_dependency_edges[rule].add_edges_via(selector_path, dep_rules)
+        else:
+
+          new_edges = RuleEdges()
+          new_edges.add_edges_via(selector_path, dep_rules)
+          root_rule_dependency_edges[rule] = new_edges
       elif rule not in rule_dependency_edges:
         new_edges = RuleEdges()
         new_edges.add_edges_via(selector_path, dep_rules)
