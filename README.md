@@ -23,6 +23,9 @@ At a minimum, pants requires the following to run properly:
 
 * Linux or Mac OS X
 * Python 2.7.x (the latest stable version of 2.7 is recommended)
-* A C compiler, system headers, Python headers (to compile native Python modules)
-* OpenJDK or Oracle JDK version 8 or greater
+* A C compiler, system headers, Python headers (to compile native Python modules) and libffi and headers (to compile modules that use CFFI to access native code).
 * Internet access (so that pants can fully bootstrap itself)
+
+Additionally, if you use the jvm backend to work with java or scala code (installed by default):
+
+* OpenJDK or Oracle JDK version 8 or greater
