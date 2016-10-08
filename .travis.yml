@@ -92,6 +92,12 @@ before_script:
   - ./build-support/bin/ci-sync.sh
   - ./build-support/bin/install-android-sdk.sh
 
+  # TODO(John Sirois): Fixup tests/python/pants_test/scm/test_git.py to
+  # not need this handholding. Continued work tracked here:
+  #   https://github.com/pantsbuild/pants/issues/3767
+  - git config --global user.email "you@example.com"
+  - git config --global user.name "Your Name"
+
 script:
   - uname -a
   - java -version
