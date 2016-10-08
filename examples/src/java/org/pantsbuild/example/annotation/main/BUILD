@@ -3,7 +3,7 @@
 #
 #  Example for annotation_processor() target
 
-jvm_binary(name='main',
+jvm_binary(
   source='Main.java',
   main='org.pantsbuild.example.annotation.main.Main',
   basename = 'annotation-example',

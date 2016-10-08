@@ -7,8 +7,7 @@ target(name='alongside-16',
                     ])
 
 
-java_library(name='jarversionincompatibility',
-             sources=['DependsOnRateLimiter.java'],
+java_library(sources=['DependsOnRateLimiter.java'],
              dependencies=[':guava-15'])
 
 

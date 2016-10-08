@@ -3,7 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='toolchain',
   sources=[
     'cpp_toolchain.py',
   ],

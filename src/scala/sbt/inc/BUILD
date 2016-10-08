@@ -1,5 +1,4 @@
 scala_library(
-  name='inc',
   provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc-sbt-inc',

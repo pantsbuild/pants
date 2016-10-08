@@ -1,4 +1,4 @@
-java_tests(name='tests',
+java_tests(
   sources=[
     'AllTestsBase.java',
     'AllTests.java',
