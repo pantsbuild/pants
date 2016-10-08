@@ -12,6 +12,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
++ Caitie McCaffrey
 + Chris Aniszczyk
 + Chris Burroughs
 + Chris Chen
@@ -90,6 +91,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Matthew Jeffryes
 + Maxim Khutornenko
 + Michael Doherty
++ Mike Cripps
 + Mike Lindsey
 + Misho Krastev
 + Moses Nakamura
@@ -103,6 +105,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Peiyu Wang
 + Peter Seibel
 + Qicheng Ma
++ Roger Jiang
 + Ryan Williams
 + Sameer Brenn
 + Sara Solano
