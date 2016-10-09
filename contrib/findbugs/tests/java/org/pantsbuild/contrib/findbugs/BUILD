@@ -26,7 +26,7 @@ java_library(
   sources=['HighWarning.java']
 )
 
-java_library(
+target(
   name='all',
   dependencies=[
     ':none',
