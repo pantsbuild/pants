@@ -6,8 +6,8 @@ use std::io;
 use std::path::Path;
 
 use externs::Externs;
-use core::FNV;
-use nodes::{Node, Complete, State};
+use core::{FNV, Key};
+use nodes::{Node, Complete};
 
 pub type EntryId = usize;
 
@@ -258,47 +258,73 @@ impl Graph {
   }
 
   /**
-   * Removes the given invalidation roots and their transitive dependents from the Graph.
+   * Finds all Nodes with the given subjects, and invalidates their transitive dependents.
    */
-  pub fn invalidate(&mut self, roots: &Vec<Node>) -> usize {
-    // Eagerly collect all entries that will be deleted before we begin mutating anything.
+  pub fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
+    // Collect all entries that will be deleted.
     let ids: HashSet<EntryId, FNV> = {
-      let root_ids = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
+      let root_ids =
+        self.nodes.iter()
+          .filter_map(|(node, &entry_id)| {
+            if subjects.contains(node.subject()) {
+              Some(entry_id)
+            } else {
+              None
+            }
+          })
+          .collect();
       self.walk(root_ids, { |_| true }, true).map(|e| e.id()).collect()
     };
+
+    // Then remove all entries in one shot.
     Graph::invalidate_internal(
       &mut self.entries,
       &mut self.nodes,
-      ids,
-    )
+      &ids,
+    );
+
+    // And return the removed count.
+    ids.len()
   }
 
-  fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: HashSet<EntryId, FNV>) -> usize {
-    // Remove the roots from their dependencies' dependents lists.
-    for &id in &ids {
+  fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: &HashSet<EntryId, FNV>) {
+    if ids.is_empty() {
+      return;
+    }
+
+    for &id in ids {
+      // Remove the entries from their dependencies' dependents lists.
       // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
       // I can't figure out how to iterate over one immutable Entry while mutating a different
       // mutable Entry... so I clone() here. Perhaps this is completely sane, because what's to say
       // they're not the same Entry after all? But regardless, less efficient than it could be.
       let dep_ids = entries[&id].dependencies.clone();
       for dep_id in dep_ids {
-        match entries.get_mut(&dep_id) {
-          Some(entry) => { entry.dependents.retain(|&dependent| dependent != id); () },
-          _ => {},
-        }
+        entries.get_mut(&dep_id).map(|entry| {
+          entry.dependents.retain(|&dependent| dependent != id);
+        });
       }
 
+      // Validate that all dependents of the id are also scheduled for removal.
+      assert!(entries[&id].dependents.iter().all(|dep| ids.contains(dep)));
+
+      // Remove the entry itself.
       entries.remove(&id);
     }
 
-    // Filter the Nodes to delete any with matching keys.
+    // Filter the Nodes to delete any with matching ids.
     let filtered: Vec<(Node, EntryId)> =
       nodes.drain()
-        .filter(|&(_, id)| ids.contains(&id))
+        .filter(|&(_, id)| !ids.contains(&id))
         .collect();
     nodes.extend(filtered);
 
-    entries.len()
+    assert!(
+      nodes.len() == entries.len(),
+      "The Nodes and Entries maps are mismatched: {} vs {}",
+      nodes.len(),
+      entries.len()
+    );
   }
 
   pub fn visualize(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {

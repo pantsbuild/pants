@@ -120,6 +120,7 @@ _FFI.cdef(
     void task_end(RawScheduler*);
 
     uint64_t graph_len(RawScheduler*);
+    uint64_t graph_invalidate(RawScheduler*, Key*, uint64_t);
     void graph_visualize(RawScheduler*, char*);
 
     void execution_reset(RawScheduler*);

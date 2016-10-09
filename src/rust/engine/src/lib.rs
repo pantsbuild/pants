@@ -406,6 +406,20 @@ pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
 }
 
 #[no_mangle]
+pub extern fn graph_invalidate(
+  scheduler_ptr: *mut RawScheduler,
+  subjects_ptr: *mut Key,
+  subjects_len: u64,
+) -> u64 {
+  with_scheduler(scheduler_ptr, |raw| {
+   with_vec(subjects_ptr, subjects_len as usize, |subjects| {
+      let subjects_set = subjects.iter().collect();
+      raw.scheduler.graph.invalidate(subjects_set) as u64
+    })
+  })
+}
+
+#[no_mangle]
 pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.graph.len() as u64

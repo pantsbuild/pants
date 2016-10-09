@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use graph::{Entry, Graph};
 use core::{Field, Function, Key, TypeId, Value, Variants};
 use externs::Externs;
@@ -333,7 +331,7 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn step(&self, _: StepContext) -> State<Node> {
     State::Complete(Complete::Return(self.selector.subject.value().clone()))
   }
 }
