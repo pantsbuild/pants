@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-jvm_binary(name='main',
+jvm_binary(
   source = 'Main.java',
   main = 'org.pantsbuild.testproject.annotation.processorwithdep.Main',
   basename = 'processorwithdep-main',

@@ -3,7 +3,7 @@
 
 # This doesn't test much. It shows Pants-ly using Thrift from Java, though.
 
-junit_tests(name='usethrift',
+junit_tests(
   sources=['UseThriftTest.java',],
   dependencies=[
     '3rdparty:junit',

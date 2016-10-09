@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'distribution',
   sources = ['test_distribution.py'],
   dependencies = [
     'src/python/pants/base:revision',

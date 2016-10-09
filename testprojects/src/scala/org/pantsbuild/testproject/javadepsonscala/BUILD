@@ -2,6 +2,5 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 scala_library(
-  name = 'javadepsonscala',
   sources = rglobs('*.scala')
 )

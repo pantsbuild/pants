@@ -96,7 +96,6 @@ python_tests(
 )
 
 python_tests(
-  name='engine',
   sources=['test_engine.py'],
   dependencies=[
     'src/python/pants/base:cmd_line_spec_parser',

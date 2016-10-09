@@ -1,5 +1,4 @@
 scala_library(
-  name='zinc',
   provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc',

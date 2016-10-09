@@ -1,4 +1,4 @@
-target(name='tests',
+target(
   dependencies=[
     ':one',
     ':two',

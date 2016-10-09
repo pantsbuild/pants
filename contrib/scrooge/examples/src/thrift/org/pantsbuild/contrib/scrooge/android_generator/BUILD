@@ -1,5 +1,4 @@
 java_thrift_library(
-  name='android_generator',
   sources=['struct.thrift'],
   compiler='scrooge',
   language='android',

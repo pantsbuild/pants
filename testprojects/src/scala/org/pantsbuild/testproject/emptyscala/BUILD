@@ -1,3 +1,3 @@
-scala_library(name='emptyscala',
+scala_library(
   sources=globs('*'),
 )

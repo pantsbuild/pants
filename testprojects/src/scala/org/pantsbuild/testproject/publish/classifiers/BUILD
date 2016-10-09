@@ -1,4 +1,4 @@
-scala_library(name='classifiers',
+scala_library(
   provides=scala_artifact(
     org='org.pantsbuild.testproject.publish',
     name='classifiers',

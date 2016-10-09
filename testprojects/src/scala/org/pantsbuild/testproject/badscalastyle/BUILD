@@ -1,3 +1,3 @@
-scala_library(name='badscalastyle',
+scala_library(
   sources=globs('*')
 )

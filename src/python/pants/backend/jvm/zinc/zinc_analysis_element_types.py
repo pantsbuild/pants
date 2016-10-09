@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.zinc.zinc_analysis_diff import ZincAnalysisElementDiff
 from pants.backend.jvm.zinc.zinc_analysis_element import ZincAnalysisElement
 
 
@@ -92,12 +91,6 @@ class Stamps(ZincAnalysisElement):
     for a in self.args:
       self.translate_keys(token_translator, a)
     self.translate_values(token_translator, self.classnames)
-
-  # We make equality ignore the values in classnames: classnames is a map from
-  # jar file to one representative class in that jar, and the representative can change.
-  # However this doesn't affect any useful aspect of the analysis, so we ignore it.
-  def diff(self, other):
-    return ZincAnalysisElementDiff(self, other, keys_only_headers=('class names', ))
 
   def __eq__(self, other):
     return (self.products, self.sources, self.binaries, set(self.classnames.keys())) == \

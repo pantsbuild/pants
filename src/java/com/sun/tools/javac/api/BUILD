@@ -3,7 +3,6 @@
 
 
 java_library(
-  name='api',
   sources=globs('*.java'),
   dependencies=[
   ],

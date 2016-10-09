@@ -3,7 +3,6 @@
 
 
 python_library(
-  name = 'invalidation',
   sources = globs('*.py'),
   dependencies = [
     'src/python/pants/base:hash_utils',

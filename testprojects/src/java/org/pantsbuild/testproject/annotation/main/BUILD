@@ -3,7 +3,7 @@
 #
 #  Test project for resource mapping feature
 
-jvm_binary(name='main',
+jvm_binary(
   source='Main.java',
   main='org.pantsbuild.testproject.annotation.main.Main',
   basename = 'annotation-example',

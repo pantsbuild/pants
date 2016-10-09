@@ -115,7 +115,10 @@ class RESTfulArtifactCache(ArtifactCache):
                                          .format(method, url,
                                                  response.status_code, response.reason))
 
+  def _url_suffix_for_key(self, cache_key):
+    return '{0}/{1}.tgz'.format(cache_key.id, cache_key.hash)
+
   def _url_for_key(self, url, cache_key):
     path_prefix = url.path.rstrip(b'/')
-    path = '{0}/{1}/{2}.tgz'.format(path_prefix, cache_key.id, cache_key.hash)
+    path = '{0}/{1}'.format(path_prefix, self._url_suffix_for_key(cache_key))
     return '{0}://{1}{2}'.format(url.scheme, url.netloc, path)

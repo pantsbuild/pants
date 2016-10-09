@@ -57,7 +57,6 @@ python_library(
 )
 
 python_library(
-  name = 'jvm_compile',
   sources = ['jvm_compile.py'],
   dependencies = [
     ':compile_context',

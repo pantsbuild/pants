@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='bin',
   sources=globs('*.py', exclude=['options_initializer.py',
                                  'extension_loader.py',
                                  'plugin_resolver.py']),

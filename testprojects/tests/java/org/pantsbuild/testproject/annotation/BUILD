@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-junit_tests(name='annotation',
+junit_tests(
   sources=globs('*'),
   dependencies=[
     '3rdparty:junit',
