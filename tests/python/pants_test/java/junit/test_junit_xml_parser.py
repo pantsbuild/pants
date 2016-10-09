@@ -60,28 +60,33 @@ class TestTestRegistry(unittest.TestCase):
     self.assertIsNone(registry.get_owning_target(JUnitTest('class3')))
     self.assertEqual('Heidi', registry.get_owning_target(JUnitTest('class3', 'method1')))
 
+  def _assert_index(self, expected, actual):
+    def sorted_values(index):
+      # Eliminate unimportant ordering differences in the index values.
+      return {key: sorted(values) for key, values in index.items()}
+
+    self.assertEqual(sorted_values(expected), sorted_values(actual))
+
   def test_index_nominal(self):
     registry = TestRegistry({JUnitTest('class1'): (1, 'a'),
                              JUnitTest('class2'): (2, 'b'),
                              JUnitTest('class3', 'method1'): (1, 'a'),
                              JUnitTest('class3', 'method2'): (4, 'b')})
 
-    index = registry.index(lambda t: t[0], lambda t: t[1])
-    self.assertEqual({(1, 'a'): (JUnitTest('class1'), JUnitTest('class3', 'method1')),
+    actual_index = registry.index(lambda t: t[0], lambda t: t[1])
+    expected_index = {(1, 'a'): (JUnitTest('class1'), JUnitTest('class3', 'method1')),
                       (2, 'b'): (JUnitTest('class2'),),
-                      (4, 'b'): (JUnitTest('class3', 'method2'),)},
-                      # Eliminate unimportant ordering differences in the index values.
-                      {key: tuple(sorted(values)) for key, values in index.items()})
+                      (4, 'b'): (JUnitTest('class3', 'method2'),)}
+    self._assert_index(expected_index, actual_index)
 
   def test_index_empty(self):
-    self.assertEqual({}, TestRegistry({}).index())
+    self._assert_index({}, TestRegistry({}).index())
 
   def test_index_no_indexers(self):
     registry = TestRegistry({JUnitTest('class1'): (1, 'a'),
                              JUnitTest('class2'): (2, 'b')})
 
-    index = registry.index()
-    self.assertEqual({(): (JUnitTest('class1'), JUnitTest('class2'))}, index)
+    self._assert_index({(): (JUnitTest('class1'), JUnitTest('class2'))}, registry.index())
 
 
 class TestParseFailedTargets(unittest.TestCase):

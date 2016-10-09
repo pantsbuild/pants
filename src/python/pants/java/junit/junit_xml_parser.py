@@ -60,7 +60,7 @@ class TestRegistry(object):
 
   @property
   def empty(self):
-    """Return true if there ar no registered tests.
+    """Return true if there are no registered tests.
 
     :returns: `True` if this registry is empty.
     :rtype: bool
