@@ -6,11 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 import shutil
 import sys
 from abc import abstractmethod
-from collections import defaultdict
 from contextlib import contextmanager
 
 from six.moves import range
@@ -34,6 +32,7 @@ from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.java.junit.junit_xml_parser import Test, TestRegistry, parse_failed_targets
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util import desktop
@@ -42,81 +41,7 @@ from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
 from pants.util.strutil import pluralize
-from pants.util.xml_parser import XmlParser
-
-
-class _Test(datatype('Test', ['classname', 'methodname'])):
-  """Describes a junit-style test or collection of tests."""
-
-  def __new__(cls, classname, methodname=None):
-    # We deliberately normalize an empty methodname ('') to None.
-    return super(_Test, cls).__new__(cls, classname, methodname or None)
-
-  def enclosing(self):
-    """Return a test representing all the tests in this test's enclosing class.
-
-    :returns: A test representing this test's enclosing test class if this test represents a test
-              method or else just this test if it specifies no method.
-    :rtype: :class:`_Test`
-    """
-    return self if self.methodname is None else _Test(classname=self.classname)
-
-  def render_test_spec(self):
-    """Renders this test in `[classname]#[methodname]` test specification format.
-
-    :returns: A rendering of this test in the semi-standard test specification format.
-    :rtype: string
-    """
-    if self.methodname is None:
-      return self.classname
-    else:
-      return '{}#{}'.format(self.classname, self.methodname)
-
-
-class _TestRegistry(object):
-  """A registry of tests and the targets that own them."""
-
-  def __init__(self, test_to_target):
-    self._test_to_target = test_to_target
-
-  @property
-  def empty(self):
-    """Return true if there ar no registered tests.
-
-    :returns: `True` if this registry is empty.
-    :rtype: bool
-    """
-    return len(self._test_to_target) == 0
-
-  def get_owning_target(self, test):
-    """Return the target that owns the given test.
-
-    :param test: The test to find an owning target for.
-    :type test: :class:`_Test`
-    :returns: The target that owns the given `test` or else `None` if the owning target is unknown.
-    :rtype: :class:`pants.build_graph.target.Target`
-    """
-    target = self._test_to_target.get(test)
-    if target is None:
-      target = self._test_to_target.get(test.enclosing())
-    return target
-
-  def index(self, *indexers):
-    """Indexes the tests in this registry by sets of common properties their owning targets share.
-
-    :param indexers: Functions that index a target, producing a hashable key for a given property.
-    :return: An index of tests by shared properties.
-    :rtype: dict from tuple of properties to a tuple of :class:`Test`.
-    """
-    def combined_indexer(tgt):
-      return tuple(indexer(tgt) for indexer in indexers)
-
-    properties = defaultdict(OrderedSet)
-    for test, target in self._test_to_target.items():
-      properties[combined_indexer(target)].add(test)
-    return {prop: tuple(tests) for prop, tests in properties.items()}
 
 
 class _TestSpecification(AbstractClass):
@@ -161,7 +86,7 @@ class _TestSpecification(AbstractClass):
     :param context: The pants execution context.
     :type context: :class:`pants.goal.context.Context`
     :returns: An iterator over possible tests.
-    :rtype: iter of :class:`_Test`
+    :rtype: iter of :class:`pants.java.junit.junit_xml_parser.Test`
     """
 
 
@@ -176,7 +101,7 @@ class _SourcefileSpec(_TestSpecification):
     for classname in self._classnames_from_source_file(context):
       # Tack the methodname onto all classes in the source file, as we
       # can't know which method the user intended.
-      yield _Test(classname=classname, methodname=self._methodname)
+      yield Test(classname=classname, methodname=self._methodname)
 
   def _classnames_from_source_file(self, context):
     source_products = context.products.get_data('classes_by_source').get(self._sourcefile)
@@ -198,7 +123,7 @@ class _ClassnameSpec(_TestSpecification):
     self._methodname = methodname
 
   def iter_possible_tests(self, context):
-    yield _Test(classname=self._classname, methodname=self._methodname)
+    yield Test(classname=self._classname, methodname=self._methodname)
 
 
 class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
@@ -410,10 +335,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     If `self._tests_to_run` is set, return a registry of explicitly specified tests instead.
 
     :returns: A registry of tests to run.
-    :rtype: :class:`_TestRegistry`
+    :rtype: :class:`pants.java.junit.junit_xml_parser.Test.TestRegistry`
     """
 
-    test_registry = _TestRegistry(dict(list(self._calculate_tests_from_targets(targets))))
+    test_registry = TestRegistry(tuple(self._calculate_tests_from_targets(targets)))
 
     if targets and self._tests_to_run:
       # If there are some junit_test targets in the graph, find ones that match the requested
@@ -432,43 +357,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                         "specifier or bring in the proper target(s)."
                         .format("'\n  '".join(t.render_test_spec() for t in unknown_tests)))
 
-      return _TestRegistry(possible_test_to_target)
+      return TestRegistry(possible_test_to_target)
     else:
       return test_registry
-
-  _JUNIT_XML_MATCHER = re.compile(r'^TEST-.+\.xml$')
-
-  def _get_failed_targets(self, test_registry, output_dir):
-    """Return a mapping from targets to the set of individual tests that failed.
-
-    Targets with no failed tests are omitted.
-
-    :param test_registry: A registry of tests that were run.
-    :type test_registry: :class:`_TestRegistry`
-    :param string output_dir: A path to a directory containing test junit xml reports to analyze.
-    :returns: A mapping from targets to the set of individual tests that failed.
-    :rtype: dict from :class:`pants.build_graph.target.Target` to a set of :class:`_Test`
-    """
-    failed_targets = defaultdict(set)
-    for path in os.listdir(output_dir):
-      if self._JUNIT_XML_MATCHER.match(path):
-        try:
-          xml = XmlParser.from_file(os.path.join(output_dir, path))
-          failures = int(xml.get_attribute('testsuite', 'failures'))
-          errors = int(xml.get_attribute('testsuite', 'errors'))
-          if failures or errors:
-            for testcase in xml.parsed.getElementsByTagName('testcase'):
-              test_failed = testcase.getElementsByTagName('failure')
-              test_errored = testcase.getElementsByTagName('error')
-              if test_failed or test_errored:
-                test = _Test(classname=testcase.getAttribute('classname'),
-                             methodname=testcase.getAttribute('name'))
-                target = test_registry.get_owning_target(test)
-                failed_targets[target].add(test)
-        except (XmlParser.XmlError, ValueError) as e:
-          self.context.log.error('Error parsing test result file {0}: {1}'.format(path, e))
-
-    return dict(failed_targets)
 
   def _run_tests(self, test_registry, output_dir, coverage=None):
     if coverage:
@@ -546,7 +437,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
             break
 
     if result != 0:
-      target_to_failed_test = self._get_failed_targets(test_registry, output_dir)
+      def error_handler(parse_error):
+        # Just log and move on since the result is only used to characterize failures, and raising
+        # an error here would just distract from the underlying test failures.
+        self.context.log.error('Error parsing test result file {path}: {cause}'
+                               .format(path=parse_error.junit_xml_path, cause=parse_error.cause))
+
+      target_to_failed_test = parse_failed_targets(test_registry, output_dir, error_handler)
       failed_targets = sorted(target_to_failed_test, key=lambda target: target.address.spec)
       error_message_lines = []
       if self._failure_summary:
@@ -587,7 +484,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       for f in contents:
         classname = ClasspathUtil.classname_for_rel_classfile(f)
         if classname:
-          yield _Test(classname=classname), target
+          yield Test(classname=classname), target
 
   def _test_target_filter(self):
     def target_filter(target):
