@@ -724,7 +724,8 @@ class StepContext(object):
     if type(selector_path) is tuple and selector_path[-1] == Select(Variants):
       # this is the nested Select(Variants)
       #len may also be > 2 which the graph currently doesn't understand
-      return Noop('no variant support')
+      #return Noop('no variant support')
+      return
     else:
       return self._state_via_edges(selector_path, subject, variants)
 
