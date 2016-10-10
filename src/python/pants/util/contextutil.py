@@ -22,9 +22,6 @@ from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
 
 
-logger = logging.getLogger(__name__)
-
-
 @contextmanager
 def environment_as(**kwargs):
   """Update the environment to the supplied values, for example:
@@ -244,7 +241,7 @@ def exception_logging(logger, msg):
 
 
 @contextmanager
-def maybe_profiled(profile_path=None):
+def maybe_profiled(profile_path):
   """A profiling context manager.
 
   :param string profile_path: The path to write profile information to. If `None`, this will no-op.
@@ -263,6 +260,19 @@ def maybe_profiled(profile_path=None):
     profiler.dump_stats(profile_path)
     view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png'
                      .format(path=profile_path))
-    logger.info(
+    logging.getLogger().info(
       'Dumped profile data to: {}\nUse e.g. {} to render and view.'.format(profile_path, view_cmd)
     )
+
+
+class HardSystemExit(SystemExit):
+  """A SystemExit subclass that incurs an os._exit() via special handling."""
+
+
+@contextmanager
+def hard_exit_handler():
+  """An exit helper for the daemon/fork'd context that provides for deferred os._exit() calls."""
+  try:
+    yield
+  except HardSystemExit:
+    os._exit(0)

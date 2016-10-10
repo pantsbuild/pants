@@ -11,7 +11,7 @@ from pants.bin.options_initializer import OptionsInitializer
 from pants.bin.reporting_initializer import ReportingInitializer
 from pants.bin.repro import Reproducer
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.util.contextutil import maybe_profiled
+from pants.util.contextutil import hard_exit_handler, maybe_profiled
 
 
 class LocalPantsRunner(object):
@@ -30,10 +30,10 @@ class LocalPantsRunner(object):
     self._env = env
     self._daemon_build_graph = daemon_build_graph
     self._options_bootstrapper = options_bootstrapper
-    self._profile_path = self._env.get('PANTS_PROFILE')
 
   def run(self):
-    with maybe_profiled(self._profile_path):
+    profile_path = self._env.get('PANTS_PROFILE')
+    with hard_exit_handler(), maybe_profiled(profile_path):
       self._run()
 
   def _run(self):
