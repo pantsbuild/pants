@@ -5,14 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from colors import green
-
 from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner
 from pants.bin.options_initializer import OptionsInitializer
 from pants.bin.reporting_initializer import ReportingInitializer
 from pants.bin.repro import Reproducer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.util.contextutil import maybe_profiled
 
 
 class LocalPantsRunner(object):
@@ -33,24 +32,9 @@ class LocalPantsRunner(object):
     self._options_bootstrapper = options_bootstrapper
     self._profile_path = self._env.get('PANTS_PROFILE')
 
-  def _maybe_profiled(self, runner):
-    """Run with profiling, if requested."""
-    if self._profile_path:
-      import cProfile
-      profiler = cProfile.Profile()
-      try:
-        profiler.runcall(runner)
-      finally:
-        profiler.dump_stats(self._profile_path)
-        print('\nDumped profile data to {}'.format(self._profile_path))
-        view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png'
-                         .format(path=self._profile_path))
-        print('Use, e.g., {} to render and view.'.format(view_cmd))
-    else:
-      runner()
-
   def run(self):
-    self._maybe_profiled(self._run)
+    with maybe_profiled(self._profile_path):
+      self._run()
 
   def _run(self):
     # Bootstrap options and logging.

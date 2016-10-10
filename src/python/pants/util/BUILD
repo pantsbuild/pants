@@ -11,6 +11,7 @@ python_library(
    sources = ['contextutil.py'],
    dependencies = [
      '3rdparty/python:six',
+     '3rdparty/python:ansicolors',
      ':dirutil',
      ':tarutil',
    ],

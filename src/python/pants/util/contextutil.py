@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import shutil
 import sys
@@ -14,10 +15,14 @@ import uuid
 import zipfile
 from contextlib import closing, contextmanager
 
+from colors import green
 from six import string_types
 
 from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
+
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -236,3 +241,28 @@ def exception_logging(logger, msg):
   except Exception:
     logger.exception(msg)
     raise
+
+
+@contextmanager
+def maybe_profiled(profile_path=None):
+  """A profiling context manager.
+
+  :param string profile_path: The path to write profile information to. If `None`, this will no-op.
+  """
+  if not profile_path:
+    yield
+    return
+
+  import cProfile
+  profiler = cProfile.Profile()
+  try:
+    profiler.enable()
+    yield
+  finally:
+    profiler.disable()
+    profiler.dump_stats(profile_path)
+    view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png'
+                     .format(path=profile_path))
+    logger.info(
+      'Dumped profile data to: {}\nUse e.g. {} to render and view.'.format(profile_path, view_cmd)
+    )
