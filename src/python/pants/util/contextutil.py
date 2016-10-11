@@ -271,7 +271,7 @@ class HardSystemExit(SystemExit):
 
 @contextmanager
 def hard_exit_handler():
-  """An exit helper for the daemon/fork'd context that provides for deferred os._exit() calls."""
+  """An exit helper for the daemon/fork'd context that provides for deferred os._exit(0) calls."""
   try:
     yield
   except HardSystemExit:

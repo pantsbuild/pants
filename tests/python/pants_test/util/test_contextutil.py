@@ -14,8 +14,12 @@ import unittest
 
 import mock
 
-from pants.util.contextutil import (Timer, environment_as, exception_logging, maybe_profiled,
-                                    open_zip, pushd, stdio_as, temporary_dir, temporary_file)
+from pants.util.contextutil import (HardSystemExit, Timer, environment_as, exception_logging,
+                                    hard_exit_handler, maybe_profiled, open_zip, pushd, stdio_as,
+                                    temporary_dir, temporary_file)
+
+
+PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
 class ContextutilTest(unittest.TestCase):
@@ -208,3 +212,10 @@ class ContextutilTest(unittest.TestCase):
 
       # Ensure the profile data is valid.
       pstats.Stats(profile_path).print_stats()
+
+  def test_hard_exit_handler(self):
+    with mock.patch('os._exit', **PATCH_OPTS) as mock_exit:
+      with hard_exit_handler():
+        raise HardSystemExit()
+
+    mock_exit.assert_called_once_with(0)
