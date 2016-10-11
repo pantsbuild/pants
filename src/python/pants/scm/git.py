@@ -14,6 +14,7 @@ from contextlib import contextmanager
 
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
+from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_binary
 
@@ -162,15 +163,18 @@ class Git(Scm):
   def changed_files(self, from_commit=None, include_untracked=False, relative_to=None):
     relative_to = relative_to or self._worktree
     rel_suffix = ['--']
-    if self._worktree.startswith(relative_to):
+
+    try:
+      fast_relpath(self._worktree, relative_to)
       # relative_to is ancester of worktree.
       rel_suffix.append(self._worktree)
-    else:
+    except ValueError:
       # 2 cases:
       # 1) relative_to is descendant of worktree
       # 2) relative_to is NOT ancester of worktree
       # In both cases, relative_to can be used.
       rel_suffix.append(relative_to)
+
     uncommitted_changes = self._check_output(['diff', '--name-only', 'HEAD'] + rel_suffix,
                                              raise_type=Scm.LocalException)
 
