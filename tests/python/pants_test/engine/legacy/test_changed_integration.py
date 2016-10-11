@@ -6,10 +6,27 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import shutil
 from contextlib import contextmanager
+from textwrap import dedent
 
+from pants.base.build_environment import get_buildroot
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_open
 from pants_test.base_test import TestGenerator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.git_util import initialize_repo
+
+
+def lines_to_set(str_or_list):
+  if isinstance(str_or_list, list):
+    return set(str_or_list)
+  else:
+    return set(x for x in str(str_or_list).split('\n') if x)
+
+
+def rel_to_buildroot(path):
+  return os.path.relpath(path, get_buildroot())
 
 
 @contextmanager
@@ -30,66 +47,167 @@ def mutated_working_copy(files_to_mutate, to_append='\n '):
         fh.truncate()
 
 
-def lines_to_set(str_or_list):
-  if isinstance(str_or_list, list):
-    return set(str_or_list)
-  else:
-    return set(x for x in str(str_or_list).split('\n') if x)
+@contextmanager
+def create_isolated_git_repo():
+  # Isolated Git Repo Structure:
+  # worktree
+  # |--README
+  # |--src
+  #    |--resources
+  #       |--org/pantsbuild/resourceonly
+  #          |--BUILD
+  #          |--README.md
+  #    |--java
+  #       |--org/pantsbuild/helloworld
+  #          |--BUILD
+  #          |--helloworld.java
+  #    |--python
+  #       |--python_targets
+  #          |--BUILD
+  #          |--test_binary.py
+  #          |--test_library.py
+  #          |--test_unclaimed_src.py
+  #       |--sources
+  #          |--BUILD
+  #          |--sources.py
+  #          |--sources.txt
+  # |--tests
+  #    |--scala
+  #       |--org/pantsbuild/cp-directories
+  #          |--BUILD
+  #          |--ClasspathDirectories.scala
+  with temporary_dir(root_dir=get_buildroot()) as worktree:
+    with safe_open(os.path.join(worktree, 'README'), 'w') as fp:
+      fp.write('Just a test tree.')
+
+    with initialize_repo(worktree=worktree, gitdir=os.path.join(worktree, '.git')) as git:
+      # Resource File
+      resource_file = os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/README.md')
+      with safe_open(resource_file, 'w') as fp:
+        fp.write('Just resource.')
+
+      resource_build_file = os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD')
+      with safe_open(resource_build_file, 'w') as fp:
+        fp.write(dedent("""
+        resources(
+          name='resource',
+          sources=['README.md'],
+        )
+        """))
+
+      git.add(resource_file, resource_build_file)
+      git.commit('Check in a resource target.')
+
+      # Java Program
+      src_file = os.path.join(worktree, 'src/java/org/pantsbuild/helloworld/helloworld.java')
+      with safe_open(src_file, 'w') as fp:
+        fp.write(dedent("""
+        package org.pantsbuild.helloworld;
+
+        class HelloWorld {
+          public static void main(String[] args) {
+            System.out.println("Hello, World!\n");
+          }
+        }
+        """))
+
+      src_build_file = os.path.join(worktree, 'src/java/org/pantsbuild/helloworld/BUILD')
+      with safe_open(src_build_file, 'w') as fp:
+        dep_path = os.path.join(
+          rel_to_buildroot(worktree),
+          'src/resources/org/pantsbuild/resourceonly:resource')
+        fp.write(dedent("""
+        jvm_binary(
+          dependencies=[
+            '{}',
+          ],
+          source='helloworld.java',
+          main='org.pantsbuild.helloworld.HelloWorld',
+        )
+        """.format(dep_path)))
+
+      git.add(src_file, src_build_file)
+      git.commit('hello world java program with a dependency on a resource file.')
+
+      # Scala Program
+      scala_src_dir = os.path.join(worktree, 'tests/scala/org/pantsbuild/cp-directories')
+      safe_mkdir(os.path.dirname(scala_src_dir))
+      shutil.copytree('testprojects/tests/scala/org/pantsbuild/testproject/cp-directories', scala_src_dir)
+      git.add(scala_src_dir)
+      git.commit('Check in a scala test target.')
+
+      # Python library and binary
+      python_src_dir = os.path.join(worktree, 'src/python/python_targets')
+      safe_mkdir(os.path.dirname(python_src_dir))
+      shutil.copytree('testprojects/src/python/python_targets', python_src_dir)
+      git.add(python_src_dir)
+      git.commit('Check in python targets.')
+
+      # A `python_library` with `resources=['file.name']`.
+      python_src_dir = os.path.join(worktree, 'src/python/sources')
+      safe_mkdir(os.path.dirname(python_src_dir))
+      shutil.copytree('testprojects/src/python/sources', python_src_dir)
+      git.add(python_src_dir)
+      git.commit('Check in a python library with resource dependency.')
+
+      yield worktree
 
 
 class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
 
   TEST_MAPPING = {
     # A `jvm_binary` with `source='file.name'`.
-    'testprojects/src/java/org/pantsbuild/testproject/utf8proto/ExampleUtf8Proto.java': dict(
-      none=['testprojects/src/java/org/pantsbuild/testproject/utf8proto:utf8proto'],
-      direct=['testprojects/src/java/org/pantsbuild/testproject/utf8proto:utf8proto'],
-      transitive=['testprojects/src/java/org/pantsbuild/testproject/utf8proto:utf8proto']
+    'src/java/org/pantsbuild/helloworld/helloworld.java': dict(
+      none=['src/java/org/pantsbuild/helloworld:helloworld'],
+      direct=['src/java/org/pantsbuild/helloworld:helloworld'],
+      transitive=['src/java/org/pantsbuild/helloworld:helloworld']
     ),
     # A `python_binary` with `source='file.name'`.
-    'testprojects/src/python/python_targets/test_binary.py': dict(
-      none=['testprojects/src/python/python_targets:test'],
-      direct=['testprojects/src/python/python_targets:test'],
-      transitive=['testprojects/src/python/python_targets:test']
+    'src/python/python_targets/test_binary.py': dict(
+      none=['src/python/python_targets:test'],
+      direct=['src/python/python_targets:test'],
+      transitive=['src/python/python_targets:test']
     ),
     # A `python_library` with `sources=['file.name']`.
-    'testprojects/src/python/python_targets/test_library.py': dict(
-      none=['testprojects/src/python/python_targets:test_library'],
-      direct=['testprojects/src/python/python_targets:test',
-              'testprojects/src/python/python_targets:test_library',
-              'testprojects/src/python/python_targets:test_library_direct_dependee'],
-      transitive=['testprojects/src/python/python_targets:test',
-                  'testprojects/src/python/python_targets:test_library',
-                  'testprojects/src/python/python_targets:test_library_direct_dependee',
-                  'testprojects/src/python/python_targets:test_library_transitive_dependee',
-                  'testprojects/src/python/python_targets:test_library_transitive_dependee_2',
-                  'testprojects/src/python/python_targets:test_library_transitive_dependee_3',
-                  'testprojects/src/python/python_targets:test_library_transitive_dependee_4']
+    'src/python/python_targets/test_library.py': dict(
+      none=['src/python/python_targets:test_library'],
+      direct=['src/python/python_targets:test',
+              'src/python/python_targets:test_library',
+              'src/python/python_targets:test_library_direct_dependee'],
+      transitive=['src/python/python_targets:test',
+                  'src/python/python_targets:test_library',
+                  'src/python/python_targets:test_library_direct_dependee',
+                  'src/python/python_targets:test_library_transitive_dependee',
+                  'src/python/python_targets:test_library_transitive_dependee_2',
+                  'src/python/python_targets:test_library_transitive_dependee_3',
+                  'src/python/python_targets:test_library_transitive_dependee_4']
     ),
     # A `resources` target with `sources=['file.name']` referenced by a `java_library` target.
-    'testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly/README.md': dict(
-      none=['testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly:resource'],
-      direct=['testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/code:code',
-              'testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly:resource'],
-      transitive=['testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/code:code',
-                  'testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly:resource'],
+    'src/resources/org/pantsbuild/resourceonly/README.md': dict(
+      none=['src/resources/org/pantsbuild/resourceonly:resource'],
+      direct=['src/java/org/pantsbuild/helloworld:helloworld',
+              'src/resources/org/pantsbuild/resourceonly:resource'],
+      transitive=['src/java/org/pantsbuild/helloworld:helloworld',
+                  'src/resources/org/pantsbuild/resourceonly:resource'],
     ),
     # A `python_library` with `resources=['file.name']`.
-    'testprojects/src/python/sources/sources.txt': dict(
-      none=['testprojects/src/python/sources:sources'],
-      direct=['testprojects/src/python/sources:sources'],
-      transitive=['testprojects/src/python/sources:sources']
+    'src/python/sources/sources.txt': dict(
+      none=['src/python/sources:sources'],
+      direct=['src/python/sources:sources'],
+      transitive=['src/python/sources:sources']
     ),
     # A `scala_library` with `sources=['file.name']`.
-    'testprojects/tests/scala/org/pantsbuild/testproject/cp-directories/ClasspathDirectories.scala': dict(
-      none=['testprojects/tests/scala/org/pantsbuild/testproject/cp-directories:cp-directories'],
-      direct=['testprojects/tests/scala/org/pantsbuild/testproject/cp-directories:cp-directories'],
-      transitive=['testprojects/tests/scala/org/pantsbuild/testproject/cp-directories:cp-directories']
+    'tests/scala/org/pantsbuild/cp-directories/ClasspathDirectories.scala': dict(
+      none=['tests/scala/org/pantsbuild/cp-directories:cp-directories'],
+      direct=['tests/scala/org/pantsbuild/cp-directories:cp-directories'],
+      transitive=['tests/scala/org/pantsbuild/cp-directories:cp-directories']
     ),
     # An unclaimed source file.
-    'testprojects/src/python/python_targets/test_unclaimed_src.py': dict(none=[],
-                                                                         direct=[],
-                                                                         transitive=[])
+    'src/python/python_targets/test_unclaimed_src.py': dict(
+      none=[],
+      direct=[],
+      transitive=[]
+    )
   }
 
   @classmethod
@@ -102,17 +220,19 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       for dependee_type in dependee_mapping.keys():
         # N.B. The parameters here are used purely to close over the respective loop variables.
         def inner_integration_coverage_test(self, filename=filename, dependee_type=dependee_type):
-          # Mutate the working copy so we can do `--changed-parent=HEAD` deterministically.
-          with mutated_working_copy([filename]):
-            stdout = self.assert_changed_new_equals_old(
-              ['--changed-include-dependees={}'.format(dependee_type), '--changed-parent=HEAD'],
-              test_list=True
-            )
+          with create_isolated_git_repo() as worktree:
+            # Mutate the working copy so we can do `--changed-parent=HEAD` deterministically.
+            with mutated_working_copy([os.path.join(worktree, filename)]):
+              stdout = self.assert_changed_new_equals_old(
+                ['--changed-include-dependees={}'.format(dependee_type), '--changed-parent=HEAD'],
+                test_list=True
+              )
 
-            self.assertEqual(
-              lines_to_set(self.TEST_MAPPING[filename][dependee_type]),
-              lines_to_set(stdout)
-            )
+              relative_worktree = rel_to_buildroot(worktree)
+              self.assertEqual(
+                set(os.path.join(relative_worktree, x) for x in self.TEST_MAPPING[filename][dependee_type]),
+                lines_to_set(stdout)
+              )
 
         cls.add_test(
           'test_changed_coverage_{}_{}'.format(dependee_type, safe_filename(filename)),
@@ -138,6 +258,51 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
     # If we get to here without asserting, we know all copies of stdout are identical - return one.
     return changed_run.stdout_data
 
+  def test_changed_options_scope_shadowing(self):
+    """Tests that the `test-changed` scope overrides `changed` scope."""
+    changed_src = 'src/python/python_targets/test_library.py'
+    expected_target = self.TEST_MAPPING[changed_src]['none'][0]
+    expected_set = {expected_target}
+    not_expected_set = set(self.TEST_MAPPING[changed_src]['transitive']).difference(expected_set)
+
+    with create_isolated_git_repo() as worktree:
+      with mutated_working_copy([os.path.join(worktree, changed_src)]):
+        pants_run = self.run_pants([
+          '-ldebug',   # This ensures the changed target name shows up in the pants output.
+          'test-changed',
+          '--test-changed-changes-since=HEAD',
+          '--test-changed-include-dependees=none',     # This option should be used.
+          '--changed-include-dependees=transitive'     # This option should be stomped on.
+        ])
+
+      self.assert_success(pants_run)
+
+      for expected_item in expected_set:
+        self.assertIn(os.path.join(rel_to_buildroot(worktree), expected_item), pants_run.stdout_data)
+
+      for not_expected_item in not_expected_set:
+        if expected_target.startswith(not_expected_item):
+          continue  # Ignore subset matches.
+        self.assertNotIn(os.path.join(rel_to_buildroot(worktree), not_expected_item), pants_run.stdout_data)
+
+  def test_changed_options_scope_positional(self):
+    changed_src = 'src/python/python_targets/test_library.py'
+    expected_set = set(self.TEST_MAPPING[changed_src]['transitive'])
+
+    with create_isolated_git_repo() as worktree:
+      with mutated_working_copy([os.path.join(worktree, changed_src)]):
+        pants_run = self.run_pants([
+          '-ldebug',   # This ensures the changed target names show up in the pants output.
+          'test-changed',
+          '--changes-since=HEAD',
+          '--include-dependees=transitive'
+        ])
+
+      self.assert_success(pants_run)
+      for expected_item in expected_set:
+        self.assertIn(os.path.join(rel_to_buildroot(worktree), expected_item), pants_run.stdout_data)
+
+  # Following 4 tests do not run in isolated repo because they don't mutate working copy.
   def test_changed(self):
     self.assert_changed_new_equals_old([])
 
@@ -149,48 +314,6 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
 
   def test_changed_with_changes_since_transitive(self):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
-
-  def test_changed_options_scope_shadowing(self):
-    """Tests that the `test-changed` scope overrides `changed` scope."""
-    changed_src = 'testprojects/src/python/python_targets/test_library.py'
-    expected_target = self.TEST_MAPPING[changed_src]['none'][0]
-    expected_set = set([expected_target])
-    not_expected_set = set(self.TEST_MAPPING[changed_src]['transitive']).difference(expected_set)
-
-    with mutated_working_copy([changed_src]):
-      pants_run = self.run_pants([
-        '-ldebug',   # This ensures the changed target name shows up in the pants output.
-        'test-changed',
-        '--test-changed-changes-since=HEAD',
-        '--test-changed-include-dependees=none',     # This option should be used.
-        '--changed-include-dependees=transitive'     # This option should be stomped on.
-      ])
-
-    self.assert_success(pants_run)
-
-    for expected_item in expected_set:
-      self.assertIn(expected_item, pants_run.stdout_data)
-
-    for not_expected_item in not_expected_set:
-      if expected_target.startswith(not_expected_item):
-        continue  # Ignore subset matches.
-      self.assertNotIn(not_expected_item, pants_run.stdout_data)
-
-  def test_changed_options_scope_positional(self):
-    changed_src = 'testprojects/src/python/python_targets/test_library.py'
-    expected_set = set(self.TEST_MAPPING[changed_src]['transitive'])
-
-    with mutated_working_copy([changed_src]):
-      pants_run = self.run_pants([
-        '-ldebug',   # This ensures the changed target names show up in the pants output.
-        'test-changed',
-        '--changes-since=HEAD',
-        '--include-dependees=transitive'
-      ])
-
-    self.assert_success(pants_run)
-    for expected_item in expected_set:
-      self.assertIn(expected_item, pants_run.stdout_data)
 
 
 ChangedIntegrationTest.generate_tests()
