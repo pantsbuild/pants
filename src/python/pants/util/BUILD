@@ -10,8 +10,8 @@ python_library(
    name = 'contextutil',
    sources = ['contextutil.py'],
    dependencies = [
-     '3rdparty/python:six',
      '3rdparty/python:ansicolors',
+     '3rdparty/python:six',
      ':dirutil',
      ':tarutil',
    ],
