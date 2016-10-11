@@ -425,7 +425,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               classpath=complete_classpath,
               main=JUnit.RUNNER_MAIN,
               jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
-              args=args + batch_test_specs,
+              args=args + batch_tests,
               workunit_factory=self.context.new_workunit,
               workunit_name='run',
               workunit_labels=[WorkUnitLabel.TEST],
