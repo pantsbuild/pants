@@ -83,8 +83,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def test_junit_runner_error(self):
     with self.assertRaises(TaskError) as cm:
       self._execute_junit_runner(
-        [
-          ('FooTest.java', dedent("""
+        [('FooTest.java', dedent("""
           import org.junit.Test;
           public class FooTest {
             @Test
@@ -92,8 +91,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               throw new RuntimeException("test error");
             }
           }
-        """))
-        ]
+        """))]
       )
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
