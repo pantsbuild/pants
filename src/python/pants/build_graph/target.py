@@ -755,20 +755,27 @@ class Target(AbstractTarget):
   # default_sources_globs (e.g., '*Test.java').
   default_sources_excludes_globs = None
 
-  def default_sources(self, sources_rel_path):
+  @classmethod
+  def supports_default_sources(cls):
+    """Whether this target type can provide default sources if none were specified explicitly."""
+    return cls.default_sources_globs is not None
+
+  @classmethod
+  def default_sources(cls, sources_rel_path):
     """Provide sources, if they weren't specified explicitly in the BUILD file.
 
     By default this globs over self.default_sources_globs (e.g., '*.java')
     but subclasses can override to provide more nuanced default behavior.
+    In this case, the subclasses must also override supports_default_sources().
     """
-    if self.default_sources_globs is not None:
-      if self.default_sources_excludes_globs is not None:
+    if cls.default_sources_globs is not None:
+      if cls.default_sources_excludes_globs is not None:
         exclude = [Globs.create_fileset_with_spec(sources_rel_path,
-                                                  *maybe_list(self.default_sources_excludes_globs))]
+                                                  *maybe_list(cls.default_sources_excludes_globs))]
       else:
         exclude = []
       return Globs.create_fileset_with_spec(sources_rel_path,
-                                            *maybe_list(self.default_sources_globs),
+                                            *maybe_list(cls.default_sources_globs),
                                             exclude=exclude)
     return None
 
@@ -784,7 +791,12 @@ class Target(AbstractTarget):
     :rtype: SourcesField
     """
     # Make sure we don't apply the defaulting to resources.
-    if ((key_arg is None or key_arg == 'sources') and sources is None and
+    # Note that the check for supports_default_sources() precedes the subsystem check.
+    # This is so that tests don't need to set up the subsystem when creating targets that
+    # legitimately do not require sources.
+    if ((key_arg is None or key_arg == 'sources') and
+        sources is None and
+        self.supports_default_sources() and
         self.Arguments.global_instance().get_options().implicit_sources):
       sources = self.default_sources(sources_rel_path)
     if isinstance(sources, Addresses):
