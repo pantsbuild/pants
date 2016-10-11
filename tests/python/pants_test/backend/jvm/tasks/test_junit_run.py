@@ -46,8 +46,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     ))
 
   def test_junit_runner_success(self):
-    self.execute_junit_runner(
-      dedent("""
+    self._execute_junit_runner(
+      [('FooTest.java', dedent("""
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
         public class FooTest {
@@ -56,7 +56,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(5 > 3);
           }
         }
-      """)
+      """))]
     )
 
   def setUp(self):
@@ -65,8 +65,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   def test_junit_runner_failure(self):
     with self.assertRaises(TaskError) as cm:
-      self.execute_junit_runner(
-        dedent("""
+      self._execute_junit_runner(
+        [('FooTest.java', dedent("""
           import org.junit.Test;
           import static org.junit.Assert.assertTrue;
           public class FooTest {
@@ -75,15 +75,16 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               assertTrue(5 < 3);
             }
           }
-        """)
+        """))]
       )
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
   def test_junit_runner_error(self):
     with self.assertRaises(TaskError) as cm:
-      self.execute_junit_runner(
-        dedent("""
+      self._execute_junit_runner(
+        [
+          ('FooTest.java', dedent("""
           import org.junit.Test;
           public class FooTest {
             @Test
@@ -91,7 +92,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               throw new RuntimeException("test error");
             }
           }
-        """)
+        """))
+        ]
       )
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
@@ -102,8 +104,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       self.set_options(timeout_default=1)
       self.set_options(timeouts=True)
-      self.execute_junit_runner(
-        dedent("""
+      self._execute_junit_runner(
+        [('FooTest.java', dedent("""
           import org.junit.Test;
           import static org.junit.Assert.assertTrue;
           public class FooTest {
@@ -112,7 +114,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               assertTrue(5 > 3);
             }
           }
-        """)
+        """))]
       )
 
       # Ensures that Timeout is instantiated with a 1 second timeout.
@@ -128,8 +130,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       self.set_options(timeout_default=1)
       self.set_options(timeouts=True)
       with self.assertRaises(TaskError) as cm:
-        self.execute_junit_runner(
-          dedent("""
+        self._execute_junit_runner(
+          [('FooTest.java', dedent("""
             import org.junit.Test;
             import static org.junit.Assert.assertTrue;
             public class FooTest {
@@ -138,7 +140,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                 assertTrue(5 > 3);
               }
             }
-          """)
+          """))]
         )
 
       self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
@@ -147,17 +149,20 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (1,))
 
-  def execute_junit_runner(self, content, create_some_resources=True, **kwargs):
+  def _execute_junit_runner(self, list_of_filename_content_tuples, create_some_resources=True, **kwargs):
     # Create the temporary base test directory
     test_rel_path = 'tests/java/org/pantsbuild/foo'
     test_abs_path = self.create_dir(test_rel_path)
 
-    # Generate the temporary java test source code.
-    test_java_file_rel_path = os.path.join(test_rel_path, 'FooTest.java')
-    test_java_file_abs_path = self.create_file(test_java_file_rel_path, content)
-
     # Create the temporary classes directory under work dir
     test_classes_abs_path = self.create_workdir_dir(test_rel_path)
+
+    test_java_file_abs_paths = []
+    # Generate the temporary java test source code.
+    for t in list_of_filename_content_tuples:
+      test_java_file_rel_path = os.path.join(test_rel_path, t[0])
+      test_java_file_abs_path = self.create_file(test_java_file_rel_path, t[1])
+      test_java_file_abs_paths.append(test_java_file_abs_path)
 
     # Invoke ivy to resolve classpath for junit.
     classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
@@ -176,7 +181,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # the test on.
     javac = distribution.binary('javac')
     subprocess.check_call(
-      [javac, '-d', test_classes_abs_path, '-cp', classpath, test_java_file_abs_path])
+      [javac, '-d', test_classes_abs_path, '-cp', classpath] + test_java_file_abs_paths)
 
     # If a target_name is specified create a target with it, otherwise create a java_tests target.
     if 'target_name' in kwargs:
@@ -267,7 +272,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       sources=['FooTest.java'],
       extra_jvm_options=['-Dexample.property=1'],
     )
-    self.execute_junit_runner(dedent("""
+    self._execute_junit_runner([('FooTest.java', dedent("""
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
         public class FooTest {
@@ -277,9 +282,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(exampleProperty != null && exampleProperty.equals("1"));
           }
         }
-      """),
-      target_name='foo:foo_test'
-    )
+      """))], target_name='foo:foo_test')
 
   def test_junit_runner_multiple_extra_jvm_options(self):
     self.make_target(
@@ -288,7 +291,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       sources=['FooTest.java'],
       extra_jvm_options=['-Dexample.property1=1','-Dexample.property2=2'],
     )
-    self.execute_junit_runner(dedent("""
+    self._execute_junit_runner([('FooTest.java', dedent("""
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
         public class FooTest {
@@ -302,9 +305,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(exampleProperty3 == null);
           }
         }
-      """),
-    target_name='foo:foo_test'
-    )
+      """))], target_name='foo:foo_test')
 
   def test_junit_runner_extra_env_vars(self):
     self.make_target(
@@ -327,7 +328,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       },
     )
 
-    self.execute_junit_runner(dedent("""
+    self._execute_junit_runner(
+      [
+        ('FooTest.java', dedent("""
         import org.junit.Test;
         import static org.junit.Assert.assertEquals;
         public class FooTest {
@@ -337,10 +340,12 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertEquals("32", System.getenv().get("THERE"));
           }
         }
-      """), target_name='foo:foo_test')
+      """))
+      ], target_name='foo:foo_test'
+    )
 
     # Execute twice in a row to make sure the environment changes aren't sticky.
-    self.execute_junit_runner(dedent("""
+    self._execute_junit_runner([('FooTest.java', dedent("""
         import org.junit.Test;
         import static org.junit.Assert.assertEquals;
         import static org.junit.Assert.assertFalse;
@@ -352,7 +357,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertFalse(System.getenv().containsKey("THERE"));
           }
         }
-      """), target_name='bar:bar_test', create_some_resources=False)
+      """))], target_name='bar:bar_test', create_some_resources=False)
 
   def test_junit_runner_extra_env_vars_none(self):
     with environment_as(THIS_VARIABLE="12", THAT_VARIABLE="This is a variable."):
@@ -367,7 +372,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         },
       )
 
-      self.execute_junit_runner(dedent("""
+      self._execute_junit_runner([('FooTest.java', dedent("""
           import org.junit.Test;
           import static org.junit.Assert.assertEquals;
           import static org.junit.Assert.assertFalse;
@@ -380,32 +385,31 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               assertFalse(System.getenv().containsKey("THIS_VARIABLE"));
             }
           }
-        """), target_name='foo:foo_test')
+        """))], target_name='foo:foo_test')
 
   def test_junt_run_with_many_args(self):
 
-    max_subprocess_args = 20
-    num_of_classes = 100
+    max_subprocess_args = 2
+    num_of_classes = 5
+    list_of_filename_content_tuples = []
+    for n in range(num_of_classes):
+      filename = 'FooTest{}.java'.format(n)
+      content = dedent("""
+          import org.junit.Test;
+          import static org.junit.Assert.assertTrue;
+          public class FooTest{}{{
+          @Test
+            public void testFoo() {{
+              int x = 5;
+            }}
+          }}""".format(n))
+      list_of_filename_content_tuples.append((filename, content))
 
     self.make_target(
       spec='foo:foo_test',
       target_type=JavaTests,
-      sources=['FooTest.java'],
+      sources=[t[0] for t in list_of_filename_content_tuples],
     )
     self.set_options(max_subprocess_args=max_subprocess_args)
 
-    # Not using the str format because actual curly braces will cause confusion.
-    many_test_methods = '\n'.join(dedent("""
-          @Test
-          public void testFoo""" + str(count) + """() {
-            int x = 5;
-          }
-      """) for count in range(num_of_classes))
-
-    self.execute_junit_runner(dedent("""
-        import org.junit.Test;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest{
-      """ + many_test_methods + """}"""),
-      target_name='foo:foo_test'
-    )
+    self._execute_junit_runner(list_of_filename_content_tuples, target_name='foo:foo_test')
