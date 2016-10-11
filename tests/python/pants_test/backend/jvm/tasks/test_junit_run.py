@@ -339,8 +339,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           }
         }
       """))
-      ], target_name='foo:foo_test'
-    )
+      ], target_name='foo:foo_test')
 
     # Execute twice in a row to make sure the environment changes aren't sticky.
     self._execute_junit_runner([('FooTest.java', dedent("""
