@@ -1,4 +1,4 @@
-# coding=utf-8
+/# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -18,6 +18,8 @@ migrations = {
   # E.g.:
   #('backends', 'packages'): ('DEFAULT', 'backend_packages'),
   #('unknown-arguments', 'ignored'): None,
+
+  ('unknown-arguments', 'ignored'): ('target-arguments', 'ignored'),
 }
 
 
