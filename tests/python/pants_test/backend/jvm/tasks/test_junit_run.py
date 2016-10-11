@@ -381,3 +381,31 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             }
           }
         """), target_name='foo:foo_test')
+
+  def test_junt_run_with_many_args(self):
+
+    max_subprocess_args = 20
+    num_of_classes = 100
+
+    self.make_target(
+      spec='foo:foo_test',
+      target_type=JavaTests,
+      sources=['FooTest.java'],
+    )
+    self.set_options(max_subprocess_args=max_subprocess_args)
+
+    # Not using the str format because actual curly braces will cause confusion.
+    many_test_methods = '\n'.join(dedent("""
+          @Test
+          public void testFoo""" + str(count) + """() {
+            int x = 5;
+          }
+      """) for count in range(num_of_classes))
+
+    self.execute_junit_runner(dedent("""
+        import org.junit.Test;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest{
+      """ + many_test_methods + """}"""),
+      target_name='foo:foo_test'
+    )
