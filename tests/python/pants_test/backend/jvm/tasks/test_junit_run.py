@@ -157,9 +157,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     test_java_file_abs_paths = []
     # Generate the temporary java test source code.
-    for t in list_of_filename_content_tuples:
-      test_java_file_rel_path = os.path.join(test_rel_path, t[0])
-      test_java_file_abs_path = self.create_file(test_java_file_rel_path, t[1])
+    for filename, content in list_of_filename_content_tuples:
+      test_java_file_rel_path = os.path.join(test_rel_path, filename)
+      test_java_file_abs_path = self.create_file(test_java_file_rel_path, content)
       test_java_file_abs_paths.append(test_java_file_abs_path)
 
     # Invoke ivy to resolve classpath for junit.
@@ -384,7 +384,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           }
         """))], target_name='foo:foo_test')
 
-  def test_junt_run_with_many_args(self):
+  def test_junt_run_with_too_many_args(self):
 
     max_subprocess_args = 2
     num_of_classes = 5
@@ -405,7 +405,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.make_target(
       spec='foo:foo_test',
       target_type=JavaTests,
-      sources=[t[0] for t in list_of_filename_content_tuples],
+      sources=[filename for filename, _ in list_of_filename_content_tuples],
     )
     self.set_options(max_subprocess_args=max_subprocess_args)
 

@@ -6,12 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 
 from pants.backend.jvm import argfile
-from pants_test.base_test import BaseTest
 
 
-class SafeArgTest(BaseTest):
+class SafeArgTest(unittest.TestCase):
   def test_safe_args_over_max_arg(self):
     # len(args) > max_args, so it should a file should be yielded
     args = ['1', '2', '3', '4']
