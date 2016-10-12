@@ -385,9 +385,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         """))], target_name='foo:foo_test')
 
   def test_junt_run_with_too_many_args(self):
-
     max_subprocess_args = 2
     num_of_classes = 5
+
     list_of_filename_content_tuples = []
     for n in range(num_of_classes):
       filename = 'FooTest{}.java'.format(n)
@@ -405,7 +405,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.make_target(
       spec='foo:foo_test',
       target_type=JavaTests,
-      sources=[filename for filename, _ in list_of_filename_content_tuples],
+      sources=[name for name, _ in list_of_filename_content_tuples],
     )
     self.set_options(max_subprocess_args=max_subprocess_args)
 
