@@ -511,10 +511,18 @@ class RuleEdges(object):
         yield d
 
   def add_edges_via(self, selector, new_dependencies):
+    if len(set(new_dependencies)) != len(new_dependencies):
+      raise ValueError("you gave me new deps with dups {} {}".format(selector, new_dependencies))
     if selector is None and new_dependencies:
       raise ValueError("Cannot specify a None selector with non-empty dependencies!")
     tupled_other_rules = tuple(new_dependencies)
+    if any(t in self._selector_to_deps[selector]  for t in tupled_other_rules):
+      raise ValueError("Cannot specify dep twice!\n new: {}\n old: {}".format(new_dependencies, self._selector_to_deps[selector]))
     self._selector_to_deps[selector] += tupled_other_rules
+
+    if len(set(self._selector_to_deps[selector])) != len(self._selector_to_deps[selector]):
+      raise ValueError("you gave me new deps with dups {} {}".format(selector, self._selector_to_deps[selector]))
+
     self._dependencies += tupled_other_rules
 
   def has_edges_for(self, selector):
@@ -568,14 +576,14 @@ class GraphMaker(object):
 
   def full_graph(self):
     """Produces a full graph based on the root subjects and all of the products produced by rules."""
-    root_rules = set()
+    raw_root_rules = set()
     full_root_rule_dependency_edges = dict()
     full_dependency_edges = {}
     full_unfulfillable_rules = {}
     for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
       for product in sorted(self.rule_index.all_produced_product_types(root_subject_type)):
         beginning_root = RootRule(root_subject_type, selector_fn(product))
-        root_rules.add(beginning_root)
+        raw_root_rules.add(beginning_root)
         root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(
           beginning_root,
           root_rule_dependency_edges=full_root_rule_dependency_edges,
@@ -603,7 +611,7 @@ class GraphMaker(object):
       full_unfulfillable_rules)
 
     return RuleGraph(self.root_subject_selector_fns,
-                     root_rules,
+                     raw_root_rules,
                      dict(full_root_rule_dependency_edges),
                      full_dependency_edges,
                      full_unfulfillable_rules)

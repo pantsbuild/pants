@@ -17,9 +17,10 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.nodes import (FilesystemNode, LiteralNode, Node, Noop, Return, Runnable,
-                                SelectNode, TaskNode, Throw, Waiting, logger)
-from pants.engine.rules import GraphMaker, NodeBuilder, RuleIndex, RulesetValidator
+from pants.engine.nodes import (ConflictingProducersError, FilesystemNode, LiteralNode, Node, Noop,
+                                Return, Runnable, SelectNode, State, TaskNode, Throw, Waiting)
+from pants.engine.rules import (GraphMaker, NodeBuilder, RuleGraphEntry, RuleGraphLiteral,
+                                RuleGraphSubjectIsProduct, RuleIndex, RulesetValidator)
 from pants.engine.selectors import (Select, SelectDependencies, SelectProjection,
                                     type_or_constraint_repr)
 from pants.engine.struct import Variants
@@ -727,9 +728,7 @@ class StepContext(object):
     self._node_builder = node_builder
     self.project_tree = project_tree
     self._node_states = dict(node_states)
-#    self._parents = tuple()
     self._parents = []
-    #self._parents = OrderedSet()
 
     self._inline_nodes = inline_nodes
     self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
@@ -763,14 +762,9 @@ class StepContext(object):
     if self._inline_nodes and node.is_inlineable:
       if node in self._parents:
         return Noop.cycle(list(self._parents)[-1], node)
-#      self._parents += (node,)
-     # self._parents.add(node)
-      self._parents.append(node)
 
+      self._parents.append(node)
       state = self._node_states[node] = node.step(self)
-      #assert self._parents[-1] == node
-      #self._parents = self._parents[:-1]
-      #self._parents.remove(node)
       self._parents.pop()
       return state
     else:
@@ -778,11 +772,9 @@ class StepContext(object):
 
   def get_nodes_and_states_for(self, subject, product, variants):
     if hasattr(self._current_node, 'rule'):
-      logger.debug('calling get_nodes_and_states_for with parents {} current rule {}'.format([p.selector for p in self._parents], self._current_node.rule))
-      # nb otherwise is a select node
-      # I think this is only called for the beginning nodes now.
-      # So, hypothesis
-    matching = self._graph.root_rules_matching(type(subject), self._current_node.selector)
+      matching = None
+    else:
+      matching = self._graph.root_rules_matching(type(subject), self._current_node.selector)
     edges = None
     if matching:
       edges = self._graph.root_rule_edges(matching)
@@ -790,19 +782,19 @@ class StepContext(object):
       rule_entries = [e for e in edges if e.subject_type == type(subject)]
       yielded = False
       for rule_entry in rule_entries:
-        if type(rule_entry).__name__ == "RuleGraphSubjectIsProduct": # TODO this is crap
+        if type(rule_entry) is RuleGraphSubjectIsProduct:
           assert rule_entry.value == type(subject)
           assert len(rule_entries) == 1, "if subject is product, it should be the only one"
           yield LiteralNode(subject), Return(subject)
           yielded = True
           break
 
-        elif type(rule_entry).__name__ == "RuleGraphLiteral": # TODO this is crap
+        elif type(rule_entry) is RuleGraphLiteral:
           assert len(rule_entries) == 1, "if literal, it should be the only one"
           yield LiteralNode(rule_entry.value), Return(rule_entry.value)
           yielded = True
           break
-        elif type(rule_entry).__name__ == "RuleGraphEntry": # TODO this is crap
+        elif type(rule_entry) is RuleGraphEntry:
           node = rule_entry.rule.as_node(subject, variants)
           #nodes.append(node)
           yield node, self._node_states.get(node, Waiting([node]))
@@ -865,29 +857,43 @@ class StepContext(object):
   def _state_via_edges(self, selector_path, subject, variants):
     rule_entries = list(self._rule_edges.rules_for(selector_path, type(subject)))
     if rule_entries:
+      final_selector = selector_path if type(selector_path) is not tuple else selector_path[-1]
       nodes = []
       for rule_entry in rule_entries:
-        if type(rule_entry).__name__ == "RuleGraphSubjectIsProduct": # TODO this is crap
+        if type(rule_entry) is RuleGraphSubjectIsProduct:
           assert rule_entry.value == type(subject)
           assert len(rule_entries) == 1, "if subject is product, it should be the only one"
           return Return(subject)
-        elif type(rule_entry).__name__ == "RuleGraphLiteral": # TODO this is crap
+        elif type(rule_entry) is RuleGraphLiteral:
           assert len(rule_entries) == 1, "if literal, it should be the only one"
           return Return(rule_entry.value)
-        elif type(rule_entry).__name__ == "RuleGraphEntry": # TODO this is crap
+        elif type(rule_entry) is RuleGraphEntry:
           node = rule_entry.rule.as_node(subject, variants)
           nodes.append(node)
       if nodes:
-        states = [self._node_states.get(n, Waiting([n])) for n in nodes]
-        if len(states) > 1:
-          logger.debug('states({}) {}'.format(len(states), states))
-        if all(type(state) is Waiting for state in states):
-          return Waiting(nodes)
-        elif (len(states) == 1 and type(states[0]) in (Return, Throw, Noop)):
-          return states[0]
-        else:
-          logger.debug('found states, but didnt know what to do {}'.format(states))
-          pass
+        had_return = None
+        state = None
+        waiting = []
+        matches = []
+        for node in nodes:
+          state = self._node_states.get(node, Waiting([node]))
+          if type(state) is Waiting:
+            waiting.extend(state.dependencies)
+          elif type(state) is Return:
+            return # defer to SelectNode, for now
+          elif type(state) is Throw:
+            return state # always bubble up the first throw
+          elif type(state) is Noop:
+            continue
+          else:
+            State.raise_unrecognized(state)
+
+        if waiting:
+          return Waiting(waiting)
+        elif len(matches) == 0:
+          return Noop('No source of {} for {} : {} because no nodes with returns, but there were rule entries {}\n the return if there was one {}\n last state {}', selector_path, type(subject).__name__, subject, rule_entries, had_return, state)
+        elif len(matches) > 1:
+          return Throw(ConflictingProducersError.create(subject, final_selector, matches))
       else:
         # this doesn't happen
         logger.debug('rule entries yes, but no nodes {}'.format(rule_entries))
