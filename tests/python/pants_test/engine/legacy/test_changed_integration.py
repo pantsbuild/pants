@@ -148,10 +148,11 @@ def create_isolated_git_repo():
       git.commit('Check in a python library with resource dependency.')
 
       # Copy 3rdparty dir.
-      _3rdparty_dir = os.path.join(worktree, '3rdparty')
-      shutil.copytree('3rdparty', _3rdparty_dir)
-      git.add(_3rdparty_dir)
-      git.commit('Check in 3rdparty dir.')
+      _3rdparty_build = os.path.join(worktree, '3rdparty/BUILD')
+      safe_mkdir(os.path.dirname(_3rdparty_build))
+      shutil.copyfile('3rdparty/BUILD', _3rdparty_build)
+      git.add(_3rdparty_build)
+      git.commit('Check in 3rdparty/BUILD.')
 
       with environment_as(PANTS_BUILDROOT_OVERRIDE=worktree):
         yield worktree
