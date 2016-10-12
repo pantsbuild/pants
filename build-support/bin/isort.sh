@@ -33,4 +33,4 @@ do
   esac
 done
 
-./pants changed | xargs -I {} ./pants fmt.isort {} -- ${isort_args[@]}
+./pants changed | xargs -I {} ./pants -q fmt.isort {} -- ${isort_args[@]}
