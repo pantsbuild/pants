@@ -251,10 +251,6 @@ class GitTest(unittest.TestCase):
     # Confirm that files outside of a given relative_to path are ignored
     self.assertEqual(set(), self.git.changed_files(relative_to='non-existent'))
 
-    # Test relative_to being ancester of worktree.
-    path = os.path.join(os.path.basename(self.git.worktree), 'README')
-    self.assertEqual({path}, self.git.changed_files(relative_to=os.path.dirname(self.git.worktree)))
-
     self.git.commit('API Changes.')
     try:
       # These changes should be rejected because our branch point from origin is 1 commit behind

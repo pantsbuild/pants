@@ -11,8 +11,8 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_open, touch
 from pants_test.base_test import TestGenerator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.git_util import initialize_repo
@@ -23,10 +23,6 @@ def lines_to_set(str_or_list):
     return set(str_or_list)
   else:
     return set(x for x in str(str_or_list).split('\n') if x)
-
-
-def rel_to_buildroot(path):
-  return os.path.relpath(path, get_buildroot())
 
 
 @contextmanager
@@ -52,6 +48,7 @@ def create_isolated_git_repo():
   # Isolated Git Repo Structure:
   # worktree
   # |--README
+  # |--pants.ini
   # |--src
   #    |--resources
   #       |--org/pantsbuild/resourceonly
@@ -79,6 +76,9 @@ def create_isolated_git_repo():
   with temporary_dir(root_dir=get_buildroot()) as worktree:
     with safe_open(os.path.join(worktree, 'README'), 'w') as fp:
       fp.write('Just a test tree.')
+
+    # Create an empty pants config file.
+    touch(os.path.join(worktree, 'pants.ini'))
 
     with initialize_repo(worktree=worktree, gitdir=os.path.join(worktree, '.git')) as git:
       # Resource File
@@ -113,9 +113,6 @@ def create_isolated_git_repo():
 
       src_build_file = os.path.join(worktree, 'src/java/org/pantsbuild/helloworld/BUILD')
       with safe_open(src_build_file, 'w') as fp:
-        dep_path = os.path.join(
-          rel_to_buildroot(worktree),
-          'src/resources/org/pantsbuild/resourceonly:resource')
         fp.write(dedent("""
         jvm_binary(
           dependencies=[
@@ -124,7 +121,7 @@ def create_isolated_git_repo():
           source='helloworld.java',
           main='org.pantsbuild.helloworld.HelloWorld',
         )
-        """.format(dep_path)))
+        """.format('src/resources/org/pantsbuild/resourceonly:resource')))
 
       git.add(src_file, src_build_file)
       git.commit('hello world java program with a dependency on a resource file.')
@@ -150,7 +147,14 @@ def create_isolated_git_repo():
       git.add(python_src_dir)
       git.commit('Check in a python library with resource dependency.')
 
-      yield worktree
+      # Copy 3rdparty dir.
+      _3rdparty_dir = os.path.join(worktree, '3rdparty')
+      shutil.copytree('3rdparty', _3rdparty_dir)
+      git.add(_3rdparty_dir)
+      git.commit('Check in 3rdparty dir.')
+
+      with environment_as(PANTS_BUILDROOT_OVERRIDE=worktree):
+        yield worktree
 
 
 class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
@@ -228,9 +232,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
                 test_list=True
               )
 
-              relative_worktree = rel_to_buildroot(worktree)
               self.assertEqual(
-                set(os.path.join(relative_worktree, x) for x in self.TEST_MAPPING[filename][dependee_type]),
+                lines_to_set(self.TEST_MAPPING[filename][dependee_type]),
                 lines_to_set(stdout)
               )
 
@@ -278,12 +281,12 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       self.assert_success(pants_run)
 
       for expected_item in expected_set:
-        self.assertIn(os.path.join(rel_to_buildroot(worktree), expected_item), pants_run.stdout_data)
+        self.assertIn(expected_item, pants_run.stdout_data)
 
       for not_expected_item in not_expected_set:
         if expected_target.startswith(not_expected_item):
           continue  # Ignore subset matches.
-        self.assertNotIn(os.path.join(rel_to_buildroot(worktree), not_expected_item), pants_run.stdout_data)
+        self.assertNotIn(not_expected_item, pants_run.stdout_data)
 
   def test_changed_options_scope_positional(self):
     changed_src = 'src/python/python_targets/test_library.py'
@@ -300,7 +303,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
 
       self.assert_success(pants_run)
       for expected_item in expected_set:
-        self.assertIn(os.path.join(rel_to_buildroot(worktree), expected_item), pants_run.stdout_data)
+        self.assertIn(expected_item, pants_run.stdout_data)
 
   # Following 4 tests do not run in isolated repo because they don't mutate working copy.
   def test_changed(self):
