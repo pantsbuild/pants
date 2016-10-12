@@ -11,6 +11,14 @@ python_tests(
   ]
 )
 
+python_tests(
+  name='test_safeargs',
+  sources=['test_safeargs.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm:argfile'
+  ]
+)
+
 python_library(
   name='jvm_tool_task_test_base',
   sources=['jvm_tool_task_test_base.py'],
