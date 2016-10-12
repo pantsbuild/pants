@@ -566,7 +566,6 @@ class LocalScheduler(object):
           selector = selector_fn(product)
           matching = list([self._rule_graph.root_rules_matching(type(subject), selector)])
           logger.debug('matching raw root rules: product: {}, subject type: {}'.format(product, type(subject)))
-          logger.debug('count of raw root rules total {}'.format(len(self._rule_graph.raw_root_rules)))
           logger.debug(matching)
           for r in matching:
             yield (subject, r) #terrible
@@ -584,7 +583,7 @@ class LocalScheduler(object):
     #TODO: Think about how to deprecate the existing execution_request API.
     roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
     #for (selector, subject)
-    return ExecutionRequest(tuple(roots))#, tuple(self._rule_graph.root_rules_matching(type(subject), selector)))
+    return ExecutionRequest(tuple(roots), tuple(self._rule_graph.root_rules_matching(type(subject), selector) for (selector, subject) in requests))
 
   @property
   def product_graph(self):
