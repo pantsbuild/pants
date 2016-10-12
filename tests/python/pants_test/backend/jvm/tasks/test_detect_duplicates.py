@@ -107,7 +107,8 @@ class DuplicateDetectorTest(JvmTaskTestBase):
 
   def _setup_internal_duplicate(self):
     java_library = self.make_target(spec='src/java/com/twitter:lib',
-                                    target_type=JavaLibrary)
+                                    target_type=JavaLibrary,
+                                    sources=[])
     jvm_binary = self.make_target(spec='src/java/com/twitter:thing',
                                   target_type=JvmBinary,
                                   dependencies=[java_library])

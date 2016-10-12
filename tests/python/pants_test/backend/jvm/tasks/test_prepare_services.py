@@ -22,9 +22,10 @@ class PrepareServicesTest(TaskTestBase):
 
   def test_find_all_relevant_resources_targets(self):
     jvm_target = self.make_target('jvm:target', target_type=JvmTarget)
-    java_library = self.make_target('java:target', target_type=JavaLibrary)
+    java_library = self.make_target('java:target', target_type=JavaLibrary, sources=[])
     java_library2 = self.make_target('java:target2',
                                      target_type=JavaLibrary,
+                                     sources=[],
                                      services={'com.foo.bars.Baz': ['com.spam.bars.BaxImpl']})
     non_services_target = self.make_target('other:target')
 
@@ -43,13 +44,14 @@ class PrepareServicesTest(TaskTestBase):
 
     target = self.make_target('java:target',
                               target_type=JavaLibrary,
+                              sources=[],
                               services={'com.foo.bars.Baz': ['com.spam.bars.BaxImplA']})
     fingerprint1 = invalidation_strategy.fingerprint_target(target)
     self.assertIsNotNone(fingerprint1)
 
     # Removal of services should be detected.
     self.reset_build_graph()
-    target = self.make_target('java:target', target_type=JavaLibrary)
+    target = self.make_target('java:target', target_type=JavaLibrary, sources=[])
     fingerprint2 = invalidation_strategy.fingerprint_target(target)
     self.assertIsNotNone(fingerprint2)
     self.assertNotEqual(fingerprint1, fingerprint2)
@@ -58,7 +60,8 @@ class PrepareServicesTest(TaskTestBase):
     self.reset_build_graph()
     target = self.make_target('java:target',
                               excludes=[Exclude('com.foo', 'fiz')],
-                              target_type=JavaLibrary)
+                              target_type=JavaLibrary,
+                              sources=[])
     fingerprint3 = invalidation_strategy.fingerprint_target(target)
     self.assertEqual(fingerprint2, fingerprint3)
 
@@ -66,6 +69,7 @@ class PrepareServicesTest(TaskTestBase):
     self.reset_build_graph()
     target = self.make_target('java:target',
                               target_type=JavaLibrary,
+                              sources=[],
                               services={'com.foo.bars.Baz': ['com.spam.bars.BazImplA',
                                                              'com.spam.bars.BazImplB']})
     fingerprint4 = invalidation_strategy.fingerprint_target(target)
@@ -81,9 +85,11 @@ class PrepareServicesTest(TaskTestBase):
         task.prepare_resources(target, chroot)
         self.assertEqual([], os.listdir(chroot))
 
-    assert_no_resources_prepared(self.make_target('java:target', target_type=JavaLibrary))
+    assert_no_resources_prepared(self.make_target('java:target', target_type=JavaLibrary,
+                                                  sources=[]))
     assert_no_resources_prepared(self.make_target('java:target2',
                                                   target_type=JavaLibrary,
+                                                  sources=[],
                                                   services={}))
     assert_no_resources_prepared(self.make_target('jvm:target',
                                                   target_type=JvmTarget,

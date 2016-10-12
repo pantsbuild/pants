@@ -13,11 +13,14 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
+# TODO: Rename this to JUnitTests.  It isn't just for Java language tests.
 class JavaTests(JvmTarget):
   """JUnit tests.
 
   :API: public
   """
+
+  default_sources_globs = ('*Test.java', '*Test.scala', '*Spec.scala')
 
   CONCURRENCY_SERIAL = 'SERIAL'
   CONCURRENCY_PARALLEL_CLASSES = 'PARALLEL_CLASSES'

@@ -21,7 +21,7 @@ class JavaAgentTest(BaseTest):
     )
 
   def create_agent(self, name, **kwargs):
-    args = {'name': name}
+    args = {'name': name, 'sources': []}
     args.update(**kwargs)
     formatted_args = ', '.join('{name}={value!r}'.format(name=k, value=v) for k, v in args.items())
     target = 'java_agent({args})'.format(args=formatted_args)

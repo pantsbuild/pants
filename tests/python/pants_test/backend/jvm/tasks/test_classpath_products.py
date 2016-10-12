@@ -16,7 +16,9 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_products import (ArtifactClasspathEntry, ClasspathEntry,
                                                         ClasspathProducts)
 from pants.base.exceptions import TaskError
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def resolved_example_jar_at(path, org='com.example', name='lib'):
@@ -26,6 +28,9 @@ def resolved_example_jar_at(path, org='com.example', name='lib'):
 
 
 class ClasspathProductsTest(BaseTest):
+  def setUp(self):
+    super(ClasspathProductsTest, self).setUp()
+    init_subsystem(Target.Arguments)
 
   def test_single_classpath_element_no_excludes(self):
     a = self.make_target('a', JvmTarget)

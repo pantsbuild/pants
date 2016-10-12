@@ -13,4 +13,9 @@ class PythonLibrary(PythonTarget):
 
   :API: public
   """
-  pass
+
+  # Note that these defaults allow a library and its tests to coexist in the
+  # same dir, if so desired.
+  default_sources_globs = '*.py'
+  # These are the patterns matched by pytest's test discovery.
+  default_sources_excludes_globs = ['test_*.py', '*_test.py']

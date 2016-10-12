@@ -20,6 +20,11 @@ class JavaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
+  # Note that these defaults allow a library and its tests to coexist in the
+  # same dir, if so desired.
+  default_sources_globs = '*.java'
+  default_sources_excludes_globs = '*Test.java'
+
   @classmethod
   def subsystems(cls):
     return super(JavaLibrary, cls).subsystems()

@@ -23,6 +23,9 @@ class ScalaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
+  default_sources_globs = '*.scala'
+  default_sources_excludes_globs = ('*Test.scala', '*Spec.scala')
+
   @classmethod
   def subsystems(cls):
     return super(ScalaLibrary, cls).subsystems() + (ScalaPlatform, )
