@@ -11,9 +11,9 @@ from pants.backend.jvm import argfile
 from pants_test.base_test import BaseTest
 
 
-class ArgfileTest(BaseTest):
+class SafeArgTest(BaseTest):
   def test_safe_args_over_max_arg(self):
-
+    # len(args) > max_args, so it should a file should be yielded
     args = ['1', '2', '3', '4']
     with argfile.safe_args(args, options=None, max_args=2, quoter=lambda x: x, delimiter='') as safe_args:
       self.assertEqual(1, len(safe_args))
@@ -23,6 +23,7 @@ class ArgfileTest(BaseTest):
         self.assertEqual(['1234'], f.readlines())
 
   def test_safe_args_below_max_arg(self):
+    # len(args) < max_args, so args should pass through.
     args = ['1', '2', '3', '4']
     with argfile.safe_args(args, options=None, max_args=10, quoter=lambda x: x, delimiter='') as safe_args:
       self.assertTrue(args, safe_args)
