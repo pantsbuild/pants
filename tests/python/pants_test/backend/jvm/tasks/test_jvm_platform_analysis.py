@@ -17,12 +17,12 @@ class JvmPlatformAnalysisTestMixin(object):
   Mostly for building sets of targets that are interesting for testing.
   """
 
-  def _java(self, name, platform=None, deps=None, sources=None):
+  def _java(self, name, platform=None, deps=None):
     return self.make_target(spec='java:{}'.format(name),
                             target_type=JavaLibrary,
                             platform=platform,
                             dependencies=deps or [],
-                            sources=sources)
+                            sources=[])
 
   def _plain(self, name, deps=None):
     """Make a non-jvm target, useful for testing non-jvm intermediate dependencies."""

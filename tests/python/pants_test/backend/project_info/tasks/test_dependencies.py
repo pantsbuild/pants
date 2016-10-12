@@ -36,11 +36,13 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
     third = self.make_target(
       'dependencies:third',
       target_type=JavaLibrary,
+      sources=[],
     )
 
     first = self.make_target(
       'dependencies:first',
       target_type=JavaLibrary,
+      sources=[],
       dependencies=[
         third,
       ],
@@ -57,6 +59,7 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
     project = self.make_target(
       'project:project',
       target_type=JavaLibrary,
+      sources=[],
       dependencies=[
         first,
         second,
@@ -143,11 +146,13 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
     python_leaf = self.make_target(
       'dependencies:python_leaf',
       target_type=PythonLibrary,
+      sources=[],
     )
 
     python_inner = self.make_target(
       'dependencies:python_inner',
       target_type=PythonLibrary,
+      sources=[],
       dependencies=[
         python_leaf,
       ],
@@ -164,6 +169,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
     self.make_target(
       'dependencies:python_root',
       target_type=PythonLibrary,
+      sources=[],
       dependencies=[
         python_inner,
         python_inner_with_external,

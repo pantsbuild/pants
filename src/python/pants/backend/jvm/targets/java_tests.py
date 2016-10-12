@@ -19,6 +19,8 @@ class JavaTests(JvmTarget):
   :API: public
   """
 
+  default_sources_globs = '*.java'
+
   CONCURRENCY_SERIAL = 'SERIAL'
   CONCURRENCY_PARALLEL_CLASSES = 'PARALLEL_CLASSES'
   CONCURRENCY_PARALLEL_METHODS = 'PARALLEL_METHODS'

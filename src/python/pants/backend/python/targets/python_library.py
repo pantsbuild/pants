@@ -13,4 +13,5 @@ class PythonLibrary(PythonTarget):
 
   :API: public
   """
-  pass
+
+  default_sources_globs = '*.py'

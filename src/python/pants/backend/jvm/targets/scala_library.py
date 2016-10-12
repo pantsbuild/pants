@@ -23,6 +23,8 @@ class ScalaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
+  default_sources_globs = '*.scala'
+
   @classmethod
   def subsystems(cls):
     return super(ScalaLibrary, cls).subsystems() + (ScalaPlatform, )
