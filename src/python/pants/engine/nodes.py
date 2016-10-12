@@ -349,7 +349,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
 
   def step(self, step_context):
     # Request the product we need in order to request dependencies.
-    dep_product_selector = self.selector.dep_product_selector
+    dep_product_selector = self.selector.input_product_selector
     dep_product_state = step_context.select_for(dep_product_selector,
                                                 self.subject,
                                                 self.variants)

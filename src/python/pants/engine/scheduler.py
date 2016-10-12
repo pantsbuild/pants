@@ -830,7 +830,7 @@ class StepContext(object):
   def _do_rule_edge_stuff(self, selector, subject, variants):
     if type(selector) is SelectDependencies:
       # select for dep_product_selector, if it's return, return None, otherwise wait on it
-      dep_state = self._state_via_edges((selector, selector.dep_product_selector), subject, variants)
+      dep_state = self._state_via_edges((selector, selector.input_product_selector), subject, variants)
       if type(dep_state) is Waiting:
         return dep_state
       else:

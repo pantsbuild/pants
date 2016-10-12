@@ -100,7 +100,7 @@ class SelectDependencies(datatype('Dependencies',
     return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
 
   @property
-  def dep_product_selector(self):
+  def input_product_selector(self):
     return Select(self.dep_product)
 
   @property

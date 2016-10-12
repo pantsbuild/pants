@@ -116,7 +116,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
   def test_gather_snapshot_of_pathglobs(self):
     project_tree = self.mk_example_fs_tree()
     scheduler = self.mk_scheduler(project_tree=project_tree)
-    empty_step_context = StepContext(node_builder=None, project_tree=project_tree, node_states=[], inline_nodes=False)
+    empty_step_context = StepContext(current_node=None, graph=None, node_builder=None, project_tree=project_tree, node_states=[], inline_nodes=False)
 
     request = scheduler.execution_request([Snapshot],
                                           [PathGlobs.create('', globs=['fs_test/a/b/*'])])
