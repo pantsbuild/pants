@@ -49,6 +49,8 @@ def create_isolated_git_repo():
   # worktree
   # |--README
   # |--pants.ini
+  # |--3rdparty
+  #    |--BUILD
   # |--src
   #    |--resources
   #       |--org/pantsbuild/resourceonly
@@ -147,7 +149,7 @@ def create_isolated_git_repo():
       git.add(python_src_dir)
       git.commit('Check in a python library with resource dependency.')
 
-      # Copy 3rdparty dir.
+      # Copy 3rdparty/BUILD.
       _3rdparty_build = os.path.join(worktree, '3rdparty/BUILD')
       safe_mkdir(os.path.dirname(_3rdparty_build))
       shutil.copyfile('3rdparty/BUILD', _3rdparty_build)
