@@ -714,8 +714,10 @@ class LocalScheduler(object):
 
 class SomethingOrOther(object):
   def __init__(self, current_node, graph, node_states):
+
     self._graph = graph
     self._current_node = current_node
+    self.current_node_is_rule_holder = hasattr(self._current_node, 'rule')
 
     self.will_noop = False
     self.noop_reason = None
@@ -810,6 +812,33 @@ class SomethingOrOther(object):
         logger.debug('rule entries yes, but no nodes {}'.format(rule_entries))
         pass
 
+  def get_nodes_and_states(self, subject, product, variants):
+
+    if self.current_node_is_rule_holder:
+      matching = None
+    else:
+      matching = self._graph.root_rules_matching(type(subject), self._current_node.selector)
+    edges = None
+    if matching:
+      edges = self._graph.root_rule_edges(matching)
+    if edges:
+      rule_entries = [e for e in edges if e.subject_type == type(subject)]
+      for rule_entry in rule_entries:
+        if type(rule_entry) is RuleGraphSubjectIsProduct:
+          assert rule_entry.value == type(subject)
+          assert len(rule_entries) == 1, "if subject is product, it should be the only one"
+          yield LiteralNode(subject), Return(subject)
+          break
+
+        elif type(rule_entry) is RuleGraphLiteral:
+          assert len(rule_entries) == 1, "if literal, it should be the only one"
+          yield LiteralNode(rule_entry.value), Return(rule_entry.value)
+          break
+        elif type(rule_entry) is RuleGraphEntry:
+          node = rule_entry.rule.as_node(subject, variants)
+          #nodes.append(node)
+          yield node, self._node_states.get(node, Waiting([node]))
+
 
 class StepContext(object):
   """Encapsulates external state and the details of creating Nodes.
@@ -853,37 +882,14 @@ class StepContext(object):
       return Waiting([node])
 
   def get_nodes_and_states_for(self, subject, product, variants):
-    if hasattr(self._current_node, 'rule'):
-      matching = None
+    yielded = False
+    for node, state in self._something.get_nodes_and_states(subject, product, variants):
+      yield node, state
+      yielded = True
     else:
-      matching = self._something._graph.root_rules_matching(type(subject), self._current_node.selector)
-    edges = None
-    if matching:
-      edges = self._something._graph.root_rule_edges(matching)
-    if edges:
-      rule_entries = [e for e in edges if e.subject_type == type(subject)]
-      yielded = False
-      for rule_entry in rule_entries:
-        if type(rule_entry) is RuleGraphSubjectIsProduct:
-          assert rule_entry.value == type(subject)
-          assert len(rule_entries) == 1, "if subject is product, it should be the only one"
-          yield LiteralNode(subject), Return(subject)
-          yielded = True
-          break
-
-        elif type(rule_entry) is RuleGraphLiteral:
-          assert len(rule_entries) == 1, "if literal, it should be the only one"
-          yield LiteralNode(rule_entry.value), Return(rule_entry.value)
-          yielded = True
-          break
-        elif type(rule_entry) is RuleGraphEntry:
-          node = rule_entry.rule.as_node(subject, variants)
-          #nodes.append(node)
-          yield node, self._node_states.get(node, Waiting([node]))
-          yielded = True
-      if yielded:
-        return
-
+      pass
+    if yielded:
+      return
     for node in self._node_builder.gen_nodes(subject, product, variants):
       state = self.get(node)
       yield node, state
