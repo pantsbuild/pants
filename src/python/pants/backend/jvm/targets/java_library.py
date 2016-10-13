@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
+from pants.backend.jvm.targets.java_tests import JavaTests
 
 
 class JavaLibrary(ExportableJvmLibrary):
@@ -20,10 +21,8 @@ class JavaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
-  # Note that these defaults allow a library and its tests to coexist in the
-  # same dir, if so desired.
   default_sources_globs = '*.java'
-  default_sources_excludes_globs = '*Test.java'
+  default_sources_exclude_globs = JavaTests.java_test_globs
 
   @classmethod
   def subsystems(cls):

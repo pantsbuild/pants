@@ -20,7 +20,10 @@ class JavaTests(JvmTarget):
   :API: public
   """
 
-  default_sources_globs = ('*Test.java', '*Test.scala', '*Spec.scala')
+  java_test_globs = ('*Test.java',)
+  scala_test_globs = ('*Test.scala', '*Spec.scala')
+
+  default_sources_globs = java_test_globs + scala_test_globs
 
   CONCURRENCY_SERIAL = 'SERIAL'
   CONCURRENCY_PARALLEL_CLASSES = 'PARALLEL_CLASSES'

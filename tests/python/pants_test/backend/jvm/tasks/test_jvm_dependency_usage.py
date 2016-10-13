@@ -40,7 +40,7 @@ class TestJvmDependencyUsage(TaskTestBase):
 
   def make_java_target(self, *args, **kwargs):
     assert 'target_type' not in kwargs
-    sources = kwargs.pop('sources', None) or []
+    sources = kwargs.pop('sources', [])
     return self.make_target(target_type=JavaLibrary, *args, sources=sources, **kwargs)
 
   def _cover_output(self, graph):

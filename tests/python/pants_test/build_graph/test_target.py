@@ -31,7 +31,7 @@ class TestImplicitSourcesTarget(Target):
 
 class TestImplicitSourcesTargetMulti(Target):
   default_sources_globs = ('*.foo', '*.bar')
-  default_sources_excludes_globs = ('*.baz', '*.qux')
+  default_sources_exclude_globs = ('*.baz', '*.qux')
 
 
 class TargetTest(BaseTest):
@@ -114,15 +114,23 @@ class TargetTest(BaseTest):
     options = {Target.Arguments.options_scope: {'implicit_sources': True}}
     init_subsystem(Target.Arguments, options)
     target = self.make_target(':a', TestImplicitSourcesTarget)
-    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
+    # Note explicit key_arg.
+    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar',
+                                          key_arg='sources')
     self.assertEqual(sources.filespec, {'globs': ['src/foo/bar/*.foo']})
 
     target = self.make_target(':b', TestImplicitSourcesTargetMulti)
+    # Note no explicit key_arg, which should behave just like key_arg='sources'.
     sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
     self.assertEqual(sources.filespec, {
       'globs': ['src/foo/bar/*.foo', 'src/foo/bar/*.bar'],
       'exclude': [{'globs': ['src/foo/bar/*.baz', 'src/foo/bar/*.qux']}],
     })
+
+    # Ensure that we don't use implicit sources when creating resources fields.
+    resources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar',
+                                            key_arg='resources')
+    self.assertEqual(resources.filespec, {'globs': []})
 
   def test_implicit_sources_disabled(self):
     options = {Target.Arguments.options_scope: {'implicit_sources': False}}

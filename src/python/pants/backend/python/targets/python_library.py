@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.targets.python_tests import PythonTests
 
 
 class PythonLibrary(PythonTarget):
@@ -14,8 +15,5 @@ class PythonLibrary(PythonTarget):
   :API: public
   """
 
-  # Note that these defaults allow a library and its tests to coexist in the
-  # same dir, if so desired.
   default_sources_globs = '*.py'
-  # These are the patterns matched by pytest's test discovery.
-  default_sources_excludes_globs = ['test_*.py', '*_test.py']
+  default_sources_exclude_globs = PythonTests.default_sources_globs

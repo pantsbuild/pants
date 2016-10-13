@@ -77,6 +77,7 @@ python_library(
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':java',  # For a dep on java_tests.py, which we might want to move to a separate target.
     ':jvm',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/base:exceptions',

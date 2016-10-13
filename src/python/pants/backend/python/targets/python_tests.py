@@ -16,7 +16,8 @@ class PythonTests(PythonTarget):
   :API: public
   """
 
-  default_sources_globs = ['test_*.py', '*_test.py']
+  # These are the patterns matched by pytest's test discovery.
+  default_sources_globs = ('test_*.py', '*_test.py')
 
   def __init__(self, coverage=None, timeout=None, **kwargs):
     """

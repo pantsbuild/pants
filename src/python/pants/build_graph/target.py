@@ -753,7 +753,7 @@ class Target(AbstractTarget):
   # List of glob patterns, or a single glob pattern.
   # Subclasses can override, to specify files that should be excluded from the
   # default_sources_globs (e.g., '*Test.java').
-  default_sources_excludes_globs = None
+  default_sources_exclude_globs = None
 
   @classmethod
   def supports_default_sources(cls):
@@ -769,9 +769,9 @@ class Target(AbstractTarget):
     In this case, the subclasses must also override supports_default_sources().
     """
     if cls.default_sources_globs is not None:
-      if cls.default_sources_excludes_globs is not None:
+      if cls.default_sources_exclude_globs is not None:
         exclude = [Globs.create_fileset_with_spec(sources_rel_path,
-                                                  *maybe_list(cls.default_sources_excludes_globs))]
+                                                  *maybe_list(cls.default_sources_exclude_globs))]
       else:
         exclude = []
       return Globs.create_fileset_with_spec(sources_rel_path,
@@ -790,17 +790,19 @@ class Target(AbstractTarget):
     :return: a payload field object representing the sources parameter
     :rtype: SourcesField
     """
-    # Make sure we don't apply the defaulting to uses of this method other than for
-    # creating a sources= field (e.g., we also use this for creating resources= fields).
-    # Note that the check for supports_default_sources() precedes the subsystem check.
-    # This is so that tests don't need to set up the subsystem when creating targets that
-    # legitimately do not require sources.
-    if ((key_arg is None or key_arg == 'sources') and
-        sources is None and
-        self.supports_default_sources() and
-        self.Arguments.global_instance().get_options().implicit_sources):
-      sources = self.default_sources(sources_rel_path)
-    if isinstance(sources, Addresses):
+    if sources is None:
+      # Make sure we don't apply the defaulting to uses of this method other than for
+      # creating a sources= field (e.g., we also use this for creating resources= fields).
+      # Note that the check for supports_default_sources() precedes the subsystem check.
+      # This is so that tests don't need to set up the subsystem when creating targets that
+      # legitimately do not require sources.
+      if ((key_arg is None or key_arg == 'sources') and
+          self.supports_default_sources() and
+          self.Arguments.global_instance().get_options().implicit_sources):
+        sources = self.default_sources(sources_rel_path)
+      else:
+        sources = FilesetWithSpec.empty(sources_rel_path)
+    elif isinstance(sources, Addresses):
       # Currently, this is only created by the result of from_target() which takes a single argument
       if len(sources.addresses) != 1:
         key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
@@ -810,14 +812,10 @@ class Target(AbstractTarget):
           .format(key_arg_section=key_arg_section, spec_section=spec_section))
       referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
-    elif sources is None:
-      sources = FilesetWithSpec.empty(sources_rel_path)
-    elif isinstance(sources, FilesetWithSpec):
-      pass
     elif isinstance(sources, (set, list, tuple)):
       # Received a literal sources list: convert to a FilesetWithSpec via Files.
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
-    else:
+    elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
                                             .format(key_arg_section, type(sources)))
