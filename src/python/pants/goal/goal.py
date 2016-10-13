@@ -75,7 +75,7 @@ class Goal(object):
 
   @staticmethod
   def all():
-    """Returns all registered goals, sorted alphabetically by name.
+    """Returns all active registered goals, sorted alphabetically by name.
 
     :API: public
     """
