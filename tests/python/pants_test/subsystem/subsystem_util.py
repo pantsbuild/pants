@@ -89,7 +89,7 @@ def global_subsystem_instance(subsystem_type, options=None):
 
 
 def init_subsystems(subsystem_types, options=None):
-  """Initialize a subsystem for use in tests.
+  """Initialize subsystems for use in tests.
 
   Does not create an instance.  This function is for setting up subsystems that the code
   under test creates.
@@ -125,4 +125,14 @@ def init_subsystems(subsystem_types, options=None):
 
 
 def init_subsystem(subsystem_type, options=None):
+  """
+  Singular form of :func:`pants_test.subsystem.subsystem_util.init_subsystems`
+
+  :param subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
+                               to create.
+  :param options: dict of scope -> (dict of option name -> value).
+                  The scopes may be those of the global instance of the subsystem (i.e.,
+                  subsystem_type.options_scope) and/or the scopes of instance of the
+                  subsystem it transitively depends on.
+  """
   init_subsystems([subsystem_type], options)
