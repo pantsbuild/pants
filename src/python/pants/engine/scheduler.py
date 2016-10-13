@@ -483,9 +483,10 @@ class LocalScheduler(object):
       deps[dep] = Noop.cycle(node_entry.node, dep)
 
     # Run.
-    step_context = StepContext(node_entry.node, self._rule_graph, self.node_builder, self._project_tree, deps, self._inline_nodes)
-    if step_context.will_noop:
-      return step_context.noop_reason
+    something = SomethingOrOther(node_entry.node, self._rule_graph, dict(deps))
+    if something.will_noop:
+      return something.noop_reason
+    step_context = StepContext(something, self.node_builder, self._project_tree, deps, self._inline_nodes)
     return node_entry.node.step(step_context)
 
   @property
@@ -846,11 +847,10 @@ class StepContext(object):
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, current_node, graph, node_builder, project_tree, node_states, inline_nodes):
+  def __init__(self, something, node_builder, project_tree, node_states, inline_nodes):
     """
     :type graph: RuleGraph
     """
-    self._current_node = current_node
     self._node_builder = node_builder
     self.project_tree = project_tree
     self._node_states = dict(node_states)
@@ -858,9 +858,7 @@ class StepContext(object):
 
     self._inline_nodes = inline_nodes
     self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
-    self._something = SomethingOrOther(current_node, graph, self._node_states)
-    self.will_noop = self._something.will_noop
-    self.noop_reason = self._something.noop_reason
+    self._something = something
 
   def get(self, node):
     """Given a Node and computed node_states, gets the current state for the Node.
