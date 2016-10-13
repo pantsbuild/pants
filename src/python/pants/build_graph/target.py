@@ -790,7 +790,8 @@ class Target(AbstractTarget):
     :return: a payload field object representing the sources parameter
     :rtype: SourcesField
     """
-    # Make sure we don't apply the defaulting to resources.
+    # Make sure we don't apply the defaulting to uses of this method other than for
+    # creating a sources= field (e.g., we also use this for creating resources= fields).
     # Note that the check for supports_default_sources() precedes the subsystem check.
     # This is so that tests don't need to set up the subsystem when creating targets that
     # legitimately do not require sources.
