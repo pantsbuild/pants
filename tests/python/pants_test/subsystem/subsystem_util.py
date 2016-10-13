@@ -128,6 +128,8 @@ def init_subsystem(subsystem_type, options=None):
   """
   Singular form of :func:`pants_test.subsystem.subsystem_util.init_subsystems`
 
+  :API: public
+
   :param subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
                                to create.
   :param options: dict of scope -> (dict of option name -> value).
