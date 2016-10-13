@@ -1,18 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  name = 'context_utils',
-  sources = ['context_utils.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:workunit',
-    'src/python/pants/build_graph',
-    'src/python/pants/goal:context',
-    'tests/python/pants_test/option/util',
-  ]
-)
-
 python_tests(
   name = 'build_environment',
   sources = ['test_build_environment.py'],
@@ -34,50 +22,46 @@ python_library(
 )
 
 python_tests(
-  name = 'filesystem_build_file',
-  sources = ['test_filesystem_build_file.py'],
+  name = 'build_root',
+  sources = ['test_build_root.py'],
   dependencies = [
-    ':build_file_test_base',
+    'src/python/pants/base:build_root',
+    'tests/python/pants_test:base_test',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name = 'bundle_integration',
+  sources = [ 'test_bundle_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+  timeout = 120,
+)
+
+python_tests(
+  name = 'cmd_line_spec_parser',
+  sources = ['test_cmd_line_spec_parser.py'],
+  dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
-    'src/python/pants/base:build_file',
-    'src/python/pants/util:dirutil',
+    'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:base_test',
   ]
 )
 
 python_library(
-  name = 'project_tree_test_base',
-  sources = ['project_tree_test_base.py'],
+  name = 'context_utils',
+  sources = ['context_utils.py'],
   dependencies = [
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
-  ]
-)
-
-python_library(
-  name = 'pants_ignore_test_base',
-  sources = ['pants_ignore_test_base.py'],
-  dependencies = [
-    ':project_tree_test_base',
-  ]
-)
-
-python_tests(
-  name = 'pants_ignore_file_system',
-  sources = ['test_pants_ignore_file_system.py'],
-  dependencies = [
-    ':pants_ignore_test_base',
-    'src/python/pants/base:project_tree',
-  ]
-)
-
-python_tests(
-  name = 'pants_ignore_scm',
-  sources = ['test_pants_ignore_scm.py'],
-  dependencies = [
-    ':pants_ignore_test_base',
-    'src/python/pants/base:project_tree',
-    'src/python/pants/scm:git',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:workunit',
+    'src/python/pants/build_graph',
+    'src/python/pants/goal:context',
+    'tests/python/pants_test/option/util',
   ]
 )
 
@@ -91,24 +75,14 @@ python_tests(
 )
 
 python_tests(
-  name = 'build_root',
-  sources = ['test_build_root.py'],
+  name = 'filesystem_build_file',
+  sources = ['test_filesystem_build_file.py'],
   dependencies = [
-    'src/python/pants/base:build_root',
-    'tests/python/pants_test:base_test',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-  ]
-)
-
-python_tests(
-  name = 'cmd_line_spec_parser',
-  sources = ['test_cmd_line_spec_parser.py'],
-  dependencies = [
+    ':build_file_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
+    '3rdparty/python:six',
+    'src/python/pants/base:build_file',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -140,6 +114,33 @@ python_tests(
 )
 
 python_tests(
+  name = 'pants_ignore_file_system',
+  sources = ['test_pants_ignore_file_system.py'],
+  dependencies = [
+    ':pants_ignore_test_base',
+    'src/python/pants/base:project_tree',
+  ]
+)
+
+python_tests(
+  name = 'pants_ignore_scm',
+  sources = ['test_pants_ignore_scm.py'],
+  dependencies = [
+    ':pants_ignore_test_base',
+    'src/python/pants/base:project_tree',
+    'src/python/pants/scm:git',
+  ]
+)
+
+python_library(
+  name = 'pants_ignore_test_base',
+  sources = ['pants_ignore_test_base.py'],
+  dependencies = [
+    ':project_tree_test_base',
+  ]
+)
+
+python_tests(
   name = 'payload',
   sources = ['test_payload.py'],
   dependencies = [
@@ -158,6 +159,15 @@ python_tests(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_library(
+  name = 'project_tree_test_base',
+  sources = ['project_tree_test_base.py'],
+  dependencies = [
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -190,16 +200,6 @@ python_tests(
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
   ]
-)
-
-python_tests(
-  name = 'bundle_integration',
-  sources = [ 'test_bundle_integration.py' ],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-  timeout = 120,
 )
 
 python_tests(

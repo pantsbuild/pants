@@ -9,7 +9,7 @@ import os
 import unittest
 
 from pants.base.build_root import BuildRoot
-from pants.util.contextutil import pushd, temporary_dir
+from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree, touch
 
 
@@ -61,3 +61,8 @@ class BuildRootTest(unittest.TestCase):
       root = os.path.realpath(root)
       with pushd(root):
         self.assertRaises(BuildRoot.NotFoundError, lambda: BuildRoot().path)
+
+  def test_buildroot_override(self):
+    with temporary_dir() as root:
+      with environment_as(PANTS_BUILDROOT_OVERRIDE=root):
+        self.assertEqual(BuildRoot().path, root)
