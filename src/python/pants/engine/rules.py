@@ -157,7 +157,7 @@ class SnapshotIntrinsicRule(Rule):
 
   def as_node(self, subject, variants):
     assert type(subject) in (Files, PathGlobs)
-    return SnapshotNode.create(subject, variants)
+    return SnapshotNode.create(subject, variants, self)
 
   @classmethod
   def as_intrinsics(cls):

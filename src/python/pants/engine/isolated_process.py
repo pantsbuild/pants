@@ -232,14 +232,14 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     return Runnable(_execute, (execution,))
 
 
-class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
+class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants', 'rule']), Node):
   is_inlineable = False
   is_cacheable = False
   product = Snapshot
 
   @classmethod
-  def create(cls, subject, variants):
-    return SnapshotNode(subject, variants)
+  def create(cls, subject, variants, rule):
+    return SnapshotNode(subject, variants, rule)
 
   def step(self, step_context):
     select_state = step_context.select_for(Select(Files), self.subject, self.variants)
