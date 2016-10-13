@@ -83,7 +83,7 @@ class DirectoryArtifact(Artifact):
 class TarballArtifact(Artifact):
   """An artifact stored in a tarball."""
 
-  def __init__(self, artifact_root, tarfile_, compression=9, dereference=False):
+  def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
     super(TarballArtifact, self).__init__(artifact_root)
     self._tarfile = tarfile_
     self._compression = compression
