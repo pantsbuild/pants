@@ -712,28 +712,17 @@ class LocalScheduler(object):
         self._graph_validator.validate(self._product_graph)
 
 
-class StepContext(object):
-  """Encapsulates external state and the details of creating Nodes.
-
-  This avoids giving Nodes direct access to the task list or subject set.
-  """
-
-  def __init__(self, current_node, graph, node_builder, project_tree, node_states, inline_nodes):
-    """
-    :type graph: RuleGraph
-    """
-    self._current_node = current_node
+class SomethingOrOther(object):
+  def __init__(self, current_node, graph, node_states):
     self._graph = graph
-    self._node_builder = node_builder
-    self.project_tree = project_tree
-    self._node_states = dict(node_states)
-    self._parents = []
+    self._current_node = current_node
 
-    self._inline_nodes = inline_nodes
-    self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
+    self.will_noop = False
+    self.noop_reason = None
+
+    self._node_states = node_states # NB needed for some edge stuff.
 
     self._rule_edges = None
-    self.will_noop = False
     if hasattr(current_node, 'rule') and hasattr(current_node, 'subject'):
       edges = self._graph.dependency_edges_for_rule(current_node.rule, type(current_node.subject))
       if edges:
@@ -750,101 +739,24 @@ class StepContext(object):
       #logger.debug("node with no rule / subject {}".format(current_node))
       pass
 
-  def get(self, node):
-    """Given a Node and computed node_states, gets the current state for the Node.
-
-    Optionally inlines execution of inlineable dependencies if `inline_nodes=True`.
-    """
-    state = self._node_states.get(node, None)
-    if state is not None:
-      return state
-    if self._inline_nodes and node.is_inlineable:
-      if node in self._parents:
-        return Noop.cycle(list(self._parents)[-1], node)
-
-      self._parents.append(node)
-      state = self._node_states[node] = node.step(self)
-      self._parents.pop()
-      return state
-    else:
-      return Waiting([node])
-
-  def get_nodes_and_states_for(self, subject, product, variants):
-    if hasattr(self._current_node, 'rule'):
-      matching = None
-    else:
-      matching = self._graph.root_rules_matching(type(subject), self._current_node.selector)
-    edges = None
-    if matching:
-      edges = self._graph.root_rule_edges(matching)
-    if edges:
-      rule_entries = [e for e in edges if e.subject_type == type(subject)]
-      yielded = False
-      for rule_entry in rule_entries:
-        if type(rule_entry) is RuleGraphSubjectIsProduct:
-          assert rule_entry.value == type(subject)
-          assert len(rule_entries) == 1, "if subject is product, it should be the only one"
-          yield LiteralNode(subject), Return(subject)
-          yielded = True
-          break
-
-        elif type(rule_entry) is RuleGraphLiteral:
-          assert len(rule_entries) == 1, "if literal, it should be the only one"
-          yield LiteralNode(rule_entry.value), Return(rule_entry.value)
-          yielded = True
-          break
-        elif type(rule_entry) is RuleGraphEntry:
-          node = rule_entry.rule.as_node(subject, variants)
-          #nodes.append(node)
-          yield node, self._node_states.get(node, Waiting([node]))
-          yielded = True
-      if yielded:
-        return
-
-    for node in self._node_builder.gen_nodes(subject, product, variants):
-      state = self.get(node)
-      yield node, state
-
-  def select_for(self, selector, subject, variants):
-    """Returns the state for selecting a product via the provided selector."""
-    if self._rule_edges:
-      r = self._do_rule_edge_stuff(selector, subject, variants)
-      if r:
-        return r
-    else:
-      #logger.debug('no entries for {} with {} {} {}'.format(self._current_node, selector_path, subject, variants))
-      pass
-
-    dep_node = self._node_builder.select_node(selector, subject, variants)
-    return self.get(dep_node)
-
-  def _selector_path(self, selector):
-    if self._parents:
-      selector_path = tuple(p.selector for p in self._parents) + (selector,)
-      # logger.debug('has parents like {}'.format(self._parents))
-    else:
-      selector_path = selector
-    # logger.debug('selector path  {}'.format(selector_path))
-    return selector_path
-
-  def _do_rule_edge_stuff(self, selector, subject, variants):
-    if type(selector) is SelectDependencies:
+  def _do_rule_edge_stuff(self, selector_path, subject, variants):
+    if type(selector_path) is SelectDependencies:
       # select for dep_product_selector, if it's return, return None, otherwise wait on it
-      dep_state = self._state_via_edges((selector, selector.input_product_selector), subject, variants)
+      dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants)
       if type(dep_state) is Waiting:
         return dep_state
       else:
         # otherwise, return None and let the DependenciesNode do its work
         return
-    if type(selector) is SelectProjection:
+    if type(selector_path) is SelectProjection:
       # select for dep_product_selector, if it's return, return None, otherwise wait on it
-      dep_state = self._state_via_edges((selector, selector.input_product_selector), subject, variants)
+      dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants)
       if type(dep_state) is Waiting:
         return dep_state
       else:
         # otherwise, return None and let the ProjectionNode do its work
         return
-    selector_path = self._selector_path(selector)
+
     if type(selector_path) is tuple and selector_path[-1] == Select(Variants):
       # this is the nested Select(Variants)
       #len may also be > 2 which the graph currently doesn't understand
@@ -897,3 +809,104 @@ class StepContext(object):
         # this doesn't happen
         logger.debug('rule entries yes, but no nodes {}'.format(rule_entries))
         pass
+
+
+class StepContext(object):
+  """Encapsulates external state and the details of creating Nodes.
+
+  This avoids giving Nodes direct access to the task list or subject set.
+  """
+
+  def __init__(self, current_node, graph, node_builder, project_tree, node_states, inline_nodes):
+    """
+    :type graph: RuleGraph
+    """
+    self._current_node = current_node
+    self._node_builder = node_builder
+    self.project_tree = project_tree
+    self._node_states = dict(node_states)
+    self._parents = []
+
+    self._inline_nodes = inline_nodes
+    self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
+    self._something = SomethingOrOther(current_node, graph, self._node_states)
+    self.will_noop = self._something.will_noop
+    self.noop_reason = self._something.noop_reason
+
+  def get(self, node):
+    """Given a Node and computed node_states, gets the current state for the Node.
+
+    Optionally inlines execution of inlineable dependencies if `inline_nodes=True`.
+    """
+    state = self._node_states.get(node, None)
+    if state is not None:
+      return state
+    if self._inline_nodes and node.is_inlineable:
+      if node in self._parents:
+        return Noop.cycle(list(self._parents)[-1], node)
+
+      self._parents.append(node)
+      state = self._node_states[node] = node.step(self)
+      self._parents.pop()
+      return state
+    else:
+      return Waiting([node])
+
+  def get_nodes_and_states_for(self, subject, product, variants):
+    if hasattr(self._current_node, 'rule'):
+      matching = None
+    else:
+      matching = self._something._graph.root_rules_matching(type(subject), self._current_node.selector)
+    edges = None
+    if matching:
+      edges = self._something._graph.root_rule_edges(matching)
+    if edges:
+      rule_entries = [e for e in edges if e.subject_type == type(subject)]
+      yielded = False
+      for rule_entry in rule_entries:
+        if type(rule_entry) is RuleGraphSubjectIsProduct:
+          assert rule_entry.value == type(subject)
+          assert len(rule_entries) == 1, "if subject is product, it should be the only one"
+          yield LiteralNode(subject), Return(subject)
+          yielded = True
+          break
+
+        elif type(rule_entry) is RuleGraphLiteral:
+          assert len(rule_entries) == 1, "if literal, it should be the only one"
+          yield LiteralNode(rule_entry.value), Return(rule_entry.value)
+          yielded = True
+          break
+        elif type(rule_entry) is RuleGraphEntry:
+          node = rule_entry.rule.as_node(subject, variants)
+          #nodes.append(node)
+          yield node, self._node_states.get(node, Waiting([node]))
+          yielded = True
+      if yielded:
+        return
+
+    for node in self._node_builder.gen_nodes(subject, product, variants):
+      state = self.get(node)
+      yield node, state
+
+  def select_for(self, selector, subject, variants):
+    """Returns the state for selecting a product via the provided selector."""
+    if self._something._rule_edges:
+      selector_path = self._selector_path(selector)
+      r = self._something._do_rule_edge_stuff(selector_path, subject, variants)
+      if r:
+        return r
+    else:
+      #logger.debug('no entries for {} with {} {} {}'.format(self._current_node, selector_path, subject, variants))
+      pass
+
+    dep_node = self._node_builder.select_node(selector, subject, variants)
+    return self.get(dep_node)
+
+  def _selector_path(self, selector):
+    if self._parents:
+      selector_path = tuple(p.selector for p in self._parents) + (selector,)
+      # logger.debug('has parents like {}'.format(self._parents))
+    else:
+      selector_path = selector
+    # logger.debug('selector path  {}'.format(selector_path))
+    return selector_path
