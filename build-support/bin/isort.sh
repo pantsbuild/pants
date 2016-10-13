@@ -33,4 +33,9 @@ do
   esac
 done
 
-./pants changed | xargs -I {} ./pants fmt.isort {} -- ${isort_args[@]}
+to_sort=$(mktemp -t changed.isort.XXXXX)
+trap "rm -f ${to_sort}" EXIT
+if [[ "$(./pants changed | tee ${to_sort})" != "" ]]
+then
+  ./pants -q --target-spec-file=${to_sort} fmt.isort -- ${isort_args[@]}
+fi

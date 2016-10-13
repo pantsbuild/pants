@@ -414,7 +414,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           args = remove_arg(args, '-parallel-threads', has_param=True)
           args += ['-parallel-threads', str(threads)]
 
-        with argfile.safe_args(batch, self.get_options()) as batch_tests:
+        batch_test_specs = [test.render_test_spec() for test in batch]
+        with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
           self.context.log.debug('CWD = {}'.format(workdir))
           self.context.log.debug('platform = {}'.format(platform))
           with environment_as(**dict(target_env_vars)):
@@ -424,7 +425,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               classpath=complete_classpath,
               main=JUnit.RUNNER_MAIN,
               jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
-              args=args + [test.render_test_spec() for test in batch_tests],
+              args=args + batch_tests,
               workunit_factory=self.context.new_workunit,
               workunit_name='run',
               workunit_labels=[WorkUnitLabel.TEST],
