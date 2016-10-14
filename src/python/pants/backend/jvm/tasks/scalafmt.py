@@ -13,8 +13,9 @@ from pants.option.custom_types import file_option
 
 
 class ScalaFmt(NailgunTask):
-  """ScalaFmt base class executes the help command.  Classes that inherit from this 
-  should override get_command_args and process_results to run different scalafmt commands
+  """ScalaFmt base class executes the help command.  Classes
+  that inherit from this should override get_command_args and
+  process_results to run different scalafmt commands
 
   :API: public
   """
@@ -79,9 +80,9 @@ class ScalaFmt(NailgunTask):
 
 
 class ScalaFmtCheckFormat(ScalaFmt):
-  """This Task checks that all scala files in the target are formatted 
-  correctly.  If they are not an error is raised including the command to
-  run to format the files correctly
+  """This Task checks that all scala files in the target are formatted
+  correctly.  If they are not an error is raised including the command
+  to run to format the files correctly
 
   :API: public
   """
@@ -97,7 +98,7 @@ class ScalaFmtCheckFormat(ScalaFmt):
 
   def process_results(self, result):
     """Processes the results of running the scalafmt command"""
-    if result != 0:       
+    if result != 0:
       raise TaskError('Scalafmt failed with exit code {} to fix run: `./pants fmt <targets>`'.format(result), exit_code=result)
 
 

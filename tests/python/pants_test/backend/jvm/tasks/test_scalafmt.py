@@ -29,27 +29,25 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     self.assert_success(failing_test)
 
   def test_scalafmt_format(self):
-
-    # take a snapshot of the file which we can write out 
-    # after the test finishes executing. 
+    # take a snapshot of the file which we can write out
+    # after the test finishes executing.
     test_file_name = '{}/badscalastyle/BadScalaStyle.scala'.format(TEST_DIR)
     f = open(test_file_name, 'r')
     contents = f.read()
     f.close()
 
-
+    # format an incorrectly formatted file.  
     target = '{}/badscalastyle::'.format(TEST_DIR)
     fmt_result = self.run_pants(['fmt', target],
       {'fmt.scalafmt':{'skip': 'False'}})
-
     self.assert_success(fmt_result)
 
+    # verify that the compile check not passes.
     test_fmt= self.run_pants(['compile', target],
       {'compile.scalafmt':{'skip': 'False'}})
-
     self.assert_success(test_fmt)
 
-    # restore the file to its original state
+    # restore the file to its original state.
     f = open(test_file_name, 'w')
     f.write(contents)
     f.close()
