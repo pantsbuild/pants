@@ -101,8 +101,9 @@ the release manager may also need to do a release from a stable branch.*
     4. Bring the CONTRIBUTORS roster (from master) in
        [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
        up to date by running `build-support/bin/contributors.sh`.
-    5. Create a review for changes in the master branch.
-    6. If creating a release candidate, after merging create the stable branch from the commit in
+    5. Create and land a review for changes in the master branch.
+    6. Execute the release as described later on this page.
+    7. Finally, if creating a release candidate, create the stable branch from the commit in
        master for your release. For example if you were releasing `1.2.0rc0`, create the branch
        `1.2.x` from your release commit.
 
@@ -115,9 +116,9 @@ the release manager may also need to do a release from a stable branch.*
        cherry-picked (can use `build-support/bin/release-changelog-helper.sh` to get a head start).
        For example if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
     3. Create and land a review for the notes changes in master.
-    4. Cherry pick changes the merged notes changes from master to the release branch.
-    5. In your release branch: edit and commit the version number in `src/python/pants/version.py`, and
-       then proceed to releasing as below.
+    4. Cherry pick the merged notes changes from master to the release branch.
+    5. In your release branch: edit and commit the version number in `src/python/pants/version.py`.
+    6. Execute the release as described later on this page.
 
 Dry Run (Optional)
 ------------------
