@@ -36,7 +36,7 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     contents = f.read()
     f.close()
 
-    # format an incorrectly formatted file.  
+    # format an incorrectly formatted file.
     target = '{}/badscalastyle::'.format(TEST_DIR)
     fmt_result = self.run_pants(['fmt', target],
       {'fmt.scalafmt':{'skip': 'False'}})
