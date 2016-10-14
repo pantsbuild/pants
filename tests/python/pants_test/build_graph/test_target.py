@@ -11,18 +11,8 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target import Target
-from pants.source.payload_fields import DeferredSourcesField
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
-
-
-class TestDeferredSourcesTarget(Target):
-  def __init__(self, deferred_sources_address=None, *args, **kwargs):
-    payload = Payload()
-    payload.add_fields({
-      'def_sources': DeferredSourcesField(ref_address=deferred_sources_address),
-    })
-    super(TestDeferredSourcesTarget, self).__init__(payload=payload, *args, **kwargs)
 
 
 class TargetTest(BaseTest):
@@ -58,14 +48,6 @@ class TargetTest(BaseTest):
     target = self.make_target(':foo', Target)
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([], list(target.traversable_dependency_specs))
-
-  def test_deferred_sources_payload_field(self):
-    foo = self.make_target(':foo', Target)
-    target = self.make_target(':bar',
-                              TestDeferredSourcesTarget,
-                              deferred_sources_address=foo.address)
-    self.assertSequenceEqual([], list(target.traversable_specs))
-    self.assertSequenceEqual(['//:foo'], list(target.traversable_dependency_specs))
 
   def test_illegal_kwargs(self):
     init_subsystem(Target.UnknownArguments)

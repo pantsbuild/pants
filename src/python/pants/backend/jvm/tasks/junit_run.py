@@ -144,9 +144,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              choices=junit_tests.VALID_CONCURRENCY_OPTS, default=junit_tests.CONCURRENCY_SERIAL,
              help='Set the default concurrency mode for running tests not annotated with'
                   ' @TestParallel or @TestSerial.')
-    register('--default-parallel', advanced=True, type=bool,
-             removal_hint='Use --default-concurrency instead.', removal_version='1.3.0',
-             help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
     register('--parallel-threads', advanced=True, type=int, default=0,
              help='Number of threads to run tests in parallel. 0 for autoset.')
     register('--test-shard', advanced=True,
@@ -236,36 +233,29 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.per_test_timer:
       args.append('-per-test-timer')
 
-    if options.default_parallel:
-      # TODO(zundel): Remove when --default_parallel finishes deprecation
-      if options.default_concurrency != junit_tests.CONCURRENCY_SERIAL:
-        self.context.log.warn('--default-parallel overrides --default-concurrency')
+    if options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
+      if not options.use_experimental_runner:
+        self.context.log.warn('--default-concurrency=PARALLEL_CLASSES_AND_METHODS is '
+                              'experimental, use --use-experimental-runner.')
+      args.append('-default-concurrency')
+      args.append('PARALLEL_CLASSES_AND_METHODS')
+    elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
+      if not options.use_experimental_runner:
+        self.context.log.warn('--default-concurrency=PARALLEL_METHODS is experimental, use '
+                              '--use-experimental-runner.')
+      if options.test_shard:
+        # NB(zundel): The experimental junit runner doesn't support test sharding natively.  The
+        # legacy junit runner allows both methods and classes to run in parallel with this option.
+        self.context.log.warn('--default-concurrency=PARALLEL_METHODS with test sharding will '
+                              'run classes in parallel too.')
+      args.append('-default-concurrency')
+      args.append('PARALLEL_METHODS')
+    elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
       args.append('-default-concurrency')
       args.append('PARALLEL_CLASSES')
-    else:
-      if options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
-        if not options.use_experimental_runner:
-          self.context.log.warn('--default-concurrency=PARALLEL_CLASSES_AND_METHODS is '
-                                'experimental, use --use-experimental-runner.')
-        args.append('-default-concurrency')
-        args.append('PARALLEL_CLASSES_AND_METHODS')
-      elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
-        if not options.use_experimental_runner:
-          self.context.log.warn('--default-concurrency=PARALLEL_METHODS is experimental, use '
-                                '--use-experimental-runner.')
-        if options.test_shard:
-          # NB(zundel): The experimental junit runner doesn't support test sharding natively.  The
-          # legacy junit runner allows both methods and classes to run in parallel with this option.
-          self.context.log.warn('--default-concurrency=PARALLEL_METHODS with test sharding will '
-                                'run classes in parallel too.')
-        args.append('-default-concurrency')
-        args.append('PARALLEL_METHODS')
-      elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
-        args.append('-default-concurrency')
-        args.append('PARALLEL_CLASSES')
-      elif options.default_concurrency == junit_tests.CONCURRENCY_SERIAL:
-        args.append('-default-concurrency')
-        args.append('SERIAL')
+    elif options.default_concurrency == junit_tests.CONCURRENCY_SERIAL:
+      args.append('-default-concurrency')
+      args.append('SERIAL')
 
     args.append('-parallel-threads')
     args.append(str(options.parallel_threads))
