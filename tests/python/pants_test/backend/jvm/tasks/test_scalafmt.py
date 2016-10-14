@@ -27,3 +27,15 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
       {'compile.scalafmt':{'skip': 'True'}})
 
     self.assert_success(failing_test)
+
+  def test_scalafmt_format(self):
+    target = '{}/badscalastyle::'.format(TEST_DIR)
+    fmtResult = self.run_pants(['fmt', target],
+      {'fmt.scalafmt':{'skip': 'False'}})
+
+    self.assert_success(fmtResult)
+
+    testFmt = self.run_pants(['compile', target],
+      {'compile.scalafmt':{'skip': 'False'}})
+
+    self.assert_success(testFmt)
