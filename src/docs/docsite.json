@@ -12,6 +12,7 @@
     "notes-master": "dist/markdown/html/src/python/pants/notes/master.html",
     "notes-1.0.x": "dist/markdown/html/src/python/pants/notes/1.0.x.html",
     "notes-1.1.x": "dist/markdown/html/src/python/pants/notes/1.1.x.html",
+    "notes-1.2.x": "dist/markdown/html/src/python/pants/notes/1.2.x.html",
     "community": "dist/markdown/html/src/docs/community.html",
     "dev": "dist/markdown/html/src/docs/dev.html",
     "dev_tasks": "dist/markdown/html/src/docs/dev_tasks.html",
@@ -124,6 +125,7 @@
         { "page": "options_reference" },
 
         { "heading": "Release Notes"},
+        { "page": "notes-1.2.x" },
         { "page": "notes-1.1.x" },
         { "page": "notes-1.0.x" },
         { "page": "notes-master" },

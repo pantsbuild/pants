@@ -1,4 +1,4 @@
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
@@ -37,6 +37,7 @@ python_library(
     ':run_jvm_prep_command',
     ':scala_repl',
     ':scaladoc_gen',
+    ':scalafmt',
     ':scalastyle',
     ':unpack_jars',
     'src/python/pants/backend/jvm/tasks/jvm_compile:all',
@@ -361,6 +362,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
+    'src/python/pants/java/junit',
     'src/python/pants/java:executor',
     'src/python/pants/process',
     'src/python/pants/task',
@@ -370,9 +372,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-    'src/python/pants/util:objects',
     'src/python/pants/util:strutil',
-    'src/python/pants/util:xml_parser',
   ],
 )
 
@@ -608,6 +608,18 @@ python_library(
     'src/python/pants/java/distribution',
     'src/python/pants/util:memo',
   ],
+)
+
+python_library(
+  name = 'scalafmt',
+  sources = ['scalafmt.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'src/python/pants/option',
+  ]
 )
 
 python_library(

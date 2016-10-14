@@ -5,13 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 import six
 
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
 from pants.backend.jvm.zinc.zinc_analysis import ZincAnalysis as UnderlyingAnalysis
-from pants.base.build_environment import get_buildroot
 
 
 class ZincAnalysis(Analysis):
@@ -26,10 +23,6 @@ class ZincAnalysis(Analysis):
 
   FORMAT_VERSION_LINE = UnderlyingAnalysis.FORMAT_VERSION_LINE
 
-  @classmethod
-  def merge(cls, analyses):
-    return ZincAnalysis(UnderlyingAnalysis.merge([a._underlying_analysis for a in analyses]))
-
   def __init__(self, underlying_analysis):
     self._underlying_analysis = underlying_analysis
 
@@ -37,20 +30,8 @@ class ZincAnalysis(Analysis):
   def underlying_analysis(self):
     return self._underlying_analysis
 
-  def sources(self):
-    return self._underlying_analysis.sources()
-
-  def split(self, splits, catchall=False):
-    buildroot = get_buildroot()
-    abs_splits = [set([s if os.path.isabs(s) else os.path.join(buildroot, s) for s in x])
-                  for x in splits]
-    return [ZincAnalysis(s) for s in self.underlying_analysis.split(abs_splits, catchall)]
-
   def write(self, outfile):
     self.underlying_analysis.write(outfile)
-
-  def diff(self, other):
-    return self.underlying_analysis.diff(other.underlying_analysis)
 
   def __eq__(self, other):
     if other is None:

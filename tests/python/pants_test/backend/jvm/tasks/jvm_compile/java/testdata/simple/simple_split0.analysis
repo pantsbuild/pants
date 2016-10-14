@@ -1,6 +1,0 @@
-pcd entries:
-1 items
-org/pantsbuild/example/hello/greet/Greeting	/src/pants/examples/src/java/org/pantsbuild/example/hello/greet/Greeting.java	1430672789000	3705639092	DummyBlob0
-dependencies:
-1 items
-/src/pants/examples/src/java/org/pantsbuild/example/hello/greet/Greeting.java	java/io/FileInputStream	org/pantsbuild/example/hello/greet/Greeting	java/util/Scanner	java/lang/StringBuilder	java/lang/Object	java/lang/String	java/lang/Throwable	java/io/IOException	java/io/InputStream	java/lang/Class	java/lang/ClassLoader

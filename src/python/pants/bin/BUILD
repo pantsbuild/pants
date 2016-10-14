@@ -2,13 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='bin',
   sources=globs('*.py', exclude=['options_initializer.py',
                                  'extension_loader.py',
                                  'plugin_resolver.py']),
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:ansicolors',
     '3rdparty/python:setproctitle',
     ':options_initializer',
     'src/python/pants/backend/jvm/tasks:nailgun_task',

@@ -3,7 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 android_binary(
-  name='hello',
   sources=rglobs('src/*.java'),
   manifest='AndroidManifest.xml',
   dependencies = [

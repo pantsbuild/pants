@@ -3,7 +3,7 @@
 
 # Shows java working with jaxb generations.
 
-junit_tests(name='usejaxb',
+junit_tests(
   sources=['UseJaxbTest.java',],
   dependencies=[
     '3rdparty:junit',

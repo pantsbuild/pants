@@ -5,7 +5,7 @@ java_library(name='lib',
   sources = ['HelloMavenAndPants.java'],
 )
 
-jvm_binary(name='example',
+jvm_binary(
   basename = 'hello-maven-and-pants',
   main = 'org.pantsbuild.example.HelloMavenAndPants',
   dependencies = [':lib'],

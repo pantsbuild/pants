@@ -1,5 +1,4 @@
 scala_library(
-  name='cache',
   provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc-cache',

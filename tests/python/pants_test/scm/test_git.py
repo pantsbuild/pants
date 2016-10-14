@@ -116,7 +116,7 @@ class GitTest(unittest.TestCase):
                         sorted(results))
 
     for dirname in 'dir', './dir':
-      results = reader.listdir('dir')
+      results = reader.listdir(dirname)
       self.assertEquals(['f',
                          'not-absolute\u2764'.encode('utf-8'),
                          'relative-dotdot',
@@ -248,7 +248,7 @@ class GitTest(unittest.TestCase):
     self.assertEqual({'README'}, self.git.changed_files())
     self.assertEqual({'README', 'INSTALL'}, self.git.changed_files(include_untracked=True))
 
-    # confirm that files outside of a given relative_to path are ignored
+    # Confirm that files outside of a given relative_to path are ignored
     self.assertEqual(set(), self.git.changed_files(relative_to='non-existent'))
 
     self.git.commit('API Changes.')

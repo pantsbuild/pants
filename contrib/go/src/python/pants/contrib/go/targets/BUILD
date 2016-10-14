@@ -1,5 +1,4 @@
 target(
-  name='targets',
   dependencies=[
     ':go_binary',
     ':go_library',

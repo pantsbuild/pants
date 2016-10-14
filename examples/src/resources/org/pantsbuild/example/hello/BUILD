@@ -1,3 +1,3 @@
-resources(name='hello',
+resources(
   sources=['world.txt'],
 )
