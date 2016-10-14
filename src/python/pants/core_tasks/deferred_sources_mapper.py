@@ -9,11 +9,8 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import warn_or_error
-from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.from_target import from_target_deprecation_hint
 from pants.build_graph.remote_sources import RemoteSources
 from pants.source.wrapped_globs import Files
 from pants.task.task import Task
