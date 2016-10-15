@@ -131,11 +131,11 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     self._ancestor_iterator = TargetAncestorIterator(build_graph)
 
   @abstractmethod
-  def is_third_party(self, target):
-    """Identifies targets that are exported by third parties.
+  def requires_export(self, target):
+    """Identifies targets that need to be exported (are internal targets owning source code).
 
     :param target: The target to identify.
-    :returns: `True` if the given `target` represents a third party dependency.
+    :returns: `True` if the given `target` should be exported if a dependent target is exported.
     """
 
   @abstractmethod
@@ -228,7 +228,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     owner_by_owned_python_target = OrderedDict()
 
     def collect_potentially_owned_python_targets(current):
-      if (current != exported_target) and not self.is_third_party(current):
+      if (current != exported_target) and self.requires_export(current):
         owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
       return (current == exported_target) or not self.is_exported(current)
 
@@ -301,8 +301,10 @@ class SetupPy(PythonTask):
   class DependencyCalculator(ExportedTargetDependencyCalculator):
     """Calculates reduced dependencies for exported python targets."""
 
-    def is_third_party(self, target):
-      return SetupPy.is_requirements(target)
+    def requires_export(self, target):
+      # TODO(John Sirois): Consider switching to the more general target.has_sources() once Benjy's
+      # change supporting default globs is in (that change will smooth test migration).
+      return SetupPy.is_python_target(target) or SetupPy.is_resources_target(target)
 
     def is_exported(self, target):
       return SetupPy.has_provides(target)
