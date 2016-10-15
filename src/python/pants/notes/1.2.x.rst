@@ -4,6 +4,35 @@
 This document describes releases from the ``1.2.x`` ``stable`` branch.
 
 
+1.2.0rc1 (10/13/2016)
+---------------------
+
+Second release candidate for stable 1.2.0.
+
+API Changes
+~~~~~~~~~~~
+
+* Add subsystem_utils to test_infra
+  `RB #4303 <https://rbcommons.com/s/twitter/r/4303>`_
+
+Bugfixes
+~~~~~~~~
+
+* Switch default deference back to True for tarball artifact
+  `RB #4304 <https://rbcommons.com/s/twitter/r/4304>`_
+
+* Filter inactive goals from `Goal.all`.
+  `RB #4298 <https://rbcommons.com/s/twitter/r/4298>`_
+
+* JUnit runner fix for len(args) > max_args in argfile.safe_args
+  `RB #4294 <https://rbcommons.com/s/twitter/r/4294>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Version clarification
+  `RB #4299 <https://rbcommons.com/s/twitter/r/4299>`_
+
 1.2.0rc0 (10/07/2016)
 ---------------------
 

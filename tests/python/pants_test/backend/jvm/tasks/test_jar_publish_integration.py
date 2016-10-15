@@ -38,6 +38,8 @@ def publish_extra_config(unique_config):
       'backend_packages': [
         'example.pants_publish_plugin',
         'internal_backend.repositories',
+        'pants.backend.codegen',
+        'pants.backend.jvm',
       ],
     },
     'publish.jar': {
