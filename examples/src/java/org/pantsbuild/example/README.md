@@ -281,8 +281,7 @@ should design your bootclasspath to reference the union of all possible jars
 you might need to pull in from different JVMs (any paths that aren't available
 will simply be ignored by java).
 
-**Note:** Currently, pants is known to work with OpenJDK version 7 or greater,
-and Oracle JDK version 6 or greater.
+**Note:** Currently, pants is known to work with OpenJDK and Oracle JDK version 7 or greater.
 
 
 <a pantsmark="jvm_bundles"></a>
