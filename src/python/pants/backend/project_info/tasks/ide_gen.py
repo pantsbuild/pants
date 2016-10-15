@@ -24,6 +24,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 from pants.build_graph.resources import Resources
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
@@ -228,7 +229,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     """
     def is_cp(target):
       return (
-        target.is_codegen or
+        isinstance(target, CodegenLibraryMixin) or
         # Some IDEs need annotation processors pre-compiled, others are smart enough to detect and
         # proceed in 2 compile rounds
         isinstance(target, AnnotationProcessor) or

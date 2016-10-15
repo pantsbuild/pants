@@ -6,9 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 
 
-class PythonThriftLibrary(PythonTarget):
+class PythonThriftLibrary(CodegenLibraryMixin, PythonTarget):
   """A Python library generated from Thrift IDL files.
 
   :API: public
@@ -24,6 +25,4 @@ class PythonThriftLibrary(PythonTarget):
       recommended that your application uses the pkgutil package to access these
       resources in a .zip-module friendly way.)
     """
-
     super(PythonThriftLibrary, self).__init__(**kwargs)
-    self.add_labels('codegen')

@@ -26,6 +26,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -198,7 +199,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
         'id': current_target.id,
         'target_type': get_target_type(current_target),
         # NB: is_code_gen should be removed when export format advances to 1.1.0 or higher
-        'is_code_gen': current_target.is_codegen,
+        'is_code_gen': isinstance(current_target, CodegenLibraryMixin),
         'is_synthetic': current_target.is_synthetic,
         'pants_target_type': self._get_pants_target_alias(type(current_target)),
       }

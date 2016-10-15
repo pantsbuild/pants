@@ -11,12 +11,13 @@ from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 
 
 logger = logging.getLogger(__name__)
 
 
-class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
+class JavaProtobufLibrary(CodegenLibraryMixin, ImportJarsMixin, JvmTarget):
   """A Java library generated from Protocol Buffer IDL files."""
 
   def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
@@ -37,7 +38,6 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
       logger.warn(" Target definition at {address} sets attribute 'buildflags' which is "
                   "ignored and will be removed in a future release"
                   .format(address=self.address.spec))
-    self.add_labels('codegen')
 
   @property
   def imported_jar_library_specs(self):
