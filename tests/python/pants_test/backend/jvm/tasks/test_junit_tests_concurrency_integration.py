@@ -58,20 +58,6 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       self.assertIn("OK (2 tests)", pants_run.stdout_data)
 
-  # TODO(zundel): remove this test when --default-parallel is removed
-  @ensure_experimental
-  def test_parallel_cmdline_deprecated_arg(self):
-    """Checks the --test-junit-default-parallel option still works."""
-    with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir([
-        'test',
-        '--test-junit-default-parallel',
-        '--test-junit-parallel-threads=2',
-        'testprojects/tests/java/org/pantsbuild/testproject/parallel:cmdline'
-      ], workdir)
-      self.assert_success(pants_run)
-      self.assertIn("OK (2 tests)", pants_run.stdout_data)
-
   @ensure_experimental
   def test_concurrency_serial_default(self):
     """Checks the --test-junit-default-concurrency=SERIAL option."""
