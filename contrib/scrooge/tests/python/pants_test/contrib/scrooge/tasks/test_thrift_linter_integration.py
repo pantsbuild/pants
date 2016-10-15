@@ -20,7 +20,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     full_config = {
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/scrooge/src/python"],
-        'backend_packages': ["pants.contrib.scrooge"]
+        'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.scrooge"]
       },
     }
     if config:
