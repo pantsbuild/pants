@@ -135,7 +135,8 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     """Identifies targets that need to be exported (are internal targets owning source code).
 
     :param target: The target to identify.
-    :returns: `True` if the given `target` should be exported if a dependent target is exported.
+    :returns: `True` if the given `target` owns files that should be included in exported packages
+              when the target is a member of an exported target's dependency graph.
     """
 
   @abstractmethod
