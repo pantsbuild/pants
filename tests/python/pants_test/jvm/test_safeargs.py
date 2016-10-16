@@ -27,4 +27,3 @@ class SafeArgTest(unittest.TestCase):
     args = ['1', '2', '3', '4']
     with argfile.safe_args(args, options=None, max_args=10, quoter=lambda x: x, delimiter='') as safe_args:
       self.assertTrue(args, safe_args)
-

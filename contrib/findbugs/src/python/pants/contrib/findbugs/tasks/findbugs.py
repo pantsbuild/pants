@@ -11,7 +11,7 @@ import re
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -86,7 +86,7 @@ class FindBugs(NailgunTask):
     return "(" + ")|(".join(self.get_options().exclude_patterns) + ")"
 
   def _is_findbugs_target(self, target):
-    if not isinstance(target, (JavaLibrary, JavaTests)):
+    if not isinstance(target, (JavaLibrary, JUnitTests)):
       self.context.log.debug('Skipping [{}] because it is not a java library or java test'.format(target.address.spec))
       return False
     if target.is_synthetic:

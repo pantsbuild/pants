@@ -12,7 +12,7 @@ from textwrap import dedent
 from mock import patch
 
 from pants.backend.jvm.subsystems.junit import JUnit
-from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -40,7 +40,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def alias_groups(self):
     return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases(
       targets={
-        'java_tests': JavaTests,
+        'junit_tests': JUnitTests,
         'python_tests': PythonTests,
       },
     ))
@@ -181,11 +181,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     subprocess.check_call(
       [javac, '-d', test_classes_abs_path, '-cp', classpath] + test_java_file_abs_paths)
 
-    # If a target_name is specified create a target with it, otherwise create a java_tests target.
+    # If a target_name is specified create a target with it, otherwise create a junit_tests target.
     if 'target_name' in kwargs:
       target = self.target(kwargs['target_name'])
     else:
-      target = self.create_library(test_rel_path, 'java_tests', 'foo_test', ['FooTest.java'])
+      target = self.create_library(test_rel_path, 'junit_tests', 'foo_test', ['FooTest.java'])
 
     target_roots = []
     if create_some_resources:
@@ -193,7 +193,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       target_roots.append(self.make_target('some_resources', Resources))
     target_roots.append(target)
 
-    # Set the context with the two targets, one java_tests target and
+    # Set the context with the two targets, one junit_tests target and
     # one synthetic resources target.
     # The synthetic resources target is to make sure we won't regress
     # in the future with bug like https://github.com/pantsbuild/pants/issues/508. Note
@@ -226,7 +226,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   def test_empty_sources(self):
     self.add_to_build_file('foo', dedent("""
-        java_tests(
+        junit_tests(
           name='empty',
           sources=[],
         )
@@ -239,7 +239,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   def test_allow_empty_sources(self):
     self.add_to_build_file('foo', dedent("""
-        java_tests(
+        junit_tests(
           name='empty',
           sources=[],
         )
@@ -266,7 +266,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def test_junit_runner_extra_jvm_options(self):
     self.make_target(
       spec='foo:foo_test',
-      target_type=JavaTests,
+      target_type=JUnitTests,
       sources=['FooTest.java'],
       extra_jvm_options=['-Dexample.property=1'],
     )
@@ -285,7 +285,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def test_junit_runner_multiple_extra_jvm_options(self):
     self.make_target(
       spec='foo:foo_test',
-      target_type=JavaTests,
+      target_type=JUnitTests,
       sources=['FooTest.java'],
       extra_jvm_options=['-Dexample.property1=1','-Dexample.property2=2'],
     )
@@ -308,7 +308,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def test_junit_runner_extra_env_vars(self):
     self.make_target(
       spec='foo:foo_test',
-      target_type=JavaTests,
+      target_type=JUnitTests,
       sources=['FooTest.java'],
       extra_env_vars={
         'HELLO': 27,
@@ -318,7 +318,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.make_target(
       spec='bar:bar_test',
-      target_type=JavaTests,
+      target_type=JUnitTests,
       sources=['FooTest.java'],
       extra_env_vars={
         'THE_ANSWER': 42,
@@ -360,7 +360,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     with environment_as(THIS_VARIABLE="12", THAT_VARIABLE="This is a variable."):
       self.make_target(
         spec='foo:foo_test',
-        target_type=JavaTests,
+        target_type=JUnitTests,
         sources=['FooTest.java'],
         extra_env_vars={
           'HELLO': None,
@@ -404,7 +404,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.make_target(
       spec='foo:foo_test',
-      target_type=JavaTests,
+      target_type=JUnitTests,
       sources=[name for name, _ in list_of_filename_content_tuples],
     )
     self.set_options(max_subprocess_args=max_subprocess_args)

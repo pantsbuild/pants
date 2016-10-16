@@ -56,7 +56,7 @@ python_library(
     'java_agent.py',
     'java_library.py',
     'javac_plugin.py',
-    'java_tests.py',
+    'junit_tests.py',
   ],
   dependencies = [
     '3rdparty/python:six',

@@ -13,7 +13,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
-class JavaTests(JvmTarget):
+class JUnitTests(JvmTarget):
   """JUnit tests.
 
   :API: public
@@ -30,7 +30,7 @@ class JavaTests(JvmTarget):
 
   @classmethod
   def subsystems(cls):
-    return super(JavaTests, cls).subsystems() + (JUnit, )
+    return super(JUnitTests, cls).subsystems() + (JUnit,)
 
   def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None,
                extra_jvm_options=None, extra_env_vars=None, concurrency=None,
@@ -67,7 +67,7 @@ class JavaTests(JvmTarget):
       'extra_jvm_options': PrimitiveField(tuple(extra_jvm_options or ())),
       'extra_env_vars': PrimitiveField(tuple(extra_env_vars.items())),
     })
-    super(JavaTests, self).__init__(payload=payload, **kwargs)
+    super(JUnitTests, self).__init__(payload=payload, **kwargs)
 
     # These parameters don't need to go into the fingerprint:
     self._concurrency = concurrency
@@ -92,7 +92,7 @@ class JavaTests(JvmTarget):
 
   @property
   def traversable_dependency_specs(self):
-    for spec in super(JavaTests, self).traversable_dependency_specs:
+    for spec in super(JUnitTests, self).traversable_dependency_specs:
       yield spec
     yield JUnit.global_instance().library_spec(self._build_graph)
 
