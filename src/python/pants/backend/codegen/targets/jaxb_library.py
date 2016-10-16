@@ -30,7 +30,6 @@ class JaxbLibrary(JvmTarget):
     })
     super(JaxbLibrary, self).__init__(payload=payload, **kwargs)
 
-    self.add_labels('codegen')
     self.add_labels('jaxb')
 
     if language != 'java':

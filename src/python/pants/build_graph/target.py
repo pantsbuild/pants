@@ -80,13 +80,6 @@ class AbstractTarget(object):
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
-  def is_codegen(self):
-    """Returns True if the target is a codegen target."""
-    return self.has_label('codegen')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
   def is_java(self):
     """Returns True if the target has or generates java sources."""
     return self.has_label('java')

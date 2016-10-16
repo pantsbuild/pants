@@ -226,15 +226,15 @@ class IdeGen(IvyTaskMixin, NailgunTask):
       All other targets only contribute their external jar dependencies and excludes to the
       classpath definition.
     """
-    def is_cp(target):
+    def is_cp(tgt):
       return (
-        target.is_codegen or
+        tgt.is_synthetic or
         # Some IDEs need annotation processors pre-compiled, others are smart enough to detect and
         # proceed in 2 compile rounds
-        isinstance(target, AnnotationProcessor) or
-        (self.skip_java and is_java(target)) or
-        (self.skip_scala and is_scala(target)) or
-        (self.intransitive and target not in self.context.target_roots)
+        isinstance(tgt, AnnotationProcessor) or
+        (self.skip_java and is_java(tgt)) or
+        (self.skip_scala and is_scala(tgt)) or
+        (self.intransitive and tgt not in self.context.target_roots)
       )
 
     jars = OrderedSet()
