@@ -36,18 +36,18 @@ class RunPrepCommandBase(Task):
     goal validation in PrepCommand before the build graph is parsed.
     """
     super(RunPrepCommandBase, cls).register_options(register)
-    PrepCommand.add_goal(cls.goal)
+    PrepCommand.add_allowed_goal(cls.goal)
 
   @classmethod
   def runnable_prep_cmd(cls, tgt):
-    return isinstance(tgt, PrepCommand) and tgt.payload.get_field_value('goal') == cls.goal
+    return isinstance(tgt, PrepCommand) and cls.goal in tgt.goals
 
   def execute(self):
-    if self.goal not in PrepCommand.goals():
-      raise  AssertionError('Got goal "{}". Expected goal to be one of {}'.format(
+    if self.goal not in PrepCommand.allowed_goals():
+      raise AssertionError('Got goal "{}". Expected goal to be one of {}'.format(
           self.goal, PrepCommand.goals()))
 
-    targets = self.context.targets(postorder=True,  predicate=self.runnable_prep_cmd)
+    targets = self.context.targets(postorder=True, predicate=self.runnable_prep_cmd)
     Cmdline = namedtuple('Cmdline', ['cmdline', 'environ'])
 
     def make_cmdline(target):
