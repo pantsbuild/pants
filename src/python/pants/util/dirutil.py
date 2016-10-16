@@ -152,7 +152,10 @@ def safe_rmtree(directory):
 
   :API: public
   """
-  shutil.rmtree(directory, ignore_errors=True)
+  if os.path.islink(directory):
+    safe_delete(directory)
+  else:
+    shutil.rmtree(directory, ignore_errors=True)
 
 
 def safe_open(filename, *args, **kwargs):
