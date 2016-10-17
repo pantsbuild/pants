@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 import sys
 from abc import abstractmethod
 from contextlib import contextmanager
@@ -38,7 +37,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util import desktop
 from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.strutil import pluralize
@@ -551,7 +550,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           path = os.path.join(self.workdir, name)
           if name not in (run_dir, lock_file):
             if os.path.isdir(path):
-              shutil.rmtree(path)
+              safe_rmtree(path)
             else:
               os.unlink(path)
 
