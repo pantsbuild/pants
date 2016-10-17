@@ -828,32 +828,29 @@ class SomethingOrOther(object):
         # let's just precompute all of the nodes initial nodes, so we can reuse them later.
         self._selector_to_stuff = dict()
         for selector in current_node.rule.input_selectors:
-          #state_or_nodes = self._state_or_nodes_for(selector, current_node.subject, current_node.variants)
-          #if type(selector) is Select:
-          #  selector_path = selector
-          #elif type(selector) in (SelectDependencies, SelectProjection):
-          #  selector_path = (selector, selector.input_product_selector)
-          #elif type(selector) is SelectLiteral:
-          #  selector_path = selector
-          #elif type(selector) is Select
-          #else:
-            #raise
-          #  pass
-          #  selector_path = selector
           stuff = self._state_or_nodes_for(selector, current_node.subject, current_node.variants)
           self._selector_to_stuff[selector] = stuff
-
-
       else:
-        #unfillable = self._graph.is_unfulfillable(current_node.rule, current_node.subject)
-        #logger.debug("no edge holders for {} {}".format('unfillable' if unfillable else 'fillable', current_node))
-        #pass
-        self.will_noop = True
-        self.noop_reason = Noop('appears to not be reachable according to the rule graph')
-        # this may mean that the node will be a noop
+        self._handle_no_edges(current_node)
     else:
-      #logger.debug("node with no rule / subject {}".format(current_node))
       pass
+
+  def _handle_no_edges(self, current_node):
+      logger.debug('couldnt find edges for {}'.format(current_node.rule))
+      unfillable = self._graph.is_unfulfillable(current_node.rule, current_node.subject)
+      if unfillable:
+        self.will_noop = True
+        self.noop_reason = Noop('appears to not be reachable according to the rule graph and unfulfillable state{} '.format(unfillable))
+      else:
+        logger.debug('not unfulfillable. :/ {}'.format(current_node))
+        logger.debug('   {}'.format(current_node.extra_repr))
+
+        for e in self._graph.rule_dependencies:
+          if e.rule == current_node.rule and e.subject_type == type(current_node.subject):
+            print('got herererererre')
+            print(' has matching rule / subject pair, but type is {}  {}'.format(type(e), e))
+          elif e.rule == current_node.rule:
+            print('rule match, but not subj {} match, {}'.format(type(current_node.subject), e))
 
   def do_rule_edge_stuff(self, selector_path, subject, variants, get_state):
     if not self._rule_edges:

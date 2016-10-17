@@ -483,6 +483,21 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
   function, and provide a satisfied argument per clause entry to the function.
   """
 
+  def __new__(cls, *args, **kwargs):
+
+    obj = super(TaskNode, cls).__new__(cls, *args, **kwargs)
+    debug_stuff = True
+    if debug_stuff:
+      # NB, this is super slow, so make it easy to turn off
+      import inspect
+      bits = []
+      for i in range(2,5):
+        frame, filename, line_number, function_name, lines, index = inspect.getouterframes(inspect.currentframe())[i]
+        bits.append('{}:{}'.format(filename, line_number, function_name) )
+      obj.extra_repr = '\n  '.join(bits)
+
+    return obj
+
   is_cacheable = True
   is_inlineable = False
 
