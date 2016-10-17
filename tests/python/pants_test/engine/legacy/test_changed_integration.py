@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -322,6 +323,20 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
          'src/python/sources/sources.py',
          'src/python/sources/sources.txt',
          '3rdparty/BUILD'}
+      )
+
+  def test_changed_diffspec_and_files(self):
+    with create_isolated_git_repo():
+      git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD^^']).strip()
+      stdout = self.assert_changed_new_equals_old(['--changed-diffspec={}'.format(git_sha), '--files'])
+
+      # The output should be the files added in the last 2 commits.
+      self.assertEqual(
+        lines_to_set(stdout),
+        {'src/python/python_targets/BUILD',
+         'src/python/python_targets/test_binary.py',
+         'src/python/python_targets/test_library.py',
+         'src/python/python_targets/test_unclaimed_src.py'}
       )
 
   # Following 4 tests do not run in isolated repo because they don't mutate working copy.
