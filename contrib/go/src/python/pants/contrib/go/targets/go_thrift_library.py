@@ -7,12 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.targets.go_target import GoTarget
 
 
-class GoThriftLibrary(Target):
+class GoThriftLibrary(CodegenLibraryMixin, Target):
   """A Go library generated from Thrift IDL files."""
 
   def __init__(self,
@@ -34,8 +35,6 @@ class GoThriftLibrary(Target):
     })
 
     super(GoThriftLibrary, self).__init__(payload=payload, address=address, **kwargs)
-
-    self.add_labels('codegen')
 
   @classmethod
   def alias(cls):

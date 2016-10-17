@@ -6,9 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 
 
-class JavaAntlrLibrary(JvmTarget):
+class JavaAntlrLibrary(CodegenLibraryMixin, JvmTarget):
   """A Java library generated from Antlr grammar files."""
 
   def __init__(self,
@@ -36,8 +37,6 @@ class JavaAntlrLibrary(JvmTarget):
                                            provides=provides,
                                            excludes=excludes,
                                            **kwargs)
-    self.add_labels('codegen')
-
     if not sources:
       raise ValueError("Missing required 'sources' parameter.")
     self.sources = sources

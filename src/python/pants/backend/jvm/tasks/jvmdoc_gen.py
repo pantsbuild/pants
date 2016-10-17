@@ -13,6 +13,7 @@ import subprocess
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 
@@ -96,7 +97,8 @@ class JvmdocGen(JvmTask):
           'Cannot provide {} target mappings for combined output'.format(self.jvmdoc().product_type))
 
     def docable(tgt):
-      return language_predicate(tgt) and (self._include_codegen or not tgt.is_codegen)
+      return (language_predicate(tgt) and
+              (self._include_codegen or not isinstance(tgt, CodegenLibraryMixin)))
 
     targets = self.context.targets(predicate=docable)
     if not targets:

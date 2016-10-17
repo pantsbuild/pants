@@ -8,9 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 
 
-class JaxbLibrary(JvmTarget):
+class JaxbLibrary(CodegenLibraryMixin, JvmTarget):
   """A Java library generated from JAXB xsd files."""
 
   def __init__(self, payload=None, package=None, language='java', **kwargs):
@@ -30,7 +31,6 @@ class JaxbLibrary(JvmTarget):
     })
     super(JaxbLibrary, self).__init__(payload=payload, **kwargs)
 
-    self.add_labels('codegen')
     self.add_labels('jaxb')
 
     if language != 'java':

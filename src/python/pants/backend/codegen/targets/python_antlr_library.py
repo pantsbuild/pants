@@ -6,9 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 
 
-class PythonAntlrLibrary(PythonTarget):
+class PythonAntlrLibrary(CodegenLibraryMixin, PythonTarget):
   """A Python library generated from Antlr grammar files."""
 
   def __init__(self, module=None, antlr_version='3.1.3', *args, **kwargs):

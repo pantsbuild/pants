@@ -12,12 +12,13 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 
 
 logger = logging.getLogger(__name__)
 
 
-class JavaWireLibrary(ExportableJvmLibrary):
+class JavaWireLibrary(CodegenLibraryMixin, ExportableJvmLibrary):
   """A Java library generated from Wire IDL files.
 
   Supports Wire 1.x only.
@@ -68,4 +69,3 @@ class JavaWireLibrary(ExportableJvmLibrary):
     })
 
     super(JavaWireLibrary, self).__init__(payload=payload, **kwargs)
-    self.add_labels('codegen')

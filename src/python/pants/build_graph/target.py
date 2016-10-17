@@ -62,26 +62,12 @@ class AbstractTarget(object):
     # TODO(John Sirois): fixup predicate dipping down into details here.
     return self.has_label('exportable') and self.provides
 
-  # DEPRECATED  to be removed after 0.0.29
-  # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
-  @property
-  def is_thrift(self):
-    """Returns True if the target has thrift IDL sources."""
-    return False
-
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_jvm(self):
     """Returns True if the target produces jvm bytecode."""
     return self.has_label('jvm')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_codegen(self):
-    """Returns True if the target is a codegen target."""
-    return self.has_label('codegen')
 
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin

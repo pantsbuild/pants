@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.codegen_library_mixin import CodegenLibraryMixin
 
 
-class JavaThriftLibrary(JvmTarget):
+class JavaThriftLibrary(CodegenLibraryMixin, JvmTarget):
   """A Java library generated from Thrift IDL files.
 
   :API: public
@@ -43,9 +44,6 @@ class JavaThriftLibrary(JvmTarget):
 
     super(JavaThriftLibrary, self).__init__(**kwargs)
 
-    # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-    self.add_labels('codegen')
-
     def check_value_for_arg(arg, value, values):
       if value and value not in values:
         raise TargetDefinitionException(self, "{} may only be set to {} ('{}' not valid)"
@@ -72,8 +70,3 @@ class JavaThriftLibrary(JvmTarget):
   @property
   def rpc_style(self):
     return self._rpc_style
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  @property
-  def is_thrift(self):
-    return True

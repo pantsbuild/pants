@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -22,7 +23,7 @@ class ThriftLinter(NailgunTask):
 
   @staticmethod
   def _is_thrift(target):
-    return target.is_thrift
+    return isinstance(target, JavaThriftLibrary)
 
   @classmethod
   def register_options(cls, register):
