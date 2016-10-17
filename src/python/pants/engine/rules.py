@@ -750,9 +750,7 @@ class GraphMaker(object):
                              projected_rules)
         else:
           raise TypeError('Unexpected type of selector: {}'.format(selector))
-      if (not was_unfulfillable and
-          entry not in rule_dependency_edges and
-          entry not in root_rule_dependency_edges):
+      if (not was_unfulfillable):
         # NB: In this case, there are no selectors.
         add_rules_to_graph(entry, None, tuple())
 
