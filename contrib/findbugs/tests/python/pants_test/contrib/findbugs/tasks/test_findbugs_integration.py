@@ -22,7 +22,7 @@ class FindBugsTest(PantsRunIntegrationTest):
     full_config = {
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/findbugs/src/python"],
-        'backend_packages': ["pants.contrib.findbugs"]
+        'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.findbugs"]
       }
     }
     if config:

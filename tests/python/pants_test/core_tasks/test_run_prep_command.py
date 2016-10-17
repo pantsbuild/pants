@@ -26,12 +26,12 @@ class FakeRunPrepCommand(RunPrepCommandBase):
 class RunPrepCommandTest(TaskTestBase):
 
   def setUp(self):
-    super (RunPrepCommandTest, self).setUp()
+    super(RunPrepCommandTest, self).setUp()
     # This is normally taken care of in RunPrepCommandBase.register_options() when running pants,
     # but these don't get called in testing unless you call `self.create_task()`.
     # Some of these unit tests need to create targets before creating the task.
-    PrepCommand.add_goal('test')
-    PrepCommand.add_goal('binary')
+    PrepCommand.add_allowed_goal('test')
+    PrepCommand.add_allowed_goal('binary')
 
   def tearDown(self):
     PrepCommand.reset()
@@ -94,21 +94,45 @@ class RunPrepCommandTest(TaskTestBase):
       task = self.create_task(context=context, workdir='')
       task.execute()
 
-  def test_valid_target(self):
-    self.make_target('foo', PrepCommand, prep_executable='foo.sh')
+  def test_valid_target_default_goals(self):
+    prep_command = self.make_target('foo', PrepCommand, prep_executable='foo.sh')
+    self.assertEquals(frozenset(['test']), prep_command.goals)
 
-  def test_invalid_target(self):
+  def test_valid_target_single_goal(self):
+    prep_command = self.make_target('foo', PrepCommand, prep_executable='foo.sh', goal='binary')
+    self.assertEquals(frozenset(['binary']), prep_command.goals)
+
+  def test_valid_target_multiple_goals(self):
+    prep_command = self.make_target('foo', PrepCommand, prep_executable='foo.sh',
+                                    goals=['binary', 'test'])
+    self.assertEquals(frozenset(['binary', 'test']), prep_command.goals)
+
+  def test_invalid_target_no_executable(self):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'prep_executable must be specified'):
       self.make_target('foo', PrepCommand,)
 
+  def test_invalid_target_unrecognized_goal(self):
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'.*Got goal "baloney". Goal must be one of.*'):
+                                 r'.*Got unrecognized goal baloney. Goal must be one of.*'):
       self.make_target('foo', PrepCommand, prep_executable='foo.sh', goal='baloney')
+
+  def test_invalid_target_unrecognized_goals(self):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'.*Got unrecognized goals baloney, malarkey. '
+                                 r'Goal must be one of.*'):
+      self.make_target('foo', PrepCommand, prep_executable='foo.sh',
+                       goals=['baloney', 'malarkey', 'test'])
+
+  def test_invalid_target_goal_and_goals(self):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'.*Either `goal` or `goals` \(preferred\) should be specified.*'):
+      self.make_target('foo', PrepCommand, prep_executable='foo.sh', goal='binary', goals=['test'])
 
   def test_runnable_prep_cmd(self):
     test_prep_cmd = self.make_target('test-prep-cmd', PrepCommand, prep_executable='foo.sh')
-    binary_prep_cmd = self.make_target('binary-prep-cmd', PrepCommand, prep_executable='foo.sh', goal='binary')
+    binary_prep_cmd = self.make_target('binary-prep-cmd', PrepCommand, prep_executable='foo.sh',
+                                       goal='binary')
     not_a_prep_cmd = self.make_target('not-a-prep-cmd', Target)
     task = self.create_task(context=self.context())
 

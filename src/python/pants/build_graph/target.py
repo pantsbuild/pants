@@ -19,11 +19,10 @@ from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
-from pants.build_graph.address import Address, Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
-from pants.source.payload_fields import DeferredSourcesField, SourcesField
+from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import Files, FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -612,10 +611,7 @@ class Target(AbstractTarget):
     graph and linked in the graph as dependencies of this target
     :rtype: list of strings
     """
-    # To support DeferredSourcesField
-    for name, payload_field in self.payload.fields:
-      if isinstance(payload_field, DeferredSourcesField) and payload_field.address:
-        yield payload_field.address.spec
+    return []
 
   @property
   def dependencies(self):
@@ -746,17 +742,7 @@ class Target(AbstractTarget):
     :rtype: SourcesField
     """
 
-    if isinstance(sources, Addresses):
-      # Currently, this is only created by the result of from_target() which takes a single argument
-      if len(sources.addresses) != 1:
-        key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
-        spec_section = " to '{}'".format(address.spec) if address else ""
-        raise self.WrongNumberOfAddresses(
-          "Expected {key_arg_section}a single address to from_target() as argument{spec_section}"
-          .format(key_arg_section=key_arg_section, spec_section=spec_section))
-      referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
-      return DeferredSourcesField(ref_address=referenced_address)
-    elif sources is None:
+    if sources is None:
       sources = FilesetWithSpec.empty(sources_rel_path)
     elif isinstance(sources, FilesetWithSpec):
       pass

@@ -81,7 +81,6 @@ python_library(
     ':extension_loader',
     ':plugin_resolver',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine/legacy:change_calculator',
     'src/python/pants/goal:goal',

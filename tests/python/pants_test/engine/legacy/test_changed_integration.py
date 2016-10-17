@@ -82,6 +82,9 @@ def create_isolated_git_repo():
     # Create an empty pants config file.
     touch(os.path.join(worktree, 'pants.ini'))
 
+    # Copy .gitignore to new repo.
+    shutil.copyfile('.gitignore', os.path.join(worktree, '.gitignore'))
+
     with initialize_repo(worktree=worktree, gitdir=os.path.join(worktree, '.git')) as git:
       # Resource File
       resource_file = os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/README.md')
@@ -307,6 +310,19 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       self.assert_success(pants_run)
       for expected_item in expected_set:
         self.assertIn(expected_item, pants_run.stdout_data)
+
+  def test_changed_changed_since_and_files(self):
+    with create_isolated_git_repo():
+      stdout = self.assert_changed_new_equals_old(['--changed-since=HEAD^^', '--files'])
+
+      # The output should be the files added in the last 2 commits.
+      self.assertEqual(
+        lines_to_set(stdout),
+        {'src/python/sources/BUILD',
+         'src/python/sources/sources.py',
+         'src/python/sources/sources.txt',
+         '3rdparty/BUILD'}
+      )
 
   # Following 4 tests do not run in isolated repo because they don't mutate working copy.
   def test_changed(self):

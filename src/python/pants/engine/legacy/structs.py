@@ -10,7 +10,6 @@ from abc import abstractproperty
 
 from six import string_types
 
-from pants.build_graph.address import Addresses
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
@@ -39,7 +38,7 @@ class TargetAdaptor(StructWithDeps):
       see: https://github.com/pantsbuild/pants/issues/2997
     """
     sources = getattr(self, 'sources', None)
-    return sources is not None and not isinstance(sources, Addresses)
+    return sources is not None
 
   @property
   def field_adaptors(self):
