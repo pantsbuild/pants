@@ -817,7 +817,13 @@ class GraphMaker(object):
         else:
           root_rule_dependency_edges[current_entry] = dependency_edges.without_rule(unfulfillable_entry)
 
-    rule_dependency_edges = dict((k, v) for k, v in rule_dependency_edges.items()
-                                 if k not in unfulfillable_rules)
-    root_rule_dependency_edges = {k: v for k, v in root_rule_dependency_edges.items() if k not in unfulfillable_rules}
+    rule_dependency_edges = {k: v for k, v in rule_dependency_edges.items()
+                             if k not in unfulfillable_rules}
+    root_rule_dependency_edges = {k: v for k, v in root_rule_dependency_edges.items()
+                                  if k not in unfulfillable_rules}
+
+    for root_rule, deps in root_rule_dependency_edges.items():
+      for d in deps:
+        if d not in rule_dependency_edges and isinstance(d, RuleGraphEntry):
+          raise ValueError('wut {}'.format(d))
     return root_rule_dependency_edges, rule_dependency_edges
