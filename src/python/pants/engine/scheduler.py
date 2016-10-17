@@ -94,6 +94,9 @@ class ProductGraph(object):
               {d.node for d in self.dependents},
               self.cyclic_dependencies)
 
+    def __str__(self):
+      return '{}({})'.format(type(self).__name__, self.node)
+
   def __init__(self, validator=None, rule_graph=None):
     self._validator = validator or Node.validate_node
     # A dict of Node->Entry.
