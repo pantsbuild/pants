@@ -19,7 +19,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.nodes import (ConflictingProducersError, FilesystemNode, LiteralNode, Node, Noop,
                                 Return, Runnable, SelectNode, State, TaskNode, Throw, Waiting)
-from pants.engine.rules import (GraphMaker, NodeBuilder, RuleGraphEntry, RuleGraphLiteral,
+from pants.engine.rules import (GraphMaker, NodeBuilder, RootRule, RuleGraphEntry, RuleGraphLiteral,
                                 RuleGraphSubjectIsProduct, RuleIndex, RulesetValidator)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     type_or_constraint_repr)

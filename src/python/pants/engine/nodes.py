@@ -509,7 +509,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
         if selector.optional:
           dep_values.append(None)
         else:
-          return Noop('Was missing (at least) input for {}.', selector)
+          return Noop('Was missing (at least) input for {}. {}', selector, dep_state)
       elif type(dep_state) is Throw:
         # NB: propagate thrown exception directly.
         return dep_state
