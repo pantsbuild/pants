@@ -5,15 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from abc import abstractproperty
+
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.option.custom_types import file_option
+from pants.util.meta import AbstractClass
 
 
-class ScalaFmt(NailgunTask):
-  """ScalaFmt base class executes the help command.  
+class ScalaFmt(NailgunTask, AbstractClass):
+  """Abstract class to run ScalaFmt commands.  
   
   Classes that inherit from this should override get_command_args and
   process_results to run different scalafmt commands
@@ -26,8 +29,8 @@ class ScalaFmt(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ScalaFmt, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip Scalafmt Check')
-    register('--configuration', advanced=True, type=file_option, fingerprint=True,
+    register('--skip', type=bool, fingerprint=False, help='Skip Scalafmt Check')
+    register('--configuration', advanced=True, type=file_option, fingerprint=False,
               help='Path to scalafmt config file, if not specified default scalafmt config used')
     cls.register_jvm_tool(register,
                           'scalafmt',
@@ -56,16 +59,22 @@ class ScalaFmt(NailgunTask):
 
       self.process_results(result)
 
+  @abstractproperty
   def get_command_args(self, config_file, files):
-    """Gets the arguments for running Scalafmt
-    
-    Base class just runs help command
-    """
-    return ['--help']
+    """Returns the arguments used to run Scalafmt command.
 
+    The return value should be an array of strings.  For 
+    example, to run the Scalafmt help command: 
+    ['--help']
+    """
+
+  @abstractproperty
   def process_results(self, result):
-    if result != 0:
-      raise TaskError('Failed to run Scalafmt', exit_code=result)
+    """This method processes the results of the scalafmt command.
+
+    No return value is expected.  If an error occurs running 
+    Scalafmt raising a TaskError is recommended.
+    """
 
   def get_non_synthetic_scala_targets(self, targets):
     return filter(
