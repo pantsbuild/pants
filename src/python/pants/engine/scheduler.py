@@ -856,6 +856,8 @@ class SomethingOrOther(object):
       pass
 
   def do_rule_edge_stuff(self, selector_path, subject, variants, get_state):
+    if not self._rule_edges:
+      return
     nodes, state, rule_entries_for_debugging = self._selector_to_stuff.get(selector_path, (None, None, None))
     if state:
       return state
