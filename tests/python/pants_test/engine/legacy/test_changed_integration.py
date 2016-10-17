@@ -383,4 +383,4 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
 
 
-#ChangedIntegrationTest.generate_tests()
+ChangedIntegrationTest.generate_tests()
