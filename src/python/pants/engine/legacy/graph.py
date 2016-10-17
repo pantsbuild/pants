@@ -82,6 +82,7 @@ class LegacyBuildGraph(BuildGraph):
         raise AddressLookupError(
             'Build graph construction failed for {}:\n{}'.format(node.subject, trace))
       elif type(state) is not Return:
+        logger.debug('node without return {}'.format(node ))
         State.raise_unrecognized(state)
       if node.product is not LegacyTarget:
         continue

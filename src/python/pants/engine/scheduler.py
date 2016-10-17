@@ -21,11 +21,13 @@ from pants.engine.nodes import (ConflictingProducersError, FilesystemNode, Liter
                                 Return, Runnable, SelectNode, State, TaskNode, Throw, Waiting)
 from pants.engine.rules import (GraphMaker, NodeBuilder, RuleGraphEntry, RuleGraphLiteral,
                                 RuleGraphSubjectIsProduct, RuleIndex, RulesetValidator)
-from pants.engine.selectors import (Select, SelectDependencies, SelectProjection,
+from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     type_or_constraint_repr)
 from pants.engine.struct import Variants
 from pants.util.objects import datatype
 
+
+NOOP = Noop('its not waiting tho')
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +48,11 @@ class ProductGraph(object):
     Equality for this object is intentionally `identity` for efficiency purposes: structural
     equality can be implemented by comparing the result of the `structure` method.
     """
-    __slots__ = ('node', 'state', 'dependencies', 'dependents', 'cyclic_dependencies')
+    __slots__ = ('node', 'something', 'state', 'dependencies', 'dependents', 'cyclic_dependencies')
 
-    def __init__(self, node):
+    def __init__(self, node, something):
       self.node = node
+      self.something = something
       # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
       self.state = None
       # Sets of dependency/dependent Entry objects.
@@ -91,10 +94,11 @@ class ProductGraph(object):
               {d.node for d in self.dependents},
               self.cyclic_dependencies)
 
-  def __init__(self, validator=None):
+  def __init__(self, validator=None, rule_graph=None):
     self._validator = validator or Node.validate_node
     # A dict of Node->Entry.
     self._nodes = dict()
+    self._rule_graph = rule_graph
 
   def __len__(self):
     return len(self._nodes)
@@ -143,8 +147,73 @@ class ProductGraph(object):
     entry = self._nodes.get(node, None)
     if not entry:
       self._validator(node)
-      self._nodes[node] = entry = self.Entry(node)
+      something = SomethingOrOther(node, self._rule_graph)
+      self._nodes[node] = entry = self.Entry(node, something)
+
+      if something.will_noop:
+        self.complete_node(node, something.noop_reason)
+      else:
+        pass
+        # this doesn't work because the resulting entries are added without state, so can't determine runability
+        # that's wrong.
+        # the reason it doesn't work is because the deps are not discoverable by the scheduler, in that they
+        # cause _attempt_run_step to return None
+        #if something.current_node_is_rule_holder:
+        #  entry.validate_not_complete()
+        #  for s in something._current_node.rule.input_selectors:
+        #    if type(s) is Select:
+        #      stuff = something.do_rule_edge_stuff(s, something._current_node.subject,
+        #        something._current_node.variants, lambda n, default: default)
+        #      if type(stuff) is Waiting:
+        #        logger.debug('adding preemptive deps to {} of\n   {}'.format(node, stuff))
+        #        self._add_dependencies(entry, stuff.dependencies)
+
+
     return entry
+
+  def ensure_entry_and_expand(self, node):
+    entry = self._nodes.get(node, None)
+    if not entry:
+      self._validator(node)
+      something = SomethingOrOther(node, self._rule_graph)
+      self._nodes[node] = entry = self.Entry(node, something)
+
+      if something.will_noop:
+        self.complete_node(node, something.noop_reason)
+        return set()
+      else:
+        next_set = self.fill_in_discoverable_deps(entry)
+        if next_set:
+          return next_set
+    #return set() # return empty if was already there.
+    return {entry}
+
+
+  def fill_in_discoverable_deps(self, entry):
+    ret = set()
+    node = entry.node
+    something = entry.something
+    #found_some = False
+    if something.current_node_is_rule_holder:
+      #entry.validate_not_complete()
+      for selector in something._current_node.rule.input_selectors:
+        selector_path = None
+        if type(selector) is Select:
+          selector_path = selector
+        elif type(selector) in (SelectDependencies, SelectProjection):
+          selector_path = (selector, selector.input_product_selector)
+
+        if selector_path:
+          noop = NOOP
+          stuff = something.do_rule_edge_stuff(selector, something._current_node.subject,
+            something._current_node.variants, lambda n, default: getattr(self._nodes.get(node, None), 'state', default) or noop)
+          if type(stuff) is Waiting:
+            logger.debug('adding preemptive deps to {} of\n   {}'.format(node, stuff))
+            ret.update(self.ensure_entry_and_expand(n) for n in stuff.dependencies)
+            self._add_dependencies(entry, stuff.dependencies)
+    #if not found_some:
+    #  ret.add(entry)
+    return ret
 
   def _add_dependencies(self, node_entry, dependencies):
     """Adds dependency edges from the given src Node to the given dependency Nodes.
@@ -449,7 +518,7 @@ class LocalScheduler(object):
     self._project_tree = project_tree
 
     self._graph_validator = graph_validator
-    self._product_graph = ProductGraph()
+    self._product_graph = ProductGraph(rule_graph=self._rule_graph)
     self._product_graph_lock = graph_lock or threading.RLock()
     self._inline_nodes = inline_nodes
 
@@ -483,10 +552,11 @@ class LocalScheduler(object):
       deps[dep] = Noop.cycle(node_entry.node, dep)
 
     # Run.
-    something = SomethingOrOther(node_entry.node, self._rule_graph, dict(deps))
-    if something.will_noop:
-      return something.noop_reason
-    step_context = StepContext(something, self.node_builder, self._project_tree, deps, self._inline_nodes)
+    step_context = StepContext(node_entry.something,
+      self.node_builder,
+      self._project_tree,
+      deps,
+      self._inline_nodes)
     return node_entry.node.step(step_context)
 
   @property
@@ -641,7 +711,13 @@ class LocalScheduler(object):
       # A dict from Node entry to a possibly executing Step. Only one Step exists for a Node at a time.
       outstanding = set()
       # Node entries that might need to have Steps created (after any outstanding Step returns).
-      candidates = deque(self._product_graph.ensure_entry(r) for r in execution_request.roots)
+
+      expanded_roots = set()
+      for r in execution_request.roots:
+        expanded_roots.update(self._product_graph.ensure_entry_and_expand(r))
+
+      #candidates = deque(self._product_graph.ensure_entry(r) for r in execution_request.roots)
+      candidates = deque(expanded_roots)
 
       # Yield nodes that are Runnable, and then compute new ones.
       step_count, runnable_count, scheduling_iterations = 0, 0, 0
@@ -651,6 +727,14 @@ class LocalScheduler(object):
         runnable = []
         while candidates:
           node_entry = candidates.popleft()
+          #results = self._product_graph.fill_in_discoverable_deps(node_entry)
+          #if results:
+          ##  # this candidate has waiting deps for sure, so re-add it as a candidate after the generated deps
+          #  candidates.extend(results)
+          #  candidates.append(node_entry)
+          #  continue
+          #for r in results:
+          #  if r.
           if node_entry.is_complete or node_entry in outstanding:
             # Node has already completed, or is runnable
             continue
@@ -668,9 +752,18 @@ class LocalScheduler(object):
             runnable.append((node_entry, state))
             outstanding.add(node_entry)
           elif type(state) is Waiting:
-            # Waiting on dependencies.
+            incomplete_deps = set()
+            for n in state.dependencies:
+              discoverable_deps = self._product_graph.ensure_entry_and_expand(n)
+              incomplete_deps.update(d for d in discoverable_deps if not d.is_complete and d is not node_entry.node)
+              #candidates.extend()
+
+            #if discoverable_deps:
+            #  return Waiting(discoverable_deps)
+
+              # Waiting on dependencies.
             self._product_graph.add_dependencies(node_entry.node, state.dependencies)
-            incomplete_deps = [d for d in node_entry.dependencies if not d.is_complete]
+            incomplete_deps.update(d for d in node_entry.dependencies if not d.is_complete)
             if incomplete_deps:
               # Mark incomplete deps as candidates for Steps.
               candidates.extend(incomplete_deps)
@@ -714,7 +807,7 @@ class LocalScheduler(object):
 
 
 class SomethingOrOther(object):
-  def __init__(self, current_node, graph, node_states):
+  def __init__(self, current_node, graph):
 
     self._graph = graph
     self._current_node = current_node
@@ -723,14 +816,31 @@ class SomethingOrOther(object):
     self.will_noop = False
     self.noop_reason = None
 
-    self._node_states = node_states # NB needed for some edge stuff.
-
     self._rule_edges = None
     if hasattr(current_node, 'rule') and hasattr(current_node, 'subject'):
       edges = self._graph.dependency_edges_for_rule(current_node.rule, type(current_node.subject))
       if edges:
         #assert len(edge_holders) == 1, "expected only one edge holder for a rule / subject pair {}".format(len(edge_holders))
         self._rule_edges = edges
+        # let's just precompute all of the nodes initial nodes, so we can reuse them later.
+        self._selector_to_stuff = dict()
+        for selector in current_node.rule.input_selectors:
+          #state_or_nodes = self._state_or_nodes_for(selector, current_node.subject, current_node.variants)
+          #if type(selector) is Select:
+          #  selector_path = selector
+          #elif type(selector) in (SelectDependencies, SelectProjection):
+          #  selector_path = (selector, selector.input_product_selector)
+          #elif type(selector) is SelectLiteral:
+          #  selector_path = selector
+          #elif type(selector) is Select
+          #else:
+            #raise
+          #  pass
+          #  selector_path = selector
+          stuff = self._state_or_nodes_for(selector, current_node.subject, current_node.variants)
+          self._selector_to_stuff[selector] = stuff
+
+
       else:
         #unfillable = self._graph.is_unfulfillable(current_node.rule, current_node.subject)
         #logger.debug("no edge holders for {} {}".format('unfillable' if unfillable else 'fillable', current_node))
@@ -742,83 +852,110 @@ class SomethingOrOther(object):
       #logger.debug("node with no rule / subject {}".format(current_node))
       pass
 
-  def _do_rule_edge_stuff(self, selector_path, subject, variants):
+  def do_rule_edge_stuff(self, selector_path, subject, variants, get_state):
+    nodes, state, rule_entries_for_debugging = self._selector_to_stuff.get(selector_path, (None, None, None))
+    if state:
+      return state
+    if nodes:
+      return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants)
+    return self._do_rule_edge_stuff(selector_path, subject, variants, get_state)
+
+  def _do_rule_edge_stuff(self, selector_path, subject, variants, get_state):
     if type(selector_path) is SelectDependencies:
       # select for dep_product_selector, if it's return, return None, otherwise wait on it
-      dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants)
+      dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants, get_state)
       if type(dep_state) is Waiting:
         return dep_state
       else:
         # otherwise, return None and let the DependenciesNode do its work
-        return
+        return 'not waiting on select dep'
     if type(selector_path) is SelectProjection:
       # select for dep_product_selector, if it's return, return None, otherwise wait on it
-      dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants)
+      dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants, get_state)
       if type(dep_state) is Waiting:
         return dep_state
       else:
         # otherwise, return None and let the ProjectionNode do its work
-        return
+        return'not waiting on select prj'
 
     if type(selector_path) is tuple and selector_path[-1] == Select(Variants):
       # this is the nested Select(Variants)
       #len may also be > 2 which the graph currently doesn't understand
-      #return Noop('no variant support')
-      return
+      return Noop('no variant support')
+      #return 'deferring for select variants'
     else:
-      return self._state_via_edges(selector_path, subject, variants)
+      return self._state_via_edges(selector_path, subject, variants, get_state)
 
-  def _state_via_edges(self, selector_path, subject, variants):
+  def _state_via_edges(self, selector_path, subject, variants, get_state):
+    nodes, state, rule_entries_for_debugging = self._state_or_nodes_for(selector_path, subject, variants)
+    if state:
+      return state
+
+    return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants)
+
+  def _state_or_nodes_for(self, selector_path, subject, variants):
     rule_entries = list(self._rule_edges.rules_for(selector_path, type(subject)))
-    if rule_entries:
-      final_selector = selector_path if type(selector_path) is not tuple else selector_path[-1]
-      nodes = []
-      for rule_entry in rule_entries:
-        if type(rule_entry) is RuleGraphSubjectIsProduct:
-          assert rule_entry.value == type(subject)
-          assert len(rule_entries) == 1, "if subject is product, it should be the only one"
-          return Return(subject)
-        elif type(rule_entry) is RuleGraphLiteral:
-          assert len(rule_entries) == 1, "if literal, it should be the only one"
-          return Return(rule_entry.value)
-        elif type(rule_entry) is RuleGraphEntry:
-          node = rule_entry.rule.as_node(subject, variants)
-          nodes.append(node)
-      if nodes:
-        had_return = None
-        state = None
-        waiting = []
-        matches = []
-        for node in nodes:
-          state = self._node_states.get(node, Waiting([node]))
-          if type(state) is Waiting:
-            waiting.extend(state.dependencies)
-          elif type(state) is Return:
-            return # defer to SelectNode, for now
-          elif type(state) is Throw:
-            return state # always bubble up the first throw
-          elif type(state) is Noop:
-            continue
-          else:
-            State.raise_unrecognized(state)
+    if not rule_entries:
+      return None, None, None
 
-        if waiting:
-          return Waiting(waiting)
-        elif len(matches) == 0:
-          return Noop('No source of {} for {} : {} because no nodes with returns, but there were rule entries {}\n the return if there was one {}\n last state {}', selector_path, type(subject).__name__, subject, rule_entries, had_return, state)
-        elif len(matches) > 1:
-          return Throw(ConflictingProducersError.create(subject, final_selector, matches))
-      else:
-        # this doesn't happen
-        logger.debug('rule entries yes, but no nodes {}'.format(rule_entries))
-        pass
+    nodes = []
+    for rule_entry in rule_entries:
+      if type(rule_entry) is RuleGraphSubjectIsProduct:
+        assert rule_entry.value == type(subject)
+        assert len(rule_entries) == 1, "if subject is product, it should be the only one"
+        return None, Return(subject), None
+      elif type(rule_entry) is RuleGraphLiteral:
+        assert len(rule_entries) == 1, "if literal, it should be the only one"
+        return None, Return(rule_entry.value), None
+      elif type(rule_entry) is RuleGraphEntry:
+        node = rule_entry.rule.as_node(subject, variants)
+        nodes.append(node)
 
-  def get_nodes_and_states(self, subject, product, variants):
-
-    if self.current_node_is_rule_holder:
-      matching = None
+    if not nodes:
+      # this doesn't happen
+      logger.debug('rule entries yes, but no nodes {}'.format(rule_entries))
+      return None, None, rule_entries
     else:
-      matching = self._graph.root_rules_matching(type(subject), self._current_node.selector)
+      return nodes, None, rule_entries
+
+  def _make_state(self, rule_entries, nodes, get_state, selector_path, variants):
+    subject = self._current_node.subject
+    final_selector = selector_path if type(selector_path) is not tuple else selector_path[-1]
+    had_return = None
+    state = None
+    waiting = []
+    matches = []
+    for node in nodes:
+      state = get_state(node, Waiting([node]))
+      if type(state) is Waiting:
+        waiting.extend(state.dependencies)
+      elif type(state) is Return:
+        matched = SelectNode.do_real_select_literal(final_selector.type_constraint, state.value, variants)
+        if matched:
+          return Return(matched)
+        #return # defer to SelectNode, for now
+      elif type(state) is Throw:
+        return state # always bubble up the first throw
+      elif type(state) is Noop:
+        continue
+      else:
+        State.raise_unrecognized(state)
+
+    if waiting:
+      return Waiting(waiting)
+    elif len(matches) == 0:
+      return Noop('No source of {} for {} : {} because no nodes with returns, but there were rule entries {}\n the return if there was one {}\n last state {}', selector_path, type(subject).__name__, subject, rule_entries, had_return, state)
+    elif len(matches) > 1:
+      return Throw(ConflictingProducersError.create(subject, final_selector, matches))
+
+  def get_nodes_and_states(self, subject, selector_path, variants):
+    if self.current_node_is_rule_holder:
+      # If it's a rule, we *should* have picked it up differently
+      #logger.debug('hm. got here with {}'.format(selector_path))
+      return  # 'is rule holder'
+
+
+    matching = self._graph.root_rules_matching(type(subject), self._current_node.selector)
     edges = None
     if matching:
       edges = self._graph.root_rule_edges(matching)
@@ -838,7 +975,7 @@ class SomethingOrOther(object):
         elif type(rule_entry) is RuleGraphEntry:
           node = rule_entry.rule.as_node(subject, variants)
           #nodes.append(node)
-          yield node, self._node_states.get(node, Waiting([node]))
+          yield node, 'none from not having a state yet'# self._node_states.get(node, Waiting([node]))
 
 
 class StepContext(object):
@@ -875,13 +1012,17 @@ class StepContext(object):
       self._parents.append(node)
       state = self._node_states[node] = node.step(self)
       self._parents.pop()
+      #logger.debug('returning state {}'.format(state))
       return state
     else:
       return Waiting([node])
 
   def get_nodes_and_states_for(self, subject, product, variants):
     yielded = False
-    for node, state in self._something.get_nodes_and_states(subject, product, variants):
+
+    for node, state in self._something.get_nodes_and_states(subject, self._selector_path(product), variants):
+      if state is None or not isinstance(state, State):
+        state = self.get(node)
       yield node, state
       yielded = True
     else:
@@ -896,8 +1037,8 @@ class StepContext(object):
     """Returns the state for selecting a product via the provided selector."""
     if self._something._rule_edges:
       selector_path = self._selector_path(selector)
-      r = self._something._do_rule_edge_stuff(selector_path, subject, variants)
-      if r:
+      r = self._something.do_rule_edge_stuff(selector_path, subject, variants, lambda n, default: self._node_states.get(n, default))
+      if isinstance(r, State):
         return r
     else:
       #logger.debug('no entries for {} with {} {} {}'.format(self._current_node, selector_path, subject, variants))

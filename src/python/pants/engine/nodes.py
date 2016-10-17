@@ -225,11 +225,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
   def product(self):
     return self.selector.product
 
-  def _select_literal(self, candidate, variant_value):
-    """Looks for has-a or is-a relationships between the given value and the requested product.
-
-    Returns the resulting product value, or None if no match was made.
-    """
+  @classmethod
+  def do_real_select_literal(cls, type_constraint, candidate, variant_value):
     def items():
       # Check whether the subject is-a instance of the product.
       yield candidate
@@ -241,13 +238,21 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
     # TODO: returning only the first literal configuration of a given type/variant. Need to
     # define mergeability for products.
     for item in items():
-      if not self.selector.type_constraint.satisfied_by(item):
+      if not type_constraint.satisfied_by(item):
         continue
       if variant_value and not getattr(item, 'name', None) == variant_value:
         continue
       return item
     return None
 
+
+
+  def _select_literal(self, candidate, variant_value):
+    """Looks for has-a or is-a relationships between the given value and the requested product.
+
+    Returns the resulting product value, or None if no match was made.
+    """
+    return self.do_real_select_literal(self.selector.type_constraint, candidate, variant_value)
   def step(self, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
