@@ -16,8 +16,8 @@ from pants.util.meta import AbstractClass
 
 
 class ScalaFmt(NailgunTask, AbstractClass):
-  """Abstract class to run ScalaFmt commands.  
-  
+  """Abstract class to run ScalaFmt commands.
+
   Classes that inherit from this should override get_command_args and
   process_results to run different scalafmt commands
 
@@ -63,8 +63,8 @@ class ScalaFmt(NailgunTask, AbstractClass):
   def get_command_args(self, config_file, files):
     """Returns the arguments used to run Scalafmt command.
 
-    The return value should be an array of strings.  For 
-    example, to run the Scalafmt help command: 
+    The return value should be an array of strings.  For
+    example, to run the Scalafmt help command:
     ['--help']
     """
 
@@ -72,7 +72,7 @@ class ScalaFmt(NailgunTask, AbstractClass):
   def process_results(self, result):
     """This method processes the results of the scalafmt command.
 
-    No return value is expected.  If an error occurs running 
+    No return value is expected.  If an error occurs running
     Scalafmt raising a TaskError is recommended.
     """
 
@@ -93,9 +93,9 @@ class ScalaFmt(NailgunTask, AbstractClass):
 
 class ScalaFmtCheckFormat(ScalaFmt):
   """This Task checks that all scala files in the target are formatted
-  correctly.  
+  correctly.
 
-  If the files are not formatted correctly are not an error is raised 
+  If the files are not formatted correctly are not an error is raised
   including the command to run to format the files correctly
 
   :API: public
