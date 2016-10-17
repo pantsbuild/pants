@@ -27,7 +27,7 @@ public class SpecParserTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void testEmptySpecsThrows() {
-    new SpecParser(new ArrayList<>());
+    new SpecParser(new ArrayList<String>());
   }
 
   @Test public void testParserClass() throws Exception {
