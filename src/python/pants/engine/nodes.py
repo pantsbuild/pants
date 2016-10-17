@@ -25,31 +25,9 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-def collect_item_of_type(candidate, product, variant_value):
-  """Looks for has-a or is-a relationships between the given value and the requested product.
-
-  Returns the resulting product value, or None if no match was made.
-
-  TODO: This is reimplemented in the native SelectNode.
-  """
-  def items():
-    # Check whether the subject is-a instance of the product.
-    yield candidate
-    # Else, check whether it has-a instance of the product.
-    if isinstance(candidate, HasProducts):
-      for subject in candidate.products:
-        yield subject
-
-  # TODO: returning only the first literal configuration of a given type/variant. Need to
-  # define mergeability for products.
-  for item in items():
-
-    if not isinstance(item, product):
-      continue
-    if variant_value and not getattr(item, 'name', None) == variant_value:
-      continue
-    return item
-  return None
+def _satisfied_by(t, o):
+  """Pickleable type check function."""
+  return t.satisfied_by(o)
 
 
 class State(AbstractClass):

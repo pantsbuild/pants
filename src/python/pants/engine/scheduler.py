@@ -10,7 +10,8 @@ import threading
 import time
 from contextlib import contextmanager
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
+                              SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
@@ -18,7 +19,7 @@ from pants.engine.isolated_process import create_snapshot_intrinsics
 from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant)
+                                    SelectVariant, type_or_constraint_repr)
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import (ExternContext, extern_id_to_str, extern_issubclass,
                                            extern_key_for, extern_project, extern_project_multi,
@@ -125,6 +126,7 @@ class LocalScheduler(object):
       PathGlobs,
       SingleAddress,
       SiblingAddresses,
+      AscendantAddresses,
       DescendantAddresses,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
@@ -254,6 +256,18 @@ class LocalScheduler(object):
     :returns: An ExecutionRequest for the given products and subjects.
     """
     return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
+
+  def selection_request(self, requests):
+    """Create and return an ExecutionRequest for the given (selector, subject) tuples.
+
+    This method allows users to specify their own selectors. It has the potential to replace
+    execution_request, which is a subset of this method, because it uses default selectors.
+    :param requests: A list of (selector, subject) tuples.
+    :return: An ExecutionRequest for the given selectors and subjects.
+    """
+    #TODO: Think about how to deprecate the existing execution_request API.
+    roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
+    return ExecutionRequest(tuple(roots))
 
   @contextmanager
   def locked(self):

@@ -70,6 +70,27 @@ class ExactlyTest(TypeConstraintTestBase):
     self.assertFalse(exactly_a_or_b.satisfied_by(self.BPrime()))
     self.assertFalse(exactly_a_or_b.satisfied_by(self.C()))
 
+  def test_disallows_unsplatted_lists(self):
+    with self.assertRaises(TypeError):
+      Exactly([1])
+
+  def test_str_and_repr(self):
+    exactly_b_types = Exactly(self.B, description='B types')
+    self.assertEquals("=(B types)", str(exactly_b_types))
+    self.assertEquals("Exactly(B types)", repr(exactly_b_types))
+
+    exactly_b = Exactly(self.B)
+    self.assertEquals("=B", str(exactly_b))
+    self.assertEquals("Exactly(B)", repr(exactly_b))
+
+    exactly_multiple = Exactly(self.A, self.B)
+    self.assertEquals("=(A, B)", str(exactly_multiple))
+    self.assertEquals("Exactly(A, B)", repr(exactly_multiple))
+
+  def test_checking_via_bare_type(self):
+    self.assertTrue(Exactly(self.B).satisfied_by_type(self.B))
+    self.assertFalse(Exactly(self.B).satisfied_by_type(self.C))
+
 
 class SubclassesOfTest(TypeConstraintTestBase):
   def test_none(self):

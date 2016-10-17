@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  name='jar',
   sources=globs('*.java'),
   dependencies=[
     '3rdparty:args4j',

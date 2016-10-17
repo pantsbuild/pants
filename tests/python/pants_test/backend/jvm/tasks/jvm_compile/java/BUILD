@@ -36,6 +36,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+    'tests/python/pants_test/cache:cache_server',
   ],
   tags = {'integration'},
   timeout=180,
@@ -68,6 +69,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
     'src/python/pants/fs',
+    'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',

@@ -18,7 +18,6 @@ from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.from_target import FromTarget
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources
 from pants.core_tasks.what_changed import WhatChanged
@@ -47,7 +46,6 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       context_aware_object_factories={
         'globs': Globs,
         'rglobs': RGlobs,
-        'from_target': FromTarget,
       },
       objects={
         'jar': JarDependency,
@@ -170,6 +168,13 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=rglobs("*.java"),
       )
     """))
+
+    self.add_to_build_file('root/src/java/b', dedent("""
+          java_library(
+            name='b_java',
+            sources=globs("*.java"),
+          )
+        """))
 
     self.add_to_build_file('root/3rdparty/BUILD.twitter', dedent("""
       jar_library(
@@ -341,33 +346,6 @@ class WhatChangedTest(WhatChangedTestBasic):
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
-  def test_deferred_sources(self):
-    self.add_to_build_file('root/proto', dedent("""
-      java_protobuf_library(name='unpacked_jars',
-        sources=from_target(':external-source'),
-      )
-
-      unpacked_jars(name='external-source',
-        libraries=[':external-source-jars'],
-        include_patterns=[
-          'com/squareup/testing/**/*.proto',
-        ],
-      )
-
-      jar_library(name='external-source-jars',
-        jars=[
-          jar(org='com.squareup.testing.protolib', name='protolib-external-test', rev='0.0.2'),
-        ],
-      )
-    """))
-
-    self.assert_console_output(
-      'root/proto:unpacked_jars',
-      'root/proto:external-source',
-      'root/proto:external-source-jars',
-      workspace=self.workspace(files=['root/proto/BUILD'])
-    )
-
   def test_deferred_sources_new(self):
     self.add_to_build_file('root/proto', dedent("""
       remote_sources(name='unpacked_jars',
@@ -396,6 +374,27 @@ class WhatChangedTest(WhatChangedTestBasic):
       workspace=self.workspace(files=['root/proto/BUILD'])
     )
 
+  def test_rglobs_in_sources(self):
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      workspace=self.workspace(files=['root/src/java/a/foo.java'])
+    )
+
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      workspace=self.workspace(files=['root/src/java/a/b/foo.java'])
+    )
+
+  def test_globs_in_sources(self):
+    self.assert_console_output(
+      'root/src/java/b:b_java',
+      workspace=self.workspace(files=['root/src/java/b/foo.java'])
+    )
+
+    self.assert_console_output(
+      workspace=self.workspace(files=['root/src/java/b/b/foo.java'])
+    )
+
   def test_globs_in_resources(self):
     self.add_to_build_file('root/resources', dedent("""
       resources(
@@ -405,8 +404,12 @@ class WhatChangedTest(WhatChangedTestBasic):
     """))
 
     self.assert_console_output(
-      'root/resources:resources',
       workspace=self.workspace(files=['root/resources/foo/bar/baz.yml'])
+    )
+
+    self.assert_console_output(
+      'root/resources:resources',
+      workspace=self.workspace(files=['root/resources/baz.yml'])
     )
 
   def test_root_config(self):

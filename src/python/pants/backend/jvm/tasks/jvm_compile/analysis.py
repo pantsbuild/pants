@@ -13,20 +13,6 @@ class Analysis(object):
   and on the src -> {src|class|jar} file dependency mappings.
   """
 
-  @classmethod
-  def merge(cls, analyses):
-    """Merge multiple analysis instances into one."""
-    raise NotImplementedError()
-
-  def split(self, splits, catchall=False):
-    """Split the analysis according to splits, which is a list of K iterables of source files.
-
-    If catchall is False, returns a list of K ZincAnalysis objects, one for each of the splits, in order.
-    If catchall is True, returns K+1 ZincAnalysis objects, the last one containing the analysis for any
-    remainder sources not mentioned in the K splits.
-    """
-    raise NotImplementedError()
-
   def write_to_path(self, outfile_path):
     with open(outfile_path, 'w') as outfile:
       self.write(outfile)

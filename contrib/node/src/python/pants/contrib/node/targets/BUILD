@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name='targets',
   dependencies=[
     ':node_module',
     ':node_preinstalled_module',

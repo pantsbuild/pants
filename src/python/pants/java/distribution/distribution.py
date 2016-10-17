@@ -474,7 +474,7 @@ class _Locator(object):
         return version_a
       return stricter(version_a, version_b)
 
-    # take the tighter constraint of method args and subsystem options
+    # Take the tighter constraint of method args and subsystem options.
     minimum_version = _get_stricter_version(minimum_version,
                                             self._minimum_version,
                                             "minimum_version",
@@ -552,14 +552,6 @@ class DistributionLocator(Subsystem):
     """
 
   @classmethod
-  @memoized_method
-  def _locator(cls):
-    environment = _UnknownEnvironment(_EnvVarEnvironment(),
-                                      _LinuxEnvironment.standard(),
-                                      _OSXEnvironment.standard())
-    return cls.global_instance()._create_locator(environment)
-
-  @classmethod
   def cached(cls, minimum_version=None, maximum_version=None, jdk=False):
     """Finds a java distribution that meets the given constraints and returns it.
 
@@ -576,9 +568,10 @@ class DistributionLocator(Subsystem):
     :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
     """
     try:
-      return cls._locator().locate(minimum_version=minimum_version,
-                                   maximum_version=maximum_version,
-                                   jdk=jdk)
+      return cls.global_instance()._locator().locate(
+          minimum_version=minimum_version,
+          maximum_version=maximum_version,
+          jdk=jdk)
     except _Locator.Error as e:
       raise cls.Error('Problem locating a java distribution: {}'.format(e))
 
@@ -605,6 +598,10 @@ class DistributionLocator(Subsystem):
     """
     return self._normalized_jdk_paths
 
+  @memoized_method
+  def _locator(self):
+    return self._create_locator()
+
   @memoized_property
   def _normalized_jdk_paths(self):
     normalized = {}
@@ -627,14 +624,16 @@ class DistributionLocator(Subsystem):
                      .format(os_name))
     return self._normalized_jdk_paths.get(os_name, ())
 
-  def _create_locator(self, distribution_environment):
+  def _create_locator(self):
     homes = self._get_explicit_jdk_paths()
-    environment = _UnknownEnvironment(_ExplicitEnvironment(*homes), distribution_environment)
+    environment = _UnknownEnvironment(
+        _ExplicitEnvironment(*homes),
+        _UnknownEnvironment(
+            _EnvVarEnvironment(),
+            _LinuxEnvironment.standard(),
+            _OSXEnvironment.standard()
+        )
+    )
     return _Locator(environment,
                     self.get_options().minimum_version,
                     self.get_options().maximum_version)
-
-  # Exposed for tests.
-  def _reset(self):
-    self._locator.clear()
-    self._normalized_jdk_paths.clear()

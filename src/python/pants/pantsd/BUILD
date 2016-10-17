@@ -18,6 +18,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     'src/python/pants/java:nailgun_protocol',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:socket'
   ]
 )
@@ -57,6 +58,7 @@ python_library(
   sources = ['util.py'],
   dependencies = [
     'src/python/pants/bin:options_initializer',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:goal',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/subsystem:subsystem',

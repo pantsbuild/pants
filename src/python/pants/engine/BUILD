@@ -24,7 +24,9 @@ python_library(
   dependencies=[
     '3rdparty/python:six',
     ':objects',
+    'src/python/pants/util:memo',
     'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -38,7 +40,6 @@ python_library(
 )
 
 python_library(
-  name='engine',
   sources=['engine.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -164,7 +165,7 @@ python_library(
   sources=['selectors.py'],
   dependencies=[
     '3rdparty/python:six',
-    'src/python/pants/util:memo',
+    ':addressable',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]

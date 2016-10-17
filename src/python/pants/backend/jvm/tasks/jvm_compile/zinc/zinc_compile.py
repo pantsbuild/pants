@@ -188,7 +188,7 @@ class BaseZincCompile(JvmCompile):
                             # ScalaJarDependency. The latter would pick up the platform in a users'
                             # repo, whereas this binary is shaded and independent of the target
                             # platform version.
-                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.3')
+                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.4')
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=[

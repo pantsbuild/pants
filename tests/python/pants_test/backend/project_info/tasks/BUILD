@@ -60,6 +60,8 @@ python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/subsystems:junit',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -87,6 +89,7 @@ python_tests(
     ':resolve_jars_test_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',

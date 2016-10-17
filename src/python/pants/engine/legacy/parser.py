@@ -13,6 +13,7 @@ import six
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
+from pants.engine.mapper import UnaddressableObjectError
 from pants.engine.objects import Serializable
 from pants.engine.parser import Parser
 from pants.util.memo import memoized_method, memoized_property
@@ -38,6 +39,16 @@ class LegacyPythonCallbacksParser(Parser):
     # TODO: Nasty escape hatch: see https://github.com/pantsbuild/pants/issues/3561
     aliases = symbol_table_cls.aliases()
 
+    symbols = {}
+
+    # Compute "per path" symbols.  For performance, we use the same ParseContext, which we
+    # mutate (in a critical section) to set the rel_path appropriately before it's actually used.
+    # This allows this memoized method to depend only on the symbol_table_cls, thus reusing
+    # the same symbols for all parses.  Meanwhile we set the rel_path to None, so that we get
+    # a loud error if anything tries to use it before it's set.
+    # TODO: See https://github.com/pantsbuild/pants/issues/3561
+    parse_context = ParseContext(rel_path=None, type_aliases=symbols)
+
     class Registrar(BuildFileTargetFactory):
       def __init__(self, type_alias, object_type):
         self._type_alias = type_alias
@@ -49,6 +60,15 @@ class LegacyPythonCallbacksParser(Parser):
         return [self._object_type]
 
       def __call__(self, *args, **kwargs):
+        # Target names default to the name of the directory their BUILD file is in
+        # (as long as it's not the root directory).
+        if 'name' not in kwargs and issubclass(self._object_type, TargetAdaptor):
+          dirname = os.path.basename(parse_context.rel_path)
+          if dirname:
+            kwargs['name'] = dirname
+          else:
+            raise UnaddressableObjectError(
+                'Targets in root-level BUILD files must be named explicitly.')
         name = kwargs.get('name')
         if name and self._serializable:
           kwargs.setdefault('type_alias', self._type_alias)
@@ -58,8 +78,6 @@ class LegacyPythonCallbacksParser(Parser):
         else:
           return self._object_type(*args, **kwargs)
 
-    symbols = {}
-
     for alias, symbol in symbol_table.items():
       registrar = Registrar(alias, symbol)
       symbols[alias] = registrar
@@ -68,9 +86,6 @@ class LegacyPythonCallbacksParser(Parser):
     if aliases.objects:
       symbols.update(aliases.objects)
 
-    # Compute "per path" symbols (which will all use the same mutable ParseContext).
-    # TODO: See https://github.com/pantsbuild/pants/issues/3561
-    parse_context = ParseContext(rel_path='', type_aliases=symbols)
     for alias, object_factory in aliases.context_aware_object_factories.items():
       symbols[alias] = object_factory(parse_context)
 
@@ -100,10 +115,9 @@ class LegacyPythonCallbacksParser(Parser):
     symbols, parse_context = cls._get_symbols(symbol_table_cls)
     python = filecontent
 
-    # Mutate the parse context for the new path.
-    parse_context._rel_path = os.path.dirname(filepath)
-
     with cls._lock:
+      # Mutate the parse context for the new path.
+      parse_context._rel_path = os.path.dirname(filepath)
       del cls._objects[:]
       six.exec_(python, symbols)
       return list(cls._objects)

@@ -19,7 +19,8 @@ import six
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import Dir, File, Link
-from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
+from pants.engine.addressable import Collection
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype

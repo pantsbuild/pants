@@ -10,15 +10,38 @@ from abc import abstractproperty
 
 import six
 
-from pants.util.memo import memoized
+from pants.engine.addressable import Exactly
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
+def type_or_constraint_repr(constraint):
+  """Generate correct repr for types and TypeConstraints"""
+  if isinstance(constraint, type):
+    return constraint.__name__
+  elif isinstance(constraint, Exactly):
+    return repr(constraint)
+
+
 class Selector(AbstractClass):
+  # The type constraint for the product type for this selector.
+
+  @property
+  def type_constraint(self):
+    if isinstance(self.product, Exactly):
+      return self.product
+    elif isinstance(self.product, type):
+      return Exactly(self.product)
+    else:
+      raise TypeError("unexpected product_type type for selector: {}".format(self.product))
+
   @abstractproperty
   def optional(self):
     """Return true if this Selector is optional. It may result in a `None` match."""
+
+  @abstractproperty
+  def product(self):
+    """The product that this selector produces."""
 
 
 class Select(datatype('Select', ['product', 'optional']), Selector):
@@ -28,11 +51,12 @@ class Select(datatype('Select', ['product', 'optional']), Selector):
   """
 
   def __new__(cls, product, optional=False):
-    return super(Select, cls).__new__(cls, product, optional)
+    obj = super(Select, cls).__new__(cls, product, optional)
+    return obj
 
   def __repr__(self):
     return '{}({}{})'.format(type(self).__name__,
-                             self.product.__name__,
+                             type_or_constraint_repr(self.product),
                              ', optional=True' if self.optional else '')
 
 
@@ -52,8 +76,8 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
 
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__,
-                             self.product.__name__,
-                             repr(self.variant_key))
+                               type_or_constraint_repr(self.product),
+                               repr(self.variant_key))
 
 
 class SelectDependencies(datatype('Dependencies',
@@ -72,7 +96,13 @@ class SelectDependencies(datatype('Dependencies',
   def __new__(cls, product, dep_product, field='dependencies', field_types=tuple(), transitive=False):
     return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types, transitive)
 
-  optional = False
+  @property
+  def dep_product_selector(self):
+    return Select(self.dep_product)
+
+  @property
+  def projected_product_selector(self):
+    return Select(self.product)
 
   def __repr__(self):
     if self.field_types:
@@ -80,11 +110,11 @@ class SelectDependencies(datatype('Dependencies',
     else:
       field_types_portion = ''
     return '{}({}, {}{}{}{})'.format(type(self).__name__,
-                                   self.product.__name__,
-                                   self.dep_product.__name__,
-                                   ', {}'.format(repr(self.field)) if self.field else '',
-                                   ', transitive=True' if self.transitive else '',
-                                   field_types_portion)
+                                     type_or_constraint_repr(self.product),
+                                     type_or_constraint_repr(self.dep_product),
+                                     ', {}'.format(repr(self.field)) if self.field else '',
+                                     ', transitive=True' if self.transitive else '',
+                                     field_types_portion)
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
@@ -98,12 +128,20 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
   """
   optional = False
 
+  @property
+  def input_product_selector(self):
+    return Select(self.input_product)
+
+  @property
+  def projected_product_selector(self):
+    return Select(self.product)
+
   def __repr__(self):
     return '{}({}, {}, {}, {})'.format(type(self).__name__,
-                             self.product.__name__,
-                             self.projected_subject.__name__,
-                             repr(self.fields),
-                             self.input_product.__name__)
+                                       type_or_constraint_repr(self.product),
+                                       self.projected_subject.__name__,
+                                       repr(self.fields),
+                                       self.input_product.__name__)
 
 
 class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
@@ -111,26 +149,6 @@ class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   optional = False
 
   def __repr__(self):
-    return '{}({}, {})'.format(type(self).__name__, repr(self.subject), self.product.__name__)
-
-
-class Collection(object):
-  """
-  Singleton Collection Type. The ambition is to gain native support for flattening,
-  so methods like <pants.engine.fs.merge_files> won't have to be defined separately.
-  Related to: https://github.com/pantsbuild/pants/issues/3169
-  """
-
-  @classmethod
-  @memoized
-  def of(cls, *element_types):
-    union = '|'.join(element_type.__name__ for element_type in element_types)
-    type_name = b'{}.of({})'.format(cls.__name__, union)
-    supertypes = (cls, datatype('Collection', ['dependencies']))
-    properties = {'element_types': element_types}
-    collection_of_type = type(type_name, supertypes, properties)
-
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
-
-    return collection_of_type
+    return '{}({}, {})'.format(type(self).__name__,
+                               repr(self.subject),
+                               type_or_constraint_repr(self.product))

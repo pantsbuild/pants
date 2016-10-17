@@ -279,6 +279,18 @@ class DirutilTest(unittest.TestCase):
       touch(os.path.join(td, 'file1'))
       self.assertEqual(len(os.listdir(td)), 1)
 
+  def test_safe_rmtree_link(self):
+    with temporary_dir() as td:
+      real = os.path.join(td, 'real')
+      link = os.path.join(td, 'link')
+      os.mkdir(real)
+      os.symlink(real, link)
+      self.assertTrue(os.path.exists(real))
+      self.assertTrue(os.path.exists(link))
+      safe_rmtree(link);
+      self.assertTrue(os.path.exists(real))
+      self.assertFalse(os.path.exists(link))
+
 
 class AbsoluteSymlinkTest(unittest.TestCase):
   def setUp(self):

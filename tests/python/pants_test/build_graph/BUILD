@@ -29,6 +29,8 @@ python_tests(
   name = 'build_file_address_mapper',
   sources = ['test_build_file_address_mapper.py'],
   dependencies = [
+    'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
@@ -53,7 +55,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'build_graph',
   sources = ['test_build_graph.py'],
   dependencies = [
     'src/python/pants/build_graph',
@@ -65,6 +66,16 @@ python_tests(
   name = 'build_graph_integration',
   sources = ['test_build_graph_integration.py'],
   dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'intermediate_target_integration',
+  sources = ['test_intermediate_target_integration.py'],
+  dependencies = [
+    'src/python/pants/build_graph',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

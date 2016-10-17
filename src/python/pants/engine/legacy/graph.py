@@ -17,11 +17,11 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import Addresses
+from pants.engine.addressable import Addresses, Collection
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return, State, Throw
-from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -205,9 +205,14 @@ class LegacyBuildGraph(BuildGraph):
     for address in self._inject(specs):
       yield address
 
+  def resolve_address(self, address):
+    if not self.contains_address(address):
+      self.inject_address_closure(address)
+    return self.get_target(address)
+
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
-    logger.debug('Injecting to {}: {}'.format(self, subjects))
+    logger.debug('Injecting to %s: %s', self, subjects)
     request = self._scheduler.execution_request([HydratedTargets], subjects)
 
     result = self._engine.execute(request)
@@ -296,16 +301,22 @@ def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
   return HydratedField('bundles', bundles)
 
 
-def create_legacy_graph_tasks():
+def create_legacy_graph_tasks(symbol_table_cls):
   """Create tasks to recursively parse the legacy graph."""
+  symbol_table_constraint = symbol_table_cls.constraint()
   return [
     # Recursively requests HydratedTargets, which will result in an eager, transitive graph walk.
     (HydratedTargets,
-     [SelectDependencies(HydratedTarget, Addresses, field_types=(Address,), transitive=True)],
+     [SelectDependencies(HydratedTarget,
+                         Addresses,
+                         field_types=(Address,), transitive=True)],
      HydratedTargets),
     (HydratedTarget,
-     [Select(TargetAdaptor),
-      SelectDependencies(HydratedField, TargetAdaptor, 'field_adaptors', field_types=(SourcesField, BundlesField,))],
+     [Select(symbol_table_constraint),
+      SelectDependencies(HydratedField,
+                         symbol_table_constraint,
+                         'field_adaptors',
+                         field_types=(SourcesField, BundlesField,))],
      hydrate_target),
     (HydratedField,
      [Select(SourcesField),

@@ -15,6 +15,7 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.source.source_root import SourceRootCategories
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 
@@ -248,7 +249,7 @@ class GoBuildgen(GoTask):
     def gather_go_buildfiles(rel_path):
       address_mapper = self.context.address_mapper
       for build_file in address_mapper.scan_build_files(base_path=rel_path):
-        existing_go_buildfiles.add(build_file.relpath)
+        existing_go_buildfiles.add(build_file)
 
     gather_go_buildfiles(generation_result.local_root)
     if remote and generation_result.remote_root != generation_result.local_root:
@@ -274,9 +275,9 @@ class GoBuildgen(GoTask):
       for existing_go_buildfile in existing_go_buildfiles:
         spec_path = os.path.dirname(existing_go_buildfile)
         for address in self.context.address_mapper.addresses_in_spec_path(spec_path):
-          target = self.context.address_mapper.resolve(address)
+          target = self.context.build_graph.resolve_address(address)
           if isinstance(target, GoLocalSource):
-            os.unlink(existing_go_buildfile)
+            os.unlink(os.path.join(get_buildroot(), existing_go_buildfile))
             deleted.append(existing_go_buildfile)
       if deleted:
         self.context.log.info('Deleted the following obsolete BUILD files:\n\t{}'
@@ -331,9 +332,19 @@ class GoBuildgen(GoTask):
     # The GOPATH's 1st element is read-write, the rest are read-only; ie: their sources build to
     # the 1st element's pkg/ and bin/ dirs.
 
+    go_roots_by_category = defaultdict(list)
     # TODO: Add "find source roots for lang" functionality to SourceRoots and use that instead.
-    all_roots = list(self.context.source_roots.all_roots())
-    local_roots = [sr.path for sr in all_roots if 'go' in sr.langs]
+    for sr in self.context.source_roots.all_roots():
+      if 'go' in sr.langs:
+        go_roots_by_category[sr.category].append(sr.path)
+
+    if go_roots_by_category[SourceRootCategories.TEST]:
+      raise self.InvalidLocalRootsError('Go buildgen does not support test source roots.')
+    if go_roots_by_category[SourceRootCategories.UNKNOWN]:
+      raise self.InvalidLocalRootsError('Go buildgen does not support source roots of '
+                                        'unknown category.')
+
+    local_roots = go_roots_by_category[SourceRootCategories.SOURCE]
     if not local_roots:
       raise self.NoLocalRootsError('Can only BUILD gen if a Go local sources source root is '
                                    'defined.')
@@ -357,7 +368,7 @@ class GoBuildgen(GoTask):
       if not local_go_targets:
         return None
 
-    remote_roots = [sr.path for sr in all_roots if 'go_remote' in sr.langs]
+    remote_roots = go_roots_by_category[SourceRootCategories.THIRDPARTY]
     if len(remote_roots) > 1:
       raise self.InvalidRemoteRootsError('Can only BUILD gen for a single Go remote library source '
                                          'root, found:\n\t{}'

@@ -332,6 +332,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 360,
 )
 
 python_tests(
@@ -355,6 +356,7 @@ python_tests(
   sources = ['test_junit_run.py'],
   dependencies = [
     '3rdparty/python:mock',
+    'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',
     'src/python/pants/backend/python/tasks:python',
@@ -583,6 +585,16 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/tasks:properties',
   ]
+)
+
+python_tests(
+  name = 'scalafmt',
+  sources = ['test_scalafmt.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:scalafmt',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

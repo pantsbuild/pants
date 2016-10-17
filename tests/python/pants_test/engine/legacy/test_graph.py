@@ -13,6 +13,7 @@ from contextlib import contextmanager
 import mock
 
 from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
+from pants.bin.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
@@ -77,16 +78,15 @@ def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=
   :yields: A tuple of (graph, addresses, scheduler).
   """
   path_ignore_patterns = path_ignore_patterns or ['.*']
-  spec_roots = EngineInitializer.parse_commandline_to_spec_roots(options=options)
+  target_roots = TargetRoots.create(options=options)
   graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                       symbol_table_cls=symbol_table_cls)
-  scheduler, engine, _ = graph_helper
   try:
-    graph, _ = graph_helper.create_build_graph(spec_roots)
-    addresses = tuple(graph.inject_specs_closure(spec_roots))
-    yield graph, addresses, scheduler
+    graph = graph_helper.create_build_graph(target_roots)[0]
+    addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
+    yield graph, addresses, graph_helper.scheduler
   finally:
-    engine.close()
+    graph_helper.engine.close()
 
 
 class GraphInvalidationTest(unittest.TestCase):

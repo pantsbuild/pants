@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 from abc import abstractmethod
 from contextlib import contextmanager
@@ -26,6 +27,9 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
+
+
+logger = logging.getLogger(__name__)
 
 
 class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
@@ -374,6 +378,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 
+    self._maybe_create_results_dirs(invalidation_check.all_vts)
+
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
         cached_vts, uncached_vts, uncached_causes = \
@@ -394,8 +400,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       # Now that we've checked the cache, re-partition whatever is still invalid.
       invalidation_check = \
         InvalidationCheck(invalidation_check.all_vts, uncached_vts)
-
-    self._maybe_create_results_dirs(invalidation_check.all_vts)
 
     if not silent:
       targets = []
@@ -490,7 +494,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return [], [], []
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key, vt.results_dir if vt.has_results_dir else None)
+    items = [(read_cache, vt.cache_key, vt.current_results_dir if self.cache_target_dirs else None)
              for vt in vts]
 
     res = self.context.subproc_map(call_use_cached_files, items)
@@ -589,6 +593,23 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       raise TaskError('Multiple targets specified: {}'
                       .format(', '.join([repr(t) for t in target_roots])))
     return target_roots[0]
+
+  def determine_target_roots(self, goal_name, predicate=None):
+    """Helper for tasks that scan for default target roots.
+
+    :param string goal_name: The goal name to use for any warning emissions.
+    :param callable predicate: The predicate to pass to `context.scan().targets(predicate=X)`.
+    """
+    if not self.context.target_roots and not self.get_options().enable_v2_engine:
+      logger.warn('The behavior of `./pants {0}` (no explicit targets) will soon become a no-op. '
+                  'To remove this warning, please specify one or more explicit target specs (e.g. '
+                  '`./pants {0} ::`).'.format(goal_name))
+      # For the v1 path, continue the behavior of e.g. `./pants list` implies `./pants list ::`.
+      return self.context.scan().targets(predicate=predicate)
+
+    # For the v2 path, e.g. `./pants list` is a functional no-op. This matches the v2 mode behavior
+    # of e.g. `./pants --changed-parent=HEAD list` (w/ no changes) returning an empty result.
+    return self.context.target_roots
 
 
 class Task(TaskBase):

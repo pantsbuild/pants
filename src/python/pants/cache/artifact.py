@@ -83,10 +83,13 @@ class DirectoryArtifact(Artifact):
 class TarballArtifact(Artifact):
   """An artifact stored in a tarball."""
 
-  def __init__(self, artifact_root, tarfile_, compression=9):
+  # TODO: Expose `dereference` for tasks.
+  # https://github.com/pantsbuild/pants/issues/3961
+  def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
     super(TarballArtifact, self).__init__(artifact_root)
     self._tarfile = tarfile_
     self._compression = compression
+    self._dereference = dereference
 
   def exists(self):
     return os.path.isfile(self._tarfile)
@@ -96,7 +99,7 @@ class TarballArtifact(Artifact):
     # but decompression times are much faster.
     mode = 'w:gz'
 
-    tar_kwargs = {'dereference': True, 'errorlevel': 2, 'compresslevel': self._compression}
+    tar_kwargs = {'dereference': self._dereference, 'errorlevel': 2, 'compresslevel': self._compression}
 
     with open_tar(self._tarfile, mode, **tar_kwargs) as tarout:
       for path in paths or ():

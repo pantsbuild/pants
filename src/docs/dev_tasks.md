@@ -52,6 +52,15 @@ goal `foo`, use `Goal.by_name('foo').install`. You can install more than
 one task in a goal; e.g., there are separate tasks to run Java tests and
 Python tests; but both are in the `test` goal.
 
+Generally you'll be installing your task into an existing goal like `test`,
+`fmt` or `compile`. You can find most of these goals and their purpose by
+running the `./pants goals` command; however, some goals of a general nature
+are installed by pants without tasks and are thus hidden from `./pants goals`
+output. The `buildgen` goal is an example of this, reserving a slot for tasks
+that can auto-generate BUILD files for various languages; none of which are
+installed by default. You can hunt for these by searching for `Goal.register`
+calls in `src/python/pants/core_tasks/register.py`.
+
 Products: How one Task consumes the output of another
 ---------------------------------------------------
 

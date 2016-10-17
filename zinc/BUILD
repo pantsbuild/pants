@@ -1,5 +1,4 @@
 jvm_binary(
-  name='zinc',
   basename='zinc',
   main='org.pantsbuild.zinc.Main',
   dependencies=[

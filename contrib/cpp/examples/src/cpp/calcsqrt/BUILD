@@ -3,7 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 cpp_binary(
-  name='calcsqrt',
   sources=['main.cc'],
   libraries=['m'],
 )

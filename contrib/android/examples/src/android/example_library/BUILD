@@ -3,7 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 android_library(
-  name='example_library',
   manifest='AndroidManifest.xml',
   libraries=['contrib/android/examples/3rdparty/android:android-support-v4'],
   include_patterns=[

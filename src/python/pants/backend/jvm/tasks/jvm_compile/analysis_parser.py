@@ -61,19 +61,6 @@ class AnalysisParser(object):
                                                                   firstline,
                                                                   self.current_test_header))
 
-  def is_nonempty_analysis(self, path):
-    """Does the specified analysis file contain information for at least one source file."""
-    if not os.path.exists(path):
-      return False
-    with open(path, 'rb') as infile:
-      with raise_on_eof(infile):
-        # Skip until we get to the section that will be nonempty iff the analysis is nonempty.
-        expected_header = b'{0}:\n'.format(self.empty_test_header)
-        while infile.next() != expected_header:
-          pass
-        # Now see if this section is empty or not.
-        return self.parse_num_items(infile.next()) > 0
-
   def parse_from_path(self, infile_path):
     """Parse an analysis instance from a text file."""
     with open(infile_path, 'rb') as infile:

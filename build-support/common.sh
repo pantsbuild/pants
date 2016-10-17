@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-
-
 function log() {
   echo -e "$@" 1>&2
 }

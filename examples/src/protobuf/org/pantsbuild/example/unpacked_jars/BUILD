@@ -1,13 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-java_protobuf_library(name='unpacked_jars',
-  # This uses the legacy deferred sources mechanism.
-  sources=from_target(':external-source'),
-)
-
-remote_sources(name='better-unpacked-jars',
-  # This uses the new deferred sources mechanism.
+remote_sources(
   dest=java_protobuf_library,
   sources_target=':external-source',
 )

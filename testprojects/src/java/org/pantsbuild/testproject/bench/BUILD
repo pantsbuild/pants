@@ -1,6 +1,7 @@
-benchmark(name='bench',
-          dependencies=[':caliper'],
-          sources=['CaliperBench.java'])
+benchmark(
+  dependencies=[':caliper'],
+  sources=['CaliperBench.java']
+)
 
 jar_library(
   name= 'caliper',

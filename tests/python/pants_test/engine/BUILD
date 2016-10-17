@@ -108,7 +108,6 @@ python_tests(
 )
 
 python_tests(
-  name='engine',
   sources=['test_engine.py'],
   dependencies=[
     'src/python/pants/base:cmd_line_spec_parser',
@@ -165,6 +164,7 @@ python_tests(
   sources=['test_rules.py'],
   coverage=['pants.engine.rules'],
   dependencies=[
+    ':scheduler_test_base',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:rules',
   ]

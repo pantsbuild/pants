@@ -53,7 +53,7 @@ class IsortPythonTask(PythonTask):
 
     # If neither targets nor passthru are specified, isort ::
     if not self.context.target_roots and not self.get_passthru_args():
-      targets = self.context.scan().targets()
+      targets = self.determine_target_roots('fmt.isort')
     else:
       targets = self.context.targets()
 

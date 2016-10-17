@@ -32,7 +32,6 @@ python_tests(
 )
 
 python_tests(
-  name='task',
   sources=['test_task.py'],
   dependencies=[
     'src/python/pants/build_graph',

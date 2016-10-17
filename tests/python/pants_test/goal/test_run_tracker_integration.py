@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import os
 
 from pants.util.contextutil import temporary_file_path
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -27,3 +28,24 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('run_info', stats_json)
         self.assertIn('self_timings', stats_json)
         self.assertIn('cumulative_timings', stats_json)
+
+  def test_workunit_failure(self):
+    pants_run = self.run_pants([
+      '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
+      '--backend-packages={}'.format('pants_test.goal.data'),
+      'run-dummy-workunit',
+      '--no-success'
+    ])
+    # Make sure the task actually happens and of no exception.
+    self.assertIn('[run-dummy-workunit]', pants_run.stdout_data)
+    self.assertNotIn('Exception', pants_run.stderr_data)
+    self.assert_failure(pants_run)
+
+  def test_workunit_success(self):
+    pants_run = self.run_pants([
+      '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
+      '--backend-packages={}'.format('pants_test.goal.data'),
+      'run-dummy-workunit',
+      '--success'
+    ])
+    self.assert_success(pants_run)
