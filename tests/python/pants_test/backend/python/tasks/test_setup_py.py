@@ -22,6 +22,7 @@ from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
@@ -38,6 +39,7 @@ class TestSetupPy(PythonTaskTestBase):
     super(TestSetupPy, self).setUp()
     distdir = os.path.join(self.build_root, 'dist')
     self.set_options(pants_distdir=distdir)
+    init_subsystem(Target.Arguments)
 
     self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
 

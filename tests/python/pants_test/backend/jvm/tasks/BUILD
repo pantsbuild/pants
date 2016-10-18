@@ -157,6 +157,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
+    'src/python/pants/build_graph',
+    'src/python/pants/subsystem',
     'tests/python/pants_test:base_test',
   ]
 )
