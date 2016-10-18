@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -14,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, touch
 from pants_test.base_test import TestGenerator
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 from pants_test.testutils.git_util import initialize_repo
 
 
@@ -81,6 +82,9 @@ def create_isolated_git_repo():
 
     # Create an empty pants config file.
     touch(os.path.join(worktree, 'pants.ini'))
+
+    # Copy .gitignore to new repo.
+    shutil.copyfile('.gitignore', os.path.join(worktree, '.gitignore'))
 
     with initialize_repo(worktree=worktree, gitdir=os.path.join(worktree, '.git')) as git:
       # Resource File
@@ -264,6 +268,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
     # If we get to here without asserting, we know all copies of stdout are identical - return one.
     return changed_run.stdout_data
 
+  @ensure_engine
   def test_changed_options_scope_shadowing(self):
     """Tests that the `test-changed` scope overrides `changed` scope."""
     changed_src = 'src/python/python_targets/test_library.py'
@@ -291,6 +296,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
           continue  # Ignore subset matches.
         self.assertNotIn(not_expected_item, pants_run.stdout_data)
 
+  @ensure_engine
   def test_changed_options_scope_positional(self):
     changed_src = 'src/python/python_targets/test_library.py'
     expected_set = set(self.TEST_MAPPING[changed_src]['transitive'])
@@ -307,6 +313,61 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       self.assert_success(pants_run)
       for expected_item in expected_set:
         self.assertIn(expected_item, pants_run.stdout_data)
+
+  @ensure_engine
+  def test_test_changed_exclude_target(self):
+    changed_src = 'src/python/python_targets/test_library.py'
+    exclude_target_regexp = r'_[0-9]'
+    excluded_set = {'src/python/python_targets:test_library_transitive_dependee_2',
+                    'src/python/python_targets:test_library_transitive_dependee_3',
+                    'src/python/python_targets:test_library_transitive_dependee_4'}
+    expected_set = set(self.TEST_MAPPING[changed_src]['transitive']) - excluded_set
+
+    with create_isolated_git_repo() as worktree:
+      with mutated_working_copy([os.path.join(worktree, changed_src)]):
+        pants_run = self.run_pants([
+          '-ldebug',   # This ensures the changed target names show up in the pants output.
+          '--exclude-target-regexp={}'.format(exclude_target_regexp),
+          'test-changed',
+          '--changes-since=HEAD',
+          '--include-dependees=transitive'
+        ])
+
+      self.assert_success(pants_run)
+      for expected_item in expected_set:
+        self.assertIn(expected_item, pants_run.stdout_data)
+
+      for excluded_item in excluded_set:
+        self.assertNotIn(excluded_item, pants_run.stdout_data)
+
+  @ensure_engine
+  def test_changed_changed_since_and_files(self):
+    with create_isolated_git_repo():
+      stdout = self.assert_changed_new_equals_old(['--changed-since=HEAD^^', '--files'])
+
+      # The output should be the files added in the last 2 commits.
+      self.assertEqual(
+        lines_to_set(stdout),
+        {'src/python/sources/BUILD',
+         'src/python/sources/sources.py',
+         'src/python/sources/sources.txt',
+         '3rdparty/BUILD'}
+      )
+
+  @ensure_engine
+  def test_changed_diffspec_and_files(self):
+    with create_isolated_git_repo():
+      git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD^^']).strip()
+      stdout = self.assert_changed_new_equals_old(['--changed-diffspec={}'.format(git_sha), '--files'])
+
+      # The output should be the files added in the last 2 commits.
+      self.assertEqual(
+        lines_to_set(stdout),
+        {'src/python/python_targets/BUILD',
+         'src/python/python_targets/test_binary.py',
+         'src/python/python_targets/test_library.py',
+         'src/python/python_targets/test_unclaimed_src.py'}
+      )
 
   # Following 4 tests do not run in isolated repo because they don't mutate working copy.
   def test_changed(self):

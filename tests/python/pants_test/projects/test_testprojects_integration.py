@@ -83,7 +83,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
                           timeout_targets + deliberately_conflicting_targets)
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
                        targets_to_exclude)
-    pants_run = self.pants_test(['testprojects::', '--jvm-platform-default-platform=java6'] + exclude_opts)
+    pants_run = self.pants_test(['testprojects::', '--jvm-platform-default-platform=java7'] + exclude_opts)
     self.assert_success(pants_run)
 
   # This is a special case that we split into 2 tests instead of using ensure_engine.

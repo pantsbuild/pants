@@ -62,7 +62,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
     jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
-    scala_lib = self.make_target('//:b', JavaLibrary)
+    scala_lib = self.make_target('//:b', JavaLibrary, sources=[])
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
@@ -177,7 +177,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_jar_lib = self._make_junit_target()
 
-    excluding_target = self.make_target('//:b', JavaLibrary, excludes=[Exclude('junit', 'junit')])
+    excluding_target = self.make_target('//:b', JavaLibrary, sources=[],
+                                        excludes=[Exclude('junit', 'junit')])
     compile_classpath = self.resolve([junit_jar_lib, excluding_target])
 
     junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
@@ -189,7 +190,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
-    target = self.make_target('//:a', JavaLibrary)
+    target = self.make_target('//:a', JavaLibrary, sources=[])
     self.assertTrue(self.resolve([target]))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=1)

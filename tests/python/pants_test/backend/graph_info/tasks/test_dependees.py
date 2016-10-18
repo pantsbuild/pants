@@ -62,12 +62,14 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
     def add_to_build_file(path, name, alias=False, deps=()):
       self.add_to_build_file(path, dedent("""
           {type}(name='{name}',
-            dependencies=[{deps}]
+            dependencies=[{deps}],
+            {sources}
           )
           """.format(
         type='target' if alias else 'python_library',
         name=name,
-        deps=','.join("'{0}'".format(dep) for dep in list(deps)))
+        deps=','.join("'{0}'".format(dep) for dep in list(deps)),
+        sources='' if alias else 'sources=[]'),
       ))
 
     add_to_build_file('common/a', 'a', deps=['common/d'])
@@ -91,6 +93,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
     self.add_to_build_file('src/java/a', dedent("""
       java_library(
         name='a_java',
+        sources=[],
         resources=['resources/a:a_resources']
       )
     """))

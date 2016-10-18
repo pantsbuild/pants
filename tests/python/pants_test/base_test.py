@@ -273,7 +273,7 @@ class BaseTest(unittest.TestCase):
     """
     :API: public
     """
-    # Many tests use source root functionality via the SourceRootConfig.global_instance()
+    # Many tests use source root functionality via the SourceRootConfig.global_instance().
     # (typically accessed via Target.target_base), so we always set it up, for convenience.
     optionables = {SourceRootConfig}
     extra_scopes = set()

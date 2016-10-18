@@ -31,7 +31,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     """
     :API: public
     """
-    sources = ['__init__.py'] + source_contents_map.keys() if source_contents_map else None
+    sources = None if source_contents_map is None else ['__init__.py'] + source_contents_map.keys()
     sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""
     python_library(

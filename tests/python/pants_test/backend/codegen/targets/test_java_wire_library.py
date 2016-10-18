@@ -31,7 +31,6 @@ class JavaWireLibraryTest(BaseTest):
 
   def test_label_fields(self):
     target = self.make_target('//:foo', JavaWireLibrary)
-    self.assertTrue(target.has_label('codegen'))
     self.assertTrue(target.has_label('exportable'))
 
   def test_wire_service_options(self):

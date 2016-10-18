@@ -22,7 +22,7 @@ class FindBugsTest(PantsRunIntegrationTest):
     full_config = {
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/findbugs/src/python"],
-        'backend_packages': ["pants.contrib.findbugs"]
+        'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.findbugs"]
       }
     }
     if config:
@@ -119,7 +119,7 @@ class FindBugsTest(PantsRunIntegrationTest):
     self.assertIn('Bugs: 1 (High: 1, Normal: 0, Low: 0)', pants_run.stdout_data)
 
   def test_transitive(self):
-    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:all']
+    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:no_sources']
     pants_ini_config = {'compile.findbugs': {'transitive': False}}
     pants_run = self.run_pants(cmd, config=pants_ini_config)
     self.assert_success(pants_run)

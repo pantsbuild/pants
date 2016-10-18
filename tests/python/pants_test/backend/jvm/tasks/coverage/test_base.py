@@ -113,7 +113,8 @@ class TestBase(BaseTest):
                                        dependencies=[self.binary_target])
 
     self.java_target = self.make_target(spec='//foo:foo-java',
-                                        target_type=JavaLibrary)
+                                        target_type=JavaLibrary,
+                                        sources=[])
 
     self.annotation_target = self.make_target(spec='//foo:foo-anno',
                                               target_type=AnnotationProcessor)

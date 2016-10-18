@@ -49,7 +49,8 @@ class ChangedTargetTask(NoopExecTask):
   def alternate_target_roots(cls, options, address_mapper, build_graph):
     changed = Changed.Factory.global_instance().create(options)
     change_calculator = changed.change_calculator(build_graph=build_graph,
-                                                  address_mapper=address_mapper)
+                                                  address_mapper=address_mapper,
+                                                  exclude_target_regexp=options.exclude_target_regexp)
     changed_addresses = change_calculator.changed_target_addresses()
     readable = ''.join(sorted('\n\t* {}'.format(addr.reference()) for addr in changed_addresses))
     logger.info('Operating on changed {} target(s): {}'.format(len(changed_addresses), readable))

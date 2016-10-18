@@ -3,6 +3,7 @@
 
 python_library(
   name='test_infra',
+  sources=[],
   dependencies=[
     'tests/python/pants_test:base_test',
     'tests/python/pants_test:int-test',

@@ -3,9 +3,9 @@
 
 package org.pantsbuild.testproject.targetlevels.unspecified;
 
-public class Six {
+public class Seven {
     public static void main(String[] args) {
         Unspecified.main(args);
-        System.out.println("Java target level six.");
+        System.out.println("Java target level seven.");
     }
 }

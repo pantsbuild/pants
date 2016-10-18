@@ -39,6 +39,7 @@ class SortTargetsTest(BaseSortTargetsTest):
       all_deps = ["'{0}'".format(dep) for dep in list(deps)]
       self.add_to_build_file(path, dedent("""
           python_library(name='{name}',
+            sources=[],
             dependencies=[{all_deps}]
           )
           """.format(name=name, all_deps=','.join(all_deps))))
