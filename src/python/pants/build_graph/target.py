@@ -768,7 +768,7 @@ class Target(AbstractTarget):
                                             exclude=exclude)
     return None
 
-  def create_sources_field(self, sources, sources_rel_path, address=None, key_arg=None):
+  def create_sources_field(self, sources, sources_rel_path, key_arg=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.
 
     Note that this method is called before the call to Target.__init__ so don't expect fields to
