@@ -8,6 +8,7 @@ java_library(
     '3rdparty:guava',
     '3rdparty:jsr305',
   ],
+  platform='java7',
   provides=artifact(
     org='org.pantsbuild',
     name='args4j',
