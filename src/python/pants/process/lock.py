@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import errno
 import logging
+import os
 import sys
 
 import psutil
@@ -30,8 +31,8 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
   @property
   def missing_message_output(self):
     return (
-      'Waiting for a file lock ({}), but there was no message at {} indicating who is holding it.'
-      .format(self.path, self.message_path)
+      'Pid {} waiting for a file lock ({}), but there was no message at {} indicating who is holding it.'
+      .format(os.getpid(), self.path, self.message_path)
     )
 
   def acquire(self, message_fn=print_to_stderr, **kwargs):
@@ -40,7 +41,7 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
       try:
         with open(self.message_path, 'rb') as f:
           message = f.read().decode('utf-8', 'replace')
-          output = 'Waiting for a file lock ({}) held by: {}'.format(self.path, message)
+          output = 'PID {} waiting for a file lock ({}) held by: {}'.format(os.getpid(), self.path, message)
       except IOError as e:
         if e.errno == errno.ENOENT:
           output = self.missing_message_output
