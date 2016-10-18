@@ -4,20 +4,20 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::mem;
 
-use core::{Field, Id, Key, TypeId, Value};
+use core::{Field, Id, Key, TypeConstraint, TypeId, Value};
 
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = libc::c_void;
 
-pub type IsSubClassExtern =
-  extern "C" fn(*const ExternContext, *const TypeId, *const TypeId) -> bool;
+pub type SatisfiedByExtern =
+  extern "C" fn(*const ExternContext, *const TypeConstraint, *const TypeId) -> bool;
 
 #[derive(Clone)]
 pub struct Externs {
   context: *const ExternContext,
   key_for: KeyForExtern,
-  issubclass: IsSubClassExtern,
-  issubclass_cache: RefCell<HashMap<(TypeId,TypeId),bool>>,
+  satisfied_by: SatisfiedByExtern,
+  satisfied_by_cache: RefCell<HashMap<(TypeConstraint,TypeId),bool>>,
   store_list: StoreListExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
@@ -31,7 +31,7 @@ impl Externs {
     key_for: KeyForExtern,
     id_to_str: IdToStrExtern,
     val_to_str: ValToStrExtern,
-    issubclass: IsSubClassExtern,
+    satisfied_by: SatisfiedByExtern,
     store_list: StoreListExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
@@ -39,8 +39,8 @@ impl Externs {
     Externs {
       context: ext_context,
       key_for: key_for,
-      issubclass: issubclass,
-      issubclass_cache: RefCell::new(HashMap::new()),
+      satisfied_by: satisfied_by,
+      satisfied_by_cache: RefCell::new(HashMap::new()),
       store_list: store_list,
       project: project,
       project_multi: project_multi,
@@ -53,16 +53,12 @@ impl Externs {
     (self.key_for)(self.context, val)
   }
 
-  pub fn issubclass(&self, cls: &TypeId, super_cls: &TypeId) -> bool {
-    if cls == super_cls {
-      true
-    } else {
-      self.issubclass_cache.borrow_mut().entry((*cls, *super_cls))
-        .or_insert_with(||
-          (self.issubclass)(self.context, cls, super_cls)
-        )
-        .clone()
-    }
+  pub fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
+    self.satisfied_by_cache.borrow_mut().entry((*constraint, *cls))
+      .or_insert_with(||
+        (self.satisfied_by)(self.context, constraint, cls)
+      )
+      .clone()
   }
 
   pub fn store_list(&self, values: Vec<&Value>, merge: bool) -> Value {

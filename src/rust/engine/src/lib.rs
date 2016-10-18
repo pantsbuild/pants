@@ -13,12 +13,12 @@ use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
 
-use core::{Field, Function, Key, TypeId, Value};
+use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   ExternContext,
   Externs,
   IdToStrExtern,
-  IsSubClassExtern,
+  SatisfiedByExtern,
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
@@ -189,16 +189,16 @@ pub extern fn scheduler_create(
   key_for: KeyForExtern,
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
-  issubclass: IsSubClassExtern,
+  satisfied_by: SatisfiedByExtern,
   store_list: StoreListExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
-  type_address: TypeId,
-  type_has_products: TypeId,
-  type_has_variants: TypeId,
+  type_address: TypeConstraint,
+  type_has_products: TypeConstraint,
+  type_has_variants: TypeConstraint,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let externs = 
@@ -207,7 +207,7 @@ pub extern fn scheduler_create(
       key_for,
       id_to_str,
       val_to_str,
-      issubclass,
+      satisfied_by,
       store_list,
       project,
       project_multi,
@@ -251,7 +251,7 @@ pub extern fn execution_reset(scheduler_ptr: *mut RawScheduler) {
 pub extern fn execution_add_root_select(
   scheduler_ptr: *mut RawScheduler,
   subject: Key,
-  product: TypeId,
+  product: TypeConstraint,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.add_root_select(subject, product);
@@ -262,8 +262,8 @@ pub extern fn execution_add_root_select(
 pub extern fn execution_add_root_select_dependencies(
   scheduler_ptr: *mut RawScheduler,
   subject: Key,
-  product: TypeId,
-  dep_product: TypeId,
+  product: TypeConstraint,
+  dep_product: TypeConstraint,
   field: Field,
   transitive: bool,
 ) {

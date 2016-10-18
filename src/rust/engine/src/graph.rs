@@ -76,8 +76,8 @@ impl Entry {
     format!(
       "{}:{}:{} == {}",
       self.node.format(externs),
-      externs.id_to_str(self.node.subject().key()),
-      externs.id_to_str(self.node.selector().product()),
+      externs.id_to_str(self.node.subject().id()),
+      externs.id_to_str(&self.node.selector().product().0),
       state,
     ).replace("\"", "\\\"")
   }

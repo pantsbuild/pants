@@ -20,6 +20,7 @@ _FFI.cdef(
     } Id;
 
     typedef Id TypeId;
+    typedef Id TypeConstraint;
     typedef Id Function;
 
     typedef struct {
@@ -51,7 +52,7 @@ _FFI.cdef(
     typedef Key         (*extern_key_for)(ExternContext*, Value*);
     typedef UTF8Buffer  (*extern_id_to_str)(ExternContext*, Id*);
     typedef UTF8Buffer  (*extern_val_to_str)(ExternContext*, Value*);
-    typedef bool        (*extern_issubclass)(ExternContext*, TypeId*, TypeId*);
+    typedef bool        (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value       (*extern_store_list)(ExternContext*, Value*, uint64_t, bool);
     typedef Value       (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer (*extern_project_multi)(ExternContext*, Value*, Field*);
@@ -97,7 +98,7 @@ _FFI.cdef(
                                    extern_key_for,
                                    extern_id_to_str,
                                    extern_val_to_str,
-                                   extern_issubclass,
+                                   extern_satisfied_by,
                                    extern_store_list,
                                    extern_project,
                                    extern_project_multi,
@@ -111,12 +112,12 @@ _FFI.cdef(
 
     void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeId);
 
-    void task_add(RawScheduler*, Function, TypeId);
-    void task_add_select(RawScheduler*, TypeId);
-    void task_add_select_variant(RawScheduler*, TypeId, Key);
-    void task_add_select_literal(RawScheduler*, Key, TypeId);
-    void task_add_select_dependencies(RawScheduler*, TypeId, TypeId, Field, bool);
-    void task_add_select_projection(RawScheduler*, TypeId, TypeId, Field, TypeId);
+    void task_add(RawScheduler*, Function, TypeConstraint);
+    void task_add_select(RawScheduler*, TypeConstraint);
+    void task_add_select_variant(RawScheduler*, TypeConstraint, Key);
+    void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
+    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
+    void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
     void task_end(RawScheduler*);
 
     uint64_t graph_len(RawScheduler*);
@@ -124,11 +125,11 @@ _FFI.cdef(
     void graph_visualize(RawScheduler*, char*);
 
     void execution_reset(RawScheduler*);
-    void execution_add_root_select(RawScheduler*, Key, TypeId);
+    void execution_add_root_select(RawScheduler*, Key, TypeConstraint);
     void execution_add_root_select_dependencies(RawScheduler*,
                                                 Key,
-                                                TypeId,
-                                                TypeId,
+                                                TypeConstraint,
+                                                TypeConstraint,
                                                 Field,
                                                 bool);
     void execution_next(RawScheduler*,
@@ -169,12 +170,11 @@ def extern_val_to_str(context_handle, val):
   return (c.utf8_buf(str_bytes), len(str_bytes))
 
 
-@_FFI.callback("bool(ExternContext*, TypeId*, TypeId*)")
-def extern_issubclass(context_handle, cls_id, super_cls_id):
-  """Given two TypeIds, return issubclass(cls, super_cls)."""
+@_FFI.callback("bool(ExternContext*, TypeConstraint*, TypeId*)")
+def extern_satisfied_by(context_handle, constraint_id, cls_id):
+  """Given two TypeIds, return constraint.satisfied_by(cls)."""
   c = _FFI.from_handle(context_handle)
-  print(">>> {} {}".format(c.from_id(cls_id), c.from_id(super_cls_id)))
-  return issubclass(c.from_id(cls_id), c.from_id(super_cls_id))
+  return c.from_id(constraint_id).satisfied_by(c.from_id(cls_id))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, uint64_t, bool)")

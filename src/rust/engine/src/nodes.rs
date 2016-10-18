@@ -1,5 +1,5 @@
 use graph::{Entry, Graph};
-use core::{Field, Function, Key, TypeId, Value, Variants};
+use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
 use selectors;
@@ -54,7 +54,7 @@ impl<'g,'t> StepContext<'g,'t> {
    *
    * (analogous to NodeBuilder.gen_nodes)
    */
-  fn gen_nodes(&self, subject: &Key, product: &TypeId, variants: &Variants) -> Vec<Node> {
+  fn gen_nodes(&self, subject: &Key, product: &TypeConstraint, variants: &Variants) -> Vec<Node> {
     self.tasks.gen_tasks(subject.type_id(), product)
       .map(|tasks| {
         tasks.iter()
@@ -90,16 +90,16 @@ impl<'g,'t> StepContext<'g,'t> {
     })
   }
 
-  fn type_address(&self) -> &TypeId {
+  fn type_address(&self) -> &TypeConstraint {
     &self.tasks.type_address
   }
 
-  fn type_has_variants(&self) -> &TypeId {
+  fn type_has_variants(&self) -> &TypeConstraint {
     &self.tasks.type_has_variants
   }
 
   fn has_products(&self, item: &Value) -> bool {
-    self.tasks.externs.issubclass(item.type_id(), &self.tasks.type_has_products)
+    self.tasks.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
   }
 
   fn field_name(&self, item: &Value) -> Key {
@@ -129,10 +129,10 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   /**
-   * Calls back to Python for an issubclass check.
+   * Calls back to Python for an satisfied_by check.
    */
-  fn issubclass(&self, cls: &TypeId, supercls: &TypeId) -> bool {
-    self.tasks.externs.issubclass(cls, supercls)
+  fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
+    self.tasks.externs.satisfied_by(constraint, cls)
   }
 
   /**
@@ -173,7 +173,7 @@ pub struct Select {
 }
 
 impl Select {
-  fn product(&self) -> &TypeId {
+  fn product(&self) -> &TypeConstraint {
     &self.selector.product
   }
 
@@ -183,7 +183,7 @@ impl Select {
     candidate: &'a Value,
     variant_value: Option<&Key>
   ) -> Option<&'a Value> {
-    if !context.issubclass(candidate.type_id(), &self.selector.product) {
+    if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
       return None;
     }
     match variant_value {
@@ -230,7 +230,7 @@ impl Step for Select {
     // Request default Variants for the subject, so that if there are any we can propagate
     // them to task nodes.
     let variants =
-      if self.subject.type_id() == context.type_address() &&
+      if context.satisfied_by(context.type_address(), self.subject.type_id()) &&
         self.product() != context.type_has_variants() {
         let variants_node =
           Node::create(
@@ -394,7 +394,7 @@ impl SelectDependencies {
   }
 
   fn store(&self, context: &StepContext, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if self.selector.transitive && dep_product.type_id() == &self.selector.product {
+    if self.selector.transitive && context.satisfied_by(&self.selector.product, dep_product.type_id())  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
       // TODO: would be nice to do this in one operation.
@@ -520,7 +520,7 @@ impl Step for SelectProjection {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   subject: Key,
-  product: TypeId,
+  product: TypeConstraint,
   variants: Variants,
   selector: selectors::Task,
 }
@@ -582,7 +582,7 @@ impl Node {
       &Node::SelectLiteral(_) => "Literal".to_string(),
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
-      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(&t.selector.func)),
+      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(&t.selector.func.0)),
     }
   }
 
@@ -596,7 +596,7 @@ impl Node {
     }
   }
 
-  pub fn product(&self) -> &TypeId {
+  pub fn product(&self) -> &TypeConstraint {
     match self {
       &Node::Select(ref s) => &s.selector.product,
       &Node::SelectLiteral(ref s) => &s.selector.product,

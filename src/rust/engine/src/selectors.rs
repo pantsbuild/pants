@@ -1,37 +1,40 @@
-use core::{Field, Function, Key, TypeId};
+use core::{Field, Function, Key, TypeConstraint, TypeId};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
-  pub product: TypeId,
+  pub product: TypeConstraint,
   pub variant_key: Option<Key>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectDependencies {
-  pub product: TypeId,
-  pub dep_product: TypeId,
+  pub product: TypeConstraint,
+  pub dep_product: TypeConstraint,
   pub field: Field,
   pub transitive: bool,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
-  pub product: TypeId,
+  pub product: TypeConstraint,
+  // TODO: This should in theory be a TypeConstraint, but because the `project` operation
+  // needs to construct an instance of the type if the result doesn't match, we use
+  // a concrete type here.
   pub projected_subject: TypeId,
   pub field: Field,
-  pub input_product: TypeId,
+  pub input_product: TypeConstraint,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectLiteral {
   pub subject: Key,
-  pub product: TypeId,
+  pub product: TypeConstraint,
 }
 
 // NB: The `Task` selector is not user facing, and is provided for symmetry.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
-  pub product: TypeId,
+  pub product: TypeConstraint,
   pub clause: Vec<Selector>,
   pub func: Function,
   pub cacheable: bool,
@@ -47,7 +50,7 @@ pub enum Selector {
 }
 
 impl Selector {
-  pub fn select(product: TypeId) -> Selector {
+  pub fn select(product: TypeConstraint) -> Selector {
     Selector::Select( 
       Select {
         product: product,
@@ -56,7 +59,7 @@ impl Selector {
     )
   }
 
-  pub fn product(&self) -> &TypeId {
+  pub fn product(&self) -> &TypeConstraint {
     match self {
       &Selector::Select(ref s) => &s.product,
       &Selector::SelectLiteral(ref s) => &s.product,

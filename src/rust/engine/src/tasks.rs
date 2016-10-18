@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use core::{Field, Function, Key, TypeId};
+use core::{Field, Function, Key, TypeConstraint, TypeId};
 use externs::Externs;
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
 
@@ -9,15 +9,15 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
  * types that the engine must be aware of.
  */
 pub struct Tasks {
-  intrinsics: HashMap<(TypeId,TypeId), Vec<Task>>,
-  tasks: HashMap<TypeId, Vec<Task>>,
+  intrinsics: HashMap<(TypeId,TypeConstraint), Vec<Task>>,
+  tasks: HashMap<TypeConstraint, Vec<Task>>,
   pub externs: Externs,
   pub field_name: Field,
   pub field_products: Field,
   pub field_variants: Field,
-  pub type_address: TypeId,
-  pub type_has_products: TypeId,
-  pub type_has_variants: TypeId,
+  pub type_address: TypeConstraint,
+  pub type_has_products: TypeConstraint,
+  pub type_has_variants: TypeConstraint,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
 }
@@ -39,9 +39,9 @@ impl Tasks {
     field_name: Field,
     field_products: Field,
     field_variants: Field,
-    type_address: TypeId,
-    type_has_products: TypeId,
-    type_has_variants: TypeId,
+    type_address: TypeConstraint,
+    type_has_products: TypeConstraint,
+    type_has_variants: TypeConstraint,
   ) -> Tasks {
     Tasks {
       intrinsics: HashMap::new(),
@@ -57,12 +57,12 @@ impl Tasks {
     }
   }
 
-  pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeId) -> Option<&Vec<Task>> {
+  pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeConstraint) -> Option<&Vec<Task>> {
     // Use intrinsics if available, otherwise use tasks.
     self.intrinsics.get(&(*subject_type, *product)).or(self.tasks.get(product))
   }
 
-  pub fn intrinsic_add(&mut self, func: Function, subject_type: TypeId, product: TypeId) {
+  pub fn intrinsic_add(&mut self, func: Function, subject_type: TypeId, product: TypeConstraint) {
     self.intrinsics.entry((subject_type, product))
       .or_insert_with(|| Vec::new())
       .push(
