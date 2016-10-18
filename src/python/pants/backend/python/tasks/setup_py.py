@@ -229,14 +229,13 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     owner_by_owned_python_target = OrderedDict()
 
     def collect_potentially_owned_python_targets(current):
-      if (current != exported_target) and self.requires_export(current):
-        owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
+      owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
       return (current == exported_target) or not self.is_exported(current)
 
     self._walk(exported_target, collect_potentially_owned_python_targets)
 
     for owned in owner_by_owned_python_target:
-      if not self.is_exported(owned):
+      if self.requires_export(owned) and not self.is_exported(owned):
         potential_owners = set()
         for potential_owner in self._ancestor_iterator.iter_target_siblings_and_ancestors(owned):
           if self.is_exported(potential_owner) and owned in self._closure(potential_owner):
@@ -272,7 +271,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
           reduced_dependencies.add(current)
         else:
           reduced_dependencies.add(owner)
-        return owner == exported_target
+        return owner == exported_target or not self.requires_export(current)
 
     self._walk(exported_target, collect_reduced_dependencies)
     return reduced_dependencies

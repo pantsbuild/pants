@@ -310,7 +310,7 @@ class TestSetupPy(PythonTaskTestBase):
 
   def test_ambiguous_owner(self):
     self.create_python_library(relpath='foo/bar', name='bar')
-    self.create_file(relpath=self.build_path('foo'), contents=dedent("""
+    self.add_to_build_file('foo', dedent("""
     python_library(
       name='foo1',
       dependencies=[
@@ -340,7 +340,7 @@ class TestSetupPy(PythonTaskTestBase):
       self.dependency_calculator.reduced_dependencies(self.target('foo:foo2'))
 
   @contextmanager
-  def extracted_sdist(src, sdist, expected_prefix, collect_suffixes=None):
+  def extracted_sdist(self, sdist, expected_prefix, collect_suffixes=None):
     collect_suffixes = collect_suffixes or ('.py',)
 
     def collect(path):
@@ -556,8 +556,8 @@ class TestSetupPy(PythonTaskTestBase):
           self.assertEqual('test.exported==0.0.0', fp.read().strip())
 
   def test_prep_command_case(self):
-    PrepCommand.add_goal('compile')
-    PrepCommand.add_goal('test')
+    PrepCommand.add_allowed_goal('compile')
+    PrepCommand.add_allowed_goal('test')
     self.add_to_build_file('build-support/thrift',
                            dedent("""
                            prep_command(
