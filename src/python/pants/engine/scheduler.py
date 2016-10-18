@@ -17,8 +17,9 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.nodes import (ConflictingProducersError, FilesystemNode, LiteralNode, Node, Noop,
-                                Return, Runnable, SelectNode, State, TaskNode, Throw, Waiting)
+from pants.engine.nodes import (ConflictingProducersError, DependenciesNode, FilesystemNode,
+                                LiteralNode, Node, Noop, ProjectionNode, Return, Runnable,
+                                SelectNode, State, TaskNode, Throw, Waiting)
 from pants.engine.rules import (GraphMaker, NodeBuilder, RootRule, RuleGraphEntry, RuleGraphLiteral,
                                 RuleGraphSubjectIsProduct, RuleIndex, RulesetValidator)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -866,29 +867,84 @@ class SomethingOrOther(object):
 
   def _do_rule_edge_stuff(self, selector_path, subject, variants, get_state):
     if type(selector_path) is SelectDependencies:
-      # select for dep_product_selector, if it's return, return None, otherwise wait on it
-      dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants, get_state)
-      if type(dep_state) is Waiting:
-        return dep_state
-      else:
-        # otherwise, return None and let the DependenciesNode do its work
-        return 'not waiting on select dep'
-    if type(selector_path) is SelectProjection:
-      # select for dep_product_selector, if it's return, return None, otherwise wait on it
-      dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants, get_state)
-      if type(dep_state) is Waiting:
-        return dep_state
-      else:
-        # otherwise, return None and let the ProjectionNode do its work
-        return'not waiting on select prj'
-
-    if type(selector_path) is tuple and selector_path[-1] == Select(Variants):
+      return self._handle_select_deps(get_state, selector_path, subject, variants)
+    elif type(selector_path) is SelectProjection:
+      return self._handle_select_projection(get_state, selector_path, subject, variants)
+    elif type(selector_path) is tuple and selector_path[-1] == Select(Variants):
       # this is the nested Select(Variants)
       #len may also be > 2 which the graph currently doesn't understand
       return Noop('no variant support')
       #return 'deferring for select variants'
     else:
       return self._state_via_edges(selector_path, subject, variants, get_state)
+
+  def _handle_select_deps(self, get_state, selector_path, subject, variants):
+    # select for dep_product_selector, if it's return, return None, otherwise wait on it
+    dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector),
+      subject, variants, get_state)
+    if type(dep_state) in (Throw, Waiting):
+      return dep_state
+    elif type(dep_state) is Noop:
+      # return Noop('Could not compute {} in order to project its fields.',
+      # selector_path.input_product_selector)
+      return Noop('Could not compute {} to determine dependencies.',
+        selector_path.input_product_selector)
+    elif type(dep_state) is not Return:
+      # otherwise, return None and let the DependenciesNode do its work
+      State.raise_unrecognized(dep_state)
+    dependencies = []
+    dep_values = []
+    for dep_subject, dep_variants in DependenciesNode.dependency_subject_variants(selector_path,
+      dep_state.value, variants):
+      if type(dep_subject) not in selector_path.field_types:
+        return Throw(TypeError(
+          'Unexpected type "{}" for {}: {!r}'.format(type(dep_subject), selector_path,
+            dep_subject)))
+
+      dep_dep_state = self._state_via_edges(
+        (selector_path, selector_path.projected_product_selector), dep_subject, dep_variants,
+        get_state)
+      if type(dep_dep_state) is Waiting:
+        dependencies.extend(dep_dep_state.dependencies)
+      elif type(dep_dep_state) is Return:
+        dep_values.append(dep_dep_state.value)
+      elif type(dep_dep_state) is Noop:
+        return Throw(ValueError('No source of explicit dependency {} for {}'.format(
+          selector_path.projected_product_selector, dep_subject)))
+      elif type(dep_dep_state) is Throw:
+        # TODO maybe collate these?
+        return dep_dep_state
+      else:
+        State.raise_unrecognized(dep_dep_state)
+    if dependencies:
+      return Waiting(dependencies)
+    return Return(dep_values)
+
+  def _handle_select_projection(self, get_state, selector_path, subject, variants):
+    # select for dep_product_selector, if it's return, return None, otherwise wait on it
+    dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants, get_state)
+    if type(dep_state) in (Throw, Waiting):
+      return dep_state
+    elif type(dep_state) is Noop:
+      return Noop('Could not compute {} in order to project its fields.', selector_path.input_product_selector)
+    elif type(dep_state) is not Return:
+      State.raise_unrecognized(dep_state)
+      # otherwise, return None and let the ProjectionNode do its work
+      #return'not waiting on select prj'
+    try:
+      projected_subject = ProjectionNode.construct_projected_subject(selector_path, dep_state)
+    except Exception as e:
+      return Throw(ValueError(
+        'Fields {} of {} could not be projected as {}: {}'.format(selector_path.fields, dep_state.value,
+          selector_path.projected_subject, e)))
+
+    output_state = self._state_via_edges((selector_path, selector_path.projected_product_selector), projected_subject, variants, get_state)
+    if type(output_state) in (Return, Throw, Waiting):
+      return output_state
+    elif type(output_state) is Noop:
+      return Throw(ValueError('No source of projected dependency {}'.format(selector_path.projected_product_selector)))
+    else:
+      State.raise_unrecognized(output_state)
 
   def _state_via_edges(self, selector_path, subject, variants, get_state):
     nodes, state, rule_entries_for_debugging = self._state_or_nodes_for(selector_path, subject, variants)
@@ -954,6 +1010,7 @@ class SomethingOrOther(object):
       return Throw(ConflictingProducersError.create(subject, final_selector, matches))
     elif len(matches) == 1:
       return Return(matches[0])
+
 
   def get_nodes_and_states(self, subject, selector_path, variants):
     if self.current_node_is_rule_holder:

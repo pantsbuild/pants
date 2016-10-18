@@ -346,15 +346,21 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
     return self.selector.field
 
   def _dependency_subject_variants(self, dep_product):
-    for dependency in getattr(dep_product, self.field or 'dependencies'):
-      variants = self.variants
+    return self.dependency_subject_variants(self.selector, dep_product, self.variants)
+
+  @classmethod
+  def dependency_subject_variants(cls, selector, dep_product, input_variants):
+    for dependency in getattr(dep_product, selector.field or 'dependencies'):
       if isinstance(dependency, Address):
         # If a subject has literal variants for particular dependencies, they win over all else.
         dependency, literal_variants = parse_variants(dependency)
-        variants = Variants.merge(variants, literal_variants)
+        variants = Variants.merge(input_variants, literal_variants)
+      else:
+        variants = input_variants
       yield dependency, variants
 
   def step(self, step_context):
+    raise Exception('select node shouldnt be hit anymore self: {}'.format(self))
     # Request the product we need in order to request dependencies.
     dep_product_selector = self.selector.input_product_selector
     dep_product_state = step_context.select_for(dep_product_selector,
@@ -423,6 +429,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
     return self.selector.input_product
 
   def step(self, step_context):
+    raise Exception('select node shouldnt be hit anymore self: {}'.format(self))
     # Request the product we need to compute the subject.
     input_selector = self.selector.input_product_selector
     input_state = step_context.select_for(input_selector, self.subject, self.variants)
@@ -433,16 +440,12 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
     elif type(input_state) is not Return:
       State.raise_unrecognized(input_state)
 
-    # The input product is available: use it to construct the new Subject.
-    input_product = input_state.value
-    values = [getattr(input_product, field) for field in self.fields]
-
     # If there was only one projected field and it is already of the correct type, project it.
     try:
-      projected_subject = self._construct_projected_subject(values)
+      projected_subject = self._construct_projected_subject(input_state)
     except Exception as e:
       return Throw(ValueError(
-        'Fields {} of {} could not be projected as {}: {}'.format(self.fields, input_product,
+        'Fields {} of {} could not be projected as {}: {}'.format(self.fields, input_state.value,
           self.projected_subject, e)))
 
     # When the output node is available, return its result.
@@ -460,11 +463,17 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selecto
     output_state = step_context.select_for(output_selector, projected_subject, self.variants)
     return output_state
 
-  def _construct_projected_subject(self, values):
-    if len(values) == 1 and type(values[0]) is self.projected_subject:
+  def _construct_projected_subject(self, input_state):
+    return self.construct_projected_subject(self.selector, input_state)
+
+  @classmethod
+  def construct_projected_subject(cls, selector, input_state):
+    input_product = input_state.value
+    values = [getattr(input_product, field) for field in selector.fields]
+    if len(values) == 1 and type(values[0]) is selector.projected_subject:
       projected_subject = values[0]
     else:
-      projected_subject = self.projected_subject(*values)
+      projected_subject = selector.projected_subject(*values)
     return projected_subject
 
 
