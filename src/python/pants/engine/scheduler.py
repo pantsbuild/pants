@@ -118,20 +118,18 @@ class LocalScheduler(object):
     self._execution_request = None
 
     # Validate and register all provided and intrinsic tasks.
-    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
-    # strictly necessary for execution. We might eventually be able to remove it by only executing
-    # validation below the execution roots (and thus not considering paths that aren't in use).
-    input_types = {
-      Address,
-      PathGlobs,
-      SingleAddress,
-      SiblingAddresses,
-      AscendantAddresses,
-      DescendantAddresses,
+    select_product = lambda product: Select(product)
+    self._root_selector_fns = {
+      Address: select_product,
+      PathGlobs: select_product,
+      SingleAddress: select_product,
+      SiblingAddresses: select_product,
+      AscendantAddresses: select_product,
+      DescendantAddresses: select_product,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     node_builder = NodeBuilder.create(tasks, intrinsics)
-    RulesetValidator(node_builder, goals, input_types).validate()
+    RulesetValidator(node_builder, goals, self._root_selector_fns).validate()
     self._register_tasks(node_builder.tasks)
     self._register_intrinsics(node_builder.intrinsics)
 
@@ -154,6 +152,12 @@ class LocalScheduler(object):
     return self._context.from_key(cdata)
 
   def _select_product(self, subject, product):
+    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
+    # strictly necessary for execution. We might eventually be able to remove it by only executing
+    # validation below the execution roots (and thus not considering paths that aren't in use).
+    if product not in self._root_selector_fns:
+      types = ','.join(t.__name__ for t in self._root_selector_fns.keys())
+      raise ValueError('Only roots of types ({}) are supported.'.format(types))
     self._native.lib.execution_add_root_select(
         self._scheduler,
         self._to_key(subject),

@@ -125,19 +125,8 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
     return self.product_type
 
 
-class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type', 'product_type']),
-  Rule):
+class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', 'func']), Rule):
   """Intrinsic rule for filesystem operations."""
-
-  @classmethod
-  def as_intrinsics(cls):
-    """Returns a dict of tuple(sbj type, product type) -> functions returning a fs node for that subject product type tuple."""
-    return {(subject_type, product_type): FilesystemIntrinsicRule(subject_type, product_type)
-      for product_type, subject_type in FilesystemNode._FS_PAIRS}
-
-  def as_node(self, subject, variants):
-    assert type(subject) is self.subject_type
-    return FilesystemNode.create(subject, self.product_type, variants)
 
   @property
   def input_selectors(self):
@@ -186,12 +175,11 @@ class NodeBuilder(Closable):
 
     intrinsics = dict()
     for func, input_type, output_type in intrinsic_entries:
-      as_intrinsics = provider.as_intrinsics()
       key = (input_type, output_type)
       if key in intrinsics:
         raise ValueError('intrinsics provided by {} have already been provided by: {}'.format(
           func.__name__, intrinsics[key]))
-      intrinsics.update(as_intrinsics)
+      intrinsics[key] = IntrinsicRule(input_type, output_type, func)
     return cls(serializable_tasks, intrinsics)
 
   def __init__(self, tasks, intrinsics):
