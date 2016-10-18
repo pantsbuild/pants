@@ -13,11 +13,29 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
-class JUnitTests(JvmTarget):
+class DeprecatedJavaTestsAlias(JvmTarget):
+  pass
+
+
+# Subclasses DeprecatedJavaTestsAlias so that checks for
+# isinstance(pants.backend.jvm.targets.java_tests.JavaTests) will
+# return true for these instances during the migration.
+#
+# To migrate such code, change all BUILD files to use junit_tests instead of java_tests,
+# to get rid of deprecation warnings for the java_tests BUILD file aliases.
+# Then change the checks to isinstance(pants.backend.jvm.targets.junit_tests.JUnitTests),
+# to get rid of the module-level deprecation warning for java_tests.
+class JUnitTests(DeprecatedJavaTestsAlias):
   """JUnit tests.
 
   :API: public
   """
+
+  java_test_globs = ('*Test.java',)
+  scala_test_globs = ('*Test.scala', '*Spec.scala')
+
+  default_sources_globs = java_test_globs + scala_test_globs
+
 
   CONCURRENCY_SERIAL = 'SERIAL'
   CONCURRENCY_PARALLEL_CLASSES = 'PARALLEL_CLASSES'
