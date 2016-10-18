@@ -66,6 +66,7 @@ class FilterTest(BaseFilterTest):
       all_deps = ["'{0}'".format(dep) for dep in deps] + ["':foo'"]
       self.add_to_build_file(path, dedent("""
           python_library(name='{name}',
+            sources=[],
             dependencies=[{all_deps}],
             tags=['{tag}']
           )
