@@ -28,6 +28,7 @@ class ChangeCalculator(AbstractClass):
 
   def changed_files(self, changes_since=None, diffspec=None):
     """Determines the files changed according to SCM/workspace and options."""
+    diffspec = diffspec or self._diffspec
     if diffspec:
       return self._workspace.changes_in(diffspec)
 
