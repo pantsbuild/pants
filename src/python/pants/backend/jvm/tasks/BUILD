@@ -619,6 +619,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/option',
+    'src/python/pants/util:meta',
   ]
 )
 
