@@ -245,8 +245,6 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
       return item
     return None
 
-
-
   def _select_literal(self, candidate, variant_value):
     """Looks for has-a or is-a relationships between the given value and the requested product.
 
@@ -528,6 +526,8 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
       dep_state = step_context.select_for(selector, self.subject, self.variants)
 
       if type(dep_state) is Waiting:
+        if type(selector) is Select:
+          raise Exception("we should never wait on a Select {}\n  self: {}\ndeps:\n  {}".format(selector, self, '\n  '.join(str(d) for d in dep_state.dependencies)))
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) is Return:
         dep_values.append(dep_state.value)
