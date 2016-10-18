@@ -51,16 +51,16 @@ class ScalaFmt(NailgunTask, AbstractClass):
     if sources:
       files = ",".join(sources)
 
-      config_file = self.get_options().configuration
+      print("Running Scalafmt with Args: {} ".format(self.get_command_args(files)))
       result = self.runjava(classpath=self.tool_classpath('scalafmt'),
                    main=self._SCALAFMT_MAIN,
-                   args=self.get_command_args(config_file, files),
+                   args=self.get_command_args(files),
                    workunit_name='scalafmt')
 
       self.process_results(result)
 
   @abstractproperty
-  def get_command_args(self, config_file, files):
+  def get_command_args(self, files):
     """Returns the arguments used to run Scalafmt command.
 
     The return value should be an array of strings.  For
@@ -95,36 +95,44 @@ class ScalaFmtCheckFormat(ScalaFmt):
   """This Task checks that all scala files in the target are formatted
   correctly.
 
-  If the files are not formatted correctly are not an error is raised
+  If the files are not formatted correctly an error is raised
   including the command to run to format the files correctly
 
   :API: public
   """
 
-  def get_command_args(self, config_file, files):
+  def get_command_args(self, files):
     # If no config file is specified use default scalafmt config.
+    config_file = self.get_options().configuration
     args = ['--test', '--files', files]
-    if config_file != None:
+    if config_file!= None:
       args.extend(['--config', config_file])
+
+    print("Check Format")
+    print(self.get_options().configuration)
 
     return args
 
   def process_results(self, result):
-    # Processes the results of running the scalafmt command.
     if result != 0:
-      raise TaskError('Scalafmt failed with exit code {} to fix run: `./pants fmt <targets>`'.format(result), exit_code=result)
+      raise TaskError('Scalafmt failed with exit code {} to fix run: `./pants fmt <targets>` config{}'.format(result, self.get_options().configuration), exit_code=result)
 
 
 class ScalaFmtFormat(ScalaFmt):
-  """This Task formats all scala files in the targets.
+  """This Task reads all scala files in the target and emits
+  the source in a standard style as specified by the configuration
+  file.   
+
+  This task mutates the underlying flies.  
 
   :API: public
   """
 
-  def get_command_args(self, config_file, files):
+  def get_command_args(self, files):
     # If no config file is specified use default scalafmt config.
+    config_file = self.get_options().configuration
     args = ['-i', '--files', files]
-    if config_file != None:
+    if config_file!= None:
       args.extend(['--config', config_file])
 
     return args
