@@ -12,4 +12,5 @@ scala_library(
   ],
   sources=globs('*.scala'),
   strict_deps=True,
+  platform='java7',
 )
