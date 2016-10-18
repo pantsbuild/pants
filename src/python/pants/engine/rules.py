@@ -63,15 +63,27 @@ class TaskRule(datatype('TaskRule', ['input_selectors', 'task_func', 'product_ty
                                    self.task_func.__name__)
 
 
-def identity(product):
+def identity(_, product):
   return product
+
+
+class RootNode(TaskNode):
+  is_inlineable = True
+
 
 class RootRule(datatype('RootRule', ['subject_type', 'selector']), Rule):
 
   task_func = identity
 
+  @property
+  def constraint(self):
+    if type(self.selector) is SelectDependencies:
+      return Exactly(list)# lambda x: type(x) is list
+    #else:
+    return self.selector.type_constraint
+
   def as_node(self, subject, variants):
-    return TaskNode(subject, variants, self)
+    return RootNode(subject, variants, self)
 
   @property
   def output_product_type(self):
@@ -319,7 +331,8 @@ class CanBeDependency(object):
 
 
 class RuleGraph(datatype('RuleGraph',
-                         ['root_subject_types',
+                         ['graph_maker',
+                          'root_subject_types',
                           'root_rules',
                           'rule_dependencies',
                           'unfulfillable_rules'])):
@@ -528,7 +541,8 @@ class RuleEdges(object):
 
   def rules_for(self, selector_or_selector_path, subject_type):
     for d in self._selector_to_deps[selector_or_selector_path]:
-      if d.subject_type == subject_type or isinstance(d, RuleGraphLiteral):
+      if (d.subject_type == subject_type or
+          isinstance(d, (RuleGraphLiteral, RuleGraphSubjectIsProduct))):
         yield d
 
   def add_edges_via(self, selector, new_dependencies):
@@ -589,7 +603,8 @@ class GraphMaker(object):
     root_rule_dependency_edges, edges, unfulfillable = self._construct_graph(root_rule)
     root_rule_dependency_edges, edges = self._remove_unfulfillable_rules_and_dependents(root_rule_dependency_edges,
       edges, unfulfillable)
-    return RuleGraph((root_subject_type,),
+    return RuleGraph(self,
+                     (root_subject_type,),
                      root_rule_dependency_edges,
                      edges,
                      unfulfillable)
@@ -628,7 +643,8 @@ class GraphMaker(object):
       full_dependency_edges,
       full_unfulfillable_rules)
 
-    return RuleGraph(self.root_subject_selector_fns,
+    return RuleGraph(self,
+                     self.root_subject_selector_fns,
                      dict(full_root_rule_dependency_edges),
                      full_dependency_edges,
                      full_unfulfillable_rules)

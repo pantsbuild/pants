@@ -9,7 +9,7 @@ import logging
 import os
 import threading
 import time
-from collections import deque
+from collections import defaultdict, deque
 from contextlib import contextmanager
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
@@ -94,7 +94,7 @@ class ProductGraph(object):
               {d.node for d in self.dependents},
               self.cyclic_dependencies)
 
-    def __str__(self):
+    def __repr__(self):
       return '{}({})'.format(type(self).__name__, self.node)
 
   def __init__(self, validator=None, rule_graph=None):
@@ -196,26 +196,18 @@ class ProductGraph(object):
     ret = set()
     node = entry.node
     something = entry.something
-    #found_some = False
     if something.current_node_is_rule_holder:
       #entry.validate_not_complete()
       for selector in something._current_node.rule.input_selectors:
-        selector_path = None
-        if type(selector) is Select:
-          selector_path = selector
-        elif type(selector) in (SelectDependencies, SelectProjection):
-          selector_path = (selector, selector.input_product_selector)
-
-        if selector_path:
-          noop = NOOP
-          stuff = something.do_rule_edge_stuff(selector, something._current_node.subject,
-            something._current_node.variants, lambda n, default: getattr(self._nodes.get(node, None), 'state', default) or noop)
-          if type(stuff) is Waiting:
-            logger.debug('adding preemptive deps to {} of\n   {}'.format(node, stuff))
-            ret.update(self.ensure_entry_and_expand(n) for n in stuff.dependencies)
-            self._add_dependencies(entry, stuff.dependencies)
-    #if not found_some:
-    #  ret.add(entry)
+        selector_path = something._initial_selector_path(selector)
+        get_state_if_available = lambda n, default: \
+          getattr(self._nodes.get(node, None), 'state', default) or NOOP
+        stuff = something.do_rule_edge_stuff(selector_path, something._current_node.subject,
+          something._current_node.variants, get_state_if_available)
+        if type(stuff) is Waiting:
+          logger.debug('adding preemptive deps to {} of\n   {}'.format(node, stuff))
+          ret.update(self.ensure_entry_and_expand(n) for n in stuff.dependencies)
+          self._add_dependencies(entry, stuff.dependencies)
     return ret
 
   def _add_dependencies(self, node_entry, dependencies):
@@ -601,19 +593,6 @@ class LocalScheduler(object):
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-
-    # Determine the root Nodes for the products and subjects selected by the goals and specs.
-    def roots():
-      for subject in subjects:
-        selector_fn = self._root_selector_fns.get(type(subject), None)
-        if not selector_fn:
-          raise TypeError('Unsupported root subject type: {} for {!r}'
-                          .format(type(subject), subject))
-
-        for product in products:
-          selector = selector_fn(product)
-          yield self._node_builder.select_node(selector, subject, None)
-
     # we have a collection of subject, product_type tuples
     # so, let's boil that down to subject_type, product_type tuples.
     # then
@@ -629,7 +608,7 @@ class LocalScheduler(object):
     #for subject in subjects:
     #  for product in products:
 
-    def root_rules():
+    def root_rule_graph_entries():
       for subject in subjects:
         selector_fn = self._root_selector_fns.get(type(subject), None)
         if not selector_fn:
@@ -638,13 +617,18 @@ class LocalScheduler(object):
 
         for product in products:
           selector = selector_fn(product)
-          matching = list([self._rule_graph.root_rules_matching(type(subject), selector)])
+          matching = self._rule_graph.root_rules_matching(type(subject), selector)
           logger.debug('matching raw root rules: product: {}, subject type: {}'.format(product, type(subject)))
           logger.debug(matching)
-          for r in matching:
-            yield (subject, r) #terrible
+          if not matching:
+            #raise Exception("What is all this then. No matching for {} {}".format(subject, selector))
+            pass # This is fine, it means that this product has no matches--which ought to turn into a noop later.
+          else:
+            yield (subject, matching) #terrible
 
-    return ExecutionRequest(tuple(roots()), tuple(root_rules()))
+    t = tuple(root_rule_graph_entries())
+    root_nodes = set(RootRule(type(sub), x.selector).as_node(sub, None) for sub, x in t)
+    return ExecutionRequest(root_nodes, t)
 
   def selection_request(self, requests):
     """Create and return an ExecutionRequest for the given (selector, subject) tuples.
@@ -655,9 +639,22 @@ class LocalScheduler(object):
     :return: An ExecutionRequest for the given selectors and subjects.
     """
     #TODO: Think about how to deprecate the existing execution_request API.
-    roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
+    # TODO this needs to trigger a new graph analysis if the requests contain unexpected things
+    #
+    #roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
     #for (selector, subject)
-    return ExecutionRequest(tuple(roots), tuple(self._rule_graph.root_rules_matching(type(subject), selector) for (selector, subject) in requests))
+    t = tuple(
+      self._rule_graph.root_rules_matching(type(subject), selector) for (selector, subject) in
+      requests)
+    roots = tuple()
+    root_rule_entries = defaultdict(set)
+    for subject, r_r in t:
+      root_rule_entries[subject].update(self._rule_graph.root_rule_edges(r_r))
+
+    for subject, rres in root_rule_entries.items():
+      for rre in rres:
+        roots += rre.rule.as_node(subject, None)
+    return ExecutionRequest(roots, t)
 
   @property
   def product_graph(self):
@@ -714,12 +711,12 @@ class LocalScheduler(object):
       # A dict from Node entry to a possibly executing Step. Only one Step exists for a Node at a time.
       outstanding = set()
       # Node entries that might need to have Steps created (after any outstanding Step returns).
-
+      logger.debug('before expanding roots')
       expanded_roots = set()
-      for r in execution_request.roots:
-        expanded_roots.update(self._product_graph.ensure_entry_and_expand(r))
+      for root_node in execution_request.roots:
+        expanded_roots.update(self._product_graph.ensure_entry_and_expand(root_node))
+      logger.debug('after expanding roots')
 
-      #candidates = deque(self._product_graph.ensure_entry(r) for r in execution_request.roots)
       candidates = deque(expanded_roots)
 
       # Yield nodes that are Runnable, and then compute new ones.
@@ -759,10 +756,6 @@ class LocalScheduler(object):
             for n in state.dependencies:
               discoverable_deps = self._product_graph.ensure_entry_and_expand(n)
               incomplete_deps.update(d for d in discoverable_deps if not d.is_complete and d is not node_entry.node)
-              #candidates.extend()
-
-            #if discoverable_deps:
-            #  return Waiting(discoverable_deps)
 
               # Waiting on dependencies.
             self._product_graph.add_dependencies(node_entry.node, state.dependencies)
@@ -828,12 +821,21 @@ class SomethingOrOther(object):
         # let's just precompute all of the nodes initial nodes, so we can reuse them later.
         self._selector_to_stuff = dict()
         for selector in current_node.rule.input_selectors:
-          stuff = self._state_or_nodes_for(selector, current_node.subject, current_node.variants)
-          self._selector_to_stuff[selector] = stuff
+          selector_path = self._initial_selector_path(selector)
+
+          stuff = self._state_or_nodes_for(selector_path, current_node.subject, current_node.variants)
+          self._selector_to_stuff[selector_path] = stuff
       else:
         self._handle_no_edges(current_node)
     else:
       pass
+
+  def _initial_selector_path(self, selector):
+    if type(selector) in (SelectDependencies, SelectProjection):
+      selector_path = (selector, selector.input_product_selector)
+    else:
+      selector_path = selector
+    return selector_path
 
   def _handle_no_edges(self, current_node):
       logger.debug('couldnt find edges for {}'.format(current_node.rule))
@@ -847,15 +849,15 @@ class SomethingOrOther(object):
 
         for e in self._graph.rule_dependencies:
           if e.rule == current_node.rule and e.subject_type == type(current_node.subject):
-            print('got herererererre')
-            print(' has matching rule / subject pair, but type is {}  {}'.format(type(e), e))
+            logger.debug(' has matching rule / subject pair, but type is {}  {}'.format(type(e), e))
           elif e.rule == current_node.rule:
-            print('rule match, but not subj {} match, {}'.format(type(current_node.subject), e))
+            logger.debug('rule match, but not subj {} match, {}'.format(type(current_node.subject), e))
 
   def do_rule_edge_stuff(self, selector_path, subject, variants, get_state):
     if not self._rule_edges:
+      logger.debug('        no edges')
       return
-    nodes, state, rule_entries_for_debugging = self._selector_to_stuff.get(selector_path, (None, None, None))
+    nodes, state, rule_entries_for_debugging = self._selector_to_stuff.get(selector_path, (tuple(), None, None))
     if state:
       return state
     if nodes:
@@ -934,7 +936,8 @@ class SomethingOrOther(object):
       elif type(state) is Return:
         matched = SelectNode.do_real_select_literal(final_selector.type_constraint, state.value, variants)
         if matched:
-          return Return(matched)
+          # TODO this isn't the right list format
+          matches.append(matched)
         #return # defer to SelectNode, for now
       elif type(state) is Throw:
         return state # always bubble up the first throw
@@ -949,6 +952,8 @@ class SomethingOrOther(object):
       return Noop('No source of {} for {} : {} because no nodes with returns, but there were rule entries {}\n the return if there was one {}\n last state {}', selector_path, type(subject).__name__, subject, rule_entries, had_return, state)
     elif len(matches) > 1:
       return Throw(ConflictingProducersError.create(subject, final_selector, matches))
+    elif len(matches) == 1:
+      return Return(matches[0])
 
   def get_nodes_and_states(self, subject, selector_path, variants):
     if self.current_node_is_rule_holder:
@@ -1045,8 +1050,8 @@ class StepContext(object):
     else:
       #logger.debug('no entries for {} with {} {} {}'.format(self._current_node, selector_path, subject, variants))
       pass
-
     dep_node = self._node_builder.select_node(selector, subject, variants)
+    logger.debug('constructed select node: {}'.format(dep_node))
     return self.get(dep_node)
 
   def _selector_path(self, selector):

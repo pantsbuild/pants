@@ -253,9 +253,11 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
     Returns the resulting product value, or None if no match was made.
     """
     return self.do_real_select_literal(self.selector.type_constraint, candidate, variant_value)
+
   def step(self, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
+    raise Exception('select node shouldnt be hit anymore self: {}'.format(self))
     variants = self.variants
     if type(self.subject) is Address and self.product is not Variants:
       dep_state = step_context.select_for(self._variant_selector, self.subject, self.variants)
@@ -482,21 +484,21 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
   rule. The TaskNode will determine whether the dependencies are available before executing the
   function, and provide a satisfied argument per clause entry to the function.
   """
+  debug_stuff = False
+  if debug_stuff:
+    def __new__(cls, *args, **kwargs):
+      obj = super(TaskNode, cls).__new__(cls, *args, **kwargs)
+      debug_stuff = False
+      if debug_stuff:
+        # NB, this is super slow, so make it easy to turn off
+        import inspect
+        bits = []
+        for i in range(2,5):
+          frame, filename, line_number, function_name, lines, index = inspect.getouterframes(inspect.currentframe())[i]
+          bits.append('{}:{}'.format(filename, line_number, function_name) )
+        obj.extra_repr = '\n  '.join(bits)
 
-  def __new__(cls, *args, **kwargs):
-
-    obj = super(TaskNode, cls).__new__(cls, *args, **kwargs)
-    debug_stuff = True
-    if debug_stuff:
-      # NB, this is super slow, so make it easy to turn off
-      import inspect
-      bits = []
-      for i in range(2,5):
-        frame, filename, line_number, function_name, lines, index = inspect.getouterframes(inspect.currentframe())[i]
-        bits.append('{}:{}'.format(filename, line_number, function_name) )
-      obj.extra_repr = '\n  '.join(bits)
-
-    return obj
+      return obj
 
   is_cacheable = True
   is_inlineable = False
@@ -541,8 +543,8 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
                     tuple(dep_values))
 
   def __repr__(self):
-    return 'TaskNode(subject={}, variants={}, rule={}' \
-      .format(self.subject, self.variants, self.rule)
+    return '{}(subject={}, variants={}, rule={}' \
+      .format(type(self).__name__, self.subject, self.variants, self.rule)
 
   def __str__(self):
     return repr(self)
