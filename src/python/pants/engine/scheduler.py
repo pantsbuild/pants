@@ -986,8 +986,11 @@ class SomethingOrOther(object):
     waiting = []
     matches = []
     for node in nodes:
-      state = get_state(node, Waiting([node]))
-      if type(state) is Waiting:
+      #state = get_state(node, Waiting([node]))
+      state = get_state(node, None)
+      if state is None:
+        waiting.append(node)
+      elif type(state) is Waiting:
         waiting.extend(state.dependencies)
       elif type(state) is Return:
         matched = SelectNode.do_real_select_literal(final_selector.type_constraint, state.value, variants)
