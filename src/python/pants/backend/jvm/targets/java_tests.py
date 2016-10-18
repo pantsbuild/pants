@@ -9,9 +9,8 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.base.deprecated import warn_or_error
 
 
-class JavaTests(JUnitTests):
-  def __init__(self, *args, **kwargs):
-    super(JavaTests, self).__init__(*args, **kwargs)
-    warn_or_error('1.4.0',
-                  'pants.backend.jvm.targets.java_tests.JavaTests',
-                  'Use pants.backend.jvm.targets.junit_tests.JUnitTests instead.')
+warn_or_error('1.4.0',
+              'pants.backend.jvm.targets.java_tests.JavaTests',
+              'Use pants.backend.jvm.targets.junit_tests.JUnitTests instead.')
+
+JavaTests = JUnitTests
