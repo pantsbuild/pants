@@ -362,6 +362,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
+    'src/python/pants/java/junit',
     'src/python/pants/java:executor',
     'src/python/pants/process',
     'src/python/pants/task',
@@ -371,9 +372,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-    'src/python/pants/util:objects',
     'src/python/pants/util:strutil',
-    'src/python/pants/util:xml_parser',
   ],
 )
 

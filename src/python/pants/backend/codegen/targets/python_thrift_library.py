@@ -26,4 +26,3 @@ class PythonThriftLibrary(PythonTarget):
     """
 
     super(PythonThriftLibrary, self).__init__(**kwargs)
-    self.add_labels('codegen')

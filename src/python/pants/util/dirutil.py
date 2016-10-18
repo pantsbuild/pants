@@ -150,9 +150,15 @@ def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
 def safe_rmtree(directory):
   """Delete a directory if it's present. If it's not present, no-op.
 
+  Note that if the directory argument is a symlink, only the symlink will
+  be deleted.
+
   :API: public
   """
-  shutil.rmtree(directory, ignore_errors=True)
+  if os.path.islink(directory):
+    safe_delete(directory)
+  else:
+    shutil.rmtree(directory, ignore_errors=True)
 
 
 def safe_open(filename, *args, **kwargs):

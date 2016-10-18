@@ -9,7 +9,6 @@ import os
 from collections import defaultdict
 
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
-from pants.source.payload_fields import DeferredSourcesField
 
 
 class SourceMapper(object):
@@ -73,7 +72,7 @@ class SpecSourceMapper(SourceMapper):
             break
 
   def _sources_match(self, source, sources):
-    if not sources or isinstance(sources, DeferredSourcesField):
+    if not sources:
       return False
     return sources.matches(source)
 

@@ -18,6 +18,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     'src/python/pants/java:nailgun_protocol',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:socket'
   ]
 )

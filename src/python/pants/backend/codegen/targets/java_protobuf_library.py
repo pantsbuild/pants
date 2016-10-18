@@ -37,7 +37,6 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
       logger.warn(" Target definition at {address} sets attribute 'buildflags' which is "
                   "ignored and will be removed in a future release"
                   .format(address=self.address.spec))
-    self.add_labels('codegen')
 
   @property
   def imported_jar_library_specs(self):

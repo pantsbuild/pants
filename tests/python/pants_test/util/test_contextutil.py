@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import pstats
 import shutil
 import subprocess
 import sys
@@ -13,8 +14,12 @@ import unittest
 
 import mock
 
-from pants.util.contextutil import (Timer, environment_as, exception_logging, open_zip, pushd,
-                                    stdio_as, temporary_dir, temporary_file)
+from pants.util.contextutil import (HardSystemExit, Timer, environment_as, exception_logging,
+                                    hard_exit_handler, maybe_profiled, open_zip, pushd, stdio_as,
+                                    temporary_dir, temporary_file)
+
+
+PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
 class ContextutilTest(unittest.TestCase):
@@ -193,3 +198,24 @@ class ContextutilTest(unittest.TestCase):
         assert True is False
 
     fake_logger.exception.assert_called_once_with('error!')
+
+  def test_maybe_profiled(self):
+    with temporary_dir() as td:
+      profile_path = os.path.join(td, 'profile.prof')
+
+      with maybe_profiled(profile_path):
+        for _ in range(5):
+          print('test')
+
+      # Ensure the profile data was written.
+      self.assertTrue(os.path.exists(profile_path))
+
+      # Ensure the profile data is valid.
+      pstats.Stats(profile_path).print_stats()
+
+  def test_hard_exit_handler(self):
+    with mock.patch('os._exit', **PATCH_OPTS) as mock_exit:
+      with hard_exit_handler():
+        raise HardSystemExit()
+
+    mock_exit.assert_called_once_with(0)

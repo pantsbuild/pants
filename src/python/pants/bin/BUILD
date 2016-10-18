@@ -7,7 +7,6 @@ python_library(
                                  'plugin_resolver.py']),
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:ansicolors',
     '3rdparty/python:setproctitle',
     ':options_initializer',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
@@ -82,7 +81,6 @@ python_library(
     ':extension_loader',
     ':plugin_resolver',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine/legacy:change_calculator',
     'src/python/pants/goal:goal',

@@ -31,7 +31,7 @@ class ChangeCalculator(AbstractClass):
     if diffspec:
       return self._workspace.changes_in(diffspec)
 
-    changes_since = changes_since or self._scm.current_rev_identifier()
+    changes_since = changes_since or self._changes_since or self._scm.current_rev_identifier()
     return self._workspace.touched_files(changes_since)
 
   @abstractmethod

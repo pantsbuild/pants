@@ -8,21 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os.path
 
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.payload import Payload
-from pants.build_graph.address import Address, Addresses
+from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.source.payload_fields import DeferredSourcesField
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
-
-
-class TestDeferredSourcesTarget(Target):
-  def __init__(self, deferred_sources_address=None, *args, **kwargs):
-    payload = Payload()
-    payload.add_fields({
-      'def_sources': DeferredSourcesField(ref_address=deferred_sources_address),
-    })
-    super(TestDeferredSourcesTarget, self).__init__(payload=payload, *args, **kwargs)
 
 
 class TestImplicitSourcesTarget(Target):
@@ -67,14 +56,6 @@ class TargetTest(BaseTest):
     target = self.make_target(':foo', Target)
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([], list(target.traversable_dependency_specs))
-
-  def test_deferred_sources_payload_field(self):
-    foo = self.make_target(':foo', Target)
-    target = self.make_target(':bar',
-                              TestDeferredSourcesTarget,
-                              deferred_sources_address=foo.address)
-    self.assertSequenceEqual([], list(target.traversable_specs))
-    self.assertSequenceEqual(['//:foo'], list(target.traversable_dependency_specs))
 
   def test_illegal_kwargs(self):
     init_subsystem(Target.Arguments)
@@ -154,28 +135,6 @@ class TargetTest(BaseTest):
     self.assertIn("Expected 'my_cool_field' to be a glob, an address or a list, but was <type \'unicode\'>",
                   str(cm.exception))
     #could also test address case, but looks like nothing really uses it.
-
-  def test_sources_with_more_than_one_address_fails(self):
-    addresses = Addresses(['a', 'b', 'c'], '')
-    t = self.make_target(':t', Target)
-
-    # With address, no key_arg.
-    with self.assertRaises(Target.WrongNumberOfAddresses) as cm:
-      t.create_sources_field(sources=addresses, sources_rel_path='', address=Address.parse('a:b'))
-    self.assertIn("Expected a single address to from_target() as argument to 'a:b'",
-                  str(cm.exception))
-
-    # With no address.
-    with self.assertRaises(Target.WrongNumberOfAddresses) as cm:
-      t.create_sources_field(sources=addresses, sources_rel_path='')
-    self.assertIn("Expected a single address to from_target() as argument",
-                  str(cm.exception))
-
-    # With key_arg.
-    with self.assertRaises(Target.WrongNumberOfAddresses) as cm:
-      t.create_sources_field(sources=addresses, sources_rel_path='', key_arg='cool_field')
-    self.assertIn("Expected 'cool_field' to be a single address to from_target() as argument",
-                  str(cm.exception))
 
   def test_max_recursion(self):
     target_a = self.make_target('a', Target)

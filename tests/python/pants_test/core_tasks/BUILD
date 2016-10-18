@@ -29,6 +29,8 @@ python_tests(
   dependencies = [
     'src/python/pants/core_tasks',
     'src/python/pants/goal',
+    'src/python/pants/goal:task_registrar',
+    'src/python/pants/task',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

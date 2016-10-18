@@ -100,7 +100,7 @@ class Coverage(AbstractClass):
 
   # Utility methods, called from subclasses
   def is_coverage_target(self, tgt):
-    return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_codegen
+    return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_synthetic
 
   def initialize_instrument_classpath(self, targets, instrumentation_classpath):
     """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
