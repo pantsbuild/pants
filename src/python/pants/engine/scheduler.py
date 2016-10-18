@@ -179,6 +179,8 @@ class ProductGraph(object):
     entry = self._nodes.get(node, None)
     if not entry:
       self._validator(node)
+
+      # perhaps, the something or other should be added once the known deps are in the build graph?
       something = SomethingOrOther(node, self._rule_graph)
       self._nodes[node] = entry = self.Entry(node, something)
 
@@ -189,7 +191,6 @@ class ProductGraph(object):
         next_set = self.fill_in_discoverable_deps(entry)
         if next_set:
           return next_set
-    #return set() # return empty if was already there.
     return {entry}
 
 
@@ -858,12 +859,17 @@ class SomethingOrOther(object):
     if not self._rule_edges:
       logger.debug('        no edges')
       return
-    nodes, state, rule_entries_for_debugging = self._selector_to_stuff.get(selector_path, (tuple(), None, None))
+    nodes, rule_entries_for_debugging, state = self._check_initial_nodes(selector_path)
     if state:
       return state
     if nodes:
       return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants)
     return self._do_rule_edge_stuff(selector_path, subject, variants, get_state)
+
+  def _check_initial_nodes(self, selector_path):
+    nodes, state, rule_entries_for_debugging = self._selector_to_stuff.get(selector_path,
+      (tuple(), None, None))
+    return nodes, rule_entries_for_debugging, state
 
   def _do_rule_edge_stuff(self, selector_path, subject, variants, get_state):
     if type(selector_path) is SelectDependencies:
@@ -880,8 +886,18 @@ class SomethingOrOther(object):
 
   def _handle_select_deps(self, get_state, selector_path, subject, variants):
     # select for dep_product_selector, if it's return, return None, otherwise wait on it
-    dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector),
-      subject, variants, get_state)
+    initial_path = self._initial_selector_path(selector_path)
+    initial_nodes, rule_entries_for_debugging, initial_state = self._check_initial_nodes(initial_path)
+    if type(initial_state) is Waiting:
+      return initial_state
+    elif initial_state:
+      dep_state = initial_state
+    elif initial_nodes:
+      assert len(initial_nodes) == 1
+      dep_state = self._make_state(rule_entries_for_debugging, initial_nodes, get_state, initial_path, variants)
+    else:
+      dep_state = self._state_via_edges(initial_path, subject, variants, get_state)
+
     if type(dep_state) in (Throw, Waiting):
       return dep_state
     elif type(dep_state) is Noop:
@@ -922,7 +938,18 @@ class SomethingOrOther(object):
 
   def _handle_select_projection(self, get_state, selector_path, subject, variants):
     # select for dep_product_selector, if it's return, return None, otherwise wait on it
-    dep_state = self._state_via_edges((selector_path, selector_path.input_product_selector), subject, variants, get_state)
+    initial_path = self._initial_selector_path(selector_path)
+    initial_nodes, rule_entries_for_debugging, initial_state = self._check_initial_nodes(initial_path)
+    if type(initial_state) is Waiting:
+      return initial_state
+    elif initial_state:
+      dep_state = initial_state
+    elif initial_nodes:
+      assert len(initial_nodes) == 1
+      dep_state = self._make_state(rule_entries_for_debugging, initial_nodes, get_state, initial_path, variants)
+    else:
+      dep_state = self._state_via_edges(initial_path, subject, variants, get_state)
+
     if type(dep_state) in (Throw, Waiting):
       return dep_state
     elif type(dep_state) is Noop:
@@ -937,6 +964,8 @@ class SomethingOrOther(object):
       return Throw(ValueError(
         'Fields {} of {} could not be projected as {}: {}'.format(selector_path.fields, dep_state.value,
           selector_path.projected_subject, e)))
+
+    # it would be good to hold on to the result ^^ somehow.
 
     output_state = self._state_via_edges((selector_path, selector_path.projected_product_selector), projected_subject, variants, get_state)
     if type(output_state) in (Return, Throw, Waiting):
