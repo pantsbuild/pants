@@ -10,6 +10,7 @@ java_library(
     '3rdparty:jsr305',
     'src/java/org/pantsbuild/args4j'
   ],
+  platform='java7',
   provides=artifact(
     org='org.pantsbuild',
     name='jar-tool',
@@ -26,5 +27,6 @@ jvm_binary(
   main='org.pantsbuild.tools.jar.Main',
   dependencies=[
     ':jar',
-  ]
+  ],
+  platform='java7',
 )

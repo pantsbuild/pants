@@ -21,7 +21,8 @@ java_library(
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit/withretry',
   ],
-  sources=globs('*.java', 'impl/*.java', 'impl/experimental/*.java')
+  sources=globs('*.java', 'impl/*.java', 'impl/experimental/*.java'),
+  platform='java7',
 )
 
 jvm_binary(
@@ -31,6 +32,7 @@ jvm_binary(
   dependencies=[
     ':junit',
   ],
+  platform='java7',
   description="""
 A replacement for org.junit.runner.JUnitCore.main that adds:
   + support for running individual test methods using [classname]#[methodname]

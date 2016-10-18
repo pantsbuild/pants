@@ -4,7 +4,7 @@
 jvm_binary(name='unspecified',
   main='org.pantsbuild.testproject.targetlevels.unspecified.Unspecified',
   dependencies=[
-    ':java6',
+    ':java7',
     ':lib',
   ],
 )
@@ -13,8 +13,8 @@ java_library(name='lib',
   sources=globs('Unspecified.java'),
 )
 
-java_library(name='java6',
-  sources=globs('Six.java'),
-  platform='java6',
+java_library(name='java7',
+  sources=globs('Seven.java'),
+  platform='java7',
   dependencies=[':lib'],
 )
