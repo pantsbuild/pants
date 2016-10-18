@@ -34,6 +34,10 @@ class Rule(AbstractClass):
   """
 
   @abstractproperty
+  def constraint(self):
+    """"""
+
+  @abstractproperty
   def input_selectors(self):
     """collection of input selectors"""
 
@@ -63,7 +67,7 @@ class TaskRule(datatype('TaskRule', ['input_selectors', 'task_func', 'product_ty
                                    self.task_func.__name__)
 
 
-def identity(_, product):
+def identity(product):
   return product
 
 
@@ -71,10 +75,11 @@ class RootNode(TaskNode):
   is_inlineable = True
 
 
-
 class RootRule(datatype('RootRule', ['subject_type', 'selector']), Rule):
 
-  task_func = identity
+  @property
+  def task_func(self):
+    return identity
 
   @property
   def constraint(self):
@@ -180,12 +185,17 @@ class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type
   def output_product_type(self):
     return self.product_type
 
+  @property
+  def constraint(self):
+    return Exactly(self.product_type)
+
 
 class SnapshotIntrinsicRule(Rule):
   """Intrinsic rule for snapshot process execution."""
 
   output_product_type = Snapshot
   input_selectors = (Select(Files),)
+  constraint = Exactly(Snapshot)
 
   def as_node(self, subject, variants):
     assert type(subject) in (Files, PathGlobs)

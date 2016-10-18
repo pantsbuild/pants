@@ -18,7 +18,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.nodes import (ConflictingProducersError, DependenciesNode, FilesystemNode,
-                                LiteralNode, Node, Noop, ProjectionNode, Return, Runnable,
+                                Node, Noop, ProjectionNode, Return, Runnable,
                                 SelectNode, State, TaskNode, Throw, Waiting)
 from pants.engine.rules import (GraphMaker, NodeBuilder, RootRule, RuleGraphEntry, RuleGraphLiteral,
                                 RuleGraphSubjectIsProduct, RuleIndex, RulesetValidator)
@@ -188,7 +188,7 @@ class ProductGraph(object):
     return {entry}
 
   def fill_in_discoverable_deps(self, entry):
-    ret = {entry}#set()
+    ret = {entry} # this *shouldnt be necessary ish*
     node = entry.node
     something = entry.something
     if something.current_node_is_rule_holder:
@@ -201,7 +201,6 @@ class ProductGraph(object):
         stuff = something.do_rule_edge_stuff(selector_path, something._current_node.subject,
           something._current_node.variants, get_state_if_available)
         if type(stuff) is Waiting:
-          #logger.debug('adding preemptive deps to {} of\n   {}'.format(node, stuff))
           for n in stuff.dependencies:
             ret.update(self.ensure_entry_and_expand(n))
           self._add_dependencies(entry, stuff.dependencies)
@@ -1024,7 +1023,6 @@ class StepContext(object):
     """
     :type graph: RuleGraph
     """
-    self._node_builder = node_builder
     self.project_tree = project_tree
     self._node_states = dict(node_states)
     self._parents = []
@@ -1033,28 +1031,18 @@ class StepContext(object):
     self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
     self._something = something
 
-  def get(self, node):
-    """Given a Node and computed node_states, gets the current state for the Node.
-
-    Optionally inlines execution of inlineable dependencies if `inline_nodes=True`.
-    """
-    raise Exception('never gets here')
-
-  def get_nodes_and_states_for(self, subject, product, variants):
-    raise Exception("never gets here either")
-
   def select_for(self, selector, subject, variants):
     """Returns the state for selecting a product via the provided selector."""
     if self._something._rule_edges:
       selector_path = self._selector_path(selector)
-      r = self._something.do_rule_edge_stuff(selector_path, subject, variants, lambda n, default: self._node_states.get(n, default))
-      if isinstance(r, State):
-        return r
+      state = self._something.do_rule_edge_stuff(selector_path,
+        subject,
+        variants,
+        lambda n, default: self._node_states.get(n, default))
+      if isinstance(state, State):
+        return state
     else:
       raise Exception("all should have rules! {}".format(self._something))
-    dep_node = self._node_builder.select_node(selector, subject, variants)
-    logger.debug('constructed select node: {}'.format(dep_node))
-    return self.get(dep_node)
 
   def _selector_path(self, selector):
     if self._parents:

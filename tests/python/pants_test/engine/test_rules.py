@@ -95,6 +95,10 @@ class BoringRule(Rule):
   def output_product_type(self):
     return self._output_product_type
 
+  @property
+  def constraint(self):
+    return Exactly(self._output_product_type)
+
   def as_node(self, subject, variants):
     raise Exception('do not expect to be constructed')
 
