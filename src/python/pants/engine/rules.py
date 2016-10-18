@@ -34,18 +34,22 @@ class Rule(AbstractClass):
 
   @abstractproperty
   def input_selectors(self):
-    """collection of input selectors"""
+    """Collection of input selectors"""
+
+  @abstractproperty
+  def func(self):
+    """Rule function."""
 
   @abstractproperty
   def output_product_type(self):
     """The product type produced by this rule."""
 
-  @abstractmethod
   def as_triple(self):
     """Constructs an (output, input, func) triple for this rule."""
+    return (self.output_product_type, self.input_selectors, self.func)
 
 
-class TaskRule(datatype('TaskRule', ['input_selectors', 'task_func', 'product_type', 'constraint']),
+class TaskRule(datatype('TaskRule', ['input_selectors', 'func', 'product_type', 'constraint']),
                Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied."""
 
@@ -57,7 +61,7 @@ class TaskRule(datatype('TaskRule', ['input_selectors', 'task_func', 'product_ty
   def __str__(self):
     return '({}, {!r}, {})'.format(type_or_constraint_repr(self.product_type),
                                    self.input_selectors,
-                                   self.task_func.__name__)
+                                   self.func.__name__)
 
 
 class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', 'warnings'])):
@@ -137,7 +141,7 @@ class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', '
     return self.product_type
 
 
-class NodeBuilder(Closable):
+class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics'])):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
@@ -182,21 +186,17 @@ class NodeBuilder(Closable):
       intrinsics[key] = IntrinsicRule(input_type, output_type, func)
     return cls(serializable_tasks, intrinsics)
 
-  def __init__(self, tasks, intrinsics):
-    self._tasks = tasks
-    self._intrinsics = intrinsics
-
   def all_rules(self):
     """Returns a set containing all rules including instrinsics."""
-    declared_rules = set(rule for rules_for_product in self._tasks.values()
+    declared_rules = set(rule for rules_for_product in self.tasks.values()
                          for rule in rules_for_product)
-    declared_intrinsics = set(rule for rule in self._intrinsics.values())
+    declared_intrinsics = set(rule for rule in self.intrinsics.values())
     return declared_rules.union(declared_intrinsics)
 
   def all_produced_product_types(self, subject_type):
-    intrinsic_products = set(prod for subj, prod in self._intrinsics.keys()
+    intrinsic_products = set(prod for subj, prod in self.intrinsics.keys()
                              if subj == subject_type)
-    task_products = self._tasks.keys()
+    task_products = self.tasks.keys()
     return intrinsic_products.union(set(task_products))
 
   def gen_rules(self, subject_type, product_type):
@@ -214,11 +214,11 @@ class NodeBuilder(Closable):
       yield rule.as_node(subject, variants)
 
   def _lookup_tasks(self, product_type):
-    for entry in self._tasks.get(product_type, tuple()):
+    for entry in self.tasks.get(product_type, tuple()):
       yield entry
 
   def _lookup_intrinsic(self, product_type, subject_type):
-    return self._intrinsics.get((subject_type, product_type))
+    return self.intrinsics.get((subject_type, product_type))
 
 
 class CanHaveDependencies(object):

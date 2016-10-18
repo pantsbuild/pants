@@ -173,6 +173,7 @@ def extern_val_to_str(context_handle, val):
 def extern_issubclass(context_handle, cls_id, super_cls_id):
   """Given two TypeIds, return issubclass(cls, super_cls)."""
   c = _FFI.from_handle(context_handle)
+  print(">>> {} {}".format(c.from_id(cls_id), c.from_id(super_cls_id)))
   return issubclass(c.from_id(cls_id), c.from_id(super_cls_id))
 
 

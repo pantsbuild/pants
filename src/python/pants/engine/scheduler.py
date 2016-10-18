@@ -119,17 +119,22 @@ class LocalScheduler(object):
 
     # Validate and register all provided and intrinsic tasks.
     select_product = lambda product: Select(product)
-    self._root_selector_fns = {
+    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
+    # strictly necessary for execution. We might eventually be able to remove it by only executing
+    # validation below the execution roots (and thus not considering paths that aren't in use).
+    root_selector_fns = {
       Address: select_product,
       PathGlobs: select_product,
       SingleAddress: select_product,
       SiblingAddresses: select_product,
       AscendantAddresses: select_product,
       DescendantAddresses: select_product,
+      DescendantAddresses: select_product,
     }
-    intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
+    intrinsics = create_fs_intrinsics(project_tree)
+    # TODO: Not reachable currently: + create_snapshot_intrinsics(project_tree)
     node_builder = NodeBuilder.create(tasks, intrinsics)
-    RulesetValidator(node_builder, goals, self._root_selector_fns).validate()
+    RulesetValidator(node_builder, goals, root_selector_fns).validate()
     self._register_tasks(node_builder.tasks)
     self._register_intrinsics(node_builder.intrinsics)
 
@@ -152,12 +157,6 @@ class LocalScheduler(object):
     return self._context.from_key(cdata)
 
   def _select_product(self, subject, product):
-    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
-    # strictly necessary for execution. We might eventually be able to remove it by only executing
-    # validation below the execution roots (and thus not considering paths that aren't in use).
-    if product not in self._root_selector_fns:
-      types = ','.join(t.__name__ for t in self._root_selector_fns.keys())
-      raise ValueError('Only roots of types ({}) are supported.'.format(types))
     self._native.lib.execution_add_root_select(
         self._scheduler,
         self._to_key(subject),
@@ -169,17 +168,18 @@ class LocalScheduler(object):
     Intrinsic tasks are those that are the default for a particular type(subject), type(product)
     pair. By default, intrinsic tasks create Runnables that are not cacheable.
     """
-    for (subject_type, product_type), func in intrinsics.items():
+    for (subject_type, product_type), rule in intrinsics.items():
       self._native.lib.intrinsic_task_add(self._scheduler,
-                                          self._to_id(func),
+                                          self._to_id(rule.func),
                                           self._to_id(subject_type),
-                                           self._to_id(product_type))
+                                          self._to_id(product_type))
 
   def _register_tasks(self, tasks):
     """Register the given tasks dict with the native scheduler."""
     for output_type, rules in tasks.items():
       for rule in rules:
         _, input_selects, func = rule.as_triple()
+        print('>>> registering func {} for {}'.format(func, rule))
         self._native.lib.task_add(self._scheduler,
                                   self._to_id(func),
                                   self._to_id(output_type))
