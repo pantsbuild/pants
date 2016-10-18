@@ -10,8 +10,3 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 class JavaRagelLibrary(JvmTarget):
   """A Java library generated from a Ragel file."""
-
-  def __init__(self, **kwargs):
-    super(JavaRagelLibrary, self).__init__(**kwargs)
-
-    self.add_labels('codegen')
