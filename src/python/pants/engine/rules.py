@@ -71,6 +71,7 @@ class RootNode(TaskNode):
   is_inlineable = True
 
 
+
 class RootRule(datatype('RootRule', ['subject_type', 'selector']), Rule):
 
   task_func = identity

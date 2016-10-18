@@ -73,7 +73,13 @@ class LegacyBuildGraph(BuildGraph):
     """
     all_addresses = set()
     new_targets = list()
-
+    logger.debug('--------------------------')
+    logger.debug('--------------------------')
+    logger.debug('--------------------------')
+    logger.debug('--------------------------')
+    logger.debug('--------------------------')
+    logger.debug('--------------------------')
+    logger.debug('--------------------------')
     # Index the ProductGraph.
     for node, state in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyTarget values.
@@ -82,7 +88,7 @@ class LegacyBuildGraph(BuildGraph):
         raise AddressLookupError(
             'Build graph construction failed for {}:\n{}'.format(node.subject, trace))
       elif type(state) is not Return:
-        logger.debug('node without return {}'.format(node ))
+       #logger.debug('node without return {}'.format(node))
         State.raise_unrecognized(state)
       if node.product is not LegacyTarget:
         continue

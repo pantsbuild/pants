@@ -527,7 +527,11 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
 
       if type(dep_state) is Waiting:
         if type(selector) is Select:
-          raise Exception("we should never wait on a Select {}\n  self: {}\ndeps:\n  {}".format(selector, self, '\n  '.join(str(d) for d in dep_state.dependencies)))
+          raise Exception("we should never wait on a Select {}\n  self: {}\ndeps:\n  {}\n{}\n{}".format(selector, self,
+            '\n  '.join(str(d) for d in dep_state.dependencies),
+          step_context._node_states.values(),
+            step_context._something._selector_to_stuff
+          ))
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) is Return:
         dep_values.append(dep_state.value)
