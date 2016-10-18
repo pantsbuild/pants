@@ -17,31 +17,28 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     # test should fail because of style error.
     failing_test = self.run_pants(['compile', target],
       {'compile.scalafmt':{'skip':'False'}})
-  
     self.assert_failure(failing_test)
   
   def test_scalafmt_fail(self):
     target = '{}/badscalastyle::'.format(TEST_DIR)
     # test should fail because of style error.
     failing_test = self.run_pants(['compile', target],
-      {'compile.scalafmt':{'skip':'False', 
+      {'compile.scalafmt':{'skip':'False',
       'configuration':'%(pants_supportdir)s/scalafmt/config'}})
-  
     self.assert_failure(failing_test)
-  
+
   def test_scalafmt_disabled(self):
     target = '{}/badscalastyle::'.format(TEST_DIR)
     # test should pass because of scalafmt disabled.
     failing_test = self.run_pants(['compile', target],
       {'compile.scalafmt': {'skip':'True'}})
-
     self.assert_success(failing_test)
-  
+
   def test_scalafmt_format_default_config(self):
     self.format_file_and_verify_fmt({'skip':'False'})
-  
+
   def test_scalafmt_format(self):
-    self.format_file_and_verify_fmt({'skip':'False', 
+    self.format_file_and_verify_fmt({'skip':'False',
       'configuration':'%(pants_supportdir)s/scalafmt/config'})
 
   def format_file_and_verify_fmt(self, options):

@@ -51,7 +51,6 @@ class ScalaFmt(NailgunTask, AbstractClass):
     if sources:
       files = ",".join(sources)
 
-      print("Running Scalafmt with Args: {} ".format(self.get_command_args(files)))
       result = self.runjava(classpath=self.tool_classpath('scalafmt'),
                    main=self._SCALAFMT_MAIN,
                    args=self.get_command_args(files),
@@ -108,9 +107,6 @@ class ScalaFmtCheckFormat(ScalaFmt):
     if config_file!= None:
       args.extend(['--config', config_file])
 
-    print("Check Format")
-    print(self.get_options().configuration)
-
     return args
 
   def process_results(self, result):
@@ -121,9 +117,9 @@ class ScalaFmtCheckFormat(ScalaFmt):
 class ScalaFmtFormat(ScalaFmt):
   """This Task reads all scala files in the target and emits
   the source in a standard style as specified by the configuration
-  file.   
+  file.
 
-  This task mutates the underlying flies.  
+  This task mutates the underlying flies.
 
   :API: public
   """
