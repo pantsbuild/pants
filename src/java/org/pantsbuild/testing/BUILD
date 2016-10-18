@@ -8,5 +8,6 @@ java_library(
     '3rdparty:guava',
     '3rdparty:guava-testlib',
     '3rdparty:junit'
-  ]
+  ],
+  platform='java7',
 )

@@ -60,7 +60,7 @@ from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepComman
                                                           RunTestJvmPrepCommand)
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
-from pants.backend.jvm.tasks.scalafmt import ScalaFmt
+from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -196,7 +196,8 @@ def register_goals():
   task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty')
   task(name='scala', action=ScalaRepl, serialize=False).install('repl')
   task(name='scala-dirty', action=ScalaRepl, serialize=False).install('repl-dirty')
-  task(name='scalafmt', action=ScalaFmt, serialize=False).install('compile', first=True)
+  task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('compile', first=True)
+  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
   task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)

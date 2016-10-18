@@ -145,6 +145,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         'project_info:target_type',
         target_type=ScalaLibrary,
         dependencies=[jvm_binary],
+        sources=[],
         resources=[src_resource.address.spec],
     )
 

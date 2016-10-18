@@ -27,12 +27,12 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
   def task_type(cls):
     return ZincCompile
 
-  def _java(self, name, platform=None, deps=None, sources=None):
+  def _java(self, name, platform=None, deps=None):
     return self.make_target(spec='java:{}'.format(name),
                             target_type=JavaLibrary,
                             platform=platform,
                             dependencies=deps or [],
-                            sources=sources)
+                            sources=[])
 
   def _platforms(self, *versions):
     return {str(v): {'source': str(v)} for v in versions}
