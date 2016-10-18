@@ -272,11 +272,11 @@ Here, `java_library` is the target's *type*. Different target types
 support different arguments. The following arguments are pretty common:
 
 **name**<br>
-We use a target's name to refer to the target. If you omit the name, 
+We use a target's name to refer to the target. If you omit the name,
 it defaults to the name of the directory the `BUILD` file is in.
 
-You use names on the command line to specify which targets to operate on. 
-You also use names in `BUILD` files when one target refers to another, 
+You use names on the command line to specify which targets to operate on.
+You also use names in `BUILD` files when one target refers to another,
 e.g. in `dependencies`:
 
 **dependencies**<br>
@@ -288,16 +288,16 @@ refer to them here.
 **sources**<br>
 List of source files, which must be under the directory tree rooted
 at the BUILD file's directory.
- 
-You can provide an explicit list, e.g., 
+
+You can provide an explicit list, e.g.,
 `sources=['Foo.java', 'Bar.java']`, or use the `globs` function
-to glob over files, e.g., `sources=globs('*.java')`. Similarly, 
+to glob over files, e.g., `sources=globs('*.java')`. Similarly,
 `rglobs` will apply the glob pattern recursively in all subdirectories
 of the BUILD file's directory.
 
-If you omit `sources` in a target, Pants will attempt to apply a 
-sensible default that depends on the target type. 
-E.g., `junit_tests` will default to globbing over `*Test.java`, 
+If you omit `sources` in a target, Pants will attempt to apply a
+sensible default that depends on the target type.
+E.g., `junit_tests` will default to globbing over `*Test.java`,
 `java_library` will default to globbing over `*.java`, minus the
 test files, and so on.
 
