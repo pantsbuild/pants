@@ -4,6 +4,46 @@
 This document describes releases from the ``1.2.x`` ``stable`` branch.
 
 
+1.2.0rc2 (10/18/2016)
+---------------------
+
+The third, and perhaps final, release candidate for stable 1.2.0.
+
+Notably: this release candidate restores JDK7 compatibility for junit tests.
+
+API Changes
+~~~~~~~~~~~
+
+* Update junit runner to 1.0.15 to get java 7 compatibility
+  `RB #4324 <https://rbcommons.com/s/twitter/r/4324>`_
+
+* Back down the minimum required java version for running Pants tools to java 7
+  `RB #4314 <https://rbcommons.com/s/twitter/r/4314>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix exclude_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
+  `RB #4321 <https://rbcommons.com/s/twitter/r/4321>`_
+
+* Prevent cleanup error at end of pants test with --test-junit-html-report option, update safe_rmtree to be symlink aware
+  `RB #4319 <https://rbcommons.com/s/twitter/r/4319>`_
+
+* fix --changed-files option
+  `RB #4309 <https://rbcommons.com/s/twitter/r/4309>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Adding scalafmt formatting to fmt goal and enable by default
+  `RB #4312 <https://rbcommons.com/s/twitter/r/4312>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* migrate changed integration tests to isolated temp git repos and add an environment variable to override buildroot
+  `RB #4295 <https://rbcommons.com/s/twitter/r/4295>`_
+
 1.2.0rc1 (10/13/2016)
 ---------------------
 
