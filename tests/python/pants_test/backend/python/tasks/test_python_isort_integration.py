@@ -12,7 +12,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class PythonIsortTest(PantsRunIntegrationTest):
 
   def test_isort_passthru_has_target_but_not_python(self):
-    # Run a repl on a library target. Avoid some known-to-choke-on interpreters.
     command = ['fmt.isort',
                'testprojects/tests/java/org/pantsbuild/testproject/dummies/::',
                '--',
