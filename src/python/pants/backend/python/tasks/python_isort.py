@@ -60,7 +60,7 @@ class IsortPythonTask(PythonTask):
     sources = self._calculate_isortable_python_sources(targets)
     args = self.get_passthru_args() + sources
 
-    if len(args) == 0:
+    if len(args) == 0 or len(sources) == 0:
       logging.debug("Noop isort")
       return
 
