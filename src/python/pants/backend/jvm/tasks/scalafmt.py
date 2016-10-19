@@ -137,4 +137,3 @@ class ScalaFmtFormat(ScalaFmt):
     # Processes the results of running the scalafmt command.
     if result != 0:
       raise TaskError('Scalafmt failed to format files', exit_code=result)
-
