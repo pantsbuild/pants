@@ -10,8 +10,8 @@ from abc import abstractproperty
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.build_graph.target import Target
 from pants.option.custom_types import file_option
+from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
@@ -32,6 +32,11 @@ class ScalaFmt(NailgunTask, AbstractClass):
     register('--skip', type=bool, fingerprint=False, help='Skip Scalafmt Check')
     register('--configuration', advanced=True, type=file_option, fingerprint=False,
               help='Path to scalafmt config file, if not specified default scalafmt config used')
+    register('--target-types',
+             default={'scala_library', 'junit_tests', 'java_tests'},
+             advanced=True,
+             type=set,
+             help='The target types to apply formatting to.')
     cls.register_jvm_tool(register,
                           'scalafmt',
                           classpath=[
@@ -39,6 +44,14 @@ class ScalaFmt(NailgunTask, AbstractClass):
                                         name='scalafmt-cli_2.11',
                                         rev='0.2.11')
                           ])
+
+  @memoized_property
+  def _formatted_target_types(self):
+    aliases = self.get_options().target_types
+    registered_aliases = self.context.build_file_parser.registered_aliases()
+    return tuple({target_type
+                  for alias in aliases
+                  for target_type in registered_aliases.target_types_by_alias[alias]})
 
   def execute(self):
     """Runs Scalafmt on all found Scala Source Files."""
@@ -77,7 +90,7 @@ class ScalaFmt(NailgunTask, AbstractClass):
 
   def get_non_synthetic_scala_targets(self, targets):
     return filter(
-      lambda target: isinstance(target, Target)
+      lambda target: isinstance(target, self._formatted_target_types)
                      and target.has_sources(self._SCALA_SOURCE_EXTENSION)
                      and (not target.is_synthetic),
       targets)
@@ -111,7 +124,8 @@ class ScalaFmtCheckFormat(ScalaFmt):
 
   def process_results(self, result):
     if result != 0:
-      raise TaskError('Scalafmt failed with exit code {} to fix run: `./pants fmt <targets>` config{}'.format(result, self.get_options().configuration), exit_code=result)
+      raise TaskError('Scalafmt failed with exit code {}; to fix run: '
+                      '`./pants fmt <targets>`'.format(result), exit_code=result)
 
 
 class ScalaFmtFormat(ScalaFmt):
