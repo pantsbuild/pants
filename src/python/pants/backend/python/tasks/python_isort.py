@@ -60,8 +60,12 @@ class IsortPythonTask(PythonTask):
     sources = self._calculate_isortable_python_sources(targets)
     args = self.get_passthru_args() + sources
 
-    if len(args) == 0 or len(sources) == 0:
-      logging.debug("Noop isort")
+    if len(targets) > 0 and len(sources) == 0:
+      logging.debug("No-op: no Python source file found in target.")
+      return
+
+    if len(args) == 0:
+      logging.debug("No-op: no sources or passthru args.")
       return
 
     cmd = [isort_script] + args
