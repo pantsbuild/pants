@@ -79,12 +79,12 @@ _FFI.cdef(
     } RawScheduler;
 
     typedef struct {
-      Key      subject;
-      TypeId   product;
-      uint8_t  union_tag;
-      Value    union_return;
-      bool     union_throw;
-      bool     union_noop;
+      Key             subject;
+      TypeConstraint  product;
+      uint8_t         union_tag;
+      Value           union_return;
+      bool            union_throw;
+      bool            union_noop;
     } RawNode;
 
     typedef struct {

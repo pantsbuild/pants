@@ -69,6 +69,7 @@ impl Tasks {
         Task {
           cacheable: false,
           product: product,
+          // TODO: need to lift to a constraint.
           clause: vec![Selector::select(subject_type)],
           func: func,
         },
@@ -79,7 +80,7 @@ impl Tasks {
    * The following methods define the Task registration lifecycle.
    */
 
-  pub fn task_add(&mut self, func: Function, product: TypeId) {
+  pub fn task_add(&mut self, func: Function, product: TypeConstraint) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
@@ -96,25 +97,25 @@ impl Tasks {
       );
   }
 
-  pub fn add_select(&mut self, product: TypeId, variant_key: Option<Key>) {
+  pub fn add_select(&mut self, product: TypeConstraint, variant_key: Option<Key>) {
     self.clause(Selector::Select(
       Select { product: product, variant_key: variant_key }
     ));
   }
 
-  pub fn add_select_dependencies(&mut self, product: TypeId, dep_product: TypeId, field: Field, transitive: bool) {
+  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, transitive: bool) {
     self.clause(Selector::SelectDependencies(
       SelectDependencies { product: product, dep_product: dep_product, field: field, transitive: transitive }
     ));
   }
 
-  pub fn add_select_projection(&mut self, product: TypeId, projected_subject: TypeId, field: Field, input_product: TypeId) {
+  pub fn add_select_projection(&mut self, product: TypeConstraint, projected_subject: TypeId, field: Field, input_product: TypeConstraint) {
     self.clause(Selector::SelectProjection(
       SelectProjection { product: product, projected_subject: projected_subject, field: field, input_product: input_product }
     ));
   }
 
-  pub fn add_select_literal(&mut self, subject: Key, product: TypeId) {
+  pub fn add_select_literal(&mut self, subject: Key, product: TypeConstraint) {
     self.clause(Selector::SelectLiteral(
       SelectLiteral { subject: subject, product: product }
     ));

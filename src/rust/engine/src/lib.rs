@@ -115,7 +115,7 @@ enum RawStateTag {
 #[repr(C)]
 pub struct RawNode {
   subject: Key,
-  product: TypeId,
+  product: TypeConstraint,
   // The following values represent a union.
   // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
   // a stable release.
@@ -127,7 +127,7 @@ pub struct RawNode {
 }
 
 impl RawNode {
-  fn new(subject: &Key, product: &TypeId, state: Option<&Complete>) -> RawNode {
+  fn new(subject: &Key, product: &TypeConstraint, state: Option<&Complete>) -> RawNode {
     RawNode {
       subject: subject.clone(),
       product: product.clone(),
@@ -161,7 +161,7 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn new(node_states: Vec<(&Key,&TypeId,Option<&Complete>)>) -> Box<RawNodes> {
+  fn new(node_states: Vec<(&Key,&TypeConstraint,Option<&Complete>)>) -> Box<RawNodes> {
     let nodes =
       node_states.iter()
         .map(|&(subject, product, state)|
@@ -315,14 +315,12 @@ pub extern fn execution_roots(
   })
 }
 
-
-
 #[no_mangle]
 pub extern fn intrinsic_task_add(
   scheduler_ptr: *mut RawScheduler,
   func: Function,
   subject_type: TypeId,
-  output_type: TypeId,
+  output_type: TypeConstraint,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.tasks.intrinsic_add(func, subject_type, output_type);
@@ -333,7 +331,7 @@ pub extern fn intrinsic_task_add(
 pub extern fn task_add(
   scheduler_ptr: *mut RawScheduler,
   func: Function,
-  output_type: TypeId,
+  output_type: TypeConstraint,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.tasks.task_add(func, output_type);
@@ -343,7 +341,7 @@ pub extern fn task_add(
 #[no_mangle]
 pub extern fn task_add_select(
   scheduler_ptr: *mut RawScheduler,
-  product: TypeId,
+  product: TypeConstraint,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.tasks.add_select(product, None);
@@ -353,7 +351,7 @@ pub extern fn task_add_select(
 #[no_mangle]
 pub extern fn task_add_select_variant(
   scheduler_ptr: *mut RawScheduler,
-  product: TypeId,
+  product: TypeConstraint,
   variant_key: Key,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
@@ -365,7 +363,7 @@ pub extern fn task_add_select_variant(
 pub extern fn task_add_select_literal(
   scheduler_ptr: *mut RawScheduler,
   subject: Key,
-  product: TypeId,
+  product: TypeConstraint,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.tasks.add_select_literal(subject, product);
@@ -375,8 +373,8 @@ pub extern fn task_add_select_literal(
 #[no_mangle]
 pub extern fn task_add_select_dependencies(
   scheduler_ptr: *mut RawScheduler,
-  product: TypeId,
-  dep_product: TypeId,
+  product: TypeConstraint,
+  dep_product: TypeConstraint,
   field: Field,
   transitive: bool,
 ) {
@@ -388,10 +386,10 @@ pub extern fn task_add_select_dependencies(
 #[no_mangle]
 pub extern fn task_add_select_projection(
   scheduler_ptr: *mut RawScheduler,
-  product: TypeId,
+  product: TypeConstraint,
   projected_subject: TypeId,
   field: Field,
-  input_product: TypeId,
+  input_product: TypeConstraint,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.tasks.add_select_projection(product, projected_subject, field, input_product);

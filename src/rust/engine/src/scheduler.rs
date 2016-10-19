@@ -3,7 +3,7 @@ use std::collections::{HashSet, VecDeque};
 use std::io;
 use std::path::Path;
 
-use core::{FNV, Field, Key, TypeId};
+use core::{FNV, Field, Key, TypeConstraint, TypeId};
 use graph::{EntryId, Graph};
 use nodes::{Complete, Node, Runnable, State};
 use selectors::{Selector, SelectDependencies};
@@ -51,7 +51,7 @@ impl Scheduler {
     self.outstanding.clear();
   }
 
-  pub fn root_states(&self) -> Vec<(&Key,&TypeId,Option<&Complete>)> {
+  pub fn root_states(&self) -> Vec<(&Key,&TypeConstraint,Option<&Complete>)> {
     self.roots.iter()
       .map(|root| {
         let state = self.graph.entry(root).and_then(|e| e.state());
@@ -60,15 +60,15 @@ impl Scheduler {
       .collect()
   }
 
-  pub fn add_root_select(&mut self, subject: Key, product: TypeId) {
+  pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
     self.add_root(Node::create(Selector::select(product), subject, Vec::new()));
   }
 
   pub fn add_root_select_dependencies(
     &mut self,
     subject: Key,
-    product: TypeId,
-    dep_product: TypeId,
+    product: TypeConstraint,
+    dep_product: TypeConstraint,
     field: Field,
     transitive: bool,
   ) {
