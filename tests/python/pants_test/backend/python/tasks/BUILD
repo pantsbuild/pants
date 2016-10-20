@@ -99,6 +99,7 @@ python_tests(
   sources=['test_python_isort_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
   ],
   tags = {'integration'},
 )

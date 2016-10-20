@@ -18,4 +18,4 @@ class PythonIsortTest(PantsRunIntegrationTest):
                '--check-only']
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
-    self.assertIn(IsortPythonTask.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE, pants_run.stdout_data)
+    self.assertIn(IsortPythonTask.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE, pants_run.stderr_data)
