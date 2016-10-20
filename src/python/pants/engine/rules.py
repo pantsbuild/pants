@@ -35,7 +35,7 @@ class Rule(AbstractClass):
 
   @abstractproperty
   def constraint(self):
-    """"""
+    """The constraint for the product produced by this rule."""
 
   @abstractproperty
   def input_selectors(self):
@@ -72,6 +72,7 @@ def identity(product):
 
 
 class RootNode(TaskNode):
+  """A node used as the root node for engine requests"""
   is_inlineable = True
 
 
@@ -575,7 +576,7 @@ class RuleEdges(object):
 
   def add_edges_via(self, selector, new_dependencies):
     if len(set(new_dependencies)) != len(new_dependencies):
-      raise ValueError("you gave me new deps with dups {} {}".format(selector, new_dependencies))
+      raise ValueError("there are duplicates in the new deps {} {}".format(selector, new_dependencies))
     if selector is None and new_dependencies:
       raise ValueError("Cannot specify a None selector with non-empty dependencies!")
     tupled_other_rules = tuple(new_dependencies)
@@ -708,10 +709,8 @@ class GraphMaker(object):
       rules_to_traverse.extend(unseen_dep_rules)
       if type(rule) is RootRuleGraphEntry:
         if rule in root_rule_dependency_edges:
-          #raise ValueError('root rule already has deps {}\n  existing deps: {}\n  new deps: {}'.format(rule, list(root_rule_dependency_edges[rule]), dep_rules))
           root_rule_dependency_edges[rule].add_edges_via(selector_path, dep_rules)
         else:
-
           new_edges = RuleEdges()
           new_edges.add_edges_via(selector_path, dep_rules)
           root_rule_dependency_edges[rule] = new_edges
@@ -816,7 +815,7 @@ class GraphMaker(object):
                              projected_rules)
         else:
           raise TypeError('Unexpected type of selector: {}'.format(selector))
-      if (not was_unfulfillable):
+      if not was_unfulfillable:
         # NB: In this case, there are no selectors.
         add_rules_to_graph(entry, None, tuple())
 

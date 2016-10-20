@@ -28,8 +28,6 @@ from pants.engine.struct import Variants
 from pants.util.objects import datatype
 
 
-NOOP = Noop('its not waiting tho')
-
 logger = logging.getLogger(__name__)
 
 
@@ -70,9 +68,9 @@ class ProductGraph(object):
 
       readiness = not self.dependencies  or all(dep_entry.is_complete for dep_entry in self.dependencies)
 
-      reason = map(lambda y: y.node, filter(lambda y: y.is_complete, self.dependencies))
-      print('=====readiness checked for {}:                    {}                  {}\n'
-            '                                                  {}'.format(self, readiness,self.node, reason))
+      #reason = map(lambda y: y.node, filter(lambda y: y.is_complete, self.dependencies))
+      #print('=====readiness checked for {}:                    {}                  {}\n'
+      #      '                                                  {}'.format(self, readiness,self.node, reason))
       return readiness
 
     @property
@@ -186,7 +184,6 @@ class ProductGraph(object):
       self._nodes[node] = entry = self.Entry(node, edges)
 
       if edges.will_noop:
-        print('stuff')
         self.complete_node(node, edges.noop_reason)
         return set()
       else:
@@ -201,10 +198,7 @@ class ProductGraph(object):
     rule_edges = entry.rule_edges
     if rule_edges.current_node_is_rule_holder:
 
-      # TODO what to do about cycles?
-      # with this precomputing, we need to be sure to check for them and complain correctly on finding them.
-
-      #entry.validate_not_complete()
+      entry.validate_not_complete()
 
       for selector in rule_edges._current_node.rule.input_selectors:
 
@@ -243,18 +237,16 @@ class ProductGraph(object):
       alls = self.ensure_entry_and_expand(dependency)
       dependency_entry = self.ensure_entry(dependency)
       if dependency_entry in node_entry.dependencies:
-        print('in deps {}'.format(dependency_entry))
+        logger.debug('in deps {}'.format(dependency_entry))
         continue
       if dependency_entry.rule_edges.will_noop:
-        print('dep is statically determined noop')
+        logger.debug('dep is statically determined noop')
         continue
       if self._detect_cycle(node_entry, dependency_entry):
-        print('cycle detected! src: {} dep: {}'.format(node_entry, dependency_entry))
+        logger.debug('cycle detected! src: {} dep: {}'.format(node_entry, dependency_entry))
         node_entry.cyclic_dependencies.add(dependency)
-        #self.complete_node(dependency_entry.node, Noop.cycle(node_entry.node, dependency_entry.node))
-        #self.complete_node(node_entry.node, Noop.cycle(node_entry.node, dependency_entry.node))
       else:
-        print('adding dependency {}'.format(dependency_entry))
+        logger.debug('adding dependency {}'.format(dependency_entry))
         if dependency_entry.node in node_entry.cyclic_dependencies:
           raise Exception("was already a cyclic dependency!")
 
@@ -579,7 +571,6 @@ class LocalScheduler(object):
     """
     # See whether all of the dependencies for the node are available.
     if not node_entry.ready():
-    #if any(not dep_entry.is_complete for dep_entry in node_entry.dependencies):
       return None
 
     # Collect the deps.
@@ -588,7 +579,7 @@ class LocalScheduler(object):
       deps[dep_entry.node] = dep_entry.state
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in node_entry.cyclic_dependencies:
-      print('adding cycles to dep state')
+      logger.debug('adding cycles to dep state')
       deps[dep] = Noop.cycle(node_entry.node, dep)
 
     # Run.
@@ -597,7 +588,7 @@ class LocalScheduler(object):
       deps,
       self._inline_nodes)
     step = node_entry.node.step(step_context)
-    print('-- step result -- {}'.format(step))
+    logger.debug('-- step result -- {}'.format(step))
     return step
 
   @property
@@ -750,7 +741,6 @@ class LocalScheduler(object):
         runnable = []
         while candidates:
           node_entry = candidates.popleft()
-
           if node_entry.is_complete or node_entry in outstanding:
             # Node has already completed, or is runnable
             continue
@@ -778,11 +768,13 @@ class LocalScheduler(object):
               # Waiting on dependencies.
             self._product_graph.add_dependencies(node_entry.node, state.dependencies)
             incomplete_deps.update(d for d in node_entry.dependencies if not d.is_complete)
+
+            # remove incomplete deps that are noops due to cycles
             incomplete_deps2 = {d for d in incomplete_deps if d.node not in node_entry.cyclic_dependencies}
             if len(incomplete_deps2) != len(incomplete_deps):
-              print('          ------- removed n {} !'.format(len(incomplete_deps) - len(incomplete_deps2)))
+              logger.debug('          ------- removed n {} !'.format(len(incomplete_deps) - len(incomplete_deps2)))
             incomplete_deps = incomplete_deps2
-            print('--- incomplete deps {}'.format(incomplete_deps))
+            logger.debug('--- incomplete deps {}'.format(incomplete_deps))
             if incomplete_deps:
               # Mark incomplete deps as candidates for Steps.
               candidates.extend(incomplete_deps)
