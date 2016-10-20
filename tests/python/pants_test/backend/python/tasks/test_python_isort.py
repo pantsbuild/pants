@@ -90,18 +90,6 @@ class PythonIsortTest(PythonTaskTestBase):
     self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/b/b.py'))
     self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'))
 
-  # No target or passthru specified, should behave as ./pants fmt.isort ::,
-  # so every py file in a python target should be sorted.
-  def test_isort_no_target_no_passthru(self):
-    isort_task = self._create_task(target_roots=[])
-    isort_task.execute()
-    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_1.py'))
-    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_2.py'))
-    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/b/b.py'))
-    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'))
-    self.assertSortedWithConfigB(os.path.join(self.build_root, 'src/python/c/c.py'))
-    self.assertNotSorted(os.path.join(self.build_root, 'src/python/r/r.py'))
-
   def test_isort_passthru_no_target(self):
     isort_task = self._create_task(target_roots=[], passthru_args=['--recursive', '.'])
     isort_task.execute()

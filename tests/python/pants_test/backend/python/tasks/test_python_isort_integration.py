@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-
+from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -18,3 +18,4 @@ class PythonIsortTest(PantsRunIntegrationTest):
                '--check-only']
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
+    self.assertIn(IsortPythonTask.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE, pants_run.stdout_data)

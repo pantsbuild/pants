@@ -25,11 +25,13 @@ class IsortPythonTask(PythonTask):
   https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
 
   Behavior:
-  1. `./pants fmt.isort <targets>` will sort the files only related to specified targets, but the way of finding the config(s) is vanilla.
-  2. Additional arguments can be passed as passthru. e.g. `./pants fmt.isort <targets> -- --check-only`
-  3. `./pants fmt.isort -- <args, e.g. "--recursive .">` means both the files to be sorted and the way of finding the config(s) are vanilla.
-  4. `./pants fmt.isort` means `./pants fmt.isort ::` and NOT the entire repo directory which could include files not in any target.
+  1. `./pants fmt.isort <targets> -- <args, e.g. "--recursive .">` will sort the files only related
+      to specified targets, but the way of finding the config(s) is vanilla.
+  2. `./pants fmt.isort -- <args, e.g. "--recursive .">` means both the files to be sorted and the
+      way of finding the config(s) are vanilla.
   """
+
+  NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE = "No-op: no Python source file found in target(s)."
 
   _PYTHON_SOURCE_EXTENSION = '.py'
 
@@ -51,24 +53,16 @@ class IsortPythonTask(PythonTask):
 
     isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
 
-    # If neither targets nor passthru are specified, isort ::
-    if not self.context.target_roots and not self.get_passthru_args():
-      targets = self.determine_target_roots('fmt.isort')
-    else:
-      targets = self.context.targets()
+    targets = self.context.targets()
 
     sources = self._calculate_isortable_python_sources(targets)
-    args = self.get_passthru_args() + sources
 
-    if len(targets) > 0 and len(sources) == 0:
-      logging.debug("No-op: no Python source file found in target.")
+    # If target(s) are specified but no python source(s) are found, no op.
+    if targets and not sources:
+      logging.info(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
       return
 
-    if len(args) == 0:
-      logging.debug("No-op: no sources or passthru args.")
-      return
-
-    cmd = [isort_script] + args
+    cmd = [isort_script] + self.get_passthru_args() + sources
     logging.debug(' '.join(cmd))
 
     try:
