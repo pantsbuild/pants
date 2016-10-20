@@ -18,7 +18,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -117,7 +117,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
     self.make_target(
       'project_info:java_test',
-      target_type=JavaTests,
+      target_type=JUnitTests,
       dependencies=[jar_lib],
       sources=['this/is/a/test/source/FooTest.scala'],
       resources=[test_resource.address.spec],

@@ -19,6 +19,7 @@ python_library(
     'jar_dependency.py',
     'jar_library.py',
     'jarable.py',
+    'junit_tests.py',
     'jvm_app.py',
     'jvm_binary.py',
     'jvm_prep_command.py',
@@ -55,14 +56,15 @@ python_library(
     'annotation_processor.py',
     'java_agent.py',
     'java_library.py',
-    'javac_plugin.py',
     'java_tests.py',
+    'javac_plugin.py',
   ],
   dependencies = [
     '3rdparty/python:six',
     ':jvm',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:junit',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
   ],
@@ -77,7 +79,6 @@ python_library(
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':java',  # For a dep on java_tests.py, which we might want to move to a separate target.
     ':jvm',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/base:exceptions',

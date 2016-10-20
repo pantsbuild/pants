@@ -1,4 +1,4 @@
 # These sources intentionally missing.
-java_tests(
+junit_tests(
   sources=globs('*.java'),
 )

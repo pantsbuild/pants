@@ -40,6 +40,7 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/jvm/tasks:all',
+    'src/python/pants/base:deprecated',
     'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
