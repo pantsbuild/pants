@@ -11,7 +11,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class PythonIsortTest(PantsRunIntegrationTest):
 
-  def test_isort_passthru_has_target_but_not_python(self):
+  def test_isort_no_python_sources_should_noop(self):
     command = ['fmt.isort',
                'testprojects/tests/java/org/pantsbuild/testproject/dummies/::',
                '--',
