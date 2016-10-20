@@ -4,6 +4,30 @@
 This document describes releases from the ``1.2.x`` ``stable`` branch.
 
 
+1.2.0rc3 (10/20/2016)
+---------------------
+
+The fourth release candidate for stable 1.2.0, which limits the default targets affected
+by scalafmt and includes Benjy's lovely "default source globs" patch.
+
+Bugfixes
+~~~~~~~~
+
+* Fix erroneous deprecated scope warnings.
+  `RB #4323 <https://rbcommons.com/s/twitter/r/4323>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow targets to have sensible defaults for sources=.
+  `RB #4300 <https://rbcommons.com/s/twitter/r/4300>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add a target-types option to scalafmt to avoid formatting all targets
+  `RB #4328 <https://rbcommons.com/s/twitter/r/4328>`_
+
 1.2.0rc2 (10/18/2016)
 ---------------------
 
