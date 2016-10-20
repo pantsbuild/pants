@@ -54,7 +54,7 @@ class IsortPythonTask(PythonTask):
 
     isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
 
-    targets = self.context.targets()
+    targets = self.context.target_roots
 
     sources = self._calculate_isortable_python_sources(targets)
 
