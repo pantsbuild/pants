@@ -30,8 +30,8 @@ python_tests(
 )
 
 python_tests(
-  name='java_tests',
-  sources=['test_java_tests.py'],
+  name='junit_tests',
+  sources=['test_junit_tests.py'],
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/targets:jvm',
