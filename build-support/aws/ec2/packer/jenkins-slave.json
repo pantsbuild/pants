@@ -3,9 +3,24 @@
     "type": "amazon-ebs",
     "region": "us-east-1",
     "source_ami": "ami-840910ee",
-    "instance_type": "r3.xlarge",
+    "instance_type": "m3.xlarge",
     "ssh_username": "ubuntu",
-    "ami_name": "pantsbuild-jenkins-slave.{{timestamp}}"
+    "ami_name": "pantsbuild-jenkins-slave-m3xl.{{timestamp}}",
+    "ebs_optimized": true,
+    "ami_block_device_mappings": [
+      {
+        "device_name": "/dev/sda1",
+        "volume_size": 100,
+        "delete_on_termination": true
+      }
+    ],
+    "launch_block_device_mappings": [
+      {
+        "device_name": "/dev/sda1",
+        "volume_size": 100,
+        "delete_on_termination": true
+      }
+    ]
   }],
   "provisioners": [{
     "type": "shell",
