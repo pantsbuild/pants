@@ -151,6 +151,20 @@ class BuildFileAddressMapperTest(BaseTest):
                                  'dependencies passed to Target constructors must be a sequence of strings'):
       self.address_mapper.resolve(address)
 
+  def test_scan_addresses_build_ignore(self):
+    self.create_build_files()
+    address_mapper = BuildFileAddressMapper(self.build_file_parser,
+                                            self.project_tree,
+                                            build_ignore_patterns=['subdir'])
+    self.assertEquals({Address('', 'foo'), Address('', 'aoo'), Address('', 'boo')},
+                      address_mapper.scan_addresses())
+
+    address_mapper = BuildFileAddressMapper(self.build_file_parser,
+                                            self.project_tree,
+                                            build_ignore_patterns=['BUILD.suffix'])
+    self.assertEquals({Address('', 'foo'), Address('subdir', 'bar')},
+                      address_mapper.scan_addresses())
+
   def test_resolve_with_exclude(self):
     self.create_build_files()
     address_mapper = BuildFileAddressMapper(self.build_file_parser,
@@ -200,40 +214,6 @@ class BuildFileAddressMapperTest(BaseTest):
                                             self.project_tree,
                                             exclude_target_regexps=[r'.*:b.*'])
     self.assertEqual({Address('', 'foo'), Address('', 'aoo')}, address_mapper.scan_addresses())
-
-
-class BuildFileAddressMapperBuildIgnoreTest(BaseTest):
-  @property
-  def build_ignore_patterns(self):
-    return ['subdir']
-
-  def test_scan_from_address_mapper(self):
-    root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
-    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    self.assertEquals({BuildFileAddress(root_build_file, 'foo')}, self.address_mapper.scan_addresses())
-
-  def test_scan_from_context(self):
-    self.add_to_build_file('BUILD', 'target(name="foo")')
-    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    graph = self.context().scan()
-    self.assertEquals([target.address.spec for target in graph.targets()], ['//:foo'])
-
-
-class BuildFileAddressMapperExcludeTargetRegexpTest(BaseTest):
-  def setUp(self):
-    super(BuildFileAddressMapperExcludeTargetRegexpTest, self).setUp()
-
-    def add_target(path, name):
-      self.add_to_build_file(path, 'target(name="{name}")\n'.format(name=name))
-
-    add_target('BUILD', 'root')
-    add_target('a', 'a')
-    add_target('a', 'b')
-    add_target('a/b', 'b')
-    add_target('a/b', 'c')
-
-    self._spec_parser = CmdLineSpecParser(self.build_root)
-    pass
 
 
 class BuildFileAddressMapperScanTest(BaseTest):

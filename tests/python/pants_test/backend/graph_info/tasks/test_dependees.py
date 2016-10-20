@@ -292,12 +292,3 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'overlaps:three',
       targets=[self.target('common/a')]
     )
-
-
-class ReverseDepmapTestWithPantsBuildIgnore(BaseReverseDepmapTest):
-  @property
-  def build_ignore_patterns(self):
-    return ['overlaps']
-
-  def test_overlaps_with_build_ignore_patterns(self):
-    self.assert_console_output(targets=[self.target('common/a')])
