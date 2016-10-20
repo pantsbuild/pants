@@ -518,8 +518,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
   def func(self):
     return self.rule.task_func
 
-  def step(self, step_context):
-    # Compute dependencies for the Node, or determine whether it is a Noop.
+  def collect_dep_values(self, step_context):
     dependencies = []
     dep_values = []
     for selector in self.rule.input_selectors:
@@ -527,11 +526,23 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
 
       if type(dep_state) is Waiting:
         if type(selector) is Select:
-          raise Exception("we should never wait on a Select {}\n  self: {}\ndeps:\n  {}\n{}\n{}".format(selector, self,
-            '\n  '.join(str(d) for d in dep_state.dependencies),
-          step_context._node_states.values(),
-            step_context._something._selector_to_stuff
-          ))
+          raise Exception(
+            """we should never wait on a Select {}
+            waiting contents: {}
+            self: {}
+            deps:
+               {}
+            node_states
+               {}
+            selectors to cached vals
+               {}""".format(
+              selector,
+              dep_state.dependencies,
+              self,
+              '\n       '.join(str(d) for d in dep_state.dependencies),
+              step_context._node_states,
+              '\n       '.join('{} : {}'.format(k,v) for k, v in step_context._rule_edges._selector_to_state_node_tuple.items())
+            ))
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) is Return:
         dep_values.append(dep_state.value)
@@ -539,15 +550,22 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
         if selector.optional:
           dep_values.append(None)
         else:
-          return Noop('Was missing (at least) input for {}. {}', selector, dep_state)
+          return tuple(), Noop('Was missing (at least) input for {}. {}', selector, dep_state)
       elif type(dep_state) is Throw:
         # NB: propagate thrown exception directly.
-        return dep_state
+        return tuple(), dep_state
       else:
         State.raise_unrecognized(dep_state)
     # If any clause was still waiting on dependencies, indicate it; else execute.
     if dependencies:
-      return Waiting(dependencies)
+      return tuple(), Waiting(dependencies)
+    return dep_values, None
+
+  def step(self, step_context):
+    # Compute dependencies for the Node, or determine whether it is a Noop.
+    dep_values, state = self.collect_dep_values(step_context)
+    if state:
+      return state
     # Ready to run!
     return Runnable(functools.partial(_run_func_and_check_type,
                                       self.rule.output_product_type,
@@ -563,7 +581,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
     return repr(self)
 
 
-class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants']), Node):
+class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants', 'rule']), Node):
   """A native node type for filesystem operations."""
 
   _FS_PAIRS = {
@@ -576,10 +594,13 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   is_cacheable = False
   is_inlineable = False
 
+  #rule = None
+  extra_repr=None
+
   @classmethod
-  def create(cls, subject, product_type, variants):
+  def create(cls, subject, product_type, variants, rule):
     assert (product_type, type(subject)) in cls._FS_PAIRS
-    return FilesystemNode(subject, product_type, variants)
+    return FilesystemNode(subject, product_type, variants, rule)
 
   @classmethod
   def generate_subjects(cls, filenames):
@@ -607,7 +628,3 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
     else:
       # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
       raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
-
-
-class LiteralNode(datatype('Literal', ['value']), Node):
-  pass

@@ -136,8 +136,8 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def assert_return(self, state):
     self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
 
-  def assert_throw(self, state):
-    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
+  def assert_throw(self, state, node=None):
+    self.assertEquals(type(state), Throw, '{} is not a Throw. {}'.format(state, node))
 
 
 class InlinedGraphTest(GraphTestBase):
@@ -205,8 +205,10 @@ class InlinedGraphTest(GraphTestBase):
     walk = self.walk(scheduler, parsed_address)
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     root, state = walk[0]
-    self.assert_throw(state)
+    print(walk)
     trace_message = '\n'.join(scheduler.product_graph.trace(root))
+    print(trace_message)
+    self.assert_throw(state, root)
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
     if expected_string:

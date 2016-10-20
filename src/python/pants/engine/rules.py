@@ -100,6 +100,30 @@ class RootRule(datatype('RootRule', ['subject_type', 'selector']), Rule):
     return (self.selector,)
 
 
+# TODO the idea with these is that they sit in the product graph with their real nodes and allow the real node to say it isn't ready yet
+class SingleProjectionNode(TaskNode):
+  """"""
+  is_inlineable = True
+
+  def step(self, step_context):
+    values, state = self.collect_dep_values(step_context)
+    if state:
+      return state
+    for dep_subject, dep_variants in DependenciesNode.dependency_subject_variants(self.input_selectors[0],
+      values[0], self.variants):
+      pass
+
+
+class MultiProjectionNode(TaskNode):
+  """"""
+  is_inlineable = True
+
+  def step(self, step_context):
+    values, state = self.collect_dep_values(step_context)
+    if state:
+      return state
+
+
 class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', 'warnings'])):
   """Container for errors and warnings found during rule validation."""
 
@@ -175,7 +199,7 @@ class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type
 
   def as_node(self, subject, variants):
     assert type(subject) is self.subject_type
-    return FilesystemNode.create(subject, self.product_type, variants)
+    return FilesystemNode.create(subject, self.product_type, variants, self)
 
   @property
   def input_selectors(self):
@@ -366,13 +390,6 @@ class RuleGraph(datatype('RuleGraph',
                            containing the reasons why they were eliminated from the graph.
 
   """
-  # TODO constructing nodes from the resulting graph.
-  # Possible approach:
-  # - walk out from root nodes, constructing each node.
-  # - when hit a node that can't be constructed yet, ie the subject type changes,
-  #   skip and collect for later.
-  # - inject the constructed nodes into the product graph.
-  #
 
   def dependency_edges_for_rule(self, rule, subject_type):
     if type(rule) is RootRule:

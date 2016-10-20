@@ -13,8 +13,8 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
-                                Throw, Waiting)
+from pants.engine.nodes import ConflictingProducersError, Return, SelectNode, Throw, Waiting
+from pants.engine.rules import RootNode, RootRule
 from pants.engine.scheduler import (CompletedNodeException, IncompleteDependencyException,
                                     ProductGraph)
 from pants.engine.selectors import Select, SelectDependencies, SelectVariant
@@ -78,17 +78,17 @@ class SchedulerTest(unittest.TestCase):
     self.assert_select_for_subjects(walk, Select(Classpath), jars)
 
   def assert_root(self, walk, node, return_value):
-    """Asserts that the first Node in a walk was a DependenciesNode with the single given result."""
+    """Asserts that the first Node in a walk was a RootNode with the single given result."""
     root, root_state = walk[0]
-    self.assertEquals(type(root), DependenciesNode)
+    self.assertEquals(type(root), RootNode)
     self.assertEquals(Return([return_value]), root_state)
     self.assertIn((node, Return(return_value)),
                   [(d, self.pg.state(d)) for d in self.pg.dependencies_of(root)])
 
   def assert_root_failed(self, walk, node, thrown_type):
-    """Asserts that the first Node in a walk was a DependenciesNode with a Throw result."""
+    """Asserts that the first Node in a walk was a RootNode with a Throw result."""
     root, root_state = walk[0]
-    self.assertEquals(type(root), DependenciesNode)
+    self.assertEquals(type(root), RootNode)
     self.assertEquals(Throw, type(root_state))
     dependencies = [(d, self.pg.state(d)) for d in self.pg.dependencies_of(root)]
     self.assertIn((node, thrown_type), [(k, type(v.exc))
@@ -152,7 +152,7 @@ class SchedulerTest(unittest.TestCase):
         Jar(org='commons-lang', name='commons-lang', rev='2.5', type_alias='jar'),
         Address.parse('src/thrift:slf4j-api')]
 
-    # Root: expect a DependenciesNode depending on a SelectNode with compilation via javac.
+    # Root: expect a RootNode depending on a SelectNode with compilation via javac.
     self.assert_root(walk,
                      SelectNode(self.java, None, Select(Classpath)),
                      Classpath(creator='javac'))
@@ -233,9 +233,12 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec,
-                                      None,
-                                      SelectDependencies(Address, Addresses, field_types=(Address,))),
+    self.assertEqual(RootNode(spec,
+                              None,
+                              RootRule(type(spec),
+                                       SelectDependencies(Address,
+                                                          Addresses,
+                                                          field_types=(Address,)))),
                      root)
     self.assertEqual(list, type(root_value))
 
@@ -253,9 +256,12 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec,
-                                      None,
-                                      SelectDependencies(Address, Addresses, field_types=(Address,))),
+    self.assertEqual(RootNode(spec,
+                              None,
+                              RootRule(type(spec),
+                                SelectDependencies(Address,
+                                                   Addresses,
+                                                   field_types=(Address,)))),
                      root)
     self.assertEqual(list, type(root_value))
 

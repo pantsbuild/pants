@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from xml.dom.minidom import parse
-
 
 class XmlParser(object):
   """Parse .xml files."""
@@ -21,6 +19,7 @@ class XmlParser(object):
     :param string xml_path: File path of xml file to be parsed.
     :returns xml.dom.minidom.Document parsed_xml: Document instance containing parsed xml.
     """
+    from xml.dom.minidom import parse
     try:
       parsed_xml = parse(xml_path)
     # Minidom is a frontend for various parsers, only Exception covers ill-formed .xml for them all.
