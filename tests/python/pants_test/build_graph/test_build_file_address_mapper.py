@@ -18,9 +18,16 @@ from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 
-# TODO(Eric Ayers) There are methods in BuildFileAddressMapper that are missing
-# explicit unit tests: addresses_in_spec_path, spec_to_address, spec_to_addresses
 class BuildFileAddressMapperTest(BaseTest):
+
+  def create_build_files(self):
+    self.add_to_build_file('BUILD', 'target(name="foo")')
+    self.add_to_build_file('BUILD.suffix', dedent("""
+      target(name="aoo")
+      target(name="boo")
+      """))
+    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
+    self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
 
   def test_resolve(self):
     build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
@@ -32,32 +39,56 @@ class BuildFileAddressMapperTest(BaseTest):
     self.assertEqual(addressable.addressed_type, Target)
 
   def test_is_valid_single_address(self):
-    self.add_to_build_file('BUILD', dedent("""
-      target(name='foozle')
-      target(name='baz')
-      """))
-
+    self.create_build_files()
     self.assertFalse(self.address_mapper.is_valid_single_address(SingleAddress('', 'bad_spec')))
-    self.assertTrue(self.address_mapper.is_valid_single_address(SingleAddress('', 'foozle')))
+    self.assertTrue(self.address_mapper.is_valid_single_address(SingleAddress('', 'foo')))
+
+  def test_addresses_in_spec_path(self):
+    self.create_build_files()
+    self.assertEqual({Address('', 'foo'), Address('', 'aoo'), Address('', 'boo')},
+                     set(self.address_mapper.addresses_in_spec_path('')))
+    self.assertEqual({Address('subdir', 'bar'), Address('subdir', 'baz')},
+                     set(self.address_mapper.addresses_in_spec_path('subdir')))
+
+  def test_spec_to_address(self):
+    self.create_build_files()
+    self.assertEqual(Address('', 'foo'), self.address_mapper.spec_to_address(':foo'))
+    self.assertEqual(Address('', 'aoo'), self.address_mapper.spec_to_address(':aoo'))
+    self.assertEqual(Address('', 'boo'), self.address_mapper.spec_to_address('//:boo'))
+    self.assertEqual(Address('subdir', 'bar'), self.address_mapper.spec_to_address('subdir:bar'))
+    self.assertEqual(Address('subdir', 'baz'), self.address_mapper.spec_to_address('subdir:baz'))
+    self.assertEqual(Address('subdir', 'bar'), self.address_mapper.spec_to_address(':bar', relative_to='subdir'))
+    self.assertEqual(Address('subdir', 'baz'), self.address_mapper.spec_to_address(':baz', relative_to='subdir'))
+
+  def test_specs_to_addresses(self):
+    self.create_build_files()
+    self.assertEqual({Address('', 'foo'),
+                      Address('', 'aoo'),
+                      Address('', 'boo')},
+                     set(self.address_mapper.specs_to_addresses([':foo', ':aoo', '//:boo'])))
+    self.assertEqual({Address('subdir', 'bar'),
+                      Address('subdir', 'baz')},
+                     set(self.address_mapper.specs_to_addresses(['subdir:bar', 'subdir:baz'])))
+    self.assertEqual({Address('subdir', 'bar'),
+                      Address('subdir', 'baz')},
+                     set(self.address_mapper.specs_to_addresses([':bar', ':baz'], relative_to='subdir')))
 
   def test_scan_addresses(self):
-    root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
-    subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
+    self.create_build_files()
     with open(os.path.join(self.build_root, 'BUILD.invalid.suffix'), 'w') as invalid_build_file:
       invalid_build_file.write('target(name="foobar")')
-    self.assertEquals({BuildFileAddress(root_build_file, 'foo'),
-                       BuildFileAddress(subdir_build_file, 'bar'),
-                       BuildFileAddress(subdir_suffix_build_file, 'baz')},
+    self.assertEquals({Address('', 'foo'),
+                       Address('', 'aoo'),
+                       Address('', 'boo'),
+                       Address('subdir', 'bar'),
+                       Address('subdir', 'baz')},
                       self.address_mapper.scan_addresses())
 
   def test_scan_addresses_with_root(self):
-    self.add_to_build_file('BUILD', 'target(name="foo")')
-    subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
+    self.create_build_files()
     subdir = os.path.join(self.build_root, 'subdir')
-    self.assertEquals({BuildFileAddress(subdir_build_file, 'bar'),
-                       BuildFileAddress(subdir_suffix_build_file, 'baz')},
+    self.assertEquals({Address('subdir', 'bar'),
+                       Address('subdir', 'baz')},
                       self.address_mapper.scan_addresses(root=subdir))
 
   def test_scan_addresses_with_invalid_root(self):
@@ -86,16 +117,15 @@ class BuildFileAddressMapperTest(BaseTest):
       self.address_mapper.resolve(address)
 
   def test_raises_address_not_in_two_build_files(self):
-    self.add_to_build_file('BUILD.1', 'target(name="foo1")')
-    self.add_to_build_file('BUILD.2', 'target(name="foo2")')
-
+    self.create_build_files()
     # Create an address that doesn't exist in an existing BUILD file
     address = Address.parse(':bar')
     with self.assertRaisesRegexp(BuildFileAddressMapper.AddressNotInBuildFile,
                                  '^bar was not found in BUILD files from .*. '
                                  'Perhaps you meant one of:'
-                                 '\s+:foo1 \(from BUILD.1\)'
-                                 '\s+:foo2 \(from BUILD.2\)$'):
+                                 '\s+:aoo \(from BUILD.suffix\)'
+                                 '\s+:boo \(from BUILD.suffix\)'
+                                 '\s+:foo \(from BUILD\)$'):
       self.address_mapper.resolve(address)
 
   def test_raises_empty_build_file_error(self):
@@ -121,8 +151,58 @@ class BuildFileAddressMapperTest(BaseTest):
                                  'dependencies passed to Target constructors must be a sequence of strings'):
       self.address_mapper.resolve(address)
 
+  def test_resolve_with_exclude(self):
+    self.create_build_files()
+    address_mapper = BuildFileAddressMapper(self.build_file_parser,
+                                            self.project_tree,
+                                            exclude_target_regexps=[r'.*:b.*'])
+    with self.assertRaises(BuildFileAddressMapper.InvalidAddressError) as cm:
+      address_mapper.resolve(Address('', 'boo'))
+    self.assertIn('is excluded by exclude_target_regexp option', str(cm.exception))
 
-class BuildFileAddressMapperWithIgnoreTest(BaseTest):
+    with self.assertRaises(BuildFileAddressMapper.InvalidAddressError) as cm:
+      address_mapper.resolve(Address('subdir', 'bar'))
+    self.assertIn('is excluded by exclude_target_regexp option', str(cm.exception))
+
+  def test_addresses_in_spec_path_with_exclude(self):
+    self.create_build_files()
+    address_mapper = BuildFileAddressMapper(self.build_file_parser,
+                                            self.project_tree,
+                                            exclude_target_regexps=[r'.*:b.*'])
+    self.assertEqual({Address('', 'foo'), Address('', 'aoo')}, set(address_mapper.addresses_in_spec_path('')))
+    self.assertEqual(set(), set(address_mapper.addresses_in_spec_path('subdir')))
+
+  def test_spec_to_address_with_exclude(self):
+    self.create_build_files()
+    address_mapper = BuildFileAddressMapper(self.build_file_parser,
+                                            self.project_tree,
+                                            exclude_target_regexps=[r'.*:b.*'])
+    with self.assertRaises(BuildFileAddressMapper.InvalidBuildFileReference) as cm:
+      address_mapper.spec_to_address(':boo')
+    self.assertIn('is excluded by exclude_target_regexp option', str(cm.exception))
+
+    with self.assertRaises(BuildFileAddressMapper.InvalidBuildFileReference) as cm:
+      address_mapper.spec_to_address(':bar', relative_to='subdir')
+    self.assertIn('is excluded by exclude_target_regexp option', str(cm.exception))
+
+  def test_specs_to_addresses_with_exclude(self):
+    self.create_build_files()
+    address_mapper = BuildFileAddressMapper(self.build_file_parser,
+                                            self.project_tree,
+                                            exclude_target_regexps=[r'.*:b.*'])
+    with self.assertRaises(BuildFileAddressMapper.InvalidBuildFileReference) as cm:
+      set(address_mapper.specs_to_addresses([':foo', ':aoo', '//:boo']))
+    self.assertIn('is excluded by exclude_target_regexp option', str(cm.exception))
+
+  def test_scan_addresses_with_exclude(self):
+    self.create_build_files()
+    address_mapper = BuildFileAddressMapper(self.build_file_parser,
+                                            self.project_tree,
+                                            exclude_target_regexps=[r'.*:b.*'])
+    self.assertEqual({Address('', 'foo'), Address('', 'aoo')}, address_mapper.scan_addresses())
+
+
+class BuildFileAddressMapperBuildIgnoreTest(BaseTest):
   @property
   def build_ignore_patterns(self):
     return ['subdir']
@@ -137,6 +217,23 @@ class BuildFileAddressMapperWithIgnoreTest(BaseTest):
     self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
     graph = self.context().scan()
     self.assertEquals([target.address.spec for target in graph.targets()], ['//:foo'])
+
+
+class BuildFileAddressMapperExcludeTargetRegexpTest(BaseTest):
+  def setUp(self):
+    super(BuildFileAddressMapperExcludeTargetRegexpTest, self).setUp()
+
+    def add_target(path, name):
+      self.add_to_build_file(path, 'target(name="{name}")\n'.format(name=name))
+
+    add_target('BUILD', 'root')
+    add_target('a', 'a')
+    add_target('a', 'b')
+    add_target('a/b', 'b')
+    add_target('a/b', 'c')
+
+    self._spec_parser = CmdLineSpecParser(self.build_root)
+    pass
 
 
 class BuildFileAddressMapperScanTest(BaseTest):
