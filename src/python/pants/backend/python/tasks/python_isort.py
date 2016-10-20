@@ -25,10 +25,11 @@ class IsortPythonTask(PythonTask):
   https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
 
   Behavior:
-  1. `./pants fmt.isort <targets> -- <args, e.g. "--recursive .">` will sort the files only related
-      to specified targets, but the way of finding the config(s) is vanilla.
-  2. `./pants fmt.isort -- <args, e.g. "--recursive .">` means both the files to be sorted and the
-      way of finding the config(s) are vanilla.
+  1. ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
+      to specified targets, but the way of finding the config(s) is vanilla. If no python source file
+      is found, it would be no-op.
+  2. ./pants fmt.isort -- <args, e.g. "--recursive ."> is equivalent to isort <args>, meaning both
+      the files to be sorted and the way of finding the config(s) are vanilla.
   """
 
   NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE = "No-op: no Python source file found in target(s)."
