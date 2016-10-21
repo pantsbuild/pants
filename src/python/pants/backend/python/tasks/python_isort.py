@@ -25,11 +25,9 @@ class IsortPythonTask(PythonTask):
   https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
 
   Behavior:
-  1. ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
-      to specified targets, but the way of finding the config(s) is vanilla. If no python source file
-      is found, it would be no-op.
-  2. ./pants fmt.isort -- <args, e.g. "--recursive ."> is equivalent to isort <args>, meaning both
-      the files to be sorted and the way of finding the config(s) are vanilla.
+  ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
+    to specified targets, but the way of finding the config(s) is vanilla. If no target is
+    specified or no python source file is found in <targets>, it would be a no-op.
   """
 
   NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE = "No-op: no Python source file found in target(s)."
@@ -52,17 +50,13 @@ class IsortPythonTask(PythonTask):
     if self.options.skip:
       return
 
-    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
+    sources = self._calculate_isortable_python_sources(self.context.target_roots)
 
-    targets = self.context.target_roots
-
-    sources = self._calculate_isortable_python_sources(targets)
-
-    # If target(s) are specified but no python source(s) are found, no op.
-    if targets and not sources:
-      logging.info(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
+    if not sources:
+      logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
       return
 
+    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
     cmd = [isort_script] + self.get_passthru_args() + sources
     logging.debug(' '.join(cmd))
 

@@ -90,15 +90,16 @@ class PythonIsortTest(PythonTaskTestBase):
     self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/b/b.py'))
     self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'))
 
+  # No target means no sources, hence nothing should be sorted.
   def test_isort_passthru_no_target(self):
     isort_task = self._create_task(target_roots=[], passthru_args=['--recursive', '.'])
     isort_task.execute()
-    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_1.py'))
-    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_2.py'))
-    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/b/b.py'))
-    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'))
-    self.assertSortedWithConfigB(os.path.join(self.build_root, 'src/python/c/c.py'))
-    self.assertSortedWithConfigB(os.path.join(self.build_root, 'src/python/r/r.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/a_1.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/a_2.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/b/b.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/not_in_a_target.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/c/c.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/r/r.py'))
 
   # Resources should not be touched, hence noop isort.
   def test_isort_isortable_target(self):

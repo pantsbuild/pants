@@ -12,7 +12,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class PythonIsortTest(PantsRunIntegrationTest):
 
   def test_isort_no_python_sources_should_noop(self):
-    command = ['fmt.isort',
+    command = ['-ldebug',
+               'fmt.isort',
                'testprojects/tests/java/org/pantsbuild/testproject/dummies/::',
                '--',
                '--check-only']
