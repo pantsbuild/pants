@@ -147,11 +147,12 @@ to host code reviews:
 #### Posting the First Draft
 
 When <a pantsref="dev_run_all_tests">all of the tests are green on travis</a>, you're
-probably ready to request review for the change! 
+probably ready to request review for the change!
 
 To get your pull request reviewed, you should fill in:
 
 - A useful change description, with a short and descriptive title.
+- Links to any relevant github issues for the change.
 - Any specific [pants committers](https://github.com/orgs/pantsbuild/teams/committers)
   who should review your change to the Assignees field. Running `git log -- $filename` on
   one or more of the files that you changed is a good way to find potential reviewers!
@@ -181,7 +182,7 @@ push to the relevant branch on your fork as you did before:
 
 Look over the fields in the pull request you created earlier; perhaps some could use updating.
 Press the web form's `edit` button.
-    
+
 If at any point you need to make changes that will fundamentally overhaul a review,
 consider temporarily removing the `reviewable` label in order to let reviewers know
 to hold off until the code is ready.
