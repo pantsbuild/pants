@@ -652,33 +652,39 @@ class LocalScheduler(object):
     # if the root rule has only one dep, turn it into a node
     # otherwise we need to do pick first on node version
 
-    def root_rule_graph_entries():
+
+    def subject_selectors():
       for subject in subjects:
         selector_fn = self._root_selector_fns.get(type(subject), None)
         if not selector_fn:
           raise TypeError('Unsupported root subject type: {} for {!r}'
-            .format(type(subject), subject))
+                          .format(type(subject), subject))
 
         for product in products:
-          selector = selector_fn(product)
-          matching = self._rule_graph.root_rule_matching(type(subject), selector)
-          if not matching:
-            #raise Exception("What is all this then. No matching for {} {}".format(subject, selector))
-            logger.debug("What is all this then. No matching for {} {}".format(selector, subject))
-            logger.debug("rule table {} {}:\n  {}".format(type(subject).__name__, selector.product,'\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type and n.selector.product is product)))
-            logger.debug("rule table:\n  {}".format('\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type)))
-            pass # This is fine, it means that this product has no matches--which ought to turn into a noop later.
+          yield subject, selector_fn(product)
 
-          else:
-            yield (subject, matching) # could have a better protocol
+    def subject_rule():
+      for subject, selector in subject_selectors():
+        matching = self._rule_graph.root_rule_matching(type(subject), selector)
+        if not matching:
+          #raise Exception("What is all this then. No matching for {} {}".format(subject, selector))
+          logger.debug("What is all this then. No matching for {} {}".format(selector, subject))
+          logger.debug("rule table {} {}:\n  {}".format(type(subject).__name__, selector.product,'\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type and n.selector.product is product)))
+          logger.debug("rule table:\n  {}".format('\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type)))
+
+          # Try updating the rule graph to include the rule, or alternatively we could yield the cases that failed and collect them
+
+        else:
+          yield (subject, matching) # could have a better protocol
 
 
-    root_rule_entries = list(root_rule_graph_entries())
-    if not root_rule_entries:
-      self._rule_graph.try_building_new_graph()
+
+    root_rule_entries = list(subject_rule())
+    #if not root_rule_entries:
+    #  self._rule_graph.try_building_new_graph()
     root_nodes = set(RootRule(type(sub), x.selector).as_node(sub, None) for sub, x in
                      root_rule_entries)
-    #logger.debug('')
+
     return ExecutionRequest(root_nodes)
 
   def selection_request(self, requests):
