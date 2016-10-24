@@ -133,7 +133,7 @@ class ProductGraph(object):
     entry.set_state(state)
 
   def add_dependencies(self, node, dependencies):
-    assert node in self._nodes
+    #assert node in self._nodes
     entry = self.ensure_entry(node)
     entry.validate_not_complete()
     self._add_dependencies(entry, dependencies)
@@ -162,7 +162,7 @@ class ProductGraph(object):
     """
     entry = self._nodes.get(node, None)
     if not entry:
-      raise Exception("ensure entry called without entry existing {}".format(node))
+      #raise Exception("ensure entry called without entry existing {}".format(node))
       self._validator(node)
       edges = RuleGraphEdgeContainer(node, self._rule_graph)
       self._nodes[node] = entry = self.Entry(node, edges)
@@ -211,7 +211,8 @@ class ProductGraph(object):
           # up as a waiting state entry
           # hm. another possibility would be to do the actual check against state, and mark the node
           # completed if all of its deps exist -- can't because it hasn't run yet. :/
-          lambda n, default: default
+          lambda n, default: default,
+          on_no_matches_wait=True
         )
         if type(state_for_selector) is Waiting:
           expanded_entries.update(self._add_dependencies(entry, state_for_selector.dependencies))
@@ -491,7 +492,11 @@ class ProductGraph(object):
     yield '}'
 
 
-class ExecutionRequest(datatype('ExecutionRequest', ['roots', 'root_rules'])):
+def try_id(i):
+  return i
+
+
+class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   """Holds the roots for an execution, which might have been requested by a user.
 
   To create an ExecutionRequest, see `LocalScheduler.build_request` (which performs goal
@@ -538,7 +543,12 @@ class LocalScheduler(object):
       DescendantAddresses: select_dep_addrs,
     }
 
-    self._rule_index = RuleIndex.create(tasks)
+    self._rule_index = RuleIndex.create(tasks+
+                                         # this is a less than ideal way to get around the problem that
+                                         # the changed task fails at.
+                                         # the real solution is to update the rule graph if a request
+                                        # comes in that uses an unusual or unexpected product / subject
+                                        [(Address, (Select(Address),), try_id),])
     self._node_builder = NodeBuilder(self._rule_index)
 
     self._rule_graph = GraphMaker(self._rule_index, self._root_selector_fns).full_graph()
@@ -642,9 +652,6 @@ class LocalScheduler(object):
     # if the root rule has only one dep, turn it into a node
     # otherwise we need to do pick first on node version
 
-    #for subject in subjects:
-    #  for product in products:
-
     def root_rule_graph_entries():
       for subject in subjects:
         selector_fn = self._root_selector_fns.get(type(subject), None)
@@ -654,18 +661,25 @@ class LocalScheduler(object):
 
         for product in products:
           selector = selector_fn(product)
-          matching = self._rule_graph.root_rules_matching(type(subject), selector)
-          #logger.debug('matching raw root rules: product: {}, subject type: {}'.format(product, type(subject)))
-          #logger.debug(matching)
+          matching = self._rule_graph.root_rule_matching(type(subject), selector)
           if not matching:
             #raise Exception("What is all this then. No matching for {} {}".format(subject, selector))
+            logger.debug("What is all this then. No matching for {} {}".format(selector, subject))
+            logger.debug("rule table {} {}:\n  {}".format(type(subject).__name__, selector.product,'\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type and n.selector.product is product)))
+            logger.debug("rule table:\n  {}".format('\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type)))
             pass # This is fine, it means that this product has no matches--which ought to turn into a noop later.
+
           else:
             yield (subject, matching) # could have a better protocol
 
-    t = tuple(root_rule_graph_entries())
-    root_nodes = set(RootRule(type(sub), x.selector).as_node(sub, None) for sub, x in t)
-    return ExecutionRequest(root_nodes, t)
+
+    root_rule_entries = list(root_rule_graph_entries())
+    if not root_rule_entries:
+      self._rule_graph.try_building_new_graph()
+    root_nodes = set(RootRule(type(sub), x.selector).as_node(sub, None) for sub, x in
+                     root_rule_entries)
+    #logger.debug('')
+    return ExecutionRequest(root_nodes)
 
   def selection_request(self, requests):
     """Create and return an ExecutionRequest for the given (selector, subject) tuples.
@@ -676,22 +690,24 @@ class LocalScheduler(object):
     :return: An ExecutionRequest for the given selectors and subjects.
     """
     #TODO: Think about how to deprecate the existing execution_request API.
-    # TODO this needs to trigger a new graph analysis if the requests contain unexpected things
-    #
-    #roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
-    #for (selector, subject)
-    t = tuple(
-      self._rule_graph.root_rules_matching(type(subject), selector) for (selector, subject) in
-      requests)
-    roots = tuple()
+
+    matching_root_rules = tuple(self._rule_graph.root_rule_matching(type(subject), selector)
+                                for (selector, subject) in requests)
     root_rule_entries = defaultdict(set)
-    for subject, r_r in t:
+    for subject, r_r in matching_root_rules:
       root_rule_entries[subject].update(self._rule_graph.root_rule_edges(r_r))
 
+    if not matching_root_rules:
+      # TODO this needs to trigger a new graph analysis if the requests contain unexpected things
+      # It may still fail to match anything, and that should be handled as well.
+      raise Exception('no matching root rules')
+
+    roots = tuple()
     for subject, rres in root_rule_entries.items():
       for rre in rres:
         roots += rre.rule.as_node(subject, None)
-    return ExecutionRequest(roots, t)
+    logger.debug('roots are {}'.format(roots))
+    return ExecutionRequest(roots)
 
   @property
   def product_graph(self):
@@ -851,14 +867,15 @@ class RuleGraphEdgeContainer(object):
     else:
       pass
 
-  def get_state_for_selector(self, selector_path, subject, variants, get_state):
+  def get_state_for_selector(self, selector_path, subject, variants, get_state, on_no_matches_wait=False):
     if not self._rule_edges:
       raise Exception("Expected there to be rule edges!")
     nodes, rule_entries_for_debugging, state = self._check_initial_nodes(selector_path)
     if state:
       return state
     if nodes:
-      return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants, on_no_matches_wait=True)
+      #print('found node: {}'.format(nodes))
+      return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants, on_no_matches_wait=on_no_matches_wait)
     return self._do_rule_edge_stuff(selector_path, subject, variants, get_state)
 
   def _initial_selector_path(self, selector):
@@ -984,8 +1001,10 @@ class RuleGraphEdgeContainer(object):
     nodes, state, rule_entries_for_debugging = self._state_or_nodes_for(selector_path, subject, variants)
     if state:
       return state
+    if nodes:
+      return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants)
 
-    return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants)
+    raise Exception("Wut {} {}".format(selector_path, rule_entries_for_debugging))
 
   def _state_or_nodes_for(self, selector_path, subject, variants):
     """Finds states or nodes for the selector path, based on looking at the edges from the currently relevant rule.
@@ -1024,16 +1043,17 @@ class RuleGraphEdgeContainer(object):
     matches = []
     for node in nodes:
       state = get_state(node, None)
+      #print('gotten state {}'.format(state))
       if state is None:
         waiting.append(node)
       elif type(state) is Waiting:
         waiting.extend(state.dependencies)
+      elif type(state) is Throw:
+        return state # always bubble up the first throw
       elif type(state) is Return:
         matched = SelectNode.do_real_select_literal(final_selector.type_constraint, state.value, variants)
         if matched:
           matches.append((node, matched))
-      elif type(state) is Throw:
-        return state # always bubble up the first throw
       elif type(state) is Noop:
         continue
       else:

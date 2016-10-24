@@ -401,10 +401,14 @@ class RuleGraph(datatype('RuleGraph',
   def is_unfulfillable(self, rule, subject_type):
     return RuleGraphEntry(subject_type, rule) in self.unfulfillable_rules
 
-  def root_rules_matching(self, subject_type, selector):
+  def root_rule_matching(self, subject_type, selector):
     root_rule = RootRuleGraphEntry(subject_type, selector)
     if root_rule in self.root_rules:
       return root_rule
+
+  def try_building_new_graph(self):
+    #self.gr
+    pass
 
   def root_rule_edges(self, root_rule):
     try:

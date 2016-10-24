@@ -13,7 +13,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.nodes import ConflictingProducersError, Return, SelectNode, Throw, Waiting
+from pants.engine.nodes import ConflictingProducersError, Return, Throw, Waiting
 from pants.engine.rules import RootNode, RootRule
 from pants.engine.scheduler import (CompletedNodeException, IncompleteDependencyException,
                                     ProductGraph)
@@ -48,14 +48,12 @@ class SchedulerTest(unittest.TestCase):
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
   def assert_select_for_subjects(self, walk, selector, subjects, variants=None):
-    node_type = SelectNode
-
     variants = tuple(variants.items()) if variants else None
-    self.assertEqual({node_type(subject, variants, selector) for subject in subjects},
-                     {node for node, _ in walk
-                       if node.product == selector.product and
-                          isinstance(node, node_type) and
-                          node.variants == variants})
+    actual = {node for node, _ in walk if node.product == selector.product and isinstance(node,
+                                                                                             RootNode) and node.variants == variants}
+    print(actual)
+    self.assertEqual({RootNode(subject, variants, RootRule(type(subject), selector))
+                      for subject in subjects}, actual)
 
   def build_and_walk(self, build_request):
     """Build and then walk the given build_request, returning the walked graph as a list."""
@@ -73,7 +71,7 @@ class SchedulerTest(unittest.TestCase):
     build_request = self.request(goals, *root_specs)
     walk = self.build_and_walk(build_request)
 
-    # Expect a SelectNode for each of the Jar/Classpath.
+    # Expect a RootNode for each of the Jar/Classpath.
     self.assert_select_for_subjects(walk, Select(Jar), jars)
     self.assert_select_for_subjects(walk, Select(Classpath), jars)
 
@@ -126,7 +124,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Root: expect the synthetic GenGoal product.
     self.assert_root(walk,
-                     SelectNode(self.thrift, None, Select(GenGoal)),
+                     RootNode(self.thrift, None, RootRule(type(self.thrift), Select(GenGoal))),
                      GenGoal("non-empty input to satisfy the Goal constructor"))
 
     variants = {'thrift': 'apache_java'}
@@ -152,9 +150,9 @@ class SchedulerTest(unittest.TestCase):
         Jar(org='commons-lang', name='commons-lang', rev='2.5', type_alias='jar'),
         Address.parse('src/thrift:slf4j-api')]
 
-    # Root: expect a RootNode depending on a SelectNode with compilation via javac.
+    # Root: expect a RootNode depending on a RootNode with compilation via javac.
     self.assert_root(walk,
-                     SelectNode(self.java, None, Select(Classpath)),
+                     RootNode(self.java, None, RootRule(type(self.java), Select(Classpath))),
                      Classpath(creator='javac'))
 
     # Confirm that exactly the expected subjects got Classpaths.
@@ -168,7 +166,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.consumes_resources, None, Select(Classpath)),
+                     RootNode(self.consumes_resources, None, RootRule(type(self.consumes_resources), Select(Classpath))),
                      Classpath(creator='javac'))
 
     # Confirm a classpath for the resources target and other subjects. We know that they are
@@ -185,7 +183,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.consumes_managed_thirdparty, None, Select(Classpath)),
+                     RootNode(self.consumes_managed_thirdparty, None, RootRule(type(self.consumes_managed_thirdparty), Select(Classpath))),
                      Classpath(creator='javac'))
 
     # Confirm that we produced classpaths for the managed jars.
@@ -199,7 +197,7 @@ class SchedulerTest(unittest.TestCase):
     self.assertEquals({Jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
                        Jar('com.google.guava', 'guava', '18.0')},
                       {ret.value for node, ret in walk
-                       if node.product == Jar and isinstance(node, SelectNode)})
+                       if node.product == Jar and isinstance(node, RootNode)})
 
   def test_dependency_inference(self):
     """Scala dependency inference introduces dependencies that do not exist in BUILD files."""
@@ -208,7 +206,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate the root.
     self.assert_root(walk,
-                     SelectNode(self.inferred_deps, None, Select(Classpath)),
+                     RootNode(self.inferred_deps, None, RootRule(type(self.inferred_deps), Select(Classpath))),
                      Classpath(creator='scalac'))
 
     # Confirm that we requested a classpath for the root and inferred targets.
@@ -221,7 +219,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate that the root failed.
     self.assert_root_failed(walk,
-                            SelectNode(self.java_multi, None, Select(Classpath)),
+                            RootNode(self.java_multi, None, RootRule(type(self.java_multi), Select(Classpath))),
                             ConflictingProducersError)
 
   def test_descendant_specs(self):

@@ -8,10 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
+from twitter.common.collections import maybe_list
+
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address import Address
 from pants.build_graph.address_mapper import AddressMapper
+from pants.engine.addressable import Addresses
 from pants.engine.engine import ExecutionError
 from pants.engine.fs import Dir
 from pants.engine.graph import BuildDirs, BuildFiles
@@ -66,6 +69,11 @@ class LegacyAddressMapper(AddressMapper):
   def scan_specs(self, specs, fail_fast=True):
     try:
       addresses = set(self._engine.product_request(Address, specs))
+      Addresses
+      maybe_list
+      #Address
+      #addresses = set(maybe_list(self._engine.product_request(Addresses, specs)))
+      #addresses = set(maybe_list(self._engine.product_request(Addresses, specs)))
     except ExecutionError as e:
       raise self.BuildFileScanError(str(e))
     return addresses

@@ -12,7 +12,8 @@ from contextlib import closing, contextmanager
 from pants.build_graph.address import Address
 from pants.engine.engine import (ExecutionError, LocalMultiprocessEngine, LocalSerialEngine,
                                  SerializationError, ThreadHybridEngine)
-from pants.engine.nodes import FilesystemNode, Return, SelectNode, Throw
+from pants.engine.nodes import FilesystemNode, Return, Throw
+from pants.engine.rules import RootNode, RootRule
 from pants.engine.selectors import Select
 from pants.engine.storage import Cache, Storage
 from pants_test.engine.examples.planners import Classpath, UnpickleableResult, setup_json_scheduler
@@ -33,7 +34,7 @@ class EngineTest(unittest.TestCase):
   def assert_engine(self, engine):
     request = self.request(['compile'], self.java)
     result = engine.execute(request)
-    expected_roots = {SelectNode(self.java, None, Select(Classpath)):
+    expected_roots = {RootNode(self.java, None, RootRule(type(self.java), Select(Classpath))):
                       Return(Classpath(creator='javac'))}
     if result.root_products != expected_roots:
       root, state = self.scheduler.root_entries(request).items()[0]
