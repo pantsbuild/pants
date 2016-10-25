@@ -406,9 +406,8 @@ class RuleGraph(datatype('RuleGraph',
     if root_rule in self.root_rules:
       return root_rule
 
-  def try_building_new_graph(self):
-    #self.gr
-    pass
+  def new_graph_with_root_for(self, subject_type, selector):
+    return self.graph_maker.new_graph_from_existing(subject_type, selector, self)
 
   def root_rule_edges(self, root_rule):
     try:
@@ -628,6 +627,21 @@ class GraphMaker(object):
       raise ValueError('root_subject_fns must not be empty')
     self.root_subject_selector_fns = root_subject_fns
     self.rule_index = rule_index
+
+  def new_graph_from_existing(self, root_subject_type, root_selector, existing_graph):
+    root_rule = RootRuleGraphEntry(root_subject_type, root_selector)
+    root_rule_dependency_edges, edges, unfulfillable = self._construct_graph(root_rule,
+                                                                             root_rule_dependency_edges=existing_graph.root_rules,
+                                                                             rule_dependency_edges=existing_graph.rule_dependencies,
+                                                                             unfulfillable_rules=existing_graph.unfulfillable_rules
+                                                                             )
+    root_rule_dependency_edges, edges = self._remove_unfulfillable_rules_and_dependents(root_rule_dependency_edges,
+                                                                                        edges, unfulfillable)
+    return RuleGraph(self,
+                     self.root_subject_selector_fns.keys() + [root_subject_type,],
+                     root_rule_dependency_edges,
+                     edges,
+                     unfulfillable)
 
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)

@@ -9,7 +9,7 @@ import logging
 import os
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from contextlib import contextmanager
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
@@ -543,12 +543,7 @@ class LocalScheduler(object):
       DescendantAddresses: select_dep_addrs,
     }
 
-    self._rule_index = RuleIndex.create(tasks+
-                                         # this is a less than ideal way to get around the problem that
-                                         # the changed task fails at.
-                                         # the real solution is to update the rule graph if a request
-                                        # comes in that uses an unusual or unexpected product / subject
-                                        [(Address, (Select(Address),), try_id),])
+    self._rule_index = RuleIndex.create(tasks)
     self._node_builder = NodeBuilder(self._rule_index)
 
     self._rule_graph = GraphMaker(self._rule_index, self._root_selector_fns).full_graph()
@@ -653,7 +648,7 @@ class LocalScheduler(object):
     # otherwise we need to do pick first on node version
 
 
-    def subject_selectors():
+    def selector_subjects():
       for subject in subjects:
         selector_fn = self._root_selector_fns.get(type(subject), None)
         if not selector_fn:
@@ -661,31 +656,9 @@ class LocalScheduler(object):
                           .format(type(subject), subject))
 
         for product in products:
-          yield subject, selector_fn(product)
+          yield selector_fn(product), subject
 
-    def subject_rule():
-      for subject, selector in subject_selectors():
-        matching = self._rule_graph.root_rule_matching(type(subject), selector)
-        if not matching:
-          #raise Exception("What is all this then. No matching for {} {}".format(subject, selector))
-          logger.debug("What is all this then. No matching for {} {}".format(selector, subject))
-          logger.debug("rule table {} {}:\n  {}".format(type(subject).__name__, selector.product,'\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type and n.selector.product is product)))
-          logger.debug("rule table:\n  {}".format('\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type)))
-
-          # Try updating the rule graph to include the rule, or alternatively we could yield the cases that failed and collect them
-
-        else:
-          yield (subject, matching) # could have a better protocol
-
-
-
-    root_rule_entries = list(subject_rule())
-    #if not root_rule_entries:
-    #  self._rule_graph.try_building_new_graph()
-    root_nodes = set(RootRule(type(sub), x.selector).as_node(sub, None) for sub, x in
-                     root_rule_entries)
-
-    return ExecutionRequest(root_nodes)
+    return self.selection_request(list(selector_subjects()))
 
   def selection_request(self, requests):
     """Create and return an ExecutionRequest for the given (selector, subject) tuples.
@@ -697,23 +670,32 @@ class LocalScheduler(object):
     """
     #TODO: Think about how to deprecate the existing execution_request API.
 
-    matching_root_rules = tuple(self._rule_graph.root_rule_matching(type(subject), selector)
-                                for (selector, subject) in requests)
-    root_rule_entries = defaultdict(set)
-    for subject, r_r in matching_root_rules:
-      root_rule_entries[subject].update(self._rule_graph.root_rule_edges(r_r))
+    def rule_subject():
+      for selector, subject in requests:
+        matching_root_graph_entry = self._rule_graph.root_rule_matching(type(subject), selector)
+        if not matching_root_graph_entry:
+          #raise Exception("What is all this then. No matching for {} {}".format(subject, selector))
+          logger.debug("What is all this then. No matching for {} {}".format(selector, subject))
+          logger.debug("rule table {} {}:\n  {}".format(type(subject).__name__, selector.product,'\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type and n.selector.product is selector.product)))
+          logger.debug("rule table:\n  {}".format('\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type)))
 
-    if not matching_root_rules:
-      # TODO this needs to trigger a new graph analysis if the requests contain unexpected things
-      # It may still fail to match anything, and that should be handled as well.
-      raise Exception('no matching root rules')
+          # TODO this updating bit is less than ideal.
+          self._rule_graph = self._rule_graph.new_graph_with_root_for(type(subject), selector)
+          self._product_graph._rule_graph = self._rule_graph
 
-    roots = tuple()
-    for subject, rres in root_rule_entries.items():
-      for rre in rres:
-        roots += rre.rule.as_node(subject, None)
-    logger.debug('roots are {}'.format(roots))
-    return ExecutionRequest(roots)
+          matching_root_graph_entry = self._rule_graph.root_rule_matching(type(subject), selector)
+          if not matching_root_graph_entry:
+            logger.debug('still no matching entry after updating rule graph!')
+            continue
+          # Try updating the rule graph to include the rule, or alternatively we could yield the cases that failed and collect them
+          #self.
+        #else:
+        yield (matching_root_graph_entry, subject)
+
+    root_nodes = set(RootRule(type(subject), root.selector).as_node(subject, None)
+                     for root, subject in rule_subject())
+
+    return ExecutionRequest(root_nodes)
 
   @property
   def product_graph(self):
