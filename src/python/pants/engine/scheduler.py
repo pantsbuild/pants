@@ -66,11 +66,7 @@ class ProductGraph(object):
       # TODO, conceivably, this could check that the node has all of its selectors fulfilled instead of
 
 
-      readiness = not self.dependencies  or all(dep_entry.is_complete for dep_entry in self.dependencies)
-
-      #reason = map(lambda y: y.node, filter(lambda y: y.is_complete, self.dependencies))
-      #print('=====readiness checked for {}:                    {}                  {}\n'
-      #      '                                                  {}'.format(self, readiness,self.node, reason))
+      readiness = not self.dependencies or all(dep_entry.is_complete for dep_entry in self.dependencies)
       return readiness
 
     @property
@@ -588,10 +584,7 @@ class LocalScheduler(object):
       deps[dep] = Noop.cycle(node_entry.node, dep)
 
     # Run.
-    step_context = StepContext(node_entry.rule_edges,
-      self._project_tree,
-      deps,
-      self._inline_nodes)
+    step_context = StepContext(node_entry.rule_edges, self._project_tree, deps)
     step = node_entry.node.step(step_context)
     logger.debug('-- step result -- {}'.format(step))
     return step
@@ -845,13 +838,12 @@ class RuleGraphEdgeContainer(object):
         for selector in current_node.rule.input_selectors:
           selector_path = self._initial_selector_path(selector)
 
-          state_node_tuple = self._state_or_nodes_for(selector_path, current_node.subject, current_node.variants)
-          if (not state_node_tuple[0] and not state_node_tuple[1]) and type(selector_path) is Select:
+          nodes, state, rule_deps = self._state_or_nodes_for(selector_path, current_node.subject, current_node.variants)
+          if (not nodes and not state) and type(selector_path) is Select:
             raise Exception("didnt get nodes for {}".format(selector_path))
-
-          self._selector_to_state_node_tuple[selector_path] = state_node_tuple
+          self._selector_to_state_node_tuple[selector_path] = (nodes, state, rule_deps)
       else:
-        self._handle_no_edges(graph, current_node)
+        self._blow_up_on_missing_edges(graph, current_node)
     else:
       pass
 
@@ -864,7 +856,7 @@ class RuleGraphEdgeContainer(object):
     if nodes:
       #print('found node: {}'.format(nodes))
       return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants, on_no_matches_wait=on_no_matches_wait)
-    return self._do_rule_edge_stuff(selector_path, subject, variants, get_state)
+    return self._fall_back_to_looking_up_state(selector_path, subject, variants, get_state)
 
   def _initial_selector_path(self, selector):
     if type(selector) in (SelectDependencies, SelectProjection):
@@ -873,7 +865,7 @@ class RuleGraphEdgeContainer(object):
       selector_path = selector
     return selector_path
 
-  def _handle_no_edges(self, graph, current_node):
+  def _blow_up_on_missing_edges(self, graph, current_node):
     logger.debug('couldnt find edges for {}'.format(current_node.rule))
     unfillable = graph.is_unfulfillable(current_node.rule, current_node.subject)
     if unfillable:
@@ -895,7 +887,7 @@ class RuleGraphEdgeContainer(object):
       (tuple(), None, None))
     return nodes, rule_entries_for_debugging, state
 
-  def _do_rule_edge_stuff(self, selector_path, subject, variants, get_state):
+  def _fall_back_to_looking_up_state(self, selector_path, subject, variants, get_state):
     if type(selector_path) is SelectDependencies:
       return self._handle_select_deps(get_state, selector_path, subject, variants)
     elif type(selector_path) is SelectProjection:
@@ -917,15 +909,31 @@ class RuleGraphEdgeContainer(object):
 
     dependencies = []
     dep_values = []
-    for dep_subject, dep_variants in DependenciesNode.dependency_subject_variants(selector_path,
-      input_state.value, variants):
+
+    # could do something like,
+    # if any of the deps are waiting, we know they all will be, so return the nodes for all of them w/o fanfare
+
+    subject_variants = list(DependenciesNode.dependency_subject_variants(selector_path,
+                                                                    input_state.value, variants))
+    for dep_subject, dep_variants in subject_variants:
       if type(dep_subject) not in selector_path.field_types:
         return Throw(TypeError('Unexpected type "{}" for {}: {!r}'
                                .format(type(dep_subject), selector_path, dep_subject)))
 
-      dep_dep_state = self._state_via_edges(
-        (selector_path, selector_path.projected_product_selector), dep_subject, dep_variants,
-        get_state)
+
+    for dep_subject, dep_variants in subject_variants:
+      nodes, state, rule_entries_for_debugging = self._state_or_nodes_for((selector_path, selector_path.projected_product_selector), dep_subject, dep_variants)
+      if state:
+        continue
+      if nodes:
+        s = get_state(nodes[0], None)
+        if s is None or type(s) is Waiting:
+          dependencies.extend(nodes)
+    if dependencies:
+        return Waiting(dependencies)
+
+    for dep_subject, dep_variants in subject_variants:
+      dep_dep_state = self._blah(dep_subject, dep_variants, get_state, selector_path)
 
       if type(dep_dep_state) is Waiting:
         dependencies.extend(dep_dep_state.dependencies)
@@ -942,6 +950,18 @@ class RuleGraphEdgeContainer(object):
     if dependencies:
       return Waiting(dependencies)
     return Return(dep_values)
+
+  def _blah(self, dep_subject, dep_variants, get_state, selector_path):
+    nodes, state, rule_entries_for_debugging = self._state_or_nodes_for((selector_path, selector_path.projected_product_selector), dep_subject, dep_variants)
+
+    if state:
+      return state
+    if nodes:
+      return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, dep_variants)
+#
+#    dep_dep_state = self._state_via_edges((selector_path, selector_path.projected_product_selector),
+#      dep_subject, dep_variants, get_state)
+#    return dep_dep_state
 
   def _handle_select_projection(self, get_state, selector_path, subject, variants):
     input_state = self._input_state_for_projecting(get_state, selector_path, subject, variants)
@@ -1031,7 +1051,6 @@ class RuleGraphEdgeContainer(object):
     matches = []
     for node in nodes:
       state = get_state(node, None)
-      #print('gotten state {}'.format(state))
       if state is None:
         waiting.append(node)
       elif type(state) is Waiting:
@@ -1052,6 +1071,7 @@ class RuleGraphEdgeContainer(object):
     elif len(matches) == 0:
       if on_no_matches_wait:
         # in prep, we should return waiting for this case
+        logger.debug('select path {}'.format(selector_path))
         return Waiting(nodes)
       return Noop('No source of {} for {} : {} because no nodes with returns, but there were rule entries {}\n the return if there was one {}\n last state {}', selector_path, type(subject).__name__, subject, rule_entries, had_return, state)
     elif len(matches) > 1:
@@ -1072,7 +1092,7 @@ class StepContext(object):
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, rule_edges, project_tree, node_states, inline_nodes):
+  def __init__(self, rule_edges, project_tree, node_states):
     """
     :type graph: RuleGraph
     """
@@ -1084,8 +1104,5 @@ class StepContext(object):
 
   def select_for(self, selector, subject, variants):
     """Returns the state for selecting a product via the provided selector."""
-    if not self._rule_edges._rule_edges: # TODO rm this in favor of ensuring edges.
-      raise Exception("all should have rules! {}".format(self._rule_edges))
-
     get_state = lambda n, default: self._node_states.get(n, default)
     return self._rule_edges.get_state_for_selector(selector, subject, variants, get_state)

@@ -101,30 +101,6 @@ class RootRule(datatype('RootRule', ['subject_type', 'selector']), Rule):
     return (self.selector,)
 
 
-# TODO the idea with these is that they sit in the product graph with their real nodes and allow the real node to say it isn't ready yet
-class SingleProjectionNode(TaskNode):
-  """"""
-  is_inlineable = True
-
-  def step(self, step_context):
-    values, state = self.collect_dep_values(step_context)
-    if state:
-      return state
-    for dep_subject, dep_variants in DependenciesNode.dependency_subject_variants(self.input_selectors[0],
-      values[0], self.variants):
-      pass
-
-
-class MultiProjectionNode(TaskNode):
-  """"""
-  is_inlineable = True
-
-  def step(self, step_context):
-    values, state = self.collect_dep_values(step_context)
-    if state:
-      return state
-
-
 class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', 'warnings'])):
   """Container for errors and warnings found during rule validation."""
 
