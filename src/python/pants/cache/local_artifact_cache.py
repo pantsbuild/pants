@@ -34,7 +34,7 @@ class BaseLocalArtifactCache(ArtifactCache):
     self._permissions = permissions
 
   def _artifact(self, path):
-    return TarballArtifact(self.artifact_root, path, self._compression)
+    return TarballArtifact(self.artifact_root, path, self._compression, dereference=True)
 
   @contextmanager
   def _tmpfile(self, cache_key, use):
