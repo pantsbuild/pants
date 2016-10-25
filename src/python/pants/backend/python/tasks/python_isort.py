@@ -25,11 +25,12 @@ class IsortPythonTask(PythonTask):
   https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
 
   Behavior:
-  1. `./pants fmt.isort <targets>` will sort the files only related to specified targets, but the way of finding the config(s) is vanilla.
-  2. Additional arguments can be passed as passthru. e.g. `./pants fmt.isort <targets> -- --check-only`
-  3. `./pants fmt.isort -- <args, e.g. "--recursive .">` means both the files to be sorted and the way of finding the config(s) are vanilla.
-  4. `./pants fmt.isort` means `./pants fmt.isort ::` and NOT the entire repo directory which could include files not in any target.
+  ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
+    to specified targets, but the way of finding the config(s) is vanilla. If no target is
+    specified or no python source file is found in <targets>, it would be a no-op.
   """
+
+  NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE = "No-op: no Python source file found in target(s)."
 
   _PYTHON_SOURCE_EXTENSION = '.py'
 
@@ -49,22 +50,14 @@ class IsortPythonTask(PythonTask):
     if self.options.skip:
       return
 
-    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
+    sources = self._calculate_isortable_python_sources(self.context.target_roots)
 
-    # If neither targets nor passthru are specified, isort ::
-    if not self.context.target_roots and not self.get_passthru_args():
-      targets = self.determine_target_roots('fmt.isort')
-    else:
-      targets = self.context.targets()
-
-    sources = self._calculate_isortable_python_sources(targets)
-    args = self.get_passthru_args() + sources
-
-    if len(args) == 0:
-      logging.debug("Noop isort")
+    if not sources:
+      logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
       return
 
-    cmd = [isort_script] + args
+    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
+    cmd = [isort_script] + self.get_passthru_args() + sources
     logging.debug(' '.join(cmd))
 
     try:
