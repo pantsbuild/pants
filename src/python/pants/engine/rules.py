@@ -389,7 +389,7 @@ class RuleGraph(datatype('RuleGraph',
     try:
       return self.root_rules[root_rule]
     except KeyError:
-      logger.error('wth {}'.format(root_rule))
+      logger.error('missing root rule {}'.format(root_rule))
       raise
 
   def error_message(self):
@@ -862,5 +862,5 @@ class GraphMaker(object):
     for root_rule, deps in root_rule_dependency_edges.items():
       for d in deps:
         if d not in rule_dependency_edges and isinstance(d, RuleGraphEntry):
-          raise ValueError('wut {}'.format(d))
+          raise ValueError('expected all referenced dependencies to have entries in the graph: {}'.format(d))
     return root_rule_dependency_edges, rule_dependency_edges

@@ -64,8 +64,6 @@ class ProductGraph(object):
 
     def ready(self):
       # TODO, conceivably, this could check that the node has all of its selectors fulfilled instead of
-
-
       readiness = not self.dependencies or all(dep_entry.is_complete for dep_entry in self.dependencies)
       return readiness
 
@@ -165,8 +163,6 @@ class ProductGraph(object):
 
       if edges.will_noop:
         self.complete_node(node, edges.noop_reason)
-      else:
-        pass
 
     return entry
 
@@ -234,16 +230,16 @@ class ProductGraph(object):
       alls = self.ensure_entry_and_expand(dependency)
       dependency_entry = self.ensure_entry(dependency)
       if dependency_entry in node_entry.dependencies:
-        logger.debug('in deps {}'.format(dependency_entry))
+        #logger.debug('in deps {}'.format(dependency_entry))
         continue
       if dependency_entry.rule_edges.will_noop:
-        logger.debug('dep is statically determined noop')
+        #logger.debug('dep is statically determined noop')
         continue
       if self._detect_cycle(node_entry, dependency_entry):
-        logger.debug('cycle detected! src: {} dep: {}'.format(node_entry, dependency_entry))
+        #logger.debug('cycle detected! src: {} dep: {}'.format(node_entry, dependency_entry))
         node_entry.cyclic_dependencies.add(dependency)
       else:
-        logger.debug('adding dependency {}'.format(dependency_entry))
+        #logger.debug('adding dependency {}'.format(dependency_entry))
         if dependency_entry.node in node_entry.cyclic_dependencies:
           raise Exception("was already a cyclic dependency!")
 
@@ -580,13 +576,13 @@ class LocalScheduler(object):
       deps[dep_entry.node] = dep_entry.state
     # Additionally, include Noops for any dependencies that were cyclic.
     for dep in node_entry.cyclic_dependencies:
-      logger.debug('adding cycles to dep state')
+      #logger.debug('adding cycles to dep state')
       deps[dep] = Noop.cycle(node_entry.node, dep)
 
     # Run.
     step_context = StepContext(node_entry.rule_edges, self._project_tree, deps)
     step = node_entry.node.step(step_context)
-    logger.debug('-- step result -- {}'.format(step))
+    #logger.debug('-- step result -- {}'.format(step))
     return step
 
   @property
@@ -675,14 +671,13 @@ class LocalScheduler(object):
           # TODO this updating bit is less than ideal.
           self._rule_graph = self._rule_graph.new_graph_with_root_for(type(subject), selector)
           self._product_graph._rule_graph = self._rule_graph
+          RulesetValidator(self._rule_graph, self._products_by_goal).validate()
 
           matching_root_graph_entry = self._rule_graph.root_rule_matching(type(subject), selector)
           if not matching_root_graph_entry:
             logger.debug('still no matching entry after updating rule graph!')
             continue
           # Try updating the rule graph to include the rule, or alternatively we could yield the cases that failed and collect them
-          #self.
-        #else:
         yield (matching_root_graph_entry, subject)
 
     root_nodes = set(RootRule(type(subject), root.selector).as_node(subject, None)
@@ -721,11 +716,11 @@ class LocalScheduler(object):
       # A dict from Node entry to a possibly executing Step. Only one Step exists for a Node at a time.
       outstanding = set()
       # Node entries that might need to have Steps created (after any outstanding Step returns).
-      logger.debug('before expanding roots')
+      #logger.debug('before expanding roots')
       expanded_roots = set()
       for root_node in execution_request.roots:
         expanded_roots.update(self._product_graph.ensure_entry_and_expand(root_node))
-      logger.debug('after expanding roots')
+      #logger.debug('after expanding roots')
 
       candidates = deque(expanded_roots)
 
@@ -767,11 +762,11 @@ class LocalScheduler(object):
             incomplete_deps.update(d for d in node_entry.dependencies if not d.is_complete)
 
             # remove incomplete deps that are noops due to cycles
-            incomplete_deps2 = {d for d in incomplete_deps if d.node not in node_entry.cyclic_dependencies}
-            if len(incomplete_deps2) != len(incomplete_deps):
-              logger.debug('          ------- removed n {} !'.format(len(incomplete_deps) - len(incomplete_deps2)))
-            incomplete_deps = incomplete_deps2
-            logger.debug('--- incomplete deps {}'.format(incomplete_deps))
+            incomplete_deps_minus_cyclic_deps = {d for d in incomplete_deps if d.node not in node_entry.cyclic_dependencies}
+            if len(incomplete_deps_minus_cyclic_deps) != len(incomplete_deps):
+              logger.debug('          ------- removed n {} !'.format(len(incomplete_deps) - len(incomplete_deps_minus_cyclic_deps)))
+            incomplete_deps = incomplete_deps_minus_cyclic_deps
+            #logger.debug('--- incomplete deps {}'.format(incomplete_deps))
             if incomplete_deps:
               # Mark incomplete deps as candidates for Steps.
               candidates.extend(incomplete_deps)
@@ -870,7 +865,7 @@ class RuleGraphEdgeContainer(object):
     unfillable = graph.is_unfulfillable(current_node.rule, current_node.subject)
     if unfillable:
       self.will_noop = True
-      self.noop_reason = Noop('appears to not be reachable according to the rule graph and unfulfillable state{} '.format(unfillable))
+      self.noop_reason = Noop('appears to not be reachable according to the rule graph and unfulfillable state {} ', unfillable)
     else:
       logger.debug('not unfulfillable. :/ {}'.format(current_node))
       logger.debug('   {}'.format(current_node.extra_repr))
@@ -1070,6 +1065,7 @@ class RuleGraphEdgeContainer(object):
       return Waiting(waiting)
     elif len(matches) == 0:
       if on_no_matches_wait:
+        raise Exception('wut')
         # in prep, we should return waiting for this case
         logger.debug('select path {}'.format(selector_path))
         return Waiting(nodes)

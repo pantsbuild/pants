@@ -195,7 +195,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
         if input_selector.optional:
           input_values.append(None)
         else:
-          return Noop('Was missing value for (at least) input {} {}'.format(input_selector, sn_state))
+          return Noop('Was missing value for (at least) input {} {}', input_selector, sn_state)
       elif type(sn_state) is Throw:
         return sn_state
       else:
