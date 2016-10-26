@@ -47,6 +47,9 @@ class NodeTask(Task):
     """Returns `True` if the given target is a `NodeTest`."""
     return isinstance(target, NodeTest)
 
+  def __init__(self, *args, **kwargs):
+    super(NodeTask, self).__init__(*args, **kwargs)
+
   def execute_node(self, args, workunit_name=None, workunit_labels=None):
     """Executes node passing the given args.
 

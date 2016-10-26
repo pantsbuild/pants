@@ -270,7 +270,7 @@ class CacheFactory(object):
       return LocalArtifactCache(artifact_root, path, compression,
                                 self._options.max_entries_per_target,
                                 permissions=self._options.write_permissions,
-                                dereference=True)
+                                dereference=self._options.write_tarball_dereference)
 
     def create_remote_cache(remote_spec, local_cache):
       urls = self.get_available_urls(remote_spec.split('|'))
