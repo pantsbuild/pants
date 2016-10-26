@@ -42,7 +42,7 @@ jvm_binary(name='fail',
   ],
 )
 
-java_tests(name='test',
+junit_tests(name='test',
   sources=[
     'src/test/java/org/pantsbuild/testproject/provided_patching/ShadowTest.java',
   ],

@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 
 
 class JavaLibrary(ExportableJvmLibrary):
@@ -22,7 +22,7 @@ class JavaLibrary(ExportableJvmLibrary):
   """
 
   default_sources_globs = '*.java'
-  default_sources_exclude_globs = JavaTests.java_test_globs
+  default_sources_exclude_globs = JUnitTests.java_test_globs
 
   @classmethod
   def subsystems(cls):
