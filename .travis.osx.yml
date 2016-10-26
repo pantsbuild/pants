@@ -40,13 +40,6 @@ env:
     - CI_FLAGS="-fkmsrjlpn -i 5/7 'Python integration tests for pants - shard 6'"
     - CI_FLAGS="-fkmsrjlpn -i 6/7 'Python integration tests for pants - shard 7'"
 
-before_install:
-  # We need a sane python and as of 3/5/2015 on OSX 10.9 the provided python 2.7.5 encounters
-  # strange issues with absolute imports in the coverage module whereas the brew python 2.7.9 has
-  # no such issues.
-  - brew update
-  - brew install --upgrade python
-
 script: |
   sw_vers
   python --version
