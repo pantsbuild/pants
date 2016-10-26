@@ -14,7 +14,7 @@ from hashlib import sha1
 
 from pants.engine.fs import Files
 from pants.engine.nodes import Node, Noop, Return, Runnable, State, Throw, Waiting
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
@@ -213,10 +213,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     # Request snapshots for the snapshot_subjects from the process request.
     snapshot_subjects_value = []
     if process_request.snapshot_subjects:
-      snapshot_subjects_state = step_context.select_for(SelectDependencies(Snapshot,
-                                                                           SnapshottedProcessRequest,
-                                                                           'snapshot_subjects',
-                                                                           field_types=(Files,)),
+      snapshot_subjects_state = step_context.select_for(self.snapshot_process.snapshot_selector,
                                                         process_request,
                                                         self.variants)
       if type(snapshot_subjects_state) is not Return:
@@ -244,7 +241,7 @@ class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants', 'rule']), No
   def step(self, step_context):
     select_state = step_context.select_for(Select(Files), self.subject, self.variants)
 
-    if type(select_state) in {Waiting, Noop, Throw}:
+    if type(select_state) in (Waiting, Noop, Throw):
       return select_state
     elif type(select_state) is not Return:
       State.raise_unrecognized(select_state)

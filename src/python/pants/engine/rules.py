@@ -14,7 +14,8 @@ from twitter.common.collections import OrderedSet
 
 from pants.engine.addressable import Exactly
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import ProcessExecutionNode, Snapshot, SnapshotNode
+from pants.engine.isolated_process import (ProcessExecutionNode, Snapshot, SnapshotNode,
+                                           SnapshottedProcessRequest)
 from pants.engine.nodes import (DependenciesNode, FilesystemNode, ProjectionNode, SelectNode,
                                 TaskNode)
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -155,6 +156,11 @@ class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
                                                          'output_conversion']),
                          Rule):
   """A rule type for defining execution of snapshotted processes."""
+
+  snapshot_selector = SelectDependencies(Snapshot,
+                                         SnapshottedProcessRequest,
+                                         'snapshot_subjects',
+                                         field_types=(Files,))
 
   def as_node(self, subject, variants):
     return ProcessExecutionNode(subject, variants, self)

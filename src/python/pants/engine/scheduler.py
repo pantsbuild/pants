@@ -925,7 +925,7 @@ class RuleGraphEdgeContainer(object):
         if s is None or type(s) is Waiting:
           dependencies.extend(nodes)
     if dependencies:
-        return Waiting(dependencies)
+      return Waiting(dependencies)
 
     for dep_subject, dep_variants in subject_variants:
       dep_dep_state = self._blah(dep_subject, dep_variants, get_state, selector_path)
@@ -993,7 +993,7 @@ class RuleGraphEdgeContainer(object):
     if initial_state:
       dep_state = initial_state
     elif initial_nodes:
-      assert len(initial_nodes) == 1
+      #assert len(initial_nodes) == 1
       dep_state = self._make_state(rule_entries_for_debugging, initial_nodes, get_state,
         initial_path, variants)
     else:
@@ -1006,8 +1006,8 @@ class RuleGraphEdgeContainer(object):
       return state
     if nodes:
       return self._make_state(rule_entries_for_debugging, nodes, get_state, selector_path, variants)
-
-    raise Exception("Wut {} {}".format(selector_path, rule_entries_for_debugging))
+    return Noop('no nodes for {} {} {}. Found rule entries {}', selector_path, subject, variants, rule_entries_for_debugging)
+#    raise Exception("Wut {} {} {}".format(selector_path, rule_entries_for_debugging, self._rule_edges._selector_to_deps))
 
   def _state_or_nodes_for(self, selector_path, subject, variants):
     """Finds states or nodes for the selector path, based on looking at the edges from the currently relevant rule.
