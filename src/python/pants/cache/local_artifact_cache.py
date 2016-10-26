@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class BaseLocalArtifactCache(ArtifactCache):
 
-  def __init__(self, artifact_root, compression, permissions=None):
+  def __init__(self, artifact_root, compression, permissions=None, dereference=True):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param int compression: The gzip compression level for created artifacts.
@@ -32,9 +32,10 @@ class BaseLocalArtifactCache(ArtifactCache):
     self._compression = compression
     self._cache_root = None
     self._permissions = permissions
+    self._dereference = dereference
 
   def _artifact(self, path):
-    return TarballArtifact(self.artifact_root, path, self._compression, dereference=True)
+    return TarballArtifact(self.artifact_root, path, self._compression, dereference=self._dereference)
 
   @contextmanager
   def _tmpfile(self, cache_key, use):
@@ -90,7 +91,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
 
   def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None,
-               permissions=None):
+               permissions=None, dereference=True):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
@@ -102,6 +103,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
       artifact_root,
       compression,
       permissions=int(permissions.strip(), base=8) if permissions else None,
+      dereference=dereference
     )
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
     self._max_entries_per_target = max_entries_per_target
