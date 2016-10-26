@@ -107,6 +107,14 @@ class OptionsTest(unittest.TestCase):
     register_global('--global-crufty-expired', removal_version='0.0.1',
                     removal_hint='use a less crufty global option')
 
+    # Mutual Exclusive options
+    register_global('--mutex-foo', mutual_exclusive='mutex')
+    register_global('--mutex-bar', mutual_exclusive='mutex')
+    register_global('--mutex-baz', mutual_exclusive='mutex')
+
+    register_global('--new-name')
+    register_global('--old-name', mutual_exclusive='new_name')
+
     # For the design doc example test.
     options.register('compile', '--c', type=int, recursive=True)
 
@@ -118,6 +126,12 @@ class OptionsTest(unittest.TestCase):
     options.register('stale', '--crufty-boolean', type=bool,
                      removal_version='999.99.9',
                      removal_hint='say no to crufty, stale scoped options')
+
+    # Test mutual exclusive options with a scope
+    options.register('stale', '--mutex-a', mutual_exclusive='crufty_mutex')
+    options.register('stale', '--mutex-b', mutual_exclusive='crufty_mutex')
+    options.register('stale', '--crufty-old', mutual_exclusive='crufty_new')
+    options.register('stale', '--crufty-new')
 
     # For task identity test
     options.register('compile.scala', '--modifycompile', fingerprint=True)
@@ -849,6 +863,78 @@ class OptionsTest(unittest.TestCase):
       options = self._parse('./pants', config={'stale':{'crufty':'stale_and_crufty'}})
       self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
       self.assertWarning(w, 'crufty')
+
+  def test_mutual_exclusive_options_flags(self):
+    """Ensure error is raised when mutual exclusive options are given together."""
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --mutex-foo=foo --mutex-bar=bar').for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --mutex-foo=foo --mutex-baz=baz').for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --mutex-bar=bar --mutex-baz=baz').for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --mutex-foo=foo --mutex-bar=bar --mutex-baz=baz').for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --new-name=foo --old-name=bar').for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants stale --mutex-a=foo --mutex-b=bar').for_scope('stale')
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants stale --crufty-new=foo --crufty-old=bar').for_scope('stale')
+
+    options = self._parse('./pants --mutex-foo=orz')
+    self.assertEqual('orz', options.for_global_scope().mutex)
+
+    options = self._parse('./pants --old-name=orz')
+    self.assertEqual('orz', options.for_global_scope().new_name)
+
+    options = self._parse('./pants stale --mutex-a=orz')
+    self.assertEqual('orz', options.for_scope('stale').crufty_mutex)
+
+    options = self._parse('./pants stale --crufty-old=orz')
+    self.assertEqual('orz', options.for_scope('stale').crufty_new)
+
+  def test_mutual_exclusive_options_mix(self):
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --mutex-foo=foo', env={'PANTS_MUTEX_BAR':'bar'}).for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --new-name=foo', env={'PANTS_OLD_NAME':'bar'}).for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --mutex-foo=foo', config={'GLOBAL':{'mutex_bar':'bar'}}).for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants --new-name=foo', config={'GLOBAL':{'old_name':'bar'}}).for_global_scope()
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants stale --mutex-a=foo', env={'PANTS_STALE_MUTEX_B':'bar'}).for_scope('stale')
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants stale --crufty-new=foo', env={'PANTS_STALE_CRUFTY_OLD':'bar'}).for_scope('stale')
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants stale --mutex-a=foo', config={'stale':{'mutex_b':'bar'}}).for_scope('stale')
+
+    with self.assertRaises(Parser.MutualExclusiveOptionError):
+      self._parse('./pants stale --crufty-old=foo', config={'stale':{'crufty_new':'bar'}}).for_scope('stale')
+
+    options = self._parse('./pants', env={'PANTS_OLD_NAME': 'bar'})
+    self.assertEqual('bar', options.for_global_scope().new_name)
+
+    options = self._parse('./pants', env={'PANTS_GLOBAL_MUTEX_BAZ': 'baz'})
+    self.assertEqual('baz', options.for_global_scope().mutex)
+
+    options = self._parse('./pants', env={'PANTS_STALE_MUTEX_B':'bar'})
+    self.assertEqual('bar', options.for_scope('stale').crufty_mutex)
+
+    options = self._parse('./pants', config={'stale':{'crufty_old':'bar'}})
+    self.assertEqual('bar', options.for_scope('stale').crufty_new)
 
   def test_middle_scoped_options(self):
     """Make sure the rules for inheriting from a hierarchy of scopes.

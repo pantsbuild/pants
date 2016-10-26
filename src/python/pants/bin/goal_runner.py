@@ -67,27 +67,6 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    self._handle_ignore_patterns()
-
-  # TODO: Remove this once we have better support of option renaming in option.parser
-  def _handle_ignore_patterns(self):
-    ignore_patterns_explicit = not self._global_options.is_default('ignore_patterns')
-    build_ignore_explicit = not self._global_options.is_default('build_ignore')
-    if ignore_patterns_explicit and build_ignore_explicit:
-      class MutualExclusiveOptionError(Exception):
-        """Raised when both of exclusive options are given."""
-
-      raise MutualExclusiveOptionError(
-        "Can't use both --ignore-patterns and --build-ignore, should use --build-ignore only.")
-
-    # If --ignore-patterns is specified, we copy it to --build-ignore,
-    # since the backend uses build_ignore.
-    if ignore_patterns_explicit:
-      self._global_options.build_ignore = RankedValue(
-        self._global_options.get_rank('ignore_patterns'),
-        self._global_options.ignore_patterns
-      )
-
   def _handle_help(self, help_request):
     """Handle requests for `help` information."""
     if help_request:

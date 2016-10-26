@@ -160,7 +160,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
              removal_version='1.3.0', removal_hint='Use --build-ignore instead.',
-             help='See help for --build-ignore.')
+             mutual_exclusive='build_ignore', help='See help for --build-ignore.')
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
              help='Paths to ignore when identifying BUILD files. '
