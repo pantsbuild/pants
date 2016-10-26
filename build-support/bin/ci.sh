@@ -67,7 +67,6 @@ while getopts "hfxbkmsrjlpu:nci:a" opt; do
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     n) skip_contrib="true" ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
