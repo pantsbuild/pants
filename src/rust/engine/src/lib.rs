@@ -319,11 +319,12 @@ pub extern fn execution_roots(
 pub extern fn intrinsic_task_add(
   scheduler_ptr: *mut RawScheduler,
   func: Function,
-  subject_type: TypeId,
-  output_type: TypeConstraint,
+  input_type: TypeId,
+  input_constraint: TypeConstraint,
+  output_constraint: TypeConstraint,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.intrinsic_add(func, subject_type, output_type);
+    raw.scheduler.tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
   })
 }
 

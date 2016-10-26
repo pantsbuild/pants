@@ -62,15 +62,22 @@ impl Tasks {
     self.intrinsics.get(&(*subject_type, *product)).or(self.tasks.get(product))
   }
 
-  pub fn intrinsic_add(&mut self, func: Function, subject_type: TypeId, product: TypeConstraint) {
+  pub fn intrinsic_add(
+    &mut self,
+    func: Function,
+    // TODO: The subject_type and subject_constraint are redundant here, but we don't currently
+    // have a way to lift a TypeId into a TypeConstraint for that type.
+    subject_type: TypeId,
+    subject_constraint: TypeConstraint,
+    product: TypeConstraint
+  ) {
     self.intrinsics.entry((subject_type, product))
       .or_insert_with(|| Vec::new())
       .push(
         Task {
           cacheable: false,
           product: product,
-          // TODO: need to lift to a constraint.
-          clause: vec![Selector::select(subject_type)],
+          clause: vec![Selector::select(subject_constraint)],
           func: func,
         },
       );
@@ -133,8 +140,9 @@ impl Tasks {
     let mut tasks = self.tasks.entry(task.product.clone()).or_insert_with(|| Vec::new());
     assert!(
       !tasks.contains(&task),
-      "Task {:?} was double-registered.",
+      "{:?} was double-registered for {:?}",
       task,
+      task.product,
     );
     task.clause.shrink_to_fit();
     tasks.push(task);

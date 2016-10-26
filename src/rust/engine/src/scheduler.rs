@@ -3,7 +3,7 @@ use std::collections::{HashSet, VecDeque};
 use std::io;
 use std::path::Path;
 
-use core::{FNV, Field, Key, TypeConstraint, TypeId};
+use core::{FNV, Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
 use nodes::{Complete, Node, Runnable, State};
 use selectors::{Selector, SelectDependencies};

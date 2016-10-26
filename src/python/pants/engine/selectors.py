@@ -23,17 +23,22 @@ def type_or_constraint_repr(constraint):
     return repr(constraint)
 
 
+def constraint_for(type_or_constraint):
+  """Given a type or an `Exactly` constraint, returns an `Exactly` constraint."""
+  if isinstance(type_or_constraint, Exactly):
+    return type_or_constraint
+  elif isinstance(type_or_constraint, type):
+    return Exactly(type_or_constraint)
+  else:
+    raise TypeError("Expected a type or constraint: got: {}".format(type_or_constraint))
+
+
 class Selector(AbstractClass):
   # The type constraint for the product type for this selector.
 
   @property
   def type_constraint(self):
-    if isinstance(self.product, Exactly):
-      return self.product
-    elif isinstance(self.product, type):
-      return Exactly(self.product)
-    else:
-      raise TypeError("unexpected product_type type for selector: {}".format(self.product))
+    return constraint_for(self.product)
 
   @abstractproperty
   def optional(self):

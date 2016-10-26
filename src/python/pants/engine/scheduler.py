@@ -19,11 +19,11 @@ from pants.engine.isolated_process import create_snapshot_intrinsics
 from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant, type_or_constraint_repr)
+                                    SelectVariant, type_or_constraint_repr, constraint_for)
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import (ExternContext, extern_id_to_str, extern_issubclass,
+from pants.engine.subsystem.native import (ExternContext, extern_id_to_str, extern_satisfied_by,
                                            extern_key_for, extern_project, extern_project_multi,
-                                           extern_store_list, extern_val_to_str)
+                                           extern_store_list, extern_val_to_str, TypeId, TypeConstraint, Function)
 from pants.util.objects import datatype
 
 
@@ -104,16 +104,16 @@ class LocalScheduler(object):
                                             extern_key_for,
                                             extern_id_to_str,
                                             extern_val_to_str,
-                                            extern_issubclass,
+                                            extern_satisfied_by,
                                             extern_store_list,
                                             extern_project,
                                             extern_project_multi,
                                             self._to_key('name'),
                                             self._to_key('products'),
                                             self._to_key('default'),
-                                            self._to_id(Address),
-                                            self._to_id(HasProducts),
-                                            self._to_id(Variants))
+                                            self._to_constraint(Address),
+                                            self._to_constraint(HasProducts),
+                                            self._to_constraint(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     self._execution_request = None
 
@@ -156,11 +156,13 @@ class LocalScheduler(object):
   def _from_key(self, cdata):
     return self._context.from_key(cdata)
 
+  def _to_constraint(self, type_or_constraint):
+    return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
+
   def _select_product(self, subject, product):
-    self._native.lib.execution_add_root_select(
-        self._scheduler,
-        self._to_key(subject),
-        self._to_id(product))
+    self._native.lib.execution_add_root_select(self._scheduler,
+                                               self._to_key(subject),
+                                               self._to_constraint(product))
 
   def _register_intrinsics(self, intrinsics):
     """Register the given intrinsics dict.
@@ -170,37 +172,38 @@ class LocalScheduler(object):
     """
     for (subject_type, product_type), rule in intrinsics.items():
       self._native.lib.intrinsic_task_add(self._scheduler,
-                                          self._to_id(rule.func),
-                                          self._to_id(subject_type),
-                                          self._to_id(product_type))
+                                          Function(self._to_id(rule.func)),
+                                          TypeId(self._to_id(subject_type)),
+                                          self._to_constraint(subject_type),
+                                          self._to_constraint(product_type))
 
   def _register_tasks(self, tasks):
     """Register the given tasks dict with the native scheduler."""
     for output_type, rules in tasks.items():
+      output_constraint = self._to_constraint(output_type)
       for rule in rules:
         _, input_selects, func = rule.as_triple()
-        print('>>> registering func {} for {}'.format(func, rule))
-        self._native.lib.task_add(self._scheduler,
-                                  self._to_id(func),
-                                  self._to_id(output_type))
+        print('>>> registering func {} with output constraint {} for {}'.format(func, output_type, rule))
+        self._native.lib.task_add(self._scheduler, Function(self._to_id(func)), output_constraint)
         for selector in input_selects:
           selector_type = type(selector)
+          product_constraint = self._to_constraint(selector.product)
           if selector_type is Select:
             self._native.lib.task_add_select(self._scheduler,
-                                            self._to_id(selector.product))
+                                             product_constraint)
           elif selector_type is SelectVariant:
             self._native.lib.task_add_select_variant(self._scheduler,
-                                                    self._to_id(selector.product),
-                                                    self._to_key(selector.variant_key))
+                                                     product_constraint,
+                                                     self._to_key(selector.variant_key))
           elif selector_type is SelectLiteral:
             # NB: Intentionally ignores subject parameter to provide a literal subject.
             self._native.lib.task_add_select_literal(self._scheduler,
-                                                    self._to_key(selector.subject),
-                                                    self._to_id(selector.product))
+                                                     self._to_key(selector.subject),
+                                                     product_constraint)
           elif selector_type is SelectDependencies:
             self._native.lib.task_add_select_dependencies(self._scheduler,
-                                                          self._to_id(selector.product),
-                                                          self._to_id(selector.dep_product),
+                                                          product_constraint,
+                                                          self._to_constraint(selector.dep_product),
                                                           self._to_key(selector.field),
                                                           selector.transitive)
           elif selector_type is SelectProjection:
@@ -208,10 +211,10 @@ class LocalScheduler(object):
               raise ValueError("TODO: remove support for projecting multiple fields at once.")
             field = selector.fields[0]
             self._native.lib.task_add_select_projection(self._scheduler,
-                                                        self._to_id(selector.product),
-                                                        self._to_id(selector.projected_subject),
+                                                        self._to_constraint(selector.product),
+                                                        self._to_constraint(selector.projected_subject),
                                                         self._to_key(field),
-                                                        self._to_id(selector.input_product))
+                                                        self._to_constraint(selector.input_product))
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)

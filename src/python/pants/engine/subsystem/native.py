@@ -15,13 +15,19 @@ from pants.util.objects import datatype
 _FFI = FFI()
 _FFI.cdef(
     '''
-    typedef struct {
-      uint64_t key;
-    } Id;
+    typedef uint64_t Id;
 
-    typedef Id TypeId;
-    typedef Id TypeConstraint;
-    typedef Id Function;
+    typedef struct {
+      Id id_;
+    } TypeId;
+
+    typedef struct {
+      Id id_;
+    } TypeConstraint;
+
+    typedef struct {
+      Id id_;
+    } Function;
 
     typedef struct {
       void*    handle;
@@ -29,10 +35,12 @@ _FFI.cdef(
     } Value;
 
     typedef struct {
-      Id       key;
+      Id       id_;
       Value    value;
       TypeId   type_id;
     } Key;
+
+    typedef Key Field;
 
     typedef struct {
       char*    str_ptr;
@@ -45,7 +53,6 @@ _FFI.cdef(
     } ValueBuffer;
 
     typedef uint64_t EntryId;
-    typedef Key Field;
 
     typedef void ExternContext;
 
@@ -105,12 +112,12 @@ _FFI.cdef(
                                    Field,
                                    Field,
                                    Field,
-                                   TypeId,
-                                   TypeId,
-                                   TypeId);
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint);
     void scheduler_destroy(RawScheduler*);
 
-    void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeId);
+    void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
 
     void task_add(RawScheduler*, Function, TypeConstraint);
     void task_add_select(RawScheduler*, TypeConstraint);
@@ -174,7 +181,7 @@ def extern_val_to_str(context_handle, val):
 def extern_satisfied_by(context_handle, constraint_id, cls_id):
   """Given two TypeIds, return constraint.satisfied_by(cls)."""
   c = _FFI.from_handle(context_handle)
-  return c.from_id(constraint_id).satisfied_by(c.from_id(cls_id))
+  return c.from_id(constraint_id.id_).satisfied_by(c.from_id(cls_id.id_))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, uint64_t, bool)")
@@ -221,11 +228,19 @@ class Value(datatype('Value', ['handle', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
-class Key(datatype('Key', ['key', 'value', 'type_id'])):
+class Key(datatype('Key', ['id_', 'value', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
-class Id(datatype('Id', ['value'])):
+class Function(datatype('Function', ['id_'])):
+  """Corresponds to the native object of the same name."""
+
+
+class TypeConstraint(datatype('TypeConstraint', ['id_'])):
+  """Corresponds to the native object of the same name."""
+
+
+class TypeId(datatype('TypeId', ['id_'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -281,14 +296,14 @@ class ExternContext(object):
     return _FFI.from_handle(val.handle)
 
   def key_from_native(self, cdata):
-    return Key(self._id_from_native(cdata.key), self._id_from_native(cdata.type_id))
+    return Key(cdata.key, TypeId(cdata.type_id.id_))
 
-  def _id_from_native(self, cdata):
-    return Id(cdata.key)
+  def _type_id_from_native(self, cdata):
+    return TypeId(cdata.key)
 
   def put(self, obj):
     # If we encounter an existing id, return it.
-    new_id = Id(self._id_generator)
+    new_id = self._id_generator
     _id = self._obj_to_id.setdefault(obj, new_id)
     if _id is not new_id:
       # Object already existed.
@@ -310,11 +325,11 @@ class ExternContext(object):
     return Key(self.put(obj), Value(val.handle, val.type_id), self._id_from_native(val.type_id))
 
   def to_key(self, obj):
-    type_id = self.put(type(obj))
+    type_id = TypeId(self.put(type(obj)))
     return Key(self.put(obj), self.to_value(obj, type_id=type_id), type_id)
 
   def from_id(self, cdata):
-    return self.get(self._id_from_native(cdata))
+    return self.get(cdata)
 
   def from_key(self, cdata):
     return self.from_value(cdata.value)

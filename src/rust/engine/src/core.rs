@@ -10,10 +10,7 @@ pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 // without a roundtrip to python, we keep them encoded here.
 pub type Variants = Vec<(Key, Key)>;
 
-// NB: These structs are fairly small, so we allow copying them by default.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Id(pub u64);
+pub type Id = u64;
 
 // The type of a python object (which itself has a type, but which is not
 // represented by a Key, because that would result in a recursive structure.)
@@ -61,9 +58,9 @@ impl hash::Hash for Key {
 impl Key {
   pub fn empty() -> Key {
     Key {
-      id: Id(0),
+      id: 0,
       value: Value::empty(),
-      type_id: TypeId(Id(0)),
+      type_id: TypeId(0),
     }
   }
 
@@ -95,7 +92,7 @@ impl Value {
   pub fn empty() -> Value {
     Value {
       handle: ptr::null() as *const libc::c_void,
-      type_id: TypeId(Id(0)),
+      type_id: TypeId(0),
     }
   }
 
