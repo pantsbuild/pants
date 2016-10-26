@@ -1,0 +1,10 @@
+#!/bin/bash
+set -xeo pipefail
+cd /home/rpmuser/rpmbuild/SPECS
+{{#pre_commands}}
+{{{command}}}
+{{/pre_commands}}
+rpmbuild -ba {{{rpmbuild_options}}} {{{spec_basename}}}
+{{#post_commands}}
+{{{command}}}
+{{/post_commands}}

@@ -1,0 +1,40 @@
+FROM {{{image}}}
+
+{{#setup_commands}}
+{{{command}}}
+{{/setup_commands}}
+
+RUN yum clean metadata && \
+    rm -rf /var/cache/yum/* && \
+    useradd rpmuser && \
+    mkdir -p /home/rpmuser/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} && \
+    echo '%_topdir /home/rpmuser/rpmbuild' > /home/rpmuser/.rpmmacros && \
+    rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY* && \
+    chown -R rpmuser.rpmuser /home/rpmuser
+
+RUN mkdir -p /home/rpmuser/local_rpms
+{{#rpm_dependencies}}
+COPY {{{local_rpm}}} /home/rpmuser/local_rpms/
+{{/rpm_dependencies}}
+
+RUN rpm --rebuilddb && \
+    yum install -y /home/rpmuser/local_rpms/*rpm tar gzip bzip2 xz rpm-build redhat-rpm-config
+
+{{#build_reqs}}
+RUN rpm --rebuilddb && \
+    yum install -y --nogpgcheck {{{reqs}}}
+{{/build_reqs}}
+
+COPY {{{spec_basename}}} /home/rpmuser/rpmbuild/SPECS/{{{spec_basename}}}
+
+{{#local_sources}}
+COPY {{{basename}}} /home/rpmuser/rpmbuild/SOURCES/{{{basename}}}
+{{/local_sources}}
+
+{{#remote_sources}}
+RUN curl --fail -L "{{{url}}}" -o "/home/rpmuser/rpmbuild/SOURCES/{{{basename}}}"
+{{/remote_sources}}
+
+USER rpmuser
+COPY build_rpm.sh /home/rpmuser/build_rpm.sh
+ENTRYPOINT /home/rpmuser/build_rpm.sh
