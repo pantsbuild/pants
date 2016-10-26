@@ -1,85 +1,37 @@
-# sudo required for jdk_switcher and bad openjdk6 removal on trusty image
-# in before_install step, and not for any other purpose.
-sudo: required
+# Setting the language to objective-c is the magic to get an OSX slave
+# assigned by Travis CI.
+# Its not clearly spelled out, but the relevant bits are documented here:
+#   http://docs.travis-ci.com/user/languages/objective-c/
+#   http://docs.travis-ci.com/user/osx-ci-environment/
+#
+# NB: Travis-CI does have support for an os list in the main .travis.yml
+# and this would be preferrable, but they are currently under capacity
+# on osx slaves and not accepting new users:
+#   http://blog.travis-ci.com/2014-05-13-multi-os-feature-available/
+language: objective-c
 
-dist: trusty
-
-language: python
-
-python:
-  - "2.7.11"
-
-# These are needed to run the Android SDK tools.
-addons:
-  apt:
-    packages:
-    - lib32stdc++6
-    - lib32z1
-    - lib32z1-dev
-    - oracle-java6-installer
-
-before_cache:
-  # Kill all python bytecode in our cached venvs.  Some files appear to
-  # get bytecode compiled in non-yet-understood circumstances leading to
-  # a full cache re-pack due to new bytecode files.
-  - find build-support -name "*.py[co]" -print -delete
-  # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
-  # effect on resolution time is in the noise, but they are
-  # re-timestamped in internal comments and fields on each run and this
-  # leads to travis-ci cache thrash.  Kill these files before the cache
-  # check to avoid un-needed cache re-packing and re-upload (a ~100s
-  # operation).
-  - find $HOME/.ivy2/pants -type f -name "ivydata-*.properties" -print -delete
-  - rm -fv $HOME/.ivy2/pants/*.{css,properties,xml,xsl}
-  # We have several tests that do local file:// url resolves for
-  # com.example artifacts, these disrupt the cache but are fast since
-  # they're resolved from local files when omitted from the cache.
-  - rm -rf $HOME/.ivy2/pants/com.example
-  # The stats cache contains timestamped reports unused by CI but that
-  # thrash the cache.  Skip caching these.
-  - rm -rf $HOME/.cache/pants/stats
-
-cache:
-  directories:
-    - $HOME/.cache/pants
-    - $HOME/.ivy2/pants
-    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
-    # using its own isolated cache:
-    #   https://github.com/pantsbuild/pants/issues/2485
-    - $HOME/.npm
-    - $HOME/.android
-    - $ANDROID_SDK_INSTALL_LOCATION
-    - build-support/isort.venv
-    - build-support/pants_dev_deps.venv
-
-before_install:
-  # Remove bad openjdk6 from trusty image, so
-  # Pants will pick up oraclejdk6 from `packages` above.
-  - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-  - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-  - jdk_switcher use oraclejdk8
-
-install:
-  - pip --quiet install coveralls
+matrix:
+  # The https://github.com/pantsbuild/pants-for-travis-osx-ci repo this CI runs for is force
+  # pushed to asynchronously by https://github.com/pantsbuild/pants CI jobs.  With multiple
+  # shards in play for the OSX ci we often get into situations where later-scheduled shards
+  # try to check out the repo and fail since the sha they are looking for has since been
+  # eradicated by a force push from the https://github.com/pantsbuild/pants CI job when changes
+  # are landing on master quickly.  We fail-fast here to not belabor the point and allow the next
+  # green OSX CI to happen more quickly.
+  fast_finish: true
 
 env:
   global:
-    - ANDROID_SDK_INSTALL_LOCATION="$HOME/opt/android-sdk-install"
-    - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
-    - CXX=g++
+    - CXX=clang++
     - PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']"
-    # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
-    # These are encrypted with a public key for our repo that only
-    # Travis-CI has the private key for.  We are trusting Travis-CI
-    # here but no-one else.
-    #
-    # See: http://docs.travis-ci.com/user/encryption-keys/
-    - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
   matrix:
-    - CI_FLAGS="-cjlpn 'Various pants self checks'"  # (fkmsr)
+    # No need to run the self-checks on OSX where vms are at a premium since these are file-level,
+    # non-platform fragile lints.
+    # - CI_FLAGS="-cjlpnet 'Various pants self checks'"  # (fkmsr)
     - CI_FLAGS="-fkmsrcn -u 0/2 'Unit tests for pants and pants-plugins - shard 1'"  # (jlp)
     - CI_FLAGS="-fkmsrcn -u 1/2 'Unit tests for pants and pants-plugins - shard 2'"
-    - CI_FLAGS="-fkmsrcjlp 'Python contrib tests'"  # (n)
+    # We skip Android crontrib here since its tested on Linux and the non-cacheable ADK download is huge.
+    - CI_FLAGS="-fkmsrcjlpa 'Python contrib tests'"  # (n)
     - CI_FLAGS="-fkmsrjlpn -i 0/7 'Python integration tests for pants - shard 1'"  # (c)
     - CI_FLAGS="-fkmsrjlpn -i 1/7 'Python integration tests for pants - shard 2'"
     - CI_FLAGS="-fkmsrjlpn -i 2/7 'Python integration tests for pants - shard 3'"
@@ -88,24 +40,21 @@ env:
     - CI_FLAGS="-fkmsrjlpn -i 5/7 'Python integration tests for pants - shard 6'"
     - CI_FLAGS="-fkmsrjlpn -i 6/7 'Python integration tests for pants - shard 7'"
 
+before_install:
+  # We need a sane python and as of 3/5/2015 on OSX 10.9 the provided python 2.7.5 encounters
+  # strange issues with absolute imports in the coverage module whereas the brew python 2.7.9 has
+  # no such issues.
+  - brew update
+  - brew install python
 
-before_script:
-  - ./build-support/bin/ci-sync.sh
-  - ./build-support/bin/install-android-sdk.sh
+script: |
+  sw_vers
+  python --version
+  java -version
+  echo "Bumping open file ulimit from `ulimit -n`..."
+  ulimit -n 8192 # This is probably higher than needed, 1024 limits on linux seem to work fine.
+  echo "...to `ulimit -n`"
+  ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
-script:
-  - uname -a
-  - java -version
-  - echo $JAVA_HOME
-  # Check if JAVA_HOME is symlinked to the real home
-  - ls -l $JAVA_HOME
-  - ./build-support/bin/ci.sh -x ${CI_FLAGS}
-
-# We accept the default travis-ci email author+comitter notification
-# for now which is enabled even with no `notifications` config.
-# notifications:
-#   email: ...
-
-after_success:
-  coveralls
-
+# The `notifications:` configuration will be programatically copied over from `.travis.yml` for
+# central maintenance of distribution lists, see: `build-support/bin/ci-sync.sh`.
