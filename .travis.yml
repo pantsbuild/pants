@@ -45,7 +45,7 @@ before_install:
   # strange issues with absolute imports in the coverage module whereas the brew python 2.7.9 has
   # no such issues.
   - brew update
-  - brew install python
+  - brew install --upgrade python
 
 script: |
   sw_vers
