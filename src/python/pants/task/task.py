@@ -563,7 +563,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
       # Cache the artifacts.
       args_tuples = []
-      # deference = self.self.get_options().deference
       for vts, artifactfiles in vts_artifactfiles_pairs:
         overwrite = always_overwrite or vts.cache_key in self._cache_key_errors
         args_tuples.append((cache, vts.cache_key, artifactfiles, overwrite))

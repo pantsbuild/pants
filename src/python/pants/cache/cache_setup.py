@@ -55,7 +55,7 @@ class CacheSetup(Subsystem):
     register('--write', type=bool, default=True,
              help='Write build artifacts to cache, if available.')
     register('--tarball-dereference', type=bool, default=True,
-             help='If use dereference flag to create cache tarball.')
+             help='Use dereference flag to create cache tarball.')
     register('--overwrite', advanced=True, type=bool,
              help='If writing build artifacts to cache, overwrite existing artifacts '
                   'instead of skipping them.')
