@@ -23,7 +23,6 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
-from pants.option.ranked_value import RankedValue
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.reporting import Reporting
 from pants.scm.subsystems.changed import Changed
