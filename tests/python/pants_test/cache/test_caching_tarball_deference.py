@@ -11,8 +11,11 @@ from pants.base.payload import Payload
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheSetup
 from pants.task.task import Task
+from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_rmtree, safe_open
 from pants_test.tasks.task_test_base import TaskTestBase
+
+SYMLINK_NAME = 'link'
 
 
 class DummyLibrary(Target):
@@ -25,7 +28,7 @@ class DummyLibrary(Target):
 
 
 class DummyTask(Task):
-  """A task that appends the content of a DummyLibrary's source into its results_dir."""
+  """A task that inserts a symlink into its results_dir."""
   options_scope = 'dummy'
 
   @property
@@ -41,22 +44,19 @@ class DummyTask(Task):
         file_x = os.path.join(vt.results_dir, 'dummy')
         with safe_open(file_x, mode='wb') as fp:
           fp.write('dummy')
-        symlink_y = os.path.join(vt.results_dir, 'link')
+        symlink_y = os.path.join(vt.results_dir, SYMLINK_NAME)
         os.symlink(file_x, symlink_y)
       return invalidation.all_vts, invalidation.invalid_vts
 
 
-
 class LocalCachingTarballDereferenceTest(TaskTestBase):
-
   _filename = 'f'
 
   @classmethod
   def task_type(cls):
     return DummyTask
 
-  def setUp(self):
-    super(LocalCachingTarballDereferenceTest, self).setUp()
+  def prepare_task(self, deference):
     self.artifact_cache = self.create_dir('artifact_cache')
     self.create_file(self._filename)
     self.set_options_for_scope(
@@ -64,13 +64,14 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
       write_to=[self.artifact_cache],
       read_from=[self.artifact_cache],
       write=True,
-      write_tarball_dereference=False
+      write_tarball_dereference=deference
     )
     self.target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
     context = self.context(for_task_types=[DummyTask], target_roots=[self.target])
     self.task = self.create_task(context)
 
-  def test_cache_written_with_deference(self):
+  def test_cache_written_without_deference(self):
+    self.prepare_task(deference=False)
     all_vts, invalid_vts = self.task.execute()
     self.assertGreater(len(invalid_vts), 0)
     for vt in invalid_vts:
@@ -79,19 +80,41 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
         '.tgz',
       )
       print(artifact_address)
-      self.assertTrue(os.path.isfile(artifact_address))
-  #
-  # def test_cache_read_from(self):
-  #   all_vts, invalid_vts = self.task.execute()
-  #   # Executing the task for the first time the vt is expected to be in the invalid_vts list
-  #   self.assertGreater(len(invalid_vts), 0)
-  #   first_vt = invalid_vts[0]
-  #   # Delete .pants.d
-  #   safe_rmtree(self.task._workdir)
-  #   all_vts2, invalid_vts2 = self.task.execute()
-  #   # Check that running the task a second time results in a valid vt,
-  #   # implying the artifact cache was hit.
-  #   self.assertGreater(len(all_vts2), 0)
-  #   second_vt = all_vts2[0]
-  #   self.assertEqual(first_vt.cache_key.hash, second_vt.cache_key.hash)
-  #   self.assertListEqual(invalid_vts2, [])
+      with temporary_dir() as tmpdir:
+        with open_tar(artifact_address, 'r') as tarout:
+          tarout.extractall(path=tmpdir)
+
+        for root, dirs, files in os.walk(tmpdir):
+          for file in files:
+            if file == SYMLINK_NAME:
+              self.assertTrue(
+                os.path.islink(os.path.join(root, file)),
+                "{} in artifact {} should be a symlink but it is not.".format(SYMLINK_NAME, artifact_address)
+              )
+              return
+
+        self.fail("Cannot find symlink {} in artifact {}".format(SYMLINK_NAME, artifact_address))
+
+  def test_cache_written_with_deference(self):
+    self.prepare_task(deference=True)
+    all_vts, invalid_vts = self.task.execute()
+    self.assertGreater(len(invalid_vts), 0)
+    for vt in invalid_vts:
+      artifact_address = "{}{}".format(
+        os.path.join(self.artifact_cache, self.task.stable_name(), self.target.id, vt.cache_key.hash),
+        '.tgz',
+      )
+      print(artifact_address)
+      with temporary_dir() as tmpdir:
+        with open_tar(artifact_address, 'r') as tarout:
+          tarout.extractall(path=tmpdir)
+
+        for root, dirs, files in os.walk(tmpdir):
+          for file in files:
+            if file == SYMLINK_NAME:
+              self.assertFalse(
+                os.path.islink(os.path.join(root, file))
+                , "{} in artifact {} should not be a symlink but it is.".format(SYMLINK_NAME, artifact_address))
+              return
+
+        self.fail("Cannot find file {} in artifact {}".format(SYMLINK_NAME, artifact_address))
