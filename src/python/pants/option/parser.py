@@ -47,7 +47,7 @@ class Parser(object):
   class FromfileError(ParseError):
     """Indicates a problem reading a value @fromfile."""
 
-  class MutualExclusiveOptionError(Exception):
+  class MutuallyExclusiveOptionError(Exception):
     """Raised when both of exclusive options are given."""
 
   @staticmethod
@@ -204,7 +204,7 @@ class Parser(object):
       if val.rank > RankedValue.HARDCODED:
         self._check_deprecated(dest, kwargs)
 
-        mutex_dest = kwargs.get('mutual_exclusive')
+        mutex_dest = kwargs.get('mutually_exclusive_group')
         if mutex_dest:
           mutex_map[mutex_dest].append(dest)
           dest = mutex_dest
@@ -212,8 +212,8 @@ class Parser(object):
           mutex_map[dest].append(dest)
 
         if len(mutex_map[dest]) > 1:
-          raise self.MutualExclusiveOptionError(
-            "Can only provide one of the mutual exclusive options {}".format(mutex_map[dest]))
+          raise self.MutuallyExclusiveOptionError(
+            "Can only provide one of the mutually exclusive options {}".format(mutex_map[dest]))
 
       setattr(namespace, dest, val)
 
@@ -333,7 +333,7 @@ class Parser(object):
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutual_exclusive'
+    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
