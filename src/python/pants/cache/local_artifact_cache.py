@@ -90,8 +90,8 @@ class BaseLocalArtifactCache(ArtifactCache):
 class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
 
-  def __init__(self, artifact_root, cache_root, compression, dereference, max_entries_per_target=None,
-               permissions=None):
+  def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None,
+               permissions=None, dereference=True):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
@@ -102,8 +102,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     super(LocalArtifactCache, self).__init__(
       artifact_root,
       compression,
-      dereference,
-      permissions=int(permissions.strip(), base=8) if permissions else None
+      permissions=int(permissions.strip(), base=8) if permissions else None,
+      dereference=dereference
     )
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
     self._max_entries_per_target = max_entries_per_target
