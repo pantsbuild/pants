@@ -54,8 +54,8 @@ class CacheSetup(Subsystem):
              help='Read build artifacts from cache, if available.')
     register('--write', type=bool, default=True,
              help='Write build artifacts to cache, if available.')
-    register('--write-tarball-dereference', type=bool, default=True,
-             help='If cache is tarball, use deference to create it.')
+    register('--tarball-dereference', type=bool, default=True,
+             help='If use dereference flag to create cache tarball.')
     register('--overwrite', advanced=True, type=bool,
              help='If writing build artifacts to cache, overwrite existing artifacts '
                   'instead of skipping them.')
@@ -270,7 +270,7 @@ class CacheFactory(object):
       return LocalArtifactCache(artifact_root, path, compression,
                                 self._options.max_entries_per_target,
                                 permissions=self._options.write_permissions,
-                                dereference=self._options.write_tarball_dereference)
+                                dereference=self._options.tarball_dereference)
 
     def create_remote_cache(remote_spec, local_cache):
       urls = self.get_available_urls(remote_spec.split('|'))

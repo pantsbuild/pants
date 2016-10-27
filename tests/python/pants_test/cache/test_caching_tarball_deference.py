@@ -40,7 +40,6 @@ class DummyTask(Task):
     # self._cache_factor
     with self.invalidated(self.context.targets()) as invalidation:
       for vt in invalidation.all_vts:
-        print(vt.results_dir)
         file_x = os.path.join(vt.results_dir, 'dummy')
         with safe_open(file_x, mode='wb') as fp:
           fp.write('dummy')
@@ -64,7 +63,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
       write_to=[self.artifact_cache],
       read_from=[self.artifact_cache],
       write=True,
-      write_tarball_dereference=deference
+      tarball_dereference=deference
     )
     self.target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
     context = self.context(for_task_types=[DummyTask], target_roots=[self.target])
