@@ -58,6 +58,15 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
   def task_type(cls):
     return DummyCacheTask
 
+  @staticmethod
+  def _find_first_file_in_path(path, file_name):
+    for root, dirs, files in os.walk(path):
+      for file in files:
+        if file == file_name:
+          return os.path.join(root, file)
+
+    return None
+
   def _get_artifact_path(self, vt):
     return "{}{}".format(
       os.path.join(self.artifact_cache, self.task.stable_name(), self.target.id, vt.cache_key.hash),
@@ -77,15 +86,6 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
     self.target = self.make_target(':t', target_type=DummyCacheLibrary, source=self._filename)
     context = self.context(for_task_types=[DummyCacheTask], target_roots=[self.target])
     self.task = self.create_task(context)
-
-  @staticmethod
-  def _find_first_file_in_path(path, file_name):
-    for root, dirs, files in os.walk(path):
-      for file in files:
-        if file == file_name:
-          return os.path.join(root, file)
-
-    return None
 
   def test_cache_written_without_deference(self):
     """
