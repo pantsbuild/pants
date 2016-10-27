@@ -168,9 +168,9 @@ class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics'])):
           raise TypeError("Unexpected product_type type {}, for rule {}".format(output_type, entry))
 
         factory = TaskRule(tuple(input_selectors), task, output_type, constraint)
+        # TODO: The heterogenity here has some confusing implications here:
+        # see https://github.com/pantsbuild/pants/issues/4005
         for kind in constraint.types:
-          # NB Ensure that interior types from SelectDependencies / SelectProjections work by
-          # indexing on the list of types in the constraint.
           add_task(kind, factory)
         add_task(constraint, factory)
       else:
