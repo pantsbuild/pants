@@ -29,7 +29,7 @@ class TestArtifactCache(unittest.TestCase):
   def setup_local_cache(self):
     with temporary_dir() as artifact_root:
       with temporary_dir() as cache_root:
-        yield LocalArtifactCache(artifact_root, cache_root, compression=1)
+        yield LocalArtifactCache(artifact_root, cache_root, dereference=True, compression=1)
 
   @contextmanager
   def setup_server(self, return_failed=False, cache_root=None):

@@ -92,7 +92,6 @@ class CacheSetup(Subsystem):
 
 
 class CacheFactory(object):
-
   def __init__(self, options, log, stable_name, pinger=None, resolver=None):
     """Create a cache factory from settings.
 
@@ -254,11 +253,11 @@ class CacheFactory(object):
       raise ValueError('compression_level must be an integer 0-9: {}'.format(compression))
 
     deprecated_conditional(
-        lambda: compression == 0,
-        '1.4.0',
-        'compression==0',
-        'The artifact cache depends on gzip compression for checksumming: a compression level '
-        '==0 disables compression, and can prevent detection of corrupted artifacts.'
+      lambda: compression == 0,
+      '1.4.0',
+      'compression==0',
+      'The artifact cache depends on gzip compression for checksumming: a compression level '
+      '==0 disables compression, and can prevent detection of corrupted artifacts.'
     )
 
     artifact_root = self._options.pants_workdir
@@ -267,10 +266,12 @@ class CacheFactory(object):
       path = os.path.join(parent_path, self._stable_name)
       self._log.debug('{0} {1} local artifact cache at {2}'
                       .format(self._stable_name, action, path))
-      return LocalArtifactCache(artifact_root, path, compression,
-                                self._options.max_entries_per_target,
-                                permissions=self._options.write_permissions,
-                                dereference=self._options.tarball_dereference)
+      return LocalArtifactCache(
+        artifact_root, path, compression,
+        dereference=self._options.tarball_dereference,
+        max_entries_per_target=self._options.max_entries_per_target,
+        permissions=self._options.write_permissions,
+      )
 
     def create_remote_cache(remote_spec, local_cache):
       urls = self.get_available_urls(remote_spec.split('|'))
