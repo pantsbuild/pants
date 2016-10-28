@@ -98,16 +98,22 @@ class SchedulerTest(unittest.TestCase):
     self.assertEquals("Unsupported root subject type: <type 'unicode'> for u'string'",
                       str(cm.exception))
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
                              root_specs=['3rdparty/jvm:guava'],
                              jars=[self.guava])
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_compile_only_3rdparty(self):
     self.assert_resolve_only(goals=['compile'],
                              root_specs=['3rdparty/jvm:guava'],
                              jars=[self.guava])
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_gen_noop(self):
     # TODO(John Sirois): Ask around - is this OK?
     # This is different than today.  There is a gen'able target reachable from the java target, but
@@ -118,6 +124,8 @@ class SchedulerTest(unittest.TestCase):
 
     self.assert_select_for_subjects(walk, Select(JavaSources, optional=True), [self.java])
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_gen(self):
     build_request = self.request(['gen'], self.thrift)
     walk = self.build_and_walk(build_request)
@@ -136,6 +144,8 @@ class SchedulerTest(unittest.TestCase):
                                     [self.thrift],
                                     variants=variants)
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_codegen_simple(self):
     build_request = self.request(['compile'], self.java)
     walk = self.build_and_walk(build_request)
@@ -160,6 +170,8 @@ class SchedulerTest(unittest.TestCase):
     self.assert_select_for_subjects(walk, Select(Classpath), variant_subjects,
                                     variants={'thrift': 'apache_java'})
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_consumes_resources(self):
     build_request = self.request(['compile'], self.consumes_resources)
     walk = self.build_and_walk(build_request)
@@ -176,6 +188,8 @@ class SchedulerTest(unittest.TestCase):
                 self.guava]
     self.assert_select_for_subjects(walk, Select(Classpath), subjects)
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_managed_resolve(self):
     """A managed resolve should consume a ManagedResolve and ManagedJars to produce Jars."""
     build_request = self.request(['compile'], self.consumes_managed_thirdparty)
@@ -199,6 +213,8 @@ class SchedulerTest(unittest.TestCase):
                       {ret.value for node, ret in walk
                        if node.product == Jar and isinstance(node, RootNode)})
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_dependency_inference(self):
     """Scala dependency inference introduces dependencies that do not exist in BUILD files."""
     build_request = self.request(['compile'], self.inferred_deps)
@@ -212,6 +228,8 @@ class SchedulerTest(unittest.TestCase):
     # Confirm that we requested a classpath for the root and inferred targets.
     self.assert_select_for_subjects(walk, Select(Classpath), [self.inferred_deps, self.java_simple])
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_multiple_classpath_entries(self):
     """Multiple Classpath products for a single subject currently cause a failure."""
     build_request = self.request(['compile'], self.java_multi)
