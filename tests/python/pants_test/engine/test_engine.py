@@ -101,21 +101,20 @@ class EngineTest(unittest.TestCase):
       self.assert_engine(engine)
 
   def test_rerun_with_cache(self):
+    # NB: this test assumes the cache stats are retained across runs and not regenerated
     with self.multiprocessing_engine() as engine:
       # Run once and save stats to prepare for another run.
       self.assert_engine(engine)
       cache_stats = engine.cache_stats()
-      hits, misses = cache_stats.misses, cache_stats.misses
+      hits, misses = cache_stats.hits, cache_stats.misses
 
-      # First run there will only be duplicate executions cached (ie, the same Runnable
-      # is triggered by multiple Nodes).
-      self.assertTrue(cache_stats.hits > 0)
-      self.assertTrue(cache_stats.misses > 0)
-
+      # First run will have no cache hits, because there are no duplicate executions.
+      self.assertTrue(hits == 0)
+      self.assertTrue(misses > 0)
       self.scheduler.product_graph.invalidate()
       self.assert_engine(engine)
 
-      # Second run hits have increaed, and there are no more misses.
+      # Second run hits have increased, and there are no more misses.
       self.assertEquals(misses, cache_stats.misses)
       self.assertTrue(hits < cache_stats.hits)
 
