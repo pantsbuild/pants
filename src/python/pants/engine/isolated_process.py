@@ -171,7 +171,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
   def step(self, step_context):
     waiting_nodes = []
     # Get the binary.
-    binary_state = step_context.select_for(Select(self.snapshotted_process.binary_type),
+    binary_state = step_context.select_for(self.snapshotted_process.binary_type_selector,
                                            subject=self.subject,
                                            variants=self.variants)
     if type(binary_state) is Throw:
@@ -185,7 +185,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
 
     # Create the request from the request callback after resolving its input clauses.
     input_values = []
-    for input_selector in self.snapshotted_process.input_selectors:
+    for input_selector in self.snapshotted_process.real_input_selectors:
       sn_state = step_context.select_for(input_selector, self.subject, self.variants)
       if type(sn_state) is Waiting:
         waiting_nodes.extend(sn_state.dependencies)
@@ -213,9 +213,9 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
     # Request snapshots for the snapshot_subjects from the process request.
     snapshot_subjects_value = []
     if process_request.snapshot_subjects:
-      snapshot_subjects_state = step_context.select_for(self.snapshot_process.snapshot_selector,
-                                                        process_request,
-                                                        self.variants)
+      snapshot_subjects_state = step_context.select_for(self.snapshotted_process.snapshot_selector,
+                                                        subject=process_request,
+                                                        variants=self.variants)
       if type(snapshot_subjects_state) is not Return:
         return snapshot_subjects_state
       snapshot_subjects_value = snapshot_subjects_state.value

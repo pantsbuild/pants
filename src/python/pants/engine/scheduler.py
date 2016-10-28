@@ -1074,7 +1074,7 @@ class RuleGraphEdgeContainer(object):
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
       # by adding support for "mergeable" products. see:
       #   https://github.com/pantsbuild/pants/issues/2526
-      return Throw(ConflictingProducersError.create(subject, final_selector, matches))
+      return Throw(ConflictingProducersError.create(subject, final_selector.product, matches))
     elif len(matches) == 1:
       return Return(matches[0][1])
     else:

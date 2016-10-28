@@ -16,8 +16,7 @@ from pants.engine.addressable import Exactly
 from pants.engine.fs import Files, PathGlobs
 from pants.engine.isolated_process import (ProcessExecutionNode, Snapshot, SnapshotNode,
                                            SnapshottedProcessRequest)
-from pants.engine.nodes import (DependenciesNode, FilesystemNode, ProjectionNode, SelectNode,
-                                TaskNode)
+from pants.engine.nodes import FilesystemNode, TaskNode
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, type_or_constraint_repr)
 from pants.util.meta import AbstractClass
@@ -151,16 +150,27 @@ class RulesetValidator(object):
 
 class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
                                                          'binary_type',
-                                                         'input_selectors',
+                                                         'real_input_selectors',
                                                          'input_conversion',
                                                          'output_conversion']),
                          Rule):
   """A rule type for defining execution of snapshotted processes."""
 
+  def __new__(cls, product_type, binary_type, input_selectors, input_conversion, output_conversion):
+    return super(SnapshottedProcess, cls).__new__(cls,product_type, binary_type, input_selectors, input_conversion, output_conversion)
+
   snapshot_selector = SelectDependencies(Snapshot,
                                          SnapshottedProcessRequest,
                                          'snapshot_subjects',
                                          field_types=(Files,))
+
+  @property
+  def input_selectors(self):
+    return list(self.real_input_selectors) + [self.binary_type_selector]
+
+  @property
+  def binary_type_selector(self):
+    return Select(self.binary_type)
 
   def as_node(self, subject, variants):
     return ProcessExecutionNode(subject, variants, self)
@@ -315,27 +325,6 @@ class NodeBuilder(object):
   def gen_nodes(self, subject, product_type, variants):
     for rule in self._rule_index.gen_rules(type(subject), product_type):
       yield rule.as_node(subject, variants)
-
-  def select_node(self, selector, subject, variants):
-    """Constructs a Node for the given Selector and the given Subject/Variants.
-
-    This method is decoupled from Selector classes in order to allow the `selector` package to not
-    need a dependency on the `nodes` package.
-    """
-    selector_type = type(selector)
-    if selector_type is Select:
-      return SelectNode(subject, variants, selector)
-    if selector_type is SelectVariant:
-      return SelectNode(subject, variants, selector)
-    elif selector_type is SelectLiteral:
-      # NB: Intentionally ignores subject parameter to provide a literal subject.
-      return SelectNode(selector.subject, variants, selector)
-    elif selector_type is SelectDependencies:
-      return DependenciesNode(subject, variants, selector)
-    elif selector_type is SelectProjection:
-      return ProjectionNode(subject, variants, selector)
-    else:
-      raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
 class CanHaveDependencies(object):
@@ -815,6 +804,43 @@ class GraphMaker(object):
                              projected_rules)
         else:
           raise TypeError('Unexpected type of selector: {}'.format(selector))
+
+      if type(entry.rule) is SnapshottedProcess:
+        # TODO, this is a copy of the SelectDependencies with some changes
+        # Need to come up with a better approach here, but this fixes things
+        # It's also not tested
+        snapshot_selector = entry.rule.snapshot_selector
+        initial_selector = entry.rule.snapshot_selector.input_product_selector
+        initial_rules_or_literals = _find_rhs_for_select(SnapshottedProcessRequest, initial_selector)
+        if not initial_rules_or_literals:
+          mark_unfulfillable(entry,
+                             entry.subject_type,
+                             'no matches for {} when resolving {}'
+                             .format(initial_selector, snapshot_selector))
+          was_unfulfillable = True
+        else:
+
+          rules_for_dependencies = []
+          for field_type in snapshot_selector.field_types:
+            rules_for_field_subjects = _find_rhs_for_select(field_type,
+                                                            snapshot_selector.projected_product_selector)
+            rules_for_dependencies.extend(rules_for_field_subjects)
+
+          if not rules_for_dependencies:
+            mark_unfulfillable(entry,
+                               snapshot_selector.field_types,
+                               'no matches for {} when resolving {}'
+                               .format(snapshot_selector.projected_product_selector, snapshot_selector))
+            was_unfulfillable = True
+          else:
+            add_rules_to_graph(entry,
+                               (snapshot_selector, snapshot_selector.input_product_selector),
+                               initial_rules_or_literals)
+            add_rules_to_graph(entry,
+                               (snapshot_selector, snapshot_selector.projected_product_selector),
+                               tuple(rules_for_dependencies))
+
+
       if not was_unfulfillable:
         # NB: In this case, there are no selectors.
         add_rules_to_graph(entry, None, tuple())
