@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
+from pants.engine.addressable import Addresses, parse_variants
 from pants.engine.fs import PathGlobs
 from pants.engine.nodes import (ConflictingProducersError, DependenciesNode, FilesystemNode, Node,
                                 Noop, ProjectionNode, Return, Runnable, SelectNode, State, TaskNode,
@@ -896,12 +896,23 @@ class RuleGraphEdgeContainer(object):
       return self._state_via_edges(selector_path, subject, variants, get_state)
 
   def _handle_select_deps(self, get_state, selector_path, subject, variants):
+    def dependency_subject_variants(selector, dep_product, input_variants):
+      for dependency in getattr(dep_product, selector.field or 'dependencies'):
+        if isinstance(dependency, Address):
+          # If a subject has literal variants for particular dependencies, they win over all else.
+          dependency, literal_variants = parse_variants(dependency)
+          variants = Variants.merge(input_variants, literal_variants)
+        else:
+          variants = input_variants
+        yield dependency, variants
+
     input_state = self._input_state_for_projecting(get_state, selector_path, subject, variants)
 
     if type(input_state) in (Throw, Waiting):
       return input_state
     elif type(input_state) is Noop:
-      return Noop('Could not compute {} to determine dependencies.', selector_path.input_product_selector)
+      return Noop('Could not compute {} to determine dependencies.',
+                  selector_path.input_product_selector)
     elif type(input_state) is not Return:
       State.raise_unrecognized(input_state)
 
@@ -911,8 +922,9 @@ class RuleGraphEdgeContainer(object):
     # could do something like,
     # if any of the deps are waiting, we know they all will be, so return the nodes for all of them w/o fanfare
 
-    subject_variants = list(DependenciesNode.dependency_subject_variants(selector_path,
-                                                                    input_state.value, variants))
+    subject_variants = list(dependency_subject_variants(selector_path,
+                                                        input_state.value,
+                                                        variants))
     for dep_subject, dep_variants in subject_variants:
       if type(dep_subject) not in selector_path.field_types:
         return Throw(TypeError('Unexpected type "{}" for {}: {!r}'
@@ -962,6 +974,15 @@ class RuleGraphEdgeContainer(object):
 #    return dep_dep_state
 
   def _handle_select_projection(self, get_state, selector_path, subject, variants):
+    def construct_projected_subject(selector, input_state):
+      input_product = input_state.value
+      values = [getattr(input_product, field) for field in selector.fields]
+      if len(values) == 1 and type(values[0]) is selector.projected_subject:
+        projected_subject = values[0]
+      else:
+        projected_subject = selector.projected_subject(*values)
+      return projected_subject
+
     input_state = self._input_state_for_projecting(get_state, selector_path, subject, variants)
 
     if type(input_state) in (Throw, Waiting):
@@ -972,7 +993,7 @@ class RuleGraphEdgeContainer(object):
       State.raise_unrecognized(input_state)
 
     try:
-      projected_subject = ProjectionNode.construct_projected_subject(selector_path, input_state)
+      projected_subject = construct_projected_subject(selector_path, input_state)
     except Exception as e:
       return Throw(ValueError(
         'Fields {} of {} could not be projected as {}: {}'.format(selector_path.fields, input_state.value,

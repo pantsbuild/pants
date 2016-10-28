@@ -12,7 +12,6 @@ from os.path import dirname
 
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.addressable import parse_variants
 from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
                              file_digest, read_link, scan_directory)
 from pants.engine.selectors import Select, SelectVariant
@@ -326,33 +325,6 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
       return Throw(ConflictingProducersError.create(self.subject, self.product, matches))
     else:
       return Return(matches[0][1])
-
-
-class DependenciesNode(object):
-
-  @classmethod
-  def dependency_subject_variants(cls, selector, dep_product, input_variants):
-    for dependency in getattr(dep_product, selector.field or 'dependencies'):
-      if isinstance(dependency, Address):
-        # If a subject has literal variants for particular dependencies, they win over all else.
-        dependency, literal_variants = parse_variants(dependency)
-        variants = Variants.merge(input_variants, literal_variants)
-      else:
-        variants = input_variants
-      yield dependency, variants
-
-
-class ProjectionNode(object):
-
-  @classmethod
-  def construct_projected_subject(cls, selector, input_state):
-    input_product = input_state.value
-    values = [getattr(input_product, field) for field in selector.fields]
-    if len(values) == 1 and type(values[0]) is selector.projected_subject:
-      projected_subject = values[0]
-    else:
-      projected_subject = selector.projected_subject(*values)
-    return projected_subject
 
 
 def _run_func_and_check_type(product_type, type_check, func, *args):
