@@ -276,7 +276,6 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
       variant_value = None
     return None, variant_value
 
-
   def step(self, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
