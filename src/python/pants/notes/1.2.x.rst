@@ -4,6 +4,22 @@
 This document describes releases from the ``1.2.x`` ``stable`` branch.
 
 
+1.2.0rc4 (10/27/2016)
+---------------------
+
+The fifth release candidate for stable 1.2.0, which includes a fix for the ``fmt.isort``
+task and an important correctness fix for golang remote rev pinning. This release candidate
+likely be elevated to the final 1.2.0 release tomorrow, barring any unexpected turbulence.
+
+Bugfixes
+~~~~~~~~
+
+* Change default ./pants fmt.isort <empty> behavior to no-op; Add sources check for isort.
+  `RB #4327 <https://rbcommons.com/s/twitter/r/4327>`_
+
+* Bugfix: when synthesizing remote libraries in Go, pin them to the same rev as adjacent libs.
+  `RB #4325 <https://rbcommons.com/s/twitter/r/4325>`_
+
 1.2.0rc3 (10/20/2016)
 ---------------------
 
