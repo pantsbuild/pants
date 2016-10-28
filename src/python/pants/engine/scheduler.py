@@ -17,9 +17,8 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses, parse_variants
 from pants.engine.fs import PathGlobs
-from pants.engine.nodes import (ConflictingProducersError, DependenciesNode, FilesystemNode, Node,
-                                Noop, ProjectionNode, Return, Runnable, SelectNode, State, TaskNode,
-                                Throw, Waiting)
+from pants.engine.nodes import (ConflictingProducersError, FilesystemNode, Node, Noop, Return,
+                                Runnable, SelectNode, State, TaskNode, Throw, Waiting)
 from pants.engine.rules import (GraphMaker, NodeBuilder, RootRule, RuleGraphEntry, RuleGraphLiteral,
                                 RuleGraphSubjectIsProduct, RuleIndex, RulesetValidator)
 from pants.engine.selectors import (Select, SelectDependencies, SelectProjection,
