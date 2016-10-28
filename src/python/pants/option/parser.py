@@ -48,7 +48,7 @@ class Parser(object):
     """Indicates a problem reading a value @fromfile."""
 
   class MutuallyExclusiveOptionError(Exception):
-    """Raised when both of exclusive options are given."""
+    """Raised when more than one option belonging to the same mutually exclusive group is specified."""
 
   @staticmethod
   def _ensure_bool(s):
