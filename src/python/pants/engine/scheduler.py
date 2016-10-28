@@ -664,6 +664,8 @@ class LocalScheduler(object):
         matching_root_graph_entry = self._rule_graph.root_rule_matching(type(subject), selector)
         if not matching_root_graph_entry:
           #raise Exception("What is all this then. No matching for {} {}".format(subject, selector))
+          # TODO the message here should say how to avoid this. So that goals can move towards static
+          # definition
           logger.debug("What is all this then. No matching for {} {}".format(selector, subject))
           logger.debug("rule table {} {}:\n  {}".format(type(subject).__name__, selector.product,'\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type and n.selector.product is selector.product)))
           logger.debug("rule table:\n  {}".format('\n  '.join(str(n) for n in self._rule_graph.root_rules.keys() if type(subject) is n.subject_type)))
@@ -888,6 +890,7 @@ class RuleGraphEdgeContainer(object):
     elif type(selector_path) is SelectProjection:
       return self._handle_select_projection(get_state, selector_path, subject, variants)
     elif type(selector_path) is tuple and selector_path[-1] == Select(Variants):
+      raise Exception('got here')
       return Noop('no variant support')
     else:
       return self._state_via_edges(selector_path, subject, variants, get_state)
