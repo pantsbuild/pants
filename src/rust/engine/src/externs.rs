@@ -75,7 +75,7 @@ impl Externs {
     with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| value_vec.clone())
   }
 
-  pub fn id_to_str(&self, digest: &Id) -> String {
+  pub fn id_to_str(&self, digest: Id) -> String {
     let buf = (self.id_to_str)(self.context, digest);
     let str =
       with_vec(buf.str_ptr, buf.str_len as usize, |char_vec| {
@@ -125,7 +125,7 @@ pub struct UTF8Buffer {
 }
 
 pub type IdToStrExtern =
-  extern "C" fn(*const ExternContext, *const Id) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, Id) -> UTF8Buffer;
 
 pub type ValToStrExtern =
   extern "C" fn(*const ExternContext, *const Value) -> UTF8Buffer;

@@ -179,11 +179,19 @@ class LocalScheduler(object):
 
   def _register_tasks(self, tasks):
     """Register the given tasks dict with the native scheduler."""
+    registered = set()
     for output_type, rules in tasks.items():
       output_constraint = self._to_constraint(output_type)
       for rule in rules:
+        # TODO: The task map has heterogeneous keys, so we normalize them to type constraints
+        # and dedupe them before registering to the native engine:
+        #   see: https://github.com/pantsbuild/pants/issues/4005
+        key = (output_constraint, rule)
+        if key in registered:
+          continue
+        registered.add(key)
+
         _, input_selects, func = rule.as_triple()
-        print('>>> registering func {} with output constraint {} for {}'.format(func, output_type, rule))
         self._native.lib.task_add(self._scheduler, Function(self._to_id(func)), output_constraint)
         for selector in input_selects:
           selector_type = type(selector)
@@ -212,7 +220,7 @@ class LocalScheduler(object):
             field = selector.fields[0]
             self._native.lib.task_add_select_projection(self._scheduler,
                                                         self._to_constraint(selector.product),
-                                                        self._to_constraint(selector.projected_subject),
+                                                        TypeId(self._to_id(selector.projected_subject)),
                                                         self._to_key(field),
                                                         self._to_constraint(selector.input_product))
           else:
@@ -293,7 +301,7 @@ class LocalScheduler(object):
       roots = {}
       for root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
         subject = self._from_key(root.subject)
-        product = self._from_id(root.product)
+        product = self._from_id(root.product.id_)
         if root.union_tag is 0:
           state = None
         elif root.union_tag is 1:
@@ -301,7 +309,7 @@ class LocalScheduler(object):
         elif root.union_tag is 2:
           state = Throw("Failed")
         elif root.union_tag is 3:
-          state = Noop("Nooped")
+          state = Throw("Nooped")
         else:
           raise ValueError('Unrecognized State type `{}` on: {}'.format(root.union_tag, root))
         roots[(subject, product)] = state
@@ -340,7 +348,7 @@ class LocalScheduler(object):
     def decode_runnable(raw):
       return (
           raw.id,
-          Runnable(self._from_id(raw.func),
+          Runnable(self._from_id(raw.func.id_),
                    tuple(self._from_value(arg)
                          for arg in self._native.unpack(raw.args_ptr, raw.args_len)),
                    bool(raw.cacheable))

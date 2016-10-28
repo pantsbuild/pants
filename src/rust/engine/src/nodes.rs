@@ -582,7 +582,7 @@ impl Node {
       &Node::SelectLiteral(_) => "Literal".to_string(),
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
-      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(&t.selector.func.0)),
+      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(t.selector.func.0)),
     }
   }
 

@@ -64,8 +64,8 @@ impl Key {
     }
   }
 
-  pub fn id(&self) -> &Id {
-    &self.id
+  pub fn id(&self) -> Id {
+    self.id
   }
 
   pub fn value(&self) -> &Value {

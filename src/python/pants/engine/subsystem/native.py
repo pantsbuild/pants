@@ -57,7 +57,7 @@ _FFI.cdef(
     typedef void ExternContext;
 
     typedef Key         (*extern_key_for)(ExternContext*, Value*);
-    typedef UTF8Buffer  (*extern_id_to_str)(ExternContext*, Id*);
+    typedef UTF8Buffer  (*extern_id_to_str)(ExternContext*, Id);
     typedef UTF8Buffer  (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool        (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value       (*extern_store_list)(ExternContext*, Value*, uint64_t, bool);
@@ -159,7 +159,7 @@ def extern_key_for(context_handle, val):
   return c.value_to_key(val)
 
 
-@_FFI.callback("UTF8Buffer(ExternContext*, Id*)")
+@_FFI.callback("UTF8Buffer(ExternContext*, Id)")
 def extern_id_to_str(context_handle, _id):
   """Given an Id for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
@@ -181,7 +181,7 @@ def extern_val_to_str(context_handle, val):
 def extern_satisfied_by(context_handle, constraint_id, cls_id):
   """Given two TypeIds, return constraint.satisfied_by(cls)."""
   c = _FFI.from_handle(context_handle)
-  return c.from_id(constraint_id.id_).satisfied_by(c.from_id(cls_id.id_))
+  return c.from_id(constraint_id.id_).satisfied_by_type(c.from_id(cls_id.id_))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, uint64_t, bool)")
@@ -204,7 +204,7 @@ def extern_project(context_handle, val, field, type_id):
   c = _FFI.from_handle(context_handle)
   obj = c.from_value(val)
   field_name = c.from_key(field)
-  typ = c.from_id(type_id)
+  typ = c.from_id(type_id.id_)
 
   projected = getattr(obj, field_name)
   if type(projected) is not typ:
@@ -289,7 +289,7 @@ class ExternContext(object):
   def to_value(self, obj, type_id=None):
     handle = _FFI.new_handle(obj)
     self._handles.add(handle)
-    type_id = type_id or self.to_id(type(obj))
+    type_id = type_id or TypeId(self.to_id(type(obj)))
     return Value(handle, type_id)
 
   def from_value(self, val):
@@ -322,7 +322,8 @@ class ExternContext(object):
 
   def value_to_key(self, val):
     obj = self.from_value(val)
-    return Key(self.put(obj), Value(val.handle, val.type_id), self._id_from_native(val.type_id))
+    type_id = TypeId(val.type_id.id_)
+    return Key(self.put(obj), Value(val.handle, type_id), type_id)
 
   def to_key(self, obj):
     type_id = TypeId(self.put(type(obj)))
