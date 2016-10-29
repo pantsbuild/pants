@@ -31,7 +31,6 @@ class LegacyAddressMapper(AddressMapper):
   def __init__(self, scheduler, engine, build_root):
     self._scheduler = scheduler
     self._engine = engine
-    self._product_graph = scheduler.product_graph
     self._build_root = build_root
 
   def scan_build_files(self, base_path):
