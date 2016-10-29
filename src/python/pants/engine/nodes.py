@@ -342,21 +342,6 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
   rule. The TaskNode will determine whether the dependencies are available before executing the
   function, and provide a satisfied argument per clause entry to the function.
   """
-  debug_stuff = False
-  if debug_stuff:
-    def __new__(cls, *args, **kwargs):
-      obj = super(TaskNode, cls).__new__(cls, *args, **kwargs)
-      debug_stuff = False
-      if debug_stuff:
-        # NB, this is super slow, so make it easy to turn off
-        import inspect
-        bits = []
-        for i in range(2,5):
-          frame, filename, line_number, function_name, lines, index = inspect.getouterframes(inspect.currentframe())[i]
-          bits.append('{}:{}'.format(filename, line_number, function_name) )
-        obj.extra_repr = '\n  '.join(bits)
-
-      return obj
 
   is_cacheable = True
   is_inlineable = False
@@ -377,6 +362,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
 
       if type(dep_state) is Waiting:
         if type(selector) is Select:
+          # TODO clean this up
           raise Exception(
             """we should never wait on a Select {}
             waiting contents: {}

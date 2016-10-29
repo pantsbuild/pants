@@ -154,24 +154,20 @@ class _Process(datatype('_Process', ['snapshot_archive_root',
   """All (pickleable) arguments for the execution of a sandboxed process."""
 
 
-class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'snapshotted_process']), Node):
+class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'rule']), Node):
   """Wraps a process execution, preparing and tearing down the execution environment."""
 
   is_cacheable = True
   is_inlineable = False
 
   @property
-  def rule(self):
-    return self.snapshotted_process
-
-  @property
   def product(self):
-    return self.snapshotted_process.product_type
+    return self.rule.product_type
 
   def step(self, step_context):
     waiting_nodes = []
     # Get the binary.
-    binary_state = step_context.select_for(self.snapshotted_process.binary_type_selector,
+    binary_state = step_context.select_for(self.rule.binary_type_selector,
                                            subject=self.subject,
                                            variants=self.variants)
     if type(binary_state) is Throw:
@@ -185,7 +181,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
 
     # Create the request from the request callback after resolving its input clauses.
     input_values = []
-    for input_selector in self.snapshotted_process.real_input_selectors:
+    for input_selector in self.rule.real_input_selectors:
       sn_state = step_context.select_for(input_selector, self.subject, self.variants)
       if type(sn_state) is Waiting:
         waiting_nodes.extend(sn_state.dependencies)
@@ -206,14 +202,14 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
 
     # Now that we've returned on waiting, we can assume that relevant inputs have values.
     try:
-      process_request = self.snapshotted_process.input_conversion(*input_values)
+      process_request = self.rule.input_conversion(*input_values)
     except Exception as e:
       return Throw(e)
 
     # Request snapshots for the snapshot_subjects from the process request.
     snapshot_subjects_value = []
     if process_request.snapshot_subjects:
-      snapshot_subjects_state = step_context.select_for(self.snapshotted_process.snapshot_selector,
+      snapshot_subjects_state = step_context.select_for(self.rule.snapshot_selector,
                                                         subject=process_request,
                                                         variants=self.variants)
       if type(snapshot_subjects_state) is not Return:
@@ -225,7 +221,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
                          process_request,
                          binary_state.value,
                          snapshot_subjects_value,
-                         self.snapshotted_process.output_conversion)
+                         self.rule.output_conversion)
     return Runnable(_execute, (execution,))
 
 

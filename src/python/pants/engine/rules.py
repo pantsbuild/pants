@@ -72,11 +72,12 @@ def identity(product):
 
 
 class RootNode(TaskNode):
-  """A node used as the root node for engine requests"""
+  """A node used as the root node for engine requests."""
   is_inlineable = True
 
 
 class RootRule(datatype('RootRule', ['subject_type', 'selector']), Rule):
+  """Rules for the root requests into the rule graph."""
 
   @property
   def task_func(self):
@@ -85,8 +86,7 @@ class RootRule(datatype('RootRule', ['subject_type', 'selector']), Rule):
   @property
   def constraint(self):
     if type(self.selector) is SelectDependencies:
-      return Exactly(list)# lambda x: type(x) is list
-    #else:
+      return Exactly(list)
     return self.selector.type_constraint
 
   def as_node(self, subject, variants):
@@ -808,7 +808,7 @@ class GraphMaker(object):
       if type(entry.rule) is SnapshottedProcess:
         # TODO, this is a copy of the SelectDependencies with some changes
         # Need to come up with a better approach here, but this fixes things
-        # It's also not tested
+        # It's also not tested explicitly.
         snapshot_selector = entry.rule.snapshot_selector
         initial_selector = entry.rule.snapshot_selector.input_product_selector
         initial_rules_or_literals = _find_rhs_for_select(SnapshottedProcessRequest, initial_selector)
