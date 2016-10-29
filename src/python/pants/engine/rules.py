@@ -175,7 +175,7 @@ class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics'])):
                         " Rules either extend Rule, or are 3 elem tuples.".format(type(entry)))
 
     intrinsics = dict()
-    for func, input_type, output_type in intrinsic_entries:
+    for output_type, input_type, func in intrinsic_entries:
       key = (input_type, output_type)
       if key in intrinsics:
         raise ValueError('intrinsics provided by {} have already been provided by: {}'.format(
@@ -474,12 +474,11 @@ class GraphMaker(object):
         full_unfulfillable_rules = unfulfillable_rules
 
     rules_in_graph = set(entry.rule for entry in full_dependency_edges.keys())
-    rules_eliminated_during_construction = set(entry.rule
-                                               for entry in full_unfulfillable_rules.keys())
+    rules_eliminated_during_construction = [entry.rule for entry in full_unfulfillable_rules.keys()]
+    rules_used = set(rules_eliminated_during_construction + self.nodebuilder.intrinsics.values())
 
     declared_rules = self.nodebuilder.all_rules()
-    unreachable_rules = declared_rules.difference(rules_in_graph,
-                                                  rules_eliminated_during_construction)
+    unreachable_rules = declared_rules.difference(rules_in_graph, rules_used)
     for rule in sorted(unreachable_rules):
       full_unfulfillable_rules[UnreachableRule(rule)] = [Diagnostic(None, 'Unreachable')]
 

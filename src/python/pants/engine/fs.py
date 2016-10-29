@@ -418,10 +418,10 @@ def create_fs_intrinsics(project_tree):
     p.__name__ = '{}_partial'.format(func.__name__)
     return p
   return [
-    (ptree(scan_directory), Dir, DirectoryListing),
-    (ptree(file_content), File, FileContent),
-    (ptree(file_digest), File, FileDigest),
-    (ptree(read_link), Link, ReadLink),
+    (DirectoryListing, Dir, ptree(scan_directory)),
+    (FileContent, File, ptree(file_content)),
+    (FileDigest, File, ptree(file_digest)),
+    (ReadLink, Link, ptree(read_link)),
   ]
 
 

@@ -156,7 +156,6 @@ class _Process(datatype('_Process', ['snapshot_archive_root',
 
 
 # TODO: port to native Engine.
-
 class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'snapshotted_process'])):
   """Wraps a process execution, preparing and tearing down the execution environment."""
 
@@ -236,5 +235,5 @@ def create_snapshot_intrinsics(project_tree):
   def ptree(func):
     return functools.partial(func, project_tree, snapshot_archive_root)
   return [
-      (ptree(create_snapshot_archive), Files, Snapshot),
+      (Snapshot, Files, ptree(create_snapshot_archive)),
     ]

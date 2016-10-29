@@ -14,6 +14,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
+from pants.engine.isolated_process import create_snapshot_intrinsics
 from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -94,15 +95,13 @@ class LocalScheduler(object):
     # validation below the execution roots (and thus not considering paths that aren't in use).
     root_selector_fns = {
       Address: select_product,
-      PathGlobs: select_product,
-      SingleAddress: select_product,
-      SiblingAddresses: select_product,
       AscendantAddresses: select_product,
       DescendantAddresses: select_product,
-      DescendantAddresses: select_product,
+      PathGlobs: select_product,
+      SiblingAddresses: select_product,
+      SingleAddress: select_product,
     }
-    intrinsics = create_fs_intrinsics(project_tree)
-    # TODO: Not reachable currently: + create_snapshot_intrinsics(project_tree)
+    intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     node_builder = NodeBuilder.create(tasks, intrinsics)
     RulesetValidator(node_builder, goals, root_selector_fns).validate()
     self._register_tasks(node_builder.tasks)
