@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-import functools
 from fnmatch import fnmatch
 from os.path import basename, dirname, join
 

@@ -397,6 +397,7 @@ def files_digest(files, file_values):
 FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 
+
 def generate_fs_subjects(filenames):
   """Given filenames, generate a set of subjects for invalidation predicate matching."""
   for f in filenames:

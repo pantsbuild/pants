@@ -242,6 +242,7 @@ class HydratedTarget(datatype('HydratedTarget', ['adaptor', 'dependencies'])):
 # TODO: Only used (currently) to represent transitive hydrated targets. Consider renaming.
 HydratedTargets = Collection.of(HydratedTarget)
 
+
 class HydratedField(datatype('HydratedField', ['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 

@@ -6,16 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from abc import abstractmethod, abstractproperty
+from abc import abstractproperty
 from collections import OrderedDict, defaultdict, deque
 from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
 from pants.engine.addressable import Exactly
-from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import ProcessExecutionNode, Snapshot
-from pants.engine.objects import Closable
+from pants.engine.isolated_process import ProcessExecutionNode
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, type_or_constraint_repr)
 from pants.util.meta import AbstractClass
@@ -52,7 +50,6 @@ class Rule(AbstractClass):
 class TaskRule(datatype('TaskRule', ['input_selectors', 'func', 'product_type', 'constraint']),
                Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied."""
-
 
   @property
   def output_product_type(self):

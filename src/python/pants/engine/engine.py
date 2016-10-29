@@ -13,7 +13,6 @@ from abc import abstractmethod
 from collections import OrderedDict
 from Queue import Queue
 
-from concurrent.futures import ThreadPoolExecutor
 from twitter.common.collections import maybe_list
 
 from pants.base.exceptions import TaskError
@@ -296,16 +295,6 @@ def _execute_step(process_state, step):
     # pass this back to our main thread for handling.
     logger.warn(traceback.format_exc())
     return runnable_id, e
-
-
-def _process_initializer(storage):
-  """Another picklable top-level function that provides multi-processes' initial states.
-
-  States are returned as a tuple. States are `Closable` so they can be cleaned up once
-  processes are done.
-  """
-  storage = Storage.clone(storage)
-  return (storage, Cache.create(storage=storage))
 
 
 def _process_initializer(storage):

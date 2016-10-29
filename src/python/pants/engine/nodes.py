@@ -6,18 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import os
-from abc import abstractmethod, abstractproperty
-from collections import deque
-from os.path import dirname
 
-from pants.base.project_tree import Dir, File, Link
-from pants.build_graph.address import Address
-from pants.engine.addressable import parse_variants
-from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
-                             file_digest, read_link, scan_directory)
-from pants.engine.selectors import Select, SelectVariant
-from pants.engine.struct import HasProducts, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 

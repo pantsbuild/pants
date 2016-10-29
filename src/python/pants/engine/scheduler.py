@@ -13,17 +13,16 @@ from contextlib import contextmanager
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
-from pants.engine.isolated_process import create_snapshot_intrinsics
 from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant, type_or_constraint_repr, constraint_for)
+                                    SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import (ExternContext, extern_id_to_str, extern_satisfied_by,
-                                           extern_key_for, extern_project, extern_project_multi,
-                                           extern_store_list, extern_val_to_str, TypeId, TypeConstraint, Function)
+from pants.engine.subsystem.native import (ExternContext, Function, TypeConstraint, TypeId,
+                                           extern_id_to_str, extern_key_for, extern_project,
+                                           extern_project_multi, extern_satisfied_by,
+                                           extern_store_list, extern_val_to_str)
 from pants.util.objects import datatype
 
 
@@ -39,32 +38,6 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
   """
-
-
-class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
-                                                         'binary_type',
-                                                         'input_selectors',
-                                                         'input_conversion',
-                                                         'output_conversion'])):
-  """A task type for defining execution of snapshotted processes."""
-
-  def as_node(self, subject, product_type, variants):
-    return ProcessExecutionNode(subject, variants, self)
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-  @property
-  def input_selects(self):
-    return self.input_selectors
-
-
-class TaskNodeFactory(datatype('Task', ['input_selects', 'task_func', 'product_type'])):
-  """A set-friendly curried TaskNode constructor."""
-
-  def as_node(self, subject, product_type, variants):
-    return TaskNode(subject, product_type, variants, self.task_func, self.input_selects)
 
 
 class LocalScheduler(object):
