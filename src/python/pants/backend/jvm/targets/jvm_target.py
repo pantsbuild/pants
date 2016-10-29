@@ -40,6 +40,7 @@ class JvmTarget(Target, Jarable):
                platform=None,
                strict_deps=None,
                fatal_warnings=None,
+               zinc_file_manager=None,
                **kwargs):
     """
     :API: public
@@ -69,6 +70,9 @@ class JvmTarget(Target, Jarable):
     :param fatal_warnings: Whether to turn warnings into errors for this target.  If present,
                            takes priority over the language's fatal-warnings option.
     :type fatal_warnings: bool
+    :param zinc_file_manager: Whether to use zinc provided file manager which allows transactional
+                                  rollbacks but in certain cases, but may conflict with user libraries.
+    :type zinc_file_manager: bool
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
@@ -81,6 +85,7 @@ class JvmTarget(Target, Jarable):
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
+      'zinc_file_manager': PrimitiveField(zinc_file_manager),
     })
     self._resource_specs = self.assert_list(resources, key_arg='resources')
 
@@ -110,6 +115,15 @@ class JvmTarget(Target, Jarable):
     :rtype: bool or None
     """
     return self.payload.fatal_warnings
+
+  @property
+  def zinc_file_manager(self):
+    """If set to false, will just jvm default file manager instead of the one provided by zinc.
+
+    :return: See constructor.
+    :rtype: bool or None
+    """
+    return self.payload.zinc_file_manager
 
   @property
   def platform(self):

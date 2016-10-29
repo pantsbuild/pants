@@ -192,6 +192,8 @@ class JvmDependencyAnalyzer(object):
       if isinstance(dep, (Resources, UnpackedJars)):
         continue
       # If any of the target's jars or classfiles were used, consider it used.
+      print('Products in dependency {} used by {}: {}'
+            .format(dep, target, '\n'.join(list(product_deps & self.files_for_target(dep)))))
       if product_deps.isdisjoint(self.files_for_target(dep)):
         unused.add(dep)
       else:

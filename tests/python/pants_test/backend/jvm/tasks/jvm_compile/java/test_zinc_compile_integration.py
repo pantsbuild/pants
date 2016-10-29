@@ -54,7 +54,6 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         pants_run = self.run_test_compile(
           workdir, cachedir, target,
           extra_args=[
-            '--compile-zinc-name-hashing',
             '--cache-compile-zinc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
           ],
           clean_all=True,

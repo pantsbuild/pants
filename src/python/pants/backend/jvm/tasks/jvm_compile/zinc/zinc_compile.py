@@ -10,6 +10,7 @@ import os
 import re
 import textwrap
 from contextlib import closing
+from hashlib import sha1
 from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.java import Java
@@ -117,6 +118,10 @@ class BaseZincCompile(JvmCompile):
     return zinc_args
 
   @classmethod
+  def implementation_version(cls):
+    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 3)]
+
+  @classmethod
   def compiler_plugin_types(cls):
     """A tuple of target types which are compiler plugins."""
     return (AnnotationProcessor, JavacPlugin, ScalacPlugin)
@@ -150,12 +155,6 @@ class BaseZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(BaseZincCompile, cls).register_options(register)
-    # TODO: disable by default because it breaks dependency parsing:
-    #   https://github.com/pantsbuild/pants/issues/2224
-    # ...also, as of sbt 0.13.9, it is significantly slower for cold builds.
-    register('--name-hashing', advanced=True, type=bool, fingerprint=True,
-             help='Use zinc name hashing.')
-
     register('--whitelisted-args', advanced=True, type=dict,
              default={
                '-S.*': False,
@@ -173,54 +172,49 @@ class BaseZincCompile(JvmCompile):
                   'changed targets will be compiled with an empty output directory, as if after '
                   'running clean-all.')
 
-    # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
-    #  https://github.com/sbt/sbt/pull/2085
-    #  https://github.com/sbt/sbt/pull/2160
     register('--incremental-caching', advanced=True, type=bool,
              help='When set, the results of incremental compiles will be written to the cache. '
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
+    def sbt_jar(name, **kwargs):
+      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X2-SNAPSHOT-28dadf4c1caac6fe79989420edd0bc03ce73a4f5', **kwargs)
+
+    shader_rules = [
+        # The compiler-interface and compiler-bridge tool jars carry xsbt and
+        # xsbti interfaces that are used across the shaded tool jar boundary so
+        # we preserve these root packages wholesale along with the core scala
+        # APIs.
+        Shader.exclude_package('scala', recursive=True),
+        Shader.exclude_package('xsbt', recursive=True),
+        Shader.exclude_package('xsbti', recursive=True),
+      ]
+
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            # NB: This is explicitly a `_2.10` JarDependency rather than a
-                            # ScalaJarDependency. The latter would pick up the platform in a users'
-                            # repo, whereas this binary is shaded and independent of the target
-                            # platform version.
-                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.4')
+                            JarDependency('org.pantsbuild', 'zinc_2.11', '0.0.1-test-201610270000'),
                           ],
                           main=cls._ZINC_MAIN,
-                          custom_rules=[
-                            # The compiler-interface and sbt-interface tool jars carry xsbt and
-                            # xsbti interfaces that are used across the shaded tool jar boundary so
-                            # we preserve these root packages wholesale along with the core scala
-                            # APIs.
-                            Shader.exclude_package('scala', recursive=True),
-                            Shader.exclude_package('xsbt', recursive=True),
-                            Shader.exclude_package('xsbti', recursive=True),
+                          custom_rules=shader_rules)
+
+    cls.register_jvm_tool(register,
+                          'compiler-bridge',
+                          classpath=[
+                            sbt_jar(name='compiler-bridge_2.11',
+                                    classifier='sources',
+                                    intransitive=True)
                           ])
-
-    def sbt_jar(name, **kwargs):
-      return JarDependency(org='com.typesafe.sbt', name=name, rev='0.13.9', **kwargs)
-
     cls.register_jvm_tool(register,
                           'compiler-interface',
                           classpath=[
-                            sbt_jar(name='compiler-interface',
-                                    classifier='sources',
-                                    # We just want the single compiler-interface jar and not its
-                                    # dep on scala-lang
-                                    intransitive=True)
-                          ])
-    cls.register_jvm_tool(register,
-                          'sbt-interface',
-                          classpath=[
-                            sbt_jar(name='sbt-interface',
-                                    # We just want the single sbt-interface jar and not its dep
-                                    # on scala-lang
-                                    intransitive=True)
-                          ])
+                            sbt_jar(name='compiler-interface')
+                          ],
+                          # NB: We force a noop-jarjar'ing of the interface, since it is now broken
+                          # up into multiple jars, but zinc does not yet support a sequence of jars
+                          # for the interface.
+                          main='no.such.main.Main',
+                          custom_rules=shader_rules)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -306,8 +300,22 @@ class BaseZincCompile(JvmCompile):
       for processor in processors:
         f.write('{}\n'.format(processor.strip()))
 
+  @memoized_property
+  def _zinc_cache_dir(self):
+    """A directory where zinc can store compiled copies of the `compiler-bridge`.
+
+    The compiler-bridge is specific to each scala version, and is lazily computed by zinc if the
+    appropriate version does not exist. Eventually it would be great to just fetch this rather
+    than compiling it.
+    """
+    hasher = sha1()
+    for tool in ['zinc', 'compiler-interface', 'compiler-bridge']:
+      hasher.update(self.tool_jar(tool))
+    key = hasher.hexdigest()[:12]
+    return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
+
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, javac_plugins_to_exclude):
+              log_file, settings, fatal_warnings, zinc_file_manager, javac_plugins_to_exclude):
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(upstream_analysis.keys())
 
@@ -321,13 +329,12 @@ class BaseZincCompile(JvmCompile):
     ])
     if not self.get_options().colors:
       zinc_args.append('-no-color')
-    if not self.get_options().name_hashing:
-      zinc_args.append('-no-name-hashing')
     if log_file:
       zinc_args.extend(['-capture-log', log_file])
 
     zinc_args.extend(['-compiler-interface', self.tool_jar('compiler-interface')])
-    zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
+    zinc_args.extend(['-compiler-bridge', self.tool_jar('compiler-bridge')])
+    zinc_args.extend(['-zinc-cache-dir', self._zinc_cache_dir])
     zinc_args.extend(['-scala-path', ':'.join(self.scalac_classpath())])
 
     zinc_args.extend(self.javac_plugin_args(javac_plugins_to_exclude))
@@ -338,11 +345,15 @@ class BaseZincCompile(JvmCompile):
 
     zinc_args.extend(args)
     zinc_args.extend(self._get_zinc_arguments(settings))
+    zinc_args.append('-transactional')
 
     if fatal_warnings:
       zinc_args.extend(self.get_options().fatal_warnings_enabled_args)
     else:
       zinc_args.extend(self.get_options().fatal_warnings_disabled_args)
+
+    if not zinc_file_manager:
+      zinc_args.append('-no-zinc-file-manager')
 
     jvm_options = []
 

@@ -22,6 +22,10 @@ class ZincLanguageMixin(object):
              fingerprint=True,
              help='The default for the "fatal_warnings" argument for targets of this language.')
 
+    register('--zinc-file-manager', advanced=True, default=True, type=bool,
+             fingerprint=True,
+             help='Turn on/off zinc provided file manager if it conflicts with user library, for example, jmh.')
+
   @property
   def strict_deps(self):
     """When True, limits compile time deps to those that are directly declared by a target.
@@ -35,3 +39,11 @@ class ZincLanguageMixin(object):
     :rtype: bool
     """
     return self.get_options().fatal_warnings
+
+
+  @property
+  def zinc_file_manager(self):
+    """If false, zinc provided file manager will not be used.
+    :rtype: bool
+    """
+    return self.get_options().zinc_file_manager

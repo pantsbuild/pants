@@ -1,7 +1,7 @@
 package org.pantsbuild.zinc
 
+import sbt.util.Logger
 import xsbti.compile.CompileProgress
-import sbt.Logger
 
 /**
  * SimpleCompileProgress implements CompileProgress to add output to zinc scala compilations, but
