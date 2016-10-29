@@ -14,7 +14,7 @@ class ScopeTestIntegrationTest(PantsRunIntegrationTest):
   These tests involve a library which has the 'test' scope, meaning it should only be available at
   runtime, and only for junit tests.
 
-  There is a java_tests() target which depends on it, and checks for its existence at runtime (not
+  There is a junit_tests() target which depends on it, and checks for its existence at runtime (not
   compile time!) by using Class.forName().
 
   A binary is configured to also check for the existence of the class at runtime. The binary should
@@ -27,7 +27,7 @@ class ScopeTestIntegrationTest(PantsRunIntegrationTest):
     return 'testprojects/src/java/org/pantsbuild/testproject/junit/testscope:{}'.format(name)
 
   def test_tests_pass(self):
-    """This java_tests() target tests for the presence of a particular class at runtime.
+    """This junit_tests() target tests for the presence of a particular class at runtime.
 
     It should be included because it has the 'test' scope.
     """

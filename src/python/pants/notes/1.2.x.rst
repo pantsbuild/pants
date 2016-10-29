@@ -4,6 +4,86 @@
 This document describes releases from the ``1.2.x`` ``stable`` branch.
 
 
+1.2.0rc4 (10/27/2016)
+---------------------
+
+The fifth release candidate for stable 1.2.0, which includes a fix for the ``fmt.isort``
+task and an important correctness fix for golang remote rev pinning. This release candidate
+likely be elevated to the final 1.2.0 release tomorrow, barring any unexpected turbulence.
+
+Bugfixes
+~~~~~~~~
+
+* Change default ./pants fmt.isort <empty> behavior to no-op; Add sources check for isort.
+  `RB #4327 <https://rbcommons.com/s/twitter/r/4327>`_
+
+* Bugfix: when synthesizing remote libraries in Go, pin them to the same rev as adjacent libs.
+  `RB #4325 <https://rbcommons.com/s/twitter/r/4325>`_
+
+1.2.0rc3 (10/20/2016)
+---------------------
+
+The fourth release candidate for stable 1.2.0, which limits the default targets affected
+by scalafmt and includes Benjy's lovely "default source globs" patch.
+
+Bugfixes
+~~~~~~~~
+
+* Fix erroneous deprecated scope warnings.
+  `RB #4323 <https://rbcommons.com/s/twitter/r/4323>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow targets to have sensible defaults for sources=.
+  `RB #4300 <https://rbcommons.com/s/twitter/r/4300>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add a target-types option to scalafmt to avoid formatting all targets
+  `RB #4328 <https://rbcommons.com/s/twitter/r/4328>`_
+
+1.2.0rc2 (10/18/2016)
+---------------------
+
+The third, and perhaps final, release candidate for stable 1.2.0.
+
+Notably: this release candidate restores JDK7 compatibility for junit tests.
+
+API Changes
+~~~~~~~~~~~
+
+* Update junit runner to 1.0.15 to get java 7 compatibility
+  `RB #4324 <https://rbcommons.com/s/twitter/r/4324>`_
+
+* Back down the minimum required java version for running Pants tools to java 7
+  `RB #4314 <https://rbcommons.com/s/twitter/r/4314>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix exclude_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
+  `RB #4321 <https://rbcommons.com/s/twitter/r/4321>`_
+
+* Prevent cleanup error at end of pants test with --test-junit-html-report option, update safe_rmtree to be symlink aware
+  `RB #4319 <https://rbcommons.com/s/twitter/r/4319>`_
+
+* fix --changed-files option
+  `RB #4309 <https://rbcommons.com/s/twitter/r/4309>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Adding scalafmt formatting to fmt goal and enable by default
+  `RB #4312 <https://rbcommons.com/s/twitter/r/4312>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* migrate changed integration tests to isolated temp git repos and add an environment variable to override buildroot
+  `RB #4295 <https://rbcommons.com/s/twitter/r/4295>`_
+
 1.2.0rc1 (10/13/2016)
 ---------------------
 

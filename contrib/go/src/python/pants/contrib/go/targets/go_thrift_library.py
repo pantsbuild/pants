@@ -35,8 +35,6 @@ class GoThriftLibrary(Target):
 
     super(GoThriftLibrary, self).__init__(payload=payload, address=address, **kwargs)
 
-    self.add_labels('codegen')
-
   @classmethod
   def alias(cls):
     return "go_thrift_library"

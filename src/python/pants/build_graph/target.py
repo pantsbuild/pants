@@ -10,7 +10,7 @@ import os
 from hashlib import sha1
 
 from six import string_types
-from twitter.common.collections import OrderedSet
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
@@ -23,7 +23,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import Files, FilesetWithSpec
+from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -75,13 +75,6 @@ class AbstractTarget(object):
   def is_jvm(self):
     """Returns True if the target produces jvm bytecode."""
     return self.has_label('jvm')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_codegen(self):
-    """Returns True if the target is a codegen target."""
-    return self.has_label('codegen')
 
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
@@ -150,13 +143,15 @@ class Target(AbstractTarget):
     :API: public
     """
 
-  class UnknownArguments(Subsystem):
-    """Subsystem for validating unknown keyword arguments."""
+  class Arguments(Subsystem):
+    """Options relating to handling target arguments."""
 
-    class Error(TargetDefinitionException):
-      """Unknown keyword arguments supplied to Target."""
+    class UnknownArgumentError(TargetDefinitionException):
+      """An unknown keyword argument was supplied to Target."""
 
-    options_scope = 'unknown-arguments'
+    options_scope = 'target-arguments'
+    deprecated_options_scope = 'unknown-arguments'
+    deprecated_options_scope_removal_version = '1.4.0'
 
     @classmethod
     def register_options(cls, register):
@@ -164,6 +159,9 @@ class Target(AbstractTarget):
                help='Map of target name to a list of keyword arguments that should be ignored if a '
                     'target receives them unexpectedly. Typically used to allow usage of arguments '
                     'in BUILD files that are not yet available in the current version of pants.')
+      register('--implicit-sources', advanced=True, type=bool,
+               help='If True, Pants will infer the value of the sources argument for certain '
+                    'target types, if they do not have explicit sources specified.')
 
     @classmethod
     def check(cls, target, kwargs):
@@ -186,14 +184,14 @@ class Target(AbstractTarget):
                                             for key, val in ignored_args.items())))
       if unknown_args:
         error_message = '{target_type} received unknown arguments: {args}'
-        raise self.Error(target.address.spec, error_message.format(
+        raise self.UnknownArgumentError(target.address.spec, error_message.format(
           target_type=type(target).__name__,
           args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
         ))
 
   @classmethod
   def subsystems(cls):
-    return super(Target, cls).subsystems() + (cls.UnknownArguments,)
+    return super(Target, cls).subsystems() + (cls.Arguments,)
 
   @classmethod
   def get_addressable_type(target_cls):
@@ -373,7 +371,7 @@ class Target(AbstractTarget):
     if no_cache:
       self.add_labels('no_cache')
     if kwargs:
-      self.UnknownArguments.check(self, kwargs)
+      self.Arguments.check(self, kwargs)
 
   @property
   def scope(self):
@@ -406,11 +404,11 @@ class Target(AbstractTarget):
     """
     return self._tags
 
-  def assert_list(self, maybe_list, expected_type=string_types, key_arg=None):
+  def assert_list(self, putative_list, expected_type=string_types, key_arg=None):
     """
     :API: public
     """
-    return assert_list(maybe_list, expected_type, key_arg=key_arg,
+    return assert_list(putative_list, expected_type, key_arg=key_arg,
                        raise_type=lambda msg: TargetDefinitionException(self, msg))
 
   def compute_invalidation_hash(self, fingerprint_strategy=None):
@@ -737,7 +735,40 @@ class Target(AbstractTarget):
     addr = self.address if hasattr(self, 'address') else 'address not yet set'
     return "{}({})".format(type(self).__name__, addr)
 
-  def create_sources_field(self, sources, sources_rel_path, address=None, key_arg=None):
+  # List of glob patterns, or a single glob pattern.
+  # Subclasses can override, typically to specify a file extension (e.g., '*.java').
+  default_sources_globs = None
+
+  # List of glob patterns, or a single glob pattern.
+  # Subclasses can override, to specify files that should be excluded from the
+  # default_sources_globs (e.g., '*Test.java').
+  default_sources_exclude_globs = None
+
+  @classmethod
+  def supports_default_sources(cls):
+    """Whether this target type can provide default sources if none were specified explicitly."""
+    return cls.default_sources_globs is not None
+
+  @classmethod
+  def default_sources(cls, sources_rel_path):
+    """Provide sources, if they weren't specified explicitly in the BUILD file.
+
+    By default this globs over self.default_sources_globs (e.g., '*.java')
+    but subclasses can override to provide more nuanced default behavior.
+    In this case, the subclasses must also override supports_default_sources().
+    """
+    if cls.default_sources_globs is not None:
+      if cls.default_sources_exclude_globs is not None:
+        exclude = [Globs.create_fileset_with_spec(sources_rel_path,
+                                                  *maybe_list(cls.default_sources_exclude_globs))]
+      else:
+        exclude = []
+      return Globs.create_fileset_with_spec(sources_rel_path,
+                                            *maybe_list(cls.default_sources_globs),
+                                            exclude=exclude)
+    return None
+
+  def create_sources_field(self, sources, sources_rel_path, key_arg=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.
 
     Note that this method is called before the call to Target.__init__ so don't expect fields to
@@ -748,15 +779,22 @@ class Target(AbstractTarget):
     :return: a payload field object representing the sources parameter
     :rtype: SourcesField
     """
-
     if sources is None:
-      sources = FilesetWithSpec.empty(sources_rel_path)
-    elif isinstance(sources, FilesetWithSpec):
-      pass
+      # Make sure we don't apply the defaulting to uses of this method other than for
+      # creating a sources= field (e.g., we also use this for creating resources= fields).
+      # Note that the check for supports_default_sources() precedes the subsystem check.
+      # This is so that tests don't need to set up the subsystem when creating targets that
+      # legitimately do not require sources.
+      if ((key_arg is None or key_arg == 'sources') and
+          self.supports_default_sources() and
+          self.Arguments.global_instance().get_options().implicit_sources):
+        sources = self.default_sources(sources_rel_path)
+      else:
+        sources = FilesetWithSpec.empty(sources_rel_path)
     elif isinstance(sources, (set, list, tuple)):
       # Received a literal sources list: convert to a FilesetWithSpec via Files.
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
-    else:
+    elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
                                             .format(key_arg_section, type(sources)))

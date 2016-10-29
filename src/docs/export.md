@@ -118,7 +118,7 @@ The following is an abbreviated export file from a command in the pants repo:
                 "junit:junit:latest.integration"
             ],
             "platform": "java6",
-            "pants_target_type": "java_tests",
+            "pants_target_type": "junit_tests",
             "globs": {
                 "globs": [
                     "examples/tests/java/org/pantsbuild/example/usethrift/UseThriftTest.java"

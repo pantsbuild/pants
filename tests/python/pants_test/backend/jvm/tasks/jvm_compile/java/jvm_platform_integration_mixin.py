@@ -103,11 +103,11 @@ class JvmPlatformIntegrationMixin(object):
   def test_compile_target_coercion(self):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/targetlevels/unspecified'
     self.assert_class_versions({
-      'org/pantsbuild/testproject/targetlevels/unspecified/Unspecified.class': '1.7',
-      'org/pantsbuild/testproject/targetlevels/unspecified/Six.class': '1.6',
+      'org/pantsbuild/testproject/targetlevels/unspecified/Unspecified.class': '1.8',
+      'org/pantsbuild/testproject/targetlevels/unspecified/Seven.class': '1.7',
     }, self._get_compiled_class_versions(target_spec, more_args=[
       '--jvm-platform-validate-check=warn',
-      '--jvm-platform-default-platform=java7',
+      '--jvm-platform-default-platform=java8',
     ]))
 
   def _test_compile(self, target_level, class_name, source_contents, platform_args=None):

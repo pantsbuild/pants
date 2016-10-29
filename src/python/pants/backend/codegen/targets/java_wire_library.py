@@ -68,4 +68,3 @@ class JavaWireLibrary(ExportableJvmLibrary):
     })
 
     super(JavaWireLibrary, self).__init__(payload=payload, **kwargs)
-    self.add_labels('codegen')

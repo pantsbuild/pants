@@ -16,7 +16,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.coverage.base import Coverage
@@ -140,7 +140,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
     register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
     register('--default-concurrency', advanced=True,
-             choices=junit_tests.VALID_CONCURRENCY_OPTS, default=junit_tests.CONCURRENCY_SERIAL,
+             choices=JUnitTests.VALID_CONCURRENCY_OPTS, default=JUnitTests.CONCURRENCY_SERIAL,
              help='Set the default concurrency mode for running tests not annotated with'
                   ' @TestParallel or @TestSerial.')
     register('--parallel-threads', advanced=True, type=int, default=0,
@@ -232,13 +232,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.per_test_timer:
       args.append('-per-test-timer')
 
-    if options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
+    if options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
       if not options.use_experimental_runner:
         self.context.log.warn('--default-concurrency=PARALLEL_CLASSES_AND_METHODS is '
                               'experimental, use --use-experimental-runner.')
       args.append('-default-concurrency')
       args.append('PARALLEL_CLASSES_AND_METHODS')
-    elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
+    elif options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
       if not options.use_experimental_runner:
         self.context.log.warn('--default-concurrency=PARALLEL_METHODS is experimental, use '
                               '--use-experimental-runner.')
@@ -249,10 +249,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                               'run classes in parallel too.')
       args.append('-default-concurrency')
       args.append('PARALLEL_METHODS')
-    elif options.default_concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
+    elif options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES:
       args.append('-default-concurrency')
       args.append('PARALLEL_CLASSES')
-    elif options.default_concurrency == junit_tests.CONCURRENCY_SERIAL:
+    elif options.default_concurrency == JUnitTests.CONCURRENCY_SERIAL:
       args.append('-default-concurrency')
       args.append('SERIAL')
 
@@ -390,13 +390,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
         if concurrency is not None:
           args = remove_arg(args, '-default-parallel')
-          if concurrency == junit_tests.CONCURRENCY_SERIAL:
+          if concurrency == JUnitTests.CONCURRENCY_SERIAL:
             args = ensure_arg(args, '-default-concurrency', param='SERIAL')
-          elif concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES:
+          elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES:
             args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES')
-          elif concurrency == junit_tests.CONCURRENCY_PARALLEL_METHODS:
+          elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
             args = ensure_arg(args, '-default-concurrency', param='PARALLEL_METHODS')
-          elif concurrency == junit_tests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
+          elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
             args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES_AND_METHODS')
 
         if threads is not None:
@@ -434,7 +434,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                                .format(path=parse_error.junit_xml_path, cause=parse_error.cause))
 
       target_to_failed_test = parse_failed_targets(test_registry, output_dir, error_handler)
-      failed_targets = sorted(target_to_failed_test, key=lambda target: target.address.spec)
+      failed_targets = sorted(target_to_failed_test, key=lambda t: t.address.spec)
       error_message_lines = []
       if self._failure_summary:
         for target in failed_targets:
@@ -478,20 +478,20 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   def _test_target_filter(self):
     def target_filter(target):
-      return isinstance(target, junit_tests)
+      return isinstance(target, JUnitTests)
     return target_filter
 
   def _validate_target(self, target):
     # TODO: move this check to an optional phase in goal_runner, so
     # that missing sources can be detected early.
     if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
-      msg = 'JavaTests target must include a non-empty set of sources.'
+      msg = 'JUnitTests target must include a non-empty set of sources.'
       raise TargetDefinitionException(target, msg)
 
   def _execute(self, all_targets):
-    # NB: We only run tests within java_tests/junit_tests targets, but if coverage options are
-    # specified, we want to instrument and report on all the original targets, not just the test
-    # targets.
+    # NB: We only run tests within junit_tests targets, but if coverage options are
+    # specified, we want to instrument and report on all the original targets, not
+    # just the test targets.
 
     test_registry = self._collect_test_targets(self._get_test_targets())
     if test_registry.empty:

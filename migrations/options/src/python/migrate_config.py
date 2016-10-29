@@ -18,6 +18,8 @@ migrations = {
   # E.g.:
   #('backends', 'packages'): ('DEFAULT', 'backend_packages'),
   #('unknown-arguments', 'ignored'): None,
+
+  ('unknown-arguments', 'ignored'): ('target-arguments', 'ignored'),
 }
 
 

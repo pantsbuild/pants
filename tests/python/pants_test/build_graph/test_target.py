@@ -14,6 +14,15 @@ from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
+class TestImplicitSourcesTarget(Target):
+  default_sources_globs = '*.foo'
+
+
+class TestImplicitSourcesTargetMulti(Target):
+  default_sources_globs = ('*.foo', '*.bar')
+  default_sources_exclude_globs = ('*.baz', '*.qux')
+
+
 class TargetTest(BaseTest):
 
   def test_derived_from_chain(self):
@@ -49,15 +58,15 @@ class TargetTest(BaseTest):
     self.assertSequenceEqual([], list(target.traversable_dependency_specs))
 
   def test_illegal_kwargs(self):
-    init_subsystem(Target.UnknownArguments)
-    with self.assertRaises(Target.UnknownArguments.Error) as cm:
+    init_subsystem(Target.Arguments)
+    with self.assertRaises(Target.Arguments.UnknownArgumentError) as cm:
       self.make_target('foo:bar', Target, foobar='barfoo')
     self.assertTrue('foobar = barfoo' in str(cm.exception))
     self.assertTrue('foo:bar' in str(cm.exception))
 
   def test_unknown_kwargs(self):
-    options = {Target.UnknownArguments.options_scope: {'ignored': {'Target': ['foobar']}}}
-    init_subsystem(Target.UnknownArguments, options)
+    options = {Target.Arguments.options_scope: {'ignored': {'Target': ['foobar']}}}
+    init_subsystem(Target.Arguments, options)
     target = self.make_target('foo:bar', Target, foobar='barfoo')
     self.assertFalse(hasattr(target, 'foobar'))
 
@@ -81,6 +90,35 @@ class TargetTest(BaseTest):
     short_id = short_target.id
     self.assertEqual(short_id,
                      'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.foo')
+
+  def test_implicit_sources(self):
+    options = {Target.Arguments.options_scope: {'implicit_sources': True}}
+    init_subsystem(Target.Arguments, options)
+    target = self.make_target(':a', TestImplicitSourcesTarget)
+    # Note explicit key_arg.
+    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar',
+                                          key_arg='sources')
+    self.assertEqual(sources.filespec, {'globs': ['src/foo/bar/*.foo']})
+
+    target = self.make_target(':b', TestImplicitSourcesTargetMulti)
+    # Note no explicit key_arg, which should behave just like key_arg='sources'.
+    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
+    self.assertEqual(sources.filespec, {
+      'globs': ['src/foo/bar/*.foo', 'src/foo/bar/*.bar'],
+      'exclude': [{'globs': ['src/foo/bar/*.baz', 'src/foo/bar/*.qux']}],
+    })
+
+    # Ensure that we don't use implicit sources when creating resources fields.
+    resources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar',
+                                            key_arg='resources')
+    self.assertEqual(resources.filespec, {'globs': []})
+
+  def test_implicit_sources_disabled(self):
+    options = {Target.Arguments.options_scope: {'implicit_sources': False}}
+    init_subsystem(Target.Arguments, options)
+    target = self.make_target(':a', TestImplicitSourcesTarget)
+    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
+    self.assertEqual(sources.filespec, {'globs': []})
 
   def test_create_sources_field_with_string_fails(self):
     target = self.make_target(':a-target', Target)

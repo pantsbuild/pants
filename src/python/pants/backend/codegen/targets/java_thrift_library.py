@@ -40,11 +40,7 @@ class JavaThriftLibrary(JvmTarget):
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
     :param thrift_linter_strict: If True, fail if thrift linter produces any warnings.
     """
-
     super(JavaThriftLibrary, self).__init__(**kwargs)
-
-    # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-    self.add_labels('codegen')
 
     def check_value_for_arg(arg, value, values):
       if value and value not in values:
