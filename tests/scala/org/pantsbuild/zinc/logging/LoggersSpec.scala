@@ -8,7 +8,8 @@ import java.io.{ File, PrintWriter, StringWriter }
 import com.google.common.base.Charsets
 import com.google.common.io.Files
 
-import sbt.{ ConsoleOut, Level }
+import sbt.util.Level
+import sbt.internal.util.ConsoleOut
 
 import org.junit.runner.RunWith
 import org.scalatest.WordSpec
