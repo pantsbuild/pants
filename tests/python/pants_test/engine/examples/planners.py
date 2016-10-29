@@ -26,7 +26,6 @@ from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, S
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants_test.engine.examples.graph_validator import GraphValidator
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.sources import Sources
 
@@ -512,5 +511,4 @@ def setup_json_scheduler(build_root, native, inline_nodes=True):
                         project_tree,
                         native,
                         graph_lock=None,
-                        inline_nodes=inline_nodes,
-                        graph_validator=GraphValidator(symbol_table_cls))
+                        inline_nodes=inline_nodes)

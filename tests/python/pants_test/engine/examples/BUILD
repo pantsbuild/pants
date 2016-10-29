@@ -22,7 +22,6 @@ python_library(
   name='planners',
   sources=['planners.py'],
   dependencies=[
-    ':graph_validator',
     ':parsers',
     ':sources',
     'src/python/pants/base:exceptions',
@@ -37,14 +36,6 @@ python_library(
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:storage',
     'src/python/pants/engine:struct',
-  ]
-)
-
-python_library(
-  name='graph_validator',
-  sources=['graph_validator.py'],
-  dependencies=[
-    'src/python/pants/engine:nodes',
   ]
 )
 

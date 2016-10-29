@@ -76,8 +76,7 @@ class LocalScheduler(object):
                storage,
                project_tree,
                native,
-               graph_lock=None,
-               graph_validator=None):
+               graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
@@ -87,8 +86,6 @@ class LocalScheduler(object):
     :param native: An instance of engine.subsystem.native.Native.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
                        instance. Defaults to creating a new threading.RLock().
-    :param graph_validator: A validator that runs over the entire graph after every scheduling
-                            attempt. Very expensive, very experimental.
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
