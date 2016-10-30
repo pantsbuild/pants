@@ -10,10 +10,9 @@ import unittest
 
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import (Binary, Snapshot, SnapshottedProcessRequest,
-                                           _snapshot_path)
-from pants.engine.nodes import Return, StepContext, Throw
-from pants.engine.rules import SnapshottedProcess
+from pants.engine.isolated_process import (Binary, Snapshot, SnapshottedProcess,
+                                           SnapshottedProcessRequest, _snapshot_path)
+from pants.engine.nodes import Return, Throw
 from pants.engine.selectors import Select, SelectLiteral
 from pants.util.contextutil import open_tar
 from pants.util.objects import datatype
@@ -115,7 +114,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
   def test_gather_snapshot_of_pathglobs(self):
     project_tree = self.mk_example_fs_tree()
     scheduler = self.mk_scheduler(project_tree=project_tree)
-    empty_step_context = StepContext(node_builder=None, project_tree=project_tree, node_states=[], inline_nodes=False)
+    snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
 
     request = scheduler.execution_request([Snapshot],
                                           [PathGlobs.create('', globs=['fs_test/a/b/*'])])
@@ -126,16 +125,16 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
     snapshot = state.value
     self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], snapshot,
-                              empty_step_context)
+                              snapshot_archive_root)
 
   def test_integration_concat_with_snapshot_subjects_test(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.
-      SnapshottedProcess(product_type=Concatted,
-                         binary_type=ShellCatToOutFile,
-                         input_selectors=(Select(Files),),
-                         input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
-                         output_conversion=process_result_to_concatted_from_outfile),
+      SnapshottedProcess.create(product_type=Concatted,
+                                binary_type=ShellCatToOutFile,
+                                input_selectors=(Select(Files),),
+                                input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
+                                output_conversion=process_result_to_concatted_from_outfile),
       [ShellCatToOutFile, [], ShellCatToOutFile]
     ])
 
@@ -154,11 +153,11 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     sources = PathGlobs.create('', files=['scheduler_inputs/src/java/simple/Simple.java'])
 
     scheduler = self.mk_scheduler_in_example_fs([
-      SnapshottedProcess(ClasspathEntry,
-                         Javac,
-                         (Select(Files), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
-                         java_sources_to_javac_args,
-                         process_result_to_classpath_entry),
+      SnapshottedProcess.create(ClasspathEntry,
+                                Javac,
+                                (Select(Files), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
+                                java_sources_to_javac_args,
+                                process_result_to_classpath_entry),
       [Javac, [], Javac]
     ])
 
@@ -177,11 +176,11 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
   def test_failed_command_propagates_throw(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.
-      SnapshottedProcess(product_type=Concatted,
-                         binary_type=ShellFailCommand,
-                         input_selectors=tuple(),
-                         input_conversion=empty_process_request,
-                         output_conversion=fail_process_result),
+      SnapshottedProcess.create(product_type=Concatted,
+                                binary_type=ShellFailCommand,
+                                input_selectors=tuple(),
+                                input_conversion=empty_process_request,
+                                output_conversion=fail_process_result),
       [ShellFailCommand, [], ShellFailCommand]
     ])
 
@@ -197,11 +196,11 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
   def test_failed_output_conversion_propagates_throw(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.
-      SnapshottedProcess(product_type=Concatted,
-                         binary_type=ShellCatToOutFile,
-                         input_selectors=(Select(Files),),
-                         input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
-                         output_conversion=fail_process_result),
+      SnapshottedProcess.create(product_type=Concatted,
+                                binary_type=ShellCatToOutFile,
+                                input_selectors=(Select(Files),),
+                                input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
+                                output_conversion=fail_process_result),
       [ShellCatToOutFile, [], ShellCatToOutFile]
     ])
 
@@ -214,8 +213,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Failed in output conversion!')
 
-  def assert_archive_files(self, expected_archive_files, snapshot, step_context):
-    with open_tar(_snapshot_path(snapshot, step_context.snapshot_archive_root), errorlevel=1) as tar:
+  def assert_archive_files(self, expected_archive_files, snapshot, snapshot_archive_root):
+    with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
       self.assertEqual(sorted(expected_archive_files), sorted(tar.getnames()))
 
   def assertFirstEntryIsReturn(self, root_entries, scheduler):
