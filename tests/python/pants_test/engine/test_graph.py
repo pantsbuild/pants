@@ -10,8 +10,6 @@ import unittest
 
 from pants.engine.graph import CompletedNodeException, Graph, IncompleteDependencyException
 from pants.engine.nodes import Return, Waiting
-from pants.engine.subsystem.native import Native
-from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 # TODO: Expand test coverage here.

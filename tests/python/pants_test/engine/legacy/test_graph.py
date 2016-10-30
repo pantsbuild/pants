@@ -18,7 +18,6 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.engine.subsystem.native import Native
-from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 # Macro that adds the specified tag.
@@ -57,8 +56,10 @@ def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=
   """
   path_ignore_patterns = path_ignore_patterns or ['.*']
   target_roots = TargetRoots.create(options=options)
+  native = Native.Factory.global_instance().create()
   graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
-                                                      symbol_table_cls=symbol_table_cls)
+                                                      symbol_table_cls=symbol_table_cls,
+                                                      native=native)
   try:
     graph = graph_helper.create_build_graph(target_roots)[0]
     addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
@@ -76,12 +77,9 @@ class GraphInvalidationTest(unittest.TestCase):
 
   @contextmanager
   def open_scheduler(self, specs, symbol_table_cls=None):
-    with subsystem_instance(Native.Factory) as native_factory:
-      kwargs = self._make_setup_args(specs,
-                                     native=native_factory.create(),
-                                     symbol_table_cls=symbol_table_cls)
-      with open_legacy_graph(**kwargs) as triple:
-        yield triple
+    kwargs = self._make_setup_args(specs, symbol_table_cls=symbol_table_cls)
+    with open_legacy_graph(**kwargs) as triple:
+      yield triple
 
   def test_invalidate_fsnode(self):
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):
@@ -94,17 +92,17 @@ class GraphInvalidationTest(unittest.TestCase):
 
   def test_invalidate_fsnode_incremental(self):
     with self.open_scheduler(['//:', '3rdparty/::']) as (graph, _, _):
-      node_count = len(scheduler.product_graph)
+      node_count = len(graph)
       self.assertGreater(node_count, 0)
 
       # Invalidate the '3rdparty/python' DirectoryListing, the `3rdparty` DirectoryListing,
       # and then the root DirectoryListing by "touching" files/dirs.
       for filename in ('3rdparty/python/BUILD', '3rdparty/python', 'non_existing_file'):
-        invalidated_count = scheduler.product_graph.invalidate_files([filename])
+        invalidated_count = graph.invalidate_files([filename])
         self.assertGreater(invalidated_count,
                            0,
                            'File {} did not invalidate any Nodes.'.format(filename))
-        node_count, last_node_count = len(scheduler.product_graph), node_count
+        node_count, last_node_count = len(graph), node_count
         self.assertLess(node_count, last_node_count)
 
   def test_sources_ordering(self):
