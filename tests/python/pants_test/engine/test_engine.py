@@ -11,8 +11,8 @@ from contextlib import closing, contextmanager
 
 from pants.build_graph.address import Address
 from pants.engine.engine import (ExecutionError, LocalMultiprocessEngine, LocalSerialEngine,
-                                 SerializationError, ThreadHybridEngine)
-from pants.engine.nodes import FilesystemNode, Return, SelectNode, Throw
+                                 SerializationError)
+from pants.engine.nodes import Return, Throw
 from pants.engine.selectors import Select
 from pants.engine.storage import Cache, Storage
 from pants.engine.subsystem.native import Native
@@ -52,16 +52,6 @@ class EngineTest(unittest.TestCase):
                                          pool_size=pool_size, debug=True)) as e:
       yield e
 
-  @contextmanager
-  def hybrid_engine(self, pool_size=None):
-    async_nodes = (FilesystemNode,)
-    storage = Storage.create(in_memory=True)
-    cache = Cache.create(storage=storage)
-    with closing(ThreadHybridEngine(self.scheduler, storage,
-                                    threaded_node_types=async_nodes, cache=cache,
-                                    pool_size=pool_size, debug=True)) as e:
-      yield e
-
   def test_serial_engine_simple(self):
     with self.serial_engine() as engine:
       self.assert_engine(engine)
@@ -85,14 +75,6 @@ class EngineTest(unittest.TestCase):
       root_product = result.root_products.values()[0]
       self.assertEquals(Throw, type(root_product))
       self.assertEquals(SerializationError, type(root_product.exc))
-
-  def test_hybrid_engine_multi(self):
-    with self.hybrid_engine(pool_size=2) as engine:
-      self.assert_engine(engine)
-
-  def test_hybrid_engine_single(self):
-    with self.hybrid_engine(pool_size=2) as engine:
-      self.assert_engine(engine)
 
   def test_rerun_with_cache(self):
     with self.multiprocessing_engine() as engine:

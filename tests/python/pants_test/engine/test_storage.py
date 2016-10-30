@@ -9,7 +9,7 @@ import unittest
 from contextlib import closing
 
 from pants.base.project_tree import Dir, File
-from pants.engine.nodes import Noop, Return, Runnable, TaskNode, Throw, Waiting
+from pants.engine.nodes import Return, Runnable, TaskNode, Throw, Waiting
 from pants.engine.storage import Cache, InvalidKeyError, Lmdb, Storage
 
 
@@ -74,7 +74,6 @@ class StorageTest(unittest.TestCase):
         Throw(PickleableException()),
         Waiting([TaskNode(None, None, None)]),
         Runnable(_runnable, ('an arg',)),
-        Noop('nada {}', ('op',))
       ]
     with closing(self.storage) as storage:
       for state in states:

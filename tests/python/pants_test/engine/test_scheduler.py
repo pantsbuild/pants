@@ -12,8 +12,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
-                                Throw)
+from pants.engine.nodes import Return, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectVariant
 from pants.engine.subsystem.native import Native
 from pants.util.contextutil import temporary_dir
@@ -222,7 +221,7 @@ class SchedulerTest(unittest.TestCase):
     # Validate that the root failed.
     self.assert_root_failed(walk,
                             SelectNode(self.java_multi, None, Select(Classpath)),
-                            ConflictingProducersError)
+                            "TODO: string match for ConflictingProducers failure.")
 
   def test_descendant_specs(self):
     """Test that Addresses are produced via recursive globs of the 3rdparty/jvm directory."""

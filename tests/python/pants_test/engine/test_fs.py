@@ -14,7 +14,6 @@ from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
 from pants.engine.fs import (DirectoryListing, Dirs, Files, FilesContent, FilesDigest, PathGlobs,
                              ReadLink)
-from pants.engine.nodes import FilesystemNode
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version, initialize_repo
@@ -63,7 +62,7 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
       # Validate that FilesystemNodes for exactly the given subjects are reachable under this
       # request.
       fs_nodes = [n for n, _ in scheduler.product_graph.walk(roots=request.roots)
-                  if type(n) is FilesystemNode]
+                  if type(n) is "TODO: need a new way to filter for FS intrinsics"]
       self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
 
   def test_walk_literal(self):
