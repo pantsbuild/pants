@@ -208,12 +208,3 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
-
-python_tests(
-  name='graph_validator',
-  sources=['test_graph_validator.py'],
-  coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
-  dependencies=[
-    ':scheduler',
-  ]
-)

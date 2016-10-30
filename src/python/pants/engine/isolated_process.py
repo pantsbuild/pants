@@ -14,8 +14,7 @@ from abc import abstractproperty
 from hashlib import sha1
 
 from pants.engine.fs import Files
-from pants.engine.nodes import Return, Runnable, State, Throw
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
@@ -51,16 +50,14 @@ def _fingerprint_files_in_tar(file_list, tar_location):
 
 
 def _snapshot_path(snapshot, archive_root):
-  # TODO Consider naming snapshot archive based also on the subject and not just the fingerprint of the contained files.
   safe_mkdir(archive_root)
   tar_location = os.path.join(archive_root, '{}.tar'.format(snapshot.fingerprint))
   return tar_location
 
 
-def _extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir, subject):
+def _extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir):
   with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
     tar.extractall(sandbox_dir)
-  logger.debug('extracted {} snapshot to {}'.format(subject, sandbox_dir))
 
 
 def _run_command(binary, sandbox_dir, process_request):
@@ -77,28 +74,37 @@ def _run_command(binary, sandbox_dir, process_request):
   return popen
 
 
-def _execute(process):
-  process_request = process.request
+def _snapshotted_process(input_conversion,
+                         output_conversion,
+                         snapshot_archive_root,
+                         binary,
+                         *args):
+  """A pickleable top-level function to execute a process.
+
+  Receives two conversion functions, some required inputs, and the user-declared inputs.
+  """
+
+  process_request = input_conversion(*args)
+
   # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
   with temporary_dir(cleanup=False) as sandbox_dir:
-    if process_request.snapshot_subjects:
-      snapshots_and_subjects = zip(process.snapshot_subjects_values, process_request.snapshot_subjects)
-      for snapshot, subject in snapshots_and_subjects:
-        _extract_snapshot(process.snapshot_archive_root, snapshot, sandbox_dir, subject)
+    if process_request.snapshots:
+      for snapshot in process_request.snapshots:
+        _extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir)
 
     # All of the snapshots have been checked out now.
     if process_request.directories_to_create:
       for d in process_request.directories_to_create:
         safe_mkdir(os.path.join(sandbox_dir, d))
 
-    popen = _run_command(process.binary, sandbox_dir, process_request)
+    popen = _run_command(binary, sandbox_dir, process_request)
 
     process_result = SnapshottedProcessResult(popen.stdout.read(), popen.stderr.read(), popen.returncode)
     if process_result.exit_code != 0:
-      raise Exception('Running {} failed with non-zero exit code: {}'.format(process.binary,
+      raise Exception('Running {} failed with non-zero exit code: {}'.format(binary,
                                                                              process_result.exit_code))
 
-    return process.output_conversion(process_result, sandbox_dir)
+    return output_conversion(process_result, sandbox_dir)
 
 
 class Snapshot(datatype('Snapshot', ['fingerprint'])):
@@ -124,7 +130,7 @@ class Binary(object):
 
 
 class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
-                                         ['args', 'snapshot_subjects', 'directories_to_create'])):
+                                         ['args', 'snapshots', 'directories_to_create'])):
   """Request for execution with binary args and snapshots to extract."""
 
   def __new__(cls, args, snapshot_subjects=tuple(), directories_to_create=tuple(), **kwargs):
@@ -147,87 +153,34 @@ class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', '
   """Contains the stdout, stderr and exit code from executing a process."""
 
 
-class _Process(datatype('_Process', ['snapshot_archive_root',
-                                     'request',
-                                     'binary',
-                                     'snapshot_subjects_values',
-                                     'output_conversion'])):
-  """All (pickleable) arguments for the execution of a sandboxed process."""
+class _SnapshotDirectory(object):
+  """TODO: Needs to be provided intrinsically somewhere."""
 
 
-# TODO: port to native Engine.
-class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'snapshotted_process'])):
-  """Wraps a process execution, preparing and tearing down the execution environment."""
+class SnapshottedProcess(object):
+  """A static helper for defining a task rule to execute a snapshotted process."""
 
-  is_cacheable = True
-  is_inlineable = False
+  def __new__(cls, *args):
+    raise ValueError('Use `create` to declare a task function representing a process.')
 
-  @property
-  def product(self):
-    return self.snapshotted_process.product_type
+  @staticmethod
+  def create(product_type, binary_type, input_selectors, input_conversion, output_conversion):
+    """TODO: Not clear that `binary_type` needs to be separate from the input selectors."""
 
-  def step(self, step_context):
-    waiting_nodes = []
-    # Get the binary.
-    binary_state = step_context.select_for(Select(self.snapshotted_process.binary_type),
-                                           subject=self.subject,
-                                           variants=self.variants)
-    if type(binary_state) is Throw:
-      return binary_state
-    elif type(binary_state) is Waiting:
-      waiting_nodes.extend(binary_state.dependencies)
-    elif type(binary_state) is Noop:
-      return Noop("Couldn't find binary: {}".format(binary_state))
-    elif type(binary_state) is not Return:
-      State.raise_unrecognized(binary_state)
+    # Select the concatenation of the snapshot directory, binary, and input selectors.
+    inputs = [Select(_SnapshotDirectory), Select(binary_type)] + input_selectors
 
-    # Create the request from the request callback after resolving its input clauses.
-    input_values = []
-    for input_selector in self.snapshotted_process.input_selectors:
-      sn_state = step_context.select_for(input_selector, self.subject, self.variants)
-      if type(sn_state) is Waiting:
-        waiting_nodes.extend(sn_state.dependencies)
-      elif type(sn_state) is Return:
-        input_values.append(sn_state.value)
-      elif type(sn_state) is Noop:
-        if input_selector.optional:
-          input_values.append(None)
-        else:
-          return Noop('Was missing value for (at least) input {}'.format(input_selector))
-      elif type(sn_state) is Throw:
-        return sn_state
-      else:
-        State.raise_unrecognized(sn_state)
+    # Apply the input/output conversions to a top-level process-execution function which
+    # will receive all inputs, convert in, execute, and convert out.
+    func = functools.partial(_snapshotted_process,
+                             input_conversion,
+                             output_conversion)
+    func.__name__ = '{}_and_then_snapshotted_process_and_then_{}'.format(
+        input_conversion.__name__, output_conversion.__name__
+      )
 
-    if waiting_nodes:
-      return Waiting(waiting_nodes)
-
-    # Now that we've returned on waiting, we can assume that relevant inputs have values.
-    try:
-      process_request = self.snapshotted_process.input_conversion(*input_values)
-    except Exception as e:
-      return Throw(e)
-
-    # Request snapshots for the snapshot_subjects from the process request.
-    snapshot_subjects_value = []
-    if process_request.snapshot_subjects:
-      snapshot_subjects_state = step_context.select_for(SelectDependencies(Snapshot,
-                                                                           SnapshottedProcessRequest,
-                                                                           'snapshot_subjects',
-                                                                           field_types=(Files,)),
-                                                        process_request,
-                                                        self.variants)
-      if type(snapshot_subjects_state) is not Return:
-        return snapshot_subjects_state
-      snapshot_subjects_value = snapshot_subjects_state.value
-
-    # Ready to run.
-    execution = _Process(step_context.snapshot_archive_root,
-                         process_request,
-                         binary_state.value,
-                         snapshot_subjects_value,
-                         self.snapshotted_process.output_conversion)
-    return Runnable(_execute, (execution,))
+    # Return a task triple that executes the function to produce the product type.
+    return (product_type, inputs, func)
 
 
 def create_snapshot_intrinsics(project_tree):

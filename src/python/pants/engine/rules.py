@@ -13,7 +13,6 @@ from textwrap import dedent
 from twitter.common.collections import OrderedSet
 
 from pants.engine.addressable import Exactly
-from pants.engine.isolated_process import ProcessExecutionNode
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, type_or_constraint_repr)
 from pants.util.meta import AbstractClass
@@ -108,22 +107,6 @@ class RulesetValidator(object):
         # also available.
         raise ValueError(
           'no task for product used by goal "{}": {}'.format(goal, goal_product.__name__))
-
-
-class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
-                                                         'binary_type',
-                                                         'input_selectors',
-                                                         'input_conversion',
-                                                         'output_conversion']),
-                         Rule):
-  """A rule type for defining execution of snapshotted processes."""
-
-  def as_node(self, subject, variants):
-    return ProcessExecutionNode(subject, variants, self)
-
-  @property
-  def output_product_type(self):
-    return self.product_type
 
 
 class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', 'func']), Rule):
