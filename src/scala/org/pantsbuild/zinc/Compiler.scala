@@ -19,12 +19,8 @@ import sbt.internal.inc.{
 import sbt.io.Path
 import sbt.io.syntax._
 import sbt.util.Logger
-import sbt.internal.inc.LoggerReporter
 import xsbti.compile.{
-  ClasspathOptions,
-  CompileOptions,
   GlobalsCache,
-  IncrementalCompiler,
   JavaCompiler,
   ScalaInstance => XScalaInstance
 }
