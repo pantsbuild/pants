@@ -11,7 +11,7 @@ from collections import defaultdict
 
 from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
-from pants.engine.legacy.graph import HydratedTarget
+from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.legacy.source_mapper import EngineSourceMapper, resolve_and_parse_specs
 from pants.scm.change_calculator import ChangeCalculator
 
@@ -26,16 +26,16 @@ class _HydratedTargetDependentGraph(object):
   def from_iterable(cls, iterable):
     """Create a new HydratedTargetDependentGraph from an iterable of HydratedTarget instances."""
     inst = cls()
-    for legacy_target in iterable:
-      inst.inject_target(legacy_target)
+    for hydrated_target in iterable:
+      inst.inject_target(hydrated_target)
     return inst
 
   def __init__(self):
     self._dependent_address_map = defaultdict(set)
 
-  def _resources_addresses(self, legacy_target):
+  def _resources_addresses(self, hydrated_target):
     """Yields fully qualified string addresses of resources for a given `HydratedTarget`."""
-    kwargs = legacy_target.adaptor.kwargs()
+    kwargs = hydrated_target.adaptor.kwargs()
 
     # TODO: Figure out a better way to filter these.
     # Python targets `resources` are lists of files, not addresses - short circuit for them.
@@ -46,15 +46,15 @@ class _HydratedTargetDependentGraph(object):
     if not resource_specs:
       return
 
-    parsed_resource_specs = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
+    parsed_resource_specs = resolve_and_parse_specs(hydrated_target.adaptor.address.spec_path,
                                                     resource_specs)
     for spec in parsed_resource_specs:
       yield Address.parse(spec.to_spec_string())
 
-  def inject_target(self, legacy_target):
+  def inject_target(self, hydrated_target):
     """Inject a target, respecting both its direct dependencies and its resources targets."""
-    for dep in itertools.chain(legacy_target.dependencies, self._resources_addresses(legacy_target)):
-      self._dependent_address_map[dep].add(legacy_target.adaptor.address)
+    for dep in itertools.chain(hydrated_target.dependencies, self._resources_addresses(hydrated_target)):
+      self._dependent_address_map[dep].add(hydrated_target.adaptor.address)
 
   def dependents_of_addresses(self, addresses):
     """Given an iterable of addresses, yield all of those addresses dependents."""
@@ -112,7 +112,9 @@ class EngineChangeCalculator(ChangeCalculator):
       return
 
     # For dependee finding, we need to parse all build files.
-    product_iter = self._engine.product_request(HydratedTarget, [DescendantAddresses('')])
+    product_iter = (t
+                    for targets in self._engine.product_request(HydratedTargets, [DescendantAddresses('')])
+                    for t in targets.dependencies)
     graph = _HydratedTargetDependentGraph.from_iterable(product_iter)
 
     if changed_request.include_dependees == 'direct':
