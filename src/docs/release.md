@@ -90,9 +90,10 @@ the release manager may also need to do a release from a stable branch.*
     2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week (can use
        `build-support/bin/release-changelog-helper.sh` to get a head start).
     3. If this release is also a release candidate then:
-         * Update the corresponding notes file for that release. <br/>
+         * Create the corresponding notes file for that release, initialized with notes for all
+           `dev` releases in the series. <br/>
            _For example if you were releasing `1.2.0rc0` you would need to
-           create `src/python/pants/notes/1.2.x.rst`._
+           create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0devX` release notes._
          * Add the file to pants.ini in the branch_notes section.
          * Add the new notes file to `src/docs/docsite.json`.
          * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
