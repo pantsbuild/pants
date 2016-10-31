@@ -193,7 +193,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.11', '0.0.1-test-201610270000'),
+                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.1-test-201610270000'),
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=shader_rules)
@@ -201,7 +201,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'compiler-bridge',
                           classpath=[
-                            sbt_jar(name='compiler-bridge_2.11',
+                            sbt_jar(name='compiler-bridge_2.10',
                                     classifier='sources',
                                     intransitive=True)
                           ])
