@@ -47,7 +47,7 @@ class Parser(object):
   class FromfileError(ParseError):
     """Indicates a problem reading a value @fromfile."""
 
-  class MutuallyExclusiveOptionError(Exception):
+  class MutuallyExclusiveOptionError(ParseError):
     """Raised when more than one option belonging to the same mutually exclusive group is specified."""
 
   @staticmethod
