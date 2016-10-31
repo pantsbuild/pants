@@ -5,14 +5,16 @@ package org.pantsbuild.tools.junit.impl;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Arrays;
 import org.junit.Ignore;
 import org.junit.runner.Description;
 import org.junit.runner.RunWith;
 import org.junit.runner.notification.Failure;
+import org.pantsbuild.tools.junit.withretry.ScalaTestUtil;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 
 /**
  * Utilities for working with junit test runs.
@@ -148,6 +150,9 @@ final class Util {
     return clazz.isAnnotationPresent(RunWith.class);
   }
 
+  /**
+   * Support classes using scala test.
+   */
   public static boolean isTestClass(final Class<?> clazz) {
     // Must be a public concrete class to be a runnable junit Test.
     if (clazz.isInterface()
@@ -167,6 +172,10 @@ final class Util {
 
     // Support classes using junit 4.x custom runners.
     if (isUsingCustomRunner(clazz)) {
+      return true;
+    }
+
+    if (ScalaTestUtil.isScalaTestTest(clazz)) {
       return true;
     }
 
