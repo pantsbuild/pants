@@ -54,8 +54,6 @@ class CacheSetup(Subsystem):
              help='Read build artifacts from cache, if available.')
     register('--write', type=bool, default=True,
              help='Write build artifacts to cache, if available.')
-    register('--tarball-dereference', type=bool, default=True,
-             help='Use dereference flag to create cache tarball.')
     register('--overwrite', advanced=True, type=bool,
              help='If writing build artifacts to cache, overwrite existing artifacts '
                   'instead of skipping them.')
@@ -76,6 +74,8 @@ class CacheSetup(Subsystem):
                   'the resolver. When resolver is \'none\' list is used as is.')
     register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
+    register('--tarball-dereference', type=bool, default=True,
+             help='Use dereference flag to create cache tarball.')
     register('--max-entries-per-target', advanced=True, type=int, default=8,
              help='Maximum number of old cache files to keep per task target pair')
     register('--pinger-timeout', advanced=True, type=float, default=0.5,

@@ -15,7 +15,6 @@ from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_open
 from pants_test.tasks.task_test_base import TaskTestBase
 
-
 SYMLINK_NAME = 'link'
 DUMMY_FILE_NAME = 'dummy'
 DUMMY_FILE_CONTENT = 'dummy_content'
@@ -85,8 +84,17 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
     )
 
   def _prepare_task(self, deference, regular_file, regular_file_in_results_dir):
+    """
+    Define task with caching with certain behaviors.
+
+    :param deference: Specify whether task should dereference symlinks for `VersionedTarget`.
+    :param regular_file: If True, a regular file will be created with some content as the dst of the symlink.
+    :param regular_file_in_results_dir: If True, the regular file created will be in `results_dir`. Otherwise
+                                        it will be somewhere random.
+    """
     self.artifact_cache = self.create_dir('artifact_cache')
     self.create_file(self._filename)
+    # Set up options for CacheSetup subsystem.
     self.set_options_for_scope(
       CacheSetup.options_scope,
       write_to=[self.artifact_cache],
@@ -95,16 +103,20 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
       tarball_dereference=deference,
     )
 
+    # Set up options for DummyCacheTask as it is under TaskTestBase context.
     self.set_options_for_scope(
       TaskTestBase.options_scope,
       regular_file=regular_file,
-      regular_file_in_results_dir = regular_file_in_results_dir
+      regular_file_in_results_dir=regular_file_in_results_dir
     )
     self.target = self.make_target(':t', target_type=DummyCacheLibrary, source=self._filename)
     context = self.context(for_task_types=[DummyCacheTask], target_roots=[self.target])
     self.task = self.create_task(context)
 
   def _assert_dereferenced_symlink_in_cache(self, all_vts):
+    """
+    Assert symlink is dereferenced when in the cache tarball.
+    """
     for vt in all_vts:
       artifact_address = self._get_artifact_path(vt)
       with temporary_dir() as tmpdir:
@@ -119,6 +131,13 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
         with open(file_path, 'r') as f:
           self.assertEqual(DUMMY_FILE_CONTENT, f.read())
 
+  # Cache creation should fail because the symlink destination is non-existent.
+  def test_cache_dereference_no_file(self):
+    self._prepare_task(deference=True, regular_file=False, regular_file_in_results_dir=False)
+    with self.assertRaises(OSError):
+      self.task.execute()
+
+  # Symlink in cache should stay as a symlink
   def test_cache_no_dereference_no_file(self):
     self._prepare_task(deference=False, regular_file=False, regular_file_in_results_dir=False)
 
@@ -141,6 +160,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
           with open(file_path, 'r') as f:
             f.read()
 
+  # Symlink in cache should stay as a symlink, and so does the dst file.
   def test_cache_no_dereference_file_inside_results_dir(self):
     self._prepare_task(deference=False, regular_file=True, regular_file_in_results_dir=True)
 
@@ -174,9 +194,3 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
     all_vts = self.task.execute()
     self.assertGreater(len(all_vts), 0)
     self._assert_dereferenced_symlink_in_cache(all_vts)
-
-  def test_cache_dereference_no_file(self):
-    self._prepare_task(deference=True, regular_file=False, regular_file_in_results_dir=False)
-    # Tarball should error out because the symlink destination is non-existent.
-    with self.assertRaises(OSError):
-      self.task.execute()
