@@ -83,15 +83,8 @@ class EngineSourceMapper(SourceMapper):
       else:
         # TODO: this case should be impossible... resource targets are located in the `resource_targets`
         # kwarg.
-        raise ValueError('TODO: Impossible case?')
-        #resource_dep_subjects = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
-        #                                                target_resources)
-        # Fetch `HydratedTarget` products for all of the resources.
-        #for resource_target in self._engine.product_request(HydratedTargets, resource_dep_subjects):
-        #  resource_sources = resource_target.adaptor.kwargs().get('sources')
-        #  if resource_sources:
-        #    for f in resource_sources.iter_relative_paths():
-        #      yield f
+        #   see https://github.com/pantsbuild/pants/issues/4010
+        raise ValueError('TODO: Not supported: see #4010.')
 
   def iter_target_addresses_for_sources(self, sources):
     """Bulk, iterable form of `target_addresses_for_source`."""
