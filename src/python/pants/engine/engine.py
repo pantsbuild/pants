@@ -198,8 +198,7 @@ class LocalSerialEngine(Engine):
             result = Return(self._run(runnable))
             self._maybe_cache_put(key, result)
           except Exception as e:
-            print('>>> {} failed with {}'.format(entry, e))
-            result = Throw(e)
+            result = Throw(str(e))
         completed.append((entry, result))
       generator.send(completed)
 
