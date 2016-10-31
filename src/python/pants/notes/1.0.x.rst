@@ -1,7 +1,11 @@
 1.0.x Stable Releases
 =====================
 
-This document describes releases from the ``1.0.x`` ``stable`` branch.
+This document describes releases in the ``1.0.x`` series.
+
+*NB: Since this was the first stable release of pants, this notes page does not include
+the complete set of changes that occurred since the previous stable release (there hadn't
+been one!)*
 
 1.0.1 (05/31/2016)
 ------------------
