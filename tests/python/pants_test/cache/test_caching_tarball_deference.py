@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -100,7 +100,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
       write_to=[self.artifact_cache],
       read_from=[self.artifact_cache],
       write=True,
-      tarball_dereference=deference,
+      dereference_symlinks=deference,
     )
 
     # Set up options for DummyCacheTask as it is under TaskTestBase context.

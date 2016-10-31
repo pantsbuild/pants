@@ -74,8 +74,8 @@ class CacheSetup(Subsystem):
                   'the resolver. When resolver is \'none\' list is used as is.')
     register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
-    register('--tarball-dereference', type=bool, default=True,
-             help='Use dereference flag to create cache tarball.')
+    register('--dereference-symlinks', type=bool, default=True,
+             help='Dereference symlinks when creating cache tarball.')
     register('--max-entries-per-target', advanced=True, type=int, default=8,
              help='Maximum number of old cache files to keep per task target pair')
     register('--pinger-timeout', advanced=True, type=float, default=0.5,
@@ -270,7 +270,7 @@ class CacheFactory(object):
       return LocalArtifactCache(artifact_root, path, compression,
                                 self._options.max_entries_per_target,
                                 permissions=self._options.write_permissions,
-                                dereference=self._options.tarball_dereference)
+                                dereference=self._options.dereference_symlinks)
 
     def create_remote_cache(remote_spec, local_cache):
       urls = self.get_available_urls(remote_spec.split('|'))

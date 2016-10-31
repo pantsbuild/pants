@@ -26,7 +26,8 @@ class BaseLocalArtifactCache(ArtifactCache):
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param int compression: The gzip compression level for created artifacts.
                             Valid values are 0-9.
-    :param string permissions: File permissions to use when creating artifact files.
+    :param str permissions: File permissions to use when creating artifact files.
+    :param bool dereference: Dereference symlinks when creating the cache tarball.
     """
     super(BaseLocalArtifactCache, self).__init__(artifact_root)
     self._compression = compression
@@ -98,6 +99,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
     :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
     :param str permissions: File permissions to use when creating artifact files.
+    :param bool dereference: Dereference symlinks when creating the cache tarball.
     """
     super(LocalArtifactCache, self).__init__(
       artifact_root,

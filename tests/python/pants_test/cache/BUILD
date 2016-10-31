@@ -52,7 +52,7 @@ python_tests(
 )
 
 python_tests(
-  name = 'caching_tarball_dereference',
+  name = 'caching_dereference_symlinks',
   sources = ['test_caching_tarball_deference.py'],
   dependencies = [
     'src/python/pants/task:task',
