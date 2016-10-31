@@ -253,7 +253,7 @@ class LocalScheduler(object):
       yield
 
   def root_entries(self, execution_request):
-    """Returns the roots for the given ExecutionRequest as a dict from Node to State."""
+    """Returns the roots for the given ExecutionRequest as a dict of tuples to State."""
     with self._product_graph_lock:
       if self._execution_request is not execution_request:
         raise ValueError(
@@ -262,20 +262,18 @@ class LocalScheduler(object):
       raw_roots = self._native.gc(self._native.lib.execution_roots(self._scheduler),
                                   self._native.lib.nodes_destroy)
       roots = {}
-      for root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
-        subject = self._from_key(root.subject)
-        product = self._from_id(root.product.id_)
-        if root.union_tag is 0:
+      for root, raw_root in zip(execution_request.roots, self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len)):
+        if raw_root.union_tag is 0:
           state = None
-        elif root.union_tag is 1:
-          state = Return(self._from_value(root.union_return))
-        elif root.union_tag is 2:
+        elif raw_root.union_tag is 1:
+          state = Return(self._from_value(raw_root.union_return))
+        elif raw_root.union_tag is 2:
           state = Throw("Failed")
-        elif root.union_tag is 3:
+        elif raw_root.union_tag is 3:
           state = Throw("Nooped")
         else:
-          raise ValueError('Unrecognized State type `{}` on: {}'.format(root.union_tag, root))
-        roots[(subject, product)] = state
+          raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.union_tag, raw_root))
+        roots[root] = state
       return roots
 
   def invalidate_files(self, filenames):

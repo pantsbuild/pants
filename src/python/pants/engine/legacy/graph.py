@@ -213,23 +213,23 @@ class LegacyBuildGraph(BuildGraph):
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
     logger.debug('Injecting to %s: %s', self, subjects)
-    request = self._scheduler.execution_request([HydratedTargets], subjects)
+    request = self._scheduler.execution_request([HydratedTargets, Addresses], subjects)
 
     result = self._engine.execute(request)
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
     root_entries = self._scheduler.root_entries(request)
-    self._index(root_entries)
+    address_entries = {k: v for k, v in root_entries.items() if k[1] is Addresses}
+    target_entries = {k: v for k, v in root_entries.items() if k[1] is HydratedTargets}
+    self._index(target_entries)
 
     yielded_addresses = set()
-    for root, state in root_entries.items():
+    for root, state in address_entries.items():
       if not state.value:
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(root.subject))
-      # TODO! this is yielding transitive addresses rather than roots again.
-      for hydrated_target in state.value.dependencies:
-        address = hydrated_target.adaptor.address
+      for address in state.value.dependencies:
         if address not in yielded_addresses:
           yielded_addresses.add(address)
           yield address
