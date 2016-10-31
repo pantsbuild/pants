@@ -14,7 +14,7 @@ class CompileSetup(ZincAnalysisElement):
 
   # Output directories can obviously contain directories under pants_home. Compile/javac options may
   # refer to directories under pants_home.
-  pants_home_anywhere = ('output directories', 'compile options', 'javac options')
+  pants_home_anywhere = ('output directories', 'classpath options')
 
   def __init__(self, args):
     # Most sections in CompileSetup are arrays represented as maps from index to item:
@@ -47,15 +47,13 @@ class Relations(ZincAnalysisElement):
   # Products are src->classfile, library dependencies are src->jarfile, source/internal dependencies are src->src,
   # TODO: Check if 'used names' really needs to be in pants_home_anywhere, or can it be in pants_home_prefix_only?
   pants_home_anywhere = (b'products', b'library dependencies',
-                         b'direct source dependencies', b'public inherited source dependencies',
-                         b'member reference internal dependencies', b'inheritance internal dependencies',
-                         b'used names')
+                         b'inheritance internal dependencies')
   # External dependencies and class names are src->fqcn.
-  pants_home_prefix_only = (b'direct external dependencies', b'public inherited external dependencies',
-                            b'member reference external dependencies', b'inheritance external dependencies',
+  pants_home_prefix_only = (b'library class names',
                             b'class names')
   # Library dependencies are src->jarfile, and that jarfile might be under the jvm home.
-  java_home_anywhere = (b'library dependencies',)
+  java_home_anywhere = (b'library class names',
+                        b'library dependencies',)
 
   def __init__(self, args):
     super(Relations, self).__init__(args)
@@ -76,10 +74,9 @@ class Relations(ZincAnalysisElement):
 class Stamps(ZincAnalysisElement):
   headers = (b'product stamps', b'source stamps', b'binary stamps')
 
-  # All sections are src/class/jar file->stamp.
-  pants_home_prefix_only = headers
+  pants_home_anywhere = headers
   # Only these sections can reference jar files under the jvm home.
-  java_home_prefix_only = (b'binary stamps', b'class names')
+  java_home_prefix_only = (b'binary stamps')
 
   def __init__(self, args):
     super(Stamps, self).__init__(args)
@@ -122,7 +119,7 @@ class SourceInfos(ZincAnalysisElement):
   headers = (b'source infos', )
 
   # Source infos are src->blob.
-  pants_home_prefix_only = headers
+  pants_home_anywhere = headers
 
   def __init__(self, args):
     super(SourceInfos, self).__init__(args)
