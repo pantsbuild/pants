@@ -15,6 +15,7 @@ from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_open
 from pants_test.tasks.task_test_base import TaskTestBase
 
+
 SYMLINK_NAME = 'link'
 DUMMY_FILE_NAME = 'dummy'
 DUMMY_FILE_CONTENT = 'dummy_content'
