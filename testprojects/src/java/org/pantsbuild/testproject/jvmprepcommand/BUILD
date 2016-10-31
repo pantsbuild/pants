@@ -3,7 +3,7 @@
 
 # Integration tests for the jvm_prep_command() target
 
-java_library(name='jvmprepcommand',
+java_library(
   sources=globs('*.java'),
 )
 

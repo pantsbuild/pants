@@ -21,8 +21,8 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
@@ -60,11 +60,20 @@ from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepComman
                                                           RunTestJvmPrepCommand)
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
-from pants.backend.jvm.tasks.scalafmt import ScalaFmt
+from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
+from pants.base.deprecated import warn_or_error
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
+
+
+class DeprecatedJavaTests(JUnitTests):
+  def __init__(self, *args, **kwargs):
+    super(DeprecatedJavaTests, self).__init__(*args, **kwargs)
+    warn_or_error('1.4.0',
+                  'java_tests(...) target type',
+                  'Use junit_tests(...) instead for target {}.'.format(self.address.spec))
 
 
 def build_file_aliases():
@@ -77,8 +86,8 @@ def build_file_aliases():
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'javac_plugin': JavacPlugin,
-      'java_tests': JavaTests,
-      'junit_tests': JavaTests,
+      'java_tests': DeprecatedJavaTests,
+      'junit_tests': JUnitTests,
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
       'jvm_prep_command' : JvmPrepCommand,
@@ -189,7 +198,8 @@ def register_goals():
   task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty')
   task(name='scala', action=ScalaRepl, serialize=False).install('repl')
   task(name='scala-dirty', action=ScalaRepl, serialize=False).install('repl-dirty')
-  task(name='scalafmt', action=ScalaFmt, serialize=False).install('compile', first=True)
+  task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('compile', first=True)
+  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
   task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)

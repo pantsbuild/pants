@@ -1109,6 +1109,9 @@ class OptionsTest(unittest.TestCase):
 
     options = Options.create(env={},
                              config=self._create_config({
+                               'GLOBAL': {
+                                 'inherited': 'aa'
+                               },
                                DummyOptionable1.options_scope: {
                                  'foo': 'xx'
                                },
@@ -1126,6 +1129,7 @@ class OptionsTest(unittest.TestCase):
                              args=shlex.split('./pants --new-scope1-baz=vv'),
                              option_tracker=OptionTracker())
 
+    options.register(GLOBAL_SCOPE, '--inherited')
     options.register(DummyOptionable1.options_scope, '--foo')
     options.register(DummyOptionable1.options_scope, '--bar')
     options.register(DummyOptionable1.options_scope, '--baz')
@@ -1134,9 +1138,10 @@ class OptionsTest(unittest.TestCase):
     with self.warnings_catcher() as w:
       vals1 = options.for_scope(DummyOptionable1.options_scope)
 
-    # Check that we got a warning.
+    # Check that we got a warning, but not for the inherited option.
     self.assertEquals(1, len(w))
     self.assertTrue(isinstance(w[0].message, DeprecationWarning))
+    self.assertNotIn('inherited', w[0].message)
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
@@ -1151,6 +1156,7 @@ class OptionsTest(unittest.TestCase):
     # Check that we got a warning.
     self.assertEquals(1, len(w))
     self.assertTrue(isinstance(w[0].message, DeprecationWarning))
+    self.assertNotIn('inherited', w[0].message)
 
     # Check values.
     self.assertEquals('uu', vals2.qux)

@@ -1,5 +1,4 @@
 scala_library(
-  name='logging',
   provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc-logging',
@@ -12,4 +11,5 @@ scala_library(
   ],
   sources=globs('*.scala'),
   strict_deps=True,
+  platform='java7',
 )

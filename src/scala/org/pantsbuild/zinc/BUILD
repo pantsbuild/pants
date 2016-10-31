@@ -1,5 +1,4 @@
 scala_library(
-  name='zinc',
   provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc',
@@ -17,4 +16,5 @@ scala_library(
   ],
   sources=globs('*.scala'),
   strict_deps=True,
+  platform='java7',
 )

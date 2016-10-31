@@ -55,7 +55,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'build_graph',
   sources = ['test_build_graph.py'],
   dependencies = [
     'src/python/pants/build_graph',

@@ -3,10 +3,10 @@
 
 
 java_library(
-  name='api',
   sources=globs('*.java'),
   dependencies=[
   ],
+  platform='java7',
   provides=artifact(
     org='org.pantsbuild',
     name='custom_javactool_for_testing',

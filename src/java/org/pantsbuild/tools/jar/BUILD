@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  name='jar',
   sources=globs('*.java'),
   dependencies=[
     '3rdparty:args4j',
@@ -10,6 +9,7 @@ java_library(
     '3rdparty:jsr305',
     'src/java/org/pantsbuild/args4j'
   ],
+  platform='java7',
   provides=artifact(
     org='org.pantsbuild',
     name='jar-tool',
@@ -26,5 +26,6 @@ jvm_binary(
   main='org.pantsbuild.tools.jar.Main',
   dependencies=[
     ':jar',
-  ]
+  ],
+  platform='java7',
 )

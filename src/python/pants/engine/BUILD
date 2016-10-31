@@ -38,7 +38,6 @@ python_library(
 )
 
 python_library(
-  name='engine',
   sources=['engine.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',

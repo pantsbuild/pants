@@ -49,20 +49,20 @@ class GoFetchTest(TaskTestBase):
     r2 = self.make_target(spec='3rdparty/go/r2', target_type=GoRemoteLibrary)
 
     go_fetch = self.create_task(self.context())
-    resolved = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implicit_ok=False)
+    resolved = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', rev=None, implicit_ok=False)
     self.assertEqual(r2, resolved)
 
   def test_resolve_and_inject_explicit_failure(self):
     r1 = self.make_target(spec='3rdparty/go/r1', target_type=GoRemoteLibrary)
     go_fetch = self.create_task(self.context())
     with self.assertRaises(go_fetch.UndeclaredRemoteLibError) as cm:
-      go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implicit_ok=False)
+      go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', rev=None, implicit_ok=False)
     self.assertEqual(cm.exception.address, self.address('3rdparty/go/r2'))
 
   def test_resolve_and_inject_implicit(self):
     r1 = self.make_target(spec='3rdparty/go/r1', target_type=GoRemoteLibrary)
     go_fetch = self.create_task(self.context())
-    r2 = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implicit_ok=True)
+    r2 = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', rev=None, implicit_ok=True)
     self.assertEqual(self.address('3rdparty/go/r2'), r2.address)
     self.assertIsInstance(r2, GoRemoteLibrary)
 
@@ -70,7 +70,7 @@ class GoFetchTest(TaskTestBase):
     r1 = self.make_target(spec='3rdparty/go/r1', target_type=GoRemoteLibrary)
     self.make_target(spec='3rdparty/go/r2', target_type=GoRemoteLibrary)
     go_fetch = self.create_task(self.context())
-    r2_resolved = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implicit_ok=True)
+    r2_resolved = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', rev=None, implicit_ok=True)
     self.assertEqual(self.address('3rdparty/go/r2'), r2_resolved.address)
     self.assertIsInstance(r2_resolved, GoRemoteLibrary)
 

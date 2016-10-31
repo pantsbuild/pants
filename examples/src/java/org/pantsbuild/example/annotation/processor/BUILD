@@ -3,7 +3,7 @@
 #
 #  Example of annotation_processor() target
 
-annotation_processor(name='processor',
+annotation_processor(
   sources=['ExampleProcessor.java'],
   processors=['org.pantsbuild.example.annotation.processor.ExampleProcessor'],
   dependencies=[

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import shutil
 import sys
@@ -14,6 +15,7 @@ import uuid
 import zipfile
 from contextlib import closing, contextmanager
 
+from colors import green
 from six import string_types
 
 from pants.util.dirutil import safe_delete
@@ -236,3 +238,41 @@ def exception_logging(logger, msg):
   except Exception:
     logger.exception(msg)
     raise
+
+
+@contextmanager
+def maybe_profiled(profile_path):
+  """A profiling context manager.
+
+  :param string profile_path: The path to write profile information to. If `None`, this will no-op.
+  """
+  if not profile_path:
+    yield
+    return
+
+  import cProfile
+  profiler = cProfile.Profile()
+  try:
+    profiler.enable()
+    yield
+  finally:
+    profiler.disable()
+    profiler.dump_stats(profile_path)
+    view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png'
+                     .format(path=profile_path))
+    logging.getLogger().info(
+      'Dumped profile data to: {}\nUse e.g. {} to render and view.'.format(profile_path, view_cmd)
+    )
+
+
+class HardSystemExit(SystemExit):
+  """A SystemExit subclass that incurs an os._exit() via special handling."""
+
+
+@contextmanager
+def hard_exit_handler():
+  """An exit helper for the daemon/fork'd context that provides for deferred os._exit(0) calls."""
+  try:
+    yield
+  except HardSystemExit:
+    os._exit(0)
