@@ -10,12 +10,13 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import xsbti.Maybe
 import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntryLookup}
-import sbt.internal.inc.{Analysis, AnalysisStore, Locate, TextAnalysisFormat}
+import sbt.internal.inc.{Analysis, AnalysisStore, CompanionsStore, Locate, TextAnalysisFormat}
 import sbt.io.{IO, Using}
 import sbt.util.Logger
 import sbt.util.Logger.o2m
 import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
 import org.pantsbuild.zinc.cache.Cache.Implicits
+import xsbti.api.Companions
 
 /**
  * A facade around the analysis cache to:
@@ -138,23 +139,42 @@ object AnalysisMap {
  * and only rename to the original file upon successful write.
  *
  * TODO: merge this upstream https://github.com/sbt/zinc/issues/178
- * TODO: consider define an internal stable analysis format.
- *
  */
 object SafeFileBasedStore {
   def apply(file: File): AnalysisStore = new AnalysisStore {
-    def set(analysis: CompileAnalysis, setup: MiniSetup) {
+    override def set(analysis: CompileAnalysis, setup: MiniSetup): Unit = {
       val tmpAnalysisFile = File.createTempFile(file.getName, ".tmp")
-      Using.fileWriter(IO.utf8)(tmpAnalysisFile) { writer => TextAnalysisFormat
-        .write(writer, analysis, setup)
-      }
+      val analysisStore = PlainTextFileBasedStore(tmpAnalysisFile)
+      analysisStore.set(analysis, setup)
       Files.move(tmpAnalysisFile.toPath, file.toPath, StandardCopyOption.REPLACE_EXISTING)
     }
 
-    def get(): Option[(CompileAnalysis, MiniSetup)] = try
-      Some(Using.fileReader(IO.utf8)(file) { reader => TextAnalysisFormat.read(reader, null) })
-    catch {
-      case _: Throwable => None
+    override def get(): Option[(CompileAnalysis, MiniSetup)] =
+      PlainTextFileBasedStore(file).get
+  }
+}
+
+/**
+ * Zinc 1.0 changes its analysis file format to zip, and split into two
+ * entries.  This provides an plain text adaptor for pants parser.  Long term
+ * we should consider define an internal analysis format that's 1) more stable
+ * 2) better performance because we can pick and choose only the fields we care
+ * - string processing in rebase can be slow for example.
+ */
+object PlainTextFileBasedStore {
+  def apply(file: File): AnalysisStore = new AnalysisStore {
+    override def set(analysis: CompileAnalysis, setup: MiniSetup): Unit = {
+      Using.fileWriter(IO.utf8)(file) { writer =>TextAnalysisFormat.write(writer, analysis, setup) }
     }
+
+    override def get(): Option[(CompileAnalysis, MiniSetup)] =
+      try { Some(getUncaught()) } catch { case _: Exception => None }
+    def getUncaught(): (CompileAnalysis, MiniSetup) =
+      Using.fileReader(IO.utf8)(file) { reader => TextAnalysisFormat.read(reader, noopCompanionsStore) }
+  }
+
+  val noopCompanionsStore = new CompanionsStore {
+    override def get(): Option[(Map[String, Companions], Map[String, Companions])] = Some(getUncaught())
+    override def getUncaught(): (Map[String, Companions], Map[String, Companions]) = (Map(), Map())
   }
 }
