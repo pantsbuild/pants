@@ -13,7 +13,6 @@ from pants.build_graph.address import Address
 from pants.engine.engine import (ExecutionError, LocalMultiprocessEngine, LocalSerialEngine,
                                  SerializationError)
 from pants.engine.nodes import Return, Throw
-from pants.engine.selectors import Select
 from pants.engine.storage import Cache, Storage
 from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.planners import Classpath, UnpickleableResult, setup_json_scheduler
@@ -34,9 +33,7 @@ class EngineTest(unittest.TestCase):
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
-    self.assertEqual({SelectNode(self.java, None, Select(Classpath)):
-                      Return(Classpath(creator='javac'))},
-                     result.root_products)
+    self.assertEqual([Return(Classpath(creator='javac'))], result.root_products.values())
     self.assertIsNone(result.error)
 
   @contextmanager

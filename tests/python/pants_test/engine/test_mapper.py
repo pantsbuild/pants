@@ -254,7 +254,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     # Expect a single root.
     state, = result.root_products.values()
     if type(state) is Throw:
-      raise state.exc
+      raise Exception(state.exc)
     return state.value
 
   def resolve_multi(self, spec):

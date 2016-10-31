@@ -23,7 +23,6 @@ from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, Rem
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
-from pants.engine.storage import Storage
 from pants.engine.subsystem.native import Native
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
@@ -143,10 +142,9 @@ class EngineInitializer(object):
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
 
-    storage = Storage.create()
     # TODO: Do not use the cache yet, as it incurs a high overhead.
-    scheduler = LocalScheduler(dict(), tasks, storage, project_tree, native)
-    engine = LocalSerialEngine(scheduler, storage, use_cache=False)
+    scheduler = LocalScheduler(dict(), tasks, project_tree, native)
+    engine = LocalSerialEngine(scheduler, use_cache=False)
     change_calculator = EngineChangeCalculator(engine, scm) if scm else None
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)

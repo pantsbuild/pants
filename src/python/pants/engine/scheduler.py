@@ -47,7 +47,6 @@ class LocalScheduler(object):
   def __init__(self,
                goals,
                tasks,
-               storage,
                project_tree,
                native,
                graph_lock=None):
@@ -63,7 +62,6 @@ class LocalScheduler(object):
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
-    self._storage = storage
     self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
 
@@ -195,10 +193,6 @@ class LocalScheduler(object):
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)
-
-  @property
-  def storage(self):
-    return self._storage
 
   def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.

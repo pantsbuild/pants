@@ -9,7 +9,7 @@ import unittest
 from contextlib import closing
 
 from pants.base.project_tree import Dir, File
-from pants.engine.nodes import Return, Runnable, TaskNode, Throw, Waiting
+from pants.engine.nodes import Runnable
 from pants.engine.storage import Cache, InvalidKeyError, Lmdb, Storage
 
 
@@ -67,21 +67,6 @@ class StorageTest(unittest.TestCase):
 
       # key2 isn't mapped to any other key.
       self.assertIsNone(storage.get_mapping(key2))
-
-  def test_state_roundtrips(self):
-    states = [
-        Return('a'),
-        Throw(PickleableException()),
-        Waiting([TaskNode(None, None, None)]),
-        Runnable(_runnable, ('an arg',)),
-      ]
-    with closing(self.storage) as storage:
-      for state in states:
-        key = storage.put_state(state)
-        actual = storage.get_state(key)
-
-        self.assertEquals(state, actual)
-        self.assertEquals(key, storage.put_state(actual))
 
 
 class CacheTest(unittest.TestCase):
