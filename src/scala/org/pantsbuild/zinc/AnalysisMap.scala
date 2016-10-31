@@ -51,7 +51,7 @@ case class AnalysisMap private[AnalysisMap] (
      */
     def definesClass(classpathEntry: File): DefinesClass = {
       getAnalysis(classpathEntry).map { analysis =>
-        log.debug(s"Hit analysis cache for class definitions with ${ classpathEntry }")
+        log.debug(s"Hit analysis cache for class definitions with ${classpathEntry}")
         val classNames = analysis.asInstanceOf[Analysis].relations.srcProd.reverseMap.keys.toList.toSet.map(
           (f: File) => filePathToClassName(f))
         new ClassNamesDefinesClass(classNames)
@@ -138,6 +138,8 @@ object AnalysisMap {
  * and only rename to the original file upon successful write.
  *
  * TODO: merge this upstream https://github.com/sbt/zinc/issues/178
+ * TODO: consider define an internal stable analysis format.
+ *
  */
 object SafeFileBasedStore {
   def apply(file: File): AnalysisStore = new AnalysisStore {
