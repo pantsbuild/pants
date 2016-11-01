@@ -23,6 +23,8 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin,
                                            TaskIdentityFingerprintStrategy):
 
   def compute_fingerprint(self, python_target):
+    # Only consider the compatibility requirements in the fingerprint, as only
+    # those can affect the selected interpreter.
     hash_elements_for_target = []
     if python_target.compatibility:
       hash_elements_for_target.extend(sorted(python_target.compatibility))
