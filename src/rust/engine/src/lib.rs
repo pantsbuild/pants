@@ -259,6 +259,26 @@ pub extern fn execution_add_root_select(
 }
 
 #[no_mangle]
+pub extern fn execution_add_root_select_dependencies(
+  scheduler_ptr: *mut RawScheduler,
+  subject: Key,
+  product: TypeConstraint,
+  dep_product: TypeConstraint,
+  field: Field,
+  transitive: bool,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.add_root_select_dependencies(
+      subject,
+      product,
+      dep_product,
+      field,
+      transitive,
+    );
+  })
+}
+
+#[no_mangle]
 pub extern fn execution_next(
   scheduler_ptr: *mut RawScheduler,
   returns_ptr: *mut EntryId,

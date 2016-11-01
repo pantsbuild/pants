@@ -3,10 +3,10 @@ use std::collections::{HashSet, VecDeque};
 use std::io;
 use std::path::Path;
 
-use core::{FNV, Key, TypeConstraint};
+use core::{FNV, Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
 use nodes::{Complete, Node, Runnable, State};
-use selectors::Selector;
+use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 
 /**
@@ -61,7 +61,28 @@ impl Scheduler {
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
-    let node = Node::create(Selector::select(product), subject, Vec::new());
+    self.add_root(Node::create(Selector::select(product), subject, Vec::new()));
+  }
+
+  pub fn add_root_select_dependencies(
+    &mut self,
+    subject: Key,
+    product: TypeConstraint,
+    dep_product: TypeConstraint,
+    field: Field,
+    transitive: bool,
+  ) {
+    self.add_root(
+      Node::create(
+        Selector::SelectDependencies(
+          SelectDependencies { product: product, dep_product: dep_product, field: field, transitive: transitive }),
+        subject,
+        Vec::new(),
+      )
+    );
+  }
+
+  fn add_root(&mut self, node: Node) {
     self.roots.push(node.clone());
     self.candidates.push_back(self.graph.ensure_entry(node));
   }
