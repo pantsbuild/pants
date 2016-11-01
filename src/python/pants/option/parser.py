@@ -47,6 +47,9 @@ class Parser(object):
   class FromfileError(ParseError):
     """Indicates a problem reading a value @fromfile."""
 
+  class MutuallyExclusiveOptionError(ParseError):
+    """Raised when more than one option belonging to the same mutually exclusive group is specified."""
+
   @staticmethod
   def _ensure_bool(s):
     if isinstance(s, six.string_types):
@@ -140,6 +143,7 @@ class Parser(object):
     """Set values for this parser's options on the namespace object."""
     flag_value_map = self._create_flag_value_map(flags)
 
+    mutex_map = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
       self._validate(args, kwargs)
       dest = kwargs.get('dest') or self._select_dest(args)
@@ -196,9 +200,21 @@ class Parser(object):
           '\nCaused by:\n{}'.format(', '.join(args), self._scope_str(), traceback.format_exc())
         )
 
-      # If the option is explicitly given, check deprecation.
+      # If the option is explicitly given, check deprecation and mutual exclusion.
       if val.rank > RankedValue.HARDCODED:
         self._check_deprecated(dest, kwargs)
+
+        mutex_dest = kwargs.get('mutually_exclusive_group')
+        if mutex_dest:
+          mutex_map[mutex_dest].append(dest)
+          dest = mutex_dest
+        else:
+          mutex_map[dest].append(dest)
+
+        if len(mutex_map[dest]) > 1:
+          raise self.MutuallyExclusiveOptionError(
+            "Can only provide one of the mutually exclusive options {}".format(mutex_map[dest]))
+
       setattr(namespace, dest, val)
 
     # See if there are any unconsumed flags remaining.
@@ -317,7 +333,7 @@ class Parser(object):
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'removal_version', 'removal_hint', 'fromfile'
+    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
