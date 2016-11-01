@@ -36,6 +36,7 @@
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 source ${HERE}/build-support/pants_venv
+source ${HERE}/build-support/bootstrap_native
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_exe.py"
 
@@ -61,6 +62,7 @@ PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
 
 function exec_pants_bare() {
   activate_pants_venv
+  bootstrap_native_code
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" exec python ${PANTS_EXE} "$@"
 }
 
