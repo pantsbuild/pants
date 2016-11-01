@@ -9,6 +9,7 @@ import os
 import StringIO
 import unittest
 
+from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.zinc.zinc_analysis_element import ZincAnalysisElement
 from pants.backend.jvm.zinc.zinc_analysis_parser import ZincAnalysisParser
 from pants.util.contextutil import environment_as
@@ -26,31 +27,35 @@ class ZincAnalysisTestSimple(unittest.TestCase):
         with open(get_test_analysis_path(name), 'r') as fp:
           return fp.read()
 
+      def rebase(str, pants_home_from, pants_home_to, java_home=None):
+        buf = StringIO.StringIO()
+        ZincAnalysisParser().rebase(iter(str.splitlines(True)), buf, pants_home_from, pants_home_to, java_home)
+        return buf.getvalue()
+
+      def rebase_analysis_file(analysis_file, java_home=None):
+        orig = get_analysis_text(analysis_file)
+        rebased = rebase(orig, b'/src/pants/.pants.d', AnalysisTools._PANTS_WORKDIR_PLACEHOLDER, java_home)
+        return rebase(rebased, b'/src/pants', AnalysisTools._PANTS_BUILDROOT_PLACEHOLDER, java_home)
+
       # Now check rebasing.
-      orig = iter(get_analysis_text('simple.analysis').splitlines(True))
+      rebased = rebase_analysis_file('simple.analysis')
       expected_rebased = get_analysis_text('simple.rebased.analysis')
-      buf = StringIO.StringIO()
-      ZincAnalysisParser().rebase(orig, buf, b'/src/pants', b'$PANTS_HOME')
-      rebased = buf.getvalue()
       self.assertMultiLineEqual(expected_rebased, rebased)
 
       # And rebasing+filtering.
-      orig = iter(get_analysis_text('simple.analysis').splitlines(True))
+      rebased = rebase_analysis_file('simple.analysis', b'/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk')
       expected_filtered_rebased = get_analysis_text('simple.rebased.filtered.analysis')
-      buf = StringIO.StringIO()
-      ZincAnalysisParser().rebase(orig, buf, b'/src/pants', b'$PANTS_HOME',
-                                  b'/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk')
-      filtered_rebased = buf.getvalue()
-      self.assertMultiLineEqual(expected_filtered_rebased, filtered_rebased)
+      self.assertMultiLineEqual(expected_filtered_rebased, rebased)
 
       # Check parse_deps is returning both bin and src dependencies.
       infile = iter(get_analysis_text('simple.analysis').splitlines(True))
       deps = ZincAnalysisParser().parse_deps(infile, '')
-      f = '/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala'
-      self.assertItemsEqual(deps[f], [
+      self.assertItemsEqual(deps['/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala'], [
           '/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar',
-          '/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala',
         ])
+      self.assertItemsEqual(deps['org.pantsbuild.example.hello.exe.Exe'], [
+        'org/pantsbuild/example/hello/welcome/WelcomeEverybody$.class',
+      ])
 
 
 class ZincAnalysisTestSorting(unittest.TestCase):

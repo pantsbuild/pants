@@ -193,7 +193,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.1-test-201610310001'),
+                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.1-test-201611010000'),
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=shader_rules)

@@ -76,7 +76,7 @@ class Stamps(ZincAnalysisElement):
 
   pants_home_anywhere = headers
   # Only these sections can reference jar files under the jvm home.
-  java_home_prefix_only = (b'binary stamps')
+  java_home_anywhere = (b'binary stamps')
 
   def __init__(self, args):
     super(Stamps, self).__init__(args)

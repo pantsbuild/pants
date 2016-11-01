@@ -40,7 +40,6 @@ class ZincLanguageMixin(object):
     """
     return self.get_options().fatal_warnings
 
-
   @property
   def zinc_file_manager(self):
     """If false, zinc provided file manager will not be used.
