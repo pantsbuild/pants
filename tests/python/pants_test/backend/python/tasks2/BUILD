@@ -3,8 +3,8 @@
 
 
 python_tests(
-  name='select_python_interpreter',
-  sources=['test_select_python_interpreter.py'],
+  name='select_interpreter',
+  sources=['test_select_interpreter.py'],
   dependencies=[
     '3rdparty/python:mock',
     '3rdparty/python:pex',
