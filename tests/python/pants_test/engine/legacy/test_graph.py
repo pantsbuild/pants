@@ -18,6 +18,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.engine.subsystem.native import Native
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 # Macro that adds the specified tag.
@@ -69,6 +70,10 @@ def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=
 
 
 class GraphInvalidationTest(unittest.TestCase):
+  def setUp(self):
+    super(GraphInvalidationTest, self).setUp()
+    init_subsystem(Native.Factory)
+
   def _make_setup_args(self, specs, **kwargs):
     options = mock.Mock()
     options.target_specs = specs

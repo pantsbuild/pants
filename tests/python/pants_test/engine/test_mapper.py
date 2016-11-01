@@ -19,8 +19,10 @@ from pants.engine.engine import LocalSerialEngine
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, ResolveError, UnaddressableObjectError)
 from pants.engine.nodes import Throw
+from pants.engine.selectors import SelectDependencies
 from pants.engine.parser import SymbolTable
 from pants.engine.struct import HasProducts, Struct
+from pants.engine.addressable import Addresses
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -246,7 +248,8 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    request = self.scheduler.execution_request([UnhydratedStruct], [spec])
+    select = SelectDependencies(UnhydratedStruct, Addresses, field_types=(Address,))
+    request = self.scheduler.selection_request([(select, spec)])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error

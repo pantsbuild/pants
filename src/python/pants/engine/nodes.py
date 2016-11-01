@@ -24,6 +24,20 @@ class State(AbstractClass):
   def raise_unrecognized(cls, state):
     raise ValueError('Unrecognized Node State: {}'.format(state))
 
+  @staticmethod
+  def from_components(components):
+    """Given the components of a State, construct the State."""
+    cls, remainder = components[0], components[1:]
+    return cls._from_components(remainder)
+
+  def to_components(self):
+    """Return a flat tuple containing individual pickleable components of the State.
+
+    TODO: Consider https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-external-objects
+    for this usecase?
+    """
+    return (type(self),) + self._to_components()
+
 
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
@@ -45,3 +59,10 @@ class Runnable(datatype('Runnable', ['func', 'args', 'cacheable']), State):
 
   The return value of the Runnable will become the final state of the Node.
   """
+
+  @classmethod
+  def _from_components(cls, components):
+    return cls(components[0], components[2:], components[1])
+
+  def _to_components(self):
+    return (self.func, self.cacheable) + self.args

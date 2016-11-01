@@ -8,22 +8,25 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import unittest
 
-from pants.engine.graph import CompletedNodeException, Graph, IncompleteDependencyException
-from pants.engine.nodes import Return, Waiting
+from pants.engine.nodes import Return
+
+
+_WAITING = 'TODO: Waiting'
 
 
 # TODO: Expand test coverage here.
 class GraphTest(unittest.TestCase):
+
   def setUp(self):
-    self.pg = Graph(validator=lambda _: True)  # Allow for string nodes for testing.
+    self.pg = 'TODO: These tests need to be ported to native tests.'
 
   @classmethod
-  def _mk_chain(cls, graph, sequence, states=[Waiting, Return]):
+  def _mk_chain(cls, graph, sequence, states=[_WAITING, Return]):
     """Create a chain of dependencies (e.g. 'A'->'B'->'C'->'D') in the graph from a sequence."""
     for state in states:
       dest = None
       for src in reversed(sequence):
-        if state is Waiting:
+        if state is _WAITING:
           graph.add_dependencies(src, [dest] if dest else [])
         else:
           graph.complete_node(src, state([dest]))
@@ -32,13 +35,13 @@ class GraphTest(unittest.TestCase):
 
   def test_disallow_completed_state_change(self):
     self.pg.complete_node('A', Return('done!'))
-    with self.assertRaises(CompletedNodeException):
+    with self.assertRaises('TODO: CompletedNodeException: These tests should be ported to native tests.'):
       self.pg.add_dependencies('A', ['B'])
 
   def test_disallow_completing_with_incomplete_deps(self):
     self.pg.add_dependencies('A', ['B'])
     self.pg.add_dependencies('B', ['C'])
-    with self.assertRaises(IncompleteDependencyException):
+    with self.assertRaises('TODO: IncompleteDependencyException: These tests should be ported to native tests.'):
       self.pg.complete_node('A', Return('done!'))
 
   def test_dependency_edges(self):
@@ -71,7 +74,7 @@ class GraphTest(unittest.TestCase):
   def test_cycle_long(self):
     # Creating a long chain is allowed.
     nodes = list(range(0, 100))
-    self._mk_chain(self.pg, nodes, states=(Waiting,))
+    self._mk_chain(self.pg, nodes, states=(_WAITING,))
     walked_nodes = [node for node, _ in self.pg.walk([nodes[0]])]
     self.assertEquals(nodes, walked_nodes)
 
@@ -107,7 +110,7 @@ class GraphTest(unittest.TestCase):
       self.assertFalse(self.pg._nodes)
 
   def test_invalidate_partial(self):
-    comparison_pg = Graph(validator=lambda _: True)
+    comparison_pg = 'TODO: These tests need to be ported to native tests.'
     chain_a = list('ABCDEF')
     chain_b = list('GHIJKL')
 

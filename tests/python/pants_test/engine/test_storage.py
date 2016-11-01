@@ -34,7 +34,7 @@ class StorageTest(unittest.TestCase):
   def setUp(self):
     self.storage = Storage.create()
     self.result = 'something'
-    self.request = Runnable(func=_runnable, args=('this is an arg',))
+    self.request = Runnable(func=_runnable, args=('this is an arg',), cacheable=True)
 
   def test_lmdb_key_value_store(self):
     lmdb = Lmdb.create()[0]
@@ -75,7 +75,7 @@ class CacheTest(unittest.TestCase):
     """Setup cache as well as request and result."""
     self.storage = Storage.create()
     self.cache = Cache.create(storage=self.storage)
-    self.request = Runnable(func=_runnable, args=('this is an arg',))
+    self.request = Runnable(func=_runnable, args=('this is an arg',), cacheable=True)
     self.result = 'something'
 
   def test_cache(self):

@@ -126,11 +126,6 @@ class LocalScheduler(object):
   def _to_constraint(self, type_or_constraint):
     return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
 
-  def _select_product(self, subject, product):
-    self._native.lib.execution_add_root_select(self._scheduler,
-                                               self._to_key(subject),
-                                               self._to_constraint(product))
-
   def _register_intrinsics(self, intrinsics):
     """Register the given intrinsics dict.
 
@@ -233,7 +228,7 @@ class LocalScheduler(object):
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-    return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
+    return ExecutionRequest(tuple((s, Select(p)) for s in subjects for p in products))
 
   def selection_request(self, requests):
     """Create and return an ExecutionRequest for the given (selector, subject) tuples.
@@ -244,8 +239,7 @@ class LocalScheduler(object):
     :return: An ExecutionRequest for the given selectors and subjects.
     """
     #TODO: Think about how to deprecate the existing execution_request API.
-    roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
-    return ExecutionRequest(tuple(roots))
+    return ExecutionRequest(tuple((subject, selector) for selector, subject in requests))
 
   @contextmanager
   def locked(self):
@@ -325,8 +319,20 @@ class LocalScheduler(object):
     if self._execution_request is not None:
       self._native.lib.execution_reset(self._scheduler)
     self._execution_request = execution_request
-    for subject, product in execution_request.roots:
-      self._select_product(subject, product)
+    for subject, selector in execution_request.roots:
+      if type(selector) is Select:
+        self._native.lib.execution_add_root_select(self._scheduler,
+                                                   self._to_key(subject),
+                                                   self._to_constraint(selector.product))
+      elif type(selector) is SelectDependencies:
+        self._native.lib.execution_add_root_select_dependencies(self._scheduler,
+                                                                self._to_key(subject),
+                                                                self._to_constraint(selector.product),
+                                                                self._to_constraint(selector.dep_product),
+                                                                self._to_key(selector.field),
+                                                                selector.transitive)
+      else:
+        raise ValueError('Unsupported root selector type: {}'.format(selector))
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
