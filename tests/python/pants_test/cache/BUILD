@@ -51,6 +51,17 @@ python_tests(
   ],
 )
 
+python_tests(
+  name = 'caching_dereference_symlinks',
+  sources = ['test_caching_tarball_deference.py'],
+  dependencies = [
+    'src/python/pants/task:task',
+    'src/python/pants/cache:cache',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
 python_library(
   name = 'cache_server',
   sources = ['cache_server.py'],
