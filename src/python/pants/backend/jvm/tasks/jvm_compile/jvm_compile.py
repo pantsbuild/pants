@@ -750,7 +750,6 @@ class JvmCompile(NailgunTaskBase):
       compile_target = ivts.target
       compile_context = compile_contexts[compile_target]
       invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
-                                                                        compile_contexts,
                                                                         invalid_target_set)
 
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
@@ -763,20 +762,21 @@ class JvmCompile(NailgunTaskBase):
                       on_failure=ivts.force_invalidate))
     return jobs
 
-  def _collect_invalid_compile_dependencies(self, compile_target, compile_contexts, invalid_target_set):
-    # Collects just the direct invalid compile dependencies, traversing non-compile targets.
+  def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
+    # Collects all invalid dependencies that are not dependencies of other invalid dependencies
+    # within the closure of compile_target.
     invalid_dependencies = OrderedSet()
 
     def work(target):
       pass
 
     def predicate(target):
-      if target in compile_contexts and target is not compile_target:
-        if target in invalid_target_set:
-          invalid_dependencies.add(target)
-        return False
-      else:
+      if target is compile_target:
         return True
+      if target in invalid_target_set:
+        invalid_dependencies.add(target)
+        return False
+      return True
 
     compile_target.walk(work, predicate)
     return invalid_dependencies

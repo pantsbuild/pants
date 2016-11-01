@@ -12,7 +12,7 @@ from textwrap import dedent
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
@@ -30,6 +30,74 @@ class CacheCompileIntegrationTest(BaseCompileIT):
   def create_file(self, path, value):
     with safe_open(path, 'w') as f:
       f.write(value)
+
+  def test_transitive_invalid_target_is_dep(self):
+    with temporary_dir() as cache_dir, \
+      temporary_dir(root_dir=get_buildroot()) as src_dir:
+
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.zinc': {'incremental_caching': True},
+        'java': {'strict_deps': False},
+      }
+      target_dir = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest')
+      a_srcfile = os.path.join(target_dir, 'A.java')
+      b_srcfile = os.path.join(target_dir, 'B.java')
+      c_srcfile = os.path.join(target_dir, 'C.java')
+      buildfile = os.path.join(target_dir, 'BUILD')
+
+      self.create_file(a_srcfile,
+                       dedent("""package org.pantsbuild.cachetest;
+                          class A {}
+                          """))
+      self.create_file(b_srcfile,
+                       dedent("""package org.pantsbuild.cachetest;
+                          class B {
+                            A a;
+                          }
+                          """))
+      self.create_file(c_srcfile,
+                       dedent("""package org.pantsbuild.cachetest;
+                          class C {
+                            A a;
+                          }
+                          """))
+
+      self.create_file(buildfile,
+                       dedent("""
+                          java_library(name='a',
+                                       sources=['A.java']
+                          )
+
+                          java_library(name='b',
+                                       sources=['B.java'],
+                                       dependencies=[':a']
+                          )
+
+                          java_library(name='c',
+                                       sources=['C.java'],
+                                       dependencies=[':b']
+                          )
+                          """))
+
+      c_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild',
+                                    'cachetest:c')
+
+      with self.temporary_workdir() as workdir:
+        self.run_compile(c_spec, config, workdir)
+      # clean workdir
+
+      # rm cache entries for a and b
+      cache_dir_entries = os.listdir(os.path.join(cache_dir))
+      zinc_dir = os.path.join(cache_dir, cache_dir_entries[0])
+      c_or_a_cache_dirs = [subdir for subdir in os.listdir(zinc_dir)
+                           if subdir.endswith('cachetest.a') or subdir.endswith('cachetest.c')]
+      for subdir in c_or_a_cache_dirs:
+        safe_rmtree(os.path.join(zinc_dir, subdir))
+
+      # run compile
+      with self.temporary_workdir() as workdir:
+        self.run_compile(c_spec, config, workdir)
 
   def test_stale_artifacts_rmd_when_cache_used_with_zinc(self):
     with temporary_dir() as cache_dir, \
