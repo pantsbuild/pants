@@ -220,8 +220,8 @@ class LegacyBuildGraph(BuildGraph):
       raise result.error
     # Update the base class indexes for this request.
     root_entries = self._scheduler.root_entries(request)
-    address_entries = {k: v for k, v in root_entries.items() if k[1] is Addresses}
-    target_entries = {k: v for k, v in root_entries.items() if k[1] is HydratedTargets}
+    address_entries = {k: v for k, v in root_entries.items() if k[1].product is Addresses}
+    target_entries = {k: v for k, v in root_entries.items() if k[1].product is HydratedTargets}
     self._index(target_entries)
 
     yielded_addresses = set()
