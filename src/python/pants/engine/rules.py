@@ -120,6 +120,9 @@ class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', '
   def output_product_type(self):
     return self.product_type
 
+  def __repr__(self):
+    return '{}({})'.format(type(self).__name__, self.func.__name__)
+
 
 class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics'])):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
