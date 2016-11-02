@@ -50,6 +50,7 @@ import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
 import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
+import org.pantsbuild.tools.junit.withretry.ScalaTestUtil;
 
 /**
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
@@ -520,10 +521,14 @@ public class ConsoleRunnerImpl {
     return failures;
   }
 
-  private int runConcurrentTests(JUnitCore core, SpecSet specSet, Concurrency concurrency) {
+  private int runConcurrentTests(JUnitCore core, SpecSet specSet, Concurrency concurrency)
+      throws InitializationError {
     Computer junitComputer = new ConcurrentComputer(concurrency, parallelThreads);
     Class<?>[] classes = specSet.extract(concurrency).classes();
-    return core.run(junitComputer, classes).getFailureCount();
+    AllDefaultPossibilitiesBuilderWithRetry builder =
+        new AllDefaultPossibilitiesBuilderWithRetry(numRetries, swappableErr.getOriginal());
+    Runner suite = junitComputer.getSuite(builder, classes);
+    return core.run(Request.runner(suite)).getFailureCount();
   }
 
   private int runLegacy(Collection<Spec> parsedTests, JUnitCore core) throws InitializationError {
@@ -573,7 +578,12 @@ public class ConsoleRunnerImpl {
       if (this.perTestTimer || this.parallelThreads > 1) {
         for (Class<?> clazz : classes) {
           if (legacyShouldRunParallelMethods(clazz)) {
-            testMethods.addAll(TestMethod.fromClass(clazz));
+            if (ScalaTestUtil.isScalaTestTest(clazz)) {
+              // legacy and scala doesn't work easily.  just adding the class
+              requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
+            } else {
+              testMethods.addAll(TestMethod.fromClass(clazz));
+            }
           } else {
             requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
           }

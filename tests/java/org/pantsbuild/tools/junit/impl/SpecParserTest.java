@@ -12,6 +12,7 @@ import com.google.common.collect.Iterables;
 import org.junit.Test;
 import org.pantsbuild.tools.junit.lib.MockJUnit3Test;
 import org.pantsbuild.tools.junit.lib.MockRunWithTest;
+import org.pantsbuild.tools.junit.lib.MockScalaTest;
 import org.pantsbuild.tools.junit.lib.UnannotatedTestClass;
 
 import static org.hamcrest.CoreMatchers.containsString;
@@ -135,5 +136,13 @@ public class SpecParserTest {
     Collection<Spec> specs = parser.parse();
     Spec spec = Iterables.getOnlyElement(specs);
     assertEquals(MockRunWithTest.class, spec.getSpecClass());
+  }
+
+  @Test public void testScalaTest() throws Exception {
+    String specString = "org.pantsbuild.tools.junit.lib.MockScalaTest";
+    SpecParser parser = new SpecParser(ImmutableList.of(specString));
+    Collection<Spec> specs = parser.parse();
+    Spec spec = Iterables.getOnlyElement(specs);
+    assertEquals(MockScalaTest.class, spec.getSpecClass());
   }
 }
