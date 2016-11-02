@@ -377,4 +377,4 @@ class LocalScheduler(object):
         time.time() - start_time,
         self._native.lib.graph_len(self._scheduler)
       )
-      self.visualize_graph_to_file('viz.0.dot')
+      #self.visualize_graph_to_file('viz.0.dot')
