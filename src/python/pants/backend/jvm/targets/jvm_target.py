@@ -70,8 +70,8 @@ class JvmTarget(Target, Jarable):
     :param fatal_warnings: Whether to turn warnings into errors for this target.  If present,
                            takes priority over the language's fatal-warnings option.
     :type fatal_warnings: bool
-    :param zinc_file_manager: Whether to use zinc provided file manager which allows transactional
-                                  rollbacks but in certain cases, but may conflict with user libraries.
+    :param zinc_file_manager: Whether to use zinc provided file manager that allows transactional
+                              rollbacks, but in certain cases may conflict with user libraries.
     :type zinc_file_manager: bool
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
@@ -118,7 +118,7 @@ class JvmTarget(Target, Jarable):
 
   @property
   def zinc_file_manager(self):
-    """If set to false, will just jvm default file manager instead of the one provided by zinc.
+    """If false, the default file manager will be used instead of the zinc provided one.
 
     :return: See constructor.
     :rtype: bool or None

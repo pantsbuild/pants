@@ -24,7 +24,7 @@ class ZincLanguageMixin(object):
 
     register('--zinc-file-manager', advanced=True, default=True, type=bool,
              fingerprint=True,
-             help='Turn on/off zinc provided file manager if it conflicts with user library, for example, jmh.')
+             help='Use zinc provided file manager to ensure transactional rollback.')
 
   @property
   def strict_deps(self):
@@ -42,7 +42,7 @@ class ZincLanguageMixin(object):
 
   @property
   def zinc_file_manager(self):
-    """If false, zinc provided file manager will not be used.
+    """If false, the default file manager will be used instead of the zinc provided one.
     :rtype: bool
     """
     return self.get_options().zinc_file_manager
