@@ -44,7 +44,6 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':objects',
-    ':processing',
     ':storage',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:meta',
@@ -134,14 +133,6 @@ python_library(
     ':objects',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
-  ]
-)
-
-python_library(
-  name='processing',
-  sources=['processing.py'],
-  dependencies=[
-    '3rdparty/python:futures',
   ]
 )
 
