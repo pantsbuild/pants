@@ -103,18 +103,19 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   fn field_name(&self, item: &Value) -> Key {
-    panic!("TODO: Not implemented");
-    //self.project(item, &self.tasks.field_name)
-  }
-
-  fn field_variants(&self, item: &Value) -> Key {
-    panic!("TODO: Not implemented");
-    //self.project(item, &self.tasks.field_variants)
+    let name_val =
+      self.project(
+        item,
+        &self.tasks.field_name,
+        // TODO: This is a hack. Because we don't have access to the appropriate `str`
+        // type, we just assume that it has the same type as the name of the field.
+        self.tasks.field_name.0.type_id()
+      );
+    self.key_for(&name_val)
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
-    panic!("TODO: Not implemented");
-    //self.project_multi(item, &self.tasks.field_products)
+    self.project_multi(item, &self.tasks.field_products)
   }
 
   fn key_for(&self, val: &Value) -> Key {
@@ -243,8 +244,15 @@ impl Step for Select {
             self.variants.clone(),
           );
         match context.get(&variants_node) {
-          Some(&Complete::Return(_)) =>
-            panic!("TODO: merging variants is not yet implemented"),
+          Some(&Complete::Return(ref variants_value)) =>
+            return State::Complete(
+              Complete::Throw(
+                format!(
+                  "TODO: Merging variants is not yet implemented! Got: {}",
+                  context.id_to_str(context.key_for(variants_value).id()),
+                )
+              )
+            ),
           Some(&Complete::Noop(_, _)) =>
             &self.variants,
           Some(&Complete::Throw(ref msg)) =>
