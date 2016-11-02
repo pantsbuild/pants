@@ -38,8 +38,8 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                           ])
 
   @classmethod
-  def global_subsystems(cls):
-    return super(NailgunTaskBase, cls).global_subsystems() + (Subprocess.Factory,)
+  def subsystem_dependencies(cls):
+    return super(NailgunTaskBase, cls).subsystem_dependencies() + (Subprocess.Factory,)
 
   def __init__(self, *args, **kwargs):
     """

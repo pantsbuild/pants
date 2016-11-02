@@ -28,8 +28,8 @@ from pants.util.memo import memoized_property
 class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
-  def global_subsystems(cls):
-    return super(ProtobufGen, cls).global_subsystems() + (BinaryUtil.Factory,)
+  def subsystem_dependencies(cls):
+    return super(ProtobufGen, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
 
   @classmethod
   def register_options(cls, register):

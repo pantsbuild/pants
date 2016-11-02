@@ -31,8 +31,8 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
     cls.prepare_tools(round_manager)
 
   @classmethod
-  def global_subsystems(cls):
-    return super(JvmToolTaskMixin, cls).global_subsystems() + (DistributionLocator,)
+  def subsystem_dependencies(cls):
+    return super(JvmToolTaskMixin, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
     """
