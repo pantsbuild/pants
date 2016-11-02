@@ -121,7 +121,7 @@ _FFI.cdef(
 
     void task_add(RawScheduler*, Function, TypeConstraint);
     void task_add_select(RawScheduler*, TypeConstraint);
-    void task_add_select_variant(RawScheduler*, TypeConstraint, Key);
+    void task_add_select_variant(RawScheduler*, TypeConstraint, UTF8Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
     void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
     void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
@@ -163,18 +163,14 @@ def extern_key_for(context_handle, val):
 def extern_id_to_str(context_handle, _id):
   """Given an Id for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
-  obj = c.from_id(_id)
-  str_bytes = str(obj).encode('utf-8')
-  return (c.utf8_buf(str_bytes), len(str_bytes))
+  return c.utf8_buf(str(c.from_id(_id)))
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Value*)")
 def extern_val_to_str(context_handle, val):
   """Given a Value for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
-  obj = c.from_value(val)
-  str_bytes = str(obj).encode('utf-8')
-  return (c.utf8_buf(str_bytes), len(str_bytes))
+  return c.utf8_buf(str(c.from_value(val)))
 
 
 @_FFI.callback("bool(ExternContext*, TypeConstraint*, TypeId*)")
@@ -274,11 +270,12 @@ class ExternContext(object):
     self._keys_cap = size
     self._vals_buf = _FFI.new('Value[]', self._keys_cap)
 
-  def utf8_buf(self, utf8):
+  def utf8_buf(self, string):
+    utf8 = string.encode('utf-8')
     if self._utf8_cap < len(utf8):
       self._resize_utf8(max(len(utf8), 2 * self._utf8_cap))
     self._utf8_buf[0:len(utf8)] = utf8
-    return self._utf8_buf
+    return (self._utf8_buf, len(utf8))
 
   def vals_buf(self, keys):
     if self._keys_cap < len(keys):

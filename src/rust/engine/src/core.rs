@@ -1,14 +1,43 @@
 use fnv::FnvHasher;
 use libc;
 
+use std::collections::HashMap;
 use std::hash;
 use std::ptr;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
-// On the python side this is string->string; but to allow for equality checks
-// without a roundtrip to python, we keep them encoded here.
-pub type Variants = Vec<(Key, Key)>;
+/**
+ * Variants represent a string->string map. For hashability purposes, they're stored
+ * as sorted string tuples.
+ */
+#[repr(C)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct Variants(pub Vec<(String, String)>);
+
+impl Variants {
+
+  /**
+   * Merges right over self (by key, and then sorted by key).
+   *
+   * TODO: Unused: see https://github.com/pantsbuild/pants/issues/4020
+   */
+  pub fn merge(&self, right: Variants) -> Variants {
+    // Merge.
+    let mut left: HashMap<_, _, FNV> = self.0.iter().cloned().collect();
+    left.extend(right.0);
+    // Convert back to a vector and sort.
+    let mut result: Vec<(String,String)> = left.into_iter().collect();
+    result.sort();
+    Variants(result)
+  }
+
+  pub fn find(&self, key: &String) -> Option<&str> {
+    self.0.iter()
+      .find(|&&(ref k, _)| k == key)
+      .map(|&(_, ref v)| v.as_str())
+  }
+}
 
 pub type Id = u64;
 

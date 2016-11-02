@@ -169,7 +169,7 @@ class LocalScheduler(object):
           elif selector_type is SelectVariant:
             self._native.lib.task_add_select_variant(self._scheduler,
                                                      product_constraint,
-                                                     self._to_key(selector.variant_key))
+                                                     self._context.utf8_buf(selector.variant_key))
           elif selector_type is SelectLiteral:
             # NB: Intentionally ignores subject parameter to provide a literal subject.
             self._native.lib.task_add_select_literal(self._scheduler,

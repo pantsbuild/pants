@@ -18,11 +18,12 @@ use externs::{
   ExternContext,
   Externs,
   IdToStrExtern,
-  SatisfiedByExtern,
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
+  SatisfiedByExtern,
   StoreListExtern,
+  UTF8Buffer,
   ValToStrExtern,
   with_vec,
 };
@@ -353,8 +354,10 @@ pub extern fn task_add_select(
 pub extern fn task_add_select_variant(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
-  variant_key: Key,
+  variant_key_buf: UTF8Buffer,
 ) {
+  let variant_key =
+    variant_key_buf.to_string().expect("Failed to decode key for select_variant");
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.tasks.add_select(product, Some(variant_key));
   })

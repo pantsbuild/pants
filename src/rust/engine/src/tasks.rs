@@ -104,7 +104,7 @@ impl Tasks {
       );
   }
 
-  pub fn add_select(&mut self, product: TypeConstraint, variant_key: Option<Key>) {
+  pub fn add_select(&mut self, product: TypeConstraint, variant_key: Option<String>) {
     self.clause(Selector::Select(
       Select { product: product, variant_key: variant_key }
     ));

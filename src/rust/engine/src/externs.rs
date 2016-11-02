@@ -3,6 +3,7 @@ use libc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::mem;
+use std::string::FromUtf8Error;
 
 use core::{Field, Id, Key, TypeConstraint, TypeId, Value};
 
@@ -76,27 +77,15 @@ impl Externs {
   }
 
   pub fn id_to_str(&self, digest: Id) -> String {
-    let buf = (self.id_to_str)(self.context, digest);
-    let str =
-      with_vec(buf.str_ptr, buf.str_len as usize, |char_vec| {
-        // Attempt to decode from unicode.
-        String::from_utf8(char_vec.clone()).unwrap_or_else(|e| {
-          format!("<failed to decode unicode for {:?}: {}>", digest, e)
-        })
-      });
-    str
+    (self.id_to_str)(self.context, digest).to_string().unwrap_or_else(|e| {
+      format!("<failed to decode unicode for {:?}: {}>", digest, e)
+    })
   }
 
   pub fn val_to_str(&self, val: &Value) -> String {
-    let buf = (self.val_to_str)(self.context, val);
-    let str =
-      with_vec(buf.str_ptr, buf.str_len as usize, |char_vec| {
-        // Attempt to decode from unicode.
-        String::from_utf8(char_vec.clone()).unwrap_or_else(|e| {
-          format!("<failed to decode unicode for {:?}: {}>", val, e)
-        })
-      });
-    str
+    (self.val_to_str)(self.context, val).to_string().unwrap_or_else(|e| {
+      format!("<failed to decode unicode for {:?}: {}>", val, e)
+    })
   }
 }
 
@@ -122,6 +111,15 @@ pub type ProjectMultiExtern =
 pub struct UTF8Buffer {
   str_ptr: *mut u8,
   str_len: u64,
+}
+
+impl UTF8Buffer {
+  pub fn to_string(&self) -> Result<String, FromUtf8Error> {
+    with_vec(self.str_ptr, self.str_len as usize, |char_vec| {
+      // Attempt to decode from unicode.
+      String::from_utf8(char_vec.clone())
+    })
+  }
 }
 
 pub type IdToStrExtern =

@@ -3,7 +3,7 @@ use core::{Field, Function, Key, TypeConstraint, TypeId};
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeConstraint,
-  pub variant_key: Option<Key>,
+  pub variant_key: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

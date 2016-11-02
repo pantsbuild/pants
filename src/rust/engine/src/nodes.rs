@@ -102,16 +102,21 @@ impl<'g,'t> StepContext<'g,'t> {
     self.tasks.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
   }
 
-  fn field_name(&self, item: &Value) -> Key {
+  /**
+   * Returns the `name` field of the given item.
+   *
+   * TODO: There are at least two hacks here. Because we don't have access to the appropriate
+   * `str` type, we just assume that it has the same type as the name of the field. And more
+   * importantly, there is no check that the object _has_ a name field.
+   */
+  fn field_name(&self, item: &Value) -> String {
     let name_val =
       self.project(
         item,
         &self.tasks.field_name,
-        // TODO: This is a hack. Because we don't have access to the appropriate `str`
-        // type, we just assume that it has the same type as the name of the field.
         self.tasks.field_name.0.type_id()
       );
-    self.key_for(&name_val)
+    self.tasks.externs.val_to_str(&name_val)
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
@@ -130,7 +135,7 @@ impl<'g,'t> StepContext<'g,'t> {
   }
 
   /**
-   * Calls back to Python for an satisfied_by check.
+   * Calls back to Python for a satisfied_by check.
    */
   fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
     self.tasks.externs.satisfied_by(constraint, cls)
@@ -186,7 +191,7 @@ impl Select {
     &self,
     context: &StepContext,
     candidate: &'a Value,
-    variant_value: Option<&Key>
+    variant_value: Option<&str>
   ) -> Option<&'a Value> {
     if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
       return None;
@@ -209,7 +214,7 @@ impl Select {
     &self,
     context: &StepContext,
     candidate: &Value,
-    variant_value: Option<&Key>
+    variant_value: Option<&str>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
     if let Some(&candidate) = self.select_literal_single(context, candidate, variant_value) {
@@ -248,8 +253,9 @@ impl Step for Select {
             return State::Complete(
               Complete::Throw(
                 format!(
-                  "TODO: Merging variants is not yet implemented! Got: {}",
+                  "TODO: Merging variants is not yet implemented: see #4020. Needed to merge {} with {:?}",
                   context.id_to_str(context.key_for(variants_value).id()),
+                  self.variants
                 )
               )
             ),
@@ -265,13 +271,10 @@ impl Step for Select {
       };
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
-    let variant_value: Option<&Key> =
+    let variant_value: Option<&str> =
       match self.selector.variant_key {
         Some(ref variant_key) => {
-          let variant_value: Option<&Key> =
-            variants.iter()
-              .find(|&&(ref k, _)| k == variant_key)
-              .map(|&(_, ref v)| v);
+          let variant_value = variants.find(variant_key);
           if variant_value.is_none() {
             return State::Complete(
               Complete::Noop("A matching variant key was not configured in variants.", None)
@@ -390,6 +393,10 @@ impl SelectDependencies {
   }
 
   fn dep_node(&self, context: &StepContext, dep_subject: &Value) -> Node {
+    // TODO: This method needs to consider whether the `dep_subject` is an Address,
+    // and if so, attempt to parse Variants there. See:
+    //   https://github.com/pantsbuild/pants/issues/4020
+
     let dep_subject_key = context.key_for(dep_subject);
     if self.selector.transitive {
       // After the root has been expanded, a traversal continues with dep_product == product.
