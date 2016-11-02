@@ -1,5 +1,5 @@
 use graph::{Entry, Graph};
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
 use selectors;
@@ -147,6 +147,10 @@ impl<'g,'t> StepContext<'g,'t> {
    */
   fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
     self.tasks.externs.project_multi(item, field)
+  }
+
+  fn id_to_str(&self, item: Id) -> String {
+    self.tasks.externs.id_to_str(item)
   }
 }
 

@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
 from pants.build_graph.address import Address
+from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
 from pants.engine.isolated_process import create_snapshot_intrinsics
 from pants.engine.nodes import Return, Runnable, Throw
@@ -69,6 +70,10 @@ class LocalScheduler(object):
     # the native Scheduler.
     self._context = ExternContext()
     self._context_handle = native.new_handle(self._context)
+
+    # TODO: The only (?) case where we use inheritance rather than exact type unions.
+    has_products_constraint = TypeConstraint(self._to_id(SubclassesOf(HasProducts)))
+
     scheduler = native.lib.scheduler_create(self._context_handle,
                                             extern_key_for,
                                             extern_id_to_str,
@@ -81,7 +86,7 @@ class LocalScheduler(object):
                                             self._to_key('products'),
                                             self._to_key('default'),
                                             self._to_constraint(Address),
-                                            self._to_constraint(HasProducts),
+                                            has_products_constraint,
                                             self._to_constraint(Variants))
     self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
     self._execution_request = None
@@ -372,4 +377,4 @@ class LocalScheduler(object):
         time.time() - start_time,
         self._native.lib.graph_len(self._scheduler)
       )
-      #self.visualize_graph_to_file('viz.0.dot')
+      self.visualize_graph_to_file('viz.0.dot')
