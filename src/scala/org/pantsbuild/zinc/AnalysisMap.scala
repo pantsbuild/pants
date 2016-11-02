@@ -67,6 +67,9 @@ case class AnalysisMap private[AnalysisMap] (
     }
 
     private def filePathToClassName(file: File): String = {
+      // Extract className from path, for example:
+      //   .../.pants.d/compile/zinc/.../current/classes/org/pantsbuild/example/hello/exe/Exe.class
+      //   => org.pantsbuild.example.hello.exe.Exe
       file.getAbsolutePath.split("current/classes")(1).drop(1).replace(".class", "").replaceAll("/", ".")
     }
 
@@ -155,8 +158,8 @@ object SafeFileBasedStore {
 }
 
 /**
- * Zinc 1.0 changes its analysis file format to zip, and split into two
- * entries.  This provides an plain text adaptor for pants parser.  Long term
+ * Zinc 1.0 changes its analysis file format to zip, and split into two files.
+ * The following provides a plain text adaptor for pants parser. Long term though,
  * we should consider define an internal analysis format that's 1) more stable
  * 2) better performance because we can pick and choose only the fields we care
  * - string processing in rebase can be slow for example.
