@@ -26,10 +26,10 @@ case "${KERNEL,,}" in
     die "Unknown kernel ${KERNEL}, cannot bootstrap pants native code!"
 esac
 
-VERSION=0.0.1
+readonly VERSION=0.0.1
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
-CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}/${VERSION}
+readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}/${VERSION}
 
 function calculate_current_hash() {
   find ${NATIVE_ROOT} -type f | git hash-object -t blob --stdin-paths | fingerprint_data
@@ -40,22 +40,27 @@ function read_built_at_hash() {
 }
 
 function write_built_at_hash() {
-  local hash=$1
+  local readonly hash=$1
   echo ${hash} > ${CACHE_TARGET_DIR}/built_at_hash
 }
 
-function check_prerequisites() {
-  if ! which cargo &>/dev/null
+function ensure_prerequisites() {
+  # The machine may have a non-rustup rust install and we'll respect that, but in case we need to
+  # bootstrap via rustup, we pre-emptively add it to the end of the PATH to avoid the user needing
+  # to re-exec their SHELL.
+  export PATH="$PATH:$HOME/.cargo/bin"
+  if [[ -z "$(which cargo 2>/dev/null || true)" ]]
   then
-    log "A rust installation could not be found, please follow the instructions at"
-    die "https://www.rustup.rs/ to setup a stable rust distribution on your machine."
+    log "A rust installation could not be found, installing via the instructions at" \
+        "https://www.rustup.rs ..."
+    sh <(curl https://sh.rustup.rs -sSf) ${RUSTUP_FLAGS}
   fi
 }
 
 function bootstrap_native_code() {
-  check_prerequisites
+  ensure_prerequisites
 
-  current_hash=$(calculate_current_hash)
+  readonly current_hash=$(calculate_current_hash)
   if [[ "${current_hash}" != "$(read_built_at_hash)" ]]
   then
     cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}

@@ -68,6 +68,7 @@ env:
     - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
     - CXX=g++
     - PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']"
+    - RUSTUP_FLAGS=-y
     # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
     # These are encrypted with a public key for our repo that only
     # Travis-CI has the private key for.  We are trusting Travis-CI
