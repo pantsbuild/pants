@@ -107,6 +107,8 @@ class ThriftLinter(NailgunTask):
 
     thrift_targets = self.context.targets(self._is_thrift)
     with self.invalidated(thrift_targets) as invalidation_check:
+      if not invalidation_check.invalid_vts:
+        return
 
       with self.context.new_workunit('xground') as workunit:
         results = set()
