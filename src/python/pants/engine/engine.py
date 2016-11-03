@@ -16,6 +16,7 @@ from pants.engine.storage import Cache, Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
+
 logger = logging.getLogger(__name__)
 
 

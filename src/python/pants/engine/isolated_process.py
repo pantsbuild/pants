@@ -23,7 +23,7 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-def create_snapshot_archive(project_tree, snapshot_archive_root, file_list):
+def create_snapshot_archive(project_tree, snapshot_directory, file_list):
   logger.debug('snapshotting files: {}'.format(file_list))
 
   # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
@@ -33,7 +33,7 @@ def create_snapshot_archive(project_tree, snapshot_archive_root, file_list):
         # TODO handle GitProjectTree. Using add this this will fail with a non-filesystem project tree.
         tar.add(os.path.join(project_tree.build_root, file.path), file.path)
     snapshot = Snapshot(_fingerprint_files_in_tar(file_list, tmp_path))
-  tar_location = _snapshot_path(snapshot, snapshot_archive_root)
+  tar_location = _snapshot_path(snapshot, snapshot_directory.root)
 
   shutil.move(tmp_path, tar_location)
 
@@ -133,7 +133,7 @@ class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
                                          ['args', 'snapshots', 'directories_to_create'])):
   """Request for execution with binary args and snapshots to extract."""
 
-  def __new__(cls, args, snapshot_subjects=tuple(), directories_to_create=tuple(), **kwargs):
+  def __new__(cls, args, snapshots=tuple(), directories_to_create=tuple(), **kwargs):
     """
 
     :param args: Arguments to the binary being run.
@@ -142,11 +142,11 @@ class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
     """
     if not isinstance(args, tuple):
       raise ValueError('args must be a tuple.')
-    if not isinstance(snapshot_subjects, tuple):
-      raise ValueError('snapshot_subjects must be a tuple.')
+    if not isinstance(snapshots, tuple):
+      raise ValueError('snapshots must be a tuple.')
     if not isinstance(directories_to_create, tuple):
       raise ValueError('directories_to_create must be a tuple.')
-    return super(SnapshottedProcessRequest, cls).__new__(cls, args, snapshot_subjects, directories_to_create, **kwargs)
+    return super(SnapshottedProcessRequest, cls).__new__(cls, args, snapshots, directories_to_create, **kwargs)
 
 
 class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', 'stderr', 'exit_code'])):
@@ -158,7 +158,7 @@ class _SnapshotDirectory(datatype('_SnapshotDirectory', ['root'])):
 
 
 def snapshot_directory(project_tree):
-  return os.path.join(project_tree.build_root, '.snapshots')
+  return _SnapshotDirectory(os.path.join(project_tree.build_root, '.snapshots'))
 
 
 class SnapshottedProcess(object):
@@ -202,4 +202,18 @@ def create_snapshot_intrinsics(project_tree):
     return functools.partial(func, project_tree, snapshot_directory(project_tree))
   return [
       (Snapshot, Files, ptree(create_snapshot_archive)),
+    ]
+
+
+def create_snapshot_tasks(project_tree):
+  """TODO: Delete these.
+
+  Necessary because the intrinsic will not trigger conversions to `Files` on a PathGlobs object.
+  Instead, should replace the intrinsic with an uncacheable task, or have it depend on an
+  uncacheable singleton.
+  """
+  def ptree(func):
+    return functools.partial(func, project_tree, snapshot_directory(project_tree))
+  return [
+      (Snapshot, [Select(Files)], ptree(create_snapshot_archive)),
     ]
