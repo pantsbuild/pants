@@ -206,7 +206,7 @@ class BaseGlobs(Locatable, AbstractClass):
   @staticmethod
   def _filespec_for_exclude(raw_exclude, spec_path):
     if isinstance(raw_exclude, string_types):
-      raise ValueError('Exclude type `{}` is not supported: got "{}"'
+      raise ValueError('Excludes of type `{}` are not supported: got "{}"'
                        .format(type(raw_exclude).__name__, raw_exclude))
 
     excluded_patterns = []
