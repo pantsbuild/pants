@@ -62,11 +62,12 @@ class SelectInterpreterTest(TaskTestBase):
       mock_resolve.side_effect = se
       task.execute()
 
-    interpreter = context.products.get_data(SelectInterpreter.INTERPRETER_PRODUCT)
+    interpreter = context.products.get_data(PythonInterpreter)
     self.assertTrue(isinstance(interpreter, PythonInterpreter))
     return interpreter.version_string
 
   def test_interpreter_selection(self):
+    self.assertEquals('FakePython-2.77.777', self._select_interpreter([]))
     self.assertEquals('FakePython-2.77.777', self._select_interpreter([self.tgt1]))
     self.assertEquals('FakePython-2.88.888', self._select_interpreter([self.tgt2]))
     self.assertEquals('FakePython-2.99.999', self._select_interpreter([self.tgt3]))

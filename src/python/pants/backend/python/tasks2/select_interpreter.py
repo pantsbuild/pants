@@ -39,15 +39,13 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin,
 class SelectInterpreter(Task):
   """Select an Python interpreter that matches the constraints of all targets in the working set."""
 
-  INTERPRETER_PRODUCT = 'python_interpreter'
-
   @classmethod
   def subsystem_dependencies(cls):
     return super(SelectInterpreter, cls).subsystem_dependencies() + (PythonSetup, PythonRepos)
 
   @classmethod
   def product_types(cls):
-    return [cls.INTERPRETER_PRODUCT]
+    return [PythonInterpreter]
 
   @classmethod
   def register_options(cls, register):
@@ -101,4 +99,4 @@ class SelectInterpreter(Task):
         binary, identity = infile.read().split('\t')
       interpreter = PythonInterpreter(binary, identity)
 
-    self.context.products.get_data(self.INTERPRETER_PRODUCT, lambda: interpreter)
+    self.context.products.get_data(PythonInterpreter, lambda: interpreter)
