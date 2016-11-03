@@ -10,7 +10,7 @@ from multiprocessing import cpu_count
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.option.ranked_value import RankedValue
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
@@ -93,7 +93,7 @@ class ThriftLinter(NailgunTask):
                               main='com.twitter.scrooge.linter.Main',
                               args=args,
                               jvm_options=self.get_options().jvm_options,
-                              workunit_labels=[WorkUnitLabel.COMPILER])  # to let stdout/err through.
+                              workunit_labels=[WorkUnitLabel.MULTITOOL])  # to let stdout/err through.
 
     if returncode != 0:
       raise ThriftLintError(
@@ -121,6 +121,10 @@ class ThriftLinter(NailgunTask):
 
         for r in results:
           r.wait()
+
+        success = all(r.successful() for r in results)
+        if not success:
+          raise TaskError("Thrift linter failed.")
 
       # errors = []
       # for vt in invalidation_check.invalid_vts:
