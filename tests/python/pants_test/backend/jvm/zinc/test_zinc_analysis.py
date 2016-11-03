@@ -26,28 +26,27 @@ class ZincAnalysisTestSimple(unittest.TestCase):
         with open(get_test_analysis_path(name), 'r') as fp:
           return fp.read()
 
+      def rebase(analysis_file, java_home=None):
+        orig = get_analysis_text(analysis_file)
+        buf = StringIO.StringIO()
+        ZincAnalysisParser().rebase(iter(orig.splitlines(True)), buf,
+                                    {b'/src/pants': b'$PANTS_HOME'}, java_home)
+        return buf.getvalue()
+
       # Now check rebasing.
-      orig = iter(get_analysis_text('simple.analysis').splitlines(True))
+      rebased = rebase('simple.analysis')
       expected_rebased = get_analysis_text('simple.rebased.analysis')
-      buf = StringIO.StringIO()
-      ZincAnalysisParser().rebase(orig, buf, b'/src/pants', b'$PANTS_HOME')
-      rebased = buf.getvalue()
       self.assertMultiLineEqual(expected_rebased, rebased)
 
       # And rebasing+filtering.
-      orig = iter(get_analysis_text('simple.analysis').splitlines(True))
+      rebased = rebase('simple.analysis', b'/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk')
       expected_filtered_rebased = get_analysis_text('simple.rebased.filtered.analysis')
-      buf = StringIO.StringIO()
-      ZincAnalysisParser().rebase(orig, buf, b'/src/pants', b'$PANTS_HOME',
-                                  b'/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk')
-      filtered_rebased = buf.getvalue()
-      self.assertMultiLineEqual(expected_filtered_rebased, filtered_rebased)
+      self.assertMultiLineEqual(expected_filtered_rebased, rebased)
 
       # Check parse_deps is returning both bin and src dependencies.
       infile = iter(get_analysis_text('simple.analysis').splitlines(True))
       deps = ZincAnalysisParser().parse_deps(infile, '')
-      f = '/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala'
-      self.assertItemsEqual(deps[f], [
+      self.assertItemsEqual(deps['/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala'], [
           '/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar',
           '/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala',
         ])
