@@ -73,7 +73,6 @@ class ThriftLinter(NailgunTask):
   def _lint(self, target, classpath):
     self.context.log.debug('Linting {0}'.format(target.address.spec))
 
-    # classpath = self.tool_classpath('scrooge-linter')
     config_args = []
 
     config_args.extend(self.get_options().linter_args)
@@ -93,13 +92,11 @@ class ThriftLinter(NailgunTask):
                               main='com.twitter.scrooge.linter.Main',
                               args=args,
                               jvm_options=self.get_options().jvm_options,
-                              workunit_labels=[WorkUnitLabel.MULTITOOL])  # to let stdout/err through.
+                              workunit_labels=[WorkUnitLabel.COMPILER])  # to let stdout/err through.
 
     if returncode != 0:
       raise ThriftLintError(
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
-
-    return returncode
 
   def execute(self):
     if self.get_options().skip:
@@ -110,7 +107,7 @@ class ThriftLinter(NailgunTask):
       if not invalidation_check.invalid_vts:
         return
 
-      with self.context.new_workunit('xground') as workunit:
+      with self.context.new_workunit('parallel-thrift-linter') as workunit:
         results = set()
         worker_pool = WorkerPool(workunit.parent,
                                  self.context.run_tracker,
@@ -125,14 +122,3 @@ class ThriftLinter(NailgunTask):
         success = all(r.successful() for r in results)
         if not success:
           raise TaskError("Thrift linter failed.")
-
-      # errors = []
-      # for vt in invalidation_check.invalid_vts:
-      #   try:
-      #     self._lint(vt.target, self.tool_classpath('scrooge-linter'))
-      #   except ThriftLintError as e:
-      #     errors.append(str(e))
-      #   else:
-      #     vt.update()
-      # if errors:
-      #   raise TaskError('\n'.join(errors))
