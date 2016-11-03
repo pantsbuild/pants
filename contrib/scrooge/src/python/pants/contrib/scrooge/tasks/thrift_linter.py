@@ -5,9 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from multiprocessing import cpu_count
+
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnitLabel
+from pants.base.worker_pool import Work, WorkerPool
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.option.ranked_value import RankedValue
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
@@ -67,10 +70,10 @@ class ThriftLinter(NailgunTask):
 
     return self._to_bool(self.get_options().strict_default)
 
-  def _lint(self, target):
+  def _lint(self, target, classpath):
     self.context.log.debug('Linting {0}'.format(target.address.spec))
 
-    classpath = self.tool_classpath('scrooge-linter')
+    # classpath = self.tool_classpath('scrooge-linter')
     config_args = []
 
     config_args.extend(self.get_options().linter_args)
@@ -96,19 +99,34 @@ class ThriftLinter(NailgunTask):
       raise ThriftLintError(
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
+    return returncode
+
   def execute(self):
     if self.get_options().skip:
       return
 
     thrift_targets = self.context.targets(self._is_thrift)
     with self.invalidated(thrift_targets) as invalidation_check:
-      errors = []
-      for vt in invalidation_check.invalid_vts:
-        try:
-          self._lint(vt.target)
-        except ThriftLintError as e:
-          errors.append(str(e))
-        else:
-          vt.update()
-      if errors:
-        raise TaskError('\n'.join(errors))
+
+      with self.context.new_workunit('xground') as workunit:
+        results = set()
+        worker_pool = WorkerPool(workunit.parent,
+                                 self.context.run_tracker,
+                                 cpu_count())
+        for vt in invalidation_check.invalid_vts:
+          r = worker_pool.submit_async_work(Work(self._lint, [(vt.target, self.tool_classpath('scrooge-linter'))]))
+          results.add(r)
+
+        for r in results:
+          r.wait()
+
+      # errors = []
+      # for vt in invalidation_check.invalid_vts:
+      #   try:
+      #     self._lint(vt.target, self.tool_classpath('scrooge-linter'))
+      #   except ThriftLintError as e:
+      #     errors.append(str(e))
+      #   else:
+      #     vt.update()
+      # if errors:
+      #   raise TaskError('\n'.join(errors))

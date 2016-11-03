@@ -76,7 +76,7 @@ class WorkerPool(object):
       def do_work(*args):
         self._do_work(work.func, *args, workunit_name=work.workunit_name,
                       workunit_parent=workunit_parent, on_failure=on_failure)
-      self._pool.map_async(do_work, work.args_tuples, chunksize=1, callback=on_success)
+      return self._pool.map_async(do_work, work.args_tuples, chunksize=1, callback=on_success)
 
   def submit_async_work_chain(self, work_chain, workunit_parent, done_hook=None):
     """Submit work to be executed in the background.
