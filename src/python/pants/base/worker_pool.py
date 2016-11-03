@@ -58,12 +58,14 @@ class WorkerPool(object):
   def submit_async_work(self, work, workunit_parent=None, on_success=None, on_failure=None):
     """Submit work to be executed in the background.
 
-    - work: The work to execute.
-    - workunit_parent: If specified, work is accounted for under this workunit.
-    - on_success: If specified, a callable taking a single argument, which will be a list
+    :param work: The work to execute.
+    :param workunit_parent: If specified, work is accounted for under this workunit.
+    :param on_success: If specified, a callable taking a single argument, which will be a list
                   of return values of each invocation, in order. Called only if all work succeeded.
-    - on_failure: If specified, a callable taking a single argument, which is an exception
+    :param on_failure: If specified, a callable taking a single argument, which is an exception
                   thrown in the work.
+
+    :return: `multiprocessing.pool.MapResult`
 
     Don't do work in on_success: not only will it block the result handling thread, but
     that thread is not a worker and doesn't have a logging context etc. Use it just to
