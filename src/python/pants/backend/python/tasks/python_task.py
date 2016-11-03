@@ -35,12 +35,9 @@ class PythonTask(Task):
     return super(PythonTask, cls).implementation_version() + [('PythonTask', 1)]
 
   @classmethod
-  def global_subsystems(cls):
-    return super(PythonTask, cls).global_subsystems() + (IvySubsystem, PythonSetup, PythonRepos)
-
-  @classmethod
-  def task_subsystems(cls):
-    return super(PythonTask, cls).task_subsystems() + (ThriftBinary.Factory,)
+  def subsystem_dependencies(cls):
+    return (super(PythonTask, cls).subsystem_dependencies() +
+            (IvySubsystem, PythonSetup, PythonRepos, ThriftBinary.Factory.scoped(cls)))
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
