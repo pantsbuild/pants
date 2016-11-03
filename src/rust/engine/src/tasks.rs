@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use core::{Field, Function, Key, TypeConstraint, TypeId};
+use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
 use externs::Externs;
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
 
@@ -9,8 +9,9 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
  * types that the engine must be aware of.
  */
 pub struct Tasks {
-  intrinsics: HashMap<(TypeId,TypeConstraint), Vec<Task>>,
-  tasks: HashMap<TypeConstraint, Vec<Task>>,
+  intrinsics: HashMap<(TypeId,TypeConstraint), Vec<Task>, FNV>,
+  singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
+  tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
   pub externs: Externs,
   pub field_name: Field,
   pub field_products: Field,
@@ -44,8 +45,9 @@ impl Tasks {
     type_has_variants: TypeConstraint,
   ) -> Tasks {
     Tasks {
-      intrinsics: HashMap::new(),
-      tasks: HashMap::new(),
+      intrinsics: Default::default(),
+      singletons: Default::default(),
+      tasks: Default::default(),
       externs: externs,
       field_name: field_name,
       field_products: field_products,
@@ -58,8 +60,10 @@ impl Tasks {
   }
 
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeConstraint) -> Option<&Vec<Task>> {
-    // Use intrinsics if available, otherwise use tasks.
-    self.intrinsics.get(&(*subject_type, *product)).or(self.tasks.get(product))
+    // Use singletons, then intrinsics, otherwise tasks.
+    self.singletons.get(product)
+      .or(self.intrinsics.get(&(*subject_type, *product)))
+      .or(self.tasks.get(product))
   }
 
   pub fn intrinsic_add(
@@ -72,14 +76,29 @@ impl Tasks {
     product: TypeConstraint
   ) {
     self.intrinsics.entry((subject_type, product))
-      .or_insert_with(|| Vec::new())
-      .push(
-        Task {
-          cacheable: false,
-          product: product,
-          clause: vec![Selector::select(subject_constraint)],
-          func: func,
-        },
+      .or_insert_with(||
+        vec![
+          Task {
+            cacheable: false,
+            product: product,
+            clause: vec![Selector::select(subject_constraint)],
+            func: func,
+          }
+        ]
+      );
+  }
+
+  pub fn singleton_add(&mut self, func: Function, product: TypeConstraint) {
+    self.singletons.entry(product)
+      .or_insert_with(||
+        vec![
+          Task {
+            cacheable: false,
+            product: product,
+            clause: Vec::new(),
+            func: func,
+          }
+        ]
       );
   }
 

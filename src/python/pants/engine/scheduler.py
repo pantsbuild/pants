@@ -15,7 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
-from pants.engine.isolated_process import create_snapshot_intrinsics
+from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
 from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -105,10 +105,12 @@ class LocalScheduler(object):
       SingleAddress: select_product,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
-    node_builder = NodeBuilder.create(tasks, intrinsics)
+    singletons = create_snapshot_singletons(project_tree)
+    node_builder = NodeBuilder.create(tasks, intrinsics, singletons)
     RulesetValidator(node_builder, goals, root_selector_fns).validate()
     self._register_tasks(node_builder.tasks)
     self._register_intrinsics(node_builder.intrinsics)
+    self._register_singletons(node_builder.singletons)
 
   def _to_value(self, obj):
     return self._context.to_value(obj)
@@ -130,6 +132,17 @@ class LocalScheduler(object):
 
   def _to_constraint(self, type_or_constraint):
     return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
+
+  def _register_singletons(self, singletons):
+    """Register the given singletons dict.
+
+    Singleton tasks are those that are the default for a particular type(product). Like
+    intrinsics, singleton tasks create Runnables that are not cacheable.
+    """
+    for product_type, rule in singletons.items():
+      self._native.lib.singleton_task_add(self._scheduler,
+                                          Function(self._to_id(rule.func)),
+                                          self._to_constraint(product_type))
 
   def _register_intrinsics(self, intrinsics):
     """Register the given intrinsics dict.
@@ -193,6 +206,13 @@ class LocalScheduler(object):
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)
+
+  def trace(self, roots):
+    """Yields a stringified 'stacktrace' starting from the given failed root.
+
+    :param iterable roots: An iterable of the root nodes to begin the trace from.
+    """
+    return "TODO: Restore trace (see: #4007)."
 
   def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.

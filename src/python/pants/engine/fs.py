@@ -415,7 +415,7 @@ def generate_fs_subjects(filenames):
 def create_fs_intrinsics(project_tree):
   def ptree(func):
     p = functools.partial(func, project_tree)
-    p.__name__ = '{}_partial'.format(func.__name__)
+    p.__name__ = '{}_intrinsic'.format(func.__name__)
     return p
   return [
     (DirectoryListing, Dir, ptree(scan_directory)),

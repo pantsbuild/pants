@@ -330,6 +330,17 @@ pub extern fn intrinsic_task_add(
 }
 
 #[no_mangle]
+pub extern fn singleton_task_add(
+  scheduler_ptr: *mut RawScheduler,
+  func: Function,
+  output_constraint: TypeConstraint,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.tasks.singleton_add(func, output_constraint);
+  })
+}
+
+#[no_mangle]
 pub extern fn task_add(
   scheduler_ptr: *mut RawScheduler,
   func: Function,

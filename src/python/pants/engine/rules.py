@@ -109,8 +109,23 @@ class RulesetValidator(object):
           'no task for product used by goal "{}": {}'.format(goal, goal_product.__name__))
 
 
+class SingletonRule(datatype('SingletonRule', ['product_type', 'func']), Rule):
+  """A default rule for a product, which is thus a singleton for that product."""
+
+  @property
+  def input_selectors(self):
+    return tuple()
+
+  @property
+  def output_product_type(self):
+    return self.product_type
+
+  def __repr__(self):
+    return '{}({})'.format(type(self).__name__, self.product_type.__name__)
+
+
 class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', 'func']), Rule):
-  """Intrinsic rule for filesystem operations."""
+  """A default rule for a pair of subject+product."""
 
   @property
   def input_selectors(self):
@@ -124,12 +139,14 @@ class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', '
     return '{}({})'.format(type(self).__name__, self.func.__name__)
 
 
-class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics'])):
+class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics', 'singletons'])):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, task_entries, intrinsic_entries):
+  def create(cls, task_entries, intrinsic_entries=None, singleton_entries=None):
     """Creates a NodeBuilder with tasks indexed by their output type."""
+    intrinsic_entries = intrinsic_entries or tuple()
+    singleton_entries = singleton_entries or tuple()
     # NB make tasks ordered so that gen ordering is deterministic.
     serializable_tasks = OrderedDict()
 
@@ -164,28 +181,38 @@ class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics'])):
     for output_type, input_type, func in intrinsic_entries:
       key = (input_type, output_type)
       if key in intrinsics:
-        raise ValueError('intrinsics provided by {} have already been provided by: {}'.format(
+        raise ValueError('intrinsic provided by {} has already been provided by: {}'.format(
           func.__name__, intrinsics[key]))
       intrinsics[key] = IntrinsicRule(input_type, output_type, func)
-    return cls(serializable_tasks, intrinsics)
+
+    singletons = dict()
+    for output_type, func in singleton_entries:
+      if output_type in singletons:
+        raise ValueError('singleton provided by {} has already been provided by: {}'.format(
+          func.__name__, singletons[output_type]))
+      singletons[output_type] = SingletonRule(output_type, func)
+    return cls(serializable_tasks, intrinsics, singletons)
 
   def all_rules(self):
     """Returns a set containing all rules including instrinsics."""
     declared_rules = set(rule for rules_for_product in self.tasks.values()
                          for rule in rules_for_product)
     declared_intrinsics = set(rule for rule in self.intrinsics.values())
-    return declared_rules.union(declared_intrinsics)
+    declared_singletons = set(rule for rule in self.singletons.values())
+    return declared_rules.union(declared_intrinsics).union(declared_singletons)
 
   def all_produced_product_types(self, subject_type):
     intrinsic_products = set(prod for subj, prod in self.intrinsics.keys()
                              if subj == subject_type)
-    task_products = self.tasks.keys()
-    return intrinsic_products.union(set(task_products))
+    return intrinsic_products.union(set(self.tasks.keys())).union(set(self.singletons.keys()))
 
   def gen_rules(self, subject_type, product_type):
-    # Intrinsics that provide the requested product for the current subject type.
-    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject_type)
-    if intrinsic_node_factory:
+    # Singeltons or intrinsics that provide the requested product for the current subject type.
+    singleton_node_factory = self.singletons.get(product_type)
+    intrinsic_node_factory = self.intrinsics.get((subject_type, product_type))
+    if singleton_node_factory:
+      yield singleton_node_factory
+    elif intrinsic_node_factory:
       yield intrinsic_node_factory
     else:
       # Tasks that provide the requested product.
@@ -199,9 +226,6 @@ class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics'])):
   def _lookup_tasks(self, product_type):
     for entry in self.tasks.get(product_type, tuple()):
       yield entry
-
-  def _lookup_intrinsic(self, product_type, subject_type):
-    return self.intrinsics.get((subject_type, product_type))
 
 
 class CanHaveDependencies(object):
@@ -461,7 +485,7 @@ class GraphMaker(object):
 
     rules_in_graph = set(entry.rule for entry in full_dependency_edges.keys())
     rules_eliminated_during_construction = [entry.rule for entry in full_unfulfillable_rules.keys()]
-    rules_used = set(rules_eliminated_during_construction + self.nodebuilder.intrinsics.values())
+    rules_used = set(rules_eliminated_during_construction + self.nodebuilder.intrinsics.values() + self.nodebuilder.singletons.values())
 
     declared_rules = self.nodebuilder.all_rules()
     unreachable_rules = declared_rules.difference(rules_in_graph, rules_used)

@@ -76,7 +76,7 @@ def _run_command(binary, sandbox_dir, process_request):
 
 def _snapshotted_process(input_conversion,
                          output_conversion,
-                         snapshot_archive_root,
+                         snapshot_directory,
                          binary,
                          *args):
   """A pickleable top-level function to execute a process.
@@ -90,7 +90,7 @@ def _snapshotted_process(input_conversion,
   with temporary_dir(cleanup=False) as sandbox_dir:
     if process_request.snapshots:
       for snapshot in process_request.snapshots:
-        _extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir)
+        _extract_snapshot(snapshot_directory.root, snapshot, sandbox_dir)
 
     # All of the snapshots have been checked out now.
     if process_request.directories_to_create:
@@ -153,8 +153,12 @@ class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', '
   """Contains the stdout, stderr and exit code from executing a process."""
 
 
-class _SnapshotDirectory(object):
-  """TODO: Needs to be provided intrinsically somewhere."""
+class _SnapshotDirectory(datatype('_SnapshotDirectory', ['root'])):
+  """Private singleton value for the snapshot directory."""
+
+
+def snapshot_directory(project_tree):
+  return os.path.join(project_tree.build_root, '.snapshots')
 
 
 class SnapshottedProcess(object):
@@ -183,10 +187,19 @@ class SnapshottedProcess(object):
     return (product_type, inputs, func)
 
 
-def create_snapshot_intrinsics(project_tree):
-  snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
+def create_snapshot_singletons(project_tree):
   def ptree(func):
-    return functools.partial(func, project_tree, snapshot_archive_root)
+    p = functools.partial(func, project_tree)
+    p.__name__ = '{}_singleton'.format(func.__name__)
+    return p
+  return [
+      (_SnapshotDirectory, ptree(snapshot_directory))
+    ]
+
+
+def create_snapshot_intrinsics(project_tree):
+  def ptree(func):
+    return functools.partial(func, project_tree, snapshot_directory(project_tree))
   return [
       (Snapshot, Files, ptree(create_snapshot_archive)),
     ]

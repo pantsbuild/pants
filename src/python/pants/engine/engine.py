@@ -109,12 +109,8 @@ class Engine(AbstractClass):
     # Throw handling.
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_roots = tuple(root for root, state in result_items if type(state) is Throw)
-    throw_states = tuple(state for _, state in result_items if type(state) is Throw)
     if throw_roots:
-      cumulative_trace = 'TODO: reenable trace:\n  {}'.format('\n  '.join(str(r) for r in throw_states))
-      #cumulative_trace = '\n'.join(
-      #  '\n'.join(self._scheduler.product_graph.trace(root)) for root in throw_roots
-      #)
+      cumulative_trace = self._scheduler.trace(throw_roots)
       stringified_throw_roots = ', '.join(str(x) for x in throw_roots)
       raise ExecutionError('received unexpected Throw state(s) for root(s): {}\n{}'
                            .format(stringified_throw_roots, cumulative_trace))

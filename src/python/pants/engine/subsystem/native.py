@@ -118,6 +118,7 @@ _FFI.cdef(
     void scheduler_destroy(RawScheduler*);
 
     void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
+    void singleton_task_add(RawScheduler*, Function, TypeConstraint);
 
     void task_add(RawScheduler*, Function, TypeConstraint);
     void task_add_select(RawScheduler*, TypeConstraint);
