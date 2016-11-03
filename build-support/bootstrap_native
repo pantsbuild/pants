@@ -24,6 +24,7 @@ case "${KERNEL,,}" in
     ;;
   *)
     die "Unknown kernel ${KERNEL}, cannot bootstrap pants native code!"
+    ;;
 esac
 
 readonly VERSION=0.0.1
@@ -47,13 +48,16 @@ function write_built_at_hash() {
 function ensure_prerequisites() {
   # The machine may have a non-rustup rust install and we'll respect that, but in case we need to
   # bootstrap via rustup, we pre-emptively add it to the end of the PATH to avoid the user needing
-  # to re-exec their SHELL.
+  # to re-exec their SHELL or otherwise have their PATH permanently altered by the rustup script.
   export PATH="$PATH:$HOME/.cargo/bin"
   if [[ -z "$(which cargo 2>/dev/null || true)" ]]
   then
     log "A rust installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
-    sh <(curl https://sh.rustup.rs -sSf) ${RUSTUP_FLAGS}
+    local readonly rustup=$(mktemp -t pants.rustup.XXXXX)
+    curl https://sh.rustup.rs -sSf > ${rustup}
+    sh ${rustup} -y --no-modify-path 1>&2
+    rm -f ${rustup}
   fi
 }
 
