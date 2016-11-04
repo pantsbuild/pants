@@ -108,17 +108,23 @@ class ThriftLinter(NailgunTask):
         return
 
       with self.context.new_workunit('parallel-thrift-linter') as workunit:
-        results = set()
         worker_pool = WorkerPool(workunit.parent,
                                  self.context.run_tracker,
                                  cpu_count())
-        for vt in invalidation_check.invalid_vts:
-          r = worker_pool.submit_async_work(Work(self._lint, [(vt.target, self.tool_classpath('scrooge-linter'))]))
-          results.add(r)
 
+        scrooge_linter_classpath = self.tool_classpath('scrooge-linter')
+        results = set()
+        errors = []
+        for vt in invalidation_check.invalid_vts:
+          r = worker_pool.submit_async_work(Work(self._lint, [(vt.target, scrooge_linter_classpath)]))
+          results.add(r)
         for r in results:
           r.wait()
+          # MapResult will raise _value in `get` if the run is not successful.
+          try:
+            r.get()
+          except ThriftLintError as e:
+            errors.append(str(e))
 
-        success = all(r.successful() for r in results)
-        if not success:
-          raise TaskError("Thrift linter failed.")
+        if errors:
+          raise TaskError('\n'.join(errors))
