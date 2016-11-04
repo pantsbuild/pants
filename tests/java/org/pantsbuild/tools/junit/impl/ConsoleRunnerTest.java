@@ -394,7 +394,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
   @Test
   public void testNotATestScalaClass() throws Exception {
-    // This class is abstract, test runner should ignore
+    // This class is a basic scala class, test runner should ignore
     invokeConsoleRunner("NotAScalaTest");
     assertEquals("", TestRegistry.getCalledTests());
   }

@@ -7,5 +7,4 @@ scala_library(
     '3rdparty:scalatest',
     'tests/java/org/pantsbuild/tools/junit/lib:test-dep',
   ],
-  sources=globs('*.scala')
 )

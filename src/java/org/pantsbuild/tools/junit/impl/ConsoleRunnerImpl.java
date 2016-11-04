@@ -49,8 +49,6 @@ import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
 import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
-import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
-import org.pantsbuild.tools.junit.withretry.ScalaTestUtil;
 
 /**
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
@@ -525,8 +523,8 @@ public class ConsoleRunnerImpl {
       throws InitializationError {
     Computer junitComputer = new ConcurrentComputer(concurrency, parallelThreads);
     Class<?>[] classes = specSet.extract(concurrency).classes();
-    AllDefaultPossibilitiesBuilderWithRetry builder =
-        new AllDefaultPossibilitiesBuilderWithRetry(numRetries, swappableErr.getOriginal());
+    CustomAnnotationBuilder builder =
+        new CustomAnnotationBuilder(numRetries, swappableErr.getOriginal());
     Runner suite = junitComputer.getSuite(builder, classes);
     return core.run(Request.runner(suite)).getFailureCount();
   }
@@ -593,8 +591,8 @@ public class ConsoleRunnerImpl {
         // requests.add(Request.classes(classes.toArray(new Class<?>[classes.size()])));
         // does, except that it instantiates our own builder, needed to support retries.
         try {
-          AllDefaultPossibilitiesBuilderWithRetry builder =
-              new AllDefaultPossibilitiesBuilderWithRetry(numRetries, err);
+          CustomAnnotationBuilder builder =
+              new CustomAnnotationBuilder(numRetries, err);
           Runner suite = new Computer().getSuite(
               builder, classes.toArray(new Class<?>[classes.size()]));
           requests.add(Request.runner(suite));

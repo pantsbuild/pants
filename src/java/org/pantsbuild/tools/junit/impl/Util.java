@@ -9,7 +9,6 @@ import org.junit.Ignore;
 import org.junit.runner.Description;
 import org.junit.runner.RunWith;
 import org.junit.runner.notification.Failure;
-import org.pantsbuild.tools.junit.withretry.ScalaTestUtil;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -150,9 +149,6 @@ final class Util {
     return clazz.isAnnotationPresent(RunWith.class);
   }
 
-  /**
-   * Support classes using scala test.
-   */
   public static boolean isTestClass(final Class<?> clazz) {
     // Must be a public concrete class to be a runnable junit Test.
     if (clazz.isInterface()
