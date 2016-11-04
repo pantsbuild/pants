@@ -58,7 +58,7 @@ function ensure_prerequisites() {
     rm -f ${rustup}
     # A soft attempt to control the toolchain - if the use came in with their own cargo on that PATH
     # we'll never get here.
-    rustup override set stable
+    rustup override set stable 1>&2
   fi
 }
 
