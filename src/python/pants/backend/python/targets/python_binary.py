@@ -68,6 +68,13 @@ class PythonBinary(PythonTarget):
       interpreter compatibility for this target, using the Requirement-style format,
       e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
     """
+    if source is None and entry_point is None:
+      raise TargetDefinitionException(self,
+          'A python binary target must specify either source or entry_point.')
+
+    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
+      raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
+
     self._entry_point = entry_point
     self._inherit_path = bool(inherit_path)
     self._zip_safe = bool(zip_safe)
@@ -91,13 +98,6 @@ class PythonBinary(PythonTarget):
 
     sources = [] if source is None else [source]
     super(PythonBinary, self).__init__(sources=sources, payload=payload, **kwargs)
-
-    if source is None and entry_point is None:
-      raise TargetDefinitionException(self,
-          'A python binary target must specify either source or entry_point.')
-
-    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
-      raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
 
     if source and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]
