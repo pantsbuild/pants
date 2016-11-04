@@ -77,8 +77,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
 
   def test_multiple_bad_strict_override(self):
-    # thrift-linter fails with command line flag overriding the BUILD section.
-    # Using -q to make sure the output are in exception messages.
+    # Using -q to make sure bad thrift files are in the final exception messages.
     cmd = ['-q',
            'thrift-linter',
            '--strict',
