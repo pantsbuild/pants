@@ -234,6 +234,19 @@ class FilesetWithSpecTest(BaseTest):
     with self.assertRaises(ValueError):
       EagerFilesetWithSpec('foo', {'globs':['notfoo/a.txt']}, files=['files'], file_hashes={})
 
+  def test_lazy_fileset_with_spec_fails_if_exclude_filespec_not_prefixed_by_relroot(self):
+    with self.assertRaises(ValueError):
+      LazyFilesetWithSpec('foo',
+                          {'globs': [], 'exclude': [{'globs': ['notfoo/a.txt']}]},
+                          lambda: ['foo/a.txt'])
+
+  def test_eager_fileset_with_spec_fails_if_exclude_filespec_not_prefixed_by_relroot(self):
+    with self.assertRaises(ValueError):
+      EagerFilesetWithSpec('foo',
+                           {'globs': [], 'exclude': [{'globs': ['notfoo/a.txt']}]},
+                           files=['files'],
+                           file_hashes={})
+
   def test_iter_relative_paths(self):
     efws = EagerFilesetWithSpec('test_root', {'globs': []}, files=['a', 'b', 'c'], file_hashes={})
     result = list(efws.iter_relative_paths())

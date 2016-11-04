@@ -279,8 +279,8 @@ class JarTask(NailgunTask):
   """
 
   @classmethod
-  def global_subsystems(cls):
-    return super(JarTask, cls).global_subsystems() + (JarTool,)
+  def subsystem_dependencies(cls):
+    return super(JarTask, cls).subsystem_dependencies() + (JarTool,)
 
   @classmethod
   def prepare(cls, options, round_manager):

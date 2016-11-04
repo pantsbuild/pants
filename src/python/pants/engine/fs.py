@@ -247,9 +247,9 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
       if not specs:
         continue
       res = pattern_cls.to_filespec(specs)
-      excludes = res.get('excludes')
-      if excludes:
-        raise ValueError('Excludes not supported for PathGlobs. Got: {}'.format(excludes))
+      exclude = res.get('exclude')
+      if exclude:
+        raise ValueError('Excludes not supported for PathGlobs. Got: {}'.format(exclude))
       new_specs = res.get('globs', None)
       if new_specs:
         filespecs.update(new_specs)

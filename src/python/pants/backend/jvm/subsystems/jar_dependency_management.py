@@ -318,8 +318,8 @@ class JarDependencyManagementSetup(Task):
       )
 
   @classmethod
-  def global_subsystems(cls):
-    return (JarDependencyManagement,)
+  def subsystem_dependencies(cls):
+    return super(JarDependencyManagementSetup, cls).subsystem_dependencies() + (JarDependencyManagement,)
 
   def execute(self):
     self._resolve_default_target()

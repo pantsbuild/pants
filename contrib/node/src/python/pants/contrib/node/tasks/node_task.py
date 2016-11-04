@@ -20,7 +20,7 @@ class NodeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (NodeDistribution.Factory,)
+    return super(NodeTask, cls).subsystem_dependencies() + (NodeDistribution.Factory,)
 
   @memoized_property
   def node_distribution(self):

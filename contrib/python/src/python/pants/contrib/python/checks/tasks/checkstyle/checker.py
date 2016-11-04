@@ -51,8 +51,8 @@ class PythonCheckStyleTask(PythonTask):
     self.excluder = FileExcluder(self.options.suppress, self.context.log)
 
   @classmethod
-  def global_subsystems(cls):
-    return super(PythonTask, cls).global_subsystems() + cls._subsystems
+  def subsystem_dependencies(cls):
+    return super(PythonTask, cls).subsystem_dependencies() + cls._subsystems
 
   @classmethod
   def register_options(cls, register):
