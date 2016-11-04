@@ -31,15 +31,6 @@ function calculate_current_hash() {
   find ${NATIVE_ROOT} -type f | git hash-object -t blob --stdin-paths | fingerprint_data
 }
 
-function read_built_at_hash() {
-  cat ${CACHE_TARGET_DIR}/built_at_hash 2>/dev/null
-}
-
-function write_built_at_hash() {
-  local readonly hash=$1
-  echo ${hash} > ${CACHE_TARGET_DIR}/built_at_hash
-}
-
 function ensure_prerequisites() {
   # The machine may have a non-rustup rust install and we'll respect that, but in case we need to
   # bootstrap via rustup, we pre-emptively add it to the end of the PATH to avoid the user needing
@@ -62,16 +53,14 @@ function ensure_prerequisites() {
 function bootstrap_native_code() {
   # Bootstraps the native code and sets NATIVE_BOOTSTRAP_HASH to the resulting hash version.
   ensure_prerequisites
-
   export NATIVE_BOOTSTRAP_HASH="$(calculate_current_hash)"
-  if [[ "${NATIVE_BOOTSTRAP_HASH}" != "$(read_built_at_hash)" ]]
+
+  local target_hash_dir="${CACHE_TARGET_DIR}/${NATIVE_BOOTSTRAP_HASH}"
+  local target_binary="${target_hash_dir}/native-engine"
+  if [ ! -f "${target_binary}" ]
   then
     cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}
-    local target_hash_dir="${CACHE_TARGET_DIR}/${NATIVE_BOOTSTRAP_HASH}"
     mkdir -p ${target_hash_dir}
-    ln -f ${NATIVE_ROOT}/target/${MODE}/libengine.${EXTENSION} ${target_hash_dir}/native-engine
-    # We re-calculate the hash here since `Cargo.lock` is in the hashed directory tree and is
-    # mutable and may have changed during the `cargo build` above.
-    write_built_at_hash $(calculate_current_hash)
+    cp ${NATIVE_ROOT}/target/${MODE}/libengine.${EXTENSION} ${target_binary}
   fi
 }

@@ -82,6 +82,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return False
 
   @classmethod
+  def hermetic_env_whitelist(cls):
+    """A whitelist of environment variables to propagate to tests when hermetic=True."""
+    return [
+        # Set by the wrapper script in the repo to allow for running from source.
+        'PANTS_NATIVE_ENGINE_VERSION',
+      ]
+
+  @classmethod
   def has_python_version(cls, version):
     """Returns true if the current system has the specified version of python.
 
@@ -166,8 +174,11 @@ class PantsRunIntegrationTest(unittest.TestCase):
     pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
     pants_command = [pants_script] + args + command
 
+    # Only whitelisted entries will be included in the environment if hermetic=True.
     if self.hermetic():
       env = dict()
+      for h in self.hermetic_env_whitelist():
+        env[h] = os.getenv(h)
       hermetic_env = os.getenv('HERMETIC_ENV')
       if hermetic_env:
         for h in hermetic_env.strip(',').split(','):
