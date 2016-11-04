@@ -9,9 +9,8 @@ readonly MODE_FLAG=
 
 # TODO(John Sirois): Eliminate this replication of BinaryUtil logic internal to pants code when
 # https://github.com/pantsbuild/pants/issues/4006 is complete.
-readonly KERNEL=$(uname -s)
-# NB: ${varname,,} is a very cryptic way to lowercase a variable's contents in bash.
-case "${KERNEL,,}" in
+readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
+case "${KERNEL}" in
   linux)
     readonly EXTENSION=so
     readonly OS_ID=linux/$(uname -m)
