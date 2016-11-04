@@ -27,11 +27,6 @@ python_binary(
 
 
 class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
-  def assert_pex_attribute(self, pex, attr, value):
-    self.assertTrue(os.path.exists(pex))
-    pex_info = PexInfo.from_pex(pex)
-    self.assertEquals(getattr(pex_info, attr), value)
-
   @staticmethod
   @contextmanager
   def caching_config():
@@ -61,6 +56,11 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
     finally:
       with open(filename, 'wb') as fh:
         fh.write(old_content)
+
+  def assert_pex_attribute(self, pex, attr, value):
+    self.assertTrue(os.path.exists(pex))
+    pex_info = PexInfo.from_pex(pex)
+    self.assertEquals(getattr(pex_info, attr), value)
 
   def test_zipsafe_caching(self):
     with self.caching_config() as pants_ini_config:

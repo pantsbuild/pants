@@ -94,7 +94,7 @@ class TaskIdentityFingerprintStrategy(FingerprintStrategy):
     """
     hasher = self._build_hasher(target)
     digest = hasher.hexdigest()
-    logger.debug('target fingerprint for %s is %s', target, digest)
+    logger.debug('target fingerprint for %s is: %s', target, digest)
     return digest
 
   def __hash__(self):
