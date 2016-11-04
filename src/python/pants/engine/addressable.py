@@ -95,6 +95,9 @@ class TypeConstraint(AbstractClass):
     return ('{type_constraint_type}({constrained_type})'
       .format(type_constraint_type=type(self).__name__,
                     constrained_type=constrained_type))
+  
+  def __name__(self):
+    return ', '.join(t.__name__ for t in self._types)
 
   def __name__(self):
     return ', '.join(t.__name__ for t in self._types)
