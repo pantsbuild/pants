@@ -96,18 +96,18 @@ class GraphInvalidationTest(unittest.TestCase):
       self.assertLess(scheduler.node_count(), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
-    with self.open_scheduler(['//:', '3rdparty/::']) as (graph, _, _):
-      node_count = len(graph)
+    with self.open_scheduler(['//:', '3rdparty/::']) as (_, _, scheduler):
+      node_count = scheduler.node_count()
       self.assertGreater(node_count, 0)
 
       # Invalidate the '3rdparty/python' DirectoryListing, the `3rdparty` DirectoryListing,
       # and then the root DirectoryListing by "touching" files/dirs.
       for filename in ('3rdparty/python/BUILD', '3rdparty/python', 'non_existing_file'):
-        invalidated_count = graph.invalidate_files([filename])
+        invalidated_count = scheduler.invalidate_files([filename])
         self.assertGreater(invalidated_count,
                            0,
                            'File {} did not invalidate any Nodes.'.format(filename))
-        node_count, last_node_count = len(graph), node_count
+        node_count, last_node_count = scheduler.node_count(), node_count
         self.assertLess(node_count, last_node_count)
 
   def test_sources_ordering(self):
