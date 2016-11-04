@@ -14,7 +14,7 @@ from os.path import dirname
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir, File, Link
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import parse_variants
 from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
                              file_digest, read_link, scan_directory)
@@ -344,7 +344,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'sel
   def _dependency_subject_variants(self, dep_product):
     for dependency in getattr(dep_product, self.field or 'dependencies'):
       variants = self.variants
-      if isinstance(dependency, Address):
+      if isinstance(dependency, BuildFileAddress):
         # If a subject has literal variants for particular dependencies, they win over all else.
         dependency, literal_variants = parse_variants(dependency)
         variants = Variants.merge(variants, literal_variants)
