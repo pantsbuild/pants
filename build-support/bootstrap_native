@@ -56,8 +56,8 @@ function ensure_prerequisites() {
     curl https://sh.rustup.rs -sSf > ${rustup}
     sh ${rustup} -y --no-modify-path 1>&2
     rm -f ${rustup}
-    # A soft attempt to control the toolchain - if the use came in with their own cargo on that PATH
-    # we'll never get here.
+    # A soft attempt to control the toolchain - if the user came in with their own cargo on that
+    # PATH we'll never get here.
     rustup override set stable 1>&2
   fi
 }
