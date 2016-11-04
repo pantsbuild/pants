@@ -63,7 +63,9 @@ PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
 function exec_pants_bare() {
   activate_pants_venv
   bootstrap_native_code
-  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" exec python ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" \
+  PANTS_NATIVE_ENGINE_VERSION="${NATIVE_BOOTSTRAP_HASH}" \
+    exec python ${PANTS_EXE} "$@"
 }
 
 if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
