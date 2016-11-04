@@ -13,6 +13,8 @@ from twitter.common.collections import maybe_list
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 
 
 class PythonBinary(PythonTarget):
@@ -66,18 +68,6 @@ class PythonBinary(PythonTarget):
       interpreter compatibility for this target, using the Requirement-style format,
       e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
     """
-
-    sources = [] if source is None else [source]
-    super(PythonBinary, self).__init__(sources=sources, **kwargs)
-
-    if source is None and entry_point is None:
-      raise TargetDefinitionException(self,
-          'A python binary target must specify either source or entry_point.')
-
-    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
-      raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
-
-    # TODO(pl): Most if not all of these should live in payload fields
     self._entry_point = entry_point
     self._inherit_path = bool(inherit_path)
     self._zip_safe = bool(zip_safe)
@@ -86,6 +76,28 @@ class PythonBinary(PythonTarget):
     self._indices = maybe_list(indices or [])
     self._ignore_errors = bool(ignore_errors)
     self._platforms = tuple(maybe_list(platforms or []))
+
+    payload = Payload()
+    payload.add_fields({
+      'entry_point': PrimitiveField(self._entry_point),
+      'inherit_path': PrimitiveField(self._inherit_path),
+      'zip_safe': PrimitiveField(self._zip_safe),
+      'always_write_cache': PrimitiveField(self._always_write_cache),
+      'repositories': PrimitiveField(self._repositories),
+      'indices': PrimitiveField(self._indices),
+      'ignore_errors': PrimitiveField(self._ignore_errors),
+      'platforms': PrimitiveField(self._platforms),
+    })
+
+    sources = [] if source is None else [source]
+    super(PythonBinary, self).__init__(sources=sources, payload=payload, **kwargs)
+
+    if source is None and entry_point is None:
+      raise TargetDefinitionException(self,
+          'A python binary target must specify either source or entry_point.')
+
+    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
+      raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
 
     if source and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]
