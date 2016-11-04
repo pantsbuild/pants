@@ -113,18 +113,20 @@ class ThriftLinter(NailgunTask):
                                  cpu_count())
 
         scrooge_linter_classpath = self.tool_classpath('scrooge-linter')
-        results = set()
+        results = []
         errors = []
         for vt in invalidation_check.invalid_vts:
           r = worker_pool.submit_async_work(Work(self._lint, [(vt.target, scrooge_linter_classpath)]))
-          results.add(r)
-        for r in results:
+          results.append((r, vt))
+        for r, vt in results:
           r.wait()
           # MapResult will raise _value in `get` if the run is not successful.
           try:
             r.get()
           except ThriftLintError as e:
             errors.append(str(e))
+          else:
+            vt.update()
 
         if errors:
           raise TaskError('\n'.join(errors))
