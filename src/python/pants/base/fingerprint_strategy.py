@@ -79,7 +79,6 @@ class TaskIdentityFingerprintStrategy(FingerprintStrategy):
     hasher = hashlib.sha1()
 
     payload_fingerprint = target.payload.fingerprint() or ''
-    logger.debug('\n')
     logger.debug('payload fingerprint for %s is: %s', target, payload_fingerprint)
     hasher.update(payload_fingerprint)
 
