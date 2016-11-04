@@ -56,18 +56,22 @@ function ensure_prerequisites() {
     curl https://sh.rustup.rs -sSf > ${rustup}
     sh ${rustup} -y --no-modify-path 1>&2
     rm -f ${rustup}
+    # A soft attempt to control the toolchain - if the use came in with their own cargo on that PATH
+    # we'll never get here.
+    rustup override set stable
   fi
 }
 
 function bootstrap_native_code() {
   ensure_prerequisites
 
-  readonly current_hash=$(calculate_current_hash)
-  if [[ "${current_hash}" != "$(read_built_at_hash)" ]]
+  if [[ "$(calculate_current_hash)" != "$(read_built_at_hash)" ]]
   then
     cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}
     mkdir -p ${CACHE_TARGET_DIR}
     ln -f ${NATIVE_ROOT}/target/${MODE}/libengine.${EXTENSION} ${CACHE_TARGET_DIR}/native-engine
-    write_built_at_hash ${current_hash}
+    # We re-calculate the hash here since `Cargo.lock` is in the hashed directory tree and is
+    # mutable and may have changed during the `cargo build` above.
+    write_built_at_hash $(calculate_current_hash)
   fi
 }
