@@ -7,15 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 import logging
-import os
 from abc import abstractmethod, abstractproperty
 from os.path import dirname
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.addressable import parse_variants
 from pants.engine.fs import (DirectoryListing, FileContent, FileDigest, ReadLink, file_content,
                              file_digest, read_link, scan_directory)
 from pants.engine.selectors import Select, SelectVariant
@@ -228,11 +224,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
   def product(self):
     return self.selector.product
 
-  def _select_literal(self, candidate, variant_value):
-    """Looks for has-a or is-a relationships between the given value and the requested product.
-
-    Returns the resulting product value, or None if no match was made.
-    """
+  @classmethod
+  def do_real_select_literal(cls, type_constraint, candidate, variant_value):
     def items():
       # Check whether the subject is-a instance of the product.
       yield candidate
@@ -244,36 +237,56 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
     # TODO: returning only the first literal configuration of a given type/variant. Need to
     # define mergeability for products.
     for item in items():
-      if not self.selector.type_constraint.satisfied_by(item):
+      if not type_constraint.satisfied_by(item):
         continue
       if variant_value and not getattr(item, 'name', None) == variant_value:
         continue
       return item
     return None
 
-  def step(self, step_context):
-    # Request default Variants for the subject, so that if there are any we can propagate
-    # them to task nodes.
+  def _select_literal(self, candidate, variant_value):
+    """Looks for has-a or is-a relationships between the given value and the requested product.
+
+    Returns the resulting product value, or None if no match was made.
+    """
+    return self.do_real_select_literal(self.selector.type_constraint, candidate, variant_value)
+
+  def _maybe_do_variant_thing(self, step_context):
     variants = self.variants
     if type(self.subject) is Address and self.product is not Variants:
       dep_state = step_context.select_for(self._variant_selector, self.subject, self.variants)
       if type(dep_state) is Waiting:
-        return dep_state
+        return dep_state, None
       elif type(dep_state) is Return:
         # A subject's variants are overridden by any dependent's requested variants, so
         # we merge them left to right here.
         variants = Variants.merge(dep_state.value.default.items(), self.variants)
+    return None, variants
 
+  def _handle_selectvariant(self, variants):
     # If there is a variant_key, see whether it has been configured.
     if type(self.selector) is SelectVariant:
       variant_values = [value for key, value in variants
-        if key == self.variant_key] if variants else None
+                        if key == self.variant_key] if variants else None
       if not variant_values:
         # Select cannot be satisfied: no variant configured for this key.
-        return Noop('Variant key {} was not configured in variants {}', self.variant_key, variants)
+        return Noop('Variant key {} was not configured in variants {}', self.variant_key, variants), None
       variant_value = variant_values[0]
     else:
       variant_value = None
+    return None, variant_value
+
+  def step(self, step_context):
+    # Request default Variants for the subject, so that if there are any we can propagate
+    # them to task nodes.
+    raise Exception('select node shouldnt be hit anymore self: {}'.format(self))
+    state_to_return, variants = self._maybe_do_variant_thing(step_context)
+    if state_to_return is not None:
+      return state_to_return
+
+    state_to_return, variant_value = self._handle_selectvariant(variants)
+    if state_to_return is not None:
+      return state_to_return
 
     # If the Subject "is a" or "has a" Product, then we're done.
     literal_value = self._select_literal(self.subject, variant_value)
@@ -313,145 +326,6 @@ class SelectNode(datatype('SelectNode', ['subject', 'variants', 'selector']), No
       return Return(matches[0][1])
 
 
-class DependenciesNode(datatype('DependenciesNode', ['subject', 'variants', 'selector']), Node):
-  """A Node that selects the given Product for each of the items in `field` on `dep_product`.
-
-  Begins by selecting the `dep_product` for the subject, and then selects a product for each
-  member of a collection named `field` on the dep_product.
-
-  The value produced by this Node guarantees that the order of the provided values matches the
-  order of declaration in the list `field` of the `dep_product`.
-  """
-  is_cacheable = False
-  is_inlineable = True
-
-  def __new__(cls, subject, variants, selector):
-    return super(DependenciesNode, cls).__new__(cls, subject, variants,
-                                                selector)
-
-  @property
-  def dep_product(self):
-    return self.selector.dep_product
-
-  @property
-  def product(self):
-    return self.selector.product
-
-  @property
-  def field(self):
-    return self.selector.field
-
-  def _dependency_subject_variants(self, dep_product):
-    for dependency in getattr(dep_product, self.field or 'dependencies'):
-      variants = self.variants
-      if isinstance(dependency, Address):
-        # If a subject has literal variants for particular dependencies, they win over all else.
-        dependency, literal_variants = parse_variants(dependency)
-        variants = Variants.merge(variants, literal_variants)
-      yield dependency, variants
-
-  def step(self, step_context):
-    # Request the product we need in order to request dependencies.
-    dep_product_selector = self.selector.dep_product_selector
-    dep_product_state = step_context.select_for(dep_product_selector,
-                                                self.subject,
-                                                self.variants)
-    if type(dep_product_state) in (Throw, Waiting):
-      return dep_product_state
-    elif type(dep_product_state) is Noop:
-      return Noop('Could not compute {} to determine dependencies.', dep_product_selector)
-    elif type(dep_product_state) is not Return:
-      State.raise_unrecognized(dep_product_state)
-
-    # The product and its dependency list are available.
-    dep_values = []
-    dependencies = []
-    for dep_subject, variants in self._dependency_subject_variants(dep_product_state.value):
-      if type(dep_subject) not in self.selector.field_types:
-        return Throw(TypeError('Unexpected type "{}" for {}: {!r}'
-                               .format(type(dep_subject), self.selector, dep_subject)))
-
-      product_selector = self.selector.projected_product_selector
-      dep_state = step_context.select_for(product_selector, subject=dep_subject, variants=variants)
-      if type(dep_state) is Waiting:
-        dependencies.extend(dep_state.dependencies)
-      elif type(dep_state) is Return:
-        dep_values.append(dep_state.value)
-      elif type(dep_state) is Noop:
-        return Throw(ValueError('No source of explicit dependency {} for {}'
-                                .format(product_selector, dep_subject)))
-      elif type(dep_state) is Throw:
-        return dep_state
-      else:
-        raise State.raise_unrecognized(dep_state)
-    if dependencies:
-      return Waiting(dependencies)
-    # All dependencies are present!
-    return Return(dep_values)
-
-
-class ProjectionNode(datatype('ProjectionNode', ['subject', 'variants', 'selector']), Node):
-  """A Node that selects the given input Product for the Subject, and then selects for a new subject.
-
-  TODO: This is semantically very similar to DependenciesNode (which might be considered to be a
-  multi-field projection for the contents of a list). Should be looking for ways to merge them.
-  """
-  is_cacheable = False
-  is_inlineable = True
-
-  @property
-  def product(self):
-    return self.selector.product
-
-  @property
-  def projected_subject(self):
-    return self.selector.projected_subject
-
-  @property
-  def fields(self):
-    return self.selector.fields
-
-  @property
-  def input_product(self):
-    return self.selector.input_product
-
-  def step(self, step_context):
-    # Request the product we need to compute the subject.
-    input_selector = self.selector.input_product_selector
-    input_state = step_context.select_for(input_selector, self.subject, self.variants)
-    if type(input_state) in (Throw, Waiting):
-      return input_state
-    elif type(input_state) is Noop:
-      return Noop('Could not compute {} in order to project its fields.', input_selector)
-    elif type(input_state) is not Return:
-      State.raise_unrecognized(input_state)
-
-    # The input product is available: use it to construct the new Subject.
-    input_product = input_state.value
-    values = [getattr(input_product, field) for field in self.fields]
-
-    # If there was only one projected field and it is already of the correct type, project it.
-    try:
-      if len(values) == 1 and type(values[0]) is self.projected_subject:
-        projected_subject = values[0]
-      else:
-        projected_subject = self.projected_subject(*values)
-    except Exception as e:
-      return Throw(ValueError(
-        'Fields {} of {} could not be projected as {}: {}'.format(self.fields, input_product,
-          self.projected_subject, e)))
-
-    # When the output node is available, return its result.
-    output_selector = self.selector.projected_product_selector
-    output_state = step_context.select_for(output_selector, projected_subject, self.variants)
-    if type(output_state) in (Return, Throw, Waiting):
-      return output_state
-    elif type(output_state) is Noop:
-      return Throw(ValueError('No source of projected dependency {}'.format(output_selector)))
-    else:
-      raise State.raise_unrecognized(output_state)
-
-
 def _run_func_and_check_type(product_type, type_check, func, *args):
   result = func(*args)
   if type_check(result):
@@ -480,14 +354,32 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
   def func(self):
     return self.rule.task_func
 
-  def step(self, step_context):
-    # Compute dependencies for the Node, or determine whether it is a Noop.
+  def collect_dep_values(self, step_context):
     dependencies = []
     dep_values = []
     for selector in self.rule.input_selectors:
       dep_state = step_context.select_for(selector, self.subject, self.variants)
 
       if type(dep_state) is Waiting:
+        if type(selector) is Select:
+          # TODO clean this up
+          raise Exception(
+            """we should never wait on a Select {}
+            waiting contents: {}
+            self: {}
+            deps:
+               {}
+            node_states
+               {}
+            selectors to cached vals
+               {}""".format(
+              selector,
+              dep_state.dependencies,
+              self,
+              '\n       '.join(str(d) for d in dep_state.dependencies),
+              step_context._node_states,
+              '\n       '.join('{} : {}'.format(k,v) for k, v in step_context._rule_edges._selector_to_state_node_tuple.items())
+            ))
         dependencies.extend(dep_state.dependencies)
       elif type(dep_state) is Return:
         dep_values.append(dep_state.value)
@@ -495,15 +387,22 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
         if selector.optional:
           dep_values.append(None)
         else:
-          return Noop('Was missing (at least) input for {}.', selector)
+          return tuple(), Noop('Was missing (at least) input for {}. {}', selector, dep_state)
       elif type(dep_state) is Throw:
         # NB: propagate thrown exception directly.
-        return dep_state
+        return tuple(), dep_state
       else:
         State.raise_unrecognized(dep_state)
     # If any clause was still waiting on dependencies, indicate it; else execute.
     if dependencies:
-      return Waiting(dependencies)
+      return tuple(), Waiting(dependencies)
+    return dep_values, None
+
+  def step(self, step_context):
+    # Compute dependencies for the Node, or determine whether it is a Noop.
+    dep_values, state = self.collect_dep_values(step_context)
+    if state:
+      return state
     # Ready to run!
     return Runnable(functools.partial(_run_func_and_check_type,
                                       self.rule.output_product_type,
@@ -512,14 +411,14 @@ class TaskNode(datatype('TaskNode', ['subject', 'variants', 'rule']), Node):
                     tuple(dep_values))
 
   def __repr__(self):
-    return 'TaskNode(subject={}, variants={}, rule={}' \
-      .format(self.subject, self.variants, self.rule)
+    return '{}(subject={}, variants={}, rule={}' \
+      .format(type(self).__name__, self.subject, self.variants, self.rule)
 
   def __str__(self):
     return repr(self)
 
 
-class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants']), Node):
+class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants', 'rule']), Node):
   """A native node type for filesystem operations."""
 
   _FS_PAIRS = {
@@ -532,10 +431,13 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
   is_cacheable = False
   is_inlineable = False
 
+  #rule = None
+  extra_repr=None
+
   @classmethod
-  def create(cls, subject, product_type, variants):
+  def create(cls, subject, product_type, variants, rule):
     assert (product_type, type(subject)) in cls._FS_PAIRS
-    return FilesystemNode(subject, product_type, variants)
+    return FilesystemNode(subject, product_type, variants, rule)
 
   @classmethod
   def generate_subjects(cls, filenames):
@@ -563,46 +465,3 @@ class FilesystemNode(datatype('FilesystemNode', ['subject', 'product', 'variants
     else:
       # This would be caused by a mismatch between _FS_PRODUCT_TYPES and the above switch.
       raise ValueError('Mismatched input value {} for {}'.format(self.subject, self))
-
-
-class StepContext(object):
-  """Encapsulates external state and the details of creating Nodes.
-
-  This avoids giving Nodes direct access to the task list or subject set.
-  """
-
-  def __init__(self, node_builder, project_tree, node_states, inline_nodes):
-    self._node_builder = node_builder
-    self.project_tree = project_tree
-    self._node_states = dict(node_states)
-    self._parents = OrderedSet()
-    self._inline_nodes = inline_nodes
-    self.snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
-
-  def get(self, node):
-    """Given a Node and computed node_states, gets the current state for the Node.
-
-    Optionally inlines execution of inlineable dependencies if `inline_nodes=True`.
-    """
-    state = self._node_states.get(node, None)
-    if state is not None:
-      return state
-    if self._inline_nodes and node.is_inlineable:
-      if node in self._parents:
-        return Noop.cycle(list(self._parents)[-1], node)
-      self._parents.add(node)
-      state = self._node_states[node] = node.step(self)
-      self._parents.remove(node)
-      return state
-    else:
-      return Waiting([node])
-
-  def get_nodes_and_states_for(self, subject, product, variants):
-    for node in self._node_builder.gen_nodes(subject, product, variants):
-      state = self.get(node)
-      yield node, state
-
-  def select_for(self, selector, subject, variants):
-    """Returns the state for selecting a product via the provided selector."""
-    dep_node = self._node_builder.select_node(selector, subject, variants)
-    return self.get(dep_node)

@@ -12,7 +12,8 @@ from contextlib import closing, contextmanager
 from pants.build_graph.address import Address
 from pants.engine.engine import (ExecutionError, LocalMultiprocessEngine, LocalSerialEngine,
                                  SerializationError, ThreadHybridEngine)
-from pants.engine.nodes import FilesystemNode, Return, SelectNode, Throw
+from pants.engine.nodes import FilesystemNode, Return, Throw
+from pants.engine.rules import RootNode, RootRule
 from pants.engine.selectors import Select
 from pants.engine.storage import Cache, Storage
 from pants_test.engine.examples.planners import Classpath, UnpickleableResult, setup_json_scheduler
@@ -20,6 +21,7 @@ from pants_test.engine.examples.planners import Classpath, UnpickleableResult, s
 
 class EngineTest(unittest.TestCase):
   def setUp(self):
+    self.maxDiff = None
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.scheduler = setup_json_scheduler(build_root)
 
@@ -30,10 +32,17 @@ class EngineTest(unittest.TestCase):
                                         subjects=addresses)
 
   def assert_engine(self, engine):
-    result = engine.execute(self.request(['compile'], self.java))
-    self.assertEqual({SelectNode(self.java, None, Select(Classpath)):
-                      Return(Classpath(creator='javac'))},
-                     result.root_products)
+    request = self.request(['compile'], self.java)
+    result = engine.execute(request)
+    expected_roots = {RootNode(self.java, None, RootRule(type(self.java), Select(Classpath))):
+                      Return(Classpath(creator='javac'))}
+    if result.root_products != expected_roots:
+      root, state = self.scheduler.root_entries(request).items()[0]
+      self.fail(
+        'Unexpected root products.\n  First root: {}\n  Product graph len: {}\n  Trace:\n{}'.format(
+          root,
+          len(self.scheduler.product_graph),
+        '\n'.join(self.scheduler.product_graph.trace(root))))
     self.assertIsNone(result.error)
 
   @contextmanager
@@ -92,21 +101,20 @@ class EngineTest(unittest.TestCase):
       self.assert_engine(engine)
 
   def test_rerun_with_cache(self):
+    # NB: this test assumes the cache stats are retained across runs and not regenerated
     with self.multiprocessing_engine() as engine:
       # Run once and save stats to prepare for another run.
       self.assert_engine(engine)
       cache_stats = engine.cache_stats()
-      hits, misses = cache_stats.misses, cache_stats.misses
+      hits, misses = cache_stats.hits, cache_stats.misses
 
-      # First run there will only be duplicate executions cached (ie, the same Runnable
-      # is triggered by multiple Nodes).
-      self.assertTrue(cache_stats.hits > 0)
-      self.assertTrue(cache_stats.misses > 0)
-
+      # First run will have no cache hits, because there are no duplicate executions.
+      self.assertTrue(hits == 0)
+      self.assertTrue(misses > 0)
       self.scheduler.product_graph.invalidate()
       self.assert_engine(engine)
 
-      # Second run hits have increaed, and there are no more misses.
+      # Second run hits have increased, and there are no more misses.
       self.assertEquals(misses, cache_stats.misses)
       self.assertTrue(hits < cache_stats.hits)
 

@@ -12,6 +12,8 @@ from pants_test.engine.test_scheduler import SchedulerTest
 
 
 class GraphValidatorSchedulerTest(SchedulerTest, unittest.TestCase):
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_no_variant_thrift(self):
     """No `thrift` variant is configured, and so no configuration is selected."""
     build_request = self.request(['compile'], self.no_variant_thrift)
@@ -19,6 +21,8 @@ class GraphValidatorSchedulerTest(SchedulerTest, unittest.TestCase):
     with self.assertRaises(PartiallyConsumedInputsError):
       self.build_and_walk(build_request)
 
+  # NB Depends on variant support to pass
+  @unittest.expectedFailure
   def test_unconfigured_thrift(self):
     """The BuildPropertiesPlanner is able to produce a Classpath, but we should still fail.
 

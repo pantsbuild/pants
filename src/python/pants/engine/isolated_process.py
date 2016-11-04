@@ -14,7 +14,7 @@ from hashlib import sha1
 
 from pants.engine.fs import Files
 from pants.engine.nodes import Node, Noop, Return, Runnable, State, Throw, Waiting
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
@@ -154,7 +154,7 @@ class _Process(datatype('_Process', ['snapshot_archive_root',
   """All (pickleable) arguments for the execution of a sandboxed process."""
 
 
-class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'snapshotted_process']), Node):
+class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variants', 'rule']), Node):
   """Wraps a process execution, preparing and tearing down the execution environment."""
 
   is_cacheable = True
@@ -162,12 +162,12 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
 
   @property
   def product(self):
-    return self.snapshotted_process.product_type
+    return self.rule.product_type
 
   def step(self, step_context):
     waiting_nodes = []
     # Get the binary.
-    binary_state = step_context.select_for(Select(self.snapshotted_process.binary_type),
+    binary_state = step_context.select_for(self.rule.binary_type_selector,
                                            subject=self.subject,
                                            variants=self.variants)
     if type(binary_state) is Throw:
@@ -181,7 +181,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
 
     # Create the request from the request callback after resolving its input clauses.
     input_values = []
-    for input_selector in self.snapshotted_process.input_selectors:
+    for input_selector in self.rule.real_input_selectors:
       sn_state = step_context.select_for(input_selector, self.subject, self.variants)
       if type(sn_state) is Waiting:
         waiting_nodes.extend(sn_state.dependencies)
@@ -191,7 +191,7 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
         if input_selector.optional:
           input_values.append(None)
         else:
-          return Noop('Was missing value for (at least) input {}'.format(input_selector))
+          return Noop('Was missing value for (at least) input {} {}', input_selector, sn_state)
       elif type(sn_state) is Throw:
         return sn_state
       else:
@@ -202,19 +202,16 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
 
     # Now that we've returned on waiting, we can assume that relevant inputs have values.
     try:
-      process_request = self.snapshotted_process.input_conversion(*input_values)
+      process_request = self.rule.input_conversion(*input_values)
     except Exception as e:
       return Throw(e)
 
     # Request snapshots for the snapshot_subjects from the process request.
     snapshot_subjects_value = []
     if process_request.snapshot_subjects:
-      snapshot_subjects_state = step_context.select_for(SelectDependencies(Snapshot,
-                                                                           SnapshottedProcessRequest,
-                                                                           'snapshot_subjects',
-                                                                           field_types=(Files,)),
-                                                        process_request,
-                                                        self.variants)
+      snapshot_subjects_state = step_context.select_for(self.rule.snapshot_selector,
+                                                        subject=process_request,
+                                                        variants=self.variants)
       if type(snapshot_subjects_state) is not Return:
         return snapshot_subjects_state
       snapshot_subjects_value = snapshot_subjects_state.value
@@ -224,23 +221,23 @@ class ProcessExecutionNode(datatype('ProcessExecutionNode', ['subject', 'variant
                          process_request,
                          binary_state.value,
                          snapshot_subjects_value,
-                         self.snapshotted_process.output_conversion)
+                         self.rule.output_conversion)
     return Runnable(_execute, (execution,))
 
 
-class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants']), Node):
+class SnapshotNode(datatype('SnapshotNode', ['subject', 'variants', 'rule']), Node):
   is_inlineable = False
   is_cacheable = False
   product = Snapshot
 
   @classmethod
-  def create(cls, subject, variants):
-    return SnapshotNode(subject, variants)
+  def create(cls, subject, variants, rule):
+    return SnapshotNode(subject, variants, rule)
 
   def step(self, step_context):
     select_state = step_context.select_for(Select(Files), self.subject, self.variants)
 
-    if type(select_state) in {Waiting, Noop, Throw}:
+    if type(select_state) in (Waiting, Noop, Throw):
       return select_state
     elif type(select_state) is not Return:
       State.raise_unrecognized(select_state)
