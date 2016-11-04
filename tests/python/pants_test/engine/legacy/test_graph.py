@@ -88,12 +88,12 @@ class GraphInvalidationTest(unittest.TestCase):
 
   def test_invalidate_fsnode(self):
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):
-      initial_node_count = len(scheduler.product_graph)
+      initial_node_count = scheduler.node_count()
       self.assertGreater(initial_node_count, 0)
 
       invalidated_count = scheduler.invalidate_files(['3rdparty/python/BUILD'])
       self.assertGreater(invalidated_count, 0)
-      self.assertLess(len(scheduler.product_graph), initial_node_count)
+      self.assertLess(scheduler.node_count(), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
     with self.open_scheduler(['//:', '3rdparty/::']) as (graph, _, _):

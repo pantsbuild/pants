@@ -304,6 +304,11 @@ class LocalScheduler(object):
                                                       subject_keys,
                                                       len(subject_keys))
       logger.debug('invalidated %d nodes for subjects: %s', invalidated, subjects)
+      return invalidated
+
+  def node_count(self):
+    with self._product_graph_lock:
+      return self._native.lib.graph_len(self._scheduler)
 
   def _execution_next(self, completed):
     # Unzip into two arrays.
