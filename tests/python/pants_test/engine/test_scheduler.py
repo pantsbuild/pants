@@ -14,22 +14,23 @@ from pants.engine.addressable import Addresses
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import Return, Throw
 from pants.engine.selectors import Select, SelectDependencies, SelectVariant
-from pants.engine.subsystem.native import Native
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
                                                  Jar, ThriftSources, setup_json_scheduler)
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.engine.util import init_native
 
 
 walk = "TODO: Should port tests that attempt to inspect graph internals to the native code."
 
 
 class SchedulerTest(unittest.TestCase):
+
+  _native = init_native()
+
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
-    with subsystem_instance(Native.Factory) as native_factory:
-      self.scheduler = setup_json_scheduler(build_root, native_factory.create())
+    self.scheduler = setup_json_scheduler(build_root, self._native)
     self.engine = LocalSerialEngine(self.scheduler)
 
     self.guava = Address.parse('3rdparty/jvm:guava')

@@ -42,48 +42,28 @@ class TaggingSymbolTable(LegacySymbolTable):
       )
 
 
-@contextmanager
-def open_legacy_graph(options=None, path_ignore_patterns=None, symbol_table_cls=None):
-  """A context manager that yields a usable, legacy LegacyBuildGraph by way of the v2 scheduler.
-
-  :param Options options: An Options object to use for this run.
-  :param list path_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
-                                    usually taken from the `--pants-ignore` global option.
-                                    Defaults to: ['.*']
-  :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
-                                       None to use the default.
-  :yields: A tuple of (graph, addresses, scheduler).
-  """
-  path_ignore_patterns = path_ignore_patterns or ['.*']
-  target_roots = TargetRoots.create(options=options)
-  native = Native.Factory.global_instance().create()
-  graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
-                                                      symbol_table_cls=symbol_table_cls,
-                                                      native=native)
-  try:
-    graph = graph_helper.create_build_graph(target_roots)[0]
-    addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
-    yield graph, addresses, graph_helper.scheduler
-  finally:
-    graph_helper.engine.close()
-
-
 class GraphInvalidationTest(unittest.TestCase):
-  def setUp(self):
-    super(GraphInvalidationTest, self).setUp()
-    init_native()
 
-  def _make_setup_args(self, specs, **kwargs):
+  _native = init_native()
+
+  def _make_setup_args(self, specs):
     options = mock.Mock()
     options.target_specs = specs
-    kwargs['options'] = options
-    return kwargs
+    return options
 
   @contextmanager
   def open_scheduler(self, specs, symbol_table_cls=None):
-    kwargs = self._make_setup_args(specs, symbol_table_cls=symbol_table_cls)
-    with open_legacy_graph(**kwargs) as triple:
-      yield triple
+    path_ignore_patterns = ['.*']
+    target_roots = TargetRoots.create(options=self._make_setup_args(specs))
+    graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
+                                                        symbol_table_cls=symbol_table_cls,
+                                                        native=self._native)
+    try:
+      graph = graph_helper.create_build_graph(target_roots)[0]
+      addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
+      yield graph, addresses, graph_helper.scheduler
+    finally:
+      graph_helper.engine.close()
 
   def test_invalidate_fsnode(self):
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):

@@ -17,9 +17,12 @@ from pants_test.engine.util import init_native
 
 
 class EngineTest(unittest.TestCase):
+
+  _native = init_native()
+
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
-    self.scheduler = setup_json_scheduler(build_root, init_native())
+    self.scheduler = setup_json_scheduler(build_root, self._native)
 
     self.java = Address.parse('src/java/simple')
 
