@@ -22,7 +22,7 @@ from pants_test.engine.util import init_native
 
 class LegacyAddressMapperTest(unittest.TestCase):
 
-  init_native()
+  _native = init_native()
 
   def create_build_files(self, build_root):
     # Create BUILD files
