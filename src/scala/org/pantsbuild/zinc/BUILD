@@ -13,7 +13,6 @@ scala_library(
     'src/scala/sbt/compiler/javac',
     'src/scala/sbt/inc',
   ],
-  sources=globs('*.scala'),
   strict_deps=True,
   platform='java7',
 )

@@ -3,7 +3,6 @@
 
 python_library(
   name='python',
-  sources=globs('*.py'),
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',

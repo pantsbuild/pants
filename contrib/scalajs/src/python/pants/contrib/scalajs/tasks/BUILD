@@ -10,5 +10,4 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ],
-  sources = globs('*.py'),
 )

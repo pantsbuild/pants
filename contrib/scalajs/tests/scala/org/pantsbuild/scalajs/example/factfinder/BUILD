@@ -8,5 +8,4 @@ junit_tests(
     '3rdparty:scalatest',
     'contrib/scalajs/examples/src/scala/org/pantsbuild/scalajs/example/factfinder',
   ],
-  sources=globs('*.scala'),
 )

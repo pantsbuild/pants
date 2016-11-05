@@ -8,5 +8,4 @@ junit_tests(
     '3rdparty:scalatest',
     'src/scala/org/pantsbuild/zinc/logging',
   ],
-  sources=globs('*.scala'),
 )

@@ -14,7 +14,6 @@ java_library(
   dependencies=[
     '3rdparty:guava',
   ],
-  sources=globs('*.java'),
   platform='java7',
 )
 

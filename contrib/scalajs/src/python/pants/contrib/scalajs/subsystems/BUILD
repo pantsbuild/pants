@@ -8,5 +8,4 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],
-  sources = globs('*.py'),
 )
