@@ -15,17 +15,16 @@ from pants.bin.engine_initializer import EngineInitializer
 from pants.build_graph.address import Address
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.subsystem.native import Native
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdir
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.engine.util import init_native
 
 
 class LegacyAddressMapperTest(unittest.TestCase):
 
   def setUp(self):
     super(LegacyAddressMapperTest, self).setUp()
-    init_subsystem(Native.Factory)
+    init_native()
 
   def create_build_files(self, build_root):
     # Create BUILD files

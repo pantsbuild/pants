@@ -12,16 +12,14 @@ from contextlib import closing, contextmanager
 from pants.build_graph.address import Address
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import Return
-from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.engine.util import init_native
 
 
 class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
-    with subsystem_instance(Native.Factory) as native_factory:
-      self.scheduler = setup_json_scheduler(build_root, native_factory.create())
+    self.scheduler = setup_json_scheduler(build_root, init_native())
 
     self.java = Address.parse('src/java/simple')
 

@@ -118,10 +118,10 @@ def init_subsystems(subsystem_types, options=None):
             scope, optionables))
   # Don't trample existing subsystem options, in case a test has set up some
   # other subsystems in some other way.
-  #updated_options = dict(Subsystem._options.items()) if Subsystem._options else {}
-  #if options:
-  #  updated_options.update(options)
-  Subsystem.set_options(create_options_for_optionables(optionables, options=options))
+  updated_options = dict(Subsystem._options.items()) if Subsystem._options else {}
+  if options:
+    updated_options.update(options)
+  Subsystem.set_options(create_options_for_optionables(optionables, options=updated_options))
 
 
 def init_subsystem(subsystem_type, options=None):

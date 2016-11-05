@@ -23,6 +23,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'util',
+  sources = ['util.py'],
+  dependencies = [
+    'src/python/pants/engine/subsystem:native',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ],
+)
+
+python_tests(
   name = 'test_round_engine',
   sources = ['test_round_engine.py'],
   dependencies = [
@@ -165,8 +174,9 @@ python_tests(
   coverage=['pants.engine.rules'],
   dependencies=[
     ':scheduler_test_base',
-    'src/python/pants/engine:selectors',
+    'src/python/pants/engine:build_files',
     'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
   ]
 )
 
@@ -184,12 +194,11 @@ python_tests(
   sources=['test_scheduler.py'],
   coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
   dependencies=[
+    ':util',
     'src/python/pants/build_graph',
-    'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:planners',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
@@ -197,14 +206,13 @@ python_tests(
   name='scheduler_test_base',
   sources=['scheduler_test_base.py'],
   dependencies=[
+    ':util',
     'src/python/pants/base:project_tree',
-    'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:engine',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:storage',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

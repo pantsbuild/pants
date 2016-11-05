@@ -15,10 +15,9 @@ from pants.engine.fs import create_fs_tasks
 from pants.engine.nodes import Return
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
-from pants.engine.subsystem.native import Native
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.engine.util import init_native
 
 
 class EmptyTable(SymbolTable):
@@ -58,8 +57,7 @@ class SchedulerTestBase(object):
     project_tree = project_tree or self.mk_fs_tree()
 
     tasks = list(tasks) + create_fs_tasks()
-    with subsystem_instance(Native.Factory) as native_factory:
-      return LocalScheduler(goals, tasks, project_tree, native_factory.create())
+    return LocalScheduler(goals, tasks, project_tree, init_native())
 
   def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""

@@ -18,6 +18,7 @@ _WAITING = 'TODO: Waiting'
 class GraphTest(unittest.TestCase):
 
   def setUp(self):
+    super(GraphTest, self).setUp()
     self.pg = 'TODO: These tests need to be ported to native tests.'
 
   @classmethod
