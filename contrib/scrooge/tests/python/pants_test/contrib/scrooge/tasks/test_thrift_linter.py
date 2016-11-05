@@ -43,7 +43,7 @@ class ThriftLinterTest(TaskTestBase):
     expected_include_paths = {'src/thrift/tweet', 'src/thrift/users'}
     expected_paths = {'src/thrift/tweet/a.thrift', 'src/thrift/tweet/b.thrift'}
     mock_calculate_compile_sources.return_value = (expected_include_paths, expected_paths)
-    task._lint(thrift_target)
+    task._lint(thrift_target, task.tool_classpath('scrooge-linter'))
 
     self._run_java_mock.assert_called_once_with(classpath='foo_classpath',
       main='com.twitter.scrooge.linter.Main',
