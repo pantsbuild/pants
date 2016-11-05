@@ -329,7 +329,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     Manager = namedtuple('Manager', 'write_file pushd dir')
 
     with self.temporary_workdir() as tmp_dir:
-      for filename in ('pants', 'pants.ini', 'BUILD.tools'):
+      for filename in ('pants', 'pants.ini', 'pants.travis-ci.ini', 'BUILD.tools'):
         shutil.copy(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
 
       for filename in ('.pants.d', 'build-support', '3rdparty', 'pants-plugins', 'src', 'contrib'):
