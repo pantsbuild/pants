@@ -18,7 +18,7 @@ pub struct Externs {
   context: *const ExternContext,
   key_for: KeyForExtern,
   satisfied_by: SatisfiedByExtern,
-  satisfied_by_cache: RefCell<HashMap<(TypeConstraint,TypeId),bool>>,
+  satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
@@ -128,7 +128,7 @@ pub type IdToStrExtern =
 pub type ValToStrExtern =
   extern "C" fn(*const ExternContext, *const Value) -> UTF8Buffer;
 
-pub fn with_vec<F,C,T>(c_ptr: *mut C, c_len: usize, f: F) -> T
+pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {
   let cs = unsafe { Vec::from_raw_parts(c_ptr, c_len, c_len) };
   let output = f(&cs);

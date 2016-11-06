@@ -27,7 +27,7 @@ impl Variants {
     let mut left: HashMap<_, _, FNV> = self.0.iter().cloned().collect();
     left.extend(right.0);
     // Convert back to a vector and sort.
-    let mut result: Vec<(String,String)> = left.into_iter().collect();
+    let mut result: Vec<(String, String)> = left.into_iter().collect();
     result.sort();
     Variants(result)
   }

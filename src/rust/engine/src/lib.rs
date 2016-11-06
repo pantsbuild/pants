@@ -54,7 +54,7 @@ impl RawScheduler {
 pub struct RawExecution {
   runnables_ptr: *const RawRunnable,
   runnables_len: u64,
-  runnables: Vec<(EntryId,Runnable)>,
+  runnables: Vec<(EntryId, Runnable)>,
   raw_runnables: Vec<RawRunnable>,
 }
 
@@ -162,7 +162,7 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn new(node_states: Vec<(&Key,&TypeConstraint,Option<&Complete>)>) -> Box<RawNodes> {
+  fn new(node_states: Vec<(&Key, &TypeConstraint, Option<&Complete>)>) -> Box<RawNodes> {
     let nodes =
       node_states.iter()
         .map(|&(subject, product, state)|
@@ -457,7 +457,7 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
   let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
 }
 
-fn with_scheduler<F,T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
+fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
     where F: FnOnce(&mut RawScheduler)->T {
   let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
   let t = f(&mut scheduler);

@@ -51,7 +51,7 @@ impl Scheduler {
     self.outstanding.clear();
   }
 
-  pub fn root_states(&self) -> Vec<(&Key,&TypeConstraint,Option<&Complete>)> {
+  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<&Complete>)> {
     self.roots.iter()
       .map(|root| {
         let state = self.graph.entry(root).and_then(|e| e.state());
