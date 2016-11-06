@@ -141,7 +141,7 @@ impl RawNode {
         },
       state_return: match state {
         Some(&Complete::Return(ref v)) => v.clone(),
-        _ => Value::empty(),
+        _ => Default::default(),
       },
       state_throw: match state {
         Some(&Complete::Throw(_)) => true,
