@@ -163,10 +163,10 @@ def extern_key_for(context_handle, val):
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id)")
-def extern_id_to_str(context_handle, _id):
+def extern_id_to_str(context_handle, id_):
   """Given an Id for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
-  return c.utf8_buf(str(c.from_id(_id)))
+  return c.utf8_buf(str(c.from_id(id_)))
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Value*)")
@@ -314,8 +314,8 @@ class ExternContext(object):
     self._id_generator += 1
     return _id
 
-  def get(self, _id):
-    return self._id_to_obj[_id]
+  def get(self, id_):
+    return self._id_to_obj[id_]
 
   def to_id(self, typ):
     return self.put(typ)
