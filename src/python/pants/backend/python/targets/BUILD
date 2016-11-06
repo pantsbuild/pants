@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'python',
   sources = [
     'python_binary.py',
     'python_library.py',
@@ -23,4 +22,11 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
   ],
+)
+
+
+# TODO: Old name.  Remove after all references are fixed to refer directly to the target above.
+target(
+  name = 'python',
+  dependencies = [':targets'],
 )
