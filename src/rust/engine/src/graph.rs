@@ -131,11 +131,11 @@ impl Graph {
     self.nodes.get(node).map(|&id| self.entry_for_id(id))
   }
 
-  pub fn entry_for_id(&self, id: EntryId) -> &Entry {
+  fn entry_for_id(&self, id: EntryId) -> &Entry {
     self.entries.get(&id).unwrap_or_else(|| panic!("Invalid EntryId: {}", id))
   }
 
-  pub fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
+  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
     self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {}", id))
   }
 
