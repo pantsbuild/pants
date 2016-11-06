@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
+from pants.base.specs import SingleAddress
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
@@ -70,7 +71,8 @@ class TargetRoots(object):
       # alternate target roots.
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
       logger.debug('changed addresses: %s', changed_addresses)
-      return ChangedTargetRoots(changed_addresses)
+      return ChangedTargetRoots(tuple(SingleAddress(a.spec_path, a.target_name)
+                                      for a in changed_addresses))
 
     return LiteralTargetRoots(spec_roots)
 

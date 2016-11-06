@@ -17,6 +17,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants_test.engine.util import init_native
 
 
 class EmptyTable(SymbolTable):
@@ -30,6 +31,8 @@ class SchedulerTestBase(object):
 
   TODO: In the medium term, this should be part of pants_test.base_test.BaseTest.
   """
+
+  _native = init_native()
 
   def mk_fs_tree(self, build_root_src=None):
     """Create a temporary FilesystemProjectTree.
@@ -56,8 +59,7 @@ class SchedulerTestBase(object):
     project_tree = project_tree or self.mk_fs_tree()
 
     tasks = list(tasks) + create_fs_tasks()
-    scheduler = LocalScheduler(goals, tasks, project_tree)
-    return scheduler
+    return LocalScheduler(goals, tasks, project_tree, self._native)
 
   def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""

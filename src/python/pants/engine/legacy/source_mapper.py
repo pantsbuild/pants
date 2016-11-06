@@ -11,7 +11,7 @@ from pants.base.specs import AscendantAddresses, SingleAddress
 from pants.build_graph.address import parse_spec
 from pants.build_graph.source_mapper import SourceMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import LegacyTarget
+from pants.engine.legacy.graph import HydratedTargets
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 
 
@@ -48,8 +48,8 @@ class EngineSourceMapper(SourceMapper):
   def target_addresses_for_source(self, source):
     return list(self.iter_target_addresses_for_sources([source]))
 
-  def _iter_owned_files_from_legacy_target(self, legacy_target):
-    """Given a `LegacyTarget` instance, yield all files owned by the target."""
+  def _iter_owned_files_from_hydrated_target(self, legacy_target):
+    """Given a `HydratedTarget` instance, yield all files owned by the target."""
     target_kwargs = legacy_target.adaptor.kwargs()
 
     # Handle targets like `python_binary` which have a singular `source='main.py'` declaration.
@@ -81,14 +81,10 @@ class EngineSourceMapper(SourceMapper):
       #
       #    which is closer in premise to the `resource_targets` param.
       else:
-        resource_dep_subjects = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
-                                                        target_resources)
-        # Fetch `LegacyTarget` products for all of the resources.
-        for resource_target in self._engine.product_request(LegacyTarget, resource_dep_subjects):
-          resource_sources = resource_target.adaptor.kwargs().get('sources')
-          if resource_sources:
-            for f in resource_sources.iter_relative_paths():
-              yield f
+        # TODO: this case should be impossible... resource targets are located in the `resource_targets`
+        # kwarg.
+        #   see https://github.com/pantsbuild/pants/issues/4010
+        raise ValueError('TODO: Not supported: see #4010.')
 
   def iter_target_addresses_for_sources(self, sources):
     """Bulk, iterable form of `target_addresses_for_source`."""
@@ -96,15 +92,16 @@ class EngineSourceMapper(SourceMapper):
     sources_set = set(sources)
     subjects = [AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set)]
 
-    for legacy_target in self._engine.product_request(LegacyTarget, subjects):
-      legacy_address = legacy_target.adaptor.address
+    for hydrated_targets in self._engine.product_request(HydratedTargets, subjects):
+      for hydrated_target in hydrated_targets.dependencies:
+        legacy_address = hydrated_target.adaptor.address
 
-      # Handle BUILD files.
-      if any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set):
-        yield legacy_address
-      else:
-        # Handle claimed files.
-        target_files_iter = self._iter_owned_files_from_legacy_target(legacy_target)
-        if any(source_file in sources_set for source_file in target_files_iter):
-          # At least one file in this targets sources match our changed sources - emit its address.
+        # Handle BUILD files.
+        if any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set):
           yield legacy_address
+        else:
+          # Handle claimed files.
+          target_files_iter = self._iter_owned_files_from_hydrated_target(hydrated_target)
+          if any(source_file in sources_set for source_file in target_files_iter):
+            # At least one file in this targets sources match our changed sources - emit its address.
+            yield legacy_address
