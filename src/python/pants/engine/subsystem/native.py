@@ -9,6 +9,7 @@ from cffi import FFI
 from twitter.common.collections import OrderedSet
 
 from pants.binaries.binary_util import BinaryUtil
+from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import datatype
 
@@ -353,23 +354,32 @@ class Native(object):
       register('--supportdir', advanced=True, default='dylib/native-engine',
                help='Find native engine binaries under this dir. Used as part of the path to lookup '
                     'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
+      register('--visualize-to', default=None, type=dir_option,
+               help='A directory to write execution graphs to as `dot` files. The contents '
+                    'of the directory will be overwritten if any filenames collide.')
 
     def create(self):
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
-      return Native(binary_util, options.version, options.supportdir)
+      return Native(binary_util, options.version, options.supportdir, options.visualize_to)
 
-  def __init__(self, binary_util, version, supportdir):
+  def __init__(self, binary_util, version, supportdir, visualize_to_dir):
     """
     :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
     :param version: The binary version of the native engine.
     :param supportdir: The supportdir for the native engine.
+    :param visualize_to_dir: An existing directory (or None) to visualize executions to.
     """
     self._binary_util = binary_util
     self._version = version
     self._supportdir = supportdir
+    self._visualize_to_dir = visualize_to_dir
 
     self._lib_field = None
+
+  @property
+  def visualize_to_dir(self):
+    return self._visualize_to_dir
 
   @property
   def lib(self):

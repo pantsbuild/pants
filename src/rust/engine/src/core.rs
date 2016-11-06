@@ -41,8 +41,8 @@ impl Variants {
 
 pub type Id = u64;
 
-// The type of a python object (which itself has a type, but which is not
-// represented by a Key, because that would result in a recursive structure.)
+// The type of a python object (which itself has a type, but which is not represented
+// by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct TypeId(pub Id);

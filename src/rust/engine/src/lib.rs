@@ -67,7 +67,9 @@ impl RawExecution {
         runnables: Vec::new(),
         raw_runnables: Vec::new(),
       };
-    // Update immediately to make the pointers above (likely dangling!) valid.
+    // NB: Unsafe: because we need a raw pointer to a value in the struct, we started by
+    // initializing it to a meaningless value above (since we don't know where it will be
+    // in memory during struct construction), and then here we update it to be valid.
     execution.update(Vec::new());
     execution
   }
@@ -177,7 +179,7 @@ impl RawNodes {
           nodes: nodes,
         }
       );
-    // Update immediately to make the pointers above (likely dangling!) valid.
+    // NB: Unsafe! See comment on similar pattern in RawExecution::new().
     raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
     raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
     raw_nodes
@@ -299,7 +301,7 @@ pub extern fn execution_next(
               .map(|(&id, value)| (id, Complete::Return(value.clone())));
           let throws =
             throws_ids.iter()
-              .map(|&id| (id, Complete::Throw(format!("{} failed!", id))));
+              .map(|&id| (id, Complete::Throw(format!("{:?} failed!", id))));
           raw.next(returns.chain(throws).collect());
         })
       })

@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 import threading
 import time
 from contextlib import contextmanager
@@ -65,6 +66,7 @@ class LocalScheduler(object):
     self._project_tree = project_tree
     self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
+    self._run_count = 0
 
     # Create a handle for the ExternContext (which must be kept alive as long as this object), and
     # the native Scheduler.
@@ -275,7 +277,7 @@ class LocalScheduler(object):
     """Returns the roots for the given ExecutionRequest as a dict of tuples to State."""
     with self._product_graph_lock:
       if self._execution_request is not execution_request:
-        raise ValueError(
+        raise AssertionError(
             "Multiple concurrent executions are not supported! {} vs {}".format(
               self._execution_request, execution_request))
       raw_roots = self._native.gc(self._native.lib.execution_roots(self._scheduler),
@@ -389,10 +391,17 @@ class LocalScheduler(object):
         if not runnable and not outstanding_runnable:
           # Finished.
           break
+        # The double yield here is intentional, and assumes consumption of this generator in
+        # a `for` loop with a `generator.send(completed)` call in the body of the loop.
         completed = yield runnable
         yield
         runnable_count += len(runnable)
         scheduling_iterations += 1
+
+      if self._native.visualize_to_dir is not None:
+        name = 'run.{}.dot'.format(self._run_count)
+        self._run_count += 1
+        self.visualize_graph_to_file(os.path.join(self._native.visualize_to_dir, name))
 
       logger.debug(
         'ran %s scheduling iterations and %s runnables in %f seconds. '
@@ -402,4 +411,3 @@ class LocalScheduler(object):
         time.time() - start_time,
         self._native.lib.graph_len(self._scheduler)
       )
-      #self.visualize_graph_to_file('viz.0.dot')
