@@ -463,7 +463,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                 test = _Test(classname=testcase.getAttribute('classname'),
                              methodname=testcase.getAttribute('name'))
                 target = test_registry.get_owning_target(test)
-                failed_targets[target].add(test)
+                if target and test:
+                  failed_targets[target].add(test)
         except (XmlParser.XmlError, ValueError) as e:
           self.context.log.error('Error parsing test result file {0}: {1}'.format(path, e))
 
