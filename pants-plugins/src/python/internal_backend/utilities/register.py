@@ -50,7 +50,8 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
       'Topic :: Software Development :: Build Tools']
   classifiers = OrderedSet(standard_classifiers + (additional_classifiers or []))
 
-  notes = PantsReleases.global_instance().notes_for_version(PANTS_SEMVER)
+  #notes = PantsReleases.global_instance().notes_for_version(PANTS_SEMVER)
+  notes = ""
 
   return PythonArtifact(
       name=name,
