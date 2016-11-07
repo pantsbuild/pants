@@ -88,6 +88,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return [
         # Set by the wrapper script in the repo to allow for running from source.
         'PANTS_NATIVE_ENGINE_VERSION',
+        # Used in the wrapper script to locate a rust install.
+        'HOME',
       ]
 
   @classmethod
