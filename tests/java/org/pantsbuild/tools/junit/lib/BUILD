@@ -14,4 +14,3 @@ java_library(
   ],
   sources=globs('*.java')
 )
-''
