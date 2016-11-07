@@ -214,7 +214,7 @@ impl Graph {
         .filter(|dst_id| !(src.dependencies.contains(dst_id) || src.cyclic_dependencies.contains(dst_id)))
         .partition(|&dst_id| !self.detect_cycle(src_id, dst_id))
     };
-    
+
     // Add the source as a dependent of each non-cyclic dep.
     for &dep in &deps {
       self.entry_for_id_mut(dep).dependents.push(src_id);

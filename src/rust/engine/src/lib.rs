@@ -134,7 +134,7 @@ impl RawNode {
     RawNode {
       subject: subject.clone(),
       product: product.clone(),
-      state_tag: 
+      state_tag:
         match state {
           None => RawStateTag::Empty as u8,
           Some(&Complete::Return(_)) => RawStateTag::Return as u8,
@@ -204,7 +204,7 @@ pub extern fn scheduler_create(
   type_has_variants: TypeConstraint,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  let externs = 
+  let externs =
     Externs::new(
       ext_context,
       key_for,
@@ -446,6 +446,8 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
   with_scheduler(scheduler_ptr, |raw| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = Path::new(path_str.as_str());
+    // TODO: This should likely return an error condition to python.
+    //   see https://github.com/pantsbuild/pants/issues/4025
     raw.scheduler.visualize(&path).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });

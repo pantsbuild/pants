@@ -51,7 +51,7 @@ pub enum Selector {
 
 impl Selector {
   pub fn select(product: TypeConstraint) -> Selector {
-    Selector::Select( 
+    Selector::Select(
       Select {
         product: product,
         variant_key: None,
