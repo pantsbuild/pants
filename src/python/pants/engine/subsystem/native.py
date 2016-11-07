@@ -351,7 +351,7 @@ class Native(object):
     def register_options(cls, register):
       register('--version', advanced=True, default='0.0.1',
                help='Native engine version.')
-      register('--supportdir', advanced=True, default='dylib/native-engine',
+      register('--supportdir', advanced=True, default='bin/native-engine',
                help='Find native engine binaries under this dir. Used as part of the path to lookup '
                     'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
       register('--visualize-to', default=None, type=dir_option,

@@ -25,7 +25,7 @@ case "${KERNEL}" in
 esac
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
-readonly CACHE_TARGET_DIR=${CACHE_ROOT}/dylib/native-engine/${OS_ID}
+readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
 
 function calculate_current_hash() {
   find ${NATIVE_ROOT} -type f | git hash-object -t blob --stdin-paths | fingerprint_data

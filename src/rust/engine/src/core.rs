@@ -22,6 +22,7 @@ impl Variants {
    *
    * TODO: Unused: see https://github.com/pantsbuild/pants/issues/4020
    */
+  #[allow(dead_code)]
   pub fn merge(&self, right: Variants) -> Variants {
     // Merge.
     let mut left: HashMap<_, _, FNV> = self.0.iter().cloned().collect();
