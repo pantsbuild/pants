@@ -7,7 +7,6 @@ scala_library(
   dependencies=[
     'testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet:greet',
   ],
-  sources=globs('*.scala'),
   provides = scala_artifact(org='org.pantsbuild.testproject.publish.hello',
                             name='welcome',
                             repo=testing,),

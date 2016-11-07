@@ -5,10 +5,8 @@
 
 scala_library(
   name = 'a',
-  sources = globs('*.scala'),
 )
 
 scala_library(
   name = 'b',
-  sources = globs('*.scala'),
 )

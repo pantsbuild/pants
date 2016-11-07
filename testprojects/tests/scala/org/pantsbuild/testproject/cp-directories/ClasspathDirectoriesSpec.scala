@@ -14,10 +14,10 @@ import org.scalatest.MustMatchers
  * for jars.
  */
 @RunWith(classOf[JUnitRunner])
-class ClasspathDirectories extends WordSpec with MustMatchers {
+class ClasspathDirectoriesSpec extends WordSpec with MustMatchers {
   val thisPackage = this.getClass.getCanonicalName.split('.').dropRight(1).mkString(".")
 
-  "ClasspathDirectories" should {
+  "ClasspathDirectoriesSpec" should {
     "see its own package as a directory on the classpath" in {
       val packageResource = "/" + thisPackage.replace('.', '/')
       Option(this.getClass.getResource(packageResource)) mustBe defined

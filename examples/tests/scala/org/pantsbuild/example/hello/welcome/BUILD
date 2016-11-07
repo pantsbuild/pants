@@ -7,5 +7,4 @@ junit_tests(
     '3rdparty:junit',
     '3rdparty:scalatest',
   ],
-  sources=globs('*.scala'),
 )

@@ -18,6 +18,4 @@ jvm_binary(name='other',
   ],
 )
 
-java_library(name='lib',
-  sources=globs('*.java'),
-)
+java_library(name='lib')
