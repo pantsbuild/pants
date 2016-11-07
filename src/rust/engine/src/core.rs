@@ -22,12 +22,13 @@ impl Variants {
    *
    * TODO: Unused: see https://github.com/pantsbuild/pants/issues/4020
    */
+  #[allow(dead_code)]
   pub fn merge(&self, right: Variants) -> Variants {
     // Merge.
     let mut left: HashMap<_, _, FNV> = self.0.iter().cloned().collect();
     left.extend(right.0);
     // Convert back to a vector and sort.
-    let mut result: Vec<(String,String)> = left.into_iter().collect();
+    let mut result: Vec<(String, String)> = left.into_iter().collect();
     result.sort();
     Variants(result)
   }
@@ -41,29 +42,29 @@ impl Variants {
 
 pub type Id = u64;
 
-// The type of a python object (which itself has a type, but which is not
-// represented by a Key, because that would result in a recursive structure.)
+// The type of a python object (which itself has a type, but which is not represented
+// by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct TypeId(pub Id);
 
 // A type constraint, which a TypeId may or may-not satisfy.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct TypeConstraint(pub Id);
 
 // An identifier for a python function.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Function(pub Id);
 
 // The name of a field.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Field(pub Key);
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Key {
   id: Id,
   value: Value,
@@ -85,14 +86,6 @@ impl hash::Hash for Key {
 }
 
 impl Key {
-  pub fn empty() -> Key {
-    Key {
-      id: 0,
-      value: Value::empty(),
-      type_id: TypeId(0),
-    }
-  }
-
   pub fn id(&self) -> Id {
     self.id
   }
@@ -118,14 +111,16 @@ pub struct Value {
 }
 
 impl Value {
-  pub fn empty() -> Value {
+  pub fn type_id(&self) -> &TypeId {
+    &self.type_id
+  }
+}
+
+impl Default for Value {
+  fn default() -> Self {
     Value {
       handle: ptr::null() as *const libc::c_void,
       type_id: TypeId(0),
     }
-  }
-
-  pub fn type_id(&self) -> &TypeId {
-    &self.type_id
   }
 }

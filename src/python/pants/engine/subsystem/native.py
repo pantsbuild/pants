@@ -9,6 +9,7 @@ from cffi import FFI
 from twitter.common.collections import OrderedSet
 
 from pants.binaries.binary_util import BinaryUtil
+from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import datatype
 
@@ -162,10 +163,10 @@ def extern_key_for(context_handle, val):
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id)")
-def extern_id_to_str(context_handle, _id):
+def extern_id_to_str(context_handle, id_):
   """Given an Id for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
-  return c.utf8_buf(str(c.from_id(_id)))
+  return c.utf8_buf(str(c.from_id(id_)))
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Value*)")
@@ -313,8 +314,8 @@ class ExternContext(object):
     self._id_generator += 1
     return _id
 
-  def get(self, _id):
-    return self._id_to_obj[_id]
+  def get(self, id_):
+    return self._id_to_obj[id_]
 
   def to_id(self, typ):
     return self.put(typ)
@@ -350,26 +351,35 @@ class Native(object):
     def register_options(cls, register):
       register('--version', advanced=True, default='0.0.1',
                help='Native engine version.')
-      register('--supportdir', advanced=True, default='dylib/native-engine',
+      register('--supportdir', advanced=True, default='bin/native-engine',
                help='Find native engine binaries under this dir. Used as part of the path to lookup '
                     'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
+      register('--visualize-to', default=None, type=dir_option,
+               help='A directory to write execution graphs to as `dot` files. The contents '
+                    'of the directory will be overwritten if any filenames collide.')
 
     def create(self):
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
-      return Native(binary_util, options.version, options.supportdir)
+      return Native(binary_util, options.version, options.supportdir, options.visualize_to)
 
-  def __init__(self, binary_util, version, supportdir):
+  def __init__(self, binary_util, version, supportdir, visualize_to_dir):
     """
     :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
     :param version: The binary version of the native engine.
     :param supportdir: The supportdir for the native engine.
+    :param visualize_to_dir: An existing directory (or None) to visualize executions to.
     """
     self._binary_util = binary_util
     self._version = version
     self._supportdir = supportdir
+    self._visualize_to_dir = visualize_to_dir
 
     self._lib_field = None
+
+  @property
+  def visualize_to_dir(self):
+    return self._visualize_to_dir
 
   @property
   def lib(self):

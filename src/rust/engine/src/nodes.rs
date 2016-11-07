@@ -41,13 +41,13 @@ pub enum Complete {
   Throw(String),
 }
 
-pub struct StepContext<'g,'t> {
+pub struct StepContext<'g, 't> {
   entry: &'g Entry,
   graph: &'g Graph,
   tasks: &'t Tasks,
 }
 
-impl<'g,'t> StepContext<'g,'t> {
+impl<'g, 't> StepContext<'g, 't> {
   /**
    * Create Nodes for each Task that might be able to compute the given product for the
    * given subject and variants.

@@ -9,7 +9,7 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
  * types that the engine must be aware of.
  */
 pub struct Tasks {
-  intrinsics: HashMap<(TypeId,TypeConstraint), Vec<Task>, FNV>,
+  intrinsics: HashMap<(TypeId, TypeConstraint), Vec<Task>, FNV>,
   singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
   pub externs: Externs,

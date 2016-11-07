@@ -25,10 +25,12 @@ case "${KERNEL}" in
 esac
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
-readonly CACHE_TARGET_DIR=${CACHE_ROOT}/dylib/native-engine/${OS_ID}
+readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
 
 function calculate_current_hash() {
-  find ${NATIVE_ROOT} -type f | git hash-object -t blob --stdin-paths | fingerprint_data
+  # Cached and unstaged files, with ignored files excluded.
+  git ls-files -c -o --exclude-standard ${NATIVE_ROOT} | \
+    git hash-object -t blob --stdin-paths | fingerprint_data
 }
 
 function ensure_prerequisites() {
@@ -59,7 +61,7 @@ function bootstrap_native_code() {
   local target_binary="${target_hash_dir}/native-engine"
   if [ ! -f "${target_binary}" ]
   then
-    cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}
+    cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG} || exit 1
     mkdir -p ${target_hash_dir}
     cp ${NATIVE_ROOT}/target/${MODE}/libengine.${EXTENSION} ${target_binary}
   fi

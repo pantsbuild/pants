@@ -9,7 +9,9 @@ use externs::Externs;
 use core::{FNV, Key};
 use nodes::{Node, Complete};
 
-pub type EntryId = usize;
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct EntryId(usize);
 
 pub type DepSet = Vec<EntryId>;
 
@@ -90,7 +92,7 @@ type Entries = HashMap<EntryId, Entry, FNV>;
  * A DAG (enforced on mutation) of Entries.
  */
 pub struct Graph {
-  id_generator: EntryId,
+  id_generator: usize,
   nodes: Nodes,
   entries: Entries,
   cyclic_singleton: Complete,
@@ -132,11 +134,11 @@ impl Graph {
   }
 
   pub fn entry_for_id(&self, id: EntryId) -> &Entry {
-    self.entries.get(&id).unwrap_or_else(|| panic!("Invalid EntryId: {}", id))
+    self.entries.get(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
   pub fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {}", id))
+    self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
   pub fn ensure_entry(&mut self, node: Node) -> EntryId {
@@ -151,24 +153,23 @@ impl Graph {
   fn ensure_entry_internal<'a>(
     entries: &'a mut Entries,
     nodes: &mut Nodes,
-    id_generator: &mut EntryId,
+    id_generator: &mut usize,
     node: Node
   ) -> EntryId {
     // See TODO on Entry.
     let entry_node = node.clone();
     let id =
       nodes.entry(node).or_insert_with(|| {
-        let id = *id_generator;
-        *id_generator += 1;
-        id
+        EntryId(*id_generator)
       }).clone();
 
     // If this was an existing entry, we're done..
-    if id < entries.len() {
+    if id.0 != *id_generator {
       return id;
     }
 
     // New entry.
+    *id_generator += 1;
     entries.insert(
       id,
       Entry {
@@ -213,7 +214,7 @@ impl Graph {
         .filter(|dst_id| !(src.dependencies.contains(dst_id) || src.cyclic_dependencies.contains(dst_id)))
         .partition(|&dst_id| !self.detect_cycle(src_id, dst_id))
     };
-    
+
     // Add the source as a dependent of each non-cyclic dep.
     for &dep in &deps {
       self.entry_for_id_mut(dep).dependents.push(src_id);

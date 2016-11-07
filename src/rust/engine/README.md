@@ -1,6 +1,6 @@
 A native-code implementation of the pants v2 engine. See:
 
-    https://docs.google.com/document/d/1C64MreDeVoZAl3HrqtWUVE-qnj3MyWW0NQ52xeWw/edit?usp=sharing
+    https://docs.google.com/document/d/1C64MreDeVoZAl3HrqtWUVE-qnj3MyWW0NQ52xeWw/edit
 
 To build for development, run:
 

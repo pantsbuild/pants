@@ -54,7 +54,7 @@ impl RawScheduler {
 pub struct RawExecution {
   runnables_ptr: *const RawRunnable,
   runnables_len: u64,
-  runnables: Vec<(EntryId,Runnable)>,
+  runnables: Vec<(EntryId, Runnable)>,
   raw_runnables: Vec<RawRunnable>,
 }
 
@@ -67,7 +67,9 @@ impl RawExecution {
         runnables: Vec::new(),
         raw_runnables: Vec::new(),
       };
-    // Update immediately to make the pointers above (likely dangling!) valid.
+    // NB: Unsafe: because we need a raw pointer to a value in the struct, we started by
+    // initializing it to a meaningless value above (since we don't know where it will be
+    // in memory during struct construction), and then here we update it to be valid.
     execution.update(Vec::new());
     execution
   }
@@ -132,7 +134,7 @@ impl RawNode {
     RawNode {
       subject: subject.clone(),
       product: product.clone(),
-      state_tag: 
+      state_tag:
         match state {
           None => RawStateTag::Empty as u8,
           Some(&Complete::Return(_)) => RawStateTag::Return as u8,
@@ -141,7 +143,7 @@ impl RawNode {
         },
       state_return: match state {
         Some(&Complete::Return(ref v)) => v.clone(),
-        _ => Value::empty(),
+        _ => Default::default(),
       },
       state_throw: match state {
         Some(&Complete::Throw(_)) => true,
@@ -162,7 +164,7 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn new(node_states: Vec<(&Key,&TypeConstraint,Option<&Complete>)>) -> Box<RawNodes> {
+  fn new(node_states: Vec<(&Key, &TypeConstraint, Option<&Complete>)>) -> Box<RawNodes> {
     let nodes =
       node_states.iter()
         .map(|&(subject, product, state)|
@@ -177,7 +179,7 @@ impl RawNodes {
           nodes: nodes,
         }
       );
-    // Update immediately to make the pointers above (likely dangling!) valid.
+    // NB: Unsafe! See comment on similar pattern in RawExecution::new().
     raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
     raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
     raw_nodes
@@ -202,7 +204,7 @@ pub extern fn scheduler_create(
   type_has_variants: TypeConstraint,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  let externs = 
+  let externs =
     Externs::new(
       ext_context,
       key_for,
@@ -299,7 +301,7 @@ pub extern fn execution_next(
               .map(|(&id, value)| (id, Complete::Return(value.clone())));
           let throws =
             throws_ids.iter()
-              .map(|&id| (id, Complete::Throw(format!("{} failed!", id))));
+              .map(|&id| (id, Complete::Throw(format!("{:?} failed!", id))));
           raw.next(returns.chain(throws).collect());
         })
       })
@@ -444,6 +446,8 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
   with_scheduler(scheduler_ptr, |raw| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = Path::new(path_str.as_str());
+    // TODO: This should likely return an error condition to python.
+    //   see https://github.com/pantsbuild/pants/issues/4025
     raw.scheduler.visualize(&path).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });
@@ -457,7 +461,7 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
   let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
 }
 
-fn with_scheduler<F,T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
+fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
     where F: FnOnce(&mut RawScheduler)->T {
   let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
   let t = f(&mut scheduler);
