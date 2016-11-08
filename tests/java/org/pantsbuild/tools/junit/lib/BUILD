@@ -3,6 +3,9 @@
 
 java_library(
   name='test-dep',
+  # We need to use explicit sources here since we want to own both library code in this directory
+  # and code that looks like tests.
+  sources=globs('*.java'),
   dependencies=[
     '3rdparty/jvm/com/squareup/burst:burst-junit4',
     '3rdparty:guava',
@@ -11,5 +14,4 @@ java_library(
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit',
   ],
-  sources=globs('*.java')
 )

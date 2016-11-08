@@ -12,6 +12,5 @@ junit_tests(
     scoped('3rdparty:guava', scope='forced'),
     scoped('src/scala/org/pantsbuild/zinc/cache', scope='forced'),
   ],
-  sources=globs('*.scala'),
   strict_deps=True,
 )

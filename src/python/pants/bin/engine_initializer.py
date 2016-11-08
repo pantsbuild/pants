@@ -11,19 +11,19 @@ from collections import namedtuple
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.options_initializer import OptionsInitializer
+from pants.engine.build_files import create_graph_tasks
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
-from pants.engine.graph import create_graph_tasks
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
-from pants.engine.legacy.graph import LegacyBuildGraph, LegacyTarget, create_legacy_graph_tasks
+from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, RemoteSourcesAdaptor,
                                          TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
-from pants.engine.storage import Storage
+from pants.engine.subsystem.native import Native
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
 
@@ -63,12 +63,12 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
   def warm_product_graph(self, target_roots):
-    """Warm the scheduler's `ProductGraph` with `LegacyTarget` products.
+    """Warm the scheduler's `ProductGraph` with `HydratedTargets` products.
 
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    request = self.scheduler.execution_request([LegacyTarget], target_roots.as_specs())
+    request = self.scheduler.execution_request([HydratedTargets], target_roots.as_specs())
     result = self.engine.execute(request)
     if result.error:
       raise result.error
@@ -100,6 +100,7 @@ class EngineInitializer(object):
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
                          build_root=None,
+                         native=None,
                          symbol_table_cls=None,
                          build_ignore_patterns=None,
                          exclude_target_regexps=None):
@@ -108,6 +109,7 @@ class EngineInitializer(object):
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
     :param str build_root: A path to be used as the build root. If None, then default is used.
+    :param Native native: An instance of the native-engine subsystem.
     :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
                                          None to use the default.
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
@@ -129,6 +131,9 @@ class EngineInitializer(object):
                                    build_ignore_patterns=build_ignore_patterns,
                                    exclude_target_regexps=exclude_target_regexps)
 
+    # Load the native backend.
+    native = native or Native.Factory.global_instance().create()
+
     # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     tasks = (
@@ -137,9 +142,9 @@ class EngineInitializer(object):
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
 
-    scheduler = LocalScheduler(dict(), tasks, project_tree)
     # TODO: Do not use the cache yet, as it incurs a high overhead.
-    engine = LocalSerialEngine(scheduler, Storage.create(), use_cache=False)
+    scheduler = LocalScheduler(dict(), tasks, project_tree, native)
+    engine = LocalSerialEngine(scheduler, use_cache=False)
     change_calculator = EngineChangeCalculator(engine, scm) if scm else None
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)

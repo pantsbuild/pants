@@ -33,8 +33,8 @@ class DummyTask(Task):
   context = DummyContext()
 
   @classmethod
-  def global_subsystems(cls):
-    return super(DummyTask, cls).global_subsystems() + (CacheSetup, )
+  def subsystem_dependencies(cls):
+    return super(DummyTask, cls).subsystem_dependencies() + (CacheSetup, )
 
 
 class MockPinger(object):

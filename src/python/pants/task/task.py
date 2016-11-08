@@ -89,24 +89,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return '{}_{}'.format(cls.__module__, cls.__name__).replace('.', '_')
 
   @classmethod
-  def global_subsystems(cls):
-    """The global subsystems this task uses.
-
-    A tuple of subsystem types.
-
-    :API: public
-    """
-    return tuple()
-
-  @classmethod
-  def task_subsystems(cls):
-    """The private, per-task subsystems this task uses.
-
-    A tuple of subsystem types.
-
-    :API: public
-    """
-    return (CacheSetup,)
+  def subsystem_dependencies(cls):
+    return super(TaskBase, cls).subsystem_dependencies() + (CacheSetup.scoped(cls),)
 
   @classmethod
   def product_types(cls):

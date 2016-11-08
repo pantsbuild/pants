@@ -63,6 +63,14 @@ def target_list_option(s):
   return _convert(s, (list, tuple))
 
 
+def dir_option(s):
+  """Same type as 'str', but indicates string represents a directory path.
+
+  :API: public
+  """
+  return s
+
+
 def file_option(s):
   """Same type as 'str', but indicates string represents a filepath.
 

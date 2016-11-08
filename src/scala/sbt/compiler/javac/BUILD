@@ -8,6 +8,5 @@ scala_library(
   dependencies=[
     '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
   ],
-  sources=globs('*.scala'),
   platform='java7',
 )

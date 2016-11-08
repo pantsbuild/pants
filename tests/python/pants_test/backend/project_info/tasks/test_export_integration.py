@@ -246,7 +246,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['binary']))
       self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['chroot']))
 
-      python_target = json_data['targets']['src/python/pants/backend/python/targets:python']
+      python_target = json_data['targets']['src/python/pants/backend/python/targets:targets']
       self.assertIsNotNone(python_target)
       self.assertEquals(default_interpreter, python_target['python_interpreter'])
 

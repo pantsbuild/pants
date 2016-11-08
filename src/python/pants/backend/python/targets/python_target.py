@@ -68,9 +68,7 @@ class PythonTarget(Target):
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })
-    super(PythonTarget, self).__init__(address=address,
-                                       payload=payload,
-                                       **kwargs)
+    super(PythonTarget, self).__init__(address=address, payload=payload, **kwargs)
     self._resource_target_specs = resource_targets
     self.add_labels('python')
 

@@ -75,7 +75,7 @@ def create_isolated_git_repo():
   #    |--scala
   #       |--org/pantsbuild/cp-directories
   #          |--BUILD
-  #          |--ClasspathDirectories.scala
+  #          |--ClasspathDirectoriesSpec.scala
   with temporary_dir(root_dir=get_buildroot()) as worktree:
     with safe_open(os.path.join(worktree, 'README'), 'w') as fp:
       fp.write('Just a test tree.')
@@ -208,7 +208,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       transitive=['src/python/sources:sources']
     ),
     # A `scala_library` with `sources=['file.name']`.
-    'tests/scala/org/pantsbuild/cp-directories/ClasspathDirectories.scala': dict(
+    'tests/scala/org/pantsbuild/cp-directories/ClasspathDirectoriesSpec.scala': dict(
       none=['tests/scala/org/pantsbuild/cp-directories:cp-directories'],
       direct=['tests/scala/org/pantsbuild/cp-directories:cp-directories'],
       transitive=['tests/scala/org/pantsbuild/cp-directories:cp-directories']

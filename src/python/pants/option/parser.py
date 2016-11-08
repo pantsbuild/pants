@@ -16,7 +16,7 @@ import six
 from pants.base.deprecated import validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.custom_types import (DictValueComponent, ListValueComponent, dict_option,
-                                       file_option, list_option, target_option)
+                                       dir_option, file_option, list_option, target_option)
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
                                  InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
                                  NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
@@ -338,7 +338,7 @@ class Parser(object):
 
   # TODO: Remove dict_option from here after deprecation is complete.
   _allowed_member_types = {
-    str, int, float, dict, dict_option, file_option, target_option
+    str, int, float, dict, dir_option, dict_option, file_option, target_option
   }
 
   def _validate(self, args, kwargs):
@@ -524,10 +524,13 @@ class Parser(object):
       if val is not None:
         choices = kwargs.get('choices')
         if choices is not None and val not in choices:
-          raise ParseError('{} is not an allowed value for option {} in {}. '
+          raise ParseError('`{}` is not an allowed value for option {} in {}. '
                            'Must be one of: {}'.format(val, dest, self._scope_str(), choices))
+        elif kwargs.get('type') == dir_option and not os.path.isdir(val):
+          raise ParseError('Directory value `{}` for option {} in {} does not exist.'.format(
+              val, dest, self._scope_str()))
         elif kwargs.get('type') == file_option and not os.path.isfile(val):
-          raise ParseError('File value {} for option {} in {} does not exist.'.format(
+          raise ParseError('File value `{}` for option {} in {} does not exist.'.format(
               val, dest, self._scope_str()))
 
     # Generate the final value from all available values, and check that it (or its members,

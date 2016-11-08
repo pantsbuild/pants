@@ -1,3 +1,1 @@
-scala_library(
-  sources=globs('*.scala'),
-)
+scala_library()

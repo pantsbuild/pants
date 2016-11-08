@@ -3,7 +3,6 @@
 
 
 python_library(
-  sources = globs('*.py'),
   dependencies = [
     'src/python/pants/base:hash_utils',
     'src/python/pants/build_graph',

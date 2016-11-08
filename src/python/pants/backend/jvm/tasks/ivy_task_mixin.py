@@ -81,8 +81,8 @@ class IvyTaskMixin(TaskBase):
     """Indicates a jar dependency couldn't be mapped."""
 
   @classmethod
-  def global_subsystems(cls):
-    return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, JarDependencyManagement)
+  def subsystem_dependencies(cls):
+    return super(IvyTaskMixin, cls).subsystem_dependencies() + (IvySubsystem, JarDependencyManagement)
 
   @classmethod
   def register_options(cls, register):

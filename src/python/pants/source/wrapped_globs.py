@@ -45,9 +45,9 @@ class FilesetWithSpec(AbstractClass):
       if not glob.startswith(rel_root):
         raise ValueError('expected glob filespec: {!r}'
                          ' to start with its root path: {!r}!'.format(glob, rel_root))
-    excludes = filespec.get('excludes')
-    if excludes:
-      for exclude_filespec in excludes:
+    exclude = filespec.get('exclude')
+    if exclude:
+      for exclude_filespec in exclude:
         self._validate_globs_in_filespec(exclude_filespec, rel_root)
 
   @abstractproperty
@@ -146,7 +146,7 @@ class FilesetRelPathWrapper(AbstractClass):
       if not isinstance(pattern, string_types):
         raise ValueError("Expected string patterns for {}: got {}".format(cls.__name__, patterns))
 
-    raw_excludes = kwargs.pop('exclude', [])
+    raw_exclude = kwargs.pop('exclude', [])
     buildroot = get_buildroot()
     root = os.path.normpath(os.path.join(buildroot, rel_path))
 
@@ -161,22 +161,22 @@ class FilesetRelPathWrapper(AbstractClass):
       if cls._is_glob_dir_outside_root(glob, root):
         raise ValueError('Invalid glob {}, points outside BUILD file root {}'.format(glob, root))
 
-    excludes = cls.process_raw_excludes(raw_excludes)
+    exclude = cls.process_raw_exclude(raw_exclude)
 
-    files_calculator = cls._file_calculator(root, patterns, kwargs, excludes)
+    files_calculator = cls._file_calculator(root, patterns, kwargs, exclude)
 
     rel_root = fast_relpath(root, buildroot)
     if rel_root == '.':
       rel_root = ''
-    filespec = cls.to_filespec(patterns, root=rel_root, excludes=excludes)
+    filespec = cls.to_filespec(patterns, root=rel_root, exclude=exclude)
 
     return LazyFilesetWithSpec(rel_root, filespec, files_calculator)
 
   @classmethod
-  def _file_calculator(cls, root, patterns, kwargs, excludes):
+  def _file_calculator(cls, root, patterns, kwargs, exclude):
     def files_calculator():
       result = cls.wrapped_fn(root=root, *patterns, **kwargs)
-      for ex in excludes:
+      for ex in exclude:
         result -= ex
 
       # BUILD file's filesets should contain only files, not folders.
@@ -194,10 +194,10 @@ class FilesetRelPathWrapper(AbstractClass):
     return os.path.commonprefix([root, glob_path]) != root
 
   @staticmethod
-  def process_raw_excludes(raw_excludes):
-    if isinstance(raw_excludes, string_types):
+  def process_raw_exclude(raw_exclude):
+    if isinstance(raw_exclude, string_types):
       raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings,"
-                       " but was a string: {}".format(raw_excludes))
+                       " but was a string: {}".format(raw_exclude))
 
     # You can't subtract raw strings from globs
     def ensure_string_wrapped_in_list(element):
@@ -206,10 +206,10 @@ class FilesetRelPathWrapper(AbstractClass):
       else:
         return element
 
-    return [ensure_string_wrapped_in_list(exclude) for exclude in raw_excludes]
+    return [ensure_string_wrapped_in_list(exclude) for exclude in raw_exclude]
 
   @classmethod
-  def to_filespec(cls, args, root='', excludes=None):
+  def to_filespec(cls, args, root='', exclude=None):
     """Return a dict representation of this glob list, relative to the buildroot.
 
     The format of the dict is {'globs': [ 'list', 'of' , 'strings' ]
@@ -218,9 +218,9 @@ class FilesetRelPathWrapper(AbstractClass):
     The globs are in zglobs format.
     """
     result = {'globs': [os.path.join(root, arg) for arg in args]}
-    if excludes:
+    if exclude:
       result['exclude'] = []
-      for exclude in excludes:
+      for exclude in exclude:
         if hasattr(exclude, 'filespec'):
           result['exclude'].append(exclude.filespec)
         else:
@@ -273,7 +273,7 @@ class RGlobs(FilesetRelPathWrapper):
   validate_files = True
 
   @classmethod
-  def to_filespec(cls, args, root='', excludes=None):
+  def to_filespec(cls, args, root='', exclude=None):
     # In rglobs, * at the beginning of a path component means "any
     # number of directories, including 0". So every time we see ^*,
     # we need to output "**/*whatever".
@@ -297,7 +297,7 @@ class RGlobs(FilesetRelPathWrapper):
 
       rglobs.append(os.path.join(*out))
 
-    return super(RGlobs, cls).to_filespec(rglobs, root=root, excludes=excludes)
+    return super(RGlobs, cls).to_filespec(rglobs, root=root, exclude=exclude)
 
 
 class ZGlobs(FilesetRelPathWrapper):

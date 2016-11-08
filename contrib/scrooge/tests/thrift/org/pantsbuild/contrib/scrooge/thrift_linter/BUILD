@@ -14,6 +14,12 @@ java_thrift_library(
 )
 
 java_thrift_library(
+  name = 'bad-thrift-strict2',
+  sources = ['bad-strict2.thrift'],
+  thrift_linter_strict=True,
+)
+
+java_thrift_library(
   name = 'bad-thrift-non-strict',
   sources = ['bad-non-strict.thrift'],
   thrift_linter_strict=False,
