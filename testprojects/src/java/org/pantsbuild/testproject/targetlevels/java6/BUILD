@@ -8,6 +8,5 @@ jvm_binary(
 )
 
 java_library(name='lib',
-  sources=globs('*.java'),
   platform='java6',
 )

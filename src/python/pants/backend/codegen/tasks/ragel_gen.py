@@ -21,8 +21,8 @@ from pants.util.memo import memoized_property
 
 class RagelGen(SimpleCodegenTask):
   @classmethod
-  def global_subsystems(cls):
-    return super(RagelGen, cls).global_subsystems() + (BinaryUtil.Factory,)
+  def subsystem_dependencies(cls):
+    return super(RagelGen, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
 
   @classmethod
   def register_options(cls, register):

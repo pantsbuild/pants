@@ -14,7 +14,6 @@ scala_library(
     'src/scala/org/pantsbuild/zinc/cache',
     'src/scala/org/pantsbuild/zinc/logging',
   ],
-  sources=globs('*.scala'),
   strict_deps=True,
   platform='java7',
 )

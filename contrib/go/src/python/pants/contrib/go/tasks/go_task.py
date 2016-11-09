@@ -26,8 +26,8 @@ from pants.contrib.go.targets.go_target import GoTarget
 class GoTask(Task):
 
   @classmethod
-  def global_subsystems(cls):
-    return super(GoTask, cls).global_subsystems() + (GoDistribution.Factory,)
+  def subsystem_dependencies(cls):
+    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.Factory,)
 
   @staticmethod
   def is_binary(target):

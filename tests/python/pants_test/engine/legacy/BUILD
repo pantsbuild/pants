@@ -12,6 +12,7 @@ python_tests(
     'src/python/pants/engine/legacy:address_mapper',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/engine:util',
   ]
 )
 
@@ -85,6 +86,7 @@ python_tests(
     '3rdparty/python:mock',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
+    'tests/python/pants_test/engine:util',
   ]
 )
 

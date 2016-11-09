@@ -137,9 +137,9 @@ Use `test` to run the tests. This uses `pytest`:
                          ============== test session starts ===============
                          platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
                          plugins: cov, timeout
-                         collected 1 items
+                         collected 2 items
 
-                         examples/tests/python/example_test/hello/greet/greet.py .
+                         examples/tests/python/example_test/hello/greet/test_greet.py ..
 
                          ============ 1 passed in 0.02 seconds ============
 
@@ -310,7 +310,7 @@ parameters:
                          plugins: cov, timeout
                          collected 2 items
 
-                         examples/tests/python/example_test/hello/greet/greet.py .
+                         examples/tests/python/example_test/hello/greet/test_greet.py .
 
                          ========= 1 tests deselected by '-kreq' ==========
                          ===== 1 passed, 1 deselected in 0.05 seconds =====

@@ -84,11 +84,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (Shader.Factory,)
-
-  @classmethod
-  def global_subsystems(cls):
-    return super(BootstrapJvmTools, cls).global_subsystems() + (IvySubsystem, )
+    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (IvySubsystem, Shader.Factory)
 
   @classmethod
   def prepare(cls, options, round_manager):

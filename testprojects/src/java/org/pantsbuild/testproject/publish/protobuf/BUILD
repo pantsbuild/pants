@@ -6,7 +6,6 @@ java_library(name='protobuf-java',
     '3rdparty:protobuf-java',
     'testprojects/src/protobuf/org/pantsbuild/testproject/distance',
   ],
-  sources=globs('*.java'),
   provides=artifact(
     org='org.pantsbuild.testproject.publish.protobuf',
     name='protobuf-java',

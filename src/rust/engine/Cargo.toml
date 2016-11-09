@@ -1,0 +1,11 @@
+[project]
+version = "0.0.1"
+name = "engine"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+libc = "0.2.0"
+fnv = "1.0.3"

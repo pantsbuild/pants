@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ConfigParser
 import os
+import shutil
 import subprocess
 import unittest
 from collections import namedtuple
@@ -19,8 +20,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.contextutil import environment_as, pushd, temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
@@ -82,6 +83,16 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return False
 
   @classmethod
+  def hermetic_env_whitelist(cls):
+    """A whitelist of environment variables to propagate to tests when hermetic=True."""
+    return [
+        # Set by the wrapper script in the repo to allow for running from source.
+        'PANTS_NATIVE_ENGINE_VERSION',
+        # Used in the wrapper script to locate a rust install.
+        'HOME',
+      ]
+
+  @classmethod
   def has_python_version(cls, version):
     """Returns true if the current system has the specified version of python.
 
@@ -133,7 +144,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       yield clone_dir
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
-                             **kwargs):
+                             build_root=None, **kwargs):
 
     args = [
       '--no-pantsrc',
@@ -163,11 +174,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
         ini.write(fp)
       args.append('--config-override=' + ini_file_name)
 
-    pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
+    pants_script = os.path.join(build_root or get_buildroot(), self.PANTS_SCRIPT_NAME)
     pants_command = [pants_script] + args + command
 
+    # Only whitelisted entries will be included in the environment if hermetic=True.
     if self.hermetic():
       env = dict()
+      for h in self.hermetic_env_whitelist():
+        env[h] = os.getenv(h)
       hermetic_env = os.getenv('HERMETIC_ENV')
       if hermetic_env:
         for h in hermetic_env.strip(',').split(','):
@@ -321,6 +335,35 @@ class PantsRunIntegrationTest(unittest.TestCase):
       yield
     finally:
       os.unlink(path)
+
+  @contextmanager
+  def mock_buildroot(self):
+    """Construct a mock buildroot and return a helper object for interacting with it."""
+    Manager = namedtuple('Manager', 'write_file pushd dir')
+    # N.B. BUILD.tools needs to be copied vs symlinked to avoid a symlink prefix check error.
+    files_to_copy = ('BUILD.tools',)
+    files_to_link = ('pants', 'pants.ini', 'pants.travis-ci.ini', '.pants.d',
+                     'build-support', '3rdparty', 'pants-plugins', 'src', 'contrib')
+
+    with self.temporary_workdir() as tmp_dir:
+      for filename in files_to_copy:
+        shutil.copy(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
+
+      for filename in files_to_link:
+        os.symlink(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
+
+      def write_file(file_path, contents):
+        full_file_path = os.path.join(tmp_dir, *file_path.split(os.pathsep))
+        safe_mkdir_for(full_file_path)
+        with open(full_file_path, 'wb') as fh:
+          fh.write(contents)
+
+      @contextmanager
+      def dir_context():
+        with pushd(tmp_dir):
+          yield
+
+      yield Manager(write_file, dir_context, tmp_dir)
 
   def do_command(self, *args, **kwargs):
     """Wrapper around run_pants method.

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import inspect
+import sys
 from abc import abstractmethod
 from functools import update_wrapper
 
@@ -14,12 +15,34 @@ import six
 
 from pants.build_graph.address import Address
 from pants.engine.objects import Resolvable, Serializable
+from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Addresses(datatype('Addresses', ['dependencies'])):
-  pass
+class Collection(object):
+  """
+  Singleton Collection Type. The ambition is to gain native support for flattening,
+  so methods like <pants.engine.fs.merge_files> won't have to be defined separately.
+  Related to: https://github.com/pantsbuild/pants/issues/3169
+  """
+
+  @classmethod
+  @memoized
+  def of(cls, *element_types):
+    union = '|'.join(element_type.__name__ for element_type in element_types)
+    type_name = b'{}.of({})'.format(cls.__name__, union)
+    supertypes = (cls, datatype('Collection', ['dependencies']))
+    properties = {'element_types': element_types}
+    collection_of_type = type(type_name, supertypes, properties)
+
+    # Expose the custom class type at the module level to be pickle compatible.
+    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
+
+    return collection_of_type
+
+
+Addresses = Collection.of(Address)
 
 
 class TypeConstraint(AbstractClass):

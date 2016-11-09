@@ -6,386 +6,30 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 import threading
 import time
-from collections import deque
 from contextlib import contextmanager
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
-from pants.engine.fs import PathGlobs
-from pants.engine.nodes import (FilesystemNode, Node, Noop, Return, Runnable, SelectNode,
-                                StepContext, TaskNode, Throw, Waiting)
+from pants.engine.addressable import SubclassesOf
+from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
+from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
+from pants.engine.nodes import Return, Runnable, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
-from pants.engine.selectors import Select, SelectDependencies, type_or_constraint_repr
+from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
+                                    SelectVariant, constraint_for)
+from pants.engine.struct import HasProducts, Variants
+from pants.engine.subsystem.native import (ExternContext, Function, TypeConstraint, TypeId,
+                                           extern_id_to_str, extern_key_for, extern_project,
+                                           extern_project_multi, extern_satisfied_by,
+                                           extern_store_list, extern_val_to_str)
 from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
-
-
-class CompletedNodeException(ValueError):
-  """Indicates an attempt to change a Node that is already completed."""
-
-
-class IncompleteDependencyException(ValueError):
-  """Indicates an attempt to complete a Node that has incomplete dependencies."""
-
-
-class ProductGraph(object):
-
-  class Entry(object):
-    """An entry representing a Node in the ProductGraph.
-
-    Equality for this object is intentionally `identity` for efficiency purposes: structural
-    equality can be implemented by comparing the result of the `structure` method.
-    """
-    __slots__ = ('node', 'state', 'dependencies', 'dependents', 'cyclic_dependencies')
-
-    def __init__(self, node):
-      self.node = node
-      # The computed value for a Node: if a Node hasn't been computed yet, it will be None.
-      self.state = None
-      # Sets of dependency/dependent Entry objects.
-      self.dependencies = set()
-      self.dependents = set()
-      # Illegal/cyclic dependency Nodes. We prevent cyclic dependencies from being introduced into the
-      # dependencies/dependents lists themselves, but track them independently in order to provide
-      # context specific error messages when they are introduced.
-      self.cyclic_dependencies = set()
-
-    @property
-    def is_complete(self):
-      return self.state is not None
-
-    def validate_not_complete(self):
-      if self.is_complete:
-        # It's important not to allow state changes on completed Nodes, because that invariant
-        # is used in cycle detection to avoid walking into completed Nodes.
-        raise CompletedNodeException('Node {} is already completed with:\n  {}'
-                                    .format(self.node, self.state))
-
-    def set_state(self, state):
-      self.validate_not_complete()
-
-      # Validate that a completed Node depends only on other completed Nodes.
-      for dep in self.dependencies:
-        if not dep.is_complete:
-          raise IncompleteDependencyException(
-              'Cannot complete {} with {} while it has an incomplete dep:\n  {}'
-                .format(self, state, dep.node))
-
-      # Finally, set.
-      self.state = state
-
-    def structure(self):
-      return (self.node,
-              self.state,
-              {d.node for d in self.dependencies},
-              {d.node for d in self.dependents},
-              self.cyclic_dependencies)
-
-  def __init__(self, validator=None):
-    self._validator = validator or Node.validate_node
-    # A dict of Node->Entry.
-    self._nodes = dict()
-
-  def __len__(self):
-    return len(self._nodes)
-
-  def is_complete(self, node):
-    entry = self._nodes.get(node, None)
-    return entry and entry.is_complete
-
-  def state(self, node):
-    entry = self._nodes.get(node, None)
-    if not entry:
-      return None
-    return entry.state
-
-  def complete_node(self, node, state):
-    """Updates the Node with the given State, creating any Nodes which do not already exist."""
-    if type(state) not in (Return, Throw, Noop):
-      raise ValueError('A Node may only be completed with a final State. Got: {}'.format(state))
-    entry = self.ensure_entry(node)
-    entry.set_state(state)
-
-  def add_dependencies(self, node, dependencies):
-    entry = self.ensure_entry(node)
-    entry.validate_not_complete()
-    self._add_dependencies(entry, dependencies)
-
-  def _detect_cycle(self, src, dest):
-    """Detect whether adding an edge from src to dest would create a cycle.
-
-    :param src: Source entry: must exist in the graph.
-    :param dest: Destination entry: must exist in the graph.
-
-    Returns True if a cycle would be created by adding an edge from src->dest.
-    """
-    # We disallow adding new edges outbound from completed Nodes, and no completed Node can have
-    # a path to an uncompleted Node. Thus, we can truncate our search for cycles at any completed
-    # Node.
-    is_not_completed = lambda e: e.state is None
-    for entry in self._walk_entries([dest], entry_predicate=is_not_completed):
-      if entry is src:
-        return True
-    return False
-
-  def ensure_entry(self, node):
-    """Returns the Entry for the given Node, creating it if it does not already exist."""
-    entry = self._nodes.get(node, None)
-    if not entry:
-      self._validator(node)
-      self._nodes[node] = entry = self.Entry(node)
-    return entry
-
-  def _add_dependencies(self, node_entry, dependencies):
-    """Adds dependency edges from the given src Node to the given dependency Nodes.
-
-    Executes cycle detection: if adding one of the given dependencies would create
-    a cycle, then the _source_ Node is marked as a Noop with an error indicating the
-    cycle path, and the dependencies are not introduced.
-    """
-
-    # Add deps. Any deps which would cause a cycle are added to cyclic_dependencies instead,
-    # and ignored except for the purposes of Step execution.
-    for dependency in dependencies:
-      dependency_entry = self.ensure_entry(dependency)
-      if dependency_entry in node_entry.dependencies:
-        continue
-
-      if self._detect_cycle(node_entry, dependency_entry):
-        node_entry.cyclic_dependencies.add(dependency)
-      else:
-        node_entry.dependencies.add(dependency_entry)
-        dependency_entry.dependents.add(node_entry)
-
-  def completed_nodes(self):
-    """In linear time, yields the states of any Nodes which have completed."""
-    for node, entry in self._nodes.items():
-      if entry.state is not None:
-        yield node, entry.state
-
-  def dependents(self):
-    """In linear time, yields the dependents lists for all Nodes."""
-    for node, entry in self._nodes.items():
-      yield node, [d.node for d in entry.dependents]
-
-  def dependencies(self):
-    """In linear time, yields the dependencies lists for all Nodes."""
-    for node, entry in self._nodes.items():
-      yield node, [d.node for d in entry.dependencies]
-
-  def cyclic_dependencies(self):
-    """In linear time, yields the cyclic_dependencies lists for all Nodes."""
-    for node, entry in self._nodes.items():
-      yield node, entry.cyclic_dependencies
-
-  def dependents_of(self, node):
-    entry = self._nodes.get(node, None)
-    if entry:
-      for d in entry.dependents:
-        yield d.node
-
-  def _dependency_entries_of(self, node):
-    entry = self._nodes.get(node, None)
-    if entry:
-      for d in entry.dependencies:
-        yield d
-
-  def dependencies_of(self, node):
-    for d in self._dependency_entries_of(node):
-      yield d.node
-
-  def cyclic_dependencies_of(self, node):
-    entry = self._nodes.get(node, None)
-    if not entry:
-      return set()
-    return entry.cyclic_dependencies
-
-  def invalidate(self, predicate=None):
-    """Invalidate nodes and their subgraph of dependents given a predicate.
-
-    :param func predicate: A predicate that matches Node objects for all nodes in the graph.
-    """
-    def _sever_dependents(entry):
-      for associated_entry in entry.dependencies:
-        associated_entry.dependents.discard(entry)
-
-    def _delete_node(entry):
-      actual_entry = self._nodes.pop(entry.node)
-      assert entry is actual_entry
-
-    def all_predicate(node, state): return True
-    predicate = predicate or all_predicate
-
-    invalidated_root_entries = list(entry for entry in self._nodes.values()
-                                    if predicate(entry.node, entry.state))
-    invalidated_entries = list(entry for entry in self._walk_entries(invalidated_root_entries,
-                                                                     lambda _: True,
-                                                                     dependents=True))
-
-    # Sever dependee->dependent relationships in the graph for all given invalidated nodes.
-    for entry in invalidated_entries:
-      _sever_dependents(entry)
-
-    # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
-    for entry in invalidated_entries:
-      _delete_node(entry)
-
-    invalidated_count = len(invalidated_entries)
-    logger.info('invalidated {} of {} nodes'.format(invalidated_count, len(self)))
-    return invalidated_count
-
-  def invalidate_files(self, filenames):
-    """Given a set of changed filenames, invalidate all related FilesystemNodes in the graph."""
-    subjects = set(FilesystemNode.generate_subjects(filenames))
-    logger.debug('generated invalidation subjects: %s', subjects)
-
-    def predicate(node, state):
-      return type(node) is FilesystemNode and node.subject in subjects
-
-    return self.invalidate(predicate)
-
-  def walk(self, roots, predicate=None, dependents=False):
-    """Yields Nodes and their States depth-first in pre-order, starting from the given roots.
-
-    Each node entry is a tuple of (Node, State).
-
-    The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
-    that don't match it. The default predicate eliminates all `Noop` subgraphs.
-    """
-    def _default_entry_predicate(entry):
-      return type(entry.state) is not Noop
-    def _entry_predicate(entry):
-      return predicate(entry.node, entry.state)
-    entry_predicate = _entry_predicate if predicate else _default_entry_predicate
-
-    root_entries = []
-    for root in roots:
-      entry = self._nodes.get(root, None)
-      if entry:
-        root_entries.append(entry)
-
-    for entry in self._walk_entries(root_entries, entry_predicate, dependents=dependents):
-      yield (entry.node, entry.state)
-
-  def _walk_entries(self, root_entries, entry_predicate, dependents=False):
-    stack = deque(root_entries)
-    walked = set()
-    while stack:
-      entry = stack.pop()
-      if entry in walked:
-        continue
-      walked.add(entry)
-      if not entry_predicate(entry):
-        continue
-      stack.extend(entry.dependents if dependents else entry.dependencies)
-
-      yield entry
-
-  def trace(self, root):
-    """Yields a stringified 'stacktrace' starting from the given failed root.
-
-    TODO: This could use polish. In particular, the `__str__` representations of Nodes and
-    States are probably not sufficient for user output.
-    """
-
-    traced = set()
-
-    def is_bottom(entry):
-      return type(entry.state) in (Noop, Return) or entry in traced
-
-    def is_one_level_above_bottom(parent_entry):
-      return all(is_bottom(child_entry) for child_entry in parent_entry.dependencies)
-
-    def _format(level, entry, state):
-      output = '{}Computing {} for {}'.format('  ' * level,
-                                              type_or_constraint_repr(entry.node.product),
-                                              entry.node.subject)
-      if is_one_level_above_bottom(entry):
-        output += '\n{}{}'.format('  ' * (level + 1), state)
-
-      return output
-
-    def _trace(entry, level):
-      if is_bottom(entry):
-        return
-      traced.add(entry)
-      yield _format(level, entry, entry.state)
-      for dep in entry.cyclic_dependencies:
-        yield _format(level, entry, Noop.cycle(entry.node, dep))
-      for dep_entry in entry.dependencies:
-        for l in _trace(dep_entry, level+1):
-          yield l
-
-    for line in _trace(self._nodes[root], 1):
-      yield line
-
-  def visualize(self, roots):
-    """Visualize a graph walk by generating graphviz `dot` output.
-
-    :param iterable roots: An iterable of the root nodes to begin the graph walk from.
-    """
-    viz_colors = {}
-    viz_color_scheme = 'set312'  # NB: There are only 12 colors in `set312`.
-    viz_max_colors = 12
-
-    def format_color(node, node_state):
-      if type(node_state) is Throw:
-        return 'tomato'
-      elif type(node_state) is Noop:
-        return 'white'
-      return viz_colors.setdefault(node.product, (len(viz_colors) % viz_max_colors) + 1)
-
-    def format_type(node):
-      return node.func.__name__ if type(node) is TaskNode else type(node).__name__
-
-    def format_subject(node):
-      if node.variants:
-        return '({})@{}'.format(node.subject,
-                                ','.join('{}={}'.format(k, v) for k, v in node.variants))
-      else:
-        return '({})'.format(node.subject)
-
-    def format_product(node):
-      if type(node) is SelectNode and node.variant_key:
-        return '{}@{}'.format(node.product.__name__, node.variant_key)
-      return node.product.__name__
-
-    def format_node(node, state):
-      return '{}:{}:{} == {}'.format(format_product(node),
-                                     format_subject(node),
-                                     format_type(node),
-                                     str(state).replace('"', '\\"'))
-
-    def format_edge(src_str, dest_str, cyclic):
-      style = " [style=dashed]" if cyclic else ""
-      return '    "{}" -> "{}"{}'.format(node_str, format_node(dep, dep_state), style)
-
-    yield 'digraph plans {'
-    yield '  node[colorscheme={}];'.format(viz_color_scheme)
-    yield '  concentrate=true;'
-    yield '  rankdir=LR;'
-
-    predicate = lambda n, s: type(s) is not Noop
-
-    for (node, node_state) in self.walk(roots, predicate=predicate):
-      node_str = format_node(node, node_state)
-
-      yield '  "{}" [style=filled, fillcolor={}];'.format(node_str, format_color(node, node_state))
-
-      for cyclic, adjacencies in ((False, self.dependencies_of), (True, self.cyclic_dependencies_of)):
-        for dep in adjacencies(node):
-          dep_state = self.state(dep)
-          if not predicate(dep, dep_state):
-            continue
-          yield format_edge(node_str, format_node(dep, dep_state), cyclic)
-
-    yield '}'
 
 
 class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
@@ -394,98 +38,192 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   To create an ExecutionRequest, see `LocalScheduler.build_request` (which performs goal
   translation) or `LocalScheduler.execution_request`.
 
-  :param roots: Root Nodes for this request.
-  :type roots: list of :class:`pants.engine.nodes.Node`
+  :param roots: Roots for this request.
+  :type roots: list of tuples of subject and product.
   """
 
 
 class LocalScheduler(object):
-  """A scheduler that expands a ProductGraph by executing user defined tasks."""
+  """A scheduler that expands a product Graph by executing user defined tasks."""
 
   def __init__(self,
                goals,
                tasks,
                project_tree,
-               graph_lock=None,
-               inline_nodes=True,
-               graph_validator=None):
+               native,
+               graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
     :param project_tree: An instance of ProjectTree for the current build root.
-    :param graph_lock: A re-entrant lock to use for guarding access to the internal ProductGraph
+    :param native: An instance of engine.subsystem.native.Native.
+    :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
                        instance. Defaults to creating a new threading.RLock().
-    :param inline_nodes: Whether to inline execution of `inlineable` Nodes. This improves
-                         performance, but can make debugging more difficult because the entire
-                         execution history is not recorded in the ProductGraph.
-    :param graph_validator: A validator that runs over the entire graph after every scheduling
-                            attempt. Very expensive, very experimental.
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
-    self._node_builder = NodeBuilder.create(tasks)
-
-    self._graph_validator = graph_validator
-    self._product_graph = ProductGraph()
+    self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
-    self._inline_nodes = inline_nodes
+    self._run_count = 0
 
+    # Create a handle for the ExternContext (which must be kept alive as long as this object), and
+    # the native Scheduler.
+    self._context = ExternContext()
+    self._context_handle = native.new_handle(self._context)
+
+    # TODO: The only (?) case where we use inheritance rather than exact type unions.
+    has_products_constraint = TypeConstraint(self._to_id(SubclassesOf(HasProducts)))
+
+    scheduler = native.lib.scheduler_create(self._context_handle,
+                                            extern_key_for,
+                                            extern_id_to_str,
+                                            extern_val_to_str,
+                                            extern_satisfied_by,
+                                            extern_store_list,
+                                            extern_project,
+                                            extern_project_multi,
+                                            self._to_key('name'),
+                                            self._to_key('products'),
+                                            self._to_key('default'),
+                                            self._to_constraint(Address),
+                                            has_products_constraint,
+                                            self._to_constraint(Variants))
+    self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
+    self._execution_request = None
+
+    # Validate and register all provided and intrinsic tasks.
     select_product = lambda product: Select(product)
-    select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address,))
-    self._root_selector_fns = {
+    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
+    # strictly necessary for execution. We might eventually be able to remove it by only executing
+    # validation below the execution roots (and thus not considering paths that aren't in use).
+    root_selector_fns = {
       Address: select_product,
+      AscendantAddresses: select_product,
+      DescendantAddresses: select_product,
       PathGlobs: select_product,
-      SingleAddress: select_dep_addrs,
-      SiblingAddresses: select_dep_addrs,
-      AscendantAddresses: select_dep_addrs,
-      DescendantAddresses: select_dep_addrs,
+      SiblingAddresses: select_product,
+      SingleAddress: select_product,
     }
+    intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
+    singletons = create_snapshot_singletons(project_tree)
+    node_builder = NodeBuilder.create(tasks, intrinsics, singletons)
+    RulesetValidator(node_builder, goals, root_selector_fns).validate()
+    self._register_tasks(node_builder.tasks)
+    self._register_intrinsics(node_builder.intrinsics)
+    self._register_singletons(node_builder.singletons)
 
-    RulesetValidator(self._node_builder, goals, self._root_selector_fns).validate()
+  def _to_value(self, obj):
+    return self._context.to_value(obj)
 
-  def visualize_graph_to_file(self, roots, filename):
+  def _from_value(self, val):
+    return self._context.from_value(val)
+
+  def _to_id(self, typ):
+    return self._context.to_id(typ)
+
+  def _to_key(self, obj):
+    return self._context.to_key(obj)
+
+  def _from_id(self, cdata):
+    return self._context.from_id(cdata)
+
+  def _from_key(self, cdata):
+    return self._context.from_key(cdata)
+
+  def _to_constraint(self, type_or_constraint):
+    return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
+
+  def _register_singletons(self, singletons):
+    """Register the given singletons dict.
+
+    Singleton tasks are those that are the default for a particular type(product). Like
+    intrinsics, singleton tasks create Runnables that are not cacheable.
+    """
+    for product_type, rule in singletons.items():
+      self._native.lib.singleton_task_add(self._scheduler,
+                                          Function(self._to_id(rule.func)),
+                                          self._to_constraint(product_type))
+
+  def _register_intrinsics(self, intrinsics):
+    """Register the given intrinsics dict.
+
+    Intrinsic tasks are those that are the default for a particular type(subject), type(product)
+    pair. By default, intrinsic tasks create Runnables that are not cacheable.
+    """
+    for (subject_type, product_type), rule in intrinsics.items():
+      self._native.lib.intrinsic_task_add(self._scheduler,
+                                          Function(self._to_id(rule.func)),
+                                          TypeId(self._to_id(subject_type)),
+                                          self._to_constraint(subject_type),
+                                          self._to_constraint(product_type))
+
+  def _register_tasks(self, tasks):
+    """Register the given tasks dict with the native scheduler."""
+    registered = set()
+    for output_type, rules in tasks.items():
+      output_constraint = self._to_constraint(output_type)
+      for rule in rules:
+        # TODO: The task map has heterogeneous keys, so we normalize them to type constraints
+        # and dedupe them before registering to the native engine:
+        #   see: https://github.com/pantsbuild/pants/issues/4005
+        key = (output_constraint, rule)
+        if key in registered:
+          continue
+        registered.add(key)
+
+        _, input_selects, func = rule.as_triple()
+        self._native.lib.task_add(self._scheduler, Function(self._to_id(func)), output_constraint)
+        for selector in input_selects:
+          selector_type = type(selector)
+          product_constraint = self._to_constraint(selector.product)
+          if selector_type is Select:
+            self._native.lib.task_add_select(self._scheduler,
+                                             product_constraint)
+          elif selector_type is SelectVariant:
+            self._native.lib.task_add_select_variant(self._scheduler,
+                                                     product_constraint,
+                                                     self._context.utf8_buf(selector.variant_key))
+          elif selector_type is SelectLiteral:
+            # NB: Intentionally ignores subject parameter to provide a literal subject.
+            self._native.lib.task_add_select_literal(self._scheduler,
+                                                     self._to_key(selector.subject),
+                                                     product_constraint)
+          elif selector_type is SelectDependencies:
+            self._native.lib.task_add_select_dependencies(self._scheduler,
+                                                          product_constraint,
+                                                          self._to_constraint(selector.dep_product),
+                                                          self._to_key(selector.field),
+                                                          selector.transitive)
+          elif selector_type is SelectProjection:
+            if len(selector.fields) != 1:
+              raise ValueError("TODO: remove support for projecting multiple fields at once.")
+            field = selector.fields[0]
+            self._native.lib.task_add_select_projection(self._scheduler,
+                                                        self._to_constraint(selector.product),
+                                                        TypeId(self._to_id(selector.projected_subject)),
+                                                        self._to_key(field),
+                                                        self._to_constraint(selector.input_product))
+          else:
+            raise ValueError('Unrecognized Selector type: {}'.format(selector))
+        self._native.lib.task_end(self._scheduler)
+
+  def trace(self, roots):
+    """Yields a stringified 'stacktrace' starting from the given failed root.
+
+    :param iterable roots: An iterable of the root nodes to begin the trace from.
+    """
+    return "TODO: Restore trace (see: #4007)."
+
+  def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
 
     :param iterable roots: An iterable of the root nodes to begin the graph walk from.
     :param str filename: The filename to output the graphviz output to.
     """
-    with self._product_graph_lock, open(filename, 'wb') as fh:
-      for line in self.product_graph.visualize(roots):
-        fh.write(line)
-        fh.write('\n')
-
-  def _attempt_run_step(self, node_entry):
-    """Attempt to run a Step with the currently available dependencies of the given Node.
-
-    If the currently declared dependencies of a Node are not yet available, returns None. If
-    they are available, runs a Step and returns the resulting State.
-    """
-    # See whether all of the dependencies for the node are available.
-    if any(not dep_entry.is_complete for dep_entry in node_entry.dependencies):
-      return None
-
-    # Collect the deps.
-    deps = dict()
-    for dep_entry in node_entry.dependencies:
-      deps[dep_entry.node] = dep_entry.state
-    # Additionally, include Noops for any dependencies that were cyclic.
-    for dep in node_entry.cyclic_dependencies:
-      deps[dep] = Noop.cycle(node_entry.node, dep)
-
-    # Run.
-    step_context = StepContext(self.node_builder, self._project_tree, deps, self._inline_nodes)
-    return node_entry.node.step(step_context)
-
-  @property
-  def node_builder(self):
-    """Return the NodeBuilder instance for this Scheduler.
-
-    A NodeBuilder is a relatively heavyweight object (since it contains an index of all
-    registered tasks), so it should be used for the execution of multiple Steps.
-    """
-    return self._node_builder
+    with self._product_graph_lock:
+      self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
@@ -503,7 +241,7 @@ class LocalScheduler(object):
   def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
 
-    The resulting ExecutionRequest object will contain keys tied to this scheduler's ProductGraph, and
+    The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph, and
     so it will not be directly usable with other scheduler instances without being re-created.
 
     An ExecutionRequest for an Address represents exactly one product output, as does SingleAddress. But
@@ -517,19 +255,7 @@ class LocalScheduler(object):
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-
-    # Determine the root Nodes for the products and subjects selected by the goals and specs.
-    def roots():
-      for subject in subjects:
-        selector_fn = self._root_selector_fns.get(type(subject), None)
-        if not selector_fn:
-          raise TypeError('Unsupported root subject type: {} for {!r}'
-                          .format(type(subject), subject))
-
-        for product in products:
-          yield self._node_builder.select_node(selector_fn(product), subject, None)
-
-    return ExecutionRequest(tuple(roots()))
+    return ExecutionRequest(tuple((s, Select(p)) for s in subjects for p in products))
 
   def selection_request(self, requests):
     """Create and return an ExecutionRequest for the given (selector, subject) tuples.
@@ -540,12 +266,7 @@ class LocalScheduler(object):
     :return: An ExecutionRequest for the given selectors and subjects.
     """
     #TODO: Think about how to deprecate the existing execution_request API.
-    roots = (self._node_builder.select_node(selector, subject, None) for (selector, subject) in requests)
-    return ExecutionRequest(tuple(roots))
-
-  @property
-  def product_graph(self):
-    return self._product_graph
+    return ExecutionRequest(tuple((subject, selector) for selector, subject in requests))
 
   @contextmanager
   def locked(self):
@@ -553,15 +274,97 @@ class LocalScheduler(object):
       yield
 
   def root_entries(self, execution_request):
-    """Returns the roots for the given ExecutionRequest as a dict from Node to State."""
+    """Returns the roots for the given ExecutionRequest as a dict of tuples to State."""
     with self._product_graph_lock:
-      return {root: self._product_graph.state(root) for root in execution_request.roots}
+      if self._execution_request is not execution_request:
+        raise AssertionError(
+            "Multiple concurrent executions are not supported! {} vs {}".format(
+              self._execution_request, execution_request))
+      raw_roots = self._native.gc(self._native.lib.execution_roots(self._scheduler),
+                                  self._native.lib.nodes_destroy)
+      roots = {}
+      for root, raw_root in zip(execution_request.roots, self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len)):
+        if raw_root.union_tag is 0:
+          state = None
+        elif raw_root.union_tag is 1:
+          state = Return(self._from_value(raw_root.union_return))
+        elif raw_root.union_tag is 2:
+          state = Throw("Failed")
+        elif raw_root.union_tag is 3:
+          state = Throw("Nooped")
+        else:
+          raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.union_tag, raw_root))
+        roots[root] = state
+      return roots
 
   def invalidate_files(self, filenames):
-    """Calls `ProductGraph.invalidate_files()` against an internal ProductGraph instance
-    under protection of a scheduler-level lock."""
+    """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
+    subjects = set(generate_fs_subjects(filenames))
+    subject_keys = list(self._to_key(subject) for subject in subjects)
     with self._product_graph_lock:
-      return self._product_graph.invalidate_files(filenames)
+      invalidated = self._native.lib.graph_invalidate(self._scheduler,
+                                                      subject_keys,
+                                                      len(subject_keys))
+      logger.debug('invalidated %d nodes for subjects: %s', invalidated, subjects)
+      return invalidated
+
+  def node_count(self):
+    with self._product_graph_lock:
+      return self._native.lib.graph_len(self._scheduler)
+
+  def _execution_next(self, completed):
+    # Unzip into two arrays.
+    returns_ids, returns_states, throws_ids = [], [], []
+    for cid, c in completed:
+      if type(c) is Return:
+        returns_ids.append(cid)
+        returns_states.append(self._to_value(c.value))
+      elif type(c) is Throw:
+        throws_ids.append(cid)
+      else:
+        raise ValueError("Unexpected `Completed` state from Runnable execution: {}".format(c))
+
+    # Run, then collect the outputs from the Scheduler's RawExecution struct.
+    self._native.lib.execution_next(self._scheduler,
+                                    returns_ids,
+                                    returns_states,
+                                    len(returns_ids),
+                                    throws_ids,
+                                    len(throws_ids))
+
+    def decode_runnable(raw):
+      return (
+          raw.id,
+          Runnable(self._from_id(raw.func.id_),
+                   tuple(self._from_value(arg)
+                         for arg in self._native.unpack(raw.args_ptr, raw.args_len)),
+                   bool(raw.cacheable))
+        )
+
+    runnables = [decode_runnable(r)
+                 for r in self._native.unpack(self._scheduler.execution.runnables_ptr,
+                                              self._scheduler.execution.runnables_len)]
+    # Rezip from two arrays.
+    return runnables
+
+  def _execution_add_roots(self, execution_request):
+    if self._execution_request is not None:
+      self._native.lib.execution_reset(self._scheduler)
+    self._execution_request = execution_request
+    for subject, selector in execution_request.roots:
+      if type(selector) is Select:
+        self._native.lib.execution_add_root_select(self._scheduler,
+                                                   self._to_key(subject),
+                                                   self._to_constraint(selector.product))
+      elif type(selector) is SelectDependencies:
+        self._native.lib.execution_add_root_select_dependencies(self._scheduler,
+                                                                self._to_key(subject),
+                                                                self._to_constraint(selector.product),
+                                                                self._to_constraint(selector.dep_product),
+                                                                self._to_key(selector.field),
+                                                                selector.transitive)
+      else:
+        raise ValueError('Unsupported root selector type: {}'.format(selector))
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -572,51 +375,20 @@ class LocalScheduler(object):
     """
 
     with self._product_graph_lock:
-      # A dict from Node entry to a possibly executing Step. Only one Step exists for a Node at a time.
-      outstanding = set()
-      # Node entries that might need to have Steps created (after any outstanding Step returns).
-      candidates = deque(self._product_graph.ensure_entry(r) for r in execution_request.roots)
+      start_time = time.time()
+      # Reset execution, and add any roots from the request.
+      self._execution_add_roots(execution_request)
 
       # Yield nodes that are Runnable, and then compute new ones.
-      step_count, runnable_count, scheduling_iterations = 0, 0, 0
-      start_time = time.time()
+      completed = []
+      outstanding_runnable = set()
+      runnable_count, scheduling_iterations = 0, 0
       while True:
-        # Drain the candidate list to create Runnables for the Engine.
-        runnable = []
-        while candidates:
-          node_entry = candidates.popleft()
-          if node_entry.is_complete or node_entry in outstanding:
-            # Node has already completed, or is runnable
-            continue
-          # Create a step if all dependencies are available; otherwise, can assume they are
-          # outstanding, and will cause this Node to become a candidate again later.
-          state = self._attempt_run_step(node_entry)
-          if state is None:
-            # No state change.
-            continue
-
-          # The Node's state is changing due to this Step.
-          step_count += 1
-          if type(state) is Runnable:
-            # The Node is ready to run in the Engine.
-            runnable.append((node_entry, state))
-            outstanding.add(node_entry)
-          elif type(state) is Waiting:
-            # Waiting on dependencies.
-            self._product_graph.add_dependencies(node_entry.node, state.dependencies)
-            incomplete_deps = [d for d in node_entry.dependencies if not d.is_complete]
-            if incomplete_deps:
-              # Mark incomplete deps as candidates for Steps.
-              candidates.extend(incomplete_deps)
-            else:
-              # All deps are already completed: mark this Node as a candidate for another step.
-              candidates.append(node_entry)
-          else:
-            # The Node has completed statically.
-            self._product_graph.complete_node(node_entry.node, state)
-            candidates.extend(d for d in node_entry.dependents)
-
-        if not runnable and not outstanding:
+        # Call the scheduler to create Runnables for the Engine.
+        runnable = self._execution_next(completed)
+        outstanding_runnable.difference_update(i for i, _ in completed)
+        outstanding_runnable.update(i for i, _ in runnable)
+        if not runnable and not outstanding_runnable:
           # Finished.
           break
         # The double yield here is intentional, and assumes consumption of this generator in
@@ -626,22 +398,16 @@ class LocalScheduler(object):
         runnable_count += len(runnable)
         scheduling_iterations += 1
 
-        # Finalize any Runnables that completed in the previous round.
-        for node_entry, state in completed:
-          # Complete the Node and mark any of its dependents as candidates for Steps.
-          outstanding.discard(node_entry)
-          self._product_graph.complete_node(node_entry.node, state)
-          candidates.extend(d for d in node_entry.dependents)
+      if self._native.visualize_to_dir is not None:
+        name = 'run.{}.dot'.format(self._run_count)
+        self._run_count += 1
+        self.visualize_graph_to_file(os.path.join(self._native.visualize_to_dir, name))
 
       logger.debug(
-        'ran %s scheduling iterations, %s runnables, and %s steps in %f seconds. '
+        'ran %s scheduling iterations and %s runnables in %f seconds. '
         'there are %s total nodes.',
         scheduling_iterations,
         runnable_count,
-        step_count,
         time.time() - start_time,
-        len(self._product_graph)
+        self._native.lib.graph_len(self._scheduler)
       )
-
-      if self._graph_validator is not None:
-        self._graph_validator.validate(self._product_graph)

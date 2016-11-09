@@ -7,7 +7,6 @@ scala_library(
   dependencies=[
     'examples/src/java/org/pantsbuild/example/hello/greet:greet',
   ],
-  sources=globs('*.scala'),
   resources = [
     'examples/src/resources/org/pantsbuild/example/hello',
   ],

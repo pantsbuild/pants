@@ -18,6 +18,7 @@ from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.engine.round_engine import RoundEngine
+from pants.engine.subsystem.native import Native
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
@@ -216,7 +217,8 @@ class GoalRunner(object):
       Reproducer,
       RunTracker,
       Changed.Factory,
-      PantsDaemonLauncher.Factory
+      Native.Factory,
+      PantsDaemonLauncher.Factory,
     }
 
   def _execute_engine(self):
