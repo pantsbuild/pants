@@ -57,8 +57,6 @@ class Relations(ZincAnalysisElement):
 
   def __init__(self, args):
     super(Relations, self).__init__(args)
-    # self.internal_src_dep, self.external_dep,
-    # self.internal_src_dep_pi, self.external_dep_pi,
     (self.src_prod, self.binary_dep,
      self.member_ref_internal_dep, self.member_ref_external_dep,
      self.inheritance_internal_dep, self.inheritance_external_dep,
