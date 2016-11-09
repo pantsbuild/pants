@@ -33,7 +33,8 @@ jar_library(name='jansi',
 jar_library(name='jsr305',
             jars=[
               jar('com.google.code.findbugs', 'jsr305', '3.0.0'),
-            ])
+            ],
+            scope='compile')
 
 jar_library(name='checkstyle',
             jars = [
