@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.workunit import WorkUnitLabel
-from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
