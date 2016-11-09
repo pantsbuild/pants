@@ -165,6 +165,7 @@ object SafeFileBasedStore {
  * we should consider define an internal analysis format that's 1) more stable
  * 2) better performance because we can pick and choose only the fields we care about
  * - string processing in rebase can be slow for example.
+ * https://github.com/pantsbuild/pants/issues/4039
  */
 object PlainTextFileBasedStore {
   def apply(file: File): AnalysisStore = new AnalysisStore {
