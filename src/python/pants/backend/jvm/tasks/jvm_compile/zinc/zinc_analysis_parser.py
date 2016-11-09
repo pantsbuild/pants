@@ -48,9 +48,9 @@ class ZincAnalysisParser(AnalysisParser):
       except UnderlyingParser.ParseError as e:
         raise ParseError(e)
 
-  def rebase(self, infile, outfile, pants_home_from, pants_home_to, java_home=None):
+  def rebase(self, infile, outfile, rebase_mappings, java_home=None):
     with raise_on_eof(infile):
       try:
-        self._underlying_parser.rebase(infile, outfile, pants_home_from, pants_home_to, java_home)
+        self._underlying_parser.rebase(infile, outfile, rebase_mappings, java_home)
       except UnderlyingParser.ParseError as e:
         raise ParseError(e)
