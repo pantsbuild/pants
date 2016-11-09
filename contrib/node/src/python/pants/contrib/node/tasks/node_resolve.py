@@ -81,8 +81,9 @@ class NodeResolve(NodeTask):
                           invalidate_dependents=True) as invalidation_check:
 
       with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
-        for vt in invalidation_check.invalid_vts:
+        for vt in invalidation_check.all_vts:
           target = vt.target
-          resolver_for_target_type = self._resolver_for_target(target).global_instance()
-          resolver_for_target_type.resolve_target(self, target, vt.results_dir, node_paths)
+          if not vt.valid:
+            resolver_for_target_type = self._resolver_for_target(target).global_instance()
+            resolver_for_target_type.resolve_target(self, target, vt.results_dir, node_paths)
           node_paths.resolved(target, vt.results_dir)
