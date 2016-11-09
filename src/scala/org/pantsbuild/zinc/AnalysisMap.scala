@@ -53,6 +53,8 @@ case class AnalysisMap private[AnalysisMap] (
     def definesClass(classpathEntry: File): DefinesClass = {
       getAnalysis(classpathEntry).map { analysis =>
         log.debug(s"Hit analysis cache for class definitions with ${classpathEntry}")
+        // strongly hold the classNames, and transform them to ensure that they are unlinked from
+        // the remainder of the analysis
         val classNames = analysis.asInstanceOf[Analysis].relations.srcProd.reverseMap.keys.toList.toSet.map(
           (f: File) => filePathToClassName(f))
         new ClassNamesDefinesClass(classNames)
@@ -161,13 +163,13 @@ object SafeFileBasedStore {
  * Zinc 1.0 changes its analysis file format to zip, and split into two files.
  * The following provides a plain text adaptor for pants parser. Long term though,
  * we should consider define an internal analysis format that's 1) more stable
- * 2) better performance because we can pick and choose only the fields we care
+ * 2) better performance because we can pick and choose only the fields we care about
  * - string processing in rebase can be slow for example.
  */
 object PlainTextFileBasedStore {
   def apply(file: File): AnalysisStore = new AnalysisStore {
     override def set(analysis: CompileAnalysis, setup: MiniSetup): Unit = {
-      Using.fileWriter(IO.utf8)(file) { writer =>TextAnalysisFormat.write(writer, analysis, setup) }
+      Using.fileWriter(IO.utf8)(file) { writer => TextAnalysisFormat.write(writer, analysis, setup) }
     }
 
     override def get(): Option[(CompileAnalysis, MiniSetup)] =
