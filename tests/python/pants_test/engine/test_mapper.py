@@ -13,13 +13,14 @@ from textwrap import dedent
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.addressable import SubclassesOf, addressable_list
+from pants.engine.addressable import Addresses, SubclassesOf, addressable_list
+from pants.engine.build_files import UnhydratedStruct, create_graph_tasks
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
-                                 DuplicateNameError, ResolveError, UnaddressableObjectError)
+                                 DuplicateNameError, UnaddressableObjectError)
 from pants.engine.nodes import Throw
 from pants.engine.parser import SymbolTable
+from pants.engine.selectors import SelectDependencies
 from pants.engine.struct import HasProducts, Struct
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser
@@ -246,7 +247,8 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    request = self.scheduler.execution_request([UnhydratedStruct], [spec])
+    select = SelectDependencies(UnhydratedStruct, Addresses, field_types=(Address,))
+    request = self.scheduler.selection_request([(select, spec)])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error
@@ -254,7 +256,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     # Expect a single root.
     state, = result.root_products.values()
     if type(state) is Throw:
-      raise state.exc
+      raise Exception(state.exc)
     return state.value
 
   def resolve_multi(self, spec):
@@ -263,18 +265,19 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def test_no_address_no_family(self):
     spec = SingleAddress('a/c', None)
     # Should fail: does not exist.
-    with self.assertRaises(ResolveError):
+    with self.assertRaises(Exception):
       self.resolve(spec)
 
     # Exists on disk, but not yet in memory.
-    build_file = os.path.join(self.build_root, 'a/c/c.BUILD.json')
+    directory = 'a/c'
+    build_file = os.path.join(self.build_root, directory, 'c.BUILD.json')
     with safe_open(build_file, 'w') as fp:
       fp.write('{"type_alias": "struct", "name": "c"}')
-    with self.assertRaises(ResolveError):
+    with self.assertRaises(Exception):
       self.resolve(spec)
 
     # Success.
-    self.scheduler.product_graph.invalidate()
+    self.scheduler.invalidate_files([directory])
     resolved = self.resolve(spec)
     self.assertEqual(1, len(resolved))
     self.assertEqual(Struct(name='c', type_alias='struct'), resolved[0].struct)

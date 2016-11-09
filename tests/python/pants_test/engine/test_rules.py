@@ -13,8 +13,8 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
-from pants.engine.fs import PathGlobs, create_fs_tasks
-from pants.engine.graph import create_graph_tasks
+from pants.engine.build_files import create_graph_tasks
+from pants.engine.fs import PathGlobs, create_fs_intrinsics, create_fs_tasks
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import GraphMaker, NodeBuilder, Rule, RulesetValidator
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -77,16 +77,9 @@ class SubA(A):
 _suba_root_subject_fns = {SubA: lambda p: Select(p)}
 
 
-class IntrinsicProvider(object):
-  def __init__(self, intrinsics):
-    self.intrinsics = intrinsics
-
-  def as_intrinsics(self):
-    return self.intrinsics
-
-
 class BoringRule(Rule):
   input_selectors = tuple()
+  func = noop
 
   def __init__(self, product_type):
     self._output_product_type = product_type
@@ -95,9 +88,6 @@ class BoringRule(Rule):
   def output_product_type(self):
     return self._output_product_type
 
-  def as_node(self, subject, variants):
-    raise Exception('do not expect to be constructed')
-
   def __repr__(self):
     return '{}({})'.format(type(self).__name__, self.output_product_type.__name__)
 
@@ -105,15 +95,15 @@ class BoringRule(Rule):
 class NodeBuilderTest(unittest.TestCase):
   def test_creation_fails_with_bad_declaration_type(self):
     with self.assertRaises(TypeError) as cm:
-      NodeBuilder.create([A()])
+      NodeBuilder.create([A()], tuple())
     self.assertEquals("Unexpected rule type: <class 'pants_test.engine.test_rules.A'>."
                       " Rules either extend Rule, or are 3 elem tuples.",
       str(cm.exception))
 
   def test_creation_fails_with_intrinsic_that_overwrites_another_intrinsic(self):
-    a_provider = IntrinsicProvider({(A, A): BoringRule(A)})
+    a_provider = (A, A, noop)
     with self.assertRaises(ValueError):
-      NodeBuilder.create([BoringRule(A)], intrinsic_providers=(a_provider, a_provider))
+      NodeBuilder.create([BoringRule(A)], (a_provider, a_provider))
 
 
 class RulesetValidatorTest(unittest.TestCase):
@@ -219,8 +209,10 @@ class RulesetValidatorTest(unittest.TestCase):
     rules = [
       (D, (Select(C),), noop)
     ]
-    intrinsics = {(B, C): BoringRule(C)}
-    validator = RulesetValidator(NodeBuilder.create(rules, (IntrinsicProvider(intrinsics),)),
+    intrinsics = [
+      (B, C, noop),
+    ]
+    validator = RulesetValidator(NodeBuilder.create(rules, intrinsics),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (A,)})
 
@@ -228,11 +220,9 @@ class RulesetValidatorTest(unittest.TestCase):
       validator.validate()
 
     self.assert_equal_with_printing(dedent("""
-                                      Rules with errors: 2
+                                      Rules with errors: 1
                                         (D, (Select(C),), noop):
                                           no matches for Select(C) with subject types: A
-                                        BoringRule(C):
-                                          Unreachable with subject types: Any
                                       """).strip(),
                                     str(cm.exception))
 
@@ -240,8 +230,10 @@ class RulesetValidatorTest(unittest.TestCase):
     rules = [
       (A, (SelectDependencies(B, SubA, field_types=(D,)),), noop),
     ]
-    intrinsics = {(B, C): BoringRule(C)}
-    validator = RulesetValidator(NodeBuilder.create(rules, (IntrinsicProvider(intrinsics),)),
+    intrinsics = [
+      (B, C, noop),
+    ]
+    validator = RulesetValidator(NodeBuilder.create(rules, intrinsics),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (A,)})
 
@@ -249,10 +241,8 @@ class RulesetValidatorTest(unittest.TestCase):
       validator.validate()
 
     self.assert_equal_with_printing(dedent("""
-                             Rules with errors: 2
-                               (A, (SelectDependencies(B, SubA, field_types=(D,)),), noop):
-                                 Unreachable with subject types: Any
-                               BoringRule(C):
+                             Rules with errors: 1
+                               (A, (SelectDependencies(B, SubA, u'dependencies', field_types=(D,)),), noop):
                                  Unreachable with subject types: Any
                              """).strip(),
                                     str(cm.exception))
@@ -275,8 +265,8 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
                         (B, (Select(D),), noop):
-                          depends on unfulfillable (D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop) of SubA with subject types: SubA
-                        (D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop):
+                          depends on unfulfillable (D, (Select(A), SelectDependencies(A, SubA, u'dependencies', field_types=(C,))), noop) of SubA with subject types: SubA
+                        (D, (Select(A), SelectDependencies(A, SubA, u'dependencies', field_types=(C,))), noop):
                           depends on unfulfillable (A, (Select(SubA),), noop) of C with subject types: SubA""").strip(),
         str(cm.exception))
 
@@ -347,8 +337,9 @@ class RuleGraphMakerTest(unittest.TestCase):
     symbol_table_cls = TargetTable
     address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
     tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks()
+    intrinsics = create_fs_intrinsics('Let us pretend that this is a ProjectTree!')
 
-    rule_index = NodeBuilder.create(tasks)
+    rule_index = NodeBuilder.create(tasks, intrinsics)
     graphmaker = GraphMaker(rule_index,
       root_subject_fns={k: lambda p: Select(p) for k in (Address, # TODO, use the actual fns.
                           PathGlobs,
@@ -373,16 +364,13 @@ class RuleGraphMakerTest(unittest.TestCase):
       rules_remaining_in_graph_strs
     )
 
-    # statically assert that the number of dependency keys is fixed
-    self.assertEquals(43, len(fullgraph.rule_dependencies))
-
   def test_smallest_full_test_multiple_root_subject_types(self):
     rules = [
       (Exactly(A), (Select(SubA),), noop),
       (Exactly(B), (Select(A),), noop)
     ]
     select_p = lambda p: Select(p)
-    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsic_providers=tuple()),
+    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
       root_subject_fns=OrderedDict([(SubA, select_p), (A, select_p)]))
     fullgraph = graphmaker.full_graph()
 
@@ -450,15 +438,17 @@ class RuleGraphMakerTest(unittest.TestCase):
                                }""").strip(), subgraph)
 
   def test_noop_removal_in_subgraph(self):
-    intrinsics = {(B, C): BoringRule(C)}
     rules = [
       # C is provided by an intrinsic, but only if the subject is B.
       (Exactly(A), (Select(C),), noop),
       (Exactly(A), tuple(), noop),
     ]
+    intrinsics = [
+      (B, C, noop),
+    ]
 
     graphmaker = GraphMaker(NodeBuilder.create(rules,
-                                               intrinsic_providers=(IntrinsicProvider(intrinsics),)),
+                                               intrinsics),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -470,16 +460,17 @@ class RuleGraphMakerTest(unittest.TestCase):
                                }""").strip(), subgraph)
 
   def test_noop_removal_full_single_subject_type(self):
-    intrinsics = {(B, C): BoringRule(C)}
     rules = [
       # C is provided by an intrinsic, but only if the subject is B.
       (Exactly(A), (Select(C),), noop),
       (Exactly(A), tuple(), noop),
     ]
+    intrinsics = [
+      (B, C, BoringRule(C)),
+    ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules,
-      intrinsic_providers=(IntrinsicProvider(intrinsics),)),
-      root_subject_fns=_suba_root_subject_fns)
+    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsics),
+                            root_subject_fns=_suba_root_subject_fns)
     fullgraph = graphmaker.full_graph()
 
     self.assert_equal_with_printing(dedent("""
@@ -497,8 +488,10 @@ class RuleGraphMakerTest(unittest.TestCase):
       (Exactly(A), (Select(B),), noop),
       (Exactly(A), tuple(), noop),
     ]
-
-    graphmaker = GraphMaker(NodeBuilder.create(rules, (IntrinsicProvider({(D, C): BoringRule(C)}),)),
+    intrinsics = [
+      (D, C, BoringRule(C))
+    ]
+    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsics),
       root_subject_fns=_suba_root_subject_fns,
 
     )
@@ -525,10 +518,10 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       {
                                         root_subject_types: (SubA,)
-                                        root_rules: (Exactly(A), (SelectDependencies(B, C, field_types=(D,)),), noop) of SubA
+                                        root_rules: (Exactly(A), (SelectDependencies(B, C, u'dependencies', field_types=(D,)),), noop) of SubA
                                         (B, (Select(D),), noop) of D => (SubjectIsProduct(D),)
                                         (C, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
-                                        (Exactly(A), (SelectDependencies(B, C, field_types=(D,)),), noop) of SubA => ((C, (Select(SubA),), noop) of SubA, (B, (Select(D),), noop) of D,)
+                                        (Exactly(A), (SelectDependencies(B, C, u'dependencies', field_types=(D,)),), noop) of SubA => ((C, (Select(SubA),), noop) of SubA, (B, (Select(D),), noop) of D,)
                                       }""").strip(),
                                     subgraph)
 
@@ -545,9 +538,9 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       {
                                         root_subject_types: (SubA,)
-                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop) of SubA
+                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(D,)),), noop) of SubA
                                         (B, (Select(D),), noop) of D => (SubjectIsProduct(D),)
-                                        (Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(D),), noop) of D,)
+                                        (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(D),), noop) of D,)
                                       }""").strip(),
                                     subgraph)
 
@@ -564,10 +557,10 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       {
                                         root_subject_types: (SubA,)
-                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA
+                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of SubA
                                         (B, (Select(Exactly(C, D)),), noop) of C => (SubjectIsProduct(C),)
                                         (B, (Select(Exactly(C, D)),), noop) of D => (SubjectIsProduct(D),)
-                                        (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(Exactly(C, D)),), noop) of C, (B, (Select(Exactly(C, D)),), noop) of D,)
+                                        (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(Exactly(C, D)),), noop) of C, (B, (Select(Exactly(C, D)),), noop) of D,)
                                       }""").strip(),
                                     subgraph)
 
@@ -586,11 +579,11 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       {
                                         root_subject_types: (SubA,)
-                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA
+                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of SubA
                                         (B, (Select(C),), noop) of C => (SubjectIsProduct(C),)
                                         (B, (Select(C),), noop) of D => ((C, (Select(D),), noop) of D,)
                                         (C, (Select(D),), noop) of D => (SubjectIsProduct(D),)
-                                        (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(C),), noop) of C, (B, (Select(C),), noop) of D,)
+                                        (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(C),), noop) of C, (B, (Select(C),), noop) of D,)
                                       }""").strip(),
                                     subgraph)
 
@@ -609,12 +602,12 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       {
                                         root_subject_types: (SubA,)
-                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA
-                                        (B, (Select(A),), noop) of C => ((Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of C,)
-                                        (B, (Select(A),), noop) of D => ((Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of D,)
-                                        (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of C => ((SubA, (), noop) of C, (B, (Select(A),), noop) of C, (B, (Select(A),), noop) of D,)
-                                        (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of D => ((SubA, (), noop) of D, (B, (Select(A),), noop) of C, (B, (Select(A),), noop) of D,)
-                                        (Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(A),), noop) of C, (B, (Select(A),), noop) of D,)
+                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of SubA
+                                        (B, (Select(A),), noop) of C => ((Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of C,)
+                                        (B, (Select(A),), noop) of D => ((Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of D,)
+                                        (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of C => ((SubA, (), noop) of C, (B, (Select(A),), noop) of C, (B, (Select(A),), noop) of D,)
+                                        (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of D => ((SubA, (), noop) of D, (B, (Select(A),), noop) of C, (B, (Select(A),), noop) of D,)
+                                        (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C, D,)),), noop) of SubA => (SubjectIsProduct(SubA), (B, (Select(A),), noop) of C, (B, (Select(A),), noop) of D,)
                                         (SubA, (), noop) of C => (,)
                                         (SubA, (), noop) of D => (,)
                                       }""").strip(),
@@ -624,38 +617,38 @@ class RuleGraphMakerTest(unittest.TestCase):
     rules = [
       (Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop),
     ]
-
-    graphmaker = GraphMaker(NodeBuilder.create(rules,
-      intrinsic_providers=(IntrinsicProvider({(C, B): BoringRule(B)}),)
-    ),
-      root_subject_fns=_suba_root_subject_fns)
+    intrinsics = [
+      (C, B, noop),
+    ]
+    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsics),
+                            root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing('{empty graph}', subgraph)
     self.assert_equal_with_printing(dedent("""
                          Rules with errors: 1
-                           (Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop):
-                             no matches for Select(B) when resolving SelectDependencies(B, SubA, field_types=(D,)) with subject types: D""").strip(),
+                           (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(D,)),), noop):
+                             no matches for Select(B) when resolving SelectDependencies(B, SubA, u'dependencies', field_types=(D,)) with subject types: D""").strip(),
                                     subgraph.error_message())
 
   def test_select_dependencies_with_matching_intrinsic(self):
     rules = [
       (Exactly(A), (SelectDependencies(B, SubA, field_types=(C,)),), noop),
     ]
-    intrinsics = {(C, B): BoringRule(B)}
+    intrinsics = [
+      (B, C, noop),
+    ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules,
-      intrinsic_providers=(IntrinsicProvider(intrinsics),)
-    ),
-      root_subject_fns=_suba_root_subject_fns)
+    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsics),
+                            root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
                                       {
                                         root_subject_types: (SubA,)
-                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, field_types=(C,)),), noop) of SubA
-                                        (Exactly(A), (SelectDependencies(B, SubA, field_types=(C,)),), noop) of SubA => (SubjectIsProduct(SubA), BoringRule(B) of C,)
-                                        BoringRule(B) of C => (,)
+                                        root_rules: (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C,)),), noop) of SubA
+                                        (Exactly(A), (SelectDependencies(B, SubA, u'dependencies', field_types=(C,)),), noop) of SubA => (SubjectIsProduct(SubA), IntrinsicRule(noop) of C,)
+                                        IntrinsicRule(noop) of C => (,)
                                       }""").strip(),
                                     subgraph)
 
@@ -748,9 +741,9 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       {
                                         root_subject_types: (SubA,)
-                                        root_rules: (D, (Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C,))), noop) of SubA
+                                        root_rules: (D, (Select(Exactly(B)), SelectDependencies(B, SubA, u'dependencies', field_types=(SubA, C,))), noop) of SubA
                                         (B, (Select(SubA),), noop) of SubA => (SubjectIsProduct(SubA),)
-                                        (D, (Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C,))), noop) of SubA => ((B, (Select(SubA),), noop) of SubA, SubjectIsProduct(SubA), (B, (Select(SubA),), noop) of SubA,)
+                                        (D, (Select(Exactly(B)), SelectDependencies(B, SubA, u'dependencies', field_types=(SubA, C,))), noop) of SubA => ((B, (Select(SubA),), noop) of SubA, SubjectIsProduct(SubA), (B, (Select(SubA),), noop) of SubA,)
                                       }""").strip(),
       subgraph)
 

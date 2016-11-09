@@ -9,7 +9,7 @@ import unittest
 from contextlib import closing
 
 from pants.base.project_tree import Dir, File
-from pants.engine.nodes import Noop, Return, Runnable, TaskNode, Throw, Waiting
+from pants.engine.nodes import Runnable
 from pants.engine.storage import Cache, InvalidKeyError, Lmdb, Storage
 
 
@@ -34,7 +34,7 @@ class StorageTest(unittest.TestCase):
   def setUp(self):
     self.storage = Storage.create()
     self.result = 'something'
-    self.request = Runnable(func=_runnable, args=('this is an arg',))
+    self.request = Runnable(func=_runnable, args=('this is an arg',), cacheable=True)
 
   def test_lmdb_key_value_store(self):
     lmdb = Lmdb.create()[0]
@@ -68,22 +68,6 @@ class StorageTest(unittest.TestCase):
       # key2 isn't mapped to any other key.
       self.assertIsNone(storage.get_mapping(key2))
 
-  def test_state_roundtrips(self):
-    states = [
-        Return('a'),
-        Throw(PickleableException()),
-        Waiting([TaskNode(None, None, None)]),
-        Runnable(_runnable, ('an arg',)),
-        Noop('nada {}', ('op',))
-      ]
-    with closing(self.storage) as storage:
-      for state in states:
-        key = storage.put_state(state)
-        actual = storage.get_state(key)
-
-        self.assertEquals(state, actual)
-        self.assertEquals(key, storage.put_state(actual))
-
 
 class CacheTest(unittest.TestCase):
 
@@ -91,7 +75,7 @@ class CacheTest(unittest.TestCase):
     """Setup cache as well as request and result."""
     self.storage = Storage.create()
     self.cache = Cache.create(storage=self.storage)
-    self.request = Runnable(func=_runnable, args=('this is an arg',))
+    self.request = Runnable(func=_runnable, args=('this is an arg',), cacheable=True)
     self.result = 'something'
 
   def test_cache(self):

@@ -69,7 +69,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.junit',
                                 '--timeout-default=1',
-                                '--test=org.pantsbuild.testproject.timeout.SleeperTestShort',
+                                '--test=org.pantsbuild.testproject.timeout.ShortSleeperTest',
                                 sleeping_target])
     self.assert_success(pants_run)
 
@@ -79,7 +79,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.junit',
                                 '--timeout-default=1',
-                                '--test=org.pantsbuild.testproject.timeout.SleeperTestLong',
+                                '--test=org.pantsbuild.testproject.timeout.LongSleeperTest',
                                 sleeping_target])
     end = time.time()
     self.assert_failure(pants_run)

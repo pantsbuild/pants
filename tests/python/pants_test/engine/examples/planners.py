@@ -16,8 +16,8 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
+from pants.engine.build_files import create_graph_tasks
 from pants.engine.fs import Dirs, Files, FilesContent, PathGlobs, create_fs_tasks
-from pants.engine.graph import create_graph_tasks
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -26,7 +26,6 @@ from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, S
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants_test.engine.examples.graph_validator import GraphValidator
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.sources import Sources
 
@@ -303,23 +302,6 @@ def scalac(sources, classpath):
   return Classpath(creator='scalac')
 
 
-# TODO(John Sirois): When https://github.com/pantsbuild/pants/issues/2413 is resolved, move the
-# unpickleable input and output test planners below to engine test.  There will be less setup
-# required at that point since no target addresses will need to be supplied in the build_request.
-class UnpickleableOutput(object):
-  def __init__(self):
-    # Nested functions like this lambda are unpicklable.
-    self.lamb = lambda : None
-
-
-class UnpickleableResult(object):
-  pass
-
-
-def unpickleable_input(unpickleable):
-  raise Exception('This function should never run, because its selected input is unpickleable.')
-
-
 class Goal(AbstractClass):
   """A synthetic aggregate product produced by a goal, which is its own task."""
 
@@ -402,7 +384,7 @@ class ExampleTable(SymbolTable):
             'inferred_scala': ScalaInferredDepsSources}
 
 
-def setup_json_scheduler(build_root, inline_nodes=True):
+def setup_json_scheduler(build_root, native):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
   :rtype :class:`pants.engine.scheduler.LocalScheduler`
@@ -424,7 +406,6 @@ def setup_json_scheduler(build_root, inline_nodes=True):
       'resolve': Classpath,
       'list': Address,
       GenGoal.name(): GenGoal,
-      'unpickleable': UnpickleableResult,
       'ls': Files,
       'cat': FilesContent,
     }
@@ -492,14 +473,6 @@ def setup_json_scheduler(build_root, inline_nodes=True):
        [Select(ScalaSources),
         SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))],
        scalac),
-    ] + [
-      # TODO
-      (UnpickleableOutput,
-        [],
-        UnpickleableOutput),
-      (UnpickleableResult,
-       [Select(UnpickleableOutput)],
-       unpickleable_input),
     ] + (
       create_graph_tasks(address_mapper, symbol_table_cls)
     ) + (
@@ -510,6 +483,5 @@ def setup_json_scheduler(build_root, inline_nodes=True):
   return LocalScheduler(goals,
                         tasks,
                         project_tree,
-                        graph_lock=None,
-                        inline_nodes=inline_nodes,
-                        graph_validator=GraphValidator(symbol_table_cls))
+                        native,
+                        graph_lock=None)

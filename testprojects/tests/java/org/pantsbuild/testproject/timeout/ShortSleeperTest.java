@@ -5,9 +5,10 @@ package org.pantsbuild.testproject.timeout;
 
 import org.junit.Test;
 
-public class SleeperTestLong {
+public class ShortSleeperTest {
     @Test
     public void testSleep() throws InterruptedException {
-        Thread.sleep(120000);
+        Thread.sleep(1);
     }
 }
+

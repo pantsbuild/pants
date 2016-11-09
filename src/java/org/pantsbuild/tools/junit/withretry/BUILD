@@ -13,6 +13,5 @@ java_library(
   dependencies=[
     '3rdparty:junit',
   ],
-  sources=globs('*.java'),
   platform='java7',
 )

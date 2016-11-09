@@ -37,11 +37,6 @@ class ScopeInfoIteratorTest(unittest.TestCase):
       def subsystem_dependencies(cls):
         return (SubsystemDependency(Subsys1, 'goal1.task12'),)
 
-      # Ignore default Task subsystem dependencies.
-      @classmethod
-      def task_subsystems(cls):
-        return tuple()
-
     infos = [
       ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL, GlobalOptionsRegistrar),
       ScopeInfo('subsys2', ScopeInfo.SUBSYSTEM, Subsys2),

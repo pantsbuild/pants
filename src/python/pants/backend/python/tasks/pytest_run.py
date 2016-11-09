@@ -88,8 +88,8 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   ]
 
   @classmethod
-  def global_subsystems(cls):
-    return super(PytestRun, cls).global_subsystems() + (PythonSetup, PythonRepos)
+  def subsystem_dependencies(cls):
+    return super(PytestRun, cls).subsystem_dependencies() + (PythonSetup, PythonRepos)
 
   @classmethod
   def register_options(cls, register):

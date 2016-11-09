@@ -58,12 +58,3 @@ class SubsystemClientMixin(object):
         yield dep
       else:
         yield SubsystemDependency(dep, GLOBAL_SCOPE)
-    # Temporary hack until we replace all the global_subsystems() and task_subsystems()
-    # impls in Task with new-style impls of subsystem_dependencies().
-    # We can't check for isinstance(cls, Task) because we can't depend on it here.
-    if hasattr(cls, 'global_subsystems'):
-      for subsys in cls.global_subsystems():
-        yield SubsystemDependency(subsys, GLOBAL_SCOPE)
-    if hasattr(cls, 'task_subsystems'):
-      for subsys in cls.task_subsystems():
-        yield SubsystemDependency(subsys, cls.options_scope)

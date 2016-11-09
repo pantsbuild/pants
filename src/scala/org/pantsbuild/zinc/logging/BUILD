@@ -9,7 +9,6 @@ scala_library(
     '3rdparty/jvm/org/scala-sbt:util-logging',
     '3rdparty/jvm/org/scala-sbt:zinc',
   ],
-  sources=globs('*.scala'),
   strict_deps=True,
   platform='java7',
 )

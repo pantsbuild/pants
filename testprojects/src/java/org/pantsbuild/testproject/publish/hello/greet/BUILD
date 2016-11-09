@@ -3,7 +3,6 @@
 
 java_library(
   dependencies=[],
-  sources=globs('*.java'),
   provides=artifact(
     org='org.pantsbuild.testproject.publish',
     name='hello-greet',

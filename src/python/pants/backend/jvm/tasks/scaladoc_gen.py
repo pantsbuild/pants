@@ -21,12 +21,8 @@ class ScaladocGen(JvmdocGen):
     return Jvmdoc(tool_name='scaladoc', product_type='scaladoc')
 
   @classmethod
-  def task_subsystems(cls):
-    return super(ScaladocGen, cls).task_subsystems() + (ScalaPlatform,)
-
-  @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmdocGen, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super(ScaladocGen, cls).subsystem_dependencies() + (DistributionLocator, ScalaPlatform.scoped(cls))
 
   @classmethod
   def prepare(cls, options, round_manager):
