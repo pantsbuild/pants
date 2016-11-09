@@ -30,7 +30,8 @@ class ZincAnalysisTestSimple(unittest.TestCase):
         orig = get_analysis_text(analysis_file)
         buf = StringIO.StringIO()
         ZincAnalysisParser().rebase(iter(orig.splitlines(True)), buf,
-                                    {b'/src/pants': b'$PANTS_HOME'}, java_home)
+                                    {b'/src/pants': b'$PANTS_HOME',
+                                     b'/src/pants/.pants.d': b'$PANTS_WORKDIR'}, java_home)
         return buf.getvalue()
 
       # Now check rebasing.

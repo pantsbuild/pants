@@ -83,7 +83,8 @@ class ZincAnalysisParser(object):
     outfile.write(ZincAnalysis.FORMAT_VERSION_LINE)
 
     # Ensure we replace the longest match first, since the shorter one might be prefix of the longer.
-    rebase_mappings_sorted = sorted(rebase_mappings.items(), key=len, reverse=True)
+    rebase_mappings_sorted = [(old_base, rebase_mappings[old_base])
+                              for old_base in sorted(rebase_mappings, key=len, reverse=True)]
     def rebase_element(cls):
       for header in cls.headers:
         self._rebase_section(cls, header, infile, outfile, rebase_mappings_sorted, java_home)
