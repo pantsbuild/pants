@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.workunit import WorkUnitLabel
-from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
@@ -82,11 +81,8 @@ class NodeResolve(NodeTask):
                           invalidate_dependents=True) as invalidation_check:
 
       with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
-        for vt in invalidation_check.all_vts:
+        for vt in invalidation_check.invalid_vts:
           target = vt.target
           resolver_for_target_type = self._resolver_for_target(target).global_instance()
-          results_dir = vt.results_dir
-          if not vt.valid:
-            safe_mkdir(results_dir, clean=True)
-            resolver_for_target_type.resolve_target(self, target, results_dir, node_paths)
-          node_paths.resolved(target, results_dir)
+          resolver_for_target_type.resolve_target(self, target, vt.results_dir, node_paths)
+          node_paths.resolved(target, vt.results_dir)
