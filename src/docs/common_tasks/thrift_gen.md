@@ -35,4 +35,4 @@ You can use the `gen` and `compile` goals directly with `java_thrift_library` ta
     ::bash
     $ ./pants gen myproject/src/main/thrift:thrift-java
 
-`create_thrift_libraries` targets work somewhat differently, however. 
+`create_thrift_libraries` targets work somewhat differently, however.

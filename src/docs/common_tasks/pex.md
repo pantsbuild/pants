@@ -1,8 +1,8 @@
-# Specify a Python Executable (PEX)
+# Build a Python Executable (PEX)
 
 ## Problem
 
-You need to create an executable Python binary (aka PEX) out of Python source code.
+You need to create an executable `.pex` Python binary (aka a "PEX") out of Python source code.
 
 **Note**: If you need to create a Python library target instead, see [[Define a Python Library Target|pants('src/docs/common_tasks:python_library')]].
 
@@ -19,7 +19,7 @@ In a `python_ binary` target, you should specify:
 
 * A `name` for the PEX
 * A `source` Python file that contains a `main` function
-* A list of `dependencies` (optional). This list should include only Python [[library targets|TODO]] within the same project, *not* third-party dependencies. Any third-party dependencies should be specified in library targets.
+* A list of `dependencies` (optional). This list should include only Python [[library targets|pants('src/docs/common_tasks:python_library')]] within the same project, *not* third-party dependencies. Any third-party dependencies should be specified in library targets.
 
 **Note**: As an alternative to specifying a `source` file, you can define an `entry_point` function in your `python_binary` target. For example, specifying `entry_point='main:run'` would mean that the `main` function for the binary is the `run()` function contained in `main.py`.
 

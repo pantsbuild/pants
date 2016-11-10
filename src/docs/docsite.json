@@ -41,6 +41,7 @@
     "page": "dist/markdown/html/examples/src/java/org/pantsbuild/example/page.html",
     "powered_by": "dist/markdown/html/src/docs/powered_by.html",
     "publish": "dist/markdown/html/examples/src/java/org/pantsbuild/example/publish.html",
+    "python_library": "dist/markdown/html/src/docs/common_tasks/python_library.html",
     "python_readme": "dist/markdown/html/examples/src/python/example/README.html",
     "options": "dist/markdown/html/src/docs/options.html",
     "options_reference": "dist/reference/pants_reference_body.html",

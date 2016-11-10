@@ -11,4 +11,10 @@ The `test` goal will run any tests contained in the specified target. Here's an 
     ::bash
     $ ./pants test myproject/src/test/scala:scala-tests
 
-There are several approaches to running tests. You can combine
+For Scala and Java, test suites are defined in `junit_tests` target definitions, while Python test suites are defined in `python_tests` definitions. For each test target type, you need to specify. More on these target types can be found in [[Specify a Test Suite|pants('src/docs/common_tasks:test_suites')]].
+
+## Discussion
+
+When you run a test using `pants test`, the output will indicate whether the test (or set of tests) has succeeded or failed and it will also provide a URL that you can navigate to to see a full report from the test, for example:
+
+> http://localhost:57466/run/pants_run_2016_05_22_18_12_43_104
