@@ -310,7 +310,7 @@ class BaseZincCompile(JvmCompile):
     """
     hasher = sha1()
     for tool in ['zinc', 'compiler-interface', 'compiler-bridge']:
-      hasher.update(self.tool_jar(tool))
+      hasher.update(os.path.relpath(self.tool_jar(tool), self.get_options().pants_workdir))
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
