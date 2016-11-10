@@ -52,6 +52,11 @@ class ZincAnalysisParser(object):
     # Note: relies on the fact that these headers appear in this order in the file to use
     # the same file handle to read them mostly-sequentially.
     self._verify_version(infile)
+
+    def path_to_class(path):
+      return path.split('/current/classes/')[1].replace('.class', '').replace('/', '.')
+    class_to_sources = {path_to_class(path[0]):src for src, path
+                        in self._find_repeated_at_header(infile, b'products').items()}
     # Library dependencies: source -> jar.
     bin_deps = self._find_repeated_at_header(infile, b'library dependencies')
     # Class dependencies: classname -> classname.
@@ -70,8 +75,8 @@ class ZincAnalysisParser(object):
     def fqcn_to_path(fqcn):
       return os.path.join(classes_dir, fqcn.replace(b'.', os.sep) + b'.class')
     for ext_deps_dict in ext_deps:
-      for src, fqcns in ext_deps_dict.items():
-        transformed_ext_deps[src].extend(fqcn_to_path(fqcn) for fqcn in fqcns)
+      for clz, fqcns in ext_deps_dict.items():
+        transformed_ext_deps[class_to_sources[clz]].extend(fqcn_to_path(fqcn) for fqcn in fqcns)
 
     # TODO: We skip converting the source classname to a target-internal sourcefile, although it
     # looks like we could do that by parsing the `class names` header from this section.
