@@ -78,7 +78,7 @@ a different member of the response team. We will respect confidentiality
 requests for the purpose of protecting victims of abuse. We will endeavor to
 make an alternative reporting chain available in the event you need to report a
 project lead or a member of the response team. The members of the response team
-can be found at *TODO*.
+can be found in [COMMITTERS.md](https://github.com/pantsbuild/pants/blob/master/COMMITTERS.md#active-committers).
 
 
 Attribution & Acknowledgements
