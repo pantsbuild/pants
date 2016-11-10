@@ -55,8 +55,10 @@ class ZincAnalysisParser(object):
 
     def path_to_class(path):
       return path.split('/current/classes/')[1].replace('.class', '').replace('/', '.')
-    class_to_sources = {path_to_class(path[0]):src for src, path
-                        in self._find_repeated_at_header(infile, b'products').items()}
+    class_to_sources = {}
+    for src, paths in self._find_repeated_at_header(infile, b'products').items():
+      for path in paths:
+        class_to_sources[path_to_class(path)] = src
     # Library dependencies: source -> jar.
     bin_deps = self._find_repeated_at_header(infile, b'library dependencies')
     # Class dependencies: classname -> classname.
