@@ -42,7 +42,6 @@ before_cache:
 cache:
   directories:
     - $HOME/.cache/pants
-    - $HOME/.cargo
     - $HOME/.ivy2/pants
     # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
     # using its own isolated cache:
