@@ -50,10 +50,8 @@ class ZincAnalysisTestSimple(unittest.TestCase):
       deps = ZincAnalysisParser().parse_deps(infile, '')
       self.assertItemsEqual(deps['/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala'], [
           '/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar',
+          'org/pantsbuild/example/hello/welcome/WelcomeEverybody$.class',
         ])
-      self.assertItemsEqual(deps['org.pantsbuild.example.hello.exe.Exe'], [
-        'org/pantsbuild/example/hello/welcome/WelcomeEverybody$.class',
-      ])
 
 
 class ZincAnalysisTestSorting(unittest.TestCase):

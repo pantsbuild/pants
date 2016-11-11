@@ -53,12 +53,6 @@ class ZincAnalysisParser(object):
     # the same file handle to read them mostly-sequentially.
     self._verify_version(infile)
 
-    def path_to_class(path):
-      return path.split('/current/classes/')[1].replace('.class', '').replace('/', '.')
-    class_to_sources = {}
-    for src, paths in self._find_repeated_at_header(infile, b'products').items():
-      for path in paths:
-        class_to_sources[path_to_class(path)] = src
     # Library dependencies: source -> jar.
     bin_deps = self._find_repeated_at_header(infile, b'library dependencies')
     # Class dependencies: classname -> classname.
@@ -66,6 +60,11 @@ class ZincAnalysisParser(object):
     for ext_dep_header in (b'member reference internal dependencies',
                            b'member reference external dependencies'):
       ext_deps.append(self._find_repeated_at_header(infile, ext_dep_header))
+
+    classname_to_sources = {}
+    for src, classnames in self._find_repeated_at_header(infile, b'class names').items():
+      for classname in classnames:
+        classname_to_sources[classname] = src
 
     # TODO(benjy): Temporary hack until we inject a dep on the scala runtime jar.
     scalalib_re = re.compile(r'scala-library-\d+\.\d+\.\d+\.jar$')
@@ -78,7 +77,7 @@ class ZincAnalysisParser(object):
       return os.path.join(classes_dir, fqcn.replace(b'.', os.sep) + b'.class')
     for ext_deps_dict in ext_deps:
       for clz, fqcns in ext_deps_dict.items():
-        transformed_ext_deps[class_to_sources[clz]].extend(fqcn_to_path(fqcn) for fqcn in fqcns)
+        transformed_ext_deps[classname_to_sources[clz]].extend(fqcn_to_path(fqcn) for fqcn in fqcns)
 
     # TODO: We skip converting the source classname to a target-internal sourcefile, although it
     # looks like we could do that by parsing the `class names` header from this section.

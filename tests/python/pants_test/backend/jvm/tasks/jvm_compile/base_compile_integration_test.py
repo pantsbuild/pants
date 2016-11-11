@@ -68,7 +68,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
     """
     global_args = [
         '--cache-write',
-        '--cache-write-to=[\'{}\']'.format(cacheurl),
+        '--cache-compile-write-to=[\'{}\']'.format(cacheurl),
     ] + self._EXTRA_TASK_ARGS
     task = 'test' if test else 'compile'
     args = [task, target] + (extra_args if extra_args else [])
