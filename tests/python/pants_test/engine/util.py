@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.engine.subsystem.native import Native
 from pants_test.subsystem.subsystem_util import init_subsystem
 
