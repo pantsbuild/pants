@@ -26,6 +26,5 @@ Here is an example `jvm_app` definition that shows different possibilities for d
 
 ## See Also
 
-* [[Define a Scala or Java Bundle Target|pants('src/docs/common_tasks:jvm_app')]]
 * [[Create a Bundled zip or Other Archive|pants('src/docs/common_tasks:bundle')]]
 * [[Use globs and rglobs to Group Files|pants('src/docs/common_tasks:globs')]]

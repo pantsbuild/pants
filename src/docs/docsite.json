@@ -61,7 +61,7 @@
     "release_strategy": "dist/markdown/html/src/docs/release_strategy.html",
     "repl": "dist/markdown/html/src/docs/common_tasks/repl.html",
     "reporting_server": "dist/markdown/html/src/docs/reporting_server.html",
-    "resources": "dist/markdown/html/src/docs/common_tasks/resource.html",
+    "resources": "dist/markdown/html/src/docs/common_tasks/resources.html",
     "run": "dist/markdown/html/src/docs/common_tasks/run.html",
     "scala": "dist/markdown/html/examples/src/scala/org/pantsbuild/example/README.html",
     "server": "dist/markdown/html/src/docs/common_tasks/server.html",

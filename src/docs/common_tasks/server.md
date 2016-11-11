@@ -12,7 +12,7 @@ The `server` goal will start up a local web server that you can use to access in
     $ ./pants server
     Launching server with pid 85420 at http://localhost:57466
 
-For more info, see [[Reporting Server|pants('src/docs/reporting_server')]].
+For more info, see [[Reporting Server|pants('src/docs:reporting_server')]].
 
 ## See Also
 

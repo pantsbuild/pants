@@ -63,4 +63,4 @@ Included with the output is a URL to which you can navigate to see a report. In 
 ## See Also
 
 * [[Run Tests for Your Project|pants('src/docs/common_tasks:test')]]
-* [[Define a Test Suite for Scala and Java|pants('src/docs/common_tasks:jvm_test')]]
+* [[Define a Test Suite for Scala and Java|pants('src/docs/common_tasks:jvm_tests')]]

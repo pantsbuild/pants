@@ -34,7 +34,7 @@ Getting Started
 Cookbook
 --------
 
-The [[Common Tasks|pants('src/docs/common_tasks:index')]] documentation is a
+The [[Common Tasks|pants('src/docs/common_tasks')]] documentation is a
 practical, solutions-oriented guide to some of the Pants tasks that you're most
 likely to carry out on a daily basis.
 

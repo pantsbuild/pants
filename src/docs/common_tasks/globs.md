@@ -34,5 +34,4 @@ You can also exclude files from a particular directory:
 ## See Also
 
 * [[Create a New Scala or Java Library Target|pants('src/docs/common_tasks:jvm_library')]]
-* [[Define a Scala or Java Bundle Target|pants('src/docs/common_tasks:jvm_app')]]
 * [[Define a New Python Library Target|pants('src/docs/common_tasks:python_library')]]
