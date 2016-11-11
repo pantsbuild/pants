@@ -4,7 +4,7 @@ Tutorial
 This tutorial walks you through some first steps with Pants.
 It assumes you're already familiar with
 [[basic Pants build concepts|pants('src/docs:first_concepts')]],
-amd that you're working in a source tree that already has `pants` installed (such as
+and that you're working in a source tree that already has `pants` installed (such as
 Pants's own repo:
 [pantsbuild/pants](https://github.com/pantsbuild/pants)).
 
