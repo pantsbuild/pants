@@ -89,12 +89,6 @@ else
   banner "CI BEGINS"
 fi
 
-if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
-  banner "Running pre-commit checks"
-
-  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
-fi
-
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
 # target(s).
 INTERPRETER_CONSTRAINTS=(
@@ -112,8 +106,6 @@ PANTS_ARGS=(
 )
 
 
-# NB: The bootstrapped pants.pex is not used to run all tests: only the sanity checks below.
-# Should consider adding support to `./pants` for using the pex rather than a venv. See: #4034
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   banner "Bootstrapping pants"
   (
@@ -126,6 +118,12 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     ./pants.pex -V && \
     ./pants.pex --version
   ) || die "Failed to bootstrap pants."
+fi
+
+if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
+  banner "Running pre-commit checks"
+
+  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
 fi
 
 if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
@@ -162,7 +160,7 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   banner "Running core jvm tests"
   (
-    ./pants ${PANTS_ARGS[@]} doc test {src,tests}/{java,scala}:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} doc test {src,tests}/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
 fi
 
@@ -170,10 +168,10 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
     targets=$(
-      ./pants list pants-plugins/tests/python:: | \
-      xargs ./pants filter --filter-type=python_tests
+      ./pants.pex list pants-plugins/tests/python:: | \
+      xargs ./pants.pex filter --filter-type=python_tests
     ) && \
-    ./pants ${PANTS_ARGS[@]} test.pytest ${targets}
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest ${targets}
   ) || die "Internal backend python test failure"
 fi
 
@@ -184,10 +182,10 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests${shard_desc}"
   (
     targets=$(
-      ./pants list tests/python:: | \
-      xargs ./pants --tag='-integration' filter --filter-type=python_tests
+      ./pants.pex list tests/python:: | \
+      xargs ./pants.pex --tag='-integration' filter --filter-type=python_tests
     ) && \
-    ./pants ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
       --coverage=paths:pants/ \
       --test-pytest-test-shard=${python_unit_shard} \
       ${targets}
@@ -201,7 +199,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     # test (ie: pants_test.contrib) namespace packages.
     # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
     #  https://github.com/pantsbuild/pants/issues/1149
-    ./pants ${PANTS_ARGS[@]}  --exclude-target-regexp='.*/testprojects/.*' --build-ignore=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
+    ./pants.pex ${PANTS_ARGS[@]}  --exclude-target-regexp='.*/testprojects/.*' --build-ignore=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
   ) || die "Contrib python test failure"
 fi
 
@@ -212,10 +210,10 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests${shard_desc}"
   (
     targets=$(
-      ./pants list tests/python:: | \
-      xargs ./pants --tag='+integration' filter --filter-type=python_tests
+      ./pants.pex list tests/python:: | \
+      xargs ./pants.pex --tag='+integration' filter --filter-type=python_tests
     ) && \
-    ./pants ${PANTS_ARGS[@]} test.pytest --test-pytest-test-shard=${python_intg_shard} ${targets}
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --test-pytest-test-shard=${python_intg_shard} ${targets}
   ) || die "Pants Integration test failure"
 fi
 
