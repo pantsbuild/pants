@@ -11,8 +11,10 @@ from contextlib import contextmanager
 
 import six
 
+from pants.cache.cache_setup import CacheSetup
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class BaseCompileIT(PantsRunIntegrationTest):
@@ -66,9 +68,16 @@ class BaseCompileIT(PantsRunIntegrationTest):
     """
     :API: public
     """
+    # Use the provided cacheurl for all artifacts except for bootstrap.
+    bootstrap_cache_dir = global_subsystem_instance(CacheSetup).get_options().write_to
+
+    def format_str_list(lst):
+      return ', '.join('\'{}\''.format(s) for s in lst)
     global_args = [
         '--cache-write',
-        '--cache-compile-write-to=[\'{}\']'.format(cacheurl),
+        '--cache-write-to=[{}]'.format(format_str_list([cacheurl])),
+        '--cache-bootstrap-read-from=[{}]'.format(format_str_list(bootstrap_cache_dir)),
+        '--cache-bootstrap-write-to=[{}]'.format(format_str_list(bootstrap_cache_dir)),
     ] + self._EXTRA_TASK_ARGS
     task = 'test' if test else 'compile'
     args = [task, target] + (extra_args if extra_args else [])
