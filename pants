@@ -64,7 +64,6 @@ function exec_pants_bare() {
   activate_pants_venv
   bootstrap_native_code
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" \
-  PANTS_NATIVE_ENGINE_VERSION="${NATIVE_BOOTSTRAP_HASH}" \
     exec python ${PANTS_EXE} "$@"
 }
 

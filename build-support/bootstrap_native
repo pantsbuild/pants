@@ -7,6 +7,8 @@ readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly MODE=debug
 readonly MODE_FLAG=
 
+readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"
+
 # TODO(John Sirois): Eliminate this replication of BinaryUtil logic internal to pants code when
 # https://github.com/pantsbuild/pants/issues/4006 is complete.
 readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -34,35 +36,44 @@ function calculate_current_hash() {
 }
 
 function ensure_prerequisites() {
-  # The machine may have a non-rustup rust install and we'll respect that, but in case we need to
-  # bootstrap via rustup, we pre-emptively add it to the end of the PATH to avoid the user needing
-  # to re-exec their SHELL or otherwise have their PATH permanently altered by the rustup script.
-  export PATH="$PATH:$HOME/.cargo/bin"
-  if [[ -z "$(which cargo 2>/dev/null || true)" ]]
+  # Control a pants-specific rust toolchain.
+  export CARGO_HOME=${CACHE_ROOT}/rust-toolchain
+  export RUSTUP_HOME=${CARGO_HOME}
+
+  if [[ ! -x "${RUSTUP_HOME}/bin/rustup" ]]
   then
-    log "A rust installation could not be found, installing via the instructions at" \
+    log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
     local readonly rustup=$(mktemp -t pants.rustup.XXXXX)
     curl https://sh.rustup.rs -sSf > ${rustup}
     sh ${rustup} -y --no-modify-path 1>&2
     rm -f ${rustup}
-    # A soft attempt to control the toolchain - if the user came in with their own cargo on that
-    # PATH we'll never get here.
-    rustup override set stable 1>&2
+    ${RUSTUP_HOME}/bin/rustup override set stable 1>&2
   fi
 }
 
 function bootstrap_native_code() {
-  # Bootstraps the native code and sets NATIVE_BOOTSTRAP_HASH to the resulting hash version.
-  ensure_prerequisites
-  export NATIVE_BOOTSTRAP_HASH="$(calculate_current_hash)"
+  # Bootstraps the native code and sets overwrites the native_engine_version to the resulting hash
+  # version if needed.
 
-  local target_hash_dir="${CACHE_TARGET_DIR}/${NATIVE_BOOTSTRAP_HASH}"
-  local target_binary="${target_hash_dir}/native-engine"
+  ensure_prerequisites
+
+  local native_engine_version="$(calculate_current_hash)"
+  local target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
   if [ ! -f "${target_binary}" ]
   then
-    cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG} || exit 1
-    mkdir -p ${target_hash_dir}
+    ${CARGO_HOME}/bin/cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG} || die
+
+    # Pick up Cargo.lock changes if any caused by the `cargo build`.
+    native_engine_version="$(calculate_current_hash)"
+    target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
+
+    mkdir -p $(dirname ${target_binary})
     cp ${NATIVE_ROOT}/target/${MODE}/libengine.${EXTENSION} ${target_binary}
+
+    # NB: The resource file emitted/over-written below is used by the `Native` subsystem to default
+    # the native engine library version used by pants. More info can be read here:
+    #  src/python/pants/engine/subsystem/README.md
+    echo ${native_engine_version} > ${NATIVE_ENGINE_VERSION_RESOURCE}
   fi
 }
