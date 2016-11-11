@@ -7,6 +7,8 @@ readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly MODE=debug
 readonly MODE_FLAG=
 
+readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"
+
 # TODO(John Sirois): Eliminate this replication of BinaryUtil logic internal to pants code when
 # https://github.com/pantsbuild/pants/issues/4006 is complete.
 readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -55,14 +57,23 @@ function ensure_prerequisites() {
 function bootstrap_native_code() {
   # Bootstraps the native code and sets NATIVE_BOOTSTRAP_HASH to the resulting hash version.
   ensure_prerequisites
-  export NATIVE_BOOTSTRAP_HASH="$(calculate_current_hash)"
 
-  local target_hash_dir="${CACHE_TARGET_DIR}/${NATIVE_BOOTSTRAP_HASH}"
-  local target_binary="${target_hash_dir}/native-engine"
+  local native_engine_version="$(calculate_current_hash)"
+  local target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
   if [ ! -f "${target_binary}" ]
   then
-    cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG} || exit 1
-    mkdir -p ${target_hash_dir}
+    cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG} || die
+
+    # Pick up Cargo.lock changes if any caused by the `cargo build`.
+    native_engine_version="$(calculate_current_hash)"
+    target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
+
+    mkdir -p $(dirname ${target_binary})
     cp ${NATIVE_ROOT}/target/${MODE}/libengine.${EXTENSION} ${target_binary}
+
+    # NB: The resource file emitted/over-written below is used by the `Native` subsystem to default
+    # the native engine library version used by pants. More info can be read here:
+    #  src/python/pants/engine/subsystem/README.md
+    echo ${native_engine_version} > ${NATIVE_ENGINE_VERSION_RESOURCE}
   fi
 }

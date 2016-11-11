@@ -27,7 +27,7 @@ function banner() {
 }
 
 function fingerprint_data() {
-  openssl md5 | cut -d' ' -f2
+  openssl sha1 | cut -d' ' -f2
 }
 
 # Prevent bootstrapping failure due to unrecognized flag:
