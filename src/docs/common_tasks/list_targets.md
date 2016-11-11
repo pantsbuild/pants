@@ -2,19 +2,17 @@
 
 ## Problem
 
-You want to find out which Pants targets are currently available in a project or in a folder within the project.
+You want to find out which Pants targets are currently available in your project or in a subfolder within the project.
 
 ## Solution
 
-Use the `list` goal and specify a folder containing a `BUILD` file.
-
-This command, for example, would show all targets available in `myproject/BUILD`:
+Use the `list` goal and specify a folder containing a `BUILD` file. This command, for example, would show all targets available in `myproject/BUILD`:
 
 ```bash
 $ ./pants list myproject/:
 ```
 
-This command would show all targets available both in the `myproject` directory *as well as in all sub-directories*:
+This command would show all targets available in the `myproject` directory *as well as in all subdirectories*:
 
 ```bash
 $ ./pants list myproject/::

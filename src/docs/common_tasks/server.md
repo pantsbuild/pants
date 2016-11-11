@@ -12,6 +12,17 @@ The `server` goal will start up a local web server that you can use to access in
     $ ./pants server
     Launching server with pid 85420 at http://localhost:57466
 
+Set the `-o` or `--open` flag to automatically open the browser.
+
+The UI looks like this:
+
+<img src="images/pants-server-ui.png" width="800px">
+
+To kill the server:
+
+    ::bash
+    $ ./pants killserver
+
 For more info, see [[Reporting Server|pants('src/docs:reporting_server')]].
 
 ## See Also

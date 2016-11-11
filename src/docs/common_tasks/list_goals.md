@@ -21,10 +21,12 @@ The resulting list should look something like this:
                    binary: Create a runnable binary.
                    # etc.
 
-You can get help output for each Pants goal (including all the available flags for that goal) by appending the `-h` or `--help` flag. Here's an example:
+You can get help output for each Pants goal (including all the available flags for that goal) by appending the `-h` or `--help` flags or the `help` command. Here are three equivalent examples:
 
     :::bash
-    $ ./pants binary -h
+    $ ./pants goals -h
+    $ ./pants goals --help
+    $ ./pants goals help
 
 ## See Also
 

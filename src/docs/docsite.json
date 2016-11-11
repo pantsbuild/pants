@@ -90,6 +90,7 @@
     "images/ossrh-publish-close-staging-repo.png": "src/docs/images/ossrh-publish-close-staging-repo.png",
     "images/ossrh-publish-find-staging-repo.png": "src/docs/images/ossrh-publish-find-staging-repo.png",
     "images/ossrh-publish-release-staging-repo.png": "src/docs/images/ossrh-publish-release-staging-repo.png",
+    "images/pants-server-ui.png": "src/docs/images/pants-server-ui.png",
     "images/report-server-page.png": "src/docs/images/report-server-page.png",
     "images/transitive-dependencies.png": "src/docs/images/transitive-dependencies.png",
     "robots.txt": "src/docs/robots.txt",
