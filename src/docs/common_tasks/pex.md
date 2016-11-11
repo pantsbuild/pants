@@ -39,5 +39,5 @@ Here's an example `python_binary` target:
 
 ## See Also
 
-* [[Run a Binary Target|pants('src/docs/common_tasks:bin')]]
+* [[Run a Binary Target|pants('src/docs/common_tasks:run')]]
 * [[Define a Python Library Target|pants('src/docs/common_tasks:python_library')]]

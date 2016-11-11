@@ -11,7 +11,7 @@ The `compile` goal enables you to compile Scala or Java [[binaries|]]. Here's an
     :::bash
     $ ./pants compile myproject/src/main/scala/com/square/myproject:scala
 
-This work somewhat differently if you're working on `python_library` targets because these targets never require a separate compilation phase, even when you're using the library locally. You can, however, compile Python binary targets. See [[Build a Python Executable (PEX)|pants('src/docs/common_tasks:pex')]] and [[Run a Binary Target|pants('src/docs/common_tasks:run')]]. for more info.
+This work somewhat differently if you're working on `python_library` targets because these targets never require a separate compilation phase, even when you're using the library locally. You can, however, compile Python binary targets. See [[Build a Python Executable|pants('src/docs/common_tasks:pex')]] and [[Run a Binary Target|pants('src/docs/common_tasks:run')]]. for more info.
 
 ## Discussion
 
