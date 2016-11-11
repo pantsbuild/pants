@@ -87,7 +87,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """A whitelist of environment variables to propagate to tests when hermetic=True."""
     return [
         # Used in the wrapper script to locate a rust install.
-        'HOME',
+        'CARGO_HOME',
+        'RUSTUP_HOME',
       ]
 
   @classmethod

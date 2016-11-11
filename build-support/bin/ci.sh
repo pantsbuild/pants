@@ -89,6 +89,12 @@ else
   banner "CI BEGINS"
 fi
 
+if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
+  banner "Running pre-commit checks"
+
+  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
+fi
+
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
 # target(s).
 INTERPRETER_CONSTRAINTS=(
@@ -118,12 +124,6 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     ./pants.pex -V && \
     ./pants.pex --version
   ) || die "Failed to bootstrap pants."
-fi
-
-if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
-  banner "Running pre-commit checks"
-
-  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
 fi
 
 if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
