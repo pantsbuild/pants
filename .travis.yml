@@ -56,6 +56,8 @@ matrix:
     - os: osx
       language: generic
       env: TRAVIS_SCRIPT="./pants --version"
+      after_success:
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -81,7 +83,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -107,7 +111,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -133,7 +139,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -159,7 +167,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -185,7 +195,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -211,7 +223,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -237,7 +251,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -263,7 +279,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -289,7 +307,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -315,7 +335,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -341,7 +363,9 @@ matrix:
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
-      after_success: coveralls
+      after_success:
+        - coveralls
+        - ./build-support/bin/generate-bintray-manifest.sh
 
 script: |-
   uname -a
@@ -372,7 +396,6 @@ deploy:
     # NB: Pull requests do not trigger deploys, so this setting means we always build a
     # native-engine binary for master and each of our long-term branches.
     all_branches: true
-  before_deploy: ./build-support/bin/generate-bintray-manifest.sh
 
 # We accept the default travis-ci email author+committer notification
 # for now which is enabled even with no `notifications` config.
