@@ -70,7 +70,7 @@ function emit_linux_files() {
 EOF
 }
 
-if [ "${OS_NAME}" == "osx" ]; then
+if [ "${OS_NAME}" == "mac" ]; then
   emit_osx_files
 else
   emit_linux_files
