@@ -1,7 +1,7 @@
 env:
   global:
     - PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']"
-    - ANDROID_SDK_INSTALL_LOCATION="$HOME/opt/android-sdk-install"
+    - ANDROID_SDK_INSTALL_LOCATION="${HOME}/opt/android-sdk-install"
     - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
     # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
     # These are encrypted with a public key for our repo that only
@@ -26,26 +26,26 @@ before_cache:
   # leads to travis-ci cache thrash.  Kill these files before the cache
   # check to avoid un-needed cache re-packing and re-upload (a ~100s
   # operation).
-  - find $HOME/.ivy2/pants -type f -name "ivydata-*.properties" -print -delete
-  - rm -fv $HOME/.ivy2/pants/*.{css,properties,xml,xsl}
+  - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -print -delete
+  - rm -fv ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
   # We have several tests that do local file:// url resolves for
   # com.example artifacts, these disrupt the cache but are fast since
   # they're resolved from local files when omitted from the cache.
-  - rm -rf $HOME/.ivy2/pants/com.example
+  - rm -rf ${HOME}/.ivy2/pants/com.example
   # The stats cache contains timestamped reports unused by CI but that
   # thrash the cache.  Skip caching these.
-  - rm -rf $HOME/.cache/pants/stats
+  - rm -rf ${HOME}/.cache/pants/stats
 
 cache:
   directories:
-    - $HOME/.cache/pants
-    - $HOME/.ivy2/pants
+    - ${HOME}/.cache/pants
+    - ${HOME}/.ivy2/pants
     # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
-    - $HOME/.npm
-    - $HOME/.android
-    - $ANDROID_SDK_INSTALL_LOCATION
+    - ${HOME}/.npm
+    - ${HOME}/.android
+    - ${ANDROID_SDK_INSTALL_LOCATION}
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
@@ -57,7 +57,7 @@ matrix:
       language: generic
       env: TRAVIS_SCRIPT="./pants --version"
       after_success:
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -85,7 +85,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -113,7 +113,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -141,7 +141,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -169,7 +169,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -197,7 +197,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -225,7 +225,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -253,7 +253,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -281,7 +281,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -309,7 +309,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -337,7 +337,7 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -365,17 +365,17 @@ matrix:
         - ./build-support/bin/install-android-sdk.sh
       after_success:
         - coveralls
-        - ./build-support/bin/generate-bintray-manifest.sh
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
 script: |-
   uname -a
 
-  if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+  if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
     export CXX=clang++
     /usr/libexec/java_home
-  else
+  else # linux
     export CXX=g++
-    echo $JAVA_HOME
+    echo ${JAVA_HOME}
   fi
 
   java -version
@@ -386,11 +386,11 @@ deploy:
   # See: https://docs.travis-ci.com/user/deployment/bintray/
   provider: bintray
 
-  # NB: This is generated in before_deploy below.
+  # NB: This is generated in after_success in each shard above.
   file: ./native-engine.bintray.json
 
-  user: $BINTRAY_USER
-  key: $BINTRAY_KEY
+  user: ${BINTRAY_USER}
+  key: ${BINTRAY_KEY}
   dry-run: false
   on:
     # NB: Pull requests do not trigger deploys, so this setting means we always build a

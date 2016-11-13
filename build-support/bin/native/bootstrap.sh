@@ -1,30 +1,20 @@
 #!/usr/bin/env bash
 
-readonly REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd -P)
+readonly REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
+
+# Defines:
+# + LIB_EXTENSION: The extension of native libraries.
+# + KERNEL: The lower-cased name of the kernel as reported by uname.
+# + OS_NAME: The name of the OS as seen by pants.
+# + OS_ID: The ID of the current OS as seen by pants.
+source ${REPO_ROOT}/build-support/bin/native/detect_os.sh
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly MODE=debug
 readonly MODE_FLAG=
 
 readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"
-
-# TODO(John Sirois): Eliminate this replication of BinaryUtil logic internal to pants code when
-# https://github.com/pantsbuild/pants/issues/4006 is complete.
-readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
-case "${KERNEL}" in
-  linux)
-    readonly EXTENSION=so
-    readonly OS_ID=linux/$(uname -m)
-    ;;
-  darwin)
-    readonly EXTENSION=dylib
-    readonly OS_ID=mac/$(sw_vers -productVersion | cut -d: -f2 | tr -d ' \t' | cut -d. -f1-2)
-    ;;
-  *)
-    die "Unknown kernel ${KERNEL}, cannot bootstrap pants native code!"
-    ;;
-esac
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
@@ -69,7 +59,7 @@ function bootstrap_native_code() {
     target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
 
     mkdir -p $(dirname ${target_binary})
-    cp ${NATIVE_ROOT}/target/${MODE}/libengine.${EXTENSION} ${target_binary}
+    cp ${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION} ${target_binary}
 
     # NB: The resource file emitted/over-written below is used by the `Native` subsystem to default
     # the native engine library version used by pants. More info can be read here:
