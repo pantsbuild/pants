@@ -251,7 +251,7 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, zinc_file_manager, javac_plugins_to_exclude):
+              log_file, settings, javac_plugins_to_exclude, extra_options):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -266,11 +266,10 @@ class JvmCompile(NailgunTaskBase):
     :param log_file: Where to write logs.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
-    :param fatal_warnings: whether to convert compilation warnings to errors.
-    :param zinc_file_manager: whether to use zinc provided file manager.
     :param javac_plugins_to_exclude: A list of names of javac plugins that mustn't be used in
                                      this compilation, even if requested (typically because
                                      this compilation is building those same plugins).
+    :param list additional compile options.
     """
     raise NotImplementedError()
 
@@ -478,8 +477,7 @@ class JvmCompile(NailgunTaskBase):
         f.write(text.encode('utf-8'))
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings, fatal_warnings, zinc_file_manager,
-                   counter):
+                   log_file, progress_message, settings, counter, extra_options):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -520,8 +518,7 @@ class JvmCompile(NailgunTaskBase):
         # If compiling a plugin, don't try to use it on itself.
         javac_plugins_to_exclude = (t.plugin for t in vts.targets if isinstance(t, JavacPlugin))
         self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings, fatal_warnings, zinc_file_manager,
-                     javac_plugins_to_exclude)
+                     log_file, settings, javac_plugins_to_exclude, extra_options)
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -719,8 +716,9 @@ class JvmCompile(NailgunTaskBase):
           safe_rmtree(ctx.classes_dir)
 
         tgt, = vts.targets
-        fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
-        zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
+        extra_options = []
+        extra_options.extend(self._compute_compile_options(tgt, lambda x: x.fatal_warnings))
+        extra_options.extend(self._compute_compile_options(tgt, lambda x: x.zinc_file_manager))
         self._compile_vts(vts,
                           ctx.sources,
                           ctx.analysis_file,
@@ -730,9 +728,8 @@ class JvmCompile(NailgunTaskBase):
                           log_file,
                           progress_message,
                           tgt.platform,
-                          fatal_warnings,
-                          zinc_file_manager,
-                          counter)
+                          counter,
+                          extra_options)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.
@@ -851,6 +848,12 @@ class JvmCompile(NailgunTaskBase):
     if target.has_sources('.scala'):
       prop |= selector(ScalaPlatform.global_instance())
     return prop
+
+  def _compute_compile_options(self, target, selector):
+    if selector(target) is not None:
+      return selector(target)
+
+    return selector(self.get_default_compile_options())
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.

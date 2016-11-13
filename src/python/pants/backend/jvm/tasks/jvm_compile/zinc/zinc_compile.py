@@ -45,6 +45,17 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 # Well known metadata file to register annotation processors with a java 1.6+ compiler.
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
+_DEFAULT_ZINC_OPTIONS = {
+  'fatal_warnings:': (
+    {'-S-Xfatal-warnings', '-C-Werror'},
+    {}
+  ),
+  'zinc_file_manager': (
+    {},
+    {'--no-zinc-file-manager'},
+  ),
+}
+
 
 logger = logging.getLogger(__name__)
 
@@ -145,14 +156,6 @@ class BaseZincCompile(JvmCompile):
     return ('-C-nowarn', '-C-Xlint:none', '-S-nowarn', '-S-Xlint:none', )
 
   @classmethod
-  def get_fatal_warnings_enabled_args_default(cls):
-    return ('-S-Xfatal-warnings', '-C-Werror')
-
-  @classmethod
-  def get_fatal_warnings_disabled_args_default(cls):
-    return ()
-
-  @classmethod
   def register_options(cls, register):
     super(BaseZincCompile, cls).register_options(register)
     register('--whitelisted-args', advanced=True, type=dict,
@@ -176,6 +179,14 @@ class BaseZincCompile(JvmCompile):
              help='When set, the results of incremental compiles will be written to the cache. '
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
+
+    register('--zinc-options', advanced=True, default=_DEFAULT_ZINC_OPTIONS,
+             fingerprint=True, type=dict,
+             help='Advanced zinc compile options that can be referred to by name in jvm_targets.')
+
+    register('--default-zinc-options', advanced=True, default={'-fatal_warning', '+zinc_file_manager'},
+             fingerprint=True, type=set,
+             help='Default zinc options.')
 
     def sbt_jar(name, **kwargs):
       return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X5', **kwargs)
@@ -315,7 +326,7 @@ class BaseZincCompile(JvmCompile):
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, zinc_file_manager, javac_plugins_to_exclude):
+              log_file, settings, javac_plugins_to_exclude, extra_options):
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(upstream_analysis.keys())
 
@@ -347,13 +358,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(self._get_zinc_arguments(settings))
     zinc_args.append('-transactional')
 
-    if fatal_warnings:
-      zinc_args.extend(self.get_options().fatal_warnings_enabled_args)
-    else:
-      zinc_args.extend(self.get_options().fatal_warnings_disabled_args)
-
-    if not zinc_file_manager:
-      zinc_args.append('-no-zinc-file-manager')
+    zinc_args.extend(extra_options)
 
     jvm_options = []
 
