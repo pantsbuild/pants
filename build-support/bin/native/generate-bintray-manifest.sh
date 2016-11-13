@@ -59,9 +59,14 @@ function emit_osx_files() {
     else
       local sep=""
     fi
+    # It appears to be the case that upload de-dupes on includePattern keys; so we make a unique
+    # includePattern per uploadPattern via a symlink here per OSX version.
+    ln -fs \
+      ${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine \
+      ${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine.10.${version}
     cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
     {
-      "includePattern": "${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine",
+      "includePattern": "${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine.10.${version}",
       "uploadPattern": "build-support/bin/native-engine/mac/10.${version}/${NATIVE_ENGINE_VERSION}/native-engine"
     }${sep}
 EOF
