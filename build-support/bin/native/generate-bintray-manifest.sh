@@ -50,14 +50,13 @@ cat << EOF > ${REPO_ROOT}/native-engine.bintray.json
 
   "files": [
     {
-      "includePattern": "${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine",
 EOF
 
 function emit_osx_files() {
   # Rust targets OSX 10.7+ as noted here: https://doc.rust-lang.org/book/getting-started.html#tier-1
   for version in $(seq 7 ${OSX_MAX_VERSION}); do
     cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
-      "uploadPattern": "build-support/bin/native-engine/mac/${version}/${NATIVE_ENGINE_VERSION}/native-engine"
+      "uploadPattern": "build-support/bin/native-engine/mac/10.${version}/${NATIVE_ENGINE_VERSION}/native-engine",
 EOF
   done
 }
@@ -66,7 +65,7 @@ function emit_linux_files() {
   # TODO(John Sirois): We should either have a 32 bit linux node, or use docker to get this or
   # use rustup to install a 32 bit rust platfrm and generate a second binary.
   cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
-      "uploadPattern": "build-support/bin/native-engine/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine"
+      "uploadPattern": "build-support/bin/native-engine/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine",
 EOF
 }
 
@@ -77,6 +76,7 @@ else
 fi
 
 cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
+      "includePattern": "${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine"
     }
   ]
 }
