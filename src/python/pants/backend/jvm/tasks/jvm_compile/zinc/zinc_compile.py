@@ -53,7 +53,7 @@ _DEFAULT_ZINC_OPTIONS = {
   ),
   'zinc_file_manager': (
     [],
-    ['--no-zinc-file-manager'],
+    ['-no-zinc-file-manager'],
   ),
 }
 
@@ -446,7 +446,7 @@ class BaseZincCompile(JvmCompile):
     if not target.compile_options:
       return selector(self._default_zinc_options)
 
-    return selector(self.get_zinc_options(target.compile_options))
+    return selector(self._get_zinc_options(target.compile_options))
 
 
 class ZincCompile(BaseZincCompile):
