@@ -217,5 +217,6 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/bench:jmh'
     with self.temporary_workdir() as workdir:
       with self.temporary_cachedir() as cachedir:
-        pants_run = self.run_test_compile(workdir, cachedir, target_spec, clean_all=True)
+        pants_run = self.run_test_compile(workdir, cachedir, target_spec, clean_all=True,
+                                          extra_args=['--compile-zinc-default-extra-compile-options=["-zinc_file_manager"]'])
         self.assertEquals(0, pants_run.returncode)

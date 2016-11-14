@@ -12,6 +12,7 @@ import textwrap
 from collections import defaultdict
 from contextlib import closing
 from hashlib import sha1
+from itertools import chain
 from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.java import Java
@@ -195,11 +196,10 @@ class BaseZincCompile(JvmCompile):
 
     register('--extra-compile-options', advanced=True, default=_DEFAULT_EXTRA_COMPILE_OPTIONS,
              fingerprint=True, type=dict,
-             help='Advanced zinc compile options that can be referred to by name in jvm_targets.')
+             help='Extra compile options that can be referred to by name in jvm_targets.')
 
-    register('--default-extra-compile-options', advanced=True, default=['-fatal_warnings', '+zinc_file_manager'],
-             fingerprint=True, type=list,
-             help='Default zinc options.')
+    register('--default-extra-compile-options', advanced=True, fingerprint=True, type=list,
+             help='Default compile options.')
 
     def sbt_jar(name, **kwargs):
       return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X5', **kwargs)
@@ -425,8 +425,9 @@ class BaseZincCompile(JvmCompile):
 
   def _get_extra_compile_options(self, option_names):
     """Get zinc options by translating option names into predefined zinc options."""
-    zinc_options = self.get_options().extra_compile_options
-    options = defaultdict(dict, [(k, {}) for k in _DEFAULT_EXTRA_COMPILE_OPTIONS])
+    zinc_options = self.get_options().extra_compile_options or {}
+    option_names = option_names or []
+    options = defaultdict(dict, [(k, []) for k in _DEFAULT_EXTRA_COMPILE_OPTIONS])
     for option_name in option_names:
       modifier, option_name_configured = extract_modifier(option_name)
       if not option_name_configured in zinc_options:
@@ -441,11 +442,11 @@ class BaseZincCompile(JvmCompile):
   def _default_zinc_options(self):
     return self._get_extra_compile_options(self.get_options().default_extra_compile_options)
 
-  def _compute_extra_compile_options(self, target, selector):
-    if not target.extra_compile_options:
-      return selector(self._default_zinc_options)
-
-    return selector(self._get_extra_compile_options(target.extra_compile_options))
+  def _compute_extra_compile_options(self, target, selectors):
+    compileOptions = self._default_zinc_options
+    if target.extra_compile_options:
+      compileOptions = self._get_extra_compile_options(target.extra_compile_options)
+    return list(chain(*[selector(compileOptions) for selector in selectors]))
 
 
 class ZincCompile(BaseZincCompile):

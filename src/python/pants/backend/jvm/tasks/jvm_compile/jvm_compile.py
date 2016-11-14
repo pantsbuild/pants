@@ -720,9 +720,15 @@ class JvmCompile(NailgunTaskBase):
           safe_rmtree(ctx.classes_dir)
 
         tgt, = vts.targets
-        extra_options = []
-        extra_options.extend(self._compute_extra_compile_options(tgt, lambda x: x.fatal_warnings))
-        extra_options.extend(self._compute_extra_compile_options(tgt, lambda x: x.zinc_file_manager))
+
+        extra_options = self._compute_extra_compile_options(tgt, [lambda x: x.fatal_warnings,
+                                                                  lambda x: x.zinc_file_manager])
+        if not extra_options:
+          # TODO remove once we deprecate individual compile options and replace with `--default-extra-compile-options`
+          fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
+          zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
+          extra_options = self._compute_extra_compile_options_deprecated(fatal_warnings, zinc_file_manager)
+
         self._compile_vts(vts,
                           ctx.sources,
                           ctx.analysis_file,
@@ -853,7 +859,20 @@ class JvmCompile(NailgunTaskBase):
       prop |= selector(ScalaPlatform.global_instance())
     return prop
 
-  def _compute_extra_compile_options(self, target, selector):
+  def _compute_extra_compile_options_deprecated(self, fatal_warnings=None, zinc_file_manager=None):
+    """TODO remove once we deprecate individual compile options and replace with `--default-extra-compile-options`"""
+    extra_options = []
+    if fatal_warnings is not None:
+      if fatal_warnings:
+        extra_options.extend(self.get_options().fatal_warnings_enabled_args)
+      else:
+        extra_options.extend(self.get_options().fatal_warnings_disabled_args)
+    if zinc_file_manager is not None:
+      if not zinc_file_manager:
+        extra_options.append('-no-zinc-file-manager')
+    return extra_options
+
+  def _compute_extra_compile_options(self, target, selectors):
     return []
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
