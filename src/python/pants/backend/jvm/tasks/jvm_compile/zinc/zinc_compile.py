@@ -49,6 +49,8 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 # Well known metadata file to register annotation processors with a java 1.6+ compiler.
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
+# The minimum set of extra compile options and their default settings.
+# Each option is defined by a name and compile flags when it's enabled ('+') or disabled ('-').
 _DEFAULT_EXTRA_COMPILE_OPTIONS = {
   'fatal_warnings': {
     '+': ['-S-Xfatal-warnings', '-C-Werror'],
@@ -199,7 +201,8 @@ class BaseZincCompile(JvmCompile):
              help='Extra compile options that can be referred to by name in jvm_targets.')
 
     register('--default-extra-compile-options', advanced=True, fingerprint=True, type=list,
-             help='Default compile options.')
+             help="Names of the extra compile options to use. "
+                  "Optionally prefix '+' to enable, and '-' to disable")
 
     def sbt_jar(name, **kwargs):
       return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X5', **kwargs)
@@ -421,10 +424,10 @@ class BaseZincCompile(JvmCompile):
                                    else 'nonexistent'))
 
   class IllegalDefaultCompileOption(TaskError):
-    """TODO."""
+    """The --default-extra-compile-options was set, but isn't defined in --extra-compile-options."""
 
   def _get_extra_compile_options(self, option_names):
-    """Get zinc options by translating option names into predefined zinc options."""
+    """Translate option names into compile options by looking up in --extra-compile-options."""
     zinc_options = self.get_options().extra_compile_options or {}
     option_names = option_names or []
     options = defaultdict(dict, [(k, []) for k in _DEFAULT_EXTRA_COMPILE_OPTIONS])

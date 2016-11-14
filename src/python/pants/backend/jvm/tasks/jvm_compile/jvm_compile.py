@@ -123,13 +123,13 @@ class JvmCompile(NailgunTaskBase):
              default=list(cls.get_fatal_warnings_enabled_args_default()),
              help='Extra compiler args to use when fatal warnings are enabled.',
              removal_version='1.4.0',
-             removal_hint='Please use --compile-zinc-zinc-options.')
+             removal_hint='Please use --compile-zinc-extra-compile-options.')
 
     register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_disabled_args_default()),
              help='Extra compiler args to use when fatal warnings are disabled.',
              removal_version='1.4.0',
-             removal_hint='Please use --compile-zinc-zinc-options.')
+             removal_hint='Please use --compile-zinc-extra-compile-options.')
 
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
@@ -273,7 +273,7 @@ class JvmCompile(NailgunTaskBase):
     :param javac_plugins_to_exclude: A list of names of javac plugins that mustn't be used in
                                      this compilation, even if requested (typically because
                                      this compilation is building those same plugins).
-    :param list additional compile options.
+    :param extra_options list additional compile options.
     """
     raise NotImplementedError()
 

@@ -75,7 +75,8 @@ class JvmTarget(Target, Jarable):
     :param zinc_file_manager: Whether to use zinc provided file manager that allows transactional
                               rollbacks, but in certain cases may conflict with user libraries.
     :type zinc_file_manager: bool
-    :param extra_compile_options: List of zinc options.
+    :param extra_compile_options: List of zinc options that reference to compile option settings
+                                  by their names.
     :type extra_compile_options: list
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
@@ -86,7 +87,7 @@ class JvmTarget(Target, Jarable):
       lambda: fatal_warnings or zinc_file_manager,
       '1.4.0',
       'fatal_warnings or zinc_file_manager is set.'
-      'Please use compile_options.')
+      'Please use extra_compile_options instead of individual compile flags.')
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
@@ -118,7 +119,7 @@ class JvmTarget(Target, Jarable):
     return self.payload.strict_deps
 
   @property
-  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
+  @deprecated(removal_version='1.4.0', hint_message='Please use extra_compile_options.')
   def fatal_warnings(self):
     """If set, overrides the platform's default fatal_warnings setting.
 
@@ -128,7 +129,7 @@ class JvmTarget(Target, Jarable):
     return self.payload.fatal_warnings
 
   @property
-  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
+  @deprecated(removal_version='1.4.0', hint_message='Please use extra_compile_options.')
   def zinc_file_manager(self):
     """If false, the default file manager will be used instead of the zinc provided one.
 

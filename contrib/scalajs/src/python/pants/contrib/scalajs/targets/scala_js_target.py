@@ -40,12 +40,12 @@ class ScalaJSTarget(object):
     return False
 
   @property
-  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
+  @deprecated(removal_version='1.4.0', hint_message='Please use --compile-zinc-default-extra-compile-options.')
   def fatal_warnings(self):
     return False
 
   @property
-  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
+  @deprecated(removal_version='1.4.0', hint_message='Please use --compile-zinc-default-extra-compile-options.')
   def zinc_file_manager(self):
     return False
 
