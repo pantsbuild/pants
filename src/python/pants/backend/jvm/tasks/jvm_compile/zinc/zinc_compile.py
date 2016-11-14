@@ -34,6 +34,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.objects import datatype
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -46,15 +47,19 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 _DEFAULT_ZINC_OPTIONS = {
-  'fatal_warnings:': (
-    {'-S-Xfatal-warnings', '-C-Werror'},
-    {}
+  'fatal_warnings': (
+    ['-S-Xfatal-warnings', '-C-Werror'],
+    []
   ),
   'zinc_file_manager': (
-    {},
-    {'--no-zinc-file-manager'},
+    [],
+    ['--no-zinc-file-manager'],
   ),
 }
+
+
+class CompileOptions(datatype('CompileOptions', list(_DEFAULT_ZINC_OPTIONS.keys()))):
+  pass
 
 
 logger = logging.getLogger(__name__)
@@ -184,8 +189,8 @@ class BaseZincCompile(JvmCompile):
              fingerprint=True, type=dict,
              help='Advanced zinc compile options that can be referred to by name in jvm_targets.')
 
-    register('--default-zinc-options', advanced=True, default={'-fatal_warning', '+zinc_file_manager'},
-             fingerprint=True, type=set,
+    register('--default-zinc-options', advanced=True, default=['-fatal_warnings', '+zinc_file_manager'],
+             fingerprint=True, type=list,
              help='Default zinc options.')
 
     def sbt_jar(name, **kwargs):
@@ -406,6 +411,42 @@ class BaseZincCompile(JvmCompile):
                                    hash_file(analysis_file).upper()
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
+
+  class IllegalDefaultCompileOption(TaskError):
+    """TODO."""
+
+  @memoized_property
+  def _default_zinc_options(self):
+    return self._get_zinc_options(self.get_options().default_zinc_options)
+
+  def _get_zinc_options(self, options):
+    def extract_modifier(option_name):
+      if option_name.startswith('+'):
+        return '+', option_name[1:]
+      if option_name.startswith('-'):
+        return '-', option_name[1:]
+      return '+', option_name
+
+    default_options = {}
+    for option in options:
+      modifier, option_name_configured = extract_modifier(option)
+      if not option_name_configured in _DEFAULT_ZINC_OPTIONS:
+        raise self.IllegalDefaultCompileOption("The default compile option {} needs to be defined."
+                                                 .format(option_name_configured))
+      index = 0 if modifier == '+' else 1
+      default_options[option_name_configured] = _DEFAULT_ZINC_OPTIONS[option_name_configured][index]
+
+    for option_name in _DEFAULT_ZINC_OPTIONS:
+      if not option_name in default_options:
+        default_options[option_name] = {}
+
+    return CompileOptions(**default_options)
+
+  def _compute_extra_compile_options(self, target, selector):
+    if not target.compile_options:
+      return selector(self._default_zinc_options)
+
+    return selector(self.get_zinc_options(target.compile_options))
 
 
 class ZincCompile(BaseZincCompile):

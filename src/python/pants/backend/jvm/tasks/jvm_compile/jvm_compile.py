@@ -717,8 +717,8 @@ class JvmCompile(NailgunTaskBase):
 
         tgt, = vts.targets
         extra_options = []
-        extra_options.extend(self._compute_compile_options(tgt, lambda x: x.fatal_warnings))
-        extra_options.extend(self._compute_compile_options(tgt, lambda x: x.zinc_file_manager))
+        extra_options.extend(self._compute_extra_compile_options(tgt, lambda x: x.fatal_warnings))
+        extra_options.extend(self._compute_extra_compile_options(tgt, lambda x: x.zinc_file_manager))
         self._compile_vts(vts,
                           ctx.sources,
                           ctx.analysis_file,
@@ -849,11 +849,8 @@ class JvmCompile(NailgunTaskBase):
       prop |= selector(ScalaPlatform.global_instance())
     return prop
 
-  def _compute_compile_options(self, target, selector):
-    if selector(target) is not None:
-      return selector(target)
-
-    return selector(self.get_default_compile_options())
+  def _compute_extra_compile_options(self, target, selector):
+    return []
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.

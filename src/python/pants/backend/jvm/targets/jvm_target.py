@@ -74,8 +74,8 @@ class JvmTarget(Target, Jarable):
     :param zinc_file_manager: Whether to use zinc provided file manager that allows transactional
                               rollbacks, but in certain cases may conflict with user libraries.
     :type zinc_file_manager: bool
-    :param compile_options: Set of zinc options.
-    :type compile_options: set
+    :param compile_options: List of zinc options.
+    :type compile_options: list
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
@@ -89,7 +89,7 @@ class JvmTarget(Target, Jarable):
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
       'zinc_file_manager': PrimitiveField(zinc_file_manager),
-      'compile_options': PrimitiveField(compile_options or {}),
+      'compile_options': PrimitiveField(compile_options or []),
     })
     self._resource_specs = self.assert_list(resources, key_arg='resources')
 
@@ -128,6 +128,10 @@ class JvmTarget(Target, Jarable):
     :rtype: bool or None
     """
     return self.payload.zinc_file_manager
+
+  @property
+  def compile_options(self):
+    return self.payload.compile_options
 
   @property
   def platform(self):
