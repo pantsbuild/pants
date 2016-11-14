@@ -5,14 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.engine.subsystem.native import Native
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def init_native():
-  """Retrieve the native engine from the environment, where it is placed by the `./pants` script."""
-  version = os.getenv('PANTS_NATIVE_ENGINE_VERSION')
-  init_subsystem(Native.Factory, options={'native-engine': {'version': version}})
+  """Initialize and return the `Native` subsystem."""
+  init_subsystem(Native.Factory)
   return Native.Factory.global_instance().create()

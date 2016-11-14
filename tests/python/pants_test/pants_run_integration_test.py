@@ -86,8 +86,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def hermetic_env_whitelist(cls):
     """A whitelist of environment variables to propagate to tests when hermetic=True."""
     return [
-        # Set by the wrapper script in the repo to allow for running from source.
-        'PANTS_NATIVE_ENGINE_VERSION',
         # Used in the wrapper script to locate a rust install.
         'HOME',
       ]
