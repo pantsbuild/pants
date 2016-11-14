@@ -28,7 +28,6 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis_parser import ZincAnalysisParser
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
@@ -162,12 +161,10 @@ class BaseZincCompile(JvmCompile):
     return ('-C-nowarn', '-C-Xlint:none', '-S-nowarn', '-S-Xlint:none', )
 
   @classmethod
-  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def get_fatal_warnings_enabled_args_default(cls):
     return ('-S-Xfatal-warnings', '-C-Werror')
 
   @classmethod
-  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def get_fatal_warnings_disabled_args_default(cls):
     return ()
 

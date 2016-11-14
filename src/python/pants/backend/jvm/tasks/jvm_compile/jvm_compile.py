@@ -229,13 +229,11 @@ class JvmCompile(NailgunTaskBase):
     return ()
 
   @classmethod
-  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def get_fatal_warnings_enabled_args_default(cls):
     """Override to set default for --fatal-warnings-enabled-args option."""
     return ()
 
   @classmethod
-  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def get_fatal_warnings_disabled_args_default(cls):
     """Override to set default for --fatal-warnings-disabled-args option."""
     return ()
