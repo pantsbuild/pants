@@ -25,8 +25,11 @@ function calculate_current_hash() {
     git hash-object -t blob --stdin-paths | fingerprint_data
 }
 
-function ensure_prerequisites() {
-  # Control a pants-specific rust toolchain.
+function ensure_build_prerequisites() {
+  # Control a pants-specific rust toolchain, optionally ensuring the given target toolchain is
+  # installed.
+  local readonly target=$1
+
   export CARGO_HOME=${CACHE_ROOT}/rust-toolchain
   export RUSTUP_HOME=${CARGO_HOME}
 
@@ -40,26 +43,49 @@ function ensure_prerequisites() {
     rm -f ${rustup}
     ${RUSTUP_HOME}/bin/rustup override set stable 1>&2
   fi
+
+  if [[ -n "${target}" ]]
+  then
+    if ! ${RUSTUP_HOME}/bin/rustup target list | grep -E "${target} \((default|installed)\)" &> /dev/null
+    then
+      ${RUSTUP_HOME}/bin/rustup target add ${target}
+    fi
+  fi
+}
+
+function build_native_code() {
+  # Builds the native code, optionally taking an explicit target triple arg, and echos the path of
+  # the built binary.
+  local readonly target=$1
+  ensure_build_prerequisites ${target}
+
+  local readonly cargo="${CARGO_HOME}/bin/cargo"
+  local readonly build_cmd="${cargo} build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}"
+  if [[ -z "${target}" ]]
+  then
+    ${build_cmd} || die
+    echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+  else
+    ${build_cmd} --target ${target} || echo "FAILED to build for target ${target}"
+    echo "${NATIVE_ROOT}/target/${target}/${MODE}/libengine.${LIB_EXTENSION}"
+  fi
 }
 
 function bootstrap_native_code() {
-  # Bootstraps the native code and sets overwrites the native_engine_version to the resulting hash
+  # Bootstraps the native code and overwrites the native_engine_version to the resulting hash
   # version if needed.
-
-  ensure_prerequisites
-
   local native_engine_version="$(calculate_current_hash)"
   local target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
   if [ ! -f "${target_binary}" ]
   then
-    ${CARGO_HOME}/bin/cargo build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG} || die
+    local readonly native_binary="$(build_native_code)"
 
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
     target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
 
-    mkdir -p $(dirname ${target_binary})
-    cp ${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION} ${target_binary}
+    mkdir -p "$(dirname ${target_binary})"
+    cp "${native_binary}" ${target_binary}
 
     # NB: The resource file emitted/over-written below is used by the `Native` subsystem to default
     # the native engine library version used by pants. More info can be read here:
