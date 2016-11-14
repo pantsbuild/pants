@@ -24,7 +24,6 @@ from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailur
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
