@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.base.deprecated import deprecated
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
@@ -39,17 +40,19 @@ class ScalaJSTarget(object):
     return False
 
   @property
+  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def fatal_warnings(self):
     return False
 
   @property
+  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def zinc_file_manager(self):
     return False
 
   @property
   def compile_options(self):
     return []
-  
+
   @property
   def platform(self):
     return JvmPlatform.global_instance().get_platform_for_target(self)

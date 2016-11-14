@@ -12,6 +12,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField
 from pants.build_graph.resources import Resources
@@ -81,6 +82,8 @@ class JvmTarget(Target, Jarable):
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
 
+    deprecated_conditional(fatal_warnings or zinc_file_manager,'1.4.0',
+      'Please use compile_options.')
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
@@ -112,6 +115,7 @@ class JvmTarget(Target, Jarable):
     return self.payload.strict_deps
 
   @property
+  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def fatal_warnings(self):
     """If set, overrides the platform's default fatal_warnings setting.
 
@@ -121,6 +125,7 @@ class JvmTarget(Target, Jarable):
     return self.payload.fatal_warnings
 
   @property
+  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def zinc_file_manager(self):
     """If false, the default file manager will be used instead of the zinc provided one.
 
