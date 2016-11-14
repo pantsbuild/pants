@@ -8,16 +8,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import operator
 
 
-_identity = lambda x: x
+_MODIFIER_FUNC = {
+  '+': lambda x: x,
+  '-': operator.not_
+}
 
 
-def _extract_modifier(modified_param):
+def extract_modifier(modified_param):
   if modified_param.startswith('+'):
-    return _identity, modified_param[1:]
+    return '+', modified_param[1:]
   elif modified_param.startswith('-'):
-    return operator.not_, modified_param[1:]
+    return '-', modified_param[1:]
   else:
-    return _identity, modified_param
+    return '+', modified_param
 
 
 def create_filters(predicate_params, predicate_factory):
@@ -48,10 +51,10 @@ def create_filter(predicate_param, predicate_factory):
   """
   # NOTE: Do not inline this into create_filters above. A separate function is necessary
   # in order to capture the different closure on each invocation.
-  modifier, param = _extract_modifier(predicate_param)
+  modifier, param = extract_modifier(predicate_param)
   predicates = map(predicate_factory, param.split(','))
   def filt(x):
-    return modifier(any(map(lambda pred: pred(x), predicates)))
+    return _MODIFIER_FUNC[modifier](any(map(lambda pred: pred(x), predicates)))
   return filt
 
 
