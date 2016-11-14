@@ -118,7 +118,9 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:filtering',
     'src/python/pants/util:memo',
+    'src/python/pants/util:objects',
   ],
 )
 

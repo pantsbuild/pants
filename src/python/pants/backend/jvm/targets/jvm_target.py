@@ -12,6 +12,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField
 from pants.build_graph.resources import Resources
@@ -40,6 +41,8 @@ class JvmTarget(Target, Jarable):
                platform=None,
                strict_deps=None,
                fatal_warnings=None,
+               zinc_file_manager=None,
+               extra_compile_options=None,
                **kwargs):
     """
     :API: public
@@ -69,11 +72,22 @@ class JvmTarget(Target, Jarable):
     :param fatal_warnings: Whether to turn warnings into errors for this target.  If present,
                            takes priority over the language's fatal-warnings option.
     :type fatal_warnings: bool
+    :param zinc_file_manager: Whether to use zinc provided file manager that allows transactional
+                              rollbacks, but in certain cases may conflict with user libraries.
+    :type zinc_file_manager: bool
+    :param extra_compile_options: List of zinc options that reference to compile option settings
+                                  by their names.
+    :type extra_compile_options: list
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
 
+    deprecated_conditional(
+      lambda: fatal_warnings or zinc_file_manager,
+      '1.4.0',
+      'fatal_warnings or zinc_file_manager is set.'
+      'Please use extra_compile_options instead of individual compile flags.')
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
@@ -81,6 +95,8 @@ class JvmTarget(Target, Jarable):
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
+      'zinc_file_manager': PrimitiveField(zinc_file_manager),
+      'extra_compile_options': PrimitiveField(extra_compile_options or []),
     })
     self._resource_specs = self.assert_list(resources, key_arg='resources')
 
@@ -103,6 +119,7 @@ class JvmTarget(Target, Jarable):
     return self.payload.strict_deps
 
   @property
+  @deprecated(removal_version='1.4.0', hint_message='Please use extra_compile_options.')
   def fatal_warnings(self):
     """If set, overrides the platform's default fatal_warnings setting.
 
@@ -110,6 +127,20 @@ class JvmTarget(Target, Jarable):
     :rtype: bool or None
     """
     return self.payload.fatal_warnings
+
+  @property
+  @deprecated(removal_version='1.4.0', hint_message='Please use extra_compile_options.')
+  def zinc_file_manager(self):
+    """If false, the default file manager will be used instead of the zinc provided one.
+
+    :return: See constructor.
+    :rtype: bool or None
+    """
+    return self.payload.zinc_file_manager
+
+  @property
+  def extra_compile_options(self):
+    return self.payload.extra_compile_options
 
   @property
   def platform(self):

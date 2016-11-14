@@ -121,11 +121,15 @@ class JvmCompile(NailgunTaskBase):
 
     register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_enabled_args_default()),
-             help='Extra compiler args to use when fatal warnings are enabled.')
+             help='Extra compiler args to use when fatal warnings are enabled.',
+             removal_version='1.4.0',
+             removal_hint='Please use --compile-zinc-extra-compile-options.')
 
     register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_disabled_args_default()),
-             help='Extra compiler args to use when fatal warnings are disabled.')
+             help='Extra compiler args to use when fatal warnings are disabled.',
+             removal_version='1.4.0',
+             removal_hint='Please use --compile-zinc-extra-compile-options.')
 
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
@@ -251,7 +255,7 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, javac_plugins_to_exclude):
+              log_file, settings, javac_plugins_to_exclude, extra_options):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -266,10 +270,10 @@ class JvmCompile(NailgunTaskBase):
     :param log_file: Where to write logs.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
-    :param fatal_warnings: whether to convert compilation warnings to errors.
     :param javac_plugins_to_exclude: A list of names of javac plugins that mustn't be used in
                                      this compilation, even if requested (typically because
                                      this compilation is building those same plugins).
+    :param extra_options list additional compile options.
     """
     raise NotImplementedError()
 
@@ -477,7 +481,7 @@ class JvmCompile(NailgunTaskBase):
         f.write(text.encode('utf-8'))
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings, fatal_warnings, counter):
+                   log_file, progress_message, settings, counter, extra_options):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -518,7 +522,7 @@ class JvmCompile(NailgunTaskBase):
         # If compiling a plugin, don't try to use it on itself.
         javac_plugins_to_exclude = (t.plugin for t in vts.targets if isinstance(t, JavacPlugin))
         self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings, fatal_warnings, javac_plugins_to_exclude)
+                     log_file, settings, javac_plugins_to_exclude, extra_options)
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -716,7 +720,15 @@ class JvmCompile(NailgunTaskBase):
           safe_rmtree(ctx.classes_dir)
 
         tgt, = vts.targets
-        fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
+
+        extra_options = self._compute_extra_compile_options(tgt, [lambda x: x.fatal_warnings,
+                                                                  lambda x: x.zinc_file_manager])
+        if not extra_options:
+          # TODO remove once we deprecate individual compile options and replace with `--default-extra-compile-options`
+          fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
+          zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
+          extra_options = self._compute_extra_compile_options_deprecated(fatal_warnings, zinc_file_manager)
+
         self._compile_vts(vts,
                           ctx.sources,
                           ctx.analysis_file,
@@ -726,8 +738,8 @@ class JvmCompile(NailgunTaskBase):
                           log_file,
                           progress_message,
                           tgt.platform,
-                          fatal_warnings,
-                          counter)
+                          counter,
+                          extra_options)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.
@@ -846,6 +858,22 @@ class JvmCompile(NailgunTaskBase):
     if target.has_sources('.scala'):
       prop |= selector(ScalaPlatform.global_instance())
     return prop
+
+  def _compute_extra_compile_options_deprecated(self, fatal_warnings=None, zinc_file_manager=None):
+    """TODO remove once we deprecate individual compile options and replace with `--default-extra-compile-options`"""
+    extra_options = []
+    if fatal_warnings is not None:
+      if fatal_warnings:
+        extra_options.extend(self.get_options().fatal_warnings_enabled_args)
+      else:
+        extra_options.extend(self.get_options().fatal_warnings_disabled_args)
+    if zinc_file_manager is not None:
+      if not zinc_file_manager:
+        extra_options.append('-no-zinc-file-manager')
+    return extra_options
+
+  def _compute_extra_compile_options(self, target, selectors):
+    return []
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.

@@ -135,9 +135,9 @@ class BaseZincCompileIntegrationTest(object):
       with self.temporary_workdir() as workdir:
         with self.temporary_cachedir() as cachedir:
           if default_fatal_warnings:
-            arg = '--scala-platform-fatal-warnings'
+            arg = '--compile-zinc-default-extra-compile-options=["+fatal_warnings"]'
           else:
-            arg = '--no-scala-platform-fatal-warnings'
+            arg = '--compile-zinc-default-extra-compile-options=["-fatal_warnings"]'
           pants_run = self.run_test_compile(
               workdir,
               cachedir,
@@ -156,9 +156,11 @@ class BaseZincCompileIntegrationTest(object):
     test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)
 
     test_combination('fatal', default_fatal_warnings=True, expect_success=True,
-      extra_args=['--compile-zinc-fatal-warnings-enabled-args=[\'-C-Werror\']'])
+      extra_args=["--compile-zinc-extra-compile-options={'fatal_warnings': {'+': ['-C-Werror']},"
+                  "'zinc_file_manager': {'-': ['-no-zinc-filemanager']}}"])
     test_combination('fatal', default_fatal_warnings=False, expect_success=False,
-      extra_args=['--compile-zinc-fatal-warnings-disabled-args=[\'-S-Xfatal-warnings\']'])
+      extra_args=["--compile-zinc-extra-compile-options={'fatal_warnings': {'+': ['-S-Xfatal-warnings']},"
+                  "'zinc_file_manager': {'-': ['-no-zinc-filemanager']}}"])
 
   def test_pool_created_for_fresh_compile_but_not_for_valid_compile(self):
     with self.temporary_cachedir() as cachedir, self.temporary_workdir() as workdir:
@@ -173,3 +175,11 @@ class BaseZincCompileIntegrationTest(object):
                             'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
       self.assertNotIn('isolation-zinc-pool-bootstrap', second_run.stdout_data)
+
+  def test_unconfigured_extra_compile_option(self):
+    with self.temporary_cachedir() as cachedir, self.temporary_workdir() as workdir:
+      pants_run = self.run_test_compile(
+        workdir, cachedir, 'examples/src/java/org/pantsbuild/example/hello/greet',
+        extra_args=['--compile-zinc-default-extra-compile-options=["-foo-arg"]'])
+      self.assert_failure(pants_run)
+      self.assertIn('The default compile option foo-arg needs to be defined', pants_run.stdout_data)

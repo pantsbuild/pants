@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.deprecated import deprecated
+
 
 class ZincLanguageMixin(object):
   """A mixin for subsystems for languages compiled with Zinc."""
@@ -20,7 +22,15 @@ class ZincLanguageMixin(object):
 
     register('--fatal-warnings', advanced=True, type=bool,
              fingerprint=True,
-             help='The default for the "fatal_warnings" argument for targets of this language.')
+             help='The default for the "fatal_warnings" argument for targets of this language.',
+             removal_version='1.4.0',
+             removal_hint='Please use --compile-zinc-default-extra-compile-options.')
+
+    register('--zinc-file-manager', advanced=True, default=True, type=bool,
+             fingerprint=True,
+             help='Use zinc provided file manager to ensure transactional rollback.',
+             removal_version='1.4.0',
+             removal_hint='Please use --compile-zinc-default-extra-compile-options.')
 
   @property
   def strict_deps(self):
@@ -30,8 +40,17 @@ class ZincLanguageMixin(object):
     return self.get_options().strict_deps
 
   @property
+  @deprecated(removal_version='1.4.0', hint_message='Please use --compile-zinc-default-extra-compile-options.')
   def fatal_warnings(self):
     """If true, make warnings fatal for targets that do not specify fatal_warnings.
     :rtype: bool
     """
     return self.get_options().fatal_warnings
+
+  @property
+  @deprecated(removal_version='1.4.0', hint_message='Please use --compile-zinc-default-extra-compile-options.')
+  def zinc_file_manager(self):
+    """If false, the default file manager will be used instead of the zinc provided one.
+    :rtype: bool
+    """
+    return self.get_options().zinc_file_manager
