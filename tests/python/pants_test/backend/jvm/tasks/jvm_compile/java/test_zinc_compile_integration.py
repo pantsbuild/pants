@@ -134,9 +134,9 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       with self.temporary_workdir() as workdir:
         with self.temporary_cachedir() as cachedir:
           if default_fatal_warnings:
-            arg = '--java-fatal-warnings'
+            arg = '--compile-zinc-default-extra-compile-options=["+fatal_warnings"]'
           else:
-            arg = '--no-java-fatal-warnings'
+            arg = '--compile-zinc-default-extra-compile-options=["-fatal_warnings"]'
           pants_run = self.run_test_compile(
               workdir,
               cachedir,
@@ -219,5 +219,3 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       with self.temporary_cachedir() as cachedir:
         pants_run = self.run_test_compile(workdir, cachedir, target_spec, clean_all=True)
         self.assertEquals(0, pants_run.returncode)
-
-  def test_
