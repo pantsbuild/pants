@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import textwrap
+from collections import defaultdict
 from contextlib import closing
 from hashlib import sha1
 from xml.etree import ElementTree
@@ -50,10 +51,8 @@ _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 _DEFAULT_ZINC_OPTIONS = {
   'fatal_warnings': {
     '+': ['-S-Xfatal-warnings', '-C-Werror'],
-    '-': []
   },
   'zinc_file_manager': {
-    '+': [],
     '-': ['-no-zinc-file-manager'],
   },
 }
@@ -416,22 +415,17 @@ class BaseZincCompile(JvmCompile):
   class IllegalDefaultCompileOption(TaskError):
     """TODO."""
 
-  def _get_zinc_options(self, options):
-    default_options = {}
-    for option in options:
-      modifier, option_name_configured = extract_modifier(option)
-      if not option_name_configured in _DEFAULT_ZINC_OPTIONS:
+  def _get_zinc_options(self, option_names):
+    zinc_options = self.get_options().zinc_options
+    options = defaultdict(dict)
+    for option_name in option_names:
+      modifier, option_name_configured = extract_modifier(option_name)
+      if not option_name_configured in zinc_options:
         raise self.IllegalDefaultCompileOption("The default compile option {} needs to be defined."
                                                  .format(option_name_configured))
-      if not modifier in _DEFAULT_ZINC_OPTIONS[option_name_configured]:
-        raise self.IllegalDefaultCompileOption("TODO")
-      default_options[option_name_configured] = _DEFAULT_ZINC_OPTIONS[option_name_configured][modifier]
+      options[option_name_configured] = zinc_options[option_name_configured].get(modifier, [])
 
-    for option_name in _DEFAULT_ZINC_OPTIONS:
-      if not option_name in default_options:
-        default_options[option_name] = {}
-
-    return CompileOptions(**default_options)
+    return CompileOptions(**options)
 
   @memoized_property
   def _default_zinc_options(self):
