@@ -219,3 +219,5 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       with self.temporary_cachedir() as cachedir:
         pants_run = self.run_test_compile(workdir, cachedir, target_spec, clean_all=True)
         self.assertEquals(0, pants_run.returncode)
+
+  def test_

@@ -48,7 +48,7 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 # Well known metadata file to register annotation processors with a java 1.6+ compiler.
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
-_DEFAULT_ZINC_OPTIONS = {
+_DEFAULT_EXTRA_COMPILE_OPTIONS = {
   'fatal_warnings': {
     '+': ['-S-Xfatal-warnings', '-C-Werror'],
   },
@@ -58,7 +58,7 @@ _DEFAULT_ZINC_OPTIONS = {
 }
 
 
-class CompileOptions(datatype('CompileOptions', list(_DEFAULT_ZINC_OPTIONS.keys()))):
+class CompileOptions(datatype('CompileOptions', list(_DEFAULT_EXTRA_COMPILE_OPTIONS.keys()))):
   pass
 
 
@@ -193,11 +193,11 @@ class BaseZincCompile(JvmCompile):
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
-    register('--zinc-options', advanced=True, default=_DEFAULT_ZINC_OPTIONS,
+    register('--extra-compile-options', advanced=True, default=_DEFAULT_EXTRA_COMPILE_OPTIONS,
              fingerprint=True, type=dict,
              help='Advanced zinc compile options that can be referred to by name in jvm_targets.')
 
-    register('--default-zinc-options', advanced=True, default=['-fatal_warnings', '+zinc_file_manager'],
+    register('--default-extra-compile-options', advanced=True, default=['-fatal_warnings', '+zinc_file_manager'],
              fingerprint=True, type=list,
              help='Default zinc options.')
 
@@ -423,9 +423,10 @@ class BaseZincCompile(JvmCompile):
   class IllegalDefaultCompileOption(TaskError):
     """TODO."""
 
-  def _get_zinc_options(self, option_names):
-    zinc_options = self.get_options().zinc_options
-    options = defaultdict(dict, [(k, {}) for k in zinc_options])
+  def _get_extra_compile_options(self, option_names):
+    """Get zinc options by translating option names into predefined zinc options."""
+    zinc_options = self.get_options().extra_compile_options
+    options = defaultdict(dict, [(k, {}) for k in _DEFAULT_EXTRA_COMPILE_OPTIONS])
     for option_name in option_names:
       modifier, option_name_configured = extract_modifier(option_name)
       if not option_name_configured in zinc_options:
@@ -438,13 +439,13 @@ class BaseZincCompile(JvmCompile):
 
   @memoized_property
   def _default_zinc_options(self):
-    return self._get_zinc_options(self.get_options().default_zinc_options)
+    return self._get_extra_compile_options(self.get_options().default_extra_compile_options)
 
   def _compute_extra_compile_options(self, target, selector):
-    if not target.compile_options:
+    if not target.extra_compile_options:
       return selector(self._default_zinc_options)
 
-    return selector(self._get_zinc_options(target.compile_options))
+    return selector(self._get_extra_compile_options(target.extra_compile_options))
 
 
 class ZincCompile(BaseZincCompile):

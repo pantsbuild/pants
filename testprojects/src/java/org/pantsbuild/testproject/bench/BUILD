@@ -19,5 +19,5 @@ java_library(name='jmh',
   sources=['JmhBench.java'],
   # Turn off zinc provided file manager, incompatible with jmh.
   # See https://github.com/sbt/zinc/issues/185
-  compile_options=['-zinc_file_manager'],
+  extra_compile_options=['-zinc_file_manager'],
 )

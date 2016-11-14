@@ -50,7 +50,7 @@ class ScalaJSTarget(object):
     return False
 
   @property
-  def compile_options(self):
+  def extra_compile_options(self):
     return []
 
   @property
