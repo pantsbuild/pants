@@ -82,7 +82,10 @@ class JvmTarget(Target, Jarable):
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
 
-    deprecated_conditional(fatal_warnings or zinc_file_manager,'1.4.0',
+    deprecated_conditional(
+      lambda: fatal_warnings or zinc_file_manager,
+      '1.4.0',
+      'fatal_warnings or zinc_file_manager is set.'
       'Please use compile_options.')
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),

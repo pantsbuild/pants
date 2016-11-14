@@ -24,6 +24,7 @@ from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailur
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
@@ -121,11 +122,15 @@ class JvmCompile(NailgunTaskBase):
 
     register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_enabled_args_default()),
-             help='Extra compiler args to use when fatal warnings are enabled.')
+             help='Extra compiler args to use when fatal warnings are enabled.',
+             removal_version='1.4.0',
+             removal_hint='Please use --compile-zinc-zinc-options.')
 
     register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_disabled_args_default()),
-             help='Extra compiler args to use when fatal warnings are disabled.')
+             help='Extra compiler args to use when fatal warnings are disabled.',
+             removal_version='1.4.0',
+             removal_hint='Please use --compile-zinc-zinc-options.')
 
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
@@ -224,11 +229,13 @@ class JvmCompile(NailgunTaskBase):
     return ()
 
   @classmethod
+  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def get_fatal_warnings_enabled_args_default(cls):
     """Override to set default for --fatal-warnings-enabled-args option."""
     return ()
 
   @classmethod
+  @deprecated(removal_version='1.4.0', hint_message='Please use compile_options method.')
   def get_fatal_warnings_disabled_args_default(cls):
     """Override to set default for --fatal-warnings-disabled-args option."""
     return ()

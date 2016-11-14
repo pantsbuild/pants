@@ -156,8 +156,8 @@ class BaseZincCompileIntegrationTest(object):
     test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)
 
     test_combination('fatal', default_fatal_warnings=True, expect_success=True,
-      extra_args=['--compile-zinc-zinc-options={\'fatal_warnings\': {\'+\': [\'-C-Werror\']},'
-                  '\'zinc_file_manager\': {\'-\': [\'-no-zinc-filemanager\']}}'])
+      extra_args=["--compile-zinc-zinc-options={'fatal_warnings': {'+': ['-C-Werror']},"
+                  "'zinc_file_manager': {'-': ['-no-zinc-filemanager']}}"])
     test_combination('fatal', default_fatal_warnings=False, expect_success=False,
       extra_args=["--compile-zinc-zinc-options={'fatal_warnings': {'+': ['-S-Xfatal-warnings']},"
                   "'zinc_file_manager': {'-': ['-no-zinc-filemanager']}}"])
