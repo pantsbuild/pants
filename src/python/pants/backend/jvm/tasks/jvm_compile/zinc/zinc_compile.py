@@ -417,13 +417,14 @@ class BaseZincCompile(JvmCompile):
 
   def _get_zinc_options(self, option_names):
     zinc_options = self.get_options().zinc_options
-    options = defaultdict(dict)
+    options = defaultdict(dict, [(k, {}) for k in zinc_options])
     for option_name in option_names:
       modifier, option_name_configured = extract_modifier(option_name)
       if not option_name_configured in zinc_options:
         raise self.IllegalDefaultCompileOption("The default compile option {} needs to be defined."
                                                  .format(option_name_configured))
       options[option_name_configured] = zinc_options[option_name_configured].get(modifier, [])
+
 
     return CompileOptions(**options)
 

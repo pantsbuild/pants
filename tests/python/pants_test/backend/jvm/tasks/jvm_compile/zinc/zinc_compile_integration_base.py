@@ -135,9 +135,9 @@ class BaseZincCompileIntegrationTest(object):
       with self.temporary_workdir() as workdir:
         with self.temporary_cachedir() as cachedir:
           if default_fatal_warnings:
-            arg = '--scala-platform-fatal-warnings'
+            arg = '--compile-zinc-default-zinc-options=["+fatal_warnings"]'
           else:
-            arg = '--no-scala-platform-fatal-warnings'
+            arg = '--compile-zinc-default-zinc-options=["-fatal_warnings"]'
           pants_run = self.run_test_compile(
               workdir,
               cachedir,
@@ -156,9 +156,11 @@ class BaseZincCompileIntegrationTest(object):
     test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)
 
     test_combination('fatal', default_fatal_warnings=True, expect_success=True,
-      extra_args=['--compile-zinc-fatal-warnings-enabled-args=[\'-C-Werror\']'])
+      extra_args=['--compile-zinc-zinc-options={\'fatal_warnings\': {\'+\': [\'-C-Werror\']},'
+                  '\'zinc_file_manager\': {\'-\': [\'-no-zinc-filemanager\']}}'])
     test_combination('fatal', default_fatal_warnings=False, expect_success=False,
-      extra_args=['--compile-zinc-fatal-warnings-disabled-args=[\'-S-Xfatal-warnings\']'])
+      extra_args=["--compile-zinc-zinc-options={'fatal_warnings': {'+': ['-S-Xfatal-warnings']},"
+                  "'zinc_file_manager': {'-': ['-no-zinc-filemanager']}}"])
 
   def test_pool_created_for_fresh_compile_but_not_for_valid_compile(self):
     with self.temporary_cachedir() as cachedir, self.temporary_workdir() as workdir:
