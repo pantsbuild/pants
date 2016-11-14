@@ -47,5 +47,9 @@ class ScalaJSTarget(object):
     return False
 
   @property
+  def compile_options(self):
+    return []
+  
+  @property
   def platform(self):
     return JvmPlatform.global_instance().get_platform_for_target(self)
