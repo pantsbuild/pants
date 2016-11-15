@@ -338,14 +338,19 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def mock_buildroot(self):
     """Construct a mock buildroot and return a helper object for interacting with it."""
     Manager = namedtuple('Manager', 'write_file pushd dir')
-    # N.B. BUILD.tools needs to be copied vs symlinked to avoid a symlink prefix check error.
+    # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
+    # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)
     files_to_link = ('pants', 'pants.ini', 'pants.travis-ci.ini', '.pants.d',
-                     'build-support', '3rdparty', 'pants-plugins', 'src', 'contrib')
+                     'build-support', 'pants-plugins', 'src')
+    dirs_to_copy = ('contrib', '3rdparty')
 
     with self.temporary_workdir() as tmp_dir:
       for filename in files_to_copy:
         shutil.copy(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
+
+      for dirname in dirs_to_copy:
+        shutil.copytree(os.path.join(get_buildroot(), dirname), os.path.join(tmp_dir, dirname))
 
       for filename in files_to_link:
         os.symlink(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
