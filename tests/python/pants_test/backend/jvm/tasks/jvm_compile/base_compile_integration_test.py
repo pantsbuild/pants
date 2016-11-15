@@ -68,7 +68,8 @@ class BaseCompileIT(PantsRunIntegrationTest):
     """
     :API: public
     """
-    # Use the provided cacheurl for all artifacts except for bootstrap.
+    # Use the provided cacheurl for all artifacts except for bootstrap,
+    # because bootstrapping is expensive.
     bootstrap_cache_dir = global_subsystem_instance(CacheSetup).get_options().write_to
 
     def format_str_list(lst):
