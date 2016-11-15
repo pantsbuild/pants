@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pex.pex_info import PexInfo
+from scoot import client_lib
 from six import StringIO
 from six.moves import configparser
 
@@ -94,6 +95,8 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
+    register('--scoot', type=bool, default=False,
+             help='Run test through scoot')
     register('--fast', type=bool, default=True,
              help='Run all tests in a single chroot. If turned off, each test target will '
                   'create a new chroot, which will be much slower, but more correct, as the'
@@ -430,7 +433,11 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
                                             workunit) as coverage_args:
           yield pex, shard_args + junit_args + coverage_args
 
-  def _do_run_tests_with_args(self, pex, workunit, args):
+  def _do_run_tests_with_args(self, pex, workunit, args, sources):
+    if self.get_options().scoot:
+      rc = self.invoke_scoot([(pex, args, sources)], workunit)
+      return PythonTestResult.rc(rc)
+    args.extend(sources)
     try:
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
@@ -511,7 +518,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     with self._test_runner(targets, workunit) as (pex, test_args):
 
       def run_and_analyze(resultlog_path):
-        result = self._do_run_tests_with_args(pex, workunit, args)
+        result = self._do_run_tests_with_args(pex, workunit, args, sources)
         failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
         return result.with_failed_targets(failed_targets)
 
@@ -528,7 +535,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       for options in self.get_options().options + self.get_passthru_args():
         args.extend(safe_shlex_split(options))
       args.extend(test_args)
-      args.extend(sources)
+      # args.extend(sources)
 
       # The user might have already specified the resultlog option. In such case, reuse it.
       resultlog_arg = _extract_resultlog_filename(args)
@@ -555,3 +562,49 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
                                stderr=workunit.output('stderr'))
 
     return SubprocessProcessHandler(process)
+
+  def invoke_scoot(self, pex_args_list, workunit):
+    # pex_args_list is a list of (pex, args, sources) tuples
+    if not client_lib.is_started():
+      client_lib.start()
+
+    run_id_to_cmd = dict()
+
+    for pex, args, sources in pex_args_list:
+      with temporary_dir() as tmp:
+        cmd = []
+        cmd.append('python')
+        cmd.append(os.path.basename(pex._pex))
+        # Skip result log as scoot does not support this yet.
+        cmd.extend(args[1:])
+
+        shutil.copytree(pex._pex, os.path.join(tmp, os.path.basename(pex._pex)))
+
+        for src in sources:
+          if not src.startswith('-'):
+            shutil.copyfile(src, os.path.join(tmp, os.path.basename(src)))
+            cmd.append(os.path.basename(src))
+
+        # After https://github.com/scootdev/scoot/pull/166, "tmp" will be enough.
+        pex_id = client_lib.create_snapshot(os.path.join(tmp, '*'))
+        run_id = client_lib.run(pex_id, cmd)
+        run_id_to_cmd[run_id] = cmd
+
+    ret = 0
+    while run_id_to_cmd:
+      results = client_lib.poll(run_id_to_cmd.keys(), -1)
+      for scoot_status in results:
+        cmd = run_id_to_cmd[scoot_status.run_id]
+        del run_id_to_cmd[scoot_status.run_id]
+        with temporary_dir() as snapshot_dir:
+          client_lib.checkout_snapshot(scoot_status.snapshot_id, snapshot_dir)
+          if scoot_status.exit_code != 0:
+            # Here we only return the last failed exit_code. As long as it is not 0, it should be ok.
+            ret = scoot_status.exit_code
+            workunit.output('stderr').write('Test {} failed'.format(cmd[-1]))
+            workunit.output('stderr').write(open(os.path.join(snapshot_dir, 'STDERR')).read())
+            workunit.output('stderr').write(open(os.path.join(snapshot_dir, 'STDOUT')).read())
+          else:
+            workunit.output('stdout').write('Test {} passed'.format(cmd[-1]))
+            workunit.output('stdout').write(open(os.path.join(snapshot_dir, 'STDOUT')).read())
+    return ret
