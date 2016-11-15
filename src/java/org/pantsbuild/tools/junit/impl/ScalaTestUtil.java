@@ -17,7 +17,7 @@ public final class ScalaTestUtil {
           true, clazz.getClassLoader());
       return (Runner)junitRunnerClass.getConstructor(Class.class).newInstance(clazz);
     } catch (Exception e) {
-      // debatable what to do here.  isScalaTest should fail if scala test isn't available so this is probably ok.
+      // isScalaTest should fail if scala test isn't available so this is probably ok.
       throw new RuntimeException(e);
     }
   }
