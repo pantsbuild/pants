@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import pkg_resources
 from cffi import FFI
 from twitter.common.collections import OrderedSet
 
@@ -347,13 +348,17 @@ class Native(object):
     def subsystem_dependencies(cls):
       return (BinaryUtil.Factory,)
 
+    @staticmethod
+    def _default_native_engine_version():
+      return pkg_resources.resource_string(__name__, 'native_engine_version').strip()
+
     @classmethod
     def register_options(cls, register):
-      register('--version', advanced=True, default='0.0.1',
+      register('--version', advanced=True, default=cls._default_native_engine_version(),
                help='Native engine version.')
       register('--supportdir', advanced=True, default='bin/native-engine',
-               help='Find native engine binaries under this dir. Used as part of the path to lookup '
-                    'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
+               help='Find native engine binaries under this dir. Used as part of the path to '
+                    'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
       register('--visualize-to', default=None, type=dir_option,
                help='A directory to write execution graphs to as `dot` files. The contents '
                     'of the directory will be overwritten if any filenames collide.')
