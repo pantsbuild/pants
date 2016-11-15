@@ -11,6 +11,7 @@ java_library(
     '3rdparty:guava',
     '3rdparty:junit',
     '3rdparty/jvm/org/hamcrest:hamcrest-core',
+    '3rdparty/jvm/org/mockito:mockito-core',
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit',
   ],
