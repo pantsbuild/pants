@@ -4,6 +4,173 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0dev1 (11/16/2016)
+----------------------
+
+There has been a month gap between master releases and a corresponding large number of
+changes. Most notably:
+
+* Pants now ships with a new native engine core that is the future of pants scalability work.
+
+* Pants has adopted a `code of conduct
+  <https://github.com/pantsbuild/pants/blob/master/CODE_OF_CONDUCT.md>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Make findbugs task not transitive by default and modify findbugs progress output
+  `RB #4376 <https://rbcommons.com/s/twitter/r/4376>`_
+
+* Adding a Code of Conduct
+  `RB #4354 <https://rbcommons.com/s/twitter/r/4354>`_
+
+* Surface --dereference-symlinks flag to task caching level
+  `RB #4338 <https://rbcommons.com/s/twitter/r/4338>`_
+
+* support mutually_exclusive_group paramater in option registration
+  `RB #4336 <https://rbcommons.com/s/twitter/r/4336>`_
+
+* Deprecate the `java_tests` alias in favor of `junit_tests`.
+  `RB #4322 <https://rbcommons.com/s/twitter/r/4322>`_
+
+* Add a target-types option to scalafmt to avoid formatting all targets
+  `RB #4328 <https://rbcommons.com/s/twitter/r/4328>`_
+
+* Adding scalafmt formatting to fmt goal
+  `RB #4312 <https://rbcommons.com/s/twitter/r/4312>`_
+
+Bugfixes
+~~~~~~~~
+
+* Capture testcase for unknown test failures in the JUnit Xml
+  `RB #4377 <https://rbcommons.com/s/twitter/r/4377>`_
+
+* Correction on [resolve.node]
+  `RB #4362 <https://rbcommons.com/s/twitter/r/4362>`_
+  `RB #4364 <https://rbcommons.com/s/twitter/r/4364>`_
+
+* Remove safe_mkdir on results_dir in [resolve.node]
+  `RB #4362 <https://rbcommons.com/s/twitter/r/4362>`_
+
+* Improve python_binary target fingerprinting.
+  `RB #4353 <https://rbcommons.com/s/twitter/r/4353>`_
+
+* Bugfix: when synthesizing remote libraries in Go, pin them to the same rev as adjacent libs.
+  `RB #4325 <https://rbcommons.com/s/twitter/r/4325>`_
+
+* Fix the SetupPy target ownership check.
+  `RB #4315 <https://rbcommons.com/s/twitter/r/4315>`_
+
+* Update junit runner to 1.0.15 to get java 7 compatibility
+  `RB #4324 <https://rbcommons.com/s/twitter/r/4324>`_
+
+* Fix erroneous deprecated scope warnings.
+  `RB #4323 <https://rbcommons.com/s/twitter/r/4323>`_
+
+* Back down the minimum required java version for running Pants tools to java 7
+  `RB #4127 <https://rbcommons.com/s/twitter/r/4127>`_
+  `RB #4253 <https://rbcommons.com/s/twitter/r/4253>`_
+  `RB #4314 <https://rbcommons.com/s/twitter/r/4314>`_
+
+* Fix exlucde_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
+  `RB #4321 <https://rbcommons.com/s/twitter/r/4321>`_
+
+* Prevent cleanup error at end of pants test with --test-junit-html-report option, update safe_rmtree to be symlink aware
+  `RB #4319 <https://rbcommons.com/s/twitter/r/4319>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump junit-runner to 1.0.16
+  `RB #4381 <https://rbcommons.com/s/twitter/r/4381>`_
+
+* Patch to make scala tests work
+  `RB #4361 <https://rbcommons.com/s/twitter/r/4361>`_
+
+* Kill un-used `pants.jenkins.ini`.
+  `RB #4369 <https://rbcommons.com/s/twitter/r/4369>`_
+
+* Kill unused Jenkins experiment.
+  `RB #4366 <https://rbcommons.com/s/twitter/r/4366>`_
+
+* Split test_zinc_compile_integration into two smaller tests
+  `RB #4365 <https://rbcommons.com/s/twitter/r/4365>`_
+
+* Upgrade zinc's sbt dependency to 1.0.0: JVM portion
+  `Issue #144 <https://github.com/sbt/zinc/issues/144>`_
+  `Issue #151 <https://github.com/sbt/zinc/issues/151>`_
+  `Issue #185 <https://github.com/sbt/zinc/issues/185>`_
+  `RB #3658 <https://rbcommons.com/s/twitter/r/3658>`_
+  `RB #4342 <https://rbcommons.com/s/twitter/r/4342>`_
+  `RB #4340 <https://rbcommons.com/s/twitter/r/4340>`_
+
+* Perf improvement: rebase analyis file once instead of multiple times
+  `Issue #8 <https://github.com/pantsbuild/zincutils/issues/8>`_
+  `RB #4352 <https://rbcommons.com/s/twitter/r/4352>`_
+
+* Leverage default sources where possible.
+  `RB #4358 <https://rbcommons.com/s/twitter/r/4358>`_
+
+* [python-ng] A task to select a python interpreter.
+  `RB #4346 <https://rbcommons.com/s/twitter/r/4346>`_
+
+* Parallize thrift linter
+  `RB #4351 <https://rbcommons.com/s/twitter/r/4351>`_
+
+* normalize filespec exclude usage
+  `RB #4348 <https://rbcommons.com/s/twitter/r/4348>`_
+
+* clean up deprecated global_subsystems and task_subsystems
+  `RB #4349 <https://rbcommons.com/s/twitter/r/4349>`_
+
+* [jvm-compile] Ensure all invalid dependencies of targets are correctly represented in compile graph
+  `RB #4136 <https://rbcommons.com/s/twitter/r/4136>`_
+  `RB #4343 <https://rbcommons.com/s/twitter/r/4343>`_
+
+* Change default ./pants fmt.isort <empty> behavior to no-op; Add sources check for isort.
+  `RB #4327 <https://rbcommons.com/s/twitter/r/4327>`_
+
+* Allow targets to have sensible defaults for sources=.
+  `RB #4300 <https://rbcommons.com/s/twitter/r/4300>`_
+
+* Remove the long-deprecated Target.is_codegen().
+  `RB #4318 <https://rbcommons.com/s/twitter/r/4318>`_
+
+* Add one more shard to travis ci
+  `RB #4320 <https://rbcommons.com/s/twitter/r/4320>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Revert "Revert "Generate 32 bit native engine binaries.""
+  `RB #4380 <https://rbcommons.com/s/twitter/r/4380>`_
+  `Issue #4035 <https://github.com/pantsbuild/pants/issues/4035>`_
+
+* Add contrib, 3rdparty to copy list for mock buildroot as v2 engine to pass prefix checks.
+  `RB #4379 <https://rbcommons.com/s/twitter/r/4379>`_
+
+* Generate 32 bit native engine binaries.
+  `RB #4373 <https://rbcommons.com/s/twitter/r/4373>`_
+
+* Add support for publishing for OSX 10.7+.
+  `RB #4371 <https://rbcommons.com/s/twitter/r/4371>`_
+
+* Wire up native binary deploy to bintray.
+  `RB #4370 <https://rbcommons.com/s/twitter/r/4370>`_
+
+* Re-work native engine version.
+  `RB #4367 <https://rbcommons.com/s/twitter/r/4367>`_
+
+* First round of native engine feedback
+  `Issue #4020 <https://github.com/pantsbuild/pants/issues/4020>`_
+  `RB #4270 <https://rbcommons.com/s/twitter/r/4270>`_
+  `RB #4359 <https://rbcommons.com/s/twitter/r/4359>`_
+
+* [engine] Native scheduler implementation
+  `RB #4270 <https://rbcommons.com/s/twitter/r/4270>`_
+
+* Bootstrap the native engine from live sources.
+  `RB #4345 <https://rbcommons.com/s/twitter/r/4345>`_
 
 1.3.0dev0 (10/14/2016)
 ----------------------
