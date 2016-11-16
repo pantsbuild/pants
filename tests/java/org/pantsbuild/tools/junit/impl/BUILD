@@ -12,6 +12,7 @@ java_tests(
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit',
     'tests/java/org/pantsbuild/tools/junit/lib:test-dep',
+    'tests/scala/org/pantsbuild/tools/junit/lib:scala-test-dep',
   ],
   sources=globs('*Test.java'),
   timeout=180,
