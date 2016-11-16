@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
 from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
@@ -102,6 +102,9 @@ class LocalScheduler(object):
       Address: select_product,
       AscendantAddresses: select_product,
       DescendantAddresses: select_product,
+      #select_dep_addrs = lambda product: SelectDependencies(product, Addresses, field_types=(Address, BuildFileAddress, ))
+      Address: select_product,
+      BuildFileAddress: select_product,
       PathGlobs: select_product,
       SiblingAddresses: select_product,
       SingleAddress: select_product,
