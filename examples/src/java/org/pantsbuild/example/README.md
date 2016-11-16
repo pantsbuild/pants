@@ -72,8 +72,9 @@ especially relevant.
 > dependencies and would import and test their code.
 >
 > Pants also includes support for using the ScalaTest framework.  The
-> testing framework automatically picks up scala tests and runs them
-> using the junit runner.
+> testing framework automatically picks up scala tests that extend the
+> org.scalatest.Suite class and runs them
+> using org.scalatest.junit.JUnitRunner.
 >
 > Most other scala test frameworks support running with JUnit via a base
 > class/trait or via a `@RunWith` annotation; so you can use
