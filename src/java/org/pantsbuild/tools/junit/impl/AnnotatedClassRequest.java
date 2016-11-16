@@ -8,8 +8,6 @@ import java.io.PrintStream;
 import org.junit.internal.requests.ClassRequest;
 import org.junit.runner.Runner;
 
-import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
-
 /**
  * A ClassRequest that exposes the wrapped class. Also used to support retrying
  * flaky tests via AllDefaultPossibilitiesBuilderWithRetry, that in turn gives us
@@ -40,6 +38,6 @@ public class AnnotatedClassRequest extends ClassRequest {
   @Override
   public Runner getRunner() {
     return new
-        AllDefaultPossibilitiesBuilderWithRetry(numRetries, err).safeRunnerForClass(testClass);
+        CustomAnnotationBuilder(numRetries, err).safeRunnerForClass(testClass);
   }
 }

@@ -345,6 +345,12 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   }
 
   @Test
+  public void testMockScalaTest() throws Exception {
+    invokeConsoleRunner("MockScalaTest");
+    assertEquals("MockScalaTest-1", TestRegistry.getCalledTests());
+  }
+
+  @Test
   public void testNotATestNoPublicConstructor() throws Exception {
     // This class contains no public constructor. The test runner should ignore
     invokeConsoleRunner("NotATestNoPublicConstructor");
@@ -383,6 +389,13 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   public void testNotATestInterface() throws Exception {
     // This class is abstract, test runner should ignore
     invokeConsoleRunner("NotATestInterface");
+    assertEquals("", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testNotATestScalaClass() throws Exception {
+    // This class is a basic scala class, test runner should ignore
+    invokeConsoleRunner("NotAScalaTest");
     assertEquals("", TestRegistry.getCalledTests());
   }
 
