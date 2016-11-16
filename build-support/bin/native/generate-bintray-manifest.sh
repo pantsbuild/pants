@@ -2,11 +2,12 @@
 
 readonly REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
-# Exports:
+# Indirectly exports:
 # + LIB_EXTENSION: The extension of native libraries.
 # + OS_NAME: The name of the OS as seen by pants.
 # + OS_ID: The ID of the current OS as seen by pants.
-source ${REPO_ROOT}/build-support/bin/native/detect_os.sh
+# Exposes `build_native_code` for building target-specific native engine binaries.
+source ${REPO_ROOT}/build-support/bin/native/bootstrap.sh
 
 # Bump this when there is a new OSX released:
 readonly OSX_MAX_VERSION=12
@@ -74,12 +75,16 @@ EOF
 }
 
 function emit_linux_files() {
-  # TODO(John Sirois): We should either have a 32 bit linux node, or use docker to get this or
-  # use rustup to install a 32 bit rust platfrm and generate a second binary.
+  native_engine_32="$(build_native_code i686-unknown-linux-gnu)"
+  native_engine_64="$(build_native_code x86_64-unknown-linux-gnu)"
   cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
     {
-      "includePattern": "${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine",
-      "uploadPattern": "build-support/bin/native-engine/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine"
+      "includePattern": "${native_engine_32}",
+      "uploadPattern": "build-support/bin/native-engine/linux/i386/${NATIVE_ENGINE_VERSION}/native-engine"
+    },
+    {
+      "includePattern": "${native_engine_64}",
+      "uploadPattern": "build-support/bin/native-engine/linux/x86_64/${NATIVE_ENGINE_VERSION}/native-engine"
     }
 EOF
 }
