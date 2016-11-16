@@ -35,9 +35,9 @@ class FindBugs(NailgunTask):
     super(FindBugs, cls).register_options(register)
 
     register('--skip', type=bool, help='Skip findbugs.')
-    register('--transitive', default=True, type=bool,
-             help='Run findbugs against transitive dependencies. Disable to run findbugs only on '
-                  'targets specified on the command line.')
+    register('--transitive', default=False, type=bool,
+             help='Run findbugs against transitive dependencies of targets specified on '
+                  'the command line.')
     register('--effort', default='default', fingerprint=True,
              choices=['min', 'less', 'default', 'more', 'max'],
              help='Effort of the bug finders.')
@@ -109,12 +109,20 @@ class FindBugs(NailgunTask):
       invalidate_deps=False
 
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
+    target_count = 0
     with self.invalidated(targets, invalidate_dependents=invalidate_deps) as invalidation_check:
+      total_targets = len(invalidation_check.invalid_vts)
       for vt in invalidation_check.invalid_vts:
+        target_count += 1
+        self.context.log.info('[{}/{}] {}'.format(
+          str(target_count).rjust(len(str(total_targets))),
+          total_targets,
+          vt.target.address.spec))
+
         target_bug_counts = self.findbugs(vt.target)
         if not self.get_options().fail_on_error or sum(target_bug_counts.values()) == 0:
           vt.update()
-        bug_counts = {k: bug_counts.get(k,0) + target_bug_counts.get(k,0) for k in bug_counts.keys()}
+        bug_counts = {k: bug_counts.get(k, 0) + target_bug_counts.get(k, 0) for k in bug_counts.keys()}
 
       error_count = bug_counts.pop('error', 0)
       bug_counts['total'] = sum(bug_counts.values())
@@ -138,7 +146,7 @@ class FindBugs(NailgunTask):
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
 
     if not target_jars:
-      self.context.log.info('No jars to be analyzed')
+      self.context.log.info('  No jars to be analyzed')
       return bug_counts
 
     output_dir = os.path.join(self.workdir, target.id)
@@ -178,7 +186,6 @@ class FindBugs(NailgunTask):
                           args=args,
                           workunit_name='findbugs',
                           workunit_labels=[WorkUnitLabel.PREP])
-    self.context.log.info(target.address.spec)
     if result != 0:
       raise TaskError('java {main} ... exited non-zero ({result})'.format(
           main=self._FINDBUGS_MAIN, result=result))
@@ -204,7 +211,6 @@ class FindBugs(NailgunTask):
         priority=priority,
         type=bug_instance.getAttribute('type'),
         desc=bug_instance.getElementsByTagName('LongMessage')[0].firstChild.data,
-        src=source_line.getAttribute('classname'),
         line=source_line.getElementsByTagName('Message')[0].firstChild.data))
 
     return bug_counts
