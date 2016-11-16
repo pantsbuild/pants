@@ -12,6 +12,7 @@ import traceback
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer
 
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.util.contextutil import maybe_profiled
 from pants.util.socket import RecvBufferedSocket
 
 
@@ -75,8 +76,9 @@ class PailgunHandler(PailgunHandlerBase):
     # Instruct the client to send stdin (if applicable).
     NailgunProtocol.send_start_reading_input(self.request)
 
-    # Execute the requested command.
-    self._run_pants(self.request, arguments, environment)
+    # Execute the requested command with optional daemon-side profiling.
+    with maybe_profiled(environment.get('PANTSD_PROFILE')):
+      self._run_pants(self.request, arguments, environment)
 
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""

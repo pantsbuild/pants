@@ -9,17 +9,26 @@ from unittest import expectedFailure
 
 from pants.core_tasks.list_goals import ListGoals
 from pants.goal.goal import Goal
+from pants.goal.task_registrar import TaskRegistrar
+from pants.task.task import Task
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class ListGoalsTest(ConsoleTaskTestBase):
+  class NoopTask(Task):
+    def execute(self):
+      pass
+
   _INSTALLED_HEADER = 'Installed goals:'
   _UNDOCUMENTED_HEADER = 'Undocumented goals:'
   _LIST_GOALS_NAME = 'goals'
   _LIST_GOALS_DESC = 'List available goals.'
+  _LIST_GOALS_TASK = TaskRegistrar('list-goals', NoopTask)
   _LLAMA_NAME = 'llama'
   _LLAMA_DESC = 'With such handsome fiber, no wonder everyone loves Llamas.'
+  _LLAMA_TASK = TaskRegistrar('winamp', NoopTask)
   _ALPACA_NAME = 'alpaca'
+  _ALPACA_TASK = TaskRegistrar('alpaca', NoopTask)
 
   @classmethod
   def task_type(cls):
@@ -29,20 +38,24 @@ class ListGoalsTest(ConsoleTaskTestBase):
     Goal.clear()
     self.assert_console_output(self._INSTALLED_HEADER)
 
-    Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
+    # Goals with no tasks should always be elided.
+    list_goals_goal = Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
+    self.assert_console_output(self._INSTALLED_HEADER)
+
+    list_goals_goal.install(self._LIST_GOALS_TASK)
     self.assert_console_output(
       self._INSTALLED_HEADER,
       '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
     )
 
-    Goal.register(self._LLAMA_NAME, self._LLAMA_DESC)
+    Goal.register(self._LLAMA_NAME, self._LLAMA_DESC).install(self._LLAMA_TASK)
     self.assert_console_output(
       self._INSTALLED_HEADER,
       '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
       '  {0}: {1}'.format(self._LLAMA_NAME, self._LLAMA_DESC),
     )
 
-    Goal.register(self._ALPACA_NAME, description='')
+    Goal.register(self._ALPACA_NAME, description='').install(self._ALPACA_TASK)
     self.assert_console_output(
       self._INSTALLED_HEADER,
       '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
@@ -52,14 +65,16 @@ class ListGoalsTest(ConsoleTaskTestBase):
   def test_list_goals_all(self):
     Goal.clear()
 
-    Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
+    Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC).install(self._LIST_GOALS_TASK)
+
+    # Goals with no tasks should always be elided.
     Goal.register(self._LLAMA_NAME, self._LLAMA_DESC)
-    Goal.register(self._ALPACA_NAME, description='')
+
+    Goal.register(self._ALPACA_NAME, description='').install(self._ALPACA_TASK)
 
     self.assert_console_output(
       self._INSTALLED_HEADER,
       '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
-      '  {0}: {1}'.format(self._LLAMA_NAME, self._LLAMA_DESC),
       '',
       self._UNDOCUMENTED_HEADER,
       '  {0}'.format(self._ALPACA_NAME),
@@ -72,9 +87,8 @@ class ListGoalsTest(ConsoleTaskTestBase):
   def test_list_goals_graph(self):
     Goal.clear()
 
-
-    Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
-    Goal.register(self._LLAMA_NAME, self._LLAMA_DESC)
+    Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC).install(self._LIST_GOALS_TASK)
+    Goal.register(self._LLAMA_NAME, self._LLAMA_DESC).install(self._LLAMA_TASK)
     Goal.register(self._ALPACA_NAME, description='')
 
     self.assert_console_output(

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.source_root import SourceRootConfig
 from pants_test.base_test import BaseTest
@@ -22,7 +22,7 @@ class MavenLayoutTest(BaseTest):
     return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
-        'junit_tests': JavaTests,
+        'junit_tests': JUnitTests,
       },
     )
 

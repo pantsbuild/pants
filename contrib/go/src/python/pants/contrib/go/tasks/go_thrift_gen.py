@@ -38,14 +38,6 @@ class GoThriftGen(SimpleCodegenTask):
              help='Use this thrift import on symbolic defs.')
 
   @classmethod
-  def global_subsystems(cls):
-    return super(GoThriftGen, cls).global_subsystems() + (ThriftDefaults,)
-
-  @classmethod
-  def task_subsystems(cls):
-    return super(GoThriftGen, cls).task_subsystems() + (ThriftBinary.Factory,)
-
-  @classmethod
   def subsystem_dependencies(cls):
     return (super(GoThriftGen, cls).subsystem_dependencies() +
             (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))

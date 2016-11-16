@@ -21,7 +21,9 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
@@ -38,13 +40,16 @@ class TestSetupPy(PythonTaskTestBase):
     super(TestSetupPy, self).setUp()
     distdir = os.path.join(self.build_root, 'dist')
     self.set_options(pants_distdir=distdir)
+    init_subsystem(Target.Arguments)
 
     self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
 
   @property
   def alias_groups(self):
-    resources = BuildFileAliases(targets={'resources': Resources})
-    return super(TestSetupPy, self).alias_groups.merge(resources)
+    extra_aliases = BuildFileAliases(targets={'prep_command': PrepCommand,
+                                              'resources': Resources,
+                                              'target': Target})
+    return super(TestSetupPy, self).alias_groups.merge(extra_aliases)
 
   def create_dependencies(self, depmap):
     target_map = {}
@@ -305,7 +310,7 @@ class TestSetupPy(PythonTaskTestBase):
 
   def test_ambiguous_owner(self):
     self.create_python_library(relpath='foo/bar', name='bar')
-    self.create_file(relpath=self.build_path('foo'), contents=dedent("""
+    self.add_to_build_file('foo', dedent("""
     python_library(
       name='foo1',
       dependencies=[
@@ -335,7 +340,7 @@ class TestSetupPy(PythonTaskTestBase):
       self.dependency_calculator.reduced_dependencies(self.target('foo:foo2'))
 
   @contextmanager
-  def extracted_sdist(src, sdist, expected_prefix, collect_suffixes=None):
+  def extracted_sdist(self, sdist, expected_prefix, collect_suffixes=None):
     collect_suffixes = collect_suffixes or ('.py',)
 
     def collect(path):
@@ -549,6 +554,56 @@ class TestSetupPy(PythonTaskTestBase):
         self.assertTrue(os.path.exists(requirements))
         with open(requirements) as fp:
           self.assertEqual('test.exported==0.0.0', fp.read().strip())
+
+  def test_prep_command_case(self):
+    PrepCommand.add_allowed_goal('compile')
+    PrepCommand.add_allowed_goal('test')
+    self.add_to_build_file('build-support/thrift',
+                           dedent("""
+                           prep_command(
+                             name='prepare_binary_compile',
+                             goal='compile',
+                             prep_executable='/bin/true',
+                           )
+
+                           prep_command(
+                             name='prepare_binary_test',
+                             goal='test',
+                             prep_executable='/bin/true',
+                           )
+
+                           target(
+                             name='prepare_binary',
+                             dependencies=[
+                               ':prepare_binary_compile',
+                               ':prepare_binary_test',
+                             ],
+                           )
+                           """))
+    prepare_binary_compile = self.make_target(spec='build-support/thrift:prepare_binary_compile',
+                                              target_type=PrepCommand,
+                                              prep_executable='/bin/true',
+                                              goal='compile')
+    prepare_binary_test = self.make_target(spec='build-support/thrift:prepare_binary_test',
+                                           target_type=PrepCommand,
+                                           prep_executable='/bin/true',
+                                           goal='test')
+    self.make_target(spec='build-support/thrift:prepare_binary',
+                     dependencies=[
+                       prepare_binary_compile,
+                       prepare_binary_test
+                     ])
+
+    pants = self.create_python_library(
+      relpath='src/python/pants',
+      name='pants',
+      provides="setup_py(name='pants', version='0.0.0')",
+      dependencies=[
+        'build-support/thrift:prepare_binary'
+      ]
+    )
+    with self.run_execute(pants) as created:
+      self.assertEqual([pants], created.keys())
 
 
 def test_detect_namespace_packages():

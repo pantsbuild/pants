@@ -89,24 +89,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return '{}_{}'.format(cls.__module__, cls.__name__).replace('.', '_')
 
   @classmethod
-  def global_subsystems(cls):
-    """The global subsystems this task uses.
-
-    A tuple of subsystem types.
-
-    :API: public
-    """
-    return tuple()
-
-  @classmethod
-  def task_subsystems(cls):
-    """The private, per-task subsystems this task uses.
-
-    A tuple of subsystem types.
-
-    :API: public
-    """
-    return (CacheSetup,)
+  def subsystem_dependencies(cls):
+    return super(TaskBase, cls).subsystem_dependencies() + (CacheSetup.scoped(cls),)
 
   @classmethod
   def product_types(cls):
@@ -378,6 +362,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 
+    self._maybe_create_results_dirs(invalidation_check.all_vts)
+
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
         cached_vts, uncached_vts, uncached_causes = \
@@ -398,8 +384,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       # Now that we've checked the cache, re-partition whatever is still invalid.
       invalidation_check = \
         InvalidationCheck(invalidation_check.all_vts, uncached_vts)
-
-    self._maybe_create_results_dirs(invalidation_check.all_vts)
 
     if not silent:
       targets = []
@@ -494,7 +478,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return [], [], []
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key, vt.results_dir if vt.has_results_dir else None)
+    items = [(read_cache, vt.cache_key, vt.current_results_dir if self.cache_target_dirs else None)
              for vt in vts]
 
     res = self.context.subproc_map(call_use_cached_files, items)

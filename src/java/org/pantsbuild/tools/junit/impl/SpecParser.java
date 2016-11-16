@@ -3,10 +3,10 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import com.google.common.base.Optional;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.Optional;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -54,12 +54,13 @@ class SpecParser {
         addMethod(specString);
       } else {
         Optional<Spec> spec = getOrCreateSpec(specString, specString);
-        spec.ifPresent(s -> {
+        if (spec.isPresent()) {
+          Spec s = spec.get();
           if (specs.containsKey(s.getSpecClass()) && !s.getMethods().isEmpty()) {
             throw new SpecException(specString,
                 "Request for entire class already requesting individual methods");
           }
-        });
+        }
       }
     }
     return specs.values();
@@ -77,10 +78,13 @@ class SpecParser {
     try {
       Class<?> clazz = getClass().getClassLoader().loadClass(className);
       if (Util.isTestClass(clazz)) {
-        return Optional.of(specs.computeIfAbsent(clazz, Spec::new));
-      } else {
-        return Optional.empty();
+        if (!specs.containsKey(clazz)) {
+          Spec newSpec = new Spec(clazz);
+          specs.put(clazz, newSpec);
+        }
+        return Optional.of(specs.get(clazz));
       }
+      return Optional.absent();
     } catch (ClassNotFoundException | NoClassDefFoundError e) {
       throw new SpecException(specString,
           String.format("Class %s not found in classpath.", className), e);
@@ -110,7 +114,8 @@ class SpecParser {
     String methodName = results[1];
 
     Optional<Spec> spec = getOrCreateSpec(className, specString);
-    spec.ifPresent(s -> {
+    if (spec.isPresent()) {
+      Spec s = spec.get();
       for (Method clazzMethod : s.getSpecClass().getMethods()) {
         if (clazzMethod.getName().equals(methodName)) {
           Spec specWithMethod = s.withMethod(methodName);
@@ -121,6 +126,6 @@ class SpecParser {
       // TODO(John Sirois): Introduce an Either type to make this function total.
       throw new SpecException(specString,
           String.format("Method %s not found in class %s", methodName, className));
-    });
+    }
   }
 }

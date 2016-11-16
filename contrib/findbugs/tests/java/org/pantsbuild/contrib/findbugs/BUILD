@@ -27,11 +27,21 @@ java_library(
 )
 
 java_library(
+  name='no_sources',
+  sources=[],
+  dependencies=[
+    ':low',
+    ':normal',
+    ':high',
+  ]
+)
+
+target(
   name='all',
   dependencies=[
     ':none',
     ':low',
     ':normal',
-    ':high'
+    ':high',
   ]
 )

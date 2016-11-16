@@ -68,20 +68,6 @@ class GlobalOptionsRegistrar(Optionable):
                       'pants.backend.project_info'],
              help='Load backends from these packages that are already on the path. '
                   'Add contrib and custom backends to this list.')
-    register('--default-backend-packages', advanced=True, type=list,
-             removal_version='1.3.0',
-             removal_hint='All backends must be specified using the backend_packages option. '
-                          'That option has the same defaults as this one, and you can append'
-                          'and filter those using +[...] and -[...] syntax, as described here: '
-                          'http://www.pantsbuild.org/options.html#list-options.',
-             default=['pants.backend.graph_info',
-                      'pants.backend.python',
-                      'pants.backend.jvm',
-                      'pants.backend.codegen',
-                      'pants.backend.project_info'],
-             help='Load these backends by default.  These backends come distributed with Pants. '
-                  'Remove unused backends from this list to speed up execution. '
-                  'Use --backend-packages to configure additional backends with Pants.')
 
     register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
              help='Use this dir for global cache.')
@@ -174,7 +160,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
              removal_version='1.3.0', removal_hint='Use --build-ignore instead.',
-             help='See help for --build-ignore.')
+             mutually_exclusive_group='build_ignore', help='See help for --build-ignore.')
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
              help='Paths to ignore when identifying BUILD files. '

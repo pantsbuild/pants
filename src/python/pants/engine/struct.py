@@ -327,26 +327,7 @@ class Variants(Struct):
 
   Default variants are usually configured on a Target to be used whenever they are
   not specified by a caller.
-
-  They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
-  stored internally as sorted nested tuples of key-value strings.
   """
-
-  @staticmethod
-  def merge(left, right):
-    """Merges right over left, ensuring that the return value is a tuple of tuples, or None."""
-    if not left:
-      if right:
-        return tuple(right)
-      else:
-        return None
-    if not right:
-      return tuple(left)
-    # Merge by key, and then return sorted by key.
-    merged = dict(left)
-    for key, value in right:
-      merged[key] = value
-    return tuple(sorted(merged.items()))
 
   def __init__(self, default=None, **kwargs):
     """

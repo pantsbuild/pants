@@ -1,4 +1,3 @@
-python_library(name='sources',
-  sources=globs('*.py'),
+python_library(
   resources=globs('*.txt'),
 )

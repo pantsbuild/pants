@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  name='withretry',
   provides=artifact(
     org='org.pantsbuild',
     name='junit-runner-withretry',
@@ -14,5 +13,5 @@ java_library(
   dependencies=[
     '3rdparty:junit',
   ],
-  sources=globs('*.java')
+  platform='java7',
 )

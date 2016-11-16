@@ -11,7 +11,10 @@ import shutil
 from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
+from twitter.common.collections import OrderedSet
 
+from pants.backend.python.targets.python_target import PythonTarget
+from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 
 
@@ -57,6 +60,29 @@ class PythonInterpreterCache(object):
   def interpreters(self):
     """Returns the set of cached interpreters."""
     return self._interpreters
+
+  def select_interpreter_for_targets(self, targets):
+    """Pick an interpreter compatible with all the specified targets."""
+    allowed_interpreters = OrderedSet(self.interpreters)
+    tgts_with_compatibilities = []  # Used only for error messages.
+
+    # Constrain allowed_interpreters based on each target's compatibility requirements.
+    for target in targets:
+      if isinstance(target, PythonTarget) and target.compatibility:
+        tgts_with_compatibilities.append(target)
+        compatible_with_target = list(self.matched_interpreters(target.compatibility))
+        allowed_interpreters &= compatible_with_target
+
+    if not allowed_interpreters:
+      # Create a helpful error message.
+      unique_compatibilities = set(tuple(t.compatibility) for t in tgts_with_compatibilities)
+      unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
+      tgts_with_compatibilities_strs = [str(t) for t in tgts_with_compatibilities]
+      raise TaskError('Unable to detect a suitable interpreter for compatibilities: {} '
+                      '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
+                                                         ', '.join(tgts_with_compatibilities_strs)))
+    # Return the lowest compatible interpreter.
+    return self.select_interpreter(allowed_interpreters)[0]
 
   def _interpreter_from_path(self, path, filters):
     interpreter_dir = os.path.basename(path)
@@ -105,7 +131,7 @@ class PythonInterpreterCache(object):
       cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
       for requirements agnostic to interpreter class.
     """
-    for match in self._matching(self._interpreters, filters):
+    for match in self._matching(self.interpreters, filters):
       yield match
 
   def setup(self, paths=(), force=False, filters=(b'',)):
@@ -123,7 +149,7 @@ class PythonInterpreterCache(object):
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
     self._setup_cached(filters)
     def unsatisfied_filters():
-      return filter(lambda filt: len(list(self._matching(self._interpreters, [filt]))) == 0, filters)
+      return filter(lambda f: len(list(self._matching(self.interpreters, [f]))) == 0, filters)
     if force or len(unsatisfied_filters()) > 0:
       self._setup_paths(setup_paths, filters)
     for filt in unsatisfied_filters():

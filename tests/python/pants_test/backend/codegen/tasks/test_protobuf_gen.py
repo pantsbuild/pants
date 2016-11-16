@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
@@ -33,36 +32,6 @@ class ProtobufGenTest(TaskTestBase):
   @property
   def alias_groups(self):
     return register_core().merge(register_jvm()).merge(register_codegen())
-
-  def test_protos_extracted_under_build_root(self):
-    """This testcase shows that you can put sources for protos outside the directory where the
-    BUILD file is defined. This will be the case for .proto files that have been extracted
-    under .pants.d.
-    """
-    # place a .proto file in a place outside of where the BUILD file is defined
-    extracted_source_path = os.path.join(self.build_root, 'extracted', 'src', 'proto')
-    sample_proto_path = os.path.join('sample-package', 'sample.proto')
-    self.create_file(os.path.join(extracted_source_path, sample_proto_path), dedent("""
-          package com.example;
-          message sample {}
-        """))
-    self.add_to_build_file('sample', dedent("""
-        jar_library(name='jar',
-          jars=[jar('org.example', 'jar', '0.0.1')]
-        )"""))
-    self.add_to_build_file('sample', dedent("""
-        java_protobuf_library(name='sample',
-          sources=from_target(':jar'),
-        )"""))
-    target = self.target('sample:sample')
-    target.payload.sources.populate([sample_proto_path], extracted_source_path)
-    context = self.context(target_roots=[target])
-    task = self.create_task(context=context)
-    sources_by_base = task._calculate_sources(target)
-    self.assertEquals(['extracted/src/proto'], sources_by_base.keys())
-    self.assertEquals(
-      OrderedSet([os.path.join('extracted/src/proto', sample_proto_path)]),
-      sources_by_base['extracted/src/proto'])
 
   def test_default_javadeps(self):
     self.create_file(relpath='test_proto/test.proto', contents=dedent("""

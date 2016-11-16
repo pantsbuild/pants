@@ -13,6 +13,7 @@ from collections import namedtuple
 from six.moves import range
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import BestUrlSelector, Pinger
@@ -73,6 +74,8 @@ class CacheSetup(Subsystem):
                   'the resolver. When resolver is \'none\' list is used as is.')
     register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
+    register('--dereference-symlinks', type=bool, default=True, fingerprint=True,
+             help='Dereference symlinks when creating cache tarball.')
     register('--max-entries-per-target', advanced=True, type=int, default=8,
              help='Maximum number of old cache files to keep per task target pair')
     register('--pinger-timeout', advanced=True, type=float, default=0.5,
@@ -249,6 +252,15 @@ class CacheFactory(object):
     compression = self._options.compression_level
     if compression not in range(10):
       raise ValueError('compression_level must be an integer 0-9: {}'.format(compression))
+
+    deprecated_conditional(
+        lambda: compression == 0,
+        '1.4.0',
+        'compression==0',
+        'The artifact cache depends on gzip compression for checksumming: a compression level '
+        '==0 disables compression, and can prevent detection of corrupted artifacts.'
+    )
+
     artifact_root = self._options.pants_workdir
 
     def create_local_cache(parent_path):
@@ -257,7 +269,8 @@ class CacheFactory(object):
                       .format(self._stable_name, action, path))
       return LocalArtifactCache(artifact_root, path, compression,
                                 self._options.max_entries_per_target,
-                                permissions=self._options.write_permissions)
+                                permissions=self._options.write_permissions,
+                                dereference=self._options.dereference_symlinks)
 
     def create_remote_cache(remote_spec, local_cache):
       urls = self.get_available_urls(remote_spec.split('|'))

@@ -7,7 +7,9 @@ import org.junit.Test;
 import org.junit.runner.Description;
 import org.pantsbuild.tools.junit.lib.MockJUnit3Test;
 import org.pantsbuild.tools.junit.lib.MockRunWithTest;
+import org.pantsbuild.tools.junit.lib.MockScalaTest;
 import org.pantsbuild.tools.junit.lib.MockTest1;
+import org.pantsbuild.tools.junit.lib.NotAScalaTest;
 import org.pantsbuild.tools.junit.lib.NotATestAbstractClass;
 import org.pantsbuild.tools.junit.lib.NotATestInterface;
 import org.pantsbuild.tools.junit.lib.NotATestNoPublicConstructor;
@@ -101,12 +103,14 @@ public class UtilTest {
     assertTrue(Util.isTestClass(MockJUnit3Test.class));
     assertTrue(Util.isTestClass(MockRunWithTest.class));
     assertTrue(Util.isTestClass(UnannotatedTestClass.class));
+    assertTrue(Util.isTestClass(MockScalaTest.class));
     assertFalse(Util.isTestClass(NotATestAbstractClass.class));
     assertFalse(Util.isTestClass(NotATestNonzeroArgConstructor.class));
     assertFalse(Util.isTestClass(NotATestNoPublicConstructor.class));
     assertFalse(Util.isTestClass(NotATestInterface.class));
     assertFalse(Util.isTestClass(NotATestNoRunnableMethods.class));
     assertFalse(Util.isTestClass(NotATestPrivateClass.class));
+    assertFalse(Util.isTestClass(NotAScalaTest.class));
 
     // Even though this is ignored it should still be considered a Test
     assertTrue(Util.isTestClass(XmlReportIgnoredTestSuiteTest.class));

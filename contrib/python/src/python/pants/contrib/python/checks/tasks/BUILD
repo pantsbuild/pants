@@ -3,7 +3,6 @@
 
 python_library(
   name='python',
-  sources=globs('*.py'),
   resource_targets=[
     ':resources'
   ],

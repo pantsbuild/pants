@@ -5,8 +5,9 @@
 
 package org.pantsbuild.zinc.logging
 
+import sbt.internal.inc.LoggerReporter
+import sbt.util.Logger
 import xsbti.{ Position, Reporter, Severity }
-import sbt.{ Logger, LoggerReporter }
 
 import scala.util.matching.Regex
 

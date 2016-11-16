@@ -3,11 +3,10 @@
 
 # Seq-friendly wrapper for Java "greet" library: greet everything in a seq.
 
-scala_library(name='welcome',
+scala_library(
   dependencies=[
     'examples/src/java/org/pantsbuild/example/hello/greet:greet',
   ],
-  sources=globs('*.scala'),
   resources = [
     'examples/src/resources/org/pantsbuild/example/hello',
   ],

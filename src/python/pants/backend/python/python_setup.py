@@ -117,11 +117,10 @@ class PythonRepos(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonRepos, cls).register_options(register)
-    register('--repos', advanced=True, type=list, default=[],
+    register('--repos', advanced=True, type=list, default=[], fingerprint=True,
              help='URLs of code repositories.')
-    register('--indexes', advanced=True, type=list,
-             default=['https://pypi.python.org/simple/'],
-             help='URLs of code repository indexes.')
+    register('--indexes', advanced=True, type=list, fingerprint=True,
+             default=['https://pypi.python.org/simple/'], help='URLs of code repository indexes.')
 
   @property
   def repos(self):

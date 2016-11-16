@@ -5,8 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from multiprocessing import cpu_count
+
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.option.ranked_value import RankedValue
 
@@ -67,10 +70,9 @@ class ThriftLinter(NailgunTask):
 
     return self._to_bool(self.get_options().strict_default)
 
-  def _lint(self, target):
+  def _lint(self, target, classpath):
     self.context.log.debug('Linting {0}'.format(target.address.spec))
 
-    classpath = self.tool_classpath('scrooge-linter')
     config_args = []
 
     config_args.extend(self.get_options().linter_args)
@@ -102,13 +104,29 @@ class ThriftLinter(NailgunTask):
 
     thrift_targets = self.context.targets(self._is_thrift)
     with self.invalidated(thrift_targets) as invalidation_check:
-      errors = []
-      for vt in invalidation_check.invalid_vts:
-        try:
-          self._lint(vt.target)
-        except ThriftLintError as e:
-          errors.append(str(e))
-        else:
-          vt.update()
-      if errors:
-        raise TaskError('\n'.join(errors))
+      if not invalidation_check.invalid_vts:
+        return
+
+      with self.context.new_workunit('parallel-thrift-linter') as workunit:
+        worker_pool = WorkerPool(workunit.parent,
+                                 self.context.run_tracker,
+                                 cpu_count())
+
+        scrooge_linter_classpath = self.tool_classpath('scrooge-linter')
+        results = []
+        errors = []
+        for vt in invalidation_check.invalid_vts:
+          r = worker_pool.submit_async_work(Work(self._lint, [(vt.target, scrooge_linter_classpath)]))
+          results.append((r, vt))
+        for r, vt in results:
+          r.wait()
+          # MapResult will raise _value in `get` if the run is not successful.
+          try:
+            r.get()
+          except ThriftLintError as e:
+            errors.append(str(e))
+          else:
+            vt.update()
+
+        if errors:
+          raise TaskError('\n'.join(errors))

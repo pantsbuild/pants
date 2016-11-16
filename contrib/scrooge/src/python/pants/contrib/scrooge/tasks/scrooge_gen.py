@@ -52,8 +52,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     cls.register_jvm_tool(register, 'scrooge-gen')
 
   @classmethod
-  def global_subsystems(cls):
-    return super(ScroogeGen, cls).global_subsystems() + (ThriftDefaults,)
+  def subsystem_dependencies(cls):
+    return super(ScroogeGen, cls).subsystem_dependencies() + (ThriftDefaults,)
 
   @classmethod
   def product_types(cls):

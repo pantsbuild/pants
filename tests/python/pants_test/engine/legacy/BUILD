@@ -12,6 +12,7 @@ python_tests(
     'src/python/pants/engine/legacy:address_mapper',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/engine:util',
   ]
 )
 
@@ -31,6 +32,21 @@ python_tests(
     'tests/python/pants_test:int-test'
   ],
   tags = {'integration'}
+)
+
+python_tests(
+  name = 'changed_integration',
+  sources = ['test_changed_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/testutils:git_util',
+  ],
+  tags = {'integration'},
+  timeout = 600,
 )
 
 python_tests(
@@ -70,14 +86,7 @@ python_tests(
     '3rdparty/python:mock',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
-  ]
-)
-
-python_tests(
-  name = 'structs',
-  sources = ['test_structs.py'],
-  dependencies = [
-    'src/python/pants/engine/legacy:structs',
+    'tests/python/pants_test/engine:util',
   ]
 )
 
@@ -101,12 +110,9 @@ python_tests(
 )
 
 python_tests(
-  name = 'changed_integration',
-  sources = ['test_changed_integration.py'],
+  name = 'structs',
+  sources = ['test_structs.py'],
   dependencies = [
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test:int-test'
-  ],
-  tags = {'integration'},
-  timeout = 600,
+    'src/python/pants/engine/legacy:structs',
+  ]
 )

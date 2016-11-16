@@ -10,7 +10,6 @@ from abc import abstractproperty
 
 from six import string_types
 
-from pants.build_graph.address import Addresses
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
@@ -39,7 +38,7 @@ class TargetAdaptor(StructWithDeps):
       see: https://github.com/pantsbuild/pants/issues/2997
     """
     sources = getattr(self, 'sources', None)
-    return sources is not None and not isinstance(sources, Addresses)
+    return sources is not None
 
   @property
   def field_adaptors(self):
@@ -205,16 +204,16 @@ class BaseGlobs(Locatable, AbstractClass):
       raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
 
   @staticmethod
-  def _filespec_for_excludes(raw_excludes, spec_path):
-    if isinstance(raw_excludes, string_types):
+  def _filespec_for_exclude(raw_exclude, spec_path):
+    if isinstance(raw_exclude, string_types):
       raise ValueError('Excludes of type `{}` are not supported: got "{}"'
-                       .format(type(raw_excludes).__name__, raw_excludes))
+                       .format(type(raw_exclude).__name__, raw_exclude))
 
     excluded_patterns = []
-    for raw_exclude in raw_excludes:
-      exclude_filespecs = BaseGlobs.from_sources_field(raw_exclude, spec_path).filespecs
+    for raw_element in raw_exclude:
+      exclude_filespecs = BaseGlobs.from_sources_field(raw_element, spec_path).filespecs
       if exclude_filespecs.get('exclude', []):
-        raise ValueError('Nested excludes are not supported: got {}'.format(raw_excludes))
+        raise ValueError('Nested excludes are not supported: got {}'.format(raw_element))
       excluded_patterns.extend(exclude_filespecs.get('globs', []))
     return {'globs': excluded_patterns}
 
@@ -229,8 +228,8 @@ class BaseGlobs(Locatable, AbstractClass):
   def __init__(self, *patterns, **kwargs):
     raw_spec_path = kwargs.pop('spec_path')
     self._file_globs = self.legacy_globs_class.to_filespec(patterns).get('globs', [])
-    raw_excludes = kwargs.pop('exclude', [])
-    self._excluded_file_globs = self._filespec_for_excludes(raw_excludes, raw_spec_path).get('globs', [])
+    raw_exclude = kwargs.pop('exclude', [])
+    self._excluded_file_globs = self._filespec_for_exclude(raw_exclude, raw_spec_path).get('globs', [])
     self._spec_path = raw_spec_path
 
     # `follow_links=True` is the default behavior for wrapped globs, so we pop the old kwarg

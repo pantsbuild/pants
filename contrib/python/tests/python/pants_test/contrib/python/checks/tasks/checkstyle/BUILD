@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name='checkstyle',
-  sources=globs('*.py'),
   dependencies=[
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',
     'src/python/pants/util:dirutil',

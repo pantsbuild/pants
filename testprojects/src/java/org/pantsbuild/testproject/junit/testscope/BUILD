@@ -1,7 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-java_tests(name='tests',
+junit_tests(name='tests',
   sources=['AllTests.java'],
   dependencies=[
     '3rdparty:junit',

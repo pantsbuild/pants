@@ -5,6 +5,110 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.3.0dev0 (10/14/2016)
+----------------------
+
+The first unstable release of the 1.3.x series.
+
+API Changes
+~~~~~~~~~~~
+
+* Add subsystem_utils to test_infra
+  `RB #4303 <https://rbcommons.com/s/twitter/r/4303>`_
+
+Bugfixes
+~~~~~~~~
+
+* Switch default deference back to True for tarball artifact
+  `RB #4304 <https://rbcommons.com/s/twitter/r/4304>`_
+
+* Filter inactive goals from `Goal.all`.
+  `RB #4298 <https://rbcommons.com/s/twitter/r/4298>`_
+
+* JUnit runner fix for len(args) > max_args in argfile.safe_args
+  `RB #4294 <https://rbcommons.com/s/twitter/r/4294>`_
+
+* Fix --changed-files option
+  `RB #4309 <https://rbcommons.com/s/twitter/r/4309>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Migrate changed integration tests to isolated temp git repos and add an environment variable to override buildroot
+  `RB #4295 <https://rbcommons.com/s/twitter/r/4295>`_
+
+* Get rid of the "Skipped X files" messages from isort output.
+  `RB #4301 <https://rbcommons.com/s/twitter/r/4301>`_
+
+* Version clarification
+  `RB #4299 <https://rbcommons.com/s/twitter/r/4299>`_
+
+* Fix isort to run `./pants fmt.isort` once.
+  `RB #4297 <https://rbcommons.com/s/twitter/r/4297>`_
+
+* Dogfood `./pants fmt.isort`.
+  `RB #4289 <https://rbcommons.com/s/twitter/r/4289>`_
+
+* Extract the junit xml report parser.
+  `RB #4292 <https://rbcommons.com/s/twitter/r/4292>`_
+
+* Leverage default targets throughout pants BUILDs.
+  `RB #4287 <https://rbcommons.com/s/twitter/r/4287>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Improve daemon run profiling.
+  `RB #4293 <https://rbcommons.com/s/twitter/r/4293>`_
+
+1.2.0rc0 (10/07/2016)
+---------------------
+
+First release candidate for stable 1.2.0.
+
+New Features
+~~~~~~~~~~~~
+
+* Make the name= target keyword optional in BUILD files.
+  `RB #4275 <https://rbcommons.com/s/twitter/r/4275>`_
+
+* Add Scalafmt Support to Pants
+  `RB #4216 <https://rbcommons.com/s/twitter/r/4216>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add libffi to pants pre-reqs, qualify JDK req.
+  `RB #4285 <https://rbcommons.com/s/twitter/r/4285>`_
+
+* Update the setup.py description.
+  `RB #4283 <https://rbcommons.com/s/twitter/r/4283>`_
+
+* Refactor Intermediate Target Generation Logic
+  `RB #4277 <https://rbcommons.com/s/twitter/r/4277>`_
+
+* Clean up after failed artifact extractions
+  `RB #4255 <https://rbcommons.com/s/twitter/r/4255>`_
+
+* Publish the CPP plugin
+  `RB #4282 <https://rbcommons.com/s/twitter/r/4282>`_
+
+* Change --no-dryrun to the new flag in docs
+  `RB #4280 <https://rbcommons.com/s/twitter/r/4280>`_
+
+* Add --no-transitive flag to findbugs so you can run findbugs only for the targets specified on the command line
+  `RB #4276 <https://rbcommons.com/s/twitter/r/4276>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Rule Graph construction perf improvements
+  `RB #4281 <https://rbcommons.com/s/twitter/r/4281>`_
+
+* [engine] Introduce static analysis model and replace validator with it
+  `RB #4251 <https://rbcommons.com/s/twitter/r/4251>`_
+
+
 1.2.0dev12 (9/30/2016)
 ----------------------
 

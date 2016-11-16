@@ -3,7 +3,7 @@
 
 # Demonstrates compiling code with a unicode classes
 
-jvm_binary(name = 'main',
+jvm_binary(
   basename = 'unicode-testproject',
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject/unicode/cucumber',

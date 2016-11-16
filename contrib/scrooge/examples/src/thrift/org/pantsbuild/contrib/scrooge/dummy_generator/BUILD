@@ -1,5 +1,4 @@
 java_thrift_library(
-  name='dummy_generator',
   sources=['dummy.thrift'],
   compiler='scrooge',
   language='android',

@@ -11,6 +11,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.specs import SingleAddress
 from pants.bin.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import ChangedRequest
@@ -70,7 +71,8 @@ class TargetRoots(object):
       # alternate target roots.
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
       logger.debug('changed addresses: %s', changed_addresses)
-      return ChangedTargetRoots(changed_addresses)
+      return ChangedTargetRoots(tuple(SingleAddress(a.spec_path, a.target_name)
+                                      for a in changed_addresses))
 
     return LiteralTargetRoots(spec_roots)
 

@@ -26,7 +26,7 @@ plugins: [
 ## Running
 
 When you run `./pants compile` the plugin is executed after the compile step and will run FindBugs
-on any `java_library` or `java_tests` targets.
+on any `java_library` or `junit_tests` targets.
 
 ```
 ./pants compile <target>

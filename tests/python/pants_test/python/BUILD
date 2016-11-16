@@ -45,6 +45,17 @@ python_tests(
 )
 
 python_tests(
+  name = 'python_binary_integration',
+  sources = ['test_python_binary_integration.py'],
+  dependencies = [
+    '3rdparty/python:pex',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'test_interpreter_cache',
   sources = ['test_interpreter_cache.py'],
   dependencies = [

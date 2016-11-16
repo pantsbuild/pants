@@ -5,13 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import sys
 from abc import abstractproperty
 
 import six
 
 from pants.engine.addressable import Exactly
-from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -24,17 +22,22 @@ def type_or_constraint_repr(constraint):
     return repr(constraint)
 
 
+def constraint_for(type_or_constraint):
+  """Given a type or an `Exactly` constraint, returns an `Exactly` constraint."""
+  if isinstance(type_or_constraint, Exactly):
+    return type_or_constraint
+  elif isinstance(type_or_constraint, type):
+    return Exactly(type_or_constraint)
+  else:
+    raise TypeError("Expected a type or constraint: got: {}".format(type_or_constraint))
+
+
 class Selector(AbstractClass):
   # The type constraint for the product type for this selector.
 
   @property
   def type_constraint(self):
-    if isinstance(self.product, Exactly):
-      return self.product
-    elif isinstance(self.product, type):
-      return Exactly(self.product)
-    else:
-      raise TypeError("unexpected product_type type for selector: {}".format(self.product))
+    return constraint_for(self.product)
 
   @abstractproperty
   def optional(self):
@@ -82,7 +85,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
 
 
 class SelectDependencies(datatype('Dependencies',
-                                  ['product', 'dep_product', 'field', 'field_types']),
+                                  ['product', 'dep_product', 'field', 'field_types', 'transitive']),
                          Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
@@ -94,10 +97,8 @@ class SelectDependencies(datatype('Dependencies',
   `dep_product`.
   """
 
-  optional = False
-
-  def __new__(cls, product, dep_product, field=None, field_types=tuple()):
-    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
+  def __new__(cls, product, dep_product, field='dependencies', field_types=tuple(), transitive=False):
+    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types, transitive)
 
   @property
   def dep_product_selector(self):
@@ -112,11 +113,12 @@ class SelectDependencies(datatype('Dependencies',
       field_types_portion = ', field_types=({},)'.format(', '.join(f.__name__ for f in self.field_types))
     else:
       field_types_portion = ''
-    return '{}({}, {}{}{})'.format(type(self).__name__,
-      type_or_constraint_repr(self.product),
-      type_or_constraint_repr(self.dep_product),
-      ', {}'.format(repr(self.field)) if self.field else '',
-      field_types_portion)
+    return '{}({}, {}{}{}{})'.format(type(self).__name__,
+                                     type_or_constraint_repr(self.product),
+                                     type_or_constraint_repr(self.dep_product),
+                                     ', {}'.format(repr(self.field)) if self.field else '',
+                                     ', transitive=True' if self.transitive else '',
+                                     field_types_portion)
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
@@ -154,23 +156,3 @@ class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
     return '{}({}, {})'.format(type(self).__name__,
                                repr(self.subject),
                                type_or_constraint_repr(self.product))
-
-
-class Collection(object):
-  """
-  Singleton Collection Type. The ambition is to gain native support for flattening,
-  so methods like <pants.engine.fs.merge_files> won't have to be defined separately.
-  Related to: https://github.com/pantsbuild/pants/issues/3169
-  """
-
-  @classmethod
-  @memoized
-  def of(cls, element_type, fields=('dependencies',)):
-    type_name = b'{}.of({})'.format(cls.__name__, element_type.__name__)
-
-    collection_of_type = type(type_name, (cls, datatype("{}s".format(element_type.__name__), fields)), {})
-
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
-
-    return collection_of_type

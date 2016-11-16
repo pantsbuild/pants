@@ -6,18 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from abc import abstractmethod, abstractproperty
+from abc import abstractproperty
 from collections import OrderedDict, defaultdict, deque
 from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
 from pants.engine.addressable import Exactly
-from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import ProcessExecutionNode, Snapshot, SnapshotNode
-from pants.engine.nodes import (DependenciesNode, FilesystemNode, ProjectionNode, SelectNode,
-                                TaskNode)
-from pants.engine.objects import Closable
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, type_or_constraint_repr)
 from pants.util.meta import AbstractClass
@@ -36,23 +31,24 @@ class Rule(AbstractClass):
 
   @abstractproperty
   def input_selectors(self):
-    """collection of input selectors"""
+    """Collection of input selectors"""
+
+  @abstractproperty
+  def func(self):
+    """Rule function."""
 
   @abstractproperty
   def output_product_type(self):
     """The product type produced by this rule."""
 
-  @abstractmethod
-  def as_node(self, subject, variants):
-    """Constructs a ProductGraph node for this rule."""
+  def as_triple(self):
+    """Constructs an (output, input, func) triple for this rule."""
+    return (self.output_product_type, self.input_selectors, self.func)
 
 
-class TaskRule(datatype('TaskRule', ['input_selectors', 'task_func', 'product_type', 'constraint']),
+class TaskRule(datatype('TaskRule', ['input_selectors', 'func', 'product_type', 'constraint']),
                Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied."""
-
-  def as_node(self, subject, variants):
-    return TaskNode(subject, variants, self)
 
   @property
   def output_product_type(self):
@@ -61,7 +57,7 @@ class TaskRule(datatype('TaskRule', ['input_selectors', 'task_func', 'product_ty
   def __str__(self):
     return '({}, {!r}, {})'.format(type_or_constraint_repr(self.product_type),
                                    self.input_selectors,
-                                   self.task_func.__name__)
+                                   self.func.__name__)
 
 
 class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', 'warnings'])):
@@ -78,14 +74,13 @@ class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', '
 
 
 class RulesetValidator(object):
-  """Validates that the set of rules used by the node builder has no missing tasks.
-
-  """
+  """Validates that the set of rules used by the node builder has no missing tasks."""
 
   def __init__(self, node_builder, goal_to_product, root_subject_fns):
     if not root_subject_fns:
       raise ValueError('root_subject_fns must not be empty')
     self._goal_to_product = goal_to_product
+
 
     self._graph = GraphMaker(node_builder, root_subject_fns).full_graph()
 
@@ -114,35 +109,8 @@ class RulesetValidator(object):
           'no task for product used by goal "{}": {}'.format(goal, goal_product.__name__))
 
 
-class SnapshottedProcess(datatype('SnapshottedProcess', ['product_type',
-                                                         'binary_type',
-                                                         'input_selectors',
-                                                         'input_conversion',
-                                                         'output_conversion']),
-                         Rule):
-  """A rule type for defining execution of snapshotted processes."""
-
-  def as_node(self, subject, variants):
-    return ProcessExecutionNode(subject, variants, self)
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-
-class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type', 'product_type']),
-  Rule):
-  """Intrinsic rule for filesystem operations."""
-
-  @classmethod
-  def as_intrinsics(cls):
-    """Returns a dict of tuple(sbj type, product type) -> functions returning a fs node for that subject product type tuple."""
-    return {(subject_type, product_type): FilesystemIntrinsicRule(subject_type, product_type)
-      for product_type, subject_type in FilesystemNode._FS_PAIRS}
-
-  def as_node(self, subject, variants):
-    assert type(subject) is self.subject_type
-    return FilesystemNode.create(subject, self.product_type, variants)
+class SingletonRule(datatype('SingletonRule', ['product_type', 'func']), Rule):
+  """A default rule for a product, which is thus a singleton for that product."""
 
   @property
   def input_selectors(self):
@@ -152,35 +120,33 @@ class FilesystemIntrinsicRule(datatype('FilesystemIntrinsicRule', ['subject_type
   def output_product_type(self):
     return self.product_type
 
+  def __repr__(self):
+    return '{}({})'.format(type(self).__name__, self.product_type.__name__)
 
-class SnapshotIntrinsicRule(Rule):
-  """Intrinsic rule for snapshot process execution."""
 
-  output_product_type = Snapshot
-  input_selectors = (Select(Files),)
+class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', 'func']), Rule):
+  """A default rule for a pair of subject+product."""
 
-  def as_node(self, subject, variants):
-    assert type(subject) in (Files, PathGlobs)
-    return SnapshotNode.create(subject, variants)
+  @property
+  def input_selectors(self):
+    return tuple()
 
-  @classmethod
-  def as_intrinsics(cls):
-    snapshot_intrinsic_rule = cls()
-    return {
-      (Files, Snapshot): snapshot_intrinsic_rule,
-      (PathGlobs, Snapshot): snapshot_intrinsic_rule
-    }
+  @property
+  def output_product_type(self):
+    return self.product_type
 
   def __repr__(self):
-    return '{}()'.format(type(self).__name__)
+    return '{}({})'.format(type(self).__name__, self.func.__name__)
 
 
-class NodeBuilder(Closable):
+class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics', 'singletons'])):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, task_entries, intrinsic_providers=(FilesystemIntrinsicRule, SnapshotIntrinsicRule)):
+  def create(cls, task_entries, intrinsic_entries=None, singleton_entries=None):
     """Creates a NodeBuilder with tasks indexed by their output type."""
+    intrinsic_entries = intrinsic_entries or tuple()
+    singleton_entries = singleton_entries or tuple()
     # NB make tasks ordered so that gen ordering is deterministic.
     serializable_tasks = OrderedDict()
 
@@ -202,9 +168,9 @@ class NodeBuilder(Closable):
           raise TypeError("Unexpected product_type type {}, for rule {}".format(output_type, entry))
 
         factory = TaskRule(tuple(input_selectors), task, output_type, constraint)
+        # TODO: The heterogenity here has some confusing implications here:
+        # see https://github.com/pantsbuild/pants/issues/4005
         for kind in constraint.types:
-          # NB Ensure that interior types from SelectDependencies / SelectProjections work by
-          # indexing on the list of types in the constraint.
           add_task(kind, factory)
         add_task(constraint, factory)
       else:
@@ -212,38 +178,41 @@ class NodeBuilder(Closable):
                         " Rules either extend Rule, or are 3 elem tuples.".format(type(entry)))
 
     intrinsics = dict()
-    for provider in intrinsic_providers:
-      as_intrinsics = provider.as_intrinsics()
-      duplicate_keys = [k for k in as_intrinsics.keys() if k in intrinsics]
-      if duplicate_keys:
-        key_list = '\n  '.join('{}, {}'.format(sub.__name__, prod.__name__)
-                                for sub, prod in duplicate_keys)
-        raise ValueError('intrinsics provided by {} have already provided subject-type, '
-                         'product-type keys:\n  {}'.format(provider, key_list))
-      intrinsics.update(as_intrinsics)
-    return cls(serializable_tasks, intrinsics)
+    for output_type, input_type, func in intrinsic_entries:
+      key = (input_type, output_type)
+      if key in intrinsics:
+        raise ValueError('intrinsic provided by {} has already been provided by: {}'.format(
+          func.__name__, intrinsics[key]))
+      intrinsics[key] = IntrinsicRule(input_type, output_type, func)
 
-  def __init__(self, tasks, intrinsics):
-    self._tasks = tasks
-    self._intrinsics = intrinsics
+    singletons = dict()
+    for output_type, func in singleton_entries:
+      if output_type in singletons:
+        raise ValueError('singleton provided by {} has already been provided by: {}'.format(
+          func.__name__, singletons[output_type]))
+      singletons[output_type] = SingletonRule(output_type, func)
+    return cls(serializable_tasks, intrinsics, singletons)
 
   def all_rules(self):
     """Returns a set containing all rules including instrinsics."""
-    declared_rules = set(rule for rules_for_product in self._tasks.values()
+    declared_rules = set(rule for rules_for_product in self.tasks.values()
                          for rule in rules_for_product)
-    declared_intrinsics = set(rule for rule in self._intrinsics.values())
-    return declared_rules.union(declared_intrinsics)
+    declared_intrinsics = set(rule for rule in self.intrinsics.values())
+    declared_singletons = set(rule for rule in self.singletons.values())
+    return declared_rules.union(declared_intrinsics).union(declared_singletons)
 
   def all_produced_product_types(self, subject_type):
-    intrinsic_products = set(prod for subj, prod in self._intrinsics.keys()
+    intrinsic_products = set(prod for subj, prod in self.intrinsics.keys()
                              if subj == subject_type)
-    task_products = self._tasks.keys()
-    return intrinsic_products.union(set(task_products))
+    return intrinsic_products.union(set(self.tasks.keys())).union(set(self.singletons.keys()))
 
   def gen_rules(self, subject_type, product_type):
-    # Intrinsics that provide the requested product for the current subject type.
-    intrinsic_node_factory = self._lookup_intrinsic(product_type, subject_type)
-    if intrinsic_node_factory:
+    # Singeltons or intrinsics that provide the requested product for the current subject type.
+    singleton_node_factory = self.singletons.get(product_type)
+    intrinsic_node_factory = self.intrinsics.get((subject_type, product_type))
+    if singleton_node_factory:
+      yield singleton_node_factory
+    elif intrinsic_node_factory:
       yield intrinsic_node_factory
     else:
       # Tasks that provide the requested product.
@@ -255,32 +224,8 @@ class NodeBuilder(Closable):
       yield rule.as_node(subject, variants)
 
   def _lookup_tasks(self, product_type):
-    for entry in self._tasks.get(product_type, tuple()):
+    for entry in self.tasks.get(product_type, tuple()):
       yield entry
-
-  def _lookup_intrinsic(self, product_type, subject_type):
-    return self._intrinsics.get((subject_type, product_type))
-
-  def select_node(self, selector, subject, variants):
-    """Constructs a Node for the given Selector and the given Subject/Variants.
-
-    This method is decoupled from Selector classes in order to allow the `selector` package to not
-    need a dependency on the `nodes` package.
-    """
-    selector_type = type(selector)
-    if selector_type is Select:
-      return SelectNode(subject, variants, selector)
-    if selector_type is SelectVariant:
-      return SelectNode(subject, variants, selector)
-    elif selector_type is SelectLiteral:
-      # NB: Intentionally ignores subject parameter to provide a literal subject.
-      return SelectNode(selector.subject, variants, selector)
-    elif selector_type is SelectDependencies:
-      return DependenciesNode(subject, variants, selector)
-    elif selector_type is SelectProjection:
-      return ProjectionNode(subject, variants, selector)
-    else:
-      raise TypeError('Unrecognized Selector type "{}" for: {}'.format(selector_type, selector))
 
 
 class CanHaveDependencies(object):
@@ -462,8 +407,6 @@ class UnreachableRule(object):
 class RuleEdges(object):
   """Represents the edges from a rule to its dependencies via selectors."""
   # TODO add a highwater mark count to count how many branches are eliminated
-  # TODO it would be good to note which selectors deps are attached to,
-  #      so that eliminations happen within a selector
 
   def __init__(self, dependencies=tuple(), selector_to_deps=None):
     self._dependencies = dependencies
@@ -472,13 +415,15 @@ class RuleEdges(object):
     else:
       self._selector_to_deps = selector_to_deps
 
-  def add_edges_via(self, selector, other_rules):
-    tupled_other_rules = tuple(other_rules)
+  def add_edges_via(self, selector, new_dependencies):
+    if selector is None and new_dependencies:
+      raise ValueError("Cannot specify a None selector with non-empty dependencies!")
+    tupled_other_rules = tuple(new_dependencies)
     self._selector_to_deps[selector] += tupled_other_rules
     self._dependencies += tupled_other_rules
 
-  def has_edges_for(self, selector, other_rules):
-    return all(r in self._selector_to_deps[selector] for r in other_rules)
+  def has_edges_for(self, selector):
+    return selector in self._selector_to_deps
 
   def __contains__(self, rule):
     return rule in self._dependencies
@@ -491,11 +436,8 @@ class RuleEdges(object):
     if len(self._dependencies) == 1 and self._dependencies[0] == dep_to_eliminate:
       return True
     for selector, deps in self._selector_to_deps.items():
-      if len(deps) == 1:
-        only_dep = deps[0]
-        if (only_dep.output_product_type is dep_to_eliminate.output_product_type and
-            only_dep.subject_type is dep_to_eliminate.subject_type):
-          return True
+      if len(deps) == 1 and dep_to_eliminate == deps[0]:
+        return True
     else:
       return False
 
@@ -517,8 +459,10 @@ class GraphMaker(object):
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
     root_selector = self.root_subject_selector_fns[root_subject_type](requested_product)
-    return RuleGraph((root_subject_type,), *self._construct_graph(RootRule(root_subject_type,
-                                                                           root_selector)))
+    root_rules, edges, unfulfillable = self._construct_graph(RootRule(root_subject_type, root_selector))
+    root_rules, edges = self._remove_unfulfillable_rules_and_dependents(root_rules,
+      edges, unfulfillable)
+    return RuleGraph((root_subject_type,), root_rules, edges, unfulfillable)
 
   def full_graph(self):
     """Produces a full graph based on the root subjects and all of the products produced by rules."""
@@ -527,32 +471,46 @@ class GraphMaker(object):
     full_unfulfillable_rules = {}
     for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
       for product in sorted(self.nodebuilder.all_produced_product_types(root_subject_type)):
-        root_rule = RootRule(root_subject_type, selector_fn(product))
-        # TODO consider passing the current edge set through as a perf improvement.
-        root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(root_rule)
-        full_root_rules.update(root_dependencies)
-        full_dependency_edges.update(rule_dependency_edges)
-        full_unfulfillable_rules.update(unfulfillable_rules)
+        beginning_root = RootRule(root_subject_type, selector_fn(product))
+        root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(
+          beginning_root,
+          root_rules=full_root_rules,
+          rule_dependency_edges=full_dependency_edges,
+          unfulfillable_rules=full_unfulfillable_rules
+        )
+
+        full_root_rules = set(root_dependencies)
+        full_dependency_edges = rule_dependency_edges
+        full_unfulfillable_rules = unfulfillable_rules
 
     rules_in_graph = set(entry.rule for entry in full_dependency_edges.keys())
-    rules_eliminated_during_construction = set(entry.rule for entry in full_unfulfillable_rules.keys())
+    rules_eliminated_during_construction = [entry.rule for entry in full_unfulfillable_rules.keys()]
+    rules_used = set(rules_eliminated_during_construction + self.nodebuilder.intrinsics.values() + self.nodebuilder.singletons.values())
 
     declared_rules = self.nodebuilder.all_rules()
-    unreachable_rules = declared_rules.difference(rules_in_graph,
-                                                  rules_eliminated_during_construction)
+    unreachable_rules = declared_rules.difference(rules_in_graph, rules_used)
     for rule in sorted(unreachable_rules):
       full_unfulfillable_rules[UnreachableRule(rule)] = [Diagnostic(None, 'Unreachable')]
+
+    full_root_rules, full_dependency_edges = self._remove_unfulfillable_rules_and_dependents(
+      full_root_rules,
+      full_dependency_edges,
+      full_unfulfillable_rules)
 
     return RuleGraph(self.root_subject_selector_fns,
                          list(full_root_rules),
                          full_dependency_edges,
                          full_unfulfillable_rules)
 
-  def _construct_graph(self, root_rule):
-    root_rules = []
-    rule_dependency_edges = OrderedDict()
-    unfulfillable_rules = OrderedDict()
-    rules_to_traverse = deque([root_rule])
+  def _construct_graph(self,
+                       beginning_rule,
+                       root_rules=None,
+                       rule_dependency_edges=None,
+                       unfulfillable_rules=None):
+    root_rules = set() if root_rules is None else root_rules
+    rule_dependency_edges = dict() if rule_dependency_edges is None else rule_dependency_edges
+    unfulfillable_rules = dict() if unfulfillable_rules is None else unfulfillable_rules
+    rules_to_traverse = deque([beginning_rule])
 
     def _find_rhs_for_select(subject_type, selector):
       if selector.type_constraint.satisfied_by_type(subject_type):
@@ -572,16 +530,18 @@ class GraphMaker(object):
                           if g not in rule_dependency_edges and g not in unfulfillable_rules]
       rules_to_traverse.extend(unseen_dep_rules)
       if type(rule) is RootRule:
-        root_rules.extend(dep_rules)
+        root_rules.update(dep_rules)
         return
-      if rule not in rule_dependency_edges:
+      elif rule not in rule_dependency_edges:
         new_edges = RuleEdges()
         new_edges.add_edges_via(selector_path, dep_rules)
         rule_dependency_edges[rule] = new_edges
       else:
         existing_deps = rule_dependency_edges[rule]
-        if existing_deps.has_edges_for(selector_path, dep_rules):
-          return
+        if existing_deps.has_edges_for(selector_path):
+          raise ValueError("rule {} already has dependencies set for selector {}"
+                           .format(rule, selector_path))
+
         existing_deps.add_edges_via(selector_path, dep_rules)
 
     while rules_to_traverse:
@@ -677,9 +637,6 @@ class GraphMaker(object):
         # NB: In this case, there are no selectors.
         add_rules_to_graph(entry, None, tuple())
 
-    root_rules, rule_dependency_edges = self._remove_unfulfillable_rules_and_dependents(root_rules,
-      rule_dependency_edges, unfulfillable_rules)
-
     return root_rules, rule_dependency_edges, unfulfillable_rules
 
   def _remove_unfulfillable_rules_and_dependents(self,
@@ -702,15 +659,14 @@ class GraphMaker(object):
           # NB: these are removed at the end
           continue
 
-        if unfulfillable_entry in dependency_edges:
-          if dependency_edges.makes_unfulfillable(unfulfillable_entry):
-            unfulfillable_rules[current_entry] = [Diagnostic(current_entry.subject_type,
-                                                  'depends on unfulfillable {}'.format(unfulfillable_entry))]
-            removal_traversal.append(current_entry)
-          else:
-            rule_dependency_edges[current_entry] = dependency_edges.without_rule(unfulfillable_entry)
+        if dependency_edges.makes_unfulfillable(unfulfillable_entry):
+          unfulfillable_rules[current_entry] = [Diagnostic(current_entry.subject_type,
+                                                'depends on unfulfillable {}'.format(unfulfillable_entry))]
+          removal_traversal.append(current_entry)
+        else:
+          rule_dependency_edges[current_entry] = dependency_edges.without_rule(unfulfillable_entry)
 
-    rule_dependency_edges = OrderedDict((k, v) for k, v in rule_dependency_edges.items()
-                                        if k not in unfulfillable_rules)
+    rule_dependency_edges = dict((k, v) for k, v in rule_dependency_edges.items()
+                                 if k not in unfulfillable_rules)
     root_rules = tuple(r for r in root_rules if r not in unfulfillable_rules)
     return root_rules, rule_dependency_edges

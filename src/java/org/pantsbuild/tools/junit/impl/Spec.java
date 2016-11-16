@@ -19,9 +19,10 @@ import org.pantsbuild.junit.annotations.TestSerial;
 class Spec {
   private final Class<?> clazz;
   private final ImmutableSet<String> methods;
+  private static final ImmutableSet<String> empty = ImmutableSet.of();  // To get around java7 quirk
 
   Spec(Class<?> clazz) {
-    this(clazz, ImmutableSet.of());
+    this(clazz, Spec.empty);
   }
 
   private Spec(Class<?> clazz, ImmutableSet<String> methods) {

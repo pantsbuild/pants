@@ -37,7 +37,7 @@ statements in your Java code.
 
 For example, your `BUILD` file might have
 
-!inc[start-after=sources&end-before=src/java](../../../../../tests/java/org/pantsbuild/example/hello/greet/BUILD)
+!inc[start-after=junit_tests&end-before=src/java](../../../../../tests/java/org/pantsbuild/example/hello/greet/BUILD)
 
 And your Java code might have:
 

@@ -1,5 +1,4 @@
 node_module(
-  name='web-project',
   sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
   dependencies=[
     'contrib/node/examples/3rdparty/node/mocha',

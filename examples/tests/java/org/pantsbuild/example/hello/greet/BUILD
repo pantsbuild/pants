@@ -3,8 +3,7 @@
 
 # Test the Hello World example's "greet" library
 
-junit_tests(name='greet',
-  sources=globs('*.java'),
+junit_tests(
   dependencies=[
     'examples/src/java/org/pantsbuild/example/hello/greet',
   ],

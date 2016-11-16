@@ -21,20 +21,22 @@ logger = logging.getLogger(__name__)
 
 class BaseLocalArtifactCache(ArtifactCache):
 
-  def __init__(self, artifact_root, compression, permissions=None):
+  def __init__(self, artifact_root, compression, permissions=None, dereference=True):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param int compression: The gzip compression level for created artifacts.
                             Valid values are 0-9.
-    :param string permissions: File permissions to use when creating artifact files.
+    :param str permissions: File permissions to use when creating artifact files.
+    :param bool dereference: Dereference symlinks when creating the cache tarball.
     """
     super(BaseLocalArtifactCache, self).__init__(artifact_root)
     self._compression = compression
     self._cache_root = None
     self._permissions = permissions
+    self._dereference = dereference
 
   def _artifact(self, path):
-    return TarballArtifact(self.artifact_root, path, self._compression)
+    return TarballArtifact(self.artifact_root, path, self._compression, dereference=self._dereference)
 
   @contextmanager
   def _tmpfile(self, cache_key, use):
@@ -51,7 +53,13 @@ class BaseLocalArtifactCache(ArtifactCache):
       yield self._store_tarball(cache_key, tmp.name)
 
   def store_and_use_artifact(self, cache_key, src, results_dir=None):
-    """Read the content of a tarball from an iterator and return an artifact stored in the cache."""
+    """Store and then extract the artifact from the given `src` iterator for the given cache_key.
+
+    :param cache_key: Cache key for the artifact.
+    :param src: Iterator over binary data to store for the artifact.
+    :param str results_dir: The path to the expected destination of the artifact extraction: will
+      be cleared both before extraction, and after a failure to extract.
+    """
     with self._tmpfile(cache_key, 'read') as tmp:
       for chunk in src:
         tmp.write(chunk)
@@ -60,9 +68,19 @@ class BaseLocalArtifactCache(ArtifactCache):
       artifact = self._artifact(tarball)
 
       if results_dir is not None:
-        safe_rmtree(results_dir)
+        safe_mkdir(results_dir, clean=True)
 
-      artifact.extract()
+      try:
+        artifact.extract()
+      except Exception:
+        # Do our best to clean up after a failed artifact extraction. If a results_dir has been
+        # specified, it is "expected" to represent the output destination of the extracted
+        # artifact, and so removing it should clear any partially extracted state.
+        if results_dir is not None:
+          safe_mkdir(results_dir, clean=True)
+        safe_delete(tarball)
+        raise
+
       return True
 
   def _store_tarball(self, cache_key, src):
@@ -74,18 +92,20 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
 
   def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None,
-               permissions=None):
+               permissions=None, dereference=True):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
     :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
     :param str permissions: File permissions to use when creating artifact files.
+    :param bool dereference: Dereference symlinks when creating the cache tarball.
     """
     super(LocalArtifactCache, self).__init__(
       artifact_root,
       compression,
       permissions=int(permissions.strip(), base=8) if permissions else None,
+      dereference=dereference
     )
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
     self._max_entries_per_target = max_entries_per_target

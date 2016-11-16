@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  name='annotations',
   provides=artifact(
     org='org.pantsbuild',
     name='junit-runner-annotations',
@@ -11,5 +10,5 @@ java_library(
       Annotations for use with org.pantsbuild#junit-runner that support running tests in parallel.
     """)
   ),
-  sources=globs('*.java')
+  platform='java7',
 )

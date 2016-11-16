@@ -36,8 +36,6 @@ class JavaAntlrLibrary(JvmTarget):
                                            provides=provides,
                                            excludes=excludes,
                                            **kwargs)
-    self.add_labels('codegen')
-
     if not sources:
       raise ValueError("Missing required 'sources' parameter.")
     self.sources = sources

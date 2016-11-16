@@ -36,6 +36,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+    'tests/python/pants_test/cache:cache_server',
   ],
   tags = {'integration'},
   timeout=180,

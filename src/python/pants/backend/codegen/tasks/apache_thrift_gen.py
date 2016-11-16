@@ -48,14 +48,6 @@ class ApacheThriftGen(SimpleCodegenTask):
                   'code.  If not supplied, then --deps will be used for service deps.')
 
   @classmethod
-  def global_subsystems(cls):
-    return super(ApacheThriftGen, cls).global_subsystems() + (ThriftDefaults,)
-
-  @classmethod
-  def task_subsystems(cls):
-    return super(ApacheThriftGen, cls).task_subsystems() + (ThriftBinary.Factory,)
-
-  @classmethod
   def subsystem_dependencies(cls):
     return (super(ApacheThriftGen, cls).subsystem_dependencies() +
             (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))

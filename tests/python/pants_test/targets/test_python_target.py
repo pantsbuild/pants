@@ -62,7 +62,8 @@ class PythonTargetTest(BaseTest):
 
   def test_resources(self):
     self.create_file('test/data.txt', contents='42')
-    lib = self.make_target(spec='test:lib', target_type=PythonLibrary, resources=['data.txt'])
+    lib = self.make_target(spec='test:lib', target_type=PythonLibrary, sources=[],
+                           resources=['data.txt'])
     self.assert_single_resource_dep(lib,
                                     expected_resource_path='test/data.txt',
                                     expected_resource_contents='42')
@@ -72,6 +73,7 @@ class PythonTargetTest(BaseTest):
     res = self.make_target(spec='res:resources', target_type=Resources, sources=['data.txt'])
     lib = self.make_target(spec='test:lib',
                            target_type=PythonLibrary,
+                           sources=[],
                            resource_targets=[res.address.spec])
     resource_dep = self.assert_single_resource_dep(lib,
                                                    expected_resource_path='res/data.txt',
