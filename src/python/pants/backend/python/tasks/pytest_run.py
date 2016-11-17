@@ -585,8 +585,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
             shutil.copyfile(src, os.path.join(tmp, os.path.basename(src)))
             cmd.append(os.path.basename(src))
 
-        # After https://github.com/scootdev/scoot/pull/166, "tmp" will be enough.
-        pex_id = client_lib.create_snapshot(os.path.join(tmp, '*'))
+        pex_id = client_lib.create_snapshot(tmp)
         run_id = client_lib.run(pex_id, cmd)
         run_id_to_cmd[run_id] = cmd
 
