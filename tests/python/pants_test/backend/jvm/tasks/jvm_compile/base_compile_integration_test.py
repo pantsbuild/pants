@@ -66,16 +66,18 @@ class BaseCompileIT(PantsRunIntegrationTest):
     """
     :API: public
     """
-    global_args = [
-        '--cache-write',
-        '--cache-write-to=[\'{}\']'.format(cacheurl),
-    ] + self._EXTRA_TASK_ARGS
+    config = {
+      'cache': {
+        'write': True,
+        'write_to': [cacheurl],
+      },
+    }
     task = 'test' if test else 'compile'
-    args = [task, target] + (extra_args if extra_args else [])
+    args = self._EXTRA_TASK_ARGS + [task, target] + (extra_args if extra_args else [])
     # Clean-all on the first iteration.
     if clean_all:
       args.insert(0, 'clean-all')
-    return self.run_pants_with_workdir(global_args + args, workdir)
+    return self.run_pants_with_workdir(args, workdir, config=config)
 
   def get_only(self, found, name):
     files = found[name]
