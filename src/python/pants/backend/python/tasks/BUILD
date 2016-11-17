@@ -10,6 +10,7 @@ python_library(
     '3rdparty/python:pex',
     '3rdparty/python:pytest',
     '3rdparty/python:pytest-cov',
+    '3rdparty/python:Scoot',
     '3rdparty/python:setuptools',
     '3rdparty/python:six',
     'src/python/pants/backend/codegen/targets:python',
