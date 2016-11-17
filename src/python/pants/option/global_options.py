@@ -154,6 +154,9 @@ class GlobalOptionsRegistrar(Optionable):
              metavar='<regexp>',
              help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
+    register('--pants-export-classpath-dir', advanced=True, metavar='<dir>',
+             default=os.path.join(register.bootstrap.pants_distdir, 'export-classpath'),
+             help='Write exported classpath to this dir.')
     # Relative pants_distdir to buildroot. Requires --pants-distdir to be bootstrapped above first.
     # e.g. '/dist/'
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))

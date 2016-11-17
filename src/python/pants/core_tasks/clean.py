@@ -29,6 +29,9 @@ class Clean(Task):
                   'for large pants workdirs.')
 
   def execute(self):
+    logger.debug("Removing {}".format(self.get_options().pants_export_classpath_dir))
+    safe_rmtree(self.get_options().pants_export_classpath_dir)
+
     pants_wd = self.get_options().pants_workdir
     pants_trash = os.path.join(pants_wd, "trash")
 
