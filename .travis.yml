@@ -62,7 +62,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -70,6 +69,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -90,7 +90,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -98,6 +97,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -118,7 +118,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -126,6 +125,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -146,7 +146,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -154,6 +153,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -174,7 +174,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -182,6 +181,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -202,7 +202,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -210,6 +209,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -230,7 +230,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -238,6 +237,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -258,7 +258,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -266,6 +265,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -286,7 +286,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -294,6 +293,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -314,7 +314,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -322,6 +321,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:
@@ -342,7 +342,6 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      # These are needed to run the Android SDK tools.
       addons:
         apt:
           packages:
@@ -350,6 +349,7 @@ matrix:
             - lib32z1
             - lib32z1-dev
             - oracle-java6-installer
+            - gcc-multilib
       language: python
       python: "2.7.12"
       before_install:

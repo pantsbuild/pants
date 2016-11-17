@@ -420,9 +420,17 @@ class AntJunitXmlReportListener extends RunListener {
         // problem with initialization and we won't get a testFinished callback so
         // call finish here.
         testCase.finished();
-        suite.testCases.clear();
-        suite.testCases.add(testCase);
-        suite.finished();
+        if (suite != null) {
+          suite.testCases.clear();
+          suite.testCases.add(testCase);
+          suite.finished();
+        }
+      } else {
+        testCase.finished();
+        testCase.setError(exception);
+        if (suite != null) {
+          suite.testCases.add(testCase);
+        }
       }
     } else {
       if (isFailure) {
