@@ -5,14 +5,15 @@ package org.pantsbuild.tools.junit.impl;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Arrays;
 import org.junit.Ignore;
 import org.junit.runner.Description;
 import org.junit.runner.RunWith;
 import org.junit.runner.notification.Failure;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 
 /**
  * Utilities for working with junit test runs.
@@ -167,6 +168,10 @@ final class Util {
 
     // Support classes using junit 4.x custom runners.
     if (isUsingCustomRunner(clazz)) {
+      return true;
+    }
+
+    if (ScalaTestUtil.isScalaTestTest(clazz)) {
       return true;
     }
 

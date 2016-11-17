@@ -46,3 +46,4 @@ Contributing to Pants
 ---------------------
 
 + [[Pants Developer Center|pants('src/docs:dev')]]
++ [Code of Conduct](https://github.com/pantsbuild/pants/blob/master/CODE_OF_CONDUCT.md)

@@ -55,7 +55,7 @@ class FindBugsTest(PantsRunIntegrationTest):
     self.assertIn('Bugs: 1 (High: 0, Normal: 0, Low: 1)', pants_run.stdout_data)
 
   def test_all_warnings(self):
-    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:all']
+    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs::']
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
     self.assertIn('Bug[high]: EC_UNRELATED_TYPES', pants_run.stdout_data)
@@ -65,7 +65,7 @@ class FindBugsTest(PantsRunIntegrationTest):
     self.assertIn('Bugs: 3 (High: 1, Normal: 1, Low: 1)', pants_run.stdout_data)
 
   def test_max_rank_fail_on_error(self):
-    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:all']
+    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs::']
     pants_ini_config = {'compile.findbugs': {'max_rank': 9, 'fail_on_error': True}}
     pants_run = self.run_pants(cmd, config=pants_ini_config)
     self.assert_failure(pants_run)
@@ -75,7 +75,7 @@ class FindBugsTest(PantsRunIntegrationTest):
     self.assertIn('FAILURE: failed with 2 bugs and 0 errors', pants_run.stdout_data)
 
   def test_exclude(self):
-    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:all']
+    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs::']
     with temporary_file(root_dir=get_buildroot()) as exclude_file:
       exclude_file.write(dedent("""\
         <?xml version="1.0" encoding="UTF-8"?>
@@ -119,9 +119,12 @@ class FindBugsTest(PantsRunIntegrationTest):
     self.assertIn('Bugs: 1 (High: 1, Normal: 0, Low: 0)', pants_run.stdout_data)
 
   def test_transitive(self):
-    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:no_sources']
-    pants_ini_config = {'compile.findbugs': {'transitive': False}}
+    cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:all']
+    pants_ini_config = {'compile.findbugs': {'transitive': True}}
     pants_run = self.run_pants(cmd, config=pants_ini_config)
     self.assert_success(pants_run)
-    self.assertNotIn('Bugs:', pants_run.stdout_data)
-    self.assertIn('No jars to be analyzed', pants_run.stdout_data)
+    self.assertIn('Bug[high]: EC_UNRELATED_TYPES', pants_run.stdout_data)
+    self.assertIn('Bug[normal]: NP_ALWAYS_NULL', pants_run.stdout_data)
+    self.assertIn('Bug[low]: VA_FORMAT_STRING_USES_NEWLINE', pants_run.stdout_data)
+    self.assertNotIn('Errors:', pants_run.stdout_data)
+    self.assertIn('Bugs: 3 (High: 1, Normal: 1, Low: 1)', pants_run.stdout_data)
