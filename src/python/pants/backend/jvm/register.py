@@ -37,6 +37,7 @@ from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
+from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.backend.jvm.tasks.consolidate_classpath import ConsolidateClasspath
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
@@ -165,6 +166,8 @@ def register_goals():
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
+
+  task(name='classmap', action=ClassmapTask).install('classmap')
 
   # Generate documentation.
   task(name='javadoc', action=JavadocGen).install('doc')
