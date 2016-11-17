@@ -17,10 +17,8 @@ python_library(
   name='base_compile_integration_test',
   sources=['base_compile_integration_test.py'],
   dependencies=[
-    'src/python/pants/cache',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
 
