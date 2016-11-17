@@ -36,3 +36,11 @@ class CleanAllTest(PantsRunIntegrationTest):
       subprocess.call(["touch", trash_dir + "foo.txt"])
       self.assert_success(self.run_pants_with_workdir(["clean-all", "--async"], work_dir))
       self.assertFalse(os._exists(trash_dir))
+
+  def test_clean_export_classpath_dir(self):
+    pants_run = self.run_pants(['export-classpath', '--manifest-jar-only', 'examples/src/java/org/pantsbuild/example/hello/greet'])
+    self.assert_success(pants_run)
+    self.assertTrue(os.path.exists('dist/export-classpath/manifest.jar'))
+    clean_run = self.run_pants(['clean-all'])
+    self.assert_success(clean_run)
+    self.assertFalse(os.path.exists('dist/export-classpath/manifest.jar'))
