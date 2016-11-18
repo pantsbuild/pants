@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 
 from pants.subsystem.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_split
@@ -47,6 +48,9 @@ class JVM(Subsystem):
                   'the value of the --debug-port option.')
     register('--synthetic-classpath', advanced=True, type=bool, default=True,
              help="Use synthetic jar to work around classpath length restrictions.")
+    register('--classpath-export', advanced=True, metavar='<dir>',
+             default=os.path.join(register.bootstrap.pants_distdir, 'export-classpath'),
+             help='Directory to write exported classpaths.')
 
   def get_jvm_options(self):
     """Return the options to run this JVM with.

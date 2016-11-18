@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
@@ -39,7 +40,7 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
                                                     init_func=ClasspathProducts.init_func(self.pants_workdir))
       task = self.create_task(context)
 
-      target_classpath_output = task.get_options().pants_export_classpath_dir
+      target_classpath_output = JVM.scoped_instance(task).get_options().classpath_export
 
       # Create a classpath entry.
       touch(os.path.join(jar_dir, 'z1.jar'))
