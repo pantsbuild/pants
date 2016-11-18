@@ -78,7 +78,7 @@ class ResolveRequirementsTest(TaskTestBase):
     names_and_platforms = set(name_and_platform(w) for w in wheels)
     expected_name_and_platforms = {
       # Note that Platform.current() may happen to be the same as one of the other platforms.
-      ('cffi-1.9.1', Platform.current()),
+      ('cffi-1.9.1', Platform.current().replace('-', '_')),
       ('cffi-1.9.1', 'macosx_10_10_x86_64'),
       ('cffi-1.9.1', 'manylinux1_i686'),
       ('cffi-1.9.1', 'win_amd64'),
