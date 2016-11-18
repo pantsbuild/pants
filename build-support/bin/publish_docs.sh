@@ -11,7 +11,7 @@ source ${REPO_ROOT}/build-support/common.sh
 PANTS_EXE="${REPO_ROOT}/pants"
 
 function usage() {
-  echo "Publishes the http://pantsbuild.github.io/ docs locally or remotely."
+  echo "Publishes the http://pantsbuild.org/ docs locally or remotely."
   echo
   echo "Usage: $0 (-h|-opd)"
   echo " -h           print out this help message"

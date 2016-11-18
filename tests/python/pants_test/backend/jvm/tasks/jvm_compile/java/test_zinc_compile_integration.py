@@ -54,7 +54,6 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         pants_run = self.run_test_compile(
           workdir, cachedir, target,
           extra_args=[
-            '--compile-zinc-name-hashing',
             '--cache-compile-zinc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
           ],
           clean_all=True,
@@ -213,3 +212,10 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         )
         self.assertNotEquals(0, pants_run.returncode)  # Our custom javactool always fails.
         self.assertIn('Pants caused Zinc to load a custom JavacTool', pants_run.stdout_data)
+
+  def test_no_zinc_file_manager(self):
+    target_spec = 'testprojects/src/java/org/pantsbuild/testproject/bench:jmh'
+    with self.temporary_workdir() as workdir:
+      with self.temporary_cachedir() as cachedir:
+        pants_run = self.run_test_compile(workdir, cachedir, target_spec, clean_all=True)
+        self.assertEquals(0, pants_run.returncode)

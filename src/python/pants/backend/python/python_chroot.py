@@ -241,9 +241,9 @@ class PythonChroot(object):
   def _resolve_multi(self, requirements, find_links):
     """Multi-platform dependency resolution for PEX files.
 
-       Given a pants configuration and a set of requirements, return a list of distributions
-       that must be included in order to satisfy them.  That may involve distributions for
-       multiple platforms.
+       Given a pants configuration and a set of requirements, return a map of platform name -> list
+       of :class:`pkg_resources.Distribution` instances needed to satisfy them on that platform.
+       That may involve distributions for multiple platforms.
 
        :param requirements: A list of :class:`PythonRequirement` objects to resolve.
        :param find_links: Additional paths to search for source packages during resolution.

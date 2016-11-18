@@ -11,3 +11,13 @@ jar_library(
     ]),
   ],
 )
+
+java_library(name='jmh',
+  dependencies=[
+    '3rdparty/jvm/org/openjdk/jmh:jmh',
+  ],
+  sources=['JmhBench.java'],
+  # Turn off zinc provided file manager, incompatible with jmh.
+  # See https://github.com/sbt/zinc/issues/185
+  zinc_file_manager=False,
+)

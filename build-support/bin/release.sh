@@ -421,7 +421,7 @@ EOM
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
   echo "PyPi.  Credentials are needed for this as described in the"
-  echo "release docs: http://pantsbuild.github.io/release.html"
+  echo "release docs: http://pantsbuild.org/release.html"
   echo
   echo "Usage: $0 [-d] (-h|-n|-t|-l|-o)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
