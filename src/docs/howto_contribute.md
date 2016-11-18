@@ -175,7 +175,12 @@ there might be a few iterations before finally getting a Ship It. As reviewers e
 feedback, the github page updates; it should also send
 you mail as long as you are `Subscribed` to notifications for the pull request.
 
-If those reviews inspire you to change some code, great. Change some
+Github pull requests currently lack the ability to mark a review comment as "blocking"
+for a change, so it's important for contributors and reviewers to communicate clearly which
+comments they view as blocking. If it's unclear whether a reviewer feels strongly about
+a particular point, please bias toward clearing up the uncertainty before proceeding.
+
+If those reviews inspire you to change some code, great.  Change some
 code and commit locally. When you're ready to update the pull request with your changes,
 push to the relevant branch on your fork as you did before:
 
