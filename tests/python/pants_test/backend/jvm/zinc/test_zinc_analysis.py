@@ -9,6 +9,7 @@ import os
 import StringIO
 import unittest
 
+from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.zinc.zinc_analysis_element import ZincAnalysisElement
 from pants.backend.jvm.zinc.zinc_analysis_parser import ZincAnalysisParser
 from pants.util.contextutil import environment_as
@@ -30,8 +31,8 @@ class ZincAnalysisTestSimple(unittest.TestCase):
         orig = get_analysis_text(analysis_file)
         buf = StringIO.StringIO()
         ZincAnalysisParser().rebase(iter(orig.splitlines(True)), buf,
-                                    {b'/src/pants': b'$PANTS_HOME',
-                                     b'/src/pants/.pants.d': b'$PANTS_WORKDIR'}, java_home)
+                                    {b'/src/pants': AnalysisTools._PANTS_BUILDROOT_PLACEHOLDER,
+                                     b'/src/pants/.pants.d': AnalysisTools._PANTS_WORKDIR_PLACEHOLDER}, java_home)
         return buf.getvalue()
 
       # Now check rebasing.
@@ -49,7 +50,7 @@ class ZincAnalysisTestSimple(unittest.TestCase):
       deps = ZincAnalysisParser().parse_deps(infile, '')
       self.assertItemsEqual(deps['/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala'], [
           '/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar',
-          '/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala',
+          'org/pantsbuild/example/hello/welcome/WelcomeEverybody$.class',
         ])
 
 

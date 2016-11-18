@@ -49,11 +49,22 @@ class ZincAnalysisParser(object):
     return self._find_repeated_at_header(infile, b'products')
 
   def parse_deps(self, infile, classes_dir):
+    # Note: relies on the fact that these headers appear in this order in the file to use
+    # the same file handle to read them mostly-sequentially.
     self._verify_version(infile)
-    # Note: relies on the fact that these headers appear in this order in the file.
-    bin_deps = self._find_repeated_at_header(infile, b'binary dependencies')
-    src_deps = self._find_repeated_at_header(infile, b'direct source dependencies')
-    ext_deps = self._find_repeated_at_header(infile, b'direct external dependencies')
+
+    # Library dependencies: source -> jar.
+    bin_deps = self._find_repeated_at_header(infile, b'library dependencies')
+    # Class dependencies: classname -> classname.
+    ext_deps = []
+    for ext_dep_header in (b'member reference internal dependencies',
+                           b'member reference external dependencies'):
+      ext_deps.append(self._find_repeated_at_header(infile, ext_dep_header))
+
+    classname_to_sources = {}
+    for src, classnames in self._find_repeated_at_header(infile, b'class names').items():
+      for classname in classnames:
+        classname_to_sources[classname] = src
 
     # TODO(benjy): Temporary hack until we inject a dep on the scala runtime jar.
     scalalib_re = re.compile(r'scala-library-\d+\.\d+\.\d+\.jar$')
@@ -61,14 +72,17 @@ class ZincAnalysisParser(object):
     for src, deps in six.iteritems(bin_deps):
       filtered_bin_deps[src] = filter(lambda x: scalalib_re.search(x) is None, deps)
 
-    transformed_ext_deps = {}
+    transformed_ext_deps = defaultdict(list)
     def fqcn_to_path(fqcn):
       return os.path.join(classes_dir, fqcn.replace(b'.', os.sep) + b'.class')
-    for src, fqcns in ext_deps.items():
-      transformed_ext_deps[src] = [fqcn_to_path(fqcn) for fqcn in fqcns]
+    for ext_deps_dict in ext_deps:
+      for clz, fqcns in ext_deps_dict.items():
+        transformed_ext_deps[classname_to_sources[clz]].extend(fqcn_to_path(fqcn) for fqcn in fqcns)
 
+    # TODO: We skip converting the source classname to a target-internal sourcefile, although it
+    # looks like we could do that by parsing the `class names` header from this section.
     ret = defaultdict(list)
-    for d in [filtered_bin_deps, src_deps, transformed_ext_deps]:
+    for d in [filtered_bin_deps, transformed_ext_deps]:
       for src, deps in d.items():
         ret[src].extend(deps)
     return ret
