@@ -151,21 +151,19 @@ to host code reviews:
 When <a pantsref="dev_run_all_tests">all of the tests are green on travis</a>, you're
 probably ready to request review for the change!
 
-To get your pull request reviewed, you should fill in:
+To get your pull request reviewed, you should:
 
-- A useful change description, with a short and descriptive title.
-- Links to any relevant github issues for the change.
-- Any specific [pants committers](https://github.com/orgs/pantsbuild/teams/committers)
-  who should review your change to the Assignees field. Running `git log -- $filename` on
-  one or more of the files that you changed is a good way to find potential reviewers!
+- Include a short and descriptive title.
+- Fill in each of the sections of the pull request template, and include links to any
+  relevant github issues for the change.
+- Mention (usually in a comment on the PR) any specific
+  [pants committers](https://github.com/orgs/pantsbuild/teams/committers)
+  who should review your change. Running `git log -- $filename` on one or more of the files that
+  you changed is a good way to find potential reviewers!
 
 Finally, when the review is ready for attention, add the `reviewable` label: this is the
 signal to committers and contributors that the review is ready for attention. You can see
 a list of all actively `reviewable` reviews [here](https://github.com/pantsbuild/pants/labels/reviewable).
-
-Note that while only committers are available to add in the Assignees field,
-any pants contributors may still post reviews if you provide them with a link
-manually or they see it in the google group or github notifications.
 
 #### Iterating
 
@@ -194,7 +192,7 @@ If at any point you need to make changes that will fundamentally overhaul a revi
 consider temporarily removing the `reviewable` label in order to let reviewers know
 to hold off until the code is ready.
 
-### Commit Your Change
+### Committing a Change
 
 At this point you've made a change, had it reviewed (and received one or more Ship Its!) and
 are ready to complete things by getting your change in master. (If you're not a
@@ -202,7 +200,7 @@ committer, please ask one to do this section for you.)
 
 A committer should push the `Squash and merge` button on the PR, and ensure that the
 commit message generated from the review summary is accurate. In particular, the title should
-contain a useful summary of the change, and the description should fully describe the change
-and its implications for users.
+contain a useful summary of the change, and the description should follow the pull request
+template (defined in the root of the repo at `PULL_REQUEST_TEMPLATE.md`).
 
 Finally, the committer will select `Confirm squash and merge`. The change is now complete. Huzzah!
