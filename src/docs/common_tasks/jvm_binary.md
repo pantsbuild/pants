@@ -16,8 +16,8 @@ In any `jvm_binary` target you must specify the following:
 
 * A `name` for the target
 * A `basename` that will be used as the basis of the filename if you [[bundle|pants('src/docs/common_tasks:bundle')]] the target using a `jvm_app` target
-* The `main` function
-* A list of `dependencies` that must include at least one `scala_library` or `java_library` target. More info can be found in [[Add a Dependency from Source|TODO]].
+* The `main` function which serves as the executable's entry point.
+* A list of `dependencies` that must include at least one `scala_library` or `java_library` target. More info can be found in [[Add a Dependency from Source|pants('src/docs/common_tasks:dependencies')]].
 * A list of file `bundles` for use as static assets (optional). More info can be found in [[Specify a File Bundle|pants('src/docs/common_tasks:file_bundles')]].
 
 Here's an example `jvm_binary` definition:

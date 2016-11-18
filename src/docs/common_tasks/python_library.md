@@ -42,5 +42,5 @@ Now, another library or binary can depend on the target you created:
 
 ## See Also
 
-* [[Dependency Something|TODO]]
 * [[Specify a Python Executable (PEX)|pants('src/docs/common_tasks:pex')]]
+* [[Add a Dependency on Another Target|pants('src/docs/common_tasks:dependencies')]]

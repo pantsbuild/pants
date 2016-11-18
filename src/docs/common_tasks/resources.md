@@ -10,7 +10,7 @@ Create a `resources` target that tells Pants which files to include in the resou
 
 ## Discussion
 
-A `resources` target definition must include a `name` and a list of `sources`, which can consist of a simple list of file names, multiple `globs` or `rglobs` definitions (more on that in [[TODO]]), or any combination thereof. This would create a resource bundle with two files:
+A `resources` target definition must include a `name` and a list of `sources`, which can consist of a simple list of file names, multiple `globs` or `rglobs` definitions (more on that in [[Use globs and rglobs to Group Files|pants('src/docs/common_tasks:globs')]]), or any combination thereof. This would create a resource bundle with two files:
 
     ::python
     resources(name='config'
@@ -48,4 +48,4 @@ Once your resource bundle has been specified, you can include it in, for example
 
 ## See Also
 
-* [[Create a Bundled zip or Other Archive|TODO]]
+* [[Create a Bundled zip or Other Archive|pants('src/docs/common_tasks:bundle')]]

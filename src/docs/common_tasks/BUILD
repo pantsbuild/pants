@@ -1,4 +1,9 @@
 page(
+  name='alias',
+  source='alias.md',
+)
+
+page(
   name='bundle',
   source='bundle.md',
 )
@@ -21,6 +26,11 @@ page(
 page(
   name='compile',
   source='compile.md',
+)
+
+page(
+  name='dependencies',
+  source='dependencies.md',
 )
 
 page(

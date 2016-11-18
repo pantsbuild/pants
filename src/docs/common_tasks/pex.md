@@ -2,9 +2,11 @@
 
 ## Problem
 
-You need to create an executable `.pex` Python binary (aka a "PEX") out of Python source code.
+You need to create an executable `.pex` Python binary (aka a "PEX") out of Python source code. 
 
-**Note**: If you need to create a Python library target instead, see [[Define a Python Library Target|pants('src/docs/common_tasks:python_library')]].
+For more on PEX files see: [https://github.com/pantsbuild/pex](https://github.com/pantsbuild/pex)
+
+If you need to create a Python library target instead, see [[Define a Python Library Target|pants('src/docs/common_tasks:python_library')]].
 
 ## Solution
 

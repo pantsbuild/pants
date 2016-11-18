@@ -20,7 +20,7 @@ Here is an example `jvm_app` definition that shows different possibilities for d
     )
 
 
-1. The `rglobs` definition will recursively include all files in the `src/main/resources` directory, *including all sub-directories*. More info can be found in [[Use globs and rglobs to group files|TODO]].
+1. The `rglobs` definition will recursively include all files in the `src/main/resources` directory, *including all sub-directories*. More info can be found in [[Use globs and rglobs to group files|pants('src/docs/common_tasks:globs')]].
 2. All files in the `config` directory are included except any `.xml` files.
 3. All `.sh` files in the `src/scripts` directory will be included. The `relative_to` effectively strips away the specified directory, in this case `src`, which means that all files in `src/scripts` would end up in the root of the bundle. If you specified `relative_to='src/scripts'` instead, for example, all files would end up in the root directory.
 

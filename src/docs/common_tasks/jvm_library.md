@@ -19,9 +19,9 @@ Add a `scala_library` or `java_library` target to a `BUILD` file in the appropri
 A `scala_library` or `java_library` target should specify the following:
 
 * A `name` for the library. This may be something like just `scala` if you have only one `scala_library` target in a project or something more specific like `client-lib`.
-* Either a single `source` file or a list of `sources`. If you're including just a few files, you should consider specifying a sources list, e.g. `sources=['File1.scala', 'File2.scala']`; if you're including, you may want to specify a `globs` or `rglobs`, e.g. `sources=globs('*.scala')`. More info can be found in [[Use globs and rglobs to Group Files|TODO]]. The example further down use an `rglobs` definition.
-* A list of `dependencies` (optional). More info on dependencies can be found in [[Add a Dependency on Another Target|TODO]].
-* A list of `resources` (optional). More info on resources can be found in [[Create a Resource Bundle|TODO]].
+* Either a single `source` file or a list of `sources`. If you're including just a few files, you should consider specifying a sources list, e.g. `sources=['File1.scala', 'File2.scala']`; if you're including, you may want to specify a `globs` or `rglobs`, e.g. `sources=globs('*.scala')`. More info can be found in [[Use globs and rglobs to Group Files|pants('src/docs/common_tasks:globs')]]. The example further down use an `rglobs` definition.
+* A list of `dependencies` (optional). More info on dependencies can be found in [[Add a Dependency on Another Target|pants('src/docs/common_tasks:dependencies')]].
+* A list of `resources` (optional). More info on resources can be found in [[Create a Resource Bundle|pants('src/docs/common_tasks:resources')]].
 
 Here's an example target definition:
 
@@ -41,11 +41,11 @@ That library can then be compiled (perhaps for debugging purposes):
     ::python
     $ ./pants compile myproject/src/main/scala
 
-You can combine library targets together into a single target using a **target alias**. More info can be found in [[Create an Alias for a Target|TODO]].
+You can combine library targets together into a single target using a **target alias**. More info can be found in [[Create an Alias for a Target|pants('src/docs/common_tasks:alias')]].
 
 ## See Also
 
 * [[Compile a Library Target|pants('src/docs/common_tasks:compile')]]
 * [[Define a JVM Executable|pants('src/docs/common_tasks:jvm_binary')]]
 * [[Create a Bundled zip or Other Archive|pants('src/docs/common_tasks:bundle')]]
-* [[Create an Alias for a Target|TODO]]
+* [[Create an Alias for a Target|pants('src/docs/common_tasks:alias')]]
