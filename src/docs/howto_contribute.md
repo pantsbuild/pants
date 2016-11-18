@@ -84,15 +84,18 @@ committed.
 
 If you've already cloned your repo without forking, you don't have to
 re-checkout your repo. First, create the fork on github. Make a note the
-clone url of your fork and your github username. Then run the following commands:
+clone url of your fork. Then run the following commands:
 
     :::bash
-    $ git remote add <your-username> <url-to-clone-your-fork>
+    $ git remote remove origin
+    $ git remote add origin <url-to-clone-your-fork>
+    $ git remote add upstream  https://github.com/pantsbuild/pants
 
-After this change, `git push <your-username>` and `git pull <your-username>` will
-go to your fork. You can get the latest changes from the `pantsbuild/pants` repo's
-master branch using the [syncing a fork](https://help.github.com/articles/syncing-a-fork/)
-instructions on github.
+After this change, `git push` and `git pull` will go to your fork. You
+can get the latest changes from the `pantsbuild/pants` repo's master
+branch using the [syncing a
+fork](https://help.github.com/articles/syncing-a-fork/) instructions on
+github.
 
 Whether you've cloned the repo or your fork of the repo, you should setup the
 local pre-commit hooks to ensure your commits meet minimum compliance checks
@@ -111,9 +114,8 @@ the `master` branch that you want to keep, and you want to reset to an _exact_ c
 the `pantsbuild/pants` repo's master branch, use these commands:
 
     :::bash
-    $ git checkout master
-    $ git fetch origin
-    $ git reset --hard origin/master
+    $ git fetch upstream
+    $ git checkout master && git reset --hard upstream/master
 
 ### Making the Change
 
