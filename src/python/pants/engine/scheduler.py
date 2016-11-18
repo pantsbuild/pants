@@ -210,11 +210,8 @@ class LocalScheduler(object):
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)
 
-  def trace(self, roots):
-    """Yields a stringified 'stacktrace' starting from the given failed root.
-
-    :param iterable roots: An iterable of the root nodes to begin the trace from.
-    """
+  def trace(self):
+    """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
     with self._product_graph_lock:
       with temporary_file_path() as path:
         self._native.lib.graph_trace(self._scheduler, bytes(path))

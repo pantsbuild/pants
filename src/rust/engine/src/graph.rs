@@ -260,7 +260,7 @@ impl Graph {
   }
 
 /**
- * Begins a topological walk from the given roots. Provides both the current entry as well as the
+ *  Begins a topological walk from the given roots. Provides both the current entry as well as the
  *  depth from the root.
  */
   fn leveled_walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
@@ -423,9 +423,9 @@ impl Graph {
     };
 
     let _indent = |level: u32| -> String {
-      let mut indent = "".to_string();
+      let mut indent = String::new();
       for _ in 0..level {
-        indent = indent + "  ";
+        indent.push_str("  ");
       }
       indent
     };
@@ -434,19 +434,16 @@ impl Graph {
       let indent = _indent(level);
       let output = format!("{}Computing {} for {}",
                            indent,
-                           match entry.node.product() {
-                             ref x => format!("{}", externs.id_to_str(x.0))
-                           },
-                           match entry.node.subject() {
-                             ref x => format!("{}", externs.id_to_str(x.id()))
-                           });
+                           externs.id_to_str(entry.node.product().0),
+                           externs.id_to_str(entry.node.subject().id()));
       if is_one_level_above_bottom(entry) {
-        format!("{}\n{}  {}", output, indent, match entry.state {
+        let state_str = match entry.state {
           Some(Complete::Return(ref x)) => format!("Return({})", externs.val_to_str(x)),
           Some(Complete::Throw(ref x)) => format!("Throw({:?})", x),
           Some(Complete::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
           None => String::new(),
-        })
+        };
+        format!("{}\n{}  {}", output, indent, state_str)
       } else {
         output
       }

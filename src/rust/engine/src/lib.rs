@@ -456,13 +456,13 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
 
 #[no_mangle]
 pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const libc::c_char) {
-    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-    let path = Path::new(path_str.as_str());
-    with_scheduler(scheduler_ptr, |raw| {
-       raw.scheduler.trace(path).unwrap_or_else(|e| {
-         println!("Failed to write trace to {}: {:?}", path.display(), e);
-       });
-    });
+  let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+  let path = Path::new(path_str.as_str());
+  with_scheduler(scheduler_ptr, |raw| {
+     raw.scheduler.trace(path).unwrap_or_else(|e| {
+       println!("Failed to write trace to {}: {:?}", path.display(), e);
+     });
+  });
 }
 
 
