@@ -214,8 +214,8 @@ class InlinedGraphTest(GraphTestBase):
 
     def assert_equal_or_more_indentation(more_indented_line, less_indented_line):
       self.assertTrue(indent_of(more_indented_line) >= indent_of(less_indented_line),
-                      '\n"{}"\nshould have more equal or more indentation than\n"{}"'.format(more_indented_line,
-                                                                                             less_indented_line))
+                      '\n"{}"\nshould have more equal or more indentation than\n"{}"\n{}'.format(more_indented_line,
+                                                                                             less_indented_line, error_msg))
 
     lines = error_msg.splitlines()
     line_indices_of_throws = [i for i, v in enumerate(lines) if throw_name in v]

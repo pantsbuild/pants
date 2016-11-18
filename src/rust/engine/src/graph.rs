@@ -435,10 +435,10 @@ impl Graph {
                              ref x => format!("{}", externs.id_to_str(x.id()))
                            });
       if is_one_level_above_bottom(entry) {
-        format!("{}\n{}{}", output, indent, match entry.state {
+        format!("{}\n{}  {}", output, indent, match entry.state {
           Some(Complete::Return(ref x)) => format!("Return({})", externs.val_to_str(x)),
           Some(Complete::Throw(ref x)) => format!("Throw({:?})", x),
-          Some(Complete::Noop(ref x, _)) => format!("Noop({:?})", x),
+          Some(Complete::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
           None => String::new(),
         })
       } else {
@@ -469,27 +469,15 @@ impl Graph {
       let (entry, level) = t;
 //      try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme)));
       //println!("{}", _format(entry, level));
-      try!(write!(&mut f, "{}-\n", _format(entry, level)));
+      try!(write!(&mut f, "{}\n", _format(entry, level)));
       //try!(f.write_fmt(format_args!("{}", _format(entry, level))));
 
-      for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
-        for &dep_id in adjacencies {
-          let dep_entry = self.entry_for_id(dep_id);
-          //if !predicate(dep_entry, 0) {
-          /*if is_bottom(dep_entry) {
-            continue;
-          }*/
-          let mut indent = String::new();
-          for _ in 0..level {
-            indent += "  "
-          }
-
-          //try!(write!("{}")f.write_fmt(format_args!("{}--cycledep--", indent)));
-          try!(write!(&mut f, "{}\n", _format(dep_entry, level + 1)));
-          // Write an entry per edge.
-          //let dep_str = dep_entry.format(externs);
-          //println!("    -----> \"{}\"\n", dep_str);
+      for dep_entry in &entry.cyclic_dependencies {
+        let mut indent="".to_string();
+        for _ in 1..level {
+          indent+="  ";
         }
+        try!(write!(&mut f, "{}cycle for {:?}\n", indent, dep_entry));
       }
 
     }
