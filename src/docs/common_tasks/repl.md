@@ -23,8 +23,6 @@ If you're working on a Scala project that has, for example, `com.twitter.util.Fu
 
 **Note**: When opening up a REPL via Pants, only those dependencies that are available to the chosen target can be imported (meaning that the dependencies specified in the `scala_library` or `python_library` definition). If there's a dependency that you'd like to use only in the REPL, you will need to create a library target that includes that dependency.
 
-If you're project doesn't specify *any* external dependencies, you will only be able to interact with the classes, functions, etc. that are available from the runtime you're working with.
-
 It's also possible to open the Scala REPL without first compiling the specified library using the `repl-dirty` goal:
 
     ::bash

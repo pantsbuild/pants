@@ -1,8 +1,6 @@
 # Common Tasks
 
-This section of the Pants documentation is devoted to helping you solve some of
-the most common day-to-day Pants tasks, from defining a Python executable to
-opening up a Scala REPL and much more.
+This section of the Pants documentation describes the most common day-to-day Pants tasks, from defining a Python executable to opening up a Scala REPL and much more.
 
 ## Tasks
 
@@ -18,6 +16,7 @@ opening up a Scala REPL and much more.
 * [[Create a Resource Bundle|pants('src/docs/common_tasks:resources')]]
 * [[Use globs and rglobs to Group Files|pants('src/docs/common_tasks:globs')]]
 * [[Access a REPL for a Target|pants('src/docs/common_tasks:repl')]]
+* [[Generate Code from Thrift Definitions|pants('src/docs/common_tasks:thrift_gen')]]
 
 ### Scala and Java
 
@@ -33,10 +32,6 @@ opening up a Scala REPL and much more.
 * [[Define a Python Library Target|pants('src/docs/common_tasks:python_library')]]
 * [[Build a Python Executable (PEX)|pants('src/docs/common_tasks:pex')]]
 * [[Specify a Python Test Suite|pants('src/docs/common_tasks:python_tests')]]
-
-### Thrift
-
-* [[Generate Code from Thrift Definitions|pants('src/docs/common_tasks:thrift_gen')]]
 
 ### Testing
 

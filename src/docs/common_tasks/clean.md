@@ -11,8 +11,6 @@ The `clean-all` goal will delete all cached artifacts (much like `sbt clean` or 
     ::bash
     $ ./pants clean-all
 
-In the output, you'll find a URL for
-
 You can also run a cleanup operation asynchronously:
 
     ::bash

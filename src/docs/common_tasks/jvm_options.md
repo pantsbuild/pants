@@ -2,9 +2,9 @@
 
 ## Problem
 
-You need to specify JVM options when running a Scala or Java goal (some examples of JVM options can be found [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html)).
+You need to specify command-line options for the JVM when running a Scala or Java goal, e.g. to set GC options, memory limits, enable debugging, etc.
 
-If you need to pass command-line arguments instead, see [[Pass Command-line Arguments to an Executable|pants('src/docs/common_tasks:cli_args')]].
+Examples of JVM options can be found [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html).
 
 ## Solution
 
@@ -21,6 +21,12 @@ As you can see in the example above, you can pass in multiple options separated 
       -Xdebug
       -Xprof
       "
+
+
+## Discussion
+
+The pants argument `--jvm-run-jvm-options` is *only* used for arguments passed to the JVM itself, not to the executable target. If you need to pass command-line arguments to the executable target, see [[Pass Command-line Arguments to an Executable|pants('src/docs/common_tasks:cli_args')]].
+
 
 ## See Also
 
