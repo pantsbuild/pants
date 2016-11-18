@@ -573,11 +573,6 @@ class JvmCompile(NailgunTaskBase):
       classes_by_src[None] = list(unclaimed_classes)
     return classes_by_src_by_context
 
-  def classname_for_classfile(self, compile_context, class_file_name):
-    assert class_file_name.startswith(compile_context.classes_dir)
-    rel_classfile_path = class_file_name[len(compile_context.classes_dir) + 1:]
-    return ClasspathUtil.classname_for_rel_classfile(rel_classfile_path)
-
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
