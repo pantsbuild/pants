@@ -456,10 +456,6 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
 
 #[no_mangle]
 pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const libc::c_char) {
-    // We should also pass the root or roots that are going to be used with the trace.
-    // also need roots or a root request
-    // then can build a trace from there
-
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = Path::new(path_str.as_str());
     with_scheduler(scheduler_ptr, |raw| {
@@ -467,14 +463,6 @@ pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const lib
          println!("Failed to write trace to {}: {:?}", path.display(), e);
        });
     });
-}
-
-
-#[no_mangle]
-pub extern fn string_destroy(str_ptr: *mut libc::c_char) {
-  // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
-  // to be destroyed at the end of this function.
-  let _ = unsafe { Box::from_raw(str_ptr) };
 }
 
 

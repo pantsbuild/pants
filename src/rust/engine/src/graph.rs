@@ -70,7 +70,7 @@ impl Entry {
     self.state.is_some()
   }
 
-  pub fn format(&self, externs: &Externs) -> String {
+  fn format(&self, externs: &Externs) -> String {
     let state =
       match self.state {
         Some(Complete::Return(ref v)) => externs.val_to_str(v),
