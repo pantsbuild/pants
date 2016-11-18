@@ -111,7 +111,7 @@ the `master` branch that you want to keep, and you want to reset to an _exact_ c
 the `pantsbuild/pants` repo's master branch, use these commands:
 
     :::bash
-    $ git co master
+    $ git checkout master
     $ git fetch origin
     $ git reset --hard origin/master
 
