@@ -11,6 +11,7 @@ target(
     ':consolidate_classpath',
     ':check_published_deps',
     ':checkstyle',
+    ':classmap',
     ':detect_duplicates',
     ':ivy_imports',
     ':ivy_resolve',

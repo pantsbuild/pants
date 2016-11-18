@@ -681,3 +681,21 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name = 'classmap',
+  sources = ['test_classmap.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:classmap',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+python_tests(
+  name = 'classmap_integration',
+  sources = ['test_classmap_integration.py'],
+  dependencies = [
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+  tags = {'integration'},
+)
