@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 import subprocess
+import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -373,12 +374,15 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
   def test_changed(self):
     self.assert_changed_new_equals_old([])
 
+  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
   def test_changed_with_changes_since(self):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^'])
 
+  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
   def test_changed_with_changes_since_direct(self):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=direct'])
 
+  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
   def test_changed_with_changes_since_transitive(self):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
 
