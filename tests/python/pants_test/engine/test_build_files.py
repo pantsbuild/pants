@@ -202,7 +202,6 @@ class InlinedGraphTest(GraphTestBase):
     if expected_string:
       self.assertIn(expected_string, trace_message)
 
-  #@unittest.skip('Skipped to expedite landing #3821; see: #4007.')
   def do_test_cycle(self, address_str):
     scheduler = self.create_json()
     parsed_address = Address.parse(address_str)
@@ -237,22 +236,21 @@ class InlinedGraphTest(GraphTestBase):
   def test_cycle_indirect(self):
     self.do_test_cycle('graph_test:indirect_cycle')
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
+  @unittest.skip('Skipped to expedite landing #3821; see: #4007, #4025.')
   def test_type_mismatch_error(self):
     scheduler = self.create_json()
     mismatch = Address.parse('graph_test:type_mismatch')
-    expected_type = ResolvedTypeMismatchError
-    self.assert_resolve_failure_type(expected_type, mismatch, scheduler)
+    self.assert_resolve_failure_type(ResolvedTypeMismatchError, mismatch, scheduler)
     self.do_test_trace_message(scheduler, mismatch)
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
+  @unittest.skip('Skipped to expedite landing #3821; see: #4007, #4025.')
   def test_not_found_but_family_exists(self):
     scheduler = self.create_json()
     dne = Address.parse('graph_test:this_addressable_does_not_exist')
     self.assert_resolve_failure_type(ResolveError, dne, scheduler)
     self.do_test_trace_message(scheduler, dne)
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
+  @unittest.skip('Skipped to expedite landing #3821; see: #4007, #4025.')
   def test_not_found_and_family_does_not_exist(self):
     scheduler = self.create_json()
     dne = Address.parse('this/dir/does/not/exist')

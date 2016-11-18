@@ -78,7 +78,6 @@ class LegacyBuildGraph(BuildGraph):
     # Index the ProductGraph.
     for node, state in roots.items():
       if type(state) is Throw:
-
         trace = '\n'.join(self._scheduler.trace(node))
         raise AddressLookupError(
             'Build graph construction failed for {}:\n{}'.format(node, trace))

@@ -1,6 +1,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
@@ -399,7 +400,7 @@ impl Graph {
   }
 
   pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
-    let file = try!(File::create(path));
+    let file = try!(OpenOptions::new().append(true).open(path));
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
