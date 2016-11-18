@@ -26,6 +26,7 @@ from pants.engine.subsystem.native import (ExternContext, Function, TypeConstrai
                                            extern_id_to_str, extern_key_for, extern_project,
                                            extern_project_multi, extern_satisfied_by,
                                            extern_store_list, extern_val_to_str)
+from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
 
 
@@ -214,13 +215,12 @@ class LocalScheduler(object):
 
     :param iterable roots: An iterable of the root nodes to begin the trace from.
     """
-    print('type: {}, '.format(type(roots)))
-    print('type: {}, {!r}'.format(type(roots[0]), roots))
     with self._product_graph_lock:
-      trace_cdata = self._native.lib.graph_trace(self._scheduler)
-      trace_str = self._native.as_str(trace_cdata)
-      yield trace_str
-      self._native.lib.string_destroy(trace_cdata)
+      with temporary_file_path() as path:
+        self._native.lib.graph_trace(self._scheduler, bytes(path))
+        with open(path) as fd:
+          for line in fd.readlines():
+            yield line.rstrip()
 
   def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.

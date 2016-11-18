@@ -398,8 +398,10 @@ impl Graph {
     Ok(())
   }
 
-  pub fn trace(&self, roots: &Vec<Node>, externs: &Externs) {
-    // let trace = ...
+  pub fn trace(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
+    let file = try!(File::create(path));
+    let mut f = BufWriter::new(file);
+
     let is_bottom = |entry: &Entry| -> bool {
       let match_result = match entry.state {
         None => false,
@@ -407,8 +409,7 @@ impl Graph {
         Some(Complete::Noop(_, _)) => true,
         Some(Complete::Return(_)) => true
       };
-      //println!("isbottom {:?}: {}", entry, match_result);
-      match_result //|| traced.contains(entry)
+      match_result
     };
 
     let is_one_level_above_bottom = |c: &Entry| -> bool {
@@ -466,7 +467,10 @@ impl Graph {
     for t in self.leveled_walk(root_entries, |e,_| !is_bottom(e), false) {
     //for t in self.leveled_walk(root_entries, predicate, false) {
       let (entry, level) = t;
-      println!("{}", _format(entry, level));
+//      try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme)));
+      //println!("{}", _format(entry, level));
+      try!(write!(&mut f, "{}-\n", _format(entry, level)));
+      //try!(f.write_fmt(format_args!("{}", _format(entry, level))));
 
       for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
         for &dep_id in adjacencies {
@@ -479,8 +483,9 @@ impl Graph {
           for _ in 0..level {
             indent += "  "
           }
-          println!("{}--cycledep--", indent);
-          println!("{}", _format(dep_entry, level + 1));
+
+          //try!(write!("{}")f.write_fmt(format_args!("{}--cycledep--", indent)));
+          try!(write!(&mut f, "{}\n", _format(dep_entry, level + 1)));
           // Write an entry per edge.
           //let dep_str = dep_entry.format(externs);
           //println!("    -----> \"{}\"\n", dep_str);
@@ -489,7 +494,8 @@ impl Graph {
 
     }
 
-    print!("end!!!!\n");
+    try!(f.write_all(b"\n"));
+    Ok(())
   }
 }
 

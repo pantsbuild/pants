@@ -455,26 +455,19 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
   })
 }
 
-//pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, something) -> *mut libc::c_char {
 #[no_mangle]
-pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler) -> *mut libc::c_char {
-//    pub extern fn graph_trace() -> *const libc::c_char {
+pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const libc::c_char) {
+    // We should also pass the root or roots that are going to be used with the trace.
     // also need roots or a root request
     // then can build a trace from there
 
-    // perhaps trace should be a struct
-    // and an obj on the py side
-    // that way we could have different ways to represent it
-    // perhaps not tho
-    //
-    // what should things look like?
-    // naively I could just reimplement the previously existing thing.
-    // that's not a bad approach exactly
+    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+    let path = Path::new(path_str.as_str());
     with_scheduler(scheduler_ptr, |raw| {
-       raw.scheduler.trace();
+       raw.scheduler.trace(path).unwrap_or_else(|e| {
+         println!("Failed to write trace to {}: {:?}", path.display(), e);
+       });
     });
-  let s = CString::new("Hello!").unwrap();
-  s.into_raw()
 }
 
 
