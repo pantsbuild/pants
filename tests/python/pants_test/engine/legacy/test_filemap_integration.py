@@ -53,7 +53,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     # up in filemap, because it is synthetic. see https://github.com/pantsbuild/pants/issues/3563
     #self.assertIn('testprojects/src/python/sources/sources.txt', run.stdout_data)
 
-  @unittest.skip('Skipped to expedite landing the native engine: #4007.')
+  @unittest.skip('Skipped to expedite landing the native engine: #4007, #4025.')
   def test_exclude_invalid_string(self):
     build_path = os.path.join(self.PATH_PREFIX, 'BUILD.invalid')
     build_content = '''python_library(name='exclude_strings_disallowed',
