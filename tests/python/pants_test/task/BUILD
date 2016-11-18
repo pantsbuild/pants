@@ -22,6 +22,19 @@ python_tests(
 )
 
 python_tests(
+  name = 'simple_codegen_task',
+  sources = ['test_simple_codegen_task.py'],
+  dependencies = [
+    'src/python/pants/base:payload',
+    'src/python/pants/build_graph',
+    'src/python/pants/task',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+python_tests(
   name='scm_publish',
   sources=['test_scm_publish_mixin.py'],
   coverage=['pants.task.scm_publish_mixin'],
