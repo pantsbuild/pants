@@ -9,6 +9,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.task.console_task import ConsoleTask
 
+
 class ClassmapTask(ConsoleTask):
   """Print a mapping from class name to the owning target from target's runtime classpath."""
 

@@ -650,3 +650,13 @@ python_library(
     'src/python/pants/task',
   ]
 )
+
+python_library(
+  name = 'classmap',
+  sources = ['classmap.py'],
+  dependencies = [
+    ':classpath_util',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/task',
+  ],
+)
