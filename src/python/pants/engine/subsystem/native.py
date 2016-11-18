@@ -134,6 +134,9 @@ _FFI.cdef(
     uint64_t graph_len(RawScheduler*);
     uint64_t graph_invalidate(RawScheduler*, Key*, uint64_t);
     void graph_visualize(RawScheduler*, char*);
+    char* graph_trace(RawScheduler*);
+    void string_destroy(char*);
+
 
     void execution_reset(RawScheduler*);
     void execution_add_root_select(RawScheduler*, Key, TypeConstraint);
@@ -415,3 +418,6 @@ class Native(object):
 
   def buffer(self, cdata):
     return _FFI.buffer(cdata)
+
+  def as_str(self, cdata):
+    return _FFI.string(cdata)

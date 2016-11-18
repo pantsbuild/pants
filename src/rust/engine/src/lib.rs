@@ -10,6 +10,7 @@ extern crate libc;
 extern crate fnv;
 
 use std::ffi::CStr;
+use std::ffi::CString;
 use std::mem;
 use std::path::Path;
 
@@ -453,6 +454,37 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
     });
   })
 }
+
+//pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, something) -> *mut libc::c_char {
+#[no_mangle]
+pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler) -> *mut libc::c_char {
+//    pub extern fn graph_trace() -> *const libc::c_char {
+    // also need roots or a root request
+    // then can build a trace from there
+
+    // perhaps trace should be a struct
+    // and an obj on the py side
+    // that way we could have different ways to represent it
+    // perhaps not tho
+    //
+    // what should things look like?
+    // naively I could just reimplement the previously existing thing.
+    // that's not a bad approach exactly
+    with_scheduler(scheduler_ptr, |raw| {
+       raw.scheduler.trace();
+    });
+  let s = CString::new("Hello!").unwrap();
+  s.into_raw()
+}
+
+
+#[no_mangle]
+pub extern fn string_destroy(str_ptr: *mut libc::c_char) {
+  // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
+  // to be destroyed at the end of this function.
+  let _ = unsafe { Box::from_raw(str_ptr) };
+}
+
 
 #[no_mangle]
 pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {

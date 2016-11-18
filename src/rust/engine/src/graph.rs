@@ -69,7 +69,7 @@ impl Entry {
     self.state.is_some()
   }
 
-  fn format(&self, externs: &Externs) -> String {
+  pub fn format(&self, externs: &Externs) -> String {
     let state =
       match self.state {
         Some(Complete::Return(ref v)) => externs.val_to_str(v),
@@ -248,11 +248,27 @@ impl Graph {
    * Begins a topological Walk from the given roots.
    */
   fn walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> Walk<P>
-      where P: Fn(&Entry)->bool {
+    where P: Fn(&Entry)->bool {
     Walk {
       graph: self,
       dependents: dependents,
       deque: roots,
+      walked: HashSet::default(),
+      predicate: predicate,
+    }
+  }
+
+/**
+ * Begins a topological walk from the given roots. Provides both the current entry as well as the
+ *  depth from the root.
+ */
+  fn leveled_walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
+    where P: Fn(&Entry, Level) -> bool {
+    let rrr = roots.iter().map(|&r| (r, 0)).collect::<VecDeque<_>>();
+    LeveledWalk {
+      graph: self,
+      dependents: dependents,
+      deque: rrr,
       walked: HashSet::default(),
       predicate: predicate,
     }
@@ -381,6 +397,100 @@ impl Graph {
     try!(f.write_all(b"}\n"));
     Ok(())
   }
+
+  pub fn trace(&self, roots: &Vec<Node>, externs: &Externs) {
+    // let trace = ...
+    let is_bottom = |entry: &Entry| -> bool {
+      let match_result = match entry.state {
+        None => false,
+        Some(Complete::Throw(_)) => false,
+        Some(Complete::Noop(_, _)) => true,
+        Some(Complete::Return(_)) => true
+      };
+      //println!("isbottom {:?}: {}", entry, match_result);
+      match_result //|| traced.contains(entry)
+    };
+
+    let is_one_level_above_bottom = |c: &Entry| -> bool {
+      for d in &c.dependencies {
+        if !is_bottom(self.entry_for_id(*d)) {
+          return false;
+        }
+      }
+      true
+    };
+
+    let _format = |entry: &Entry, level: u32| -> String {
+      let mut indent = "".to_string();
+      for _ in 0..level {
+        indent = indent + "  ";
+      }
+      let output = format!("{}Computing {} for {}",
+                           indent,
+                           match entry.node.product() {
+                             ref x => format!("{}", externs.id_to_str(x.0))
+                           },
+                           match entry.node.subject() {
+                             ref x => format!("{}", externs.id_to_str(x.id()))
+                           });
+      if is_one_level_above_bottom(entry) {
+        format!("{}\n{}{}", output, indent, match entry.state {
+          Some(Complete::Return(ref x)) => format!("Return({})", externs.val_to_str(x)),
+          Some(Complete::Throw(ref x)) => format!("Throw({:?})", x),
+          Some(Complete::Noop(ref x, _)) => format!("Noop({:?})", x),
+          None => String::new(),
+        })
+      } else {
+        output
+      }
+    };
+
+
+    // v1
+    // walk and print all entries
+    // v2
+    // add ws nesting
+
+    // starting at the roots,
+    // walk down the graph until you find a bottom
+    // nesting
+    //
+
+    // 1st
+    // how do I recur how I want
+    // probably I could look at walk
+
+
+    //let predicate = |e,_| !is_bottom(e);
+    let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
+    for t in self.leveled_walk(root_entries, |e,_| !is_bottom(e), false) {
+    //for t in self.leveled_walk(root_entries, predicate, false) {
+      let (entry, level) = t;
+      println!("{}", _format(entry, level));
+
+      for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
+        for &dep_id in adjacencies {
+          let dep_entry = self.entry_for_id(dep_id);
+          //if !predicate(dep_entry, 0) {
+          /*if is_bottom(dep_entry) {
+            continue;
+          }*/
+          let mut indent = String::new();
+          for _ in 0..level {
+            indent += "  "
+          }
+          println!("{}--cycledep--", indent);
+          println!("{}", _format(dep_entry, level + 1));
+          // Write an entry per edge.
+          //let dep_str = dep_entry.format(externs);
+          //println!("    -----> \"{}\"\n", dep_str);
+        }
+      }
+
+    }
+
+    print!("end!!!!\n");
+  }
 }
 
 /**
@@ -417,6 +527,51 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
         self.deque.extend(&entry.dependencies);
       }
       return Some(entry);
+    }
+
+    None
+  }
+}
+
+type Level = u32;
+/**
+ * Represents the state of a particular topological walk through a Graph. Implements Iterator and
+ * has the same lifetime as the Graph itself.
+ */
+struct LeveledWalk<'a, P: Fn(&Entry, Level)->bool> {
+  graph: &'a Graph,
+  dependents: bool,
+  deque: VecDeque<(EntryId, Level)>,
+  walked: HashSet<EntryId, FNV>,
+  predicate: P,
+}
+
+impl<'a, P: Fn(&Entry, Level)->bool> Iterator for LeveledWalk<'a, P> {
+  type Item = (&'a Entry, Level);
+
+  fn next(&mut self) -> Option<(&'a Entry, Level)> {
+    while let Some((id, level)) = self.deque.pop_front() {
+      if self.walked.contains(&id) {
+        continue;
+      }
+      self.walked.insert(id);
+
+      let entry = self.graph.entry_for_id(id);
+      if !(self.predicate)(entry, level) {
+        continue;
+      }
+
+      // Entry matches.
+      if self.dependents {
+        for d in &entry.dependents {
+          self.deque.push_back((*d, level+1));
+        }
+      } else {
+        for d in &entry.dependencies {
+          self.deque.push_back((*d, level+1));
+        }
+      }
+      return Some((entry, level));
     }
 
     None

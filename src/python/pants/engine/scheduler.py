@@ -214,7 +214,13 @@ class LocalScheduler(object):
 
     :param iterable roots: An iterable of the root nodes to begin the trace from.
     """
-    return "TODO: Restore trace (see: #4007)."
+    print('type: {}, '.format(type(roots)))
+    print('type: {}, {!r}'.format(type(roots[0]), roots))
+    with self._product_graph_lock:
+      trace_cdata = self._native.lib.graph_trace(self._scheduler)
+      trace_str = self._native.as_str(trace_cdata)
+      yield trace_str
+      self._native.lib.string_destroy(trace_cdata)
 
   def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.

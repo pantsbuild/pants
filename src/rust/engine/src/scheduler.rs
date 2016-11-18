@@ -45,6 +45,11 @@ impl Scheduler {
     self.graph.visualize(&self.roots, path, &self.tasks.externs)
   }
 
+  pub fn trace(&self) {
+    println!("scheduler trace");
+    self.graph.trace(&self.roots, &self.tasks.externs);
+  }
+
   pub fn reset(&mut self) {
     self.roots.clear();
     self.candidates.clear();

@@ -196,13 +196,13 @@ class InlinedGraphTest(GraphTestBase):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     root, state = self._populate(scheduler, parsed_address)
     self.assertEqual(type(state), Throw)
-    trace_message = scheduler.trace([root])
+    trace_message = '\n'.join(scheduler.trace([root]))
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
     if expected_string:
       self.assertIn(expected_string, trace_message)
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
+  #@unittest.skip('Skipped to expedite landing #3821; see: #4007.')
   def do_test_cycle(self, address_str):
     scheduler = self.create_json()
     parsed_address = Address.parse(address_str)
@@ -241,22 +241,30 @@ class InlinedGraphTest(GraphTestBase):
   def test_type_mismatch_error(self):
     scheduler = self.create_json()
     mismatch = Address.parse('graph_test:type_mismatch')
-    self.assertEquals(type(self.resolve_failure(scheduler, mismatch)), ResolvedTypeMismatchError)
+    expected_type = ResolvedTypeMismatchError
+    self.assert_resolve_failure_type(expected_type, mismatch, scheduler)
     self.do_test_trace_message(scheduler, mismatch)
 
   @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
   def test_not_found_but_family_exists(self):
     scheduler = self.create_json()
     dne = Address.parse('graph_test:this_addressable_does_not_exist')
-    self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
+    self.assert_resolve_failure_type(ResolveError, dne, scheduler)
     self.do_test_trace_message(scheduler, dne)
 
   @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
   def test_not_found_and_family_does_not_exist(self):
     scheduler = self.create_json()
     dne = Address.parse('this/dir/does/not/exist')
-    self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
+    self.assert_resolve_failure_type(ResolveError, dne, scheduler)
     self.do_test_trace_message(scheduler, dne)
+
+  def assert_resolve_failure_type(self, expected_type, mismatch, scheduler):
+
+    failure = self.resolve_failure(scheduler, mismatch)
+    self.assertEquals(type(failure),
+                      expected_type,
+                      'type was not {}. Instead was {}, {!r}'.format(expected_type.__name__, type(failure).__name__, failure))
 
 
 class LazyResolvingGraphTest(GraphTestBase):
