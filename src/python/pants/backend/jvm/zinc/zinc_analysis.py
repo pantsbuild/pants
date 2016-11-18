@@ -14,7 +14,7 @@ class ZincAnalysis(object):
   those yourself.
   """
 
-  FORMAT_VERSION_LINE = b'format version: 5\n'
+  FORMAT_VERSION_LINE = b'format version: 6\n'
 
   def __init__(self, compile_setup, relations, stamps, apis, source_infos, compilations):
     (self.compile_setup, self.relations, self.stamps, self.apis, self.source_infos, self.compilations) = \

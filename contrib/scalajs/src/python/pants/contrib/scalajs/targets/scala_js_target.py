@@ -43,5 +43,9 @@ class ScalaJSTarget(object):
     return False
 
   @property
+  def zinc_file_manager(self):
+    return False
+
+  @property
   def platform(self):
     return JvmPlatform.global_instance().get_platform_for_target(self)
