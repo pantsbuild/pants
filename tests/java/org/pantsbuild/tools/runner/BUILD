@@ -3,7 +3,6 @@
 
 junit_tests(
   name='jar',
-  sources=globs('*.java'),
   dependencies=[
     '3rdparty:guava',
     '3rdparty:jsr305',

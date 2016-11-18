@@ -1,105 +1,163 @@
-format version: 5
+format version: 6
 output mode:
 1 items
 0 -> single
 output directories:
 1 items
-output dir -> $PANTS_HOME/.pants.d/compile/jvm/scala/classes
+file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/ -> file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/
+classpath options:
+7 items
+0 -> file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/
+1 -> file:/_PANTS_WORKDIR_PLACEHOLDER/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.6.jar
+2 -> file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/
+3 -> file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/
+4 -> file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.java.org.pantsbuild.example.hello.greet.greet/current/classes/
+5 -> file:/_PANTS_WORKDIR_PLACEHOLDER/resources/prepare/252d64521cf9/examples.src.resources.org.pantsbuild.example.hello.hello/current/
+6 -> file:/_PANTS_WORKDIR_PLACEHOLDER/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.6.jar
 compile options:
-5 items
+6 items
 0 -> -encoding
 1 -> UTF-8
 2 -> -g:vars
 3 -> -deprecation
 4 -> -unchecked
+5 -> -feature
 javac options:
-0 items
+6 items
+0 -> -encoding
+1 -> UTF-8
+2 -> -source
+3 -> 1.8
+4 -> -target
+5 -> 1.8
 compiler version:
 1 items
-0 -> 2.10.4
+0 -> 2.10.6
 compile order:
 1 items
 0 -> Mixed
 name hashing:
 1 items
-0 -> false
-products:
-6 items
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> $PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe$$anonfun$main$1.class
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> $PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe$.class
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> $PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe.class
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> $PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome$$anonfun$apply$1.class
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> $PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome$.class
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> $PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome.class
-binary dependencies:
-5 items
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> $PANTS_HOME/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> $PANTS_HOME/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/hello/greet/Greeting.class
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> $PANTS_HOME/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar
-direct source dependencies:
+0 -> true
+skip Api storing:
 1 items
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> $PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala
-direct external dependencies:
+0 -> false
+extra:
 0 items
-public inherited source dependencies:
-0 items
-public inherited external dependencies:
-0 items
+products:
+3 items
+/_PANTS_BUILDROOT_PLACEHOLDER/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe$$anonfun$main$1.class
+/_PANTS_BUILDROOT_PLACEHOLDER/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe$.class
+/_PANTS_BUILDROOT_PLACEHOLDER/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class
+library dependencies:
+2 items
+/_PANTS_BUILDROOT_PLACEHOLDER/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /_PANTS_WORKDIR_PLACEHOLDER/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.6.jar
+/_PANTS_BUILDROOT_PLACEHOLDER/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar
+library class names:
+2 items
+/_PANTS_WORKDIR_PLACEHOLDER/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.6.jar -> scala.Array
+/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar -> java.io.InputStreamReader
 member reference internal dependencies:
 0 items
 member reference external dependencies:
-0 items
+1 items
+org.pantsbuild.example.hello.exe.Exe -> org.pantsbuild.example.hello.welcome.WelcomeEverybody$
 inheritance internal dependencies:
 0 items
 inheritance external dependencies:
 0 items
+local internal inheritance dependencies:
+0 items
+local external inheritance dependencies:
+0 items
 class names:
-6 items
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> org.pantsbuild.example.hello.exe.Exe
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> org.pantsbuild.example.hello.exe.Exe$
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> org.pantsbuild.example.hello.exe.Exe$$anonfun$main$1
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> org.pantsbuild.example.hello.welcome.Welcome
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> org.pantsbuild.example.hello.welcome.Welcome$
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> org.pantsbuild.example.hello.welcome.Welcome$$anonfun$apply$1
+1 items
+/_PANTS_BUILDROOT_PLACEHOLDER/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> org.pantsbuild.example.hello.exe.Exe
 used names:
-0 items
+55 items
+org.pantsbuild.example.hello.exe.Exe -> $anonfun
+org.pantsbuild.example.hello.exe.Exe -> +
+org.pantsbuild.example.hello.exe.Exe -> <=
+org.pantsbuild.example.hello.exe.Exe -> <init>
+org.pantsbuild.example.hello.exe.Exe -> ?0
+org.pantsbuild.example.hello.exe.Exe -> Any
+org.pantsbuild.example.hello.exe.Exe -> AnyRef
+org.pantsbuild.example.hello.exe.Exe -> Array
+org.pantsbuild.example.hello.exe.Exe -> ArrayOps
+org.pantsbuild.example.hello.exe.Exe -> Boolean
+org.pantsbuild.example.hello.exe.Exe -> BufferedReader
+org.pantsbuild.example.hello.exe.Exe -> Class
+org.pantsbuild.example.hello.exe.Exe -> ClassLoader
+org.pantsbuild.example.hello.exe.Exe -> Exe
+org.pantsbuild.example.hello.exe.Exe -> Function1
+org.pantsbuild.example.hello.exe.Exe -> InputStream
+org.pantsbuild.example.hello.exe.Exe -> InputStreamReader
+org.pantsbuild.example.hello.exe.Exe -> Int
+org.pantsbuild.example.hello.exe.Exe -> Nothing
+org.pantsbuild.example.hello.exe.Exe -> Object
+org.pantsbuild.example.hello.exe.Exe -> Predef
+org.pantsbuild.example.hello.exe.Exe -> Reader
+org.pantsbuild.example.hello.exe.Exe -> Seq
+org.pantsbuild.example.hello.exe.Exe -> String
+org.pantsbuild.example.hello.exe.Exe -> T
+org.pantsbuild.example.hello.exe.Exe -> U
+org.pantsbuild.example.hello.exe.Exe -> Unit
+org.pantsbuild.example.hello.exe.Exe -> WelcomeEverybody
+org.pantsbuild.example.hello.exe.Exe -> WrappedArray
+org.pantsbuild.example.hello.exe.Exe -> apply
+org.pantsbuild.example.hello.exe.Exe -> args
+org.pantsbuild.example.hello.exe.Exe -> close
+org.pantsbuild.example.hello.exe.Exe -> example
+org.pantsbuild.example.hello.exe.Exe -> exe
+org.pantsbuild.example.hello.exe.Exe -> foreach
+org.pantsbuild.example.hello.exe.Exe -> getClass
+org.pantsbuild.example.hello.exe.Exe -> getClassLoader
+org.pantsbuild.example.hello.exe.Exe -> getResourceAsStream
+org.pantsbuild.example.hello.exe.Exe -> getWorld
+org.pantsbuild.example.hello.exe.Exe -> hello
+org.pantsbuild.example.hello.exe.Exe -> io
+org.pantsbuild.example.hello.exe.Exe -> is
+org.pantsbuild.example.hello.exe.Exe -> java
+org.pantsbuild.example.hello.exe.Exe -> org
+org.pantsbuild.example.hello.exe.Exe -> package
+org.pantsbuild.example.hello.exe.Exe -> pantsbuild
+org.pantsbuild.example.hello.exe.Exe -> println
+org.pantsbuild.example.hello.exe.Exe -> readLine
+org.pantsbuild.example.hello.exe.Exe -> refArrayOps
+org.pantsbuild.example.hello.exe.Exe -> s
+org.pantsbuild.example.hello.exe.Exe -> scala
+org.pantsbuild.example.hello.exe.Exe -> size
+org.pantsbuild.example.hello.exe.Exe -> w
+org.pantsbuild.example.hello.exe.Exe -> welcome
+org.pantsbuild.example.hello.exe.Exe -> wrapRefArray
+product class names:
+2 items
+org.pantsbuild.example.hello.exe.Exe -> org.pantsbuild.example.hello.exe.Exe
+org.pantsbuild.example.hello.exe.Exe -> org.pantsbuild.example.hello.exe.Exe$
 product stamps:
-6 items
-$PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe$$anonfun$main$1.class -> lastModified(1426908125000)
-$PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe$.class -> lastModified(1426908125000)
-$PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe.class -> lastModified(1426908124000)
-$PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome$$anonfun$apply$1.class -> lastModified(1426908125000)
-$PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome$.class -> lastModified(1426908125000)
-$PANTS_HOME/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome.class -> lastModified(1426908125000)
+3 items
+file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe$$anonfun$main$1.class -> lastModified(1478037432000)
+file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe$.class -> lastModified(1478037432000)
+file:/_PANTS_WORKDIR_PLACEHOLDER/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class -> lastModified(1478037432000)
 source stamps:
-2 items
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> hash(7c960d05aac5b607c6e0619bb6b81b6ca580550e)
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> hash(2245c9e68457b389bac32ccaa0dca5ddadd8f1da)
+1 items
+file:/_PANTS_BUILDROOT_PLACEHOLDER/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> hash(038e1fd7ec7159db233169332b112decb44b73d9)
 binary stamps:
-3 items
-/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar -> lastModified(1422417173000)
-$PANTS_HOME/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/hello/greet/Greeting.class -> lastModified(1426908117000)
-$PANTS_HOME/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar -> lastModified(1395179187000)
-class names:
-3 items
-/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar -> java.lang.Object
-$PANTS_HOME/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/hello/greet/Greeting.class -> org.pantsbuild.example.hello.greet.Greeting
-$PANTS_HOME/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar -> scala.collection.TraversableLike
+2 items
+file:/_PANTS_WORKDIR_PLACEHOLDER/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.6.jar -> lastModified(1442568926000)
+file:/Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar -> lastModified(1464196859000)
 internal apis:
-2 items
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> 
-FakeApiForExe
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> 
-FakeApiForWelcome
+1 items
+org.pantsbuild.example.hello.exe.Exe -> 
+rO0ABXNyABV4c2J0aS5hcGkuQ29tcGlsYXRpb27EmSg4TsDTgQIAAkoACXN0YXJ0VGltZVsAB291dHB1dHN0ABpbTHhzYnRpL2FwaS9PdXRwdXRTZXR0aW5nO3hwAAABWCHlZAB1cgAaW0x4c2J0aS5hcGkuT3V0cHV0U2V0dGluZzt/asLzp4elQgIAAHhwAAAAAXNyABd4c2J0aS5hcGkuT3V0cHV0U2V0dGluZzK9OVrpOqdQAgACTAAPb3V0cHV0RGlyZWN0b3J5dAASTGphdmEvbGFuZy9TdHJpbmc7TAAPc291cmNlRGlyZWN0b3J5cQB+AAZ4cHQAhC9Vc2Vycy9wZWl5dS9naXRodWIvcGFudHMvLnBhbnRzLmQvY29tcGlsZS96aW5jLzY2YWMxYzkzMjZiZS9leGFtcGxlcy5zcmMuc2NhbGEub3JnLnBhbnRzYnVpbGQuZXhhbXBsZS5oZWxsby5leGUuZXhlL2N1cnJlbnQvY2xhc3Nlc3QAAS8AJG9yZy5wYW50c2J1aWxkLmV4YW1wbGUuaGVsbG8uZXhlLkV4ZbFWs3Cs7QAFc3IAFHhzYnRpLmFwaS5OYW1lSGFzaGVzU7aqYFAP4q8CAAJbAA9pbXBsaWNpdE1lbWJlcnN0ABVbTHhzYnRpL2FwaS9OYW1lSGFzaDtbAA5yZWd1bGFyTWVtYmVyc3EAfgABeHB1cgAVW0x4c2J0aS5hcGkuTmFtZUhhc2g7s7a+wEFszm0CAAB4cAAAAAB1cQB+AAMAAAAWc3IAEnhzYnRpLmFwaS5OYW1lSGFzaG8bhlIJmDBlAgACSQAEaGFzaEwABG5hbWV0ABJMamF2YS9sYW5nL1N0cmluZzt4cJCJCBd0AAZub3RpZnlzcQB+AAZ8iKKldAAEd2FpdHNxAH4ABq5SmJZ0AA0kYXNJbnN0YW5jZU9mc3EAfgAGYLM+anQABmVxdWFsc3NxAH4ABj1klFJ0AAxhc0luc3RhbmNlT2ZzcQB+AAbNEyENdAAMc3luY2hyb25pemVkc3EAfgAGCXvxqHQADSRpc0luc3RhbmNlT2ZzcQB+AAZ1bNu+dAAEbWFpbnNxAH4ABu0OYFB0AAlub3RpZnlBbGxzcQB+AAYnavladAAMaXNJbnN0YW5jZU9mc3EAfgAGS/lmYXQAAj09c3EAfgAGyM+hT3QABWNsb25lc3EAfgAGx6+dGXQAA0V4ZXNxAH4ABm4TtTZ0AAhnZXRXb3JsZHNxAH4ABlfuuqt0AAh0b1N0cmluZ3NxAH4ABqv+QdF0AAIhPXNxAH4ABsi1oK10AAhnZXRDbGFzc3NxAH4ABqk626t0AAJuZXNxAH4ABgRIl0h0AAJlcXNxAH4ABun3o4x0AAIjI3NxAH4ABop/xKB0AAhmaW5hbGl6ZXNxAH4ABt6hMF50AAhoYXNoQ29kZQA=
 external apis:
-0 items
+1 items
+org.pantsbuild.example.hello.welcome.WelcomeEverybody$ -> 
+rO0ABXNyABV4c2J0aS5hcGkuQ29tcGlsYXRpb27EmSg4TsDTgQIAAkoACXN0YXJ0VGltZVsAB291dHB1dHN0ABpbTHhzYnRpL2FwaS9PdXRwdXRTZXR0aW5nO3hwAAABWCHlWt91cgAaW0x4c2J0aS5hcGkuT3V0cHV0U2V0dGluZzt/asLzp4elQgIAAHhwAAAAAXNyABd4c2J0aS5hcGkuT3V0cHV0U2V0dGluZzK9OVrpOqdQAgACTAAPb3V0cHV0RGlyZWN0b3J5dAASTGphdmEvbGFuZy9TdHJpbmc7TAAPc291cmNlRGlyZWN0b3J5cQB+AAZ4cHQAjC9Vc2Vycy9wZWl5dS9naXRodWIvcGFudHMvLnBhbnRzLmQvY29tcGlsZS96aW5jLzY2YWMxYzkzMjZiZS9leGFtcGxlcy5zcmMuc2NhbGEub3JnLnBhbnRzYnVpbGQuZXhhbXBsZS5oZWxsby53ZWxjb21lLndlbGNvbWUvY3VycmVudC9jbGFzc2VzdAABLwA1b3JnLnBhbnRzYnVpbGQuZXhhbXBsZS5oZWxsby53ZWxjb21lLldlbGNvbWVFdmVyeWJvZHnr86yYrO0ABXNyABR4c2J0aS5hcGkuTmFtZUhhc2hlc1O2qmBQD+KvAgACWwAPaW1wbGljaXRNZW1iZXJzdAAVW0x4c2J0aS9hcGkvTmFtZUhhc2g7WwAOcmVndWxhck1lbWJlcnNxAH4AAXhwdXIAFVtMeHNidGkuYXBpLk5hbWVIYXNoO7O2vsBBbM5tAgAAeHAAAAAAdXEAfgADAAAAFXNyABJ4c2J0aS5hcGkuTmFtZUhhc2hvG4ZSCZgwZQIAAkkABGhhc2hMAARuYW1ldAASTGphdmEvbGFuZy9TdHJpbmc7eHDhmZDUdAAGbm90aWZ5c3EAfgAG+MDXNHQABHdhaXRzcQB+AAZxJYetdAANJGFzSW5zdGFuY2VPZnNxAH4ABpOfs6l0AAZlcXVhbHNzcQB+AAbroX5bdAAMYXNJbnN0YW5jZU9mc3EAfgAGkP+YLnQADHN5bmNocm9uaXplZHNxAH4ABte82RB0AA0kaXNJbnN0YW5jZU9mc3EAfgAGrG106nQAEFdlbGNvbWVFdmVyeWJvZHlzcQB+AAYrkzSbdAAJbm90aWZ5QWxsc3EAfgAGjYxkU3QADGlzSW5zdGFuY2VPZnNxAH4ABmqiATt0AAVhcHBseXNxAH4ABslV8bB0AAI9PXNxAH4ABhc97Ll0AAVjbG9uZXNxAH4ABuE7orV0AAh0b1N0cmluZ3NxAH4ABhUcNK90AAIhPXNxAH4ABuCnPQV0AAhnZXRDbGFzc3NxAH4ABsI6LMF0AAJuZXNxAH4ABshOKa50AAJlcXNxAH4ABkQp7gh0AAIjI3NxAH4ABk8U8LR0AAhmaW5hbGl6ZXNxAH4ABqmJ16B0AAhoYXNoQ29kZQA=
 source infos:
-2 items
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> 
-FakeSourceInfoForExe
-$PANTS_HOME/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> 
-FakeSourceInfoForWelcome
+1 items
+file:/_PANTS_BUILDROOT_PLACEHOLDER/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> 
+AAAAAAAAAAA=
 compilations:
-0 items
+1 items
+0 -> rO0ABXNyABV4c2J0aS5hcGkuQ29tcGlsYXRpb27EmSg4TsDTgQIAAkoACXN0YXJ0VGltZVsAB291dHB1dHN0ABpbTHhzYnRpL2FwaS9PdXRwdXRTZXR0aW5nO3hwAAABWCHlZAB1cgAaW0x4c2J0aS5hcGkuT3V0cHV0U2V0dGluZzt/asLzp4elQgIAAHhwAAAAAXNyABd4c2J0aS5hcGkuT3V0cHV0U2V0dGluZzK9OVrpOqdQAgACTAAPb3V0cHV0RGlyZWN0b3J5dAASTGphdmEvbGFuZy9TdHJpbmc7TAAPc291cmNlRGlyZWN0b3J5cQB+AAZ4cHQAhC9Vc2Vycy9wZWl5dS9naXRodWIvcGFudHMvLnBhbnRzLmQvY29tcGlsZS96aW5jLzY2YWMxYzkzMjZiZS9leGFtcGxlcy5zcmMuc2NhbGEub3JnLnBhbnRzYnVpbGQuZXhhbXBsZS5oZWxsby5leGUuZXhlL2N1cnJlbnQvY2xhc3Nlc3QAAS8=

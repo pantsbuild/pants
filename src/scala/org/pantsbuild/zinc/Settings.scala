@@ -6,13 +6,20 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList }
-import sbt.inc.ClassfileManager
-import sbt.inc.IncOptions.{ Default => DefaultIncOptions }
-import sbt.Level
-import sbt.Path._
+
 import scala.collection.JavaConverters._
 import scala.util.matching.Regex
-import xsbti.compile.CompileOrder
+
+import sbt.io.Path._
+import sbt.util.{Level, Logger}
+import sbt.util.Logger.{m2o, o2m}
+import xsbti.Maybe
+import xsbti.compile.{
+  ClassfileManagerType,
+  CompileOrder,
+  TransactionalManagerType
+}
+import xsbti.compile.IncOptionsUtil.defaultIncOptions
 
 
 /**
@@ -30,6 +37,7 @@ case class Settings(
   scalacOptions: Seq[String] = Seq.empty,
   javaHome: Option[File]     = None,
   forkJava: Boolean          = false,
+  _zincCacheDir: Option[File] = None,
   javaOnly: Boolean          = false,
   javacOptions: Seq[String]  = Seq.empty,
   compileOrder: CompileOrder = CompileOrder.Mixed,
@@ -37,7 +45,11 @@ case class Settings(
   incOptions: IncOptions     = IncOptions(),
   analysis: AnalysisOptions  = AnalysisOptions(),
   properties: Seq[String]    = Seq.empty
-)
+) {
+  def zincCacheDir: File = _zincCacheDir.getOrElse {
+    throw new RuntimeException(s"The ${Settings.ZincCacheDirName} option is required.")
+  }
+}
 
 /** Due to the limit of 22 elements in a case class, options must get broken down into sub-groups.
  * TODO: further break options into sensible subgroups. */
@@ -95,76 +107,53 @@ object ScalaLocation {
  * Locating the sbt jars needed for zinc compile.
  */
 case class SbtJars(
-  sbtInterface: Option[File]         = None,
-  compilerInterfaceSrc: Option[File] = None
+  compilerBridgeSrc: Option[File] = None,
+  compilerInterface: Option[File] = None
 )
-
-object SbtJars {
-  /**
-   * Select the sbt jars from a path.
-   */
-  def fromPath(path: Seq[File]): SbtJars = {
-    val sbtInterface = path find (_.getName matches Setup.SbtInterface.pattern)
-    val compilerInterfaceSrc = path find (_.getName matches Setup.CompilerInterfaceSources.pattern)
-    SbtJars(sbtInterface, compilerInterfaceSrc)
-  }
-
-  /**
-   * Java API for selecting sbt jars from a path.
-   */
-  def fromPath(path: JList[File]): SbtJars = fromPath(path.asScala)
-}
 
 /**
  * Wrapper around incremental compiler options.
  */
 case class IncOptions(
-  transitiveStep: Int            = DefaultIncOptions.transitiveStep,
-  recompileAllFraction: Double   = DefaultIncOptions.recompileAllFraction,
-  relationsDebug: Boolean        = DefaultIncOptions.relationsDebug,
-  apiDebug: Boolean              = DefaultIncOptions.apiDebug,
-  apiDiffContextSize: Int        = DefaultIncOptions.apiDiffContextSize,
-  apiDumpDirectory: Option[File] = DefaultIncOptions.apiDumpDirectory,
+  transitiveStep: Int            = defaultIncOptions.transitiveStep,
+  recompileAllFraction: Double   = defaultIncOptions.recompileAllFraction,
+  relationsDebug: Boolean        = defaultIncOptions.relationsDebug,
+  apiDebug: Boolean              = defaultIncOptions.apiDebug,
+  apiDiffContextSize: Int        = defaultIncOptions.apiDiffContextSize,
+  apiDumpDirectory: Option[File] = m2o(defaultIncOptions.apiDumpDirectory),
   transactional: Boolean         = false,
+  useZincFileManager: Boolean    = true,
   backup: Option[File]           = None,
-  recompileOnMacroDef: Boolean   = DefaultIncOptions.recompileOnMacroDef,
-  nameHashing: Boolean           = DefaultIncOptions.nameHashing
+  recompileOnMacroDef: Option[Boolean] = m2o(defaultIncOptions.recompileOnMacroDef).map(_.booleanValue)
 ) {
-  @deprecated("Use the primary constructor instead.", "0.3.5.2")
-  def this(
-    transitiveStep: Int,
-    recompileAllFraction: Double,
-    relationsDebug: Boolean,
-    apiDebug: Boolean,
-    apiDiffContextSize: Int,
-    apiDumpDirectory: Option[File],
-    transactional: Boolean,
-    backup: Option[File]
-  ) = {
-    this(transitiveStep, recompileAllFraction, relationsDebug, apiDebug, apiDiffContextSize,
-      apiDumpDirectory, transactional, backup, DefaultIncOptions.recompileOnMacroDef,
-      DefaultIncOptions.nameHashing)
-  }
-  def options: sbt.inc.IncOptions = {
-    sbt.inc.IncOptions(
+  def options(log: Logger): xsbti.compile.IncOptions = {
+    new xsbti.compile.IncOptions(
       transitiveStep,
       recompileAllFraction,
       relationsDebug,
       apiDebug,
       apiDiffContextSize,
-      apiDumpDirectory,
-      classfileManager,
-      recompileOnMacroDef,
-      nameHashing
+      o2m(apiDumpDirectory),
+      classfileManager(log),
+      useZincFileManager,
+      o2m(recompileOnMacroDef.map(java.lang.Boolean.valueOf)),
+      true, // nameHashing
+      false, // storeApis, apis is stored separately after 1.0.0
+      false, // antStyle
+      Map.empty.asJava, // extra
+      defaultIncOptions.logRecompileOnMacro,
+      defaultIncOptions.externalHooks
     )
   }
 
-  def classfileManager: () => ClassfileManager = {
+  def defaultApiDumpDirectory =
+    defaultIncOptions.apiDumpDirectory
+
+  def classfileManager(log: Logger): Maybe[ClassfileManagerType] =
     if (transactional && backup.isDefined)
-      ClassfileManager.transactional(backup.get)
+      Maybe.just(new TransactionalManagerType(backup.get, log))
     else
-      DefaultIncOptions.newClassfileManager
-  }
+      Maybe.nothing[ClassfileManagerType]
 }
 
 /**
@@ -176,6 +165,7 @@ case class AnalysisOptions(
 )
 
 object Settings {
+  val ZincCacheDirName = "-zinc-cache-dir"
   /**
    * All available command-line options.
    */
@@ -224,8 +214,9 @@ object Settings {
     prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
-    file(      "-sbt-interface", "file",       "Specify sbt interface jar",                  (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(sbtInterface = Some(f)))),
-    file(      "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
+    file(      "-compiler-bridge", "file",     "Specify compiler bridge sources jar",        (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridgeSrc = Some(f)))),
+    file(      "-compiler-interface", "file",  "Specify compiler interface jar",             (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterface = Some(f)))),
+    file(      ZincCacheDirName, "file",       "A cache directory for compiler interfaces",  (s: Settings, f: File) => s.copy(_zincCacheDir = Some(f))),
 
     header("Incremental compiler options:"),
     int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(transitiveStep = i))),
@@ -235,11 +226,10 @@ object Settings {
     file(      "-api-dump", "directory",       "Destination for analysis API dump",          (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(apiDumpDirectory = Some(f)))),
     int(       "-api-diff-context-size", "n",  "Diff context size (in lines) for API debug", (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(apiDiffContextSize = i))),
     boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(incOptions = s.incOptions.copy(transactional = true))),
+    boolean(   "-no-zinc-file-manager",        "Disable zinc provided file manager",           (s: Settings) => s.copy(incOptions = s.incOptions.copy(useZincFileManager = false))),
     file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
     boolean(   "-recompileOnMacroDefDisabled", "Disable recompilation of all dependencies of a macro def",
-      (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = false))),
-    boolean(   "-no-name-hashing",             "Disable improved incremental compilation algorithm",
-      (s: Settings) => s.copy(incOptions = s.incOptions.copy(nameHashing = false))),
+      (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = Some(false)))),
 
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
@@ -310,8 +300,8 @@ object Settings {
         ),
         javaHome = Util.normaliseOpt(cwd)(javaHome),
         sbt = sbt.copy(
-          sbtInterface = Util.normaliseOpt(cwd)(sbt.sbtInterface),
-          compilerInterfaceSrc = Util.normaliseOpt(cwd)(sbt.compilerInterfaceSrc)
+          compilerBridgeSrc = Util.normaliseOpt(cwd)(sbt.compilerBridgeSrc),
+          compilerInterface = Util.normaliseOpt(cwd)(sbt.compilerInterface)
         ),
         incOptions = incOptions.copy(
           apiDumpDirectory = Util.normaliseOpt(cwd)(incOptions.apiDumpDirectory),

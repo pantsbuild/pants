@@ -27,8 +27,9 @@ class PythonSetup(Subsystem):
              help='The setuptools version for this python environment.')
     register('--wheel-version', advanced=True, default='0.29.0',
              help='The wheel version for this python environment.')
-    register('--platforms', advanced=True, type=list, default=['current'],
-             help='The wheel version for this python environment.')
+    register('--platforms', advanced=True, type=list, metavar='<platform>', default=['current'],
+             help='A list of platforms to be supported by this python environment. Each platform'
+                  'is a string, as returned by pkg_resources.get_supported_platform().')
     register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the interpreter cache. '
                   'If unspecified, a standard path under the workdir is used.')
@@ -117,11 +118,10 @@ class PythonRepos(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonRepos, cls).register_options(register)
-    register('--repos', advanced=True, type=list, default=[],
+    register('--repos', advanced=True, type=list, default=[], fingerprint=True,
              help='URLs of code repositories.')
-    register('--indexes', advanced=True, type=list,
-             default=['https://pypi.python.org/simple/'],
-             help='URLs of code repository indexes.')
+    register('--indexes', advanced=True, type=list, fingerprint=True,
+             default=['https://pypi.python.org/simple/'], help='URLs of code repository indexes.')
 
   @property
   def repos(self):

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources = globs('*.py'),
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',

@@ -20,8 +20,8 @@ class CountLinesOfCode(ConsoleTask):
   """Print counts of lines of code."""
 
   @classmethod
-  def global_subsystems(cls):
-    return super(CountLinesOfCode, cls).global_subsystems() + (BinaryUtil.Factory,)
+  def subsystem_dependencies(cls):
+    return super(CountLinesOfCode, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
 
   @classmethod
   def register_options(cls, register):

@@ -85,7 +85,7 @@ class DxCompile(AndroidTask, NailgunTask):
   def _compile_dex(self, args, build_tools_version):
     classpath = [self.dx_jar_tool(build_tools_version)]
 
-    # TODO(mateor) Declare a task_subsystems dependency on JVM and use that to get options.
+    # TODO(mateor) Declare a subsystem_dependencies on JVM and use that to get options.
     jvm_options = self._forced_jvm_options if self._forced_jvm_options else None
     java_main = 'com.android.dx.command.Main'
     return self.runjava(classpath=classpath, jvm_options=jvm_options, main=java_main,

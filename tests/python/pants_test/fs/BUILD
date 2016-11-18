@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources = globs('*.py'),
   dependencies = [
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',

@@ -6,18 +6,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
+import functools
 from abc import abstractproperty
+from binascii import hexlify
 from fnmatch import fnmatch
 from hashlib import sha1
 from itertools import chain
 from os import sep as os_sep
-from os.path import basename, join, normpath
+from os.path import basename, dirname, join, normpath
 
 import six
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import Dir, File, Link
-from pants.engine.selectors import Collection, Select, SelectDependencies, SelectProjection
+from pants.engine.addressable import Collection
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -76,6 +79,16 @@ class FileContent(datatype('FileContent', ['path', 'content'])):
 
 class FileDigest(datatype('FileDigest', ['path', 'digest'])):
   """A unique fingerprint for the content of a File."""
+
+  @classmethod
+  def create(cls, path, content):
+    return cls(path, sha1(content).digest())
+
+  def __repr__(self):
+    return 'FileDigest(path={}, digest={})'.format(self.path, hexlify(self.digest)[:8])
+
+  def __str__(self):
+    return repr(self)
 
 
 class Path(datatype('Path', ['path', 'stat'])):
@@ -184,7 +197,7 @@ class PathRoot(datatype('PathRoot', []), PathGlob):
   """A PathGlob matching the root of the ProjectTree.
 
   The root is special because it's the only symbolic path that we can implicit trust is
-  not a symlink.
+  not a symlink due to ProjectTree-construction-time normalization.
   """
   canonical_stat = Dir('')
   symbolic_path = ''
@@ -210,6 +223,8 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   globs/rglobs/zglobs into 'filespecs'.
   """
 
+  element_types = (PathRoot, PathWildcard, PathDirWildcard)
+
   @classmethod
   def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
@@ -232,9 +247,9 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
       if not specs:
         continue
       res = pattern_cls.to_filespec(specs)
-      excludes = res.get('excludes')
-      if excludes:
-        raise ValueError('Excludes not supported for PathGlobs. Got: {}'.format(excludes))
+      exclude = res.get('exclude')
+      if exclude:
+        raise ValueError('Excludes not supported for PathGlobs. Got: {}'.format(exclude))
       new_specs = res.get('globs', None)
       if new_specs:
         filespecs.update(new_specs)
@@ -244,6 +259,14 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   def create_from_specs(cls, relative_to, filespecs):
     path_globs = (PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec) for filespec in filespecs)
     return cls(tuple(chain.from_iterable(path_globs)))
+
+
+class PathsExpansion(datatype('PathsExpansion', ['paths', 'dependencies'])):
+  """Represents the (in-progress) expansion of one or more PathGlob objects.
+
+  The dependencies of a PathsExpansion are additional PathGlob objects to be expanded.
+  """
+  element_types = (PathRoot, PathWildcard, PathDirWildcard)
 
 
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):
@@ -267,12 +290,12 @@ def scan_directory(project_tree, directory):
       raise e
 
 
-def merge_paths(paths_list):
-  """Merge Paths lists."""
+def finalize_path_expansion(paths_expansion_list):
+  """Finalize and merge PathExpansion lists into Paths."""
   path_seen = set()
   merged_paths = []
-  for paths in paths_list:
-    for p in paths.dependencies:
+  for paths_expansion in paths_expansion_list:
+    for p in paths_expansion.paths.dependencies:
       if p not in path_seen:
         merged_paths.append(p)
         path_seen.add(p)
@@ -281,14 +304,15 @@ def merge_paths(paths_list):
 
 def apply_path_root(path_root):
   """Returns the `Paths` for the root of the repo."""
-  return path_root.paths
+  return PathsExpansion(path_root.paths, tuple())
 
 
 def apply_path_wildcard(stats, path_wildcard):
   """Filter the given DirectoryListing object using the given PathWildcard."""
-  return Paths(tuple(Path(normpath(join(path_wildcard.symbolic_path, basename(s.path))), s)
-                     for s in stats.dependencies
-                     if fnmatch(basename(s.path), path_wildcard.wildcard)))
+  paths = Paths(tuple(Path(normpath(join(path_wildcard.symbolic_path, basename(s.path))), s)
+                      for s in stats.dependencies
+                      if fnmatch(basename(s.path), path_wildcard.wildcard)))
+  return PathsExpansion(paths, tuple())
 
 
 def apply_path_dir_wildcard(dirs, path_dir_wildcard):
@@ -298,8 +322,10 @@ def apply_path_dir_wildcard(dirs, path_dir_wildcard):
   sense that they will be relative to known-canonical subdirectories.
   """
   # For each matching Path, create a PathGlob per remainder.
-  path_globs = (PathGlob.create_from_spec(d.stat, d.path, path_dir_wildcard.remainder) for d in dirs.dependencies)
-  return PathGlobs(tuple(chain.from_iterable(path_globs)))
+  path_globs = tuple(pg
+                     for d in dirs.dependencies
+                     for pg in PathGlob.create_from_spec(d.stat, d.path, path_dir_wildcard.remainder))
+  return PathsExpansion(Paths(tuple()), path_globs)
 
 
 def _zip_links(links, linked_paths):
@@ -348,7 +374,7 @@ def file_digest(project_tree, f):
 
   See NB on file_content.
   """
-  return FileDigest(f.path, sha1(project_tree.content(f.path)).digest())
+  return FileDigest.create(f.path, project_tree.content(f.path))
 
 
 def resolve_link(stats):
@@ -372,21 +398,52 @@ FilesContent = Collection.of(FileContent)
 FilesDigest = Collection.of(FileDigest)
 
 
-def create_fs_tasks():
-  """Creates tasks that consume the native filesystem Node type."""
+def generate_fs_subjects(filenames):
+  """Given filenames, generate a set of subjects for invalidation predicate matching."""
+  for f in filenames:
+    # ReadLink, FileContent, or DirectoryListing for the literal path.
+    yield File(f)
+    yield Link(f)
+    yield Dir(f)
+    # Additionally, since the FS event service does not send invalidation events
+    # for the root directory, treat any changed file in the root as an invalidation
+    # of the root's listing.
+    if dirname(f) in ('.', ''):
+      yield Dir('')
+
+
+def create_fs_intrinsics(project_tree):
+  def ptree(func):
+    p = functools.partial(func, project_tree)
+    p.__name__ = '{}_intrinsic'.format(func.__name__)
+    return p
   return [
-    # Glob execution.
+    (DirectoryListing, Dir, ptree(scan_directory)),
+    (FileContent, File, ptree(file_content)),
+    (FileDigest, File, ptree(file_digest)),
+    (ReadLink, Link, ptree(read_link)),
+  ]
+
+
+def create_fs_tasks():
+  """Creates tasks that consume the intrinsic filesystem types."""
+  return [
+    # Glob execution: to avoid memoizing lots of incremental results, we recursively expand PathGlobs, and then
+    # convert them to Paths independently.
     (Paths,
-     [SelectDependencies(Paths, PathGlobs, field_types=(PathWildcard, PathDirWildcard, PathRoot))],
-     merge_paths),
-    (Paths,
+     [SelectDependencies(PathsExpansion,
+                         PathGlobs,
+                         field_types=(PathWildcard, PathDirWildcard, PathRoot),
+                         transitive=True)],
+     finalize_path_expansion),
+    (PathsExpansion,
      [Select(PathRoot)],
      apply_path_root),
-    (Paths,
+    (PathsExpansion,
      [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathWildcard),
       Select(PathWildcard)],
      apply_path_wildcard),
-    (PathGlobs,
+    (PathsExpansion,
      [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),

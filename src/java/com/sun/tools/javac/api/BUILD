@@ -3,7 +3,6 @@
 
 
 java_library(
-  sources=globs('*.java'),
   dependencies=[
   ],
   platform='java7',

@@ -31,3 +31,7 @@ class PythonRequirementLibrary(Target):
     })
     super(PythonRequirementLibrary, self).__init__(payload=payload, **kwargs)
     self.add_labels('python')
+
+  @property
+  def requirements(self):
+    return self.payload.requirements

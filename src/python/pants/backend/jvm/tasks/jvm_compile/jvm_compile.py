@@ -251,7 +251,7 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, javac_plugins_to_exclude):
+              log_file, settings, fatal_warnings, zinc_file_manager, javac_plugins_to_exclude):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -267,6 +267,7 @@ class JvmCompile(NailgunTaskBase):
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
     :param fatal_warnings: whether to convert compilation warnings to errors.
+    :param zinc_file_manager: whether to use zinc provided file manager.
     :param javac_plugins_to_exclude: A list of names of javac plugins that mustn't be used in
                                      this compilation, even if requested (typically because
                                      this compilation is building those same plugins).
@@ -477,7 +478,8 @@ class JvmCompile(NailgunTaskBase):
         f.write(text.encode('utf-8'))
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings, fatal_warnings, counter):
+                   log_file, progress_message, settings, fatal_warnings, zinc_file_manager,
+                   counter):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -518,7 +520,8 @@ class JvmCompile(NailgunTaskBase):
         # If compiling a plugin, don't try to use it on itself.
         javac_plugins_to_exclude = (t.plugin for t in vts.targets if isinstance(t, JavacPlugin))
         self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings, fatal_warnings, javac_plugins_to_exclude)
+                     log_file, settings, fatal_warnings, zinc_file_manager,
+                     javac_plugins_to_exclude)
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -717,6 +720,7 @@ class JvmCompile(NailgunTaskBase):
 
         tgt, = vts.targets
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
+        zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
         self._compile_vts(vts,
                           ctx.sources,
                           ctx.analysis_file,
@@ -727,6 +731,7 @@ class JvmCompile(NailgunTaskBase):
                           progress_message,
                           tgt.platform,
                           fatal_warnings,
+                          zinc_file_manager,
                           counter)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
@@ -750,7 +755,6 @@ class JvmCompile(NailgunTaskBase):
       compile_target = ivts.target
       compile_context = compile_contexts[compile_target]
       invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
-                                                                        compile_contexts,
                                                                         invalid_target_set)
 
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
@@ -763,20 +767,21 @@ class JvmCompile(NailgunTaskBase):
                       on_failure=ivts.force_invalidate))
     return jobs
 
-  def _collect_invalid_compile_dependencies(self, compile_target, compile_contexts, invalid_target_set):
-    # Collects just the direct invalid compile dependencies, traversing non-compile targets.
+  def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
+    # Collects all invalid dependencies that are not dependencies of other invalid dependencies
+    # within the closure of compile_target.
     invalid_dependencies = OrderedSet()
 
     def work(target):
       pass
 
     def predicate(target):
-      if target in compile_contexts and target is not compile_target:
-        if target in invalid_target_set:
-          invalid_dependencies.add(target)
-        return False
-      else:
+      if target is compile_target:
         return True
+      if target in invalid_target_set:
+        invalid_dependencies.add(target)
+        return False
+      return True
 
     compile_target.walk(work, predicate)
     return invalid_dependencies

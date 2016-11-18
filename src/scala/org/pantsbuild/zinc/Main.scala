@@ -5,7 +5,7 @@
 package org.pantsbuild.zinc
 
 import java.io.File
-import sbt.Level
+import sbt.util.Level
 import xsbti.CompileFailed
 import org.pantsbuild.zinc.logging.{ Loggers, Reporters }
 
@@ -80,18 +80,13 @@ object Main {
       sys.exit(1)
     }
 
-    // verify inputs and update if needed
-    val vinputs = Inputs.verify(inputs)
-
-    // warn about cache file location when under zinc cache dir
-    if (vinputs.cacheFile.getCanonicalPath startsWith Setup.zincCacheDir.getPath) {
-      log.warn("Default cache file location not accessible. Using " + vinputs.cacheFile.getPath)
-    }
+    // verify inputs
+    Inputs.verify(inputs)
 
     if (isDebug) {
       val debug: String => Unit = log.debug(_)
       Setup.show(setup, debug)
-      Inputs.show(vinputs, debug)
+      Inputs.show(inputs, debug)
       debug("Setup and Inputs parsed " + Util.timing(startTime))
     }
 
@@ -99,7 +94,7 @@ object Main {
     try {
       val compiler = Compiler(setup, log)
       log.debug("Zinc compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
-      compiler.compile(vinputs, cwd, reporter, progress)(log)
+      compiler.compile(inputs, cwd, reporter, progress)(log)
       log.info("Compile success " + Util.timing(startTime))
     } catch {
       case e: CompileFailed =>

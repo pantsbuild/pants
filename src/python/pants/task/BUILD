@@ -3,7 +3,6 @@
 
 
 python_library(
-  sources = globs('*.py'),
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
