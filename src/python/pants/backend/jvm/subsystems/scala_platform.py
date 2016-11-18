@@ -16,22 +16,20 @@ from pants.subsystem.subsystem import Subsystem
 
 
 # full_version - the full scala version to use.
-# style_version - the version of org.scalastyle.scalastyle to use.
-major_version_info = namedtuple('major_version_info', ['full_version', 'style_version'])
+major_version_info = namedtuple('major_version_info', ['full_version'])
 
 
 # Note that the compiler has two roles here: as a tool (invoked by the compile task), and as a
 # runtime library (when compiling plugins, which require the compiler library as a dependency).
 scala_build_info = {
-  '2.10':
-    major_version_info(
-      full_version='2.10.6',
-      style_version='0.3.2'),
-  '2.11':
-    major_version_info(
-      full_version='2.11.8',
-      style_version='0.8.0'),
+  '2.10': major_version_info(full_version='2.10.6'),
+  '2.11': major_version_info(full_version='2.11.8'),
+  '2.12': major_version_info(full_version='2.12.0'),
 }
+
+
+# Because scalastyle inspects only the sources, it needn't match the platform version.
+scala_style_jar = JarDependency('org.scalastyle', 'scalastyle_2.11', '0.8.0')
 
 
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
@@ -75,7 +73,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
         jline_dep = JarDependency(
             org = 'org.scala-lang',
             name = 'jline',
-            rev = scala_build_info['2.10'].full_version
+            rev = scala_build_info[version].full_version
         )
         classpath.append(jline_dep)
       cls.register_jvm_tool(register,
@@ -83,17 +81,13 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                             classpath=classpath)
 
     def register_style_tool(version):
-      # Note: Since we can't use ScalaJarDependency without creating a import loop we need to
-      # specify the version info in the name.
-      style_version = scala_build_info[version].style_version
-      jardep = JarDependency('org.scalastyle', 'scalastyle_{}'.format(version), style_version)
       cls.register_jvm_tool(register,
                             cls._key_for_tool_version('scalastyle', version),
-                            classpath=[jardep])
+                            classpath=[scala_style_jar])
 
     super(ScalaPlatform, cls).register_options(register)
-    register('--version', advanced=True, default='2.11',
-             choices=['2.10', '2.11', 'custom'], fingerprint=True,
+    register('--version', advanced=True, default='2.12',
+             choices=['2.10', '2.11', '2.12', 'custom'], fingerprint=True,
              help='The scala platform version. If --version=custom, the targets '
                   '//:scala-library, //:scalac, //:scala-repl and //:scalastyle will be used, '
                   'and must exist.  Otherwise, defaults for the specified version will be used.')
@@ -111,6 +105,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register_scala_compiler_tool('2.11')
     register_scala_repl_tool('2.11')
     register_style_tool('2.11')
+
+    register_scala_compiler_tool('2.12')
+    register_scala_repl_tool('2.12')
+    register_style_tool('2.12')
 
     # Register the custom tools. We provide a dummy classpath, so that register_jvm_tool won't
     # require that a target with the given spec actually exist (not everyone will define custom
