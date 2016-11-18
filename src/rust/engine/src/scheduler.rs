@@ -46,7 +46,13 @@ impl Scheduler {
   }
 
   pub fn trace(&self, path: &Path) -> io::Result<()> {
-    self.graph.trace(&self.roots, path, &self.tasks.externs)
+    for root in &self.roots {
+      let result = self.graph.trace(&root, path, &self.tasks.externs);
+      if result.is_err() {
+        return result;
+      }
+    }
+    Ok(())
   }
 
   pub fn reset(&mut self) {

@@ -10,7 +10,6 @@ extern crate libc;
 extern crate fnv;
 
 use std::ffi::CStr;
-use std::ffi::CString;
 use std::mem;
 use std::path::Path;
 

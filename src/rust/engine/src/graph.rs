@@ -398,7 +398,7 @@ impl Graph {
     Ok(())
   }
 
-  pub fn trace(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
+  pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
 
@@ -421,11 +421,16 @@ impl Graph {
       true
     };
 
-    let _format = |entry: &Entry, level: u32| -> String {
+    let _indent = |level: u32| -> String {
       let mut indent = "".to_string();
       for _ in 0..level {
         indent = indent + "  ";
       }
+      indent
+    };
+
+    let _format = |entry: &Entry, level: u32| -> String {
+      let indent = _indent(level);
       let output = format!("{}Computing {} for {}",
                            indent,
                            match entry.node.product() {
@@ -446,37 +451,13 @@ impl Graph {
       }
     };
 
-
-    // v1
-    // walk and print all entries
-    // v2
-    // add ws nesting
-
-    // starting at the roots,
-    // walk down the graph until you find a bottom
-    // nesting
-    //
-
-    // 1st
-    // how do I recur how I want
-    // probably I could look at walk
-
-
-    //let predicate = |e,_| !is_bottom(e);
-    let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
+    let root_entries = vec![root].iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
     for t in self.leveled_walk(root_entries, |e,_| !is_bottom(e), false) {
-    //for t in self.leveled_walk(root_entries, predicate, false) {
       let (entry, level) = t;
-//      try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme)));
-      //println!("{}", _format(entry, level));
       try!(write!(&mut f, "{}\n", _format(entry, level)));
-      //try!(f.write_fmt(format_args!("{}", _format(entry, level))));
 
       for dep_entry in &entry.cyclic_dependencies {
-        let mut indent="".to_string();
-        for _ in 1..level {
-          indent+="  ";
-        }
+        let indent= _indent(level);
         try!(write!(&mut f, "{}cycle for {:?}\n", indent, dep_entry));
       }
 
