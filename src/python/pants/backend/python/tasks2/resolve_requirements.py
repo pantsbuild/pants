@@ -6,8 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-
 import shutil
+
 from pex.fetcher import Fetcher
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
@@ -18,8 +18,8 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin
-from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
+from pants.base.fingerprint_strategy import (DefaultFingerprintHashingMixin,
+                                             TaskIdentityFingerprintStrategy)
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 
