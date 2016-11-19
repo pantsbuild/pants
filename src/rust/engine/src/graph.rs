@@ -404,13 +404,12 @@ impl Graph {
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
-      let match_result = match entry.state {
+      match entry.state {
         None => false,
         Some(Complete::Throw(_)) => false,
         Some(Complete::Noop(_, _)) => true,
         Some(Complete::Return(_)) => true
-      };
-      match_result
+      }
     };
 
     let is_one_level_above_bottom = |c: &Entry| -> bool {
@@ -439,7 +438,7 @@ impl Graph {
       if is_one_level_above_bottom(entry) {
         let state_str = match entry.state {
           Some(Complete::Return(ref x)) => format!("Return({})", externs.val_to_str(x)),
-          Some(Complete::Throw(ref x)) => format!("Throw({:?})", x),
+          Some(Complete::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
           Some(Complete::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
           None => String::new(),
         };
@@ -458,7 +457,6 @@ impl Graph {
         let indent= _indent(level);
         try!(write!(&mut f, "{}cycle for {:?}\n", indent, dep_entry));
       }
-
     }
 
     try!(f.write_all(b"\n"));
