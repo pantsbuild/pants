@@ -15,6 +15,7 @@ use std::path::Path;
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
+  CreateExceptionExtern,
   ExternContext,
   Externs,
   IdToStrExtern,
@@ -196,6 +197,7 @@ pub extern fn scheduler_create(
   store_list: StoreListExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
+  create_exception: CreateExceptionExtern,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -214,6 +216,7 @@ pub extern fn scheduler_create(
       store_list,
       project,
       project_multi,
+      create_exception,
     );
   Box::into_raw(
     Box::new(

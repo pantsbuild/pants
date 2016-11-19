@@ -25,7 +25,7 @@ from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import (ExternContext, Function, TypeConstraint, TypeId,
                                            extern_id_to_str, extern_key_for, extern_project,
                                            extern_project_multi, extern_satisfied_by,
-                                           extern_store_list, extern_val_to_str)
+                                           extern_create_exception, extern_store_list, extern_val_to_str)
 from pants.util.objects import datatype
 
 
@@ -84,6 +84,7 @@ class LocalScheduler(object):
                                             extern_store_list,
                                             extern_project,
                                             extern_project_multi,
+                                            extern_create_exception,
                                             self._to_key('name'),
                                             self._to_key('products'),
                                             self._to_key('default'),

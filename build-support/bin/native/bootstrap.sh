@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 readonly REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
 
