@@ -287,25 +287,26 @@ pub extern fn execution_add_root_select_dependencies(
 #[no_mangle]
 pub extern fn execution_next(
   scheduler_ptr: *mut RawScheduler,
-  returns_ptr: *mut EntryId,
-  returns_states_ptr: *mut Value,
-  returns_len: u64,
-  throws_ptr: *mut EntryId,
-  // TODO: empty strings at the moment.
-  //throws_states_ptr: **mut CStr,
-  throws_len: u64,
+  states_ptr: *mut EntryId,
+  states_values_ptr: *mut Value,
+  states_are_throws_ptr: *mut bool,
+  states_len: u64,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
-    with_vec(returns_ptr, returns_len as usize, |returns_ids| {
-      with_vec(returns_states_ptr, returns_len as usize, |returns_states| {
-        with_vec(throws_ptr, throws_len as usize, |throws_ids| {
-          let returns =
-            returns_ids.iter().zip(returns_states.iter())
-              .map(|(&id, value)| (id, Complete::Return(value.clone())));
-          let throws =
-            throws_ids.iter()
-              .map(|&id| (id, Complete::Throw(format!("{:?} failed!", id))));
-          raw.next(returns.chain(throws).collect());
+    with_vec(states_ptr, states_len as usize, |states_ids| {
+      with_vec(states_values_ptr, states_len as usize, |states_values| {
+        with_vec(states_are_throws_ptr, states_len as usize, |states_are_throws| {
+          let states =
+            states_ids.iter().zip(states_values.iter()).zip(states_are_throws.iter())
+              .map(|((&id, value), &is_throw)| {
+                if is_throw {
+                  (id, Complete::Throw(value.clone()))
+                } else {
+                  (id, Complete::Return(value.clone()))
+                }
+              })
+              .collect();
+          raw.next(states);
         })
       })
     })

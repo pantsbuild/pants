@@ -290,9 +290,9 @@ class LocalScheduler(object):
         elif raw_root.union_tag is 1:
           state = Return(self._from_value(raw_root.union_return))
         elif raw_root.union_tag is 2:
-          state = Throw("Failed")
+          state = Throw(Exception("Failed"))
         elif raw_root.union_tag is 3:
-          state = Throw("Nooped")
+          state = Throw(Exception("Nooped"))
         else:
           raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.union_tag, raw_root))
         roots[root] = state
@@ -314,24 +314,25 @@ class LocalScheduler(object):
       return self._native.lib.graph_len(self._scheduler)
 
   def _execution_next(self, completed):
-    # Unzip into two arrays.
-    returns_ids, returns_states, throws_ids = [], [], []
+    # Unzip into three arrays.
+    states_ids, states_values, states_are_throws = [], [], []
     for cid, c in completed:
+      states_ids.append(cid)
       if type(c) is Return:
-        returns_ids.append(cid)
-        returns_states.append(self._to_value(c.value))
+        states_values.append(self._to_value(c.value))
+        states_are_throws.append(False)
       elif type(c) is Throw:
-        throws_ids.append(cid)
+        states_values.append(self._to_value(c.exc))
+        states_are_throws.append(True)
       else:
         raise ValueError("Unexpected `Completed` state from Runnable execution: {}".format(c))
 
     # Run, then collect the outputs from the Scheduler's RawExecution struct.
     self._native.lib.execution_next(self._scheduler,
-                                    returns_ids,
-                                    returns_states,
-                                    len(returns_ids),
-                                    throws_ids,
-                                    len(throws_ids))
+                                    states_ids,
+                                    states_values,
+                                    states_are_throws,
+                                    len(states_ids))
 
     def decode_runnable(raw):
       return (

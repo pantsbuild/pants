@@ -148,8 +148,7 @@ _FFI.cdef(
     void execution_next(RawScheduler*,
                         EntryId*,
                         Value*,
-                        uint64_t,
-                        EntryId*,
+                        bool*,
                         uint64_t);
     RawNodes* execution_roots(RawScheduler*);
 
