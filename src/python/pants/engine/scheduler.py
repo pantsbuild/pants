@@ -290,7 +290,7 @@ class LocalScheduler(object):
         elif raw_root.union_tag is 1:
           state = Return(self._from_value(raw_root.union_return))
         elif raw_root.union_tag is 2:
-          state = Throw(Exception("Failed"))
+          state = Throw(self._from_value(raw_root.union_throw))
         elif raw_root.union_tag is 3:
           state = Throw(Exception("Nooped"))
         else:

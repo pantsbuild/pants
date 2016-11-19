@@ -125,8 +125,7 @@ pub struct RawNode {
   // a stable release.
   state_tag: u8,
   state_return: Value,
-  // TODO: expose as cstrings.
-  state_throw: bool,
+  state_throw: Value,
   state_noop: bool,
 }
 
@@ -147,8 +146,8 @@ impl RawNode {
         _ => Default::default(),
       },
       state_throw: match state {
-        Some(&Complete::Throw(_)) => true,
-        _ => false,
+        Some(&Complete::Throw(ref v)) => v.clone(),
+        _ => Default::default(),
       },
       state_noop: match state {
         Some(&Complete::Noop(_, _)) => true,

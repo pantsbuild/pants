@@ -94,7 +94,7 @@ _FFI.cdef(
       TypeConstraint  product;
       uint8_t         union_tag;
       Value           union_return;
-      bool            union_throw;
+      Value           union_throw;
       bool            union_noop;
     } RawNode;
 
