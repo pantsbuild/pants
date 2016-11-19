@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
- 1.3.0dev2 (11/18/2016)
+1.3.0dev2 (11/18/2016)
 ----------------------
 
 A return to the regular schedule of weekly unstable releases.
@@ -17,13 +17,13 @@ API Changes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Spelling mistake in first_tutorial (#4045)
- `Pull Request #4045 <https://github.com/pantsbuild/pants/pull/4045>`_
+  `Pull Request #4045 <https://github.com/pantsbuild/pants/pull/4045>`_
 
 * Replace instances of pantsbuild.github.io in the docs with pantsbuild.org.
- `Pull Request #4074 <https://github.com/pantsbuild/pants/pull/4074>`_
+  `Pull Request #4074 <https://github.com/pantsbuild/pants/pull/4074>`_
 
 * A task to resolve python requirements.
- `Pull Request #4065 <https://github.com/pantsbuild/pants/pull/4065>`_
+  `Pull Request #4065 <https://github.com/pantsbuild/pants/pull/4065>`_
 
 * Upgrade zinc's sbt dependency to 1.0.0: python portion
   `RB #4064 <https://rbcommons.com/s/twitter/r/4064>`_
