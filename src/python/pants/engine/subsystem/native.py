@@ -136,6 +136,8 @@ _FFI.cdef(
     uint64_t graph_len(RawScheduler*);
     uint64_t graph_invalidate(RawScheduler*, Key*, uint64_t);
     void graph_visualize(RawScheduler*, char*);
+    void graph_trace(RawScheduler*, char*);
+
 
     void execution_reset(RawScheduler*);
     void execution_add_root_select(RawScheduler*, Key, TypeConstraint);

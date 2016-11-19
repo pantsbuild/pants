@@ -13,8 +13,7 @@ from pex.platforms import Platform
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_setup import PythonRepos
-from pants.backend.python.python_setup import PythonSetup
+from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot

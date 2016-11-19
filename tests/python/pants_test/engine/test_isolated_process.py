@@ -218,7 +218,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def assertFirstEntryIsReturn(self, root_entries, scheduler):
     root, state = root_entries[0]
-    self.assertReturn(state, root, scheduler)
+    self.assertReturn(state, scheduler)
     return state
 
   def assertFirstEntryIsThrow(self, root_entries, in_msg=None):
@@ -238,13 +238,13 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
                                   project_tree=project_tree)
     return scheduler
 
-  def assertReturn(self, state, root, scheduler):
+  def assertReturn(self, state, scheduler):
     is_return = isinstance(state, Return)
     if is_return:
       return
     else:
       self.fail('Expected a Return, but found a {}. trace below:\n{}'
-                .format(state, scheduler.trace([root])))
+                .format(state, scheduler.trace()))
 
   def assertPathContains(self, expected_files, path):
     for i in expected_files:

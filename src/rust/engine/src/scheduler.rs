@@ -45,6 +45,16 @@ impl Scheduler {
     self.graph.visualize(&self.roots, path, &self.tasks.externs)
   }
 
+  pub fn trace(&self, path: &Path) -> io::Result<()> {
+    for root in &self.roots {
+      let result = self.graph.trace(&root, path, &self.tasks.externs);
+      if result.is_err() {
+        return result;
+      }
+    }
+    Ok(())
+  }
+
   pub fn reset(&mut self) {
     self.roots.clear();
     self.candidates.clear();
