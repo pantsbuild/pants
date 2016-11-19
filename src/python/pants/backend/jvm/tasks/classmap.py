@@ -20,7 +20,7 @@ class ClassmapTask(ConsoleTask):
     register('--internal-only', default=False, type=bool, fingerprint=True,
              help='Specifies that only class names of internal dependencies should be included.')
     register('--transitive', default=True, type=bool,
-             help='Score all targets in the build graph transitively.')
+             help='Outputs all targets in the build graph transitively.')
 
   def classname_for_classfile(self, target, classpath_products):
     contents = ClasspathUtil.classpath_contents((target,), classpath_products)
@@ -32,11 +32,7 @@ class ClassmapTask(ConsoleTask):
 
   def console_output(self, _):
     def should_ignore(target):
-      if target.address.spec.startswith('//:'):
-        return True
-      if self.get_options().internal_only and isinstance(target, JarLibrary):
-        return True
-      return False
+      return self.get_options().internal_only and isinstance(target, JarLibrary)
 
     classpath_product = self.context.products.get_data('runtime_classpath')
     targets = self.context.targets() if self.get_options().transitive else self.context.target_roots
