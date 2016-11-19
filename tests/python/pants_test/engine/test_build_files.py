@@ -196,7 +196,7 @@ class InlinedGraphTest(GraphTestBase):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     root, state = self._populate(scheduler, parsed_address)
     self.assertEqual(type(state), Throw)
-    trace_message = '\n'.join(scheduler.trace([root]))
+    trace_message = '\n'.join(scheduler.trace())
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
     if expected_string:
