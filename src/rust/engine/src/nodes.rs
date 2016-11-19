@@ -386,7 +386,7 @@ impl SelectDependencies {
       Some(&Complete::Noop(_, _)) =>
         Err(
           State::Complete(
-          Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
+            Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
           )
         ),
       Some(&Complete::Throw(msg)) =>
