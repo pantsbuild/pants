@@ -11,11 +11,20 @@ A return to the regular schedule of weekly unstable releases.
 
 API Changes
 ~~~~~~~~~~~
+* Move SimpleCodegenTask into the pants core.
+  `Pull Request #4079 <https://github.com/pantsbuild/pants/pull/4079>`_
+
+* Move the pytest-related runtime requirement specs  into a subsystem.
+  `Pull Request #4071 <https://github.com/pantsbuild/pants/pull/4071>`_
+
 * Add the scala 2.12 platform
   `RB #4388 <https://rbcommons.com/s/twitter/r/4388>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Task to gather local python sources into a pex.
+  `Pull Request #4084 <https://github.com/pantsbuild/pants/pull/4084>`_
+
 * [engine] Initial Trace implementation for rust engine (#4076)
   `Issue #4025 <https://github.com/pantsbuild/pants/issues/4025>`_
   `Pull Request #4076 <https://github.com/pantsbuild/pants/pull/4076>`_
