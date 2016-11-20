@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.3.0dev2 (11/18/2016)
+1.3.0dev2 (11/20/2016)
 ----------------------
 
 A return to the regular schedule of weekly unstable releases.
@@ -16,6 +16,13 @@ API Changes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* [engine] Initial Trace implementation for rust engine (#4076)
+  `Issue #4025 <https://github.com/pantsbuild/pants/issues/4025>`_
+  `Pull Request #4076 <https://github.com/pantsbuild/pants/pull/4076>`_
+
+* Propose a github review workflow
+  `RB #4333 <https://rbcommons.com/s/twitter/r/4333>`_
+
 * Spelling mistake in first_tutorial (#4045)
   `Pull Request #4045 <https://github.com/pantsbuild/pants/pull/4045>`_
 
