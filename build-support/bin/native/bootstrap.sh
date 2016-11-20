@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Defines:
+# + CACHE_TARGET_DIR: The directory containing all versions of the native engine for the current OS.
+# Exposes: `build_native_code` for building target-specific native engine binaries.
+
 readonly REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
 
