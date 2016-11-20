@@ -39,8 +39,7 @@ class GatherSources(Task):
     round_manager.require_data(PythonInterpreter)
 
   def execute(self):
-    targets = self.context.targets(lambda tgt: isinstance(tgt, PythonTarget) or
-                                               isinstance(tgt, Resources))
+    targets = self.context.targets(lambda tgt: isinstance(tgt, (PythonTarget, Resources)))
     with self.invalidated(targets) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of gathering
       # an empty set of sources, to prevent downstream tasks from having to check
@@ -72,14 +71,11 @@ class GatherSources(Task):
 
   def _dump_sources(self, builder, tgt):
     buildroot = get_buildroot()
-    def copy_to_chroot(base, path, add_function):
-      src = os.path.join(buildroot, base, path)
-      add_function(src, path)
-
     self.context.log.debug('  Dumping sources: {}'.format(tgt))
     for relpath in tgt.sources_relative_to_source_root():
       try:
-        copy_to_chroot(tgt.target_base, relpath, builder.add_source)
+        src = os.path.join(buildroot, tgt.target_base, relpath)
+        builder.add_source(src, relpath)
       except OSError:
         self.context.log.error('Failed to copy {} for target {}'.format(
             os.path.join(tgt.target_base, relpath), tgt.address.spec))
@@ -87,6 +83,6 @@ class GatherSources(Task):
 
     if getattr(tgt, 'resources', None):
       # No one should be on old-style resources any more.  And if they are,
-      # switching to the new python pipeline will be a great opportunity to get fix that.
+      # switching to the new python pipeline will be a great opportunity to fix that.
       raise TaskError('Old-style resources not supported for target {}.  '
                       'Depend on resources() targets instead.'.format(tgt.address.spec))
