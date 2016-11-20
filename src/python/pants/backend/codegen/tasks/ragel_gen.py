@@ -10,11 +10,11 @@ import re
 import subprocess
 
 from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
-from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
+from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
 

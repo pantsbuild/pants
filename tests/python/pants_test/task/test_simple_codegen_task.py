@@ -8,23 +8,31 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.codegen.register import build_file_aliases as register_codegen
-from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
-from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.register import build_file_aliases as register_core
+from pants.build_graph.target import Target
+from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
-class JavaLibraryWithCopied(JavaLibrary):
-  def __init__(self, copied=None, *args, **kwargs):
+# A dummy target with sources= and copied= fields.
+class DummyTargetBase(Target):
+  def __init__(self, address, sources, copied=None, **kwargs):
     self.copied = copied
-    super(JavaLibraryWithCopied, self).__init__(*args, **kwargs)
+    payload = Payload()
+    payload.add_fields({
+      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
+    })
+    super(DummyTargetBase, self).__init__(address=address, payload=payload, **kwargs)
 
 
-class DummyLibrary(JvmTarget):
+class SyntheticDummyLibrary(DummyTargetBase):
+  pass
+
+
+class DummyLibrary(DummyTargetBase):
   """Library of .dummy files, which are just text files which generate empty java files.
 
   As the name implies, this is purely for testing the behavior of the simple_codegen_task.
@@ -41,10 +49,7 @@ class DummyLibrary(JvmTarget):
 
   Which would compile, but do nothing.
   """
-
-  def __init__(self, copied=None, *args, **kwargs):
-    self.copied = copied
-    super(DummyLibrary, self).__init__(*args, **kwargs)
+  pass
 
 
 class DummyGen(SimpleCodegenTask):
@@ -55,8 +60,8 @@ class DummyGen(SimpleCodegenTask):
   by SimpleCodegenTask.
   """
 
-  def __init__(self, *vargs, **kwargs):
-    super(DummyGen, self).__init__(*vargs, **kwargs)
+  def __init__(self, *args, **kwargs):
+    super(DummyGen, self).__init__(*args, **kwargs)
     self._test_case = None
     self._all_targets = None
     self.setup_for_testing(None, None)
@@ -101,7 +106,7 @@ class DummyGen(SimpleCodegenTask):
             yield os.path.join(target_workdir, os.path.join(*package_name.split('.')), class_name)
 
   def synthetic_target_type(self, target):
-    return JavaLibraryWithCopied
+    return SyntheticDummyLibrary
 
   @property
   def _copy_target_attributes(self):
@@ -116,7 +121,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return register_core().merge(register_codegen()).merge(BuildFileAliases({
+    return register_core().merge(BuildFileAliases({
       'dummy_library': DummyLibrary
     }))
 
@@ -129,21 +134,21 @@ class SimpleCodegenTaskTest(TaskTestBase):
   def _create_dummy_library_targets(self, target_specs):
     for spec in target_specs:
       spec_path, spec_name = spec.split(':')
-      self.add_to_build_file(spec_path, dedent('''
+      self.add_to_build_file(spec_path, dedent("""
           dummy_library(name='{name}',
             sources=[],
           )
-        '''.format(name=spec_name)))
+        """.format(name=spec_name)))
     return set([self.target(spec) for spec in target_specs])
 
   def _test_execute_strategy(self, strategy, expected_execution_count):
     dummy_suffixes = ['a', 'b', 'c']
 
-    self.add_to_build_file('gen-lib', '\n'.join(dedent('''
+    self.add_to_build_file('gen-lib', '\n'.join(dedent("""
       dummy_library(name='{suffix}',
         sources=['org/pantsbuild/example/foo{suffix}.dummy'],
       )
-    ''').format(suffix=suffix) for suffix in dummy_suffixes))
+    """).format(suffix=suffix) for suffix in dummy_suffixes))
 
     for suffix in dummy_suffixes:
       self.create_file('gen-lib/org/pantsbuild/example/foo{suffix}.dummy'.format(suffix=suffix),
@@ -167,13 +172,13 @@ class SimpleCodegenTaskTest(TaskTestBase):
     self._test_execute_strategy('isolated', 3)
 
   def _get_duplication_test_targets(self):
-    self.add_to_build_file('gen-parent', dedent('''
+    self.add_to_build_file('gen-parent', dedent("""
       dummy_library(name='gen-parent',
         sources=['org/pantsbuild/example/parent.dummy'],
       )
-    '''))
+    """))
 
-    self.add_to_build_file('gen-child', dedent('''
+    self.add_to_build_file('gen-child', dedent("""
       dummy_library(name='good',
         sources=['org/pantsbuild/example/good-child.dummy'],
         dependencies=['gen-parent'],
@@ -183,7 +188,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
         sources=['org/pantsbuild/example/bad-child.dummy'],
         dependencies=['gen-parent'],
       )
-    '''))
+    """))
 
     self.create_file('gen-parent/org/pantsbuild/example/parent.dummy',
                      'org.pantsbuild.example ParentClass')
@@ -250,12 +255,12 @@ class SimpleCodegenTaskTest(TaskTestBase):
                      'org.pantsbuild.example Fleem')
 
 
-    self.add_to_build_file('fleem', dedent('''
+    self.add_to_build_file('fleem', dedent("""
       dummy_library(name='fleem',
         sources=['org/pantsbuild/example/fleem.dummy'],
         copied='copythis'
       )
-    '''))
+    """))
 
     targets = [self.target('fleem')]
     task = self._create_dummy_task(target_roots=targets, strategy='isolated')
