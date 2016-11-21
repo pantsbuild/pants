@@ -2,11 +2,14 @@
 
 readonly REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
-# Indirectly exports:
+# Indirectly defines:
 # + LIB_EXTENSION: The extension of native libraries.
+# + KERNEL: The lower-cased name of the kernel as reported by uname.
 # + OS_NAME: The name of the OS as seen by pants.
 # + OS_ID: The ID of the current OS as seen by pants.
-# Exposes `build_native_code` for building target-specific native engine binaries.
+# Defines:
+# + CACHE_TARGET_DIR: The directory containing all versions of the native engine for the current OS.
+# Exposes: `build_native_code` for building target-specific native engine binaries.
 source ${REPO_ROOT}/build-support/bin/native/bootstrap.sh
 
 # Bump this when there is a new OSX released:
@@ -16,9 +19,6 @@ readonly NATIVE_ENGINE_VERSION=$(
   ${REPO_ROOT}/pants options --scope=native-engine --name=version --output-format=json | \
   python -c 'import json, sys; print(json.load(sys.stdin)["native-engine.version"]["value"])'
 )
-
-readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
-readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine
 
 cat << EOF > ${REPO_ROOT}/native-engine.bintray.json
 {
@@ -63,11 +63,11 @@ function emit_osx_files() {
     # It appears to be the case that upload de-dupes on includePattern keys; so we make a unique
     # includePattern per uploadPattern via a symlink here per OSX version.
     ln -fs \
-      ${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine \
-      ${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine.10.${version}
+      ${CACHE_TARGET_DIR}/${NATIVE_ENGINE_VERSION}/native-engine \
+      ${CACHE_TARGET_DIR}/${NATIVE_ENGINE_VERSION}/native-engine.10.${version}
     cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
     {
-      "includePattern": "${CACHE_TARGET_DIR}/${OS_ID}/${NATIVE_ENGINE_VERSION}/native-engine.10.${version}",
+      "includePattern": "${CACHE_TARGET_DIR}/${NATIVE_ENGINE_VERSION}/native-engine.10.${version}",
       "uploadPattern": "build-support/bin/native-engine/mac/10.${version}/${NATIVE_ENGINE_VERSION}/native-engine"
     }${sep}
 EOF
