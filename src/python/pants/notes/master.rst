@@ -22,6 +22,9 @@ API Changes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Fixup OSX bintray prep. (#4086)
+  `Pull Request #4086 <https://github.com/pantsbuild/pants/pull/4086>`_
+
 * Task to gather local python sources into a pex.
   `Pull Request #4084 <https://github.com/pantsbuild/pants/pull/4084>`_
 
