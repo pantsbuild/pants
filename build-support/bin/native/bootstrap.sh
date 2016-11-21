@@ -18,7 +18,7 @@ readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"
 
 # N.B. Set $MODE to "debug" to generate a binary with debugging symbols.
-readonly MODE="release"
+readonly MODE="${MODE:-release}"
 case "$MODE" in
   debug) MODE_FLAG="" ;;
   *) MODE_FLAG="--release" ;;
@@ -28,9 +28,10 @@ readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
 
 function calculate_current_hash() {
-  # Cached and unstaged files, with ignored files excluded.
+  # Cached and unstaged files, with ignored files excluded + $MODE mixed in.
   git ls-files -c -o --exclude-standard ${NATIVE_ROOT} | \
-    git hash-object -t blob --stdin-paths | fingerprint_data
+    git hash-object -t blob --stdin-paths | \
+      awk -v MODE="$MODE" '{print $1 "\n" MODE}' | fingerprint_data
 }
 
 function ensure_build_prerequisites() {
