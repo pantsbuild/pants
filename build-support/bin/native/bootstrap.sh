@@ -19,7 +19,10 @@ readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/su
 
 # N.B. Set $MODE to "debug" to generate a binary with debugging symbols.
 readonly MODE="release"
-readonly MODE_FLAG="--${MODE}"
+case "$MODE" in
+  debug) MODE_FLAG="" ;;
+  *) MODE_FLAG="--release" ;;
+esac
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
