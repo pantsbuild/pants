@@ -2,17 +2,24 @@
 
 # Defines:
 # + CACHE_TARGET_DIR: The directory containing all versions of the native engine for the current OS.
-# Exposes: `build_native_code` for building target-specific native engine binaries.
+# Exposes:
+# + build_native_code: Builds target-specific native engine binaries.
 
-readonly REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
 
 # Defines:
+# + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
+# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12
 # + LIB_EXTENSION: The extension of native libraries.
 # + KERNEL: The lower-cased name of the kernel as reported by uname.
 # + OS_NAME: The name of the OS as seen by pants.
 # + OS_ID: The ID of the current OS as seen by pants.
-source ${REPO_ROOT}/build-support/bin/native/detect_os.sh
+# Exposes:
+# + get_native_engine_version: Echoes the current native engine version.
+# + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
+# + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
+source ${REPO_ROOT}/build-support/bin/native/utils.sh
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"

@@ -418,6 +418,44 @@ EOM
   fi
 }
 
+# Defines:
+# + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
+# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12
+# + LIB_EXTENSION: The extension of native libraries.
+# + KERNEL: The lower-cased name of the kernel as reported by uname.
+# + OS_NAME: The name of the OS as seen by pants.
+# + OS_ID: The ID of the current OS as seen by pants.
+# Exposes:
+# + get_native_engine_version: Echoes the current native engine version.
+# + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
+# + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
+source ${ROOT}/build-support/bin/native/utils.sh
+
+readonly BINTRAY_BASE_URL=https://dl.bintray.com/pantsbuild/bin
+readonly NATIVE_ENGINE_BASE_URL=${BINTRAY_BASE_URL}/build-support/bin/native-engine
+
+function check_native_engine() {
+  local readonly native_engine_version=${NATIVE_ENGINE_VERSION:-$(get_native_engine_version)}
+  banner "Checking for native engine release version ${native_engine_version}"
+
+  local readonly headers=$(mktemp -t pants-release.XXXXXX)
+  local result=0
+  for os_id in $(get_rust_os_ids)
+  do
+    local url=${NATIVE_ENGINE_BASE_URL}/${os_id}/${native_engine_version}/native-engine
+    echo -n "  for ${os_id} -> ${url}... "
+    curl --progress-bar --fail --head ${url} &> ${headers} && echo OK || {
+      result=$(( ${result} + 1 )) && echo FAILURE && cat ${headers} && echo
+    }
+  done
+  rm -f ${headers}
+
+  if (( ${result} != 0 ))
+  then
+    die "Failed to find ${result} releases of native engine version ${native_engine_version}"
+  fi
+}
+
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
   echo "PyPi.  Credentials are needed for this as described in the"
@@ -445,7 +483,7 @@ function usage() {
   fi
 }
 
-while getopts "hdntlo" opt; do
+while getopts "hdntloe" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -453,6 +491,7 @@ while getopts "hdntlo" opt; do
     t) test_release="true" ;;
     l) list_packages && exit 0 ;;
     o) list_owners && exit 0 ;;
+    e) check_native_engine && exit 0 ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -479,7 +518,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPi." && \
   (
-    check_origin && check_clean_branch && check_pgp && check_owners && \
+    check_origin && check_clean_branch && check_pgp && check_native_engine && check_owners && \
       dry_run_install && publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
