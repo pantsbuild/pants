@@ -24,6 +24,7 @@ pub struct Externs {
   project_multi: ProjectMultiExtern,
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
+  create_exception: CreateExceptionExtern,
 }
 
 impl Externs {
@@ -36,6 +37,7 @@ impl Externs {
     store_list: StoreListExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
+    create_exception: CreateExceptionExtern,
   ) -> Externs {
     Externs {
       context: ext_context,
@@ -47,6 +49,7 @@ impl Externs {
       project_multi: project_multi,
       id_to_str: id_to_str,
       val_to_str: val_to_str,
+      create_exception: create_exception,
     }
   }
 
@@ -86,6 +89,10 @@ impl Externs {
     (self.val_to_str)(self.context, val).to_string().unwrap_or_else(|e| {
       format!("<failed to decode unicode for {:?}: {}>", val, e)
     })
+  }
+
+  pub fn create_exception(&self, msg: String) -> Value {
+    (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
 }
 
@@ -127,6 +134,9 @@ pub type IdToStrExtern =
 
 pub type ValToStrExtern =
   extern "C" fn(*const ExternContext, *const Value) -> UTF8Buffer;
+
+pub type CreateExceptionExtern =
+  extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {

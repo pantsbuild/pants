@@ -170,7 +170,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertIsInstance(classpath_entry, ClasspathEntry)
     self.assertTrue(os.path.exists(os.path.join(classpath_entry.path, 'simple', 'Simple.class')))
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4025.')
   def test_failed_command_propagates_throw(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.
@@ -191,7 +190,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Running ShellFailCommand failed with non-zero exit code: 1')
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4025.')
   def test_failed_output_conversion_propagates_throw(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.

@@ -111,10 +111,8 @@ class Engine(AbstractClass):
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_roots = tuple(root for root, state in result_items if type(state) is Throw)
     if throw_roots:
-      cumulative_trace = self._scheduler.trace()
-      stringified_throw_roots = ', '.join(str(x) for x in throw_roots)
-      raise ExecutionError('received unexpected Throw state(s) for root(s): {}\n{}'
-                           .format(stringified_throw_roots, cumulative_trace))
+      cumulative_trace = '\n'.join(self._scheduler.trace())
+      raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
 
     # Return handling.
     returns = tuple(state.value for _, state in result_items if type(state) is Return)
@@ -175,6 +173,6 @@ class LocalSerialEngine(Engine):
             result = Return(self._run(runnable))
             self._maybe_cache_put(key, result)
           except Exception as e:
-            result = Throw(str(e))
+            result = Throw(e)
         completed.append((entry, result))
       generator.send(completed)
