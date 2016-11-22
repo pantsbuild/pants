@@ -9,7 +9,6 @@ import os
 import subprocess
 
 from pex.interpreter import PythonInterpreter
-from pex.platforms import Platform
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
@@ -76,8 +75,12 @@ class ResolveRequirementsTest(TaskTestBase):
 
     names_and_platforms = set(name_and_platform(w) for w in wheels)
     expected_name_and_platforms = {
-      # Note that Platform.current() may happen to be the same as one of the other platforms.
-      ('cffi-1.9.1', Platform.current().replace('-', '_')),
+      # Note that we don't check for 'current' because if there's no published wheel for the
+      # current platform we may end up with a wheel for a compatible platform (e.g., if there's no
+      # wheel for macosx_10_11_x86_64, 'current' will be satisfied by macosx_10_10_x86_64).
+      # This is technically also true for the hard-coded platforms we list below, but we chose
+      # those and we happen to know that cffi wheels exist for them.  Whereas we have no such
+      # advance knowledge for the current platform, whatever that might be in the future.
       ('cffi-1.9.1', 'macosx_10_10_x86_64'),
       ('cffi-1.9.1', 'manylinux1_i686'),
       ('cffi-1.9.1', 'win_amd64'),
@@ -88,7 +91,9 @@ class ResolveRequirementsTest(TaskTestBase):
     if PythonInterpreter.get().identity.interpreter == 'CPython':
       expected_name_and_platforms.add(('pycparser-2.17', 'any'))
 
-    self.assertEquals(expected_name_and_platforms, names_and_platforms)
+    self.assertTrue(expected_name_and_platforms.issubset(names_and_platforms),
+                    '{} is not a subset of {}'.format(expected_name_and_platforms,
+                                                      names_and_platforms))
 
     # Check that the path is under the test's build root, so we know the pex was created there.
     self.assertTrue(path.startswith(os.path.realpath(get_buildroot())))
