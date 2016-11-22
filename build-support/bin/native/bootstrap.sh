@@ -28,10 +28,9 @@ readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
 
 function calculate_current_hash() {
-  # Cached and unstaged files, with ignored files excluded + $MODE mixed in.
+  # Cached and unstaged files, with ignored files excluded.
   git ls-files -c -o --exclude-standard ${NATIVE_ROOT} | \
-    git hash-object -t blob --stdin-paths | \
-      awk -v MODE="$MODE" '{print $1 "\n" MODE}' | fingerprint_data
+    git hash-object -t blob --stdin-paths | fingerprint_data
 }
 
 function ensure_build_prerequisites() {
