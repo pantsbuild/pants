@@ -112,7 +112,7 @@ class Engine(AbstractClass):
     throw_roots = tuple(root for root, state in result_items if type(state) is Throw)
     if throw_roots:
       cumulative_trace = '\n'.join(self._scheduler.trace())
-      raise ExecutionError('received unexpected Throw state(s):\n{}'.format(cumulative_trace))
+      raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
 
     # Return handling.
     returns = tuple(state.value for _, state in result_items if type(state) is Return)
