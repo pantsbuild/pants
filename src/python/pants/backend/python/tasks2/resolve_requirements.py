@@ -56,6 +56,10 @@ class ResolveRequirements(Task):
   def subsystem_dependencies(cls):
     return super(ResolveRequirements, cls).subsystem_dependencies() + (PythonSetup, PythonRepos)
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data(PythonInterpreter)
+
   def execute(self):
     req_libs = self.context.targets(lambda tgt: isinstance(tgt, PythonRequirementLibrary))
     fs = PythonRequirementFingerprintStrategy(task=self)

@@ -14,12 +14,12 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
+from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
 
 

@@ -13,7 +13,6 @@ from hashlib import sha1
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
@@ -22,6 +21,7 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
+from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
 
 
