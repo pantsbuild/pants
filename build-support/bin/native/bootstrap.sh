@@ -15,10 +15,14 @@ source ${REPO_ROOT}/build-support/common.sh
 source ${REPO_ROOT}/build-support/bin/native/detect_os.sh
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
-readonly MODE=debug
-readonly MODE_FLAG=
-
 readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"
+
+# N.B. Set $MODE to "debug" to generate a binary with debugging symbols.
+readonly MODE="${MODE:-release}"
+case "$MODE" in
+  debug) MODE_FLAG="" ;;
+  *) MODE_FLAG="--release" ;;
+esac
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
