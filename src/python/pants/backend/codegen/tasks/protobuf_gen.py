@@ -18,6 +18,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
@@ -136,18 +137,23 @@ class ProtobufGen(SimpleCodegenTask):
       protoc_environ['PATH'] = os.pathsep.join(self._extra_paths
                                                + protoc_environ['PATH'].split(os.pathsep))
 
-    self.context.log.debug('Executing: {0}'.format('\\\n  '.join(args)))
-    process = subprocess.Popen(args, env=protoc_environ)
-    result = process.wait()
-    if result != 0:
-      raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
+    with self.context.new_workunit(name='protoc',
+                                   labels=[WorkUnitLabel.TOOL],
+                                   cmd=' '.join(args)) as workunit:
+      result = subprocess.call(args,
+                               env=protoc_environ,
+                               stdout=workunit.output('stdout'),
+                               stderr=workunit.output('stderr'))
+      if result != 0:
+        raise TaskError('{} ... exited non-zero ({})'.format(self.protobuf_binary, result))
 
   def _calculate_sources(self, target):
     gentargets = OrderedSet()
 
-    def add_to_gentargets(target):
-      if self.is_gentarget(target):
-        gentargets.add(target)
+    def add_to_gentargets(tgt):
+      if self.is_gentarget(tgt):
+        gentargets.add(tgt)
+
     self.context.build_graph.walk_transitive_dependency_graph(
       [target.address],
       add_to_gentargets,
