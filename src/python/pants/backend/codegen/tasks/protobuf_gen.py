@@ -137,6 +137,8 @@ class ProtobufGen(SimpleCodegenTask):
       protoc_environ['PATH'] = os.pathsep.join(self._extra_paths
                                                + protoc_environ['PATH'].split(os.pathsep))
 
+    # Note: The test_source_ordering integration test scrapes this output, so modify it with care.
+    self.context.log.debug('Executing: {0}'.format('\\\n  '.join(args)))
     with self.context.new_workunit(name='protoc',
                                    labels=[WorkUnitLabel.TOOL],
                                    cmd=' '.join(args)) as workunit:
