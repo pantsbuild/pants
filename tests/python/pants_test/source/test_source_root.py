@@ -95,6 +95,14 @@ class SourceRootTest(BaseTest):
     self.assertEquals(root('src/go/src', ('go',)),
                       trie.find('src/go/src/foo/bar/baz.go'))
 
+  def test_source_root_at_buildroot(self):
+    # Test root at repo root.
+    trie = SourceRootTrie(SourceRootFactory({}))
+    trie.add_fixed('', ('proto',))
+
+    self.assertEquals(('', ('proto',), UNKNOWN),
+                      trie.find('foo/proto/bar/baz.proto'))
+
   def test_trie_traversal(self):
     trie = SourceRootTrie(SourceRootFactory({}))
     trie.add_pattern('foo1/bar1/baz1')

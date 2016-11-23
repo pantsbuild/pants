@@ -346,6 +346,8 @@ class SourceRootTrie(object):
 
   def _do_add_pattern(self, pattern, langs, category):
     keys = pattern.split(os.path.sep)
+    if keys[-1] == '':
+      keys = keys[:-1]
     node = self._root
     for key in keys:
       child = node.children.get(key)  # Can't use get_child, as we don't want to wildcard-match.
@@ -373,6 +375,6 @@ class SourceRootTrie(object):
           node = child
           j += 1
       if node.is_terminal:
-        return self._source_root_factory.create(os.path.join(*keys[1:j]), langs, node.category)
+        return self._source_root_factory.create(os.path.join(*keys[1:j]) if j > 1 else '', langs, node.category)
       # Otherwise, try the next value of i.
     return None
