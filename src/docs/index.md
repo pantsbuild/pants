@@ -31,6 +31,13 @@ Getting Started
 + [[Setting Up Pants|pants('src/docs:setup_repo')]]
 + [[Tutorial|pants('src/docs:first_tutorial')]]
 
+Cookbook
+--------
+
+The [[Common Tasks|pants('src/docs/common_tasks')]] documentation is a
+practical, solutions-oriented guide to some of the Pants tasks that you're most
+likely to carry out on a daily basis.
+
 Pants Reference Documentation
 -----------------------------
 
