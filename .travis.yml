@@ -78,13 +78,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -cjlpn 'Various pants self checks'" # (fkmsr)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -106,13 +104,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrcn -u 0/2 'Unit tests for pants and pants-plugins - shard 1'" # (jlp)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -134,13 +130,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrcn -u 1/2 'Unit tests for pants and pants-plugins - shard 2'" # (jlp)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -162,13 +156,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrcjlp 'Python contrib tests'" # (n)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -190,13 +182,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrjlpn -i 0/7 'Python integration tests for pants - shard 1'" # (c)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -218,13 +208,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrjlpn -i 1/7 'Python integration tests for pants - shard 2'" # (c)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -246,13 +234,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrjlpn -i 2/7 'Python integration tests for pants - shard 3'" # (c)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -274,13 +260,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrjlpn -i 3/7 'Python integration tests for pants - shard 4'" # (c)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -302,13 +286,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrjlpn -i 4/7 'Python integration tests for pants - shard 5'" # (c)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -330,13 +312,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrjlpn -i 5/7 'Python integration tests for pants - shard 6'" # (c)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
@@ -358,13 +338,11 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      install: pip --quiet install coveralls
       env: TRAVIS_SCRIPT="./build-support/bin/ci.sh -x -fkmsrjlpn -i 6/7 'Python integration tests for pants - shard 7'" # (c)
       before_script:
         - ./build-support/bin/ci-sync.sh
         - ./build-support/bin/install-android-sdk.sh
       after_success:
-        - coveralls
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
 script: |-
