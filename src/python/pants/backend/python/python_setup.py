@@ -23,7 +23,7 @@ class PythonSetup(Subsystem):
     super(PythonSetup, cls).register_options(register)
     register('--interpreter-requirement', advanced=True, default='CPython>=2.7,<3',
              help='The interpreter requirement string for this python environment.')
-    register('--setuptools-version', advanced=True, default='5.4.1',
+    register('--setuptools-version', advanced=True, default='20.2.2',
              help='The setuptools version for this python environment.')
     register('--wheel-version', advanced=True, default='0.29.0',
              help='The wheel version for this python environment.')
