@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import pkg_resources
 from cffi import FFI
-from twitter.common.collections import OrderedSet
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import dir_option
