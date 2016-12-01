@@ -66,6 +66,14 @@ impl Externs {
   }
 
   pub fn store_list(&self, values: Vec<&Value>, merge: bool) -> Value {
+    if merge && values.len() == 1 {
+      // We're merging, but there is only one input value: return it immediately.
+      if let Some(&first) = values.first() {
+        return first.clone();
+      }
+    }
+
+    // Execute extern.
     let values_clone: Vec<Value> = values.into_iter().map(|&v| v).collect();
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
   }
