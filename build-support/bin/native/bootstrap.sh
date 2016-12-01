@@ -36,8 +36,13 @@ readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
 
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
-  git ls-files -c -o --exclude-standard ${NATIVE_ROOT} | \
-    git hash-object -t blob --stdin-paths | fingerprint_data
+  # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
+  # sensitive to the CWD, and the `--work-tree` option doesn't seem to resolve that.
+  (
+   cd ${REPO_ROOT}
+   git ls-files -c -o --exclude-standard "${NATIVE_ROOT}" | \
+      git hash-object -t blob --stdin-paths | fingerprint_data
+  )
 }
 
 function ensure_build_prerequisites() {
