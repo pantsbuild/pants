@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import pkg_resources
 from cffi import FFI
-from twitter.common.collections import OrderedSet
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import dir_option
@@ -194,10 +193,15 @@ def extern_store_list(context_handle, vals_ptr, vals_len, merge):
   vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr, vals_len))
   if merge:
     # Expect each obj to represent a list, and do a de-duping merge.
-    merged = OrderedSet()
-    for outer_val in vals:
-      merged.update(outer_val)
-    vals = tuple(merged)
+    merged_set = set()
+    def merged():
+      for outer_val in vals:
+        for inner_val in outer_val:
+          if inner_val in merged_set:
+            continue
+          merged_set.add(inner_val)
+          yield inner_val
+    vals = tuple(merged())
   return c.to_value(vals)
 
 
