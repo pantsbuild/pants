@@ -5,7 +5,6 @@ python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
     'src/python/pants/binaries:binary_util',
