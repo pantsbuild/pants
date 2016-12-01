@@ -182,7 +182,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
       'dependencies:python_inner',
       'dependencies:python_leaf',
       'dependencies:python_inner_with_external',
-      'antlr-python-runtime==3.1.3',
+      'antlr_python_runtime==3.1.3',
       targets=[self.target('dependencies:python_root')]
     )
 
@@ -198,7 +198,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
 
   def test_external_dependencies(self):
     self.assert_console_output_ordered(
-      'antlr-python-runtime==3.1.3',
+      'antlr_python_runtime==3.1.3',
       targets=[self.target('dependencies:python_root')],
       options={'external_only': True}
     )
@@ -213,7 +213,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
 
   def test_intransitive_external_dependencies(self):
     self.assert_console_output_ordered(
-      'antlr-python-runtime==3.1.3',
+      'antlr_python_runtime==3.1.3',
       targets=[self.target('dependencies:python_root')],
       options={'transitive': False, 'external_only': True}
     )
