@@ -449,7 +449,7 @@ public class ConsoleRunnerImpl {
         createUnexpectedExitHook(shutdownListener, swappableOut.getOriginal());
     Runtime.getRuntime().addShutdownHook(unexpectedExitHook);
 
-    int failures = 0;
+    int failures = 1;
     try {
       Collection<Spec> parsedTests = new SpecParser(tests).parse();
       if (useExperimentalRunner) {
@@ -458,17 +458,15 @@ public class ConsoleRunnerImpl {
         failures = runLegacy(parsedTests, core);
       }
     } catch (SpecException e) {
-      failures = 1;
       swappableErr.getOriginal().println("Error parsing specs: " + e.getMessage());
     } catch (InitializationError e) {
-      failures = 1;
       swappableErr.getOriginal().println("Error initializing JUnit: " + e.getMessage());
     } finally {
       // If we're exiting via a thrown exception, we'll get a better message by letting it
       // propagate than by halt()ing.
       Runtime.getRuntime().removeShutdownHook(unexpectedExitHook);
     }
-    exit(failures);
+    exit(failures == 0 ? 0 : 1);
   }
 
   /**
