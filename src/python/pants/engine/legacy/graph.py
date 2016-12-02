@@ -235,8 +235,23 @@ class LegacyBuildGraph(BuildGraph):
           yield address
 
 
-class HydratedTarget(datatype('HydratedTarget', ['adaptor', 'dependencies'])):
-  """A wrapper for a fully hydrated TargetAdaptor object."""
+class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
+  """A wrapper for a fully hydrated TargetAdaptor object.
+
+  Transitive graph walks collect ordered sets of HydratedTargets which involve a huge amount
+  of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
+  """
+
+  def __eq__(self, other):
+    if type(self) != type(other):
+      return False
+    return self.address == other.address
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __hash__(self):
+    return hash(self.address)
 
 
 # TODO: Only used (currently) to represent transitive hydrated targets. Consider renaming.
@@ -253,7 +268,9 @@ def hydrate_target(target_adaptor, hydrated_fields):
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(TargetAdaptor(**kwargs), tuple(target_adaptor.dependencies))
+  return HydratedTarget(target_adaptor.address,
+                        TargetAdaptor(**kwargs),
+                        tuple(target_adaptor.dependencies))
 
 
 def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):
