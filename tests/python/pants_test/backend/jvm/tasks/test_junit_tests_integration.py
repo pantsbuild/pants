@@ -123,6 +123,14 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/annotation'])
     self.assert_success(pants_run)
 
+  # Uncomment this test after the junit_runner is updated with exit code fix
+  # def test_junit_test_256_failures(self):
+  #   pants_run = self.run_pants([
+  #     'test',
+  #     'testprojects/tests/java/org/pantsbuild/testproject/fail256'])
+  #   self.assert_failure(pants_run)
+  #   self.assertIn('Failures: 256', pants_run.stdout_data)
+  #
   def test_junit_test_duplicate_resources(self):
     pants_run = self.run_pants([
         'test',
