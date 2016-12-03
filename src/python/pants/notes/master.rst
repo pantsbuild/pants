@@ -4,6 +4,68 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0dev3 (12/02/2016)
+----------------------
+
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Bump setuptools version. (#4103)
+  `Pull Request #4103 <https://github.com/pantsbuild/pants/pull/4103>`_
+
+Bugfixes
+~~~~~~~~
+
+* Don't exit the JUnitRunner with number of failures because Java will mod the exit code. (#4106)
+  `Pull Request #4106 <https://github.com/pantsbuild/pants/pull/4106>`_
+
+* Allow for using the native engine from-source in another repo (#4105)
+  `Pull Request #4105 <https://github.com/pantsbuild/pants/pull/4105>`_
+
+* Un-publish the `jar` goal. (#4095)
+  `Pull Request #4095 <https://github.com/pantsbuild/pants/pull/4095>`_
+
+* Restore compile-zinc-name-hashing option to follow deprecation cycle (#4091)
+  `Pull Request #4091 <https://github.com/pantsbuild/pants/pull/4091>`_
+
+* Fix a Python requirement resolution test bug. (#4087)
+  `Pull Request #4087 <https://github.com/pantsbuild/pants/pull/4087>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Reduce hashing during v2 transitive graph walks (#4109)
+  `Pull Request #4109 <https://github.com/pantsbuild/pants/pull/4109>`_
+
+* Add a native engine release check. (#4096)
+  `Pull Request #4096 <https://github.com/pantsbuild/pants/pull/4096>`_
+
+* Remove coveralls from CI. (#4099)
+  `Pull Request #4099 <https://github.com/pantsbuild/pants/pull/4099>`_
+
+* Run the proto compiler in workunit. (#4092)
+  `Pull Request #4092 <https://github.com/pantsbuild/pants/pull/4092>`_
+
+* Restore propagation of thrown exceptions between rust and python (#4083)
+  `Pull Request #4083 <https://github.com/pantsbuild/pants/pull/4083>`_
+
+* Make `cargo build --release` the default for native engine bootstrapping. (#4090)
+  `Pull Request #4090 <https://github.com/pantsbuild/pants/pull/4090>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Remove stale example from 3rdparty_jvm.md (#4112)
+  `Pull Request #4112 <https://github.com/pantsbuild/pants/pull/4112>`_
+
+* Add "common tasks" docs (#4060)
+  `Pull Request #4060 <https://github.com/pantsbuild/pants/pull/4060>`_
+
+* Fix typo in docs (#4097)
+  `Pull Request #4097 <https://github.com/pantsbuild/pants/pull/4097>`_
+
 1.3.0dev2 (11/20/2016)
 ----------------------
 
