@@ -4,8 +4,8 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.3.0dev3 (12/02/2016)
-----------------------
+1.3.0.dev3 (12/02/2016)
+-----------------------
 
 A weekly unstable release.
 
@@ -13,58 +13,58 @@ API Changes
 ~~~~~~~~~~~
 
 * Bump setuptools version. (#4103)
-  `Pull Request #4103 <https://github.com/pantsbuild/pants/pull/4103>`_
+  `PR #4103 <https://github.com/pantsbuild/pants/pull/4103>`_
 
 Bugfixes
 ~~~~~~~~
 
 * Don't exit the JUnitRunner with number of failures because Java will mod the exit code. (#4106)
-  `Pull Request #4106 <https://github.com/pantsbuild/pants/pull/4106>`_
+  `PR #4106 <https://github.com/pantsbuild/pants/pull/4106>`_
 
 * Allow for using the native engine from-source in another repo (#4105)
-  `Pull Request #4105 <https://github.com/pantsbuild/pants/pull/4105>`_
+  `PR #4105 <https://github.com/pantsbuild/pants/pull/4105>`_
 
 * Un-publish the `jar` goal. (#4095)
-  `Pull Request #4095 <https://github.com/pantsbuild/pants/pull/4095>`_
+  `PR #4095 <https://github.com/pantsbuild/pants/pull/4095>`_
 
 * Restore compile-zinc-name-hashing option to follow deprecation cycle (#4091)
-  `Pull Request #4091 <https://github.com/pantsbuild/pants/pull/4091>`_
+  `PR #4091 <https://github.com/pantsbuild/pants/pull/4091>`_
 
 * Fix a Python requirement resolution test bug. (#4087)
-  `Pull Request #4087 <https://github.com/pantsbuild/pants/pull/4087>`_
+  `PR #4087 <https://github.com/pantsbuild/pants/pull/4087>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Reduce hashing during v2 transitive graph walks (#4109)
-  `Pull Request #4109 <https://github.com/pantsbuild/pants/pull/4109>`_
+  `PR #4109 <https://github.com/pantsbuild/pants/pull/4109>`_
 
 * Add a native engine release check. (#4096)
-  `Pull Request #4096 <https://github.com/pantsbuild/pants/pull/4096>`_
+  `PR #4096 <https://github.com/pantsbuild/pants/pull/4096>`_
 
 * Remove coveralls from CI. (#4099)
-  `Pull Request #4099 <https://github.com/pantsbuild/pants/pull/4099>`_
+  `PR #4099 <https://github.com/pantsbuild/pants/pull/4099>`_
 
 * Run the proto compiler in workunit. (#4092)
-  `Pull Request #4092 <https://github.com/pantsbuild/pants/pull/4092>`_
+  `PR #4092 <https://github.com/pantsbuild/pants/pull/4092>`_
 
 * Restore propagation of thrown exceptions between rust and python (#4083)
-  `Pull Request #4083 <https://github.com/pantsbuild/pants/pull/4083>`_
+  `PR #4083 <https://github.com/pantsbuild/pants/pull/4083>`_
 
 * Make `cargo build --release` the default for native engine bootstrapping. (#4090)
-  `Pull Request #4090 <https://github.com/pantsbuild/pants/pull/4090>`_
+  `PR #4090 <https://github.com/pantsbuild/pants/pull/4090>`_
 
 Documentation
 ~~~~~~~~~~~~~
 
 * Remove stale example from 3rdparty_jvm.md (#4112)
-  `Pull Request #4112 <https://github.com/pantsbuild/pants/pull/4112>`_
+  `PR #4112 <https://github.com/pantsbuild/pants/pull/4112>`_
 
 * Add "common tasks" docs (#4060)
-  `Pull Request #4060 <https://github.com/pantsbuild/pants/pull/4060>`_
+  `PR #4060 <https://github.com/pantsbuild/pants/pull/4060>`_
 
 * Fix typo in docs (#4097)
-  `Pull Request #4097 <https://github.com/pantsbuild/pants/pull/4097>`_
+  `PR #4097 <https://github.com/pantsbuild/pants/pull/4097>`_
 
 1.3.0dev2 (11/20/2016)
 ----------------------
@@ -74,10 +74,10 @@ A return to the regular schedule of weekly unstable releases.
 API Changes
 ~~~~~~~~~~~
 * Move SimpleCodegenTask into the pants core.
-  `Pull Request #4079 <https://github.com/pantsbuild/pants/pull/4079>`_
+  `PR #4079 <https://github.com/pantsbuild/pants/pull/4079>`_
 
 * Move the pytest-related runtime requirement specs  into a subsystem.
-  `Pull Request #4071 <https://github.com/pantsbuild/pants/pull/4071>`_
+  `PR #4071 <https://github.com/pantsbuild/pants/pull/4071>`_
 
 * Add the scala 2.12 platform
   `RB #4388 <https://rbcommons.com/s/twitter/r/4388>`_
@@ -85,26 +85,26 @@ API Changes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Fixup OSX bintray prep. (#4086)
-  `Pull Request #4086 <https://github.com/pantsbuild/pants/pull/4086>`_
+  `PR #4086 <https://github.com/pantsbuild/pants/pull/4086>`_
 
 * Task to gather local python sources into a pex.
-  `Pull Request #4084 <https://github.com/pantsbuild/pants/pull/4084>`_
+  `PR #4084 <https://github.com/pantsbuild/pants/pull/4084>`_
 
 * [engine] Initial Trace implementation for rust engine (#4076)
   `Issue #4025 <https://github.com/pantsbuild/pants/issues/4025>`_
-  `Pull Request #4076 <https://github.com/pantsbuild/pants/pull/4076>`_
+  `PR #4076 <https://github.com/pantsbuild/pants/pull/4076>`_
 
 * Propose a github review workflow
   `RB #4333 <https://rbcommons.com/s/twitter/r/4333>`_
 
 * Spelling mistake in first_tutorial (#4045)
-  `Pull Request #4045 <https://github.com/pantsbuild/pants/pull/4045>`_
+  `PR #4045 <https://github.com/pantsbuild/pants/pull/4045>`_
 
 * Replace instances of pantsbuild.github.io in the docs with pantsbuild.org.
-  `Pull Request #4074 <https://github.com/pantsbuild/pants/pull/4074>`_
+  `PR #4074 <https://github.com/pantsbuild/pants/pull/4074>`_
 
 * A task to resolve python requirements.
-  `Pull Request #4065 <https://github.com/pantsbuild/pants/pull/4065>`_
+  `PR #4065 <https://github.com/pantsbuild/pants/pull/4065>`_
 
 * Upgrade zinc's sbt dependency to 1.0.0: python portion
   `RB #4064 <https://rbcommons.com/s/twitter/r/4064>`_
@@ -117,7 +117,6 @@ Refactoring, Improvements, and Tooling
 * Avoid using expensive bootstrap artifacts from temporary cache location
   `RB #4342 <https://rbcommons.com/s/twitter/r/4342>`_
   `RB #4368 <https://rbcommons.com/s/twitter/r/4368>`_
-
 
 1.3.0dev1 (11/16/2016)
 ----------------------

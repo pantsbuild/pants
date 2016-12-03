@@ -79,7 +79,7 @@ do
     if echo ${url} | grep github.com | grep -q /pull/
     then
       issue=${url##*/}
-      echo "  \`Pull Request #${issue} <${url}>\`_"
+      echo "  \`PR #${issue} <${url}>\`_"
     fi
   done
 
