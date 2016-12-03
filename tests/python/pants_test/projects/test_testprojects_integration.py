@@ -21,8 +21,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       # to be first in the context, and test.junit mixes all classpaths.
       'testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb',
       'testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec',
-      # This will fail until we release and upgrade to junit runner 0.0.11.
-      'testprojects/tests/java/org/pantsbuild/testproject/cucumber',
       # TODO: This one has a missing dependency, but is intended to succeed... should it?
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
@@ -49,6 +47,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/provided:c',
       'testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target',
       'testprojects/tests/java/org/pantsbuild/testproject/empty:',
+      'testprojects/tests/java/org/pantsbuild/testproject/fail256:fail256',
       'testprojects/tests/python/pants/dummies:failing_target',
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
