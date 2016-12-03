@@ -36,6 +36,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Eric Ayers
 + Eric Danielson
 + Eric Lindvall
++ Eugene Burmako
 + Evan Jones
 + Fedor Korotkov
 + Florian Leibert
@@ -127,6 +128,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tom Dyas
 + Tom Howland
 + Travis Crawford
++ Troy Howard
 + Ugo Di Girolamo
 + Wei An
 + Wolfram Arnold
