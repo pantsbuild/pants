@@ -12,11 +12,18 @@ A weekly unstable release.
 API Changes
 ~~~~~~~~~~~
 
+* Bump pex and setuptools to latest. (#4111)
+  `PR #4111 <https://github.com/pantsbuild/pants/pull/4111>`_
+
 * Bump setuptools version. (#4103)
   `PR #4103 <https://github.com/pantsbuild/pants/pull/4103>`_
 
 Bugfixes
 ~~~~~~~~
+
+* Update junit-runner to 1.0.17 (#4113)
+  `PR #4113 <https://github.com/pantsbuild/pants/pull/4113>`_
+  `PR #4106 <https://github.com/pantsbuild/pants/pull/4106>`_
 
 * Don't exit the JUnitRunner with number of failures because Java will mod the exit code. (#4106)
   `PR #4106 <https://github.com/pantsbuild/pants/pull/4106>`_
@@ -35,6 +42,9 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [engine] Remove variant selecting from native engine (#4108)
+  `PR #4108 <https://github.com/pantsbuild/pants/pull/4108>`_
 
 * Reduce hashing during v2 transitive graph walks (#4109)
   `PR #4109 <https://github.com/pantsbuild/pants/pull/4109>`_
