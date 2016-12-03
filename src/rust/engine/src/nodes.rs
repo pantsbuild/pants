@@ -1,5 +1,5 @@
 use graph::{Entry, Graph};
-use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
 use selectors;
@@ -90,14 +90,6 @@ impl<'g, 't> StepContext<'g, 't> {
     })
   }
 
-  fn type_address(&self) -> &TypeConstraint {
-    &self.tasks.type_address
-  }
-
-  fn type_has_variants(&self) -> &TypeConstraint {
-    &self.tasks.type_has_variants
-  }
-
   fn has_products(&self, item: &Value) -> bool {
     self.tasks.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
   }
@@ -153,10 +145,6 @@ impl<'g, 't> StepContext<'g, 't> {
    */
   fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
     self.tasks.externs.project_multi(item, field)
-  }
-
-  fn id_to_str(&self, item: Id) -> String {
-    self.tasks.externs.id_to_str(item)
   }
 
   /**
@@ -244,38 +232,8 @@ impl Select {
 
 impl Step for Select {
   fn step(&self, context: StepContext) -> State<Node> {
-    // Request default Variants for the subject, so that if there are any we can propagate
-    // them to task nodes.
-    let variants =
-      if context.satisfied_by(context.type_address(), self.subject.type_id()) &&
-        self.product() != context.type_has_variants() {
-        let variants_node =
-          Node::create(
-            Selector::select(context.type_has_variants().clone()),
-            self.subject.clone(),
-            self.variants.clone(),
-          );
-        match context.get(&variants_node) {
-          Some(&Complete::Return(ref variants_value)) =>
-            return State::Complete(
-              context.throw(
-                format!(
-                  "TODO: Merging variants is not yet implemented: see #4020. Needed to merge {} with {:?}",
-                  context.id_to_str(context.key_for(variants_value).id()),
-                  self.variants
-                )
-              )
-            ),
-          Some(&Complete::Noop(_, _)) =>
-            &self.variants,
-          Some(&Complete::Throw(msg)) =>
-            return State::Complete(Complete::Throw(msg)),
-          None =>
-            return State::Waiting(vec![variants_node]),
-        }
-      } else {
-        &self.variants
-      };
+    // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
+    let variants = &self.variants;
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
     let variant_value: Option<&str> =
