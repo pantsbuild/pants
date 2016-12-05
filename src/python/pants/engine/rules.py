@@ -74,15 +74,15 @@ class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', '
 
 
 class RulesetValidator(object):
-  """Validates that the set of rules used by the node builder has no missing tasks."""
+  """Validates that the rule index has no missing tasks."""
 
-  def __init__(self, node_builder, goal_to_product, root_subject_fns):
+  def __init__(self, rule_index, goal_to_product, root_subject_fns):
     if not root_subject_fns:
       raise ValueError('root_subject_fns must not be empty')
     self._goal_to_product = goal_to_product
 
 
-    self._graph = GraphMaker(node_builder, root_subject_fns).full_graph()
+    self._graph = GraphMaker(rule_index, root_subject_fns).full_graph()
 
   def validate(self):
     """ Validates that all tasks can be executed based on the declared product types and selectors.
@@ -139,7 +139,7 @@ class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', '
     return '{}({})'.format(type(self).__name__, self.func.__name__)
 
 
-class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics', 'singletons'])):
+class RuleIndex(datatype('RuleIndex', ['tasks', 'intrinsics', 'singletons'])):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
@@ -171,6 +171,8 @@ class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics', 'singletons'])
         # TODO: The heterogenity here has some confusing implications here:
         # see https://github.com/pantsbuild/pants/issues/4005
         for kind in constraint.types:
+          # NB Ensure that interior types from SelectDependencies / SelectProjections work by
+          # indexing on the list of types in the constraint.
           add_task(kind, factory)
         add_task(constraint, factory)
       else:
@@ -204,10 +206,16 @@ class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics', 'singletons'])
   def all_produced_product_types(self, subject_type):
     intrinsic_products = set(prod for subj, prod in self.intrinsics.keys()
                              if subj == subject_type)
+ #   task_products = self.tasks.keys()
+    # Unwrap Exactlys if they only contain one type.
+    # TODO exercise w/ a test
+#    task_products = set(t._types[0] if type(t) is Exactly and len(t._types) == 1 else t for t in task_products )
+#    return intrinsic_products.union(set(task_products))
+
     return intrinsic_products.union(set(self.tasks.keys())).union(set(self.singletons.keys()))
 
   def gen_rules(self, subject_type, product_type):
-    # Singeltons or intrinsics that provide the requested product for the current subject type.
+    # Singletons or intrinsics that provide the requested product for the current subject type.
     singleton_node_factory = self.singletons.get(product_type)
     intrinsic_node_factory = self.intrinsics.get((subject_type, product_type))
     if singleton_node_factory:
@@ -218,10 +226,6 @@ class NodeBuilder(datatype('NodeBuilder', ['tasks', 'intrinsics', 'singletons'])
       # Tasks that provide the requested product.
       for node_factory in self._lookup_tasks(product_type):
         yield node_factory
-
-  def gen_nodes(self, subject, product_type, variants):
-    for rule in self.gen_rules(type(subject), product_type):
-      yield rule.as_node(subject, variants)
 
   def _lookup_tasks(self, product_type):
     for entry in self.tasks.get(product_type, tuple()):
@@ -452,9 +456,9 @@ class RuleEdges(object):
 
 class GraphMaker(object):
 
-  def __init__(self, nodebuilder, root_subject_fns):
+  def __init__(self, rule_index, root_subject_fns):
     self.root_subject_selector_fns = root_subject_fns
-    self.nodebuilder = nodebuilder
+    self.rule_index = rule_index
 
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
@@ -470,7 +474,7 @@ class GraphMaker(object):
     full_dependency_edges = {}
     full_unfulfillable_rules = {}
     for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
-      for product in sorted(self.nodebuilder.all_produced_product_types(root_subject_type)):
+      for product in sorted(self.rule_index.all_produced_product_types(root_subject_type)):
         beginning_root = RootRule(root_subject_type, selector_fn(product))
         root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(
           beginning_root,
@@ -485,9 +489,9 @@ class GraphMaker(object):
 
     rules_in_graph = set(entry.rule for entry in full_dependency_edges.keys())
     rules_eliminated_during_construction = [entry.rule for entry in full_unfulfillable_rules.keys()]
-    rules_used = set(rules_eliminated_during_construction + self.nodebuilder.intrinsics.values() + self.nodebuilder.singletons.values())
+    rules_used = set(rules_eliminated_during_construction + self.rule_index.intrinsics.values() + self.rule_index.singletons.values())
 
-    declared_rules = self.nodebuilder.all_rules()
+    declared_rules = self.rule_index.all_rules()
     unreachable_rules = declared_rules.difference(rules_in_graph, rules_used)
     for rule in sorted(unreachable_rules):
       full_unfulfillable_rules[UnreachableRule(rule)] = [Diagnostic(None, 'Unreachable')]
@@ -518,7 +522,7 @@ class GraphMaker(object):
         return (RuleGraphSubjectIsProduct(subject_type),)
       else:
         return tuple(RuleGraphEntry(subject_type, rule)
-          for rule in self.nodebuilder.gen_rules(subject_type, selector.product))
+          for rule in self.rule_index.gen_rules(subject_type, selector.product))
 
     def mark_unfulfillable(rule, subject_type, reason):
       if rule not in unfulfillable_rules:

@@ -16,7 +16,7 @@ from pants.engine.addressable import Exactly
 from pants.engine.build_files import create_graph_tasks
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, create_fs_tasks
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import GraphMaker, NodeBuilder, Rule, RulesetValidator
+from pants.engine.rules import GraphMaker, Rule, RuleIndex, RulesetValidator
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
@@ -92,10 +92,10 @@ class BoringRule(Rule):
     return '{}({})'.format(type(self).__name__, self.output_product_type.__name__)
 
 
-class NodeBuilderTest(unittest.TestCase):
+class RuleIndexTest(unittest.TestCase):
   def test_creation_fails_with_bad_declaration_type(self):
     with self.assertRaises(TypeError) as cm:
-      NodeBuilder.create([A()], tuple())
+      RuleIndex.create([A()], tuple())
     self.assertEquals("Unexpected rule type: <class 'pants_test.engine.test_rules.A'>."
                       " Rules either extend Rule, or are 3 elem tuples.",
       str(cm.exception))
@@ -103,13 +103,13 @@ class NodeBuilderTest(unittest.TestCase):
   def test_creation_fails_with_intrinsic_that_overwrites_another_intrinsic(self):
     a_provider = (A, A, noop)
     with self.assertRaises(ValueError):
-      NodeBuilder.create([BoringRule(A)], (a_provider, a_provider))
+      RuleIndex.create([BoringRule(A)], (a_provider, a_provider))
 
 
 class RulesetValidatorTest(unittest.TestCase):
   def test_ruleset_with_missing_product_type(self):
     rules = [(A, (Select(B),), noop)]
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
     with self.assertRaises(ValueError) as cm:
@@ -124,7 +124,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
     rules = [(A, (Select(B), Select(C)), noop)]
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
     with self.assertRaises(ValueError) as cm:
@@ -140,7 +140,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_with_selector_only_provided_as_root_subject(self):
     rules = [(A, (Select(B),), noop)]
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (B,)})
 
@@ -151,7 +151,7 @@ class RulesetValidatorTest(unittest.TestCase):
       (A, (Select(B),), noop),
     ]
     with self.assertRaises(ValueError) as cm:
-      RulesetValidator(NodeBuilder.create(rules, tuple()),
+      RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns={})
     self.assertEquals(dedent("""
@@ -163,7 +163,7 @@ class RulesetValidatorTest(unittest.TestCase):
       (A, (Select(B),), noop),
       (B, (Select(SubA),), noop)
     ]
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (C,)})
 
@@ -185,7 +185,7 @@ class RulesetValidatorTest(unittest.TestCase):
       (B, (Select(SubA),), noop)
     ]
 
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={'goal-name': AGoal},
       root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
     with self.assertRaises(ValueError) as cm:
@@ -199,7 +199,7 @@ class RulesetValidatorTest(unittest.TestCase):
       (Exactly(A), (Select(B),), noop),
       (B, (Select(A),), noop)
     ]
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
 
@@ -212,7 +212,7 @@ class RulesetValidatorTest(unittest.TestCase):
     intrinsics = [
       (B, C, noop),
     ]
-    validator = RulesetValidator(NodeBuilder.create(rules, intrinsics),
+    validator = RulesetValidator(RuleIndex.create(rules, intrinsics),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (A,)})
 
@@ -233,7 +233,7 @@ class RulesetValidatorTest(unittest.TestCase):
     intrinsics = [
       (B, C, noop),
     ]
-    validator = RulesetValidator(NodeBuilder.create(rules, intrinsics),
+    validator = RulesetValidator(RuleIndex.create(rules, intrinsics),
       goal_to_product={},
       root_subject_fns={k: lambda p: Select(p) for k in (A,)})
 
@@ -255,7 +255,7 @@ class RulesetValidatorTest(unittest.TestCase):
       (D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop),
       (A, (Select(SubA),), noop)
     ]
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns=_suba_root_subject_fns)
 
@@ -274,7 +274,7 @@ class RulesetValidatorTest(unittest.TestCase):
     rules = [
       (Exactly(A), (SelectProjection(B, D, ('some',), C),), noop),
     ]
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns=_suba_root_subject_fns)
 
@@ -294,7 +294,7 @@ class RulesetValidatorTest(unittest.TestCase):
       (C, tuple(), noop)
     ]
 
-    validator = RulesetValidator(NodeBuilder.create(rules, tuple()),
+    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
       root_subject_fns=_suba_root_subject_fns)
 
@@ -322,7 +322,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (Exactly(A), (Select(SubA),), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
     fullgraph = graphmaker.full_graph()
 
@@ -339,7 +339,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks()
     intrinsics = create_fs_intrinsics('Let us pretend that this is a ProjectTree!')
 
-    rule_index = NodeBuilder.create(tasks, intrinsics)
+    rule_index = RuleIndex.create(tasks, intrinsics)
     graphmaker = GraphMaker(rule_index,
       root_subject_fns={k: lambda p: Select(p) for k in (Address, # TODO, use the actual fns.
                           PathGlobs,
@@ -370,7 +370,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (Exactly(B), (Select(A),), noop)
     ]
     select_p = lambda p: Select(p)
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=OrderedDict([(SubA, select_p), (A, select_p)]))
     fullgraph = graphmaker.full_graph()
 
@@ -389,7 +389,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (Exactly(A), (Select(SubA),), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -406,7 +406,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, tuple(), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -425,7 +425,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, (Select(SubA),), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -447,7 +447,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, C, noop),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules,
+    graphmaker = GraphMaker(RuleIndex.create(rules,
                                                intrinsics),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
@@ -469,7 +469,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, C, BoringRule(C)),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsics),
+    graphmaker = GraphMaker(RuleIndex.create(rules, intrinsics),
                             root_subject_fns=_suba_root_subject_fns)
     fullgraph = graphmaker.full_graph()
 
@@ -491,7 +491,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     intrinsics = [
       (D, C, BoringRule(C))
     ]
-    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsics),
+    graphmaker = GraphMaker(RuleIndex.create(rules, intrinsics),
       root_subject_fns=_suba_root_subject_fns,
 
     )
@@ -511,7 +511,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (C, (Select(SubA),), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -531,7 +531,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, (Select(D),), noop),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -550,7 +550,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, (Select(Exactly(C, D)),), noop),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -572,7 +572,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (C, (Select(D),), noop),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -595,7 +595,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (SubA, tuple(), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -620,7 +620,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     intrinsics = [
       (C, B, noop),
     ]
-    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsics),
+    graphmaker = GraphMaker(RuleIndex.create(rules, intrinsics),
                             root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -639,7 +639,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, C, noop),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, intrinsics),
+    graphmaker = GraphMaker(RuleIndex.create(rules, intrinsics),
                             root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -659,7 +659,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (A, (Select(SubA),), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=B)
 
@@ -678,7 +678,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (A, (Select(SubA),), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.full_graph()
 
@@ -697,7 +697,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, (SelectLiteral(literally_a, A),), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=B)
 
@@ -714,7 +714,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (B, (Select(D),), noop),
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
@@ -734,7 +734,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (D, (Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C))), noop)
     ]
 
-    graphmaker = GraphMaker(NodeBuilder.create(rules, tuple()),
+    graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
       root_subject_fns=_suba_root_subject_fns)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=D)
 
