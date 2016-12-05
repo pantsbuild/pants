@@ -77,12 +77,10 @@ class LegacyBuildGraph(BuildGraph):
 
     # Index the ProductGraph.
     for node, state in roots.items():
-      if type(state) is Throw:
+      if type(state) is not Return:
         trace = '\n'.join(self._scheduler.trace())
         raise AddressLookupError(
             'Build graph construction failed for {}:\n{}'.format(node, trace))
-      elif type(state) is not Return:
-        State.raise_unrecognized(state)
       if type(state.value) is not HydratedTargets:
         raise TypeError('Expected roots to hold {}; got: {}'.format(
           HydratedTargets, type(state.value)))
