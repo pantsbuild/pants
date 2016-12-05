@@ -75,21 +75,21 @@ Managing dependencies for multiple platforms
 
 If you're building a python binary for use on multiple platforms, you might have 3rd-party
 dependencies that rely on platform-specific code. In addition to specifying the platforms
-with which your binary is intended to be compatible in the `platform` field of your
-<a pantsref="bdict_python_binary">`python_binary`</a> target, you may need to make
-<a href="https://pip.pypa.io/en/stable/reference/pip_wheel/">wheel</a> files for each platform
-available at build time.
+with which your binary is intended to be compatible in the `platforms` field of your
+<a pantsref="bdict_python_binary">`python_binary`</a> target, you will need to make
+<a href="https://pip.pypa.io/en/stable/reference/pip_wheel/">wheel</a> files for each package
+and platform available at build time.
 
-You can store these files on the web formatted in a link detection-friendly format or locally in
-your repo relative to the build root. If you opt for the latter method under version control, you may
-want to use <a href="https://git-lfs.github.com/">git-lfs</a> or similar to avoid storing large binaries
-in your repository.
-
-In either case, you will need to specify the repo location in pants.ini, as a URL or a local path like so:
+Pants will look for those files in the location specified in the
+[[`python-repos`|pants('src/docs:setup_repo')#redirecting-python-requirements-to-other-servers]] field
+in pants.ini. It can understand either a simple local directory of .whl files or a "find links"-friendly
+webpage of links formatted like so:
 
 ```
-[python-repos]
-repos: [
-  "%(buildroot)s/3rdparty/python/wheelhouse/"
-]
+<a href="x.whl">x.whl</a>
 ```
+
+If you opt for the local directory method under version control, you may want to use
+<a href="https://git-lfs.github.com/">git-lfs</a> or similar to avoid storing large binaries in your
+repository. If you opt for a hosted solution, <a href="https://pages.github.com/">Github pages</a> may
+be helpful.
