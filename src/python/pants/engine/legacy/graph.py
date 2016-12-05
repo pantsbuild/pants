@@ -20,7 +20,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import Addresses, Collection
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.nodes import Return, State, Throw
+from pants.engine.nodes import Return
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
@@ -77,12 +77,10 @@ class LegacyBuildGraph(BuildGraph):
 
     # Index the ProductGraph.
     for node, state in roots.items():
-      if type(state) is Throw:
+      if type(state) is not Return:
         trace = '\n'.join(self._scheduler.trace())
         raise AddressLookupError(
             'Build graph construction failed for {}:\n{}'.format(node, trace))
-      elif type(state) is not Return:
-        State.raise_unrecognized(state)
       if type(state.value) is not HydratedTargets:
         raise TypeError('Expected roots to hold {}; got: {}'.format(
           HydratedTargets, type(state.value)))
