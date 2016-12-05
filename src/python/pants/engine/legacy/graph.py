@@ -20,7 +20,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import Addresses, Collection
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.nodes import Return, State, Throw
+from pants.engine.nodes import Return
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
