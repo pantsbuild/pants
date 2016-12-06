@@ -1,8 +1,8 @@
 use fnv::FnvHasher;
-use libc;
 
 use std::collections::HashMap;
 use std::hash;
+use std::os::raw;
 use std::ptr;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -123,7 +123,7 @@ impl RunnableComplete {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Value {
-  handle: *const libc::c_void,
+  handle: *const raw::c_void,
   type_id: TypeId,
 }
 
@@ -136,7 +136,7 @@ impl Value {
 impl Default for Value {
   fn default() -> Self {
     Value {
-      handle: ptr::null() as *const libc::c_void,
+      handle: ptr::null() as *const raw::c_void,
       type_id: TypeId(0),
     }
   }

@@ -6,11 +6,11 @@ mod scheduler;
 mod selectors;
 mod tasks;
 
-extern crate libc;
 extern crate fnv;
 
 use std::ffi::CStr;
 use std::mem;
+use std::os::raw;
 use std::path::Path;
 
 use core::{Field, Function, Key, RunnableComplete, TypeConstraint, TypeId, Value};
@@ -474,7 +474,7 @@ pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
 }
 
 #[no_mangle]
-pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const libc::c_char) {
+pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const raw::c_char) {
   with_scheduler(scheduler_ptr, |raw| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = Path::new(path_str.as_str());
@@ -487,7 +487,7 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
 }
 
 #[no_mangle]
-pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const libc::c_char) {
+pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const raw::c_char) {
   let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
   let path = Path::new(path_str.as_str());
   with_scheduler(scheduler_ptr, |raw| {
