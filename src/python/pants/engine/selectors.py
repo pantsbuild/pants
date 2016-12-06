@@ -85,7 +85,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
 
 
 class SelectDependencies(datatype('Dependencies',
-                                  ['product', 'dep_product', 'field', 'field_types', 'transitive']),
+                                  ['product', 'dep_product', 'field_', 'field_types', 'transitive']),
                          Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
@@ -97,11 +97,17 @@ class SelectDependencies(datatype('Dependencies',
   `dep_product`.
   """
 
-  def __new__(cls, product, dep_product, field='dependencies', field_types=tuple(), transitive=False):
+  optional = False
+
+  def __new__(cls, product, dep_product, field=None, field_types=tuple(), transitive=False):
     return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types, transitive)
 
   @property
-  def dep_product_selector(self):
+  def field(self):
+    return self.field_ or 'dependencies'
+
+  @property
+  def input_product_selector(self):
     return Select(self.dep_product)
 
   @property
@@ -116,7 +122,7 @@ class SelectDependencies(datatype('Dependencies',
     return '{}({}, {}{}{}{})'.format(type(self).__name__,
                                      type_or_constraint_repr(self.product),
                                      type_or_constraint_repr(self.dep_product),
-                                     ', {}'.format(repr(self.field)) if self.field else '',
+                                     ', {}'.format(repr(self.field_)) if self.field_ else '',
                                      ', transitive=True' if self.transitive else '',
                                      field_types_portion)
 
