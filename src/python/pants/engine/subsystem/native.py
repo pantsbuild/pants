@@ -308,6 +308,9 @@ class ExternContext(object):
     type_id = type_id or TypeId(self.to_id(type(obj)))
     return Value(handle, type_id)
 
+  def from_handle(self, handle):
+    return _FFI.from_handle(handle)
+
   def from_value(self, val):
     return _FFI.from_handle(val.handle)
 

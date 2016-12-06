@@ -1,14 +1,13 @@
-use libc;
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::mem;
+use std::os::raw;
 use std::string::FromUtf8Error;
 
 use core::{Field, Id, Key, TypeConstraint, TypeId, Value};
 
 // An opaque pointer to a context used by the extern functions.
-pub type ExternContext = libc::c_void;
+pub type ExternContext = raw::c_void;
 
 pub type SatisfiedByExtern =
   extern "C" fn(*const ExternContext, *const TypeConstraint, *const TypeId) -> bool;
