@@ -12,7 +12,7 @@ from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
-from pants.engine.addressable import Exactly, TypeConstraint
+from pants.engine.addressable import Exactly
 from pants.engine.isolated_process import SnapshottedProcess, SnapshottedProcessRequest
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, type_or_constraint_repr)
@@ -186,15 +186,12 @@ class RuleIndex(datatype('RuleIndex', ['tasks', 'intrinsics', 'singletons'])):
                         " Rules either extend Rule, or are 3 elem tuples.".format(type(entry)))
 
     intrinsics = dict()
-    for output_type, subject_type, func in intrinsic_entries:
-      key = (subject_type, output_type)
-      if isinstance(output_type, TypeConstraint):
-        raise Exception( 'wut {}'.format(output_type))
-
+    for output_type, input_type, func in intrinsic_entries:
+      key = (input_type, output_type)
       if key in intrinsics:
         raise ValueError('intrinsic provided by {} has already been provided by: {}'.format(
           func.__name__, intrinsics[key]))
-      intrinsics[key] = IntrinsicRule(subject_type, output_type, func)
+      intrinsics[key] = IntrinsicRule(input_type, output_type, func)
 
     singletons = dict()
     for output_type, func in singleton_entries:
@@ -217,12 +214,12 @@ class RuleIndex(datatype('RuleIndex', ['tasks', 'intrinsics', 'singletons'])):
                              if subj == subject_type)
     singleton_products = self.singletons.keys()
     task_products = self.tasks.keys()
-    # Unwrap Exactlys if they only contain one type.
-    # TODO exercise w/ a test
+    # Unwrap Exactly's if they only contain one type.
+    # If we don't do this, then the wrapped and unwrapped products both end up in the graph.
+    # Heterogeneity of constraint types makes this tough.
     task_products = set(t._types[0] if type(t) is Exactly and len(t._types) == 1 else t for t in task_products)
 
     return intrinsic_products.union(task_products).union(set(singleton_products))
-#    return intrinsic_products.union(set(self.tasks.keys())).union(set(self.singletons.keys()))
 
   def gen_rules(self, subject_type, product_type):
     # Singletons or intrinsics that provide the requested product for the current subject type.
@@ -567,10 +564,10 @@ class GraphMaker(object):
                      full_unfulfillable_rules)
 
   def _construct_graph(self,
-    beginning_rule,
-    root_rule_dependency_edges=None,
-    rule_dependency_edges=None,
-    unfulfillable_rules=None):
+                       beginning_rule,
+                       root_rule_dependency_edges=None,
+                       rule_dependency_edges=None,
+                       unfulfillable_rules=None):
     rules_to_traverse = deque([beginning_rule])
     root_rule_dependency_edges = dict() if root_rule_dependency_edges is None else root_rule_dependency_edges
     rule_dependency_edges = dict() if rule_dependency_edges is None else rule_dependency_edges
