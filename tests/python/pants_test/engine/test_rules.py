@@ -88,10 +88,6 @@ class BoringRule(Rule):
   def output_product_type(self):
     return self._output_product_type
 
-  @property
-  def constraint(self):
-    return Exactly(self._output_product_type)
-
   def __repr__(self):
     return '{}({})'.format(type(self).__name__, self.output_product_type.__name__)
 
