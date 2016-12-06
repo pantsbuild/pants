@@ -3,7 +3,6 @@ name = "engine"
 version = "0.0.1"
 dependencies = [
  "fnv 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -11,11 +10,5 @@ name = "fnv"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
-[[package]]
-name = "libc"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
 [metadata]
 "checksum fnv 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "d3d4285d5aa1cf04504b7d8c2d1fdccf4586b56739499a04cc58663b2543cd30"
-"checksum libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)" = "23e3757828fa702a20072c37ff47938e9dd331b92fac6e223d26d4b7a55f7ee2"
