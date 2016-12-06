@@ -5,13 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import Counter
-from contextlib import contextmanager
 import logging
 import os
-import sys
 import threading
 import time
+from contextlib import contextmanager
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
@@ -410,24 +408,6 @@ class LocalScheduler(object):
         name = 'run.{}.dot'.format(self._run_count)
         self._run_count += 1
         self.visualize_graph_to_file(os.path.join(self._native.visualize_to_dir, name))
-
-      deduped = set()
-      distinct = []
-      for handle in self._context._handles:
-        item = self._context.from_handle(handle)
-        try:
-          deduped.add(item)
-        except:
-          distinct.append(item)
-          
-      print('$$$ handles: {}, deduped/distinct: {}/{}, ids: {}'.format(len(self._context._handles), len(deduped), len(distinct), len(self._context._id_to_obj)), file=sys.stderr)
-
-      print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>', file=sys.stderr)
-      counters = Counter()
-      for handle in self._context._handles:
-        counters[type(self._context.from_handle(handle)).__name__] += 1
-      for item, count in sorted(counters.items(), key=lambda x: x[1]):
-        print('>>> {}\t{}'.format(str(count).ljust(32), item), file=sys.stderr)
 
       logger.debug(
         'ran %s scheduling iterations and %s runnables in %f seconds. '
