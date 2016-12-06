@@ -160,7 +160,6 @@ class SourceRootConfig(Subsystem):
   within reason.  This means that in most cases the defaults below will be sufficient and repo
   owners will not need to explicitly specify source root patterns at all.
   """
-
   options_scope = 'source'
 
   # TODO: When we have a proper model of the concept of a language, these should really be
@@ -282,6 +281,11 @@ class SourceRootTrie(object):
   the path we're matching. E.g., ^/src/java/foo/bar will match both the fixed root ^/src/java and
   the pattern src/java, but ^/my/project/src/java/foo/bar will match only the pattern.
   """
+  class InvalidPath(Exception):
+    def __init__(self, path, reason):
+      super(SourceRootTrie.InvalidPath, self).__init__(
+        'Invalid source root path or pattern: {}. Reason: {}.'.format(path, reason))
+
   class Node(object):
     def __init__(self):
       self.children = {}
@@ -303,7 +307,7 @@ class SourceRootTrie(object):
       ret = self.children.get(key)
       if ret:
         langs.update(ret.langs)
-      else:
+      elif key != '^':
         ret = self.children.get('*')
         if ret:
           langs.add(key)
@@ -335,7 +339,10 @@ class SourceRootTrie(object):
 
   def add_fixed(self, path, langs, category=SourceRootCategories.UNKNOWN):
     """Add a fixed source root to the trie."""
-    self._do_add_pattern(os.path.join('^', path), tuple(langs), category)
+    if '*' in path:
+      raise self.InvalidPath(path, 'fixed path cannot contain the * character')
+    fixed_path = os.path.join('^', path) if path else '^'
+    self._do_add_pattern(fixed_path, tuple(langs), category)
 
   def fixed(self):
     """Returns a list of just the fixed source roots in the trie."""
@@ -345,9 +352,10 @@ class SourceRootTrie(object):
     return []
 
   def _do_add_pattern(self, pattern, langs, category):
+    if pattern != os.path.normpath(pattern):
+      raise self.InvalidPath(pattern, 'must be a normalized path')
     keys = pattern.split(os.path.sep)
-    if keys[-1] == '':
-      keys = keys[:-1]
+
     node = self._root
     for key in keys:
       child = node.children.get(key)  # Can't use get_child, as we don't want to wildcard-match.
@@ -375,6 +383,10 @@ class SourceRootTrie(object):
           node = child
           j += 1
       if node.is_terminal:
-        return self._source_root_factory.create(os.path.join(*keys[1:j]) if j > 1 else '', langs, node.category)
+        if j == 1:  # The match was on the root itself.
+          path = ''
+        else:
+          path = os.path.join(*keys[1:j])
+        return self._source_root_factory.create(path, langs, node.category)
       # Otherwise, try the next value of i.
     return None
