@@ -123,8 +123,8 @@ class SingletonRule(datatype('SingletonRule', ['product_type', 'func']), Rule):
 
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__,
-                           self.product_type.__name__,
-                           self.func.__name__)
+                               self.product_type.__name__,
+                               self.func.__name__)
 
 
 class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', 'func']), Rule):

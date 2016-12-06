@@ -85,7 +85,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
 
 
 class SelectDependencies(datatype('Dependencies',
-                                  ['product', 'dep_product', 'field_', 'field_types', 'transitive']),
+                                  ['product', 'dep_product', 'field', 'field_types', 'transitive']),
                          Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
@@ -97,14 +97,12 @@ class SelectDependencies(datatype('Dependencies',
   `dep_product`.
   """
 
+  DEFAULT_FIELD = 'dependencies'
+
   optional = False
 
-  def __new__(cls, product, dep_product, field=None, field_types=tuple(), transitive=False):
+  def __new__(cls, product, dep_product, field=DEFAULT_FIELD, field_types=tuple(), transitive=False):
     return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types, transitive)
-
-  @property
-  def field(self):
-    return self.field_ or 'dependencies'
 
   @property
   def input_product_selector(self):
@@ -119,12 +117,17 @@ class SelectDependencies(datatype('Dependencies',
       field_types_portion = ', field_types=({},)'.format(', '.join(f.__name__ for f in self.field_types))
     else:
       field_types_portion = ''
+    if self.field is not self.DEFAULT_FIELD:
+      field_name_portion = ', {}'.format(repr(self.field))
+    else:
+      field_name_portion = ''
     return '{}({}, {}{}{}{})'.format(type(self).__name__,
                                      type_or_constraint_repr(self.product),
                                      type_or_constraint_repr(self.dep_product),
-                                     ', {}'.format(repr(self.field_)) if self.field_ else '',
+                                     field_name_portion,
+                                     field_types_portion,
                                      ', transitive=True' if self.transitive else '',
-                                     field_types_portion)
+                                     )
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):

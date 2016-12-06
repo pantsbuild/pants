@@ -29,6 +29,8 @@ class SelectorsTest(unittest.TestCase):
                      SelectDependencies(AClass, AClass, field='some_field'))
     self.assert_repr("SelectDependencies(AClass, AClass, u'some_field', field_types=(AClass,))",
                      SelectDependencies(AClass, AClass, field='some_field', field_types=(AClass,)))
+    self.assert_repr("SelectDependencies(AClass, AClass, transitive=True)",
+                     SelectDependencies(AClass, AClass, transitive=True))
 
   def test_projection_repr(self):
     self.assert_repr("SelectProjection(AClass, AClass, (u'field',), AClass)",
