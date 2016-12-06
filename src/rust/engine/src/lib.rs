@@ -13,12 +13,13 @@ use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
 
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
+use core::{Field, Function, Key, RunnableComplete, TypeConstraint, TypeId, Value};
 use externs::{
   CreateExceptionExtern,
   ExternContext,
   Externs,
   IdToStrExtern,
+  InvokeRunnable,
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
@@ -197,6 +198,7 @@ pub extern fn scheduler_create(
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
+  invoke_runnable: InvokeRunnable,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -216,6 +218,7 @@ pub extern fn scheduler_create(
       project,
       project_multi,
       create_exception,
+      invoke_runnable,
     );
   Box::into_raw(
     Box::new(

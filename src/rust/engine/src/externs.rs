@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use std::mem;
 use std::string::FromUtf8Error;
 
-use core::{Field, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Field, Function, Id, Key, RunnableComplete, TypeConstraint, TypeId, Value};
+use nodes::Runnable;
 
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = libc::c_void;
@@ -25,6 +26,7 @@ pub struct Externs {
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
+  invoke_runnable: InvokeRunnable,
 }
 
 impl Externs {
@@ -38,6 +40,7 @@ impl Externs {
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
+    invoke_runnable: InvokeRunnable,
   ) -> Externs {
     Externs {
       context: ext_context,
@@ -50,6 +53,7 @@ impl Externs {
       id_to_str: id_to_str,
       val_to_str: val_to_str,
       create_exception: create_exception,
+      invoke_runnable: invoke_runnable,
     }
   }
 
@@ -102,6 +106,12 @@ impl Externs {
   pub fn create_exception(&self, msg: String) -> Value {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
+
+  pub fn invoke_runnable(&self, runnable: &Runnable) -> RunnableComplete {
+    let args_clone: Vec<Value> = runnable.args().clone();
+    (self.invoke_runnable)(
+      self.context, runnable.func(), args_clone.as_ptr(), args_clone.len() as u64, runnable.cacheable())
+  }
 }
 
 pub type KeyForExtern =
@@ -145,6 +155,9 @@ pub type ValToStrExtern =
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
+
+pub type InvokeRunnable =
+  extern "C" fn(*const ExternContext, *const Function, *const Value, u64, bool) -> RunnableComplete;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {

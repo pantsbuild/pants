@@ -99,6 +99,23 @@ impl Key {
   }
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RunnableComplete {
+  value: Value,
+  is_throw: bool,
+}
+
+impl RunnableComplete {
+  pub fn value(&self) -> &Value {
+    &self.value
+  }
+
+  pub fn is_throw(&self) -> bool {
+    self.is_throw
+  }
+}
+
 /**
  * Represents a handle to a python object, explicitly without equality or hashing. Whenever
  * the equality/identity of a Value matters, a Key should be computed for it and used instead.

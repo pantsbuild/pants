@@ -24,8 +24,8 @@ from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, S
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import (ExternContext, Function, TypeConstraint, TypeId,
                                            extern_create_exception, extern_id_to_str,
-                                           extern_key_for, extern_project, extern_project_multi,
-                                           extern_satisfied_by, extern_store_list,
+                                           extern_invoke_runnable, extern_key_for, extern_project,
+                                           extern_project_multi, extern_satisfied_by, extern_store_list,
                                            extern_val_to_str)
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
@@ -87,6 +87,7 @@ class LocalScheduler(object):
                                             extern_project,
                                             extern_project_multi,
                                             extern_create_exception,
+                                            extern_invoke_runnable,
                                             self._to_key('name'),
                                             self._to_key('products'),
                                             self._to_key('default'),
@@ -387,21 +388,24 @@ class LocalScheduler(object):
 
       # Yield nodes that are Runnable, and then compute new ones.
       completed = []
-      outstanding_runnable = set()
       runnable_count, scheduling_iterations = 0, 0
       while True:
         # Call the scheduler to create Runnables for the Engine.
-        runnable = self._execution_next(completed)
-        outstanding_runnable.difference_update(i for i, _ in completed)
-        outstanding_runnable.update(i for i, _ in runnable)
-        if not runnable and not outstanding_runnable:
+        runnable_batch = self._execution_next(completed)
+        if not runnable_batch:
           # Finished.
           break
         # The double yield here is intentional, and assumes consumption of this generator in
         # a `for` loop with a `generator.send(completed)` call in the body of the loop.
-        completed = yield runnable
-        yield
-        runnable_count += len(runnable)
+        completed = []
+        for entry, runnable in runnable_batch:
+          try:
+            result = Return(runnable.func(*runnable.args))
+          except Exception as e:
+            result = Throw(e)
+          completed.append((entry, result))
+
+        runnable_count += len(runnable_batch)
         scheduling_iterations += 1
 
       if self._native.visualize_to_dir is not None:

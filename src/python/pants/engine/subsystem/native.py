@@ -54,18 +54,24 @@ _FFI.cdef(
       uint64_t   values_len;
     } ValueBuffer;
 
+    typedef struct {
+      Value  value;
+      bool   is_throw;
+    } RunnableComplete;
+
     typedef uint64_t EntryId;
 
     typedef void ExternContext;
 
-    typedef Key         (*extern_key_for)(ExternContext*, Value*);
-    typedef UTF8Buffer  (*extern_id_to_str)(ExternContext*, Id);
-    typedef UTF8Buffer  (*extern_val_to_str)(ExternContext*, Value*);
-    typedef bool        (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
-    typedef Value       (*extern_store_list)(ExternContext*, Value*, uint64_t, bool);
-    typedef Value       (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
-    typedef ValueBuffer (*extern_project_multi)(ExternContext*, Value*, Field*);
-    typedef Value       (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
+    typedef Key              (*extern_key_for)(ExternContext*, Value*);
+    typedef UTF8Buffer       (*extern_id_to_str)(ExternContext*, Id);
+    typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
+    typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
+    typedef Value            (*extern_store_list)(ExternContext*, Value*, uint64_t, bool);
+    typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
+    typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
+    typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
+    typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
 
     typedef struct {
       EntryId     id;
@@ -113,6 +119,7 @@ _FFI.cdef(
                                    extern_project,
                                    extern_project_multi,
                                    extern_create_exception,
+                                   extern_invoke_runnable,
                                    Field,
                                    Field,
                                    Field,
@@ -239,6 +246,23 @@ def extern_create_exception(context_handle, msg_ptr, msg_len):
   return c.to_value(Exception(msg))
 
 
+@_FFI.callback("RunnableComplete(ExternContext*, Function*, Value*, uint64_t, bool)")
+def extern_invoke_runnable(context_handle, func, args_ptr, args_len, cacheable):
+  """Given a destructured rawRunnable, run it."""
+  c = _FFI.from_handle(context_handle)
+  runnable = c.from_id(func.id_)
+  args = tuple(c.from_value(arg) for arg in _FFI.unpack(args_ptr, args_len))
+
+  try:
+    val = runnable(*args)
+    is_throw = False
+  except Exception as e:
+    val = e
+    is_throw = True
+
+  return RunnableComplete(c.to_value(val), is_throw)
+
+
 class Value(datatype('Value', ['handle', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
@@ -256,6 +280,10 @@ class TypeConstraint(datatype('TypeConstraint', ['id_'])):
 
 
 class TypeId(datatype('TypeId', ['id_'])):
+  """Corresponds to the native object of the same name."""
+
+
+class RunnableComplete(datatype('RunnableComplete', ['value', 'is_throw'])):
   """Corresponds to the native object of the same name."""
 
 
