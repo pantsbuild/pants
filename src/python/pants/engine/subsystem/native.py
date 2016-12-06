@@ -158,6 +158,7 @@ _FFI.cdef(
                         Value*,
                         bool*,
                         uint64_t);
+    void execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
     void nodes_destroy(RawNodes*);

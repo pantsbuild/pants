@@ -385,39 +385,39 @@ class LocalScheduler(object):
       start_time = time.time()
       # Reset execution, and add any roots from the request.
       self._execution_add_roots(execution_request)
-
-      # Yield nodes that are Runnable, and then compute new ones.
-      completed = []
-      runnable_count, scheduling_iterations = 0, 0
-      while True:
-        # Call the scheduler to create Runnables for the Engine.
-        runnable_batch = self._execution_next(completed)
-        if not runnable_batch:
-          # Finished.
-          break
-        # The double yield here is intentional, and assumes consumption of this generator in
-        # a `for` loop with a `generator.send(completed)` call in the body of the loop.
-        completed = []
-        for entry, runnable in runnable_batch:
-          try:
-            result = Return(runnable.func(*runnable.args))
-          except Exception as e:
-            result = Throw(e)
-          completed.append((entry, result))
-
-        runnable_count += len(runnable_batch)
-        scheduling_iterations += 1
-
-      if self._native.visualize_to_dir is not None:
-        name = 'run.{}.dot'.format(self._run_count)
-        self._run_count += 1
-        self.visualize_graph_to_file(os.path.join(self._native.visualize_to_dir, name))
-
-      logger.debug(
-        'ran %s scheduling iterations and %s runnables in %f seconds. '
-        'there are %s total nodes.',
-        scheduling_iterations,
-        runnable_count,
-        time.time() - start_time,
-        self._native.lib.graph_len(self._scheduler)
-      )
+      self._native.lib.execution_execute(self._scheduler)
+      # # Yield nodes that are Runnable, and then compute new ones.
+      # completed = []
+      # runnable_count, scheduling_iterations = 0, 0
+      # while True:
+      #   # Call the scheduler to create Runnables for the Engine.
+      #   runnable_batch = self._execution_next(completed)
+      #   if not runnable_batch:
+      #     # Finished.
+      #     break
+      #   # The double yield here is intentional, and assumes consumption of this generator in
+      #   # a `for` loop with a `generator.send(completed)` call in the body of the loop.
+      #   completed = []
+      #   for entry, runnable in runnable_batch:
+      #     try:
+      #       result = Return(runnable.func(*runnable.args))
+      #     except Exception as e:
+      #       result = Throw(e)
+      #     completed.append((entry, result))
+      #
+      #   runnable_count += len(runnable_batch)
+      #   scheduling_iterations += 1
+      #
+      # if self._native.visualize_to_dir is not None:
+      #   name = 'run.{}.dot'.format(self._run_count)
+      #   self._run_count += 1
+      #   self.visualize_graph_to_file(os.path.join(self._native.visualize_to_dir, name))
+      #
+      # logger.debug(
+      #   'ran %s scheduling iterations and %s runnables in %f seconds. '
+      #   'there are %s total nodes.',
+      #   scheduling_iterations,
+      #   runnable_count,
+      #   time.time() - start_time,
+      #   self._native.lib.graph_len(self._scheduler)
+      # )

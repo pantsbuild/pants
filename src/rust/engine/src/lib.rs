@@ -316,6 +316,32 @@ pub extern fn execution_next(
 }
 
 #[no_mangle]
+pub extern fn execution_execute(
+  scheduler_ptr: *mut RawScheduler,
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    let mut completed = Vec::new();
+    loop {
+      let runnable_batch = raw.scheduler.next(completed);
+      if runnable_batch.len() == 0 {
+        break;
+      }
+      completed =
+        runnable_batch.iter()
+          .map(|&(id, ref runnable)| {
+            let result: RunnableComplete = raw.scheduler.tasks.externs.invoke_runnable(runnable);
+            if result.is_throw() {
+              (id, Complete::Throw(result.value().clone()))
+            } else {
+              (id, Complete::Return(result.value().clone()))
+            }
+          })
+          .collect();
+    }
+  })
+}
+
+#[no_mangle]
 pub extern fn execution_roots(
   scheduler_ptr: *mut RawScheduler,
 ) -> *const RawNodes {
