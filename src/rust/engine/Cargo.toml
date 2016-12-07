@@ -4,7 +4,7 @@ name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["staticlib"]
 
 [dependencies]
 fnv = "1.0.3"
