@@ -11,6 +11,7 @@ target(
     ':consolidate_classpath',
     ':check_published_deps',
     ':checkstyle',
+    ':classmap',
     ':detect_duplicates',
     ':ivy_imports',
     ':ivy_resolve',
@@ -649,4 +650,14 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/task',
   ]
+)
+
+python_library(
+  name = 'classmap',
+  sources = ['classmap.py'],
+  dependencies = [
+    ':classpath_util',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/task',
+  ],
 )
