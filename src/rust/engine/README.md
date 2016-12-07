@@ -11,6 +11,7 @@ To build for release, and enable optimization:
     cargo build --release
 
 For development purposes, it's usually fastest to then place the resulting shared library directly
-where `binary_utils` would fetch them to (TODO: expand before commit):
+where `binary_utils` would fetch them to:
 
     cp target/release/libengine.dylib ~/.cache/pants/dylib/native-engine/mac/10.11/0.0.1/native-engine
+
