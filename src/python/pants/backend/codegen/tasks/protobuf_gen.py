@@ -65,8 +65,8 @@ class ProtobufGen(SimpleCodegenTask):
              default=['3rdparty:protobuf-java'])
     register('--import-from-root', type=bool, advanced=True,
              help='If set, add the buildroot to the path protoc searches for imports. '
-                  'This facilitates import paths in .proto files that are relative to the '
-                  'build root, as recommended by the protoc documentation.')
+                  'This enables using import paths relative to the build root in .proto files, '
+                  'as recommended by the protoc documentation.')
 
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
