@@ -39,6 +39,7 @@ class PythonBinary(PythonTarget):
                repositories=None,         # pex option
                indices=None,              # pex option
                ignore_errors=False,       # pex option
+               shebang=None,              # pex option
                platforms=(),
                **kwargs):
     """
@@ -79,6 +80,7 @@ class PythonBinary(PythonTarget):
       'indices': PrimitiveField(maybe_list(indices or [])),
       'ignore_errors': PrimitiveField(bool(ignore_errors)),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
+      'shebang': PrimitiveField(shebang or None),
     })
 
     sources = [] if source is None else [source]
@@ -126,6 +128,13 @@ class PythonBinary(PythonTarget):
       assert len(self.payload.sources.source_paths) == 1
       entry_source = list(self.sources_relative_to_source_root())[0]
       return self._translate_to_entry_point(entry_source)
+    else:
+      return None
+
+  @property
+  def shebang(self):
+    if self.payload.shebang:
+      return self.payload.shebang
     else:
       return None
 

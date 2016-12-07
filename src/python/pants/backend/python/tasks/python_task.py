@@ -118,6 +118,8 @@ class PythonTask(Task):
     pex_info = PexInfo.from_pex(path)
     # Now create a PythonChroot wrapper without dumping it.
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
+    if targets[0].shebang:
+      builder.set_shebang(targets[0].shebang)
     return self.create_chroot(interpreter=interpreter,
                               builder=builder,
                               targets=targets,
@@ -138,6 +140,8 @@ class PythonTask(Task):
                      extra_requirements=None, executable_file_content=None):
     """Create a PythonChroot with the specified args."""
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
+    if targets[0].shebang:
+      builder.set_shebang(targets[0].shebang)
     with self.context.new_workunit('chroot'):
       chroot = self.create_chroot(
         interpreter=interpreter,
