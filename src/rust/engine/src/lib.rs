@@ -13,7 +13,7 @@ use std::mem;
 use std::os::raw;
 use std::path::Path;
 
-use core::{Field, Function, Key, RunnableComplete, TypeConstraint, TypeId, Value};
+use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   CreateExceptionExtern,
   ExternContext,
@@ -243,11 +243,11 @@ pub extern fn execution_execute(
       completed =
         runnable_batch.iter()
           .map(|&(id, ref runnable)| {
-            let result: RunnableComplete = raw.scheduler.tasks.externs.invoke_runnable(runnable);
-            if result.is_throw() {
-              (id, Complete::Throw(result.value().clone()))
+            let result = raw.scheduler.tasks.externs.invoke_runnable(runnable);
+            if result.is_throw {
+              (id, Complete::Throw(result.value))
             } else {
-              (id, Complete::Return(result.value().clone()))
+              (id, Complete::Return(result.value))
             }
           })
           .collect();

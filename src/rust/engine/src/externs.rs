@@ -4,7 +4,7 @@ use std::mem;
 use std::os::raw;
 use std::string::FromUtf8Error;
 
-use core::{Field, Function, Id, Key, RunnableComplete, TypeConstraint, TypeId, Value};
+use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
 
 // An opaque pointer to a context used by the extern functions.
@@ -121,6 +121,13 @@ pub type StoreListExtern =
 
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RunnableComplete {
+  pub value: Value,
+  pub is_throw: bool,
+}
 
 #[repr(C)]
 pub struct ValueBuffer {
