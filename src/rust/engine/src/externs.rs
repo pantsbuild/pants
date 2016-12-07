@@ -107,7 +107,7 @@ impl Externs {
   }
 
   pub fn invoke_runnable(&self, runnable: &Runnable) -> RunnableComplete {
-    let args_clone: Vec<Value> = runnable.args().clone();
+    let args_clone: &Vec<Value> = runnable.args();
     (self.invoke_runnable)(
       self.context, runnable.func(), args_clone.as_ptr(), args_clone.len() as u64, runnable.cacheable())
   }
