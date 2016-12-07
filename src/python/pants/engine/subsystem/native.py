@@ -73,26 +73,12 @@ _FFI.cdef(
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
     typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
 
-    typedef struct {
-      EntryId     id;
-      Function*   func;
-      Value*      args_ptr;
-      uint64_t    args_len;
-      bool        cacheable;
-    } RawRunnable;
+    typedef void RawScheduler;
 
     typedef struct {
-      RawRunnable*          runnables_ptr;
-      uint64_t              runnables_len;
-      // NB: there are more fields in this struct, but we can safely (?)
-      // ignore them because we never have collections of this type.
-    } RawExecution;
-
-    typedef struct {
-      RawExecution execution;
-      // NB: there are more fields in this struct, but we can safely (?)
-      // ignore them because we never have collections of this type.
-    } RawScheduler;
+      uint64_t runnable_count;
+      uint64_t scheduling_iterations;
+    } ExecutionStat;
 
     typedef struct {
       Key             subject;
@@ -153,7 +139,7 @@ _FFI.cdef(
                                                 TypeConstraint,
                                                 Field,
                                                 bool);
-    void execution_execute(RawScheduler*);
+    ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
     void nodes_destroy(RawNodes*);

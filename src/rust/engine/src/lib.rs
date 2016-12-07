@@ -29,80 +29,25 @@ use externs::{
   ValToStrExtern,
   with_vec,
 };
-use graph::{Graph, EntryId};
-use nodes::{Complete, Runnable};
+use graph::Graph;
+use nodes::Complete;
 use scheduler::Scheduler;
 use tasks::Tasks;
 
 pub struct RawScheduler {
-  execution: RawExecution,
   scheduler: Scheduler,
 }
 
 impl RawScheduler {
   fn reset(&mut self) {
     self.scheduler.reset();
-    self.execution.update(Vec::new());
-  }
-}
-
-/**
- * An unzipped, raw-pointer form of the return value of Scheduler.next().
- */
-pub struct RawExecution {
-  runnables_ptr: *const RawRunnable,
-  runnables_len: u64,
-  runnables: Vec<(EntryId, Runnable)>,
-  raw_runnables: Vec<RawRunnable>,
-}
-
-impl RawExecution {
-  fn new() -> RawExecution {
-    let mut execution =
-      RawExecution {
-        runnables_ptr: Vec::new().as_ptr(),
-        runnables_len: 0,
-        runnables: Vec::new(),
-        raw_runnables: Vec::new(),
-      };
-    // NB: Unsafe: because we need a raw pointer to a value in the struct, we started by
-    // initializing it to a meaningless value above (since we don't know where it will be
-    // in memory during struct construction), and then here we update it to be valid.
-    execution.update(Vec::new());
-    execution
-  }
-
-  fn update(&mut self, ready_entries: Vec<(EntryId, Runnable)>) {
-    self.runnables = ready_entries;
-
-    self.raw_runnables =
-      self.runnables.iter()
-        .map(|&(id, ref runnable)| {
-          RawRunnable {
-            id: id,
-            func: runnable.func() as *const Function,
-            args_ptr: runnable.args().as_ptr(),
-            args_len: runnable.args().len() as u64,
-            cacheable: runnable.cacheable(),
-          }
-        })
-        .collect();
-
-    self.runnables_ptr = self.raw_runnables.as_mut_ptr();
-    self.runnables_len = self.raw_runnables.len() as u64;
   }
 }
 
 #[repr(C)]
-pub struct RawRunnable {
-  id: EntryId,
-  // Single Key.
-  func: *const Function,
-  // Array of args.
-  args_ptr: *const Value,
-  args_len: u64,
-  // Boolean value indicating whether the runnable is cacheable.
-  cacheable: bool,
+pub struct ExecutionStat {
+  runnable_count: usize,
+  scheduling_iterations: usize,
 }
 
 #[repr(C)]
@@ -219,7 +164,6 @@ pub extern fn scheduler_create(
   Box::into_raw(
     Box::new(
       RawScheduler {
-        execution: RawExecution::new(),
         scheduler: Scheduler::new(
           Graph::new(),
           Tasks::new(
@@ -285,11 +229,15 @@ pub extern fn execution_add_root_select_dependencies(
 #[no_mangle]
 pub extern fn execution_execute(
   scheduler_ptr: *mut RawScheduler,
-) {
+) -> ExecutionStat {
   with_scheduler(scheduler_ptr, |raw| {
+    let mut runnable_count: usize = 0;
+    let mut scheduling_iterations: usize = 0;
     let mut completed = Vec::new();
     loop {
       let runnable_batch = raw.scheduler.next(completed);
+      runnable_count += runnable_batch.len();
+      scheduling_iterations += 1;
       if runnable_batch.len() == 0 {
         break;
       }
@@ -305,6 +253,7 @@ pub extern fn execution_execute(
           })
           .collect();
     }
+    ExecutionStat{runnable_count: runnable_count, scheduling_iterations: scheduling_iterations}
   })
 }
 

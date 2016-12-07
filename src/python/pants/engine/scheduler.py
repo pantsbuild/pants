@@ -350,7 +350,8 @@ class LocalScheduler(object):
       runnable_count, scheduling_iterations = 0, 0
       # Reset execution, and add any roots from the request.
       self._execution_add_roots(execution_request)
-      self._native.lib.execution_execute(self._scheduler)
+      aaa = self._native.lib.execution_execute(self._scheduler)
+      import pdb;pdb.set_trace()
       # # Yield nodes that are Runnable, and then compute new ones.
       # completed = []
       # runnable_count, scheduling_iterations = 0, 0
