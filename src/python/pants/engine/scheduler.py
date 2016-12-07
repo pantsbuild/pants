@@ -347,33 +347,14 @@ class LocalScheduler(object):
 
     with self._product_graph_lock:
       start_time = time.time()
-      runnable_count, scheduling_iterations = 0, 0
       # Reset execution, and add any roots from the request.
       self._execution_add_roots(execution_request)
-      aaa = self._native.lib.execution_execute(self._scheduler)
-      import pdb;pdb.set_trace()
-      # # Yield nodes that are Runnable, and then compute new ones.
-      # completed = []
-      # runnable_count, scheduling_iterations = 0, 0
-      # while True:
-      #   # Call the scheduler to create Runnables for the Engine.
-      #   runnable_batch = self._execution_next(completed)
-      #   if not runnable_batch:
-      #     # Finished.
-      #     break
-      #   # The double yield here is intentional, and assumes consumption of this generator in
-      #   # a `for` loop with a `generator.send(completed)` call in the body of the loop.
-      #   completed = []
-      #   for entry, runnable in runnable_batch:
-      #     try:
-      #       result = Return(runnable.func(*runnable.args))
-      #     except Exception as e:
-      #       result = Throw(e)
-      #     completed.append((entry, result))
-      #
-      #   runnable_count += len(runnable_batch)
-      #   scheduling_iterations += 1
-      #
+      # Execute in native engine.
+      execution_stat = self._native.lib.execution_execute(self._scheduler)
+      # Receive execution statistics.
+      runnable_count = execution_stat.runnable_count
+      scheduling_iterations = execution_stat.scheduling_iterations
+
       if self._native.visualize_to_dir is not None:
         name = 'run.{}.dot'.format(self._run_count)
         self._run_count += 1

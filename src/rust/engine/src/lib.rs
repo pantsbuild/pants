@@ -236,11 +236,10 @@ pub extern fn execution_execute(
     let mut completed = Vec::new();
     loop {
       let runnable_batch = raw.scheduler.next(completed);
-      runnable_count += runnable_batch.len();
-      scheduling_iterations += 1;
       if runnable_batch.len() == 0 {
         break;
       }
+      runnable_count += runnable_batch.len();
       completed =
         runnable_batch.iter()
           .map(|&(id, ref runnable)| {
@@ -252,6 +251,7 @@ pub extern fn execution_execute(
             }
           })
           .collect();
+      scheduling_iterations += 1;
     }
     ExecutionStat{runnable_count: runnable_count, scheduling_iterations: scheduling_iterations}
   })
