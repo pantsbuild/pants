@@ -95,6 +95,30 @@ class SourceRootTest(BaseTest):
     self.assertEquals(root('src/go/src', ('go',)),
                       trie.find('src/go/src/foo/bar/baz.go'))
 
+  def test_fixed_source_root_at_buildroot(self):
+    trie = SourceRootTrie(SourceRootFactory({}))
+    trie.add_fixed('', ('proto',))
+
+    self.assertEquals(('', ('proto',), UNKNOWN),
+                      trie.find('foo/proto/bar/baz.proto'))
+
+  def test_source_root_pattern_at_buildroot(self):
+    trie = SourceRootTrie(SourceRootFactory({}))
+    trie.add_pattern('*')
+
+    self.assertEquals(('java', ('java',), UNKNOWN),
+                      trie.find('java/bar/baz.proto'))
+
+  def test_invalid_patterns(self):
+    trie = SourceRootTrie(SourceRootFactory({}))
+    # Bad normalization.
+    self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_fixed('foo/bar/', ('bar',)))
+    self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_pattern('foo//*', ('java',)))
+    self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_pattern('foo/*/', ('java',)))
+
+    # Asterisk in fixed pattern.
+    self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_fixed('src/*', ('java',)))
+
   def test_trie_traversal(self):
     trie = SourceRootTrie(SourceRootFactory({}))
     trie.add_pattern('foo1/bar1/baz1')

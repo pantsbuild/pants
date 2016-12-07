@@ -82,12 +82,14 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
                           timeout_targets + deliberately_conflicting_targets)
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
                        targets_to_exclude)
-    pants_run = self.pants_test(['testprojects::', '--jvm-platform-default-platform=java7'] + exclude_opts)
+    pants_run = self.pants_test(['testprojects::', '--jvm-platform-default-platform=java7',
+                                 '--gen-protoc-import-from-root'] + exclude_opts)
     self.assert_success(pants_run)
 
   # This is a special case that we split into 2 tests instead of using ensure_engine.
   # The reason is the original test with ensure_engine takes more than 10 minutes in travis ci,
-  # which will cause travis to terminate the build. By spliting, each test finishes in less than 10 min.
+  # which will cause travis to terminate the build. By spliting, each test finishes in less than
+  # 10 min.
   def test_testprojects_v2_engine(self):
     with environment_as(PANTS_ENABLE_V2_ENGINE='true'):
       self.test_testprojects()
