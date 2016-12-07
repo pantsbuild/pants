@@ -44,7 +44,7 @@ function get_rust_os_ids() {
 readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
   linux)
-    readonly LIB_EXTENSION=so
+    readonly LIB_EXTENSION=a
     readonly OS_NAME=linux
     readonly OS_ID=${OS_NAME}/$(uname -m)
     ;;
