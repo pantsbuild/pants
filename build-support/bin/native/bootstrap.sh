@@ -112,6 +112,13 @@ function bootstrap_native_code() {
     native_engine_version="$(calculate_current_hash)"
     target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
 
+    set -x
+    ls -al ${native_binary}
+    file ${native_binary}
+    case "$OSTYPE" in
+      linux*) ldd ${native_binary} ;;
+    esac
+    set +x
     mkdir -p "$(dirname ${target_binary})"
     cp "${native_binary}" ${target_binary}
 
