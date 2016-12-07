@@ -68,7 +68,7 @@ class SchedulerTest(unittest.TestCase):
   def assert_root_failed(self, root, subject, msg_str):
     """Asserts that the root was a Throw result containing the given msg string."""
     self.assertEquals(subject, root[0][0])
-    self.assertEquals(Throw, root[1])
+    self.assertEquals(Throw, type(root[1]))
     self.assertIn(msg_str, str(root[1].exc))
 
   def test_compile_only_3rdparty(self):
@@ -175,14 +175,13 @@ class SchedulerTest(unittest.TestCase):
     # Confirm that we requested a classpath for the root and inferred targets.
     self.assert_select_for_subjects(walk, Select(Classpath), [self.inferred_deps, self.java_simple])
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4025.')
   def test_multiple_classpath_entries(self):
     """Multiple Classpath products for a single subject currently cause a failure."""
     build_request = self.request(['compile'], self.java_multi)
     root, = self.build(build_request)
 
     # Validate that the root failed.
-    self.assert_root_failed(root, self.java_multi, "TODO: string match for ConflictingProducers failure.")
+    self.assert_root_failed(root, self.java_multi, "Conflicting values produced for")
 
   def test_descendant_specs(self):
     """Test that Addresses are produced via recursive globs of the 3rdparty/jvm directory."""

@@ -1,14 +1,13 @@
-use libc;
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::mem;
+use std::os::raw;
 use std::string::FromUtf8Error;
 
 use core::{Field, Id, Key, TypeConstraint, TypeId, Value};
 
 // An opaque pointer to a context used by the extern functions.
-pub type ExternContext = libc::c_void;
+pub type ExternContext = raw::c_void;
 
 pub type SatisfiedByExtern =
   extern "C" fn(*const ExternContext, *const TypeConstraint, *const TypeId) -> bool;
@@ -24,6 +23,7 @@ pub struct Externs {
   project_multi: ProjectMultiExtern,
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
+  create_exception: CreateExceptionExtern,
 }
 
 impl Externs {
@@ -36,6 +36,7 @@ impl Externs {
     store_list: StoreListExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
+    create_exception: CreateExceptionExtern,
   ) -> Externs {
     Externs {
       context: ext_context,
@@ -47,6 +48,7 @@ impl Externs {
       project_multi: project_multi,
       id_to_str: id_to_str,
       val_to_str: val_to_str,
+      create_exception: create_exception,
     }
   }
 
@@ -63,6 +65,14 @@ impl Externs {
   }
 
   pub fn store_list(&self, values: Vec<&Value>, merge: bool) -> Value {
+    if merge && values.len() == 1 {
+      // We're merging, but there is only one input value: return it immediately.
+      if let Some(&first) = values.first() {
+        return first.clone();
+      }
+    }
+
+    // Execute extern.
     let values_clone: Vec<Value> = values.into_iter().map(|&v| v).collect();
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
   }
@@ -86,6 +96,10 @@ impl Externs {
     (self.val_to_str)(self.context, val).to_string().unwrap_or_else(|e| {
       format!("<failed to decode unicode for {:?}: {}>", val, e)
     })
+  }
+
+  pub fn create_exception(&self, msg: String) -> Value {
+    (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
 }
 
@@ -127,6 +141,9 @@ pub type IdToStrExtern =
 
 pub type ValToStrExtern =
   extern "C" fn(*const ExternContext, *const Value) -> UTF8Buffer;
+
+pub type CreateExceptionExtern =
+  extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {

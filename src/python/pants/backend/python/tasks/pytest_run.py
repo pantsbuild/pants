@@ -22,6 +22,7 @@ from six.moves import configparser
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
+from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
@@ -75,21 +76,10 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   """
   :API: public
   """
-  _TESTING_TARGETS = [
-    # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
-    # to avoid confusion when debugging pants tests.
-    # TODO: make these an option, so any pants install base can pick their pytest version.
-    PythonRequirement('pytest>=2.6,<2.7'),
-    # NB, pytest-timeout 1.0.0 introduces a conflicting pytest>=2.8.0 requirement, see:
-    #   https://github.com/pantsbuild/pants/issues/2566
-    PythonRequirement('pytest-timeout<1.0.0'),
-    PythonRequirement('pytest-cov>=1.8,<1.9'),
-    PythonRequirement('unittest2>=0.6.0,<=1.9.0'),
-  ]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PythonSetup, PythonRepos)
+    return super(PytestRun, cls).subsystem_dependencies() + (PyTest, PythonSetup, PythonRepos)
 
   @classmethod
   def register_options(cls, register):
@@ -416,11 +406,14 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
 
+    testing_reqs = [PythonRequirement(s)
+                    for s in PyTest.global_instance().get_requirement_strings()]
+
     chroot = self.cached_chroot(interpreter=interpreter,
                                 pex_info=pex_info,
                                 targets=targets,
                                 platforms=('current',),
-                                extra_requirements=self._TESTING_TARGETS)
+                                extra_requirements=testing_reqs)
     pex = chroot.pex()
     with self._maybe_shard() as shard_args:
       with self._maybe_emit_junit_xml(targets) as junit_args:

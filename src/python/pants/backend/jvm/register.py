@@ -174,7 +174,6 @@ def register_goals():
   task(name='scaladoc', action=ScaladocGen).install('doc')
 
   # Bundling.
-  Goal.register('jar', 'Create a JAR file.')
   task(name='create', action=JarCreate).install('jar')
   detect_duplicates = task(name='dup', action=DuplicateDetector)
 

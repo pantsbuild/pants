@@ -250,3 +250,11 @@ For python repos, you need to override the following settings in pants.ini:
         "https://pypi.python.org/simple/"
       ]
 
+You can also reference a local repo relative to your project's build root with this pattern:
+
+    :::ini
+    [python-repos]
+    repos: [
+        "%(buildroot)s/repo_path"
+      ]
+

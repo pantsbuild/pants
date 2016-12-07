@@ -81,7 +81,7 @@ class HelpPrinter(object):
       print('  [target] accepts two special forms:')
       print('    dir:  to include all targets in the specified directory.')
       print('    dir:: to include all targets found recursively under the directory.')
-      print('\nFriendly docs:\n  http://pantsbuild.github.io/')
+      print('\nFriendly docs:\n  http://pantsbuild.org/')
 
       print(self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL)))
 

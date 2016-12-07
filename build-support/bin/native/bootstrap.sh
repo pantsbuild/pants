@@ -1,28 +1,48 @@
 #!/usr/bin/env bash
 
-readonly REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
+# Defines:
+# + CACHE_TARGET_DIR: The directory containing all versions of the native engine for the current OS.
+# Exposes:
+# + build_native_code: Builds target-specific native engine binaries.
+
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
 
 # Defines:
+# + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
+# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12
 # + LIB_EXTENSION: The extension of native libraries.
 # + KERNEL: The lower-cased name of the kernel as reported by uname.
 # + OS_NAME: The name of the OS as seen by pants.
 # + OS_ID: The ID of the current OS as seen by pants.
-source ${REPO_ROOT}/build-support/bin/native/detect_os.sh
+# Exposes:
+# + get_native_engine_version: Echoes the current native engine version.
+# + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
+# + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
+source ${REPO_ROOT}/build-support/bin/native/utils.sh
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
-readonly MODE=debug
-readonly MODE_FLAG=
-
 readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"
+
+# N.B. Set $MODE to "debug" to generate a binary with debugging symbols.
+readonly MODE="${MODE:-release}"
+case "$MODE" in
+  debug) MODE_FLAG="" ;;
+  *) MODE_FLAG="--release" ;;
+esac
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly CACHE_TARGET_DIR=${CACHE_ROOT}/bin/native-engine/${OS_ID}
 
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
-  git ls-files -c -o --exclude-standard ${NATIVE_ROOT} | \
-    git hash-object -t blob --stdin-paths | fingerprint_data
+  # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
+  # sensitive to the CWD, and the `--work-tree` option doesn't seem to resolve that.
+  (
+   cd ${REPO_ROOT}
+   git ls-files -c -o --exclude-standard "${NATIVE_ROOT}" | \
+      git hash-object -t blob --stdin-paths | fingerprint_data
+  )
 }
 
 function ensure_build_prerequisites() {

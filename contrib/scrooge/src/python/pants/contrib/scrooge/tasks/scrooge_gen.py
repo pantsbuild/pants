@@ -12,11 +12,11 @@ from collections import defaultdict, namedtuple
 
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from twitter.common.collections import OrderedSet

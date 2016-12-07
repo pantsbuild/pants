@@ -23,9 +23,11 @@ from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, S
                                     SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import (ExternContext, Function, TypeConstraint, TypeId,
-                                           extern_id_to_str, extern_key_for, extern_project,
-                                           extern_project_multi, extern_satisfied_by,
-                                           extern_store_list, extern_val_to_str)
+                                           extern_create_exception, extern_id_to_str,
+                                           extern_key_for, extern_project, extern_project_multi,
+                                           extern_satisfied_by, extern_store_list,
+                                           extern_val_to_str)
+from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
 
 
@@ -84,6 +86,7 @@ class LocalScheduler(object):
                                             extern_store_list,
                                             extern_project,
                                             extern_project_multi,
+                                            extern_create_exception,
                                             self._to_key('name'),
                                             self._to_key('products'),
                                             self._to_key('default'),
@@ -209,12 +212,14 @@ class LocalScheduler(object):
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)
 
-  def trace(self, roots):
-    """Yields a stringified 'stacktrace' starting from the given failed root.
-
-    :param iterable roots: An iterable of the root nodes to begin the trace from.
-    """
-    return "TODO: Restore trace (see: #4007)."
+  def trace(self):
+    """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
+    with self._product_graph_lock:
+      with temporary_file_path() as path:
+        self._native.lib.graph_trace(self._scheduler, bytes(path))
+        with open(path) as fd:
+          for line in fd.readlines():
+            yield line.rstrip()
 
   def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -289,9 +294,9 @@ class LocalScheduler(object):
         elif raw_root.union_tag is 1:
           state = Return(self._from_value(raw_root.union_return))
         elif raw_root.union_tag is 2:
-          state = Throw("Failed")
+          state = Throw(self._from_value(raw_root.union_throw))
         elif raw_root.union_tag is 3:
-          state = Throw("Nooped")
+          state = Throw(Exception("Nooped"))
         else:
           raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.union_tag, raw_root))
         roots[root] = state
@@ -313,24 +318,25 @@ class LocalScheduler(object):
       return self._native.lib.graph_len(self._scheduler)
 
   def _execution_next(self, completed):
-    # Unzip into two arrays.
-    returns_ids, returns_states, throws_ids = [], [], []
+    # Unzip into three arrays.
+    states_ids, states_values, states_are_throws = [], [], []
     for cid, c in completed:
+      states_ids.append(cid)
       if type(c) is Return:
-        returns_ids.append(cid)
-        returns_states.append(self._to_value(c.value))
+        states_values.append(self._to_value(c.value))
+        states_are_throws.append(False)
       elif type(c) is Throw:
-        throws_ids.append(cid)
+        states_values.append(self._to_value(c.exc))
+        states_are_throws.append(True)
       else:
         raise ValueError("Unexpected `Completed` state from Runnable execution: {}".format(c))
 
     # Run, then collect the outputs from the Scheduler's RawExecution struct.
     self._native.lib.execution_next(self._scheduler,
-                                    returns_ids,
-                                    returns_states,
-                                    len(returns_ids),
-                                    throws_ids,
-                                    len(throws_ids))
+                                    states_ids,
+                                    states_values,
+                                    states_are_throws,
+                                    len(states_ids))
 
     def decode_runnable(raw):
       return (

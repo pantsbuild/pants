@@ -4,7 +4,7 @@ BUILD files
 A large, well-organized codebase divides into many small components. These components,
 and the code dependencies between them, form a directed graph.
 
-In Pants paralance, these components are called _targets_. The information about your
+In Pants parlance, these components are called _targets_. The information about your
 targets and their dependencies lives in files named `BUILD`, scattered throughout your
 source tree. A `BUILD` file in a given directory describes targets that own the
 source files in or under that directory.

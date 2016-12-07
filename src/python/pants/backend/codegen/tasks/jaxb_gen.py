@@ -9,10 +9,10 @@ import os
 import re
 
 from pants.backend.codegen.targets.jaxb_library import JaxbLibrary
-from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.task.simple_codegen_task import SimpleCodegenTask
 
 
 class JaxbGen(SimpleCodegenTask, NailgunTask):

@@ -36,6 +36,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Eric Ayers
 + Eric Danielson
 + Eric Lindvall
++ Eugene Burmako
 + Evan Jones
 + Fedor Korotkov
 + Florian Leibert
@@ -63,9 +64,9 @@ Created by running `./build-support/bin/contributors.sh`.
 + John Ioannidis
 + John Sirois
 + John Townsend
++ Jon Boulle
 + Jonathan Coveney
 + Jonathan Sokolowski
-+ Jon Boulle
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
@@ -78,18 +79,19 @@ Created by running `./build-support/bin/contributors.sh`.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
-+ Luca Clementi
 + Luc Cary
++ Luca Clementi
 + Marc Abramowitz
 + Marius Eriksen
 + Mark Chu-Carroll
++ Mark Davis
 + Mark McBride
 + Mateo Rodriguez
 + Mathew Jennings
 + Matt Dee
-+ Matthew Jeffryes
 + Matt Landis
 + Matt Olsen
++ Matthew Jeffryes
 + Maxim Khutornenko
 + Michael Doherty
 + Mike Cripps
@@ -126,6 +128,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tom Dyas
 + Tom Howland
 + Travis Crawford
++ Troy Howard
 + Ugo Di Girolamo
 + Wei An
 + Wolfram Arnold

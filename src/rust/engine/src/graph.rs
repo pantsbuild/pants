@@ -1,6 +1,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
@@ -248,11 +249,27 @@ impl Graph {
    * Begins a topological Walk from the given roots.
    */
   fn walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> Walk<P>
-      where P: Fn(&Entry)->bool {
+    where P: Fn(&Entry)->bool {
     Walk {
       graph: self,
       dependents: dependents,
       deque: roots,
+      walked: HashSet::default(),
+      predicate: predicate,
+    }
+  }
+
+/**
+ *  Begins a topological walk from the given roots. Provides both the current entry as well as the
+ *  depth from the root.
+ */
+  fn leveled_walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
+    where P: Fn(&Entry, Level) -> bool {
+    let rrr = roots.iter().map(|&r| (r, 0)).collect::<VecDeque<_>>();
+    LeveledWalk {
+      graph: self,
+      dependents: dependents,
+      deque: rrr,
       walked: HashSet::default(),
       predicate: predicate,
     }
@@ -381,6 +398,70 @@ impl Graph {
     try!(f.write_all(b"}\n"));
     Ok(())
   }
+
+  pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
+    let file = try!(OpenOptions::new().append(true).open(path));
+    let mut f = BufWriter::new(file);
+
+    let is_bottom = |entry: &Entry| -> bool {
+      match entry.state {
+        None => false,
+        Some(Complete::Throw(_)) => false,
+        Some(Complete::Noop(_, _)) => true,
+        Some(Complete::Return(_)) => true
+      }
+    };
+
+    let is_one_level_above_bottom = |c: &Entry| -> bool {
+      for d in &c.dependencies {
+        if !is_bottom(self.entry_for_id(*d)) {
+          return false;
+        }
+      }
+      true
+    };
+
+    let _indent = |level: u32| -> String {
+      let mut indent = String::new();
+      for _ in 0..level {
+        indent.push_str("  ");
+      }
+      indent
+    };
+
+    let _format = |entry: &Entry, level: u32| -> String {
+      let indent = _indent(level);
+      let output = format!("{}Computing {} for {}",
+                           indent,
+                           externs.id_to_str(entry.node.product().0),
+                           externs.id_to_str(entry.node.subject().id()));
+      if is_one_level_above_bottom(entry) {
+        let state_str = match entry.state {
+          Some(Complete::Return(ref x)) => format!("Return({})", externs.val_to_str(x)),
+          Some(Complete::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
+          Some(Complete::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
+          None => String::new(),
+        };
+        format!("{}\n{}  {}", output, indent, state_str)
+      } else {
+        output
+      }
+    };
+
+    let root_entries = vec![root].iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
+    for t in self.leveled_walk(root_entries, |e,_| !is_bottom(e), false) {
+      let (entry, level) = t;
+      try!(write!(&mut f, "{}\n", _format(entry, level)));
+
+      for dep_entry in &entry.cyclic_dependencies {
+        let indent= _indent(level);
+        try!(write!(&mut f, "{}cycle for {:?}\n", indent, dep_entry));
+      }
+    }
+
+    try!(f.write_all(b"\n"));
+    Ok(())
+  }
 }
 
 /**
@@ -417,6 +498,51 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
         self.deque.extend(&entry.dependencies);
       }
       return Some(entry);
+    }
+
+    None
+  }
+}
+
+type Level = u32;
+/**
+ * Represents the state of a particular topological walk through a Graph. Implements Iterator and
+ * has the same lifetime as the Graph itself.
+ */
+struct LeveledWalk<'a, P: Fn(&Entry, Level)->bool> {
+  graph: &'a Graph,
+  dependents: bool,
+  deque: VecDeque<(EntryId, Level)>,
+  walked: HashSet<EntryId, FNV>,
+  predicate: P,
+}
+
+impl<'a, P: Fn(&Entry, Level)->bool> Iterator for LeveledWalk<'a, P> {
+  type Item = (&'a Entry, Level);
+
+  fn next(&mut self) -> Option<(&'a Entry, Level)> {
+    while let Some((id, level)) = self.deque.pop_front() {
+      if self.walked.contains(&id) {
+        continue;
+      }
+      self.walked.insert(id);
+
+      let entry = self.graph.entry_for_id(id);
+      if !(self.predicate)(entry, level) {
+        continue;
+      }
+
+      // Entry matches.
+      if self.dependents {
+        for d in &entry.dependents {
+          self.deque.push_back((*d, level+1));
+        }
+      } else {
+        for d in &entry.dependencies {
+          self.deque.push_back((*d, level+1));
+        }
+      }
+      return Some((entry, level));
     }
 
     None

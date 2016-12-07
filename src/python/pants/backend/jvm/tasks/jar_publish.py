@@ -340,10 +340,10 @@ class JarPublish(ScmPublishMixin, JarTask):
              help='Specify a custom ivysettings.xml file to be used when publishing.')
     register('--repos', advanced=True, type=dict,
              help='Settings for repositories that can be pushed to. See '
-                  'https://pantsbuild.github.io/publish.html for details.')
+                  'https://pantsbuild.org/publish.html for details.')
     register('--publish-extras', advanced=True, type=dict,
              help='Extra products to publish. See '
-                  'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
+                  'https://pantsbuild.org/dev_tasks_publish_extras.html for details.')
     register('--individual-plugins', advanced=True, type=bool,
              help='Extra products to publish as a individual artifact.')
     register('--push-postscript', advanced=True, default=None,
@@ -385,7 +385,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       if not self.repos:
         raise TaskError(
           "This repo is not configured to publish externally! Please configure per\n"
-          "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
+          "http://pantsbuild.org/publish.html#authenticating-to-the-artifact-repository,\n"
           "by setting --publish-jar-repos=<dict> or re-run with '--publish-jar-local=<dir>'.")
       for repo, data in self.repos.items():
         auth = data.get('auth')

@@ -170,7 +170,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertIsInstance(classpath_entry, ClasspathEntry)
     self.assertTrue(os.path.exists(os.path.join(classpath_entry.path, 'simple', 'Simple.class')))
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4025.')
   def test_failed_command_propagates_throw(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.
@@ -191,7 +190,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Running ShellFailCommand failed with non-zero exit code: 1')
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4025.')
   def test_failed_output_conversion_propagates_throw(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.
@@ -218,7 +216,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def assertFirstEntryIsReturn(self, root_entries, scheduler):
     root, state = root_entries[0]
-    self.assertReturn(state, root, scheduler)
+    self.assertReturn(state, scheduler)
     return state
 
   def assertFirstEntryIsThrow(self, root_entries, in_msg=None):
@@ -238,13 +236,13 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
                                   project_tree=project_tree)
     return scheduler
 
-  def assertReturn(self, state, root, scheduler):
+  def assertReturn(self, state, scheduler):
     is_return = isinstance(state, Return)
     if is_return:
       return
     else:
       self.fail('Expected a Return, but found a {}. trace below:\n{}'
-                .format(state, scheduler.trace([root])))
+                .format(state, scheduler.trace()))
 
   def assertPathContains(self, expected_files, path):
     for i in expected_files:

@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import pkg_resources
 from cffi import FFI
-from twitter.common.collections import OrderedSet
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import dir_option
@@ -66,6 +65,7 @@ _FFI.cdef(
     typedef Value       (*extern_store_list)(ExternContext*, Value*, uint64_t, bool);
     typedef Value       (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer (*extern_project_multi)(ExternContext*, Value*, Field*);
+    typedef Value       (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
 
     typedef struct {
       EntryId     id;
@@ -93,7 +93,7 @@ _FFI.cdef(
       TypeConstraint  product;
       uint8_t         union_tag;
       Value           union_return;
-      bool            union_throw;
+      Value           union_throw;
       bool            union_noop;
     } RawNode;
 
@@ -112,6 +112,7 @@ _FFI.cdef(
                                    extern_store_list,
                                    extern_project,
                                    extern_project_multi,
+                                   extern_create_exception,
                                    Field,
                                    Field,
                                    Field,
@@ -134,6 +135,8 @@ _FFI.cdef(
     uint64_t graph_len(RawScheduler*);
     uint64_t graph_invalidate(RawScheduler*, Key*, uint64_t);
     void graph_visualize(RawScheduler*, char*);
+    void graph_trace(RawScheduler*, char*);
+
 
     void execution_reset(RawScheduler*);
     void execution_add_root_select(RawScheduler*, Key, TypeConstraint);
@@ -146,8 +149,7 @@ _FFI.cdef(
     void execution_next(RawScheduler*,
                         EntryId*,
                         Value*,
-                        uint64_t,
-                        EntryId*,
+                        bool*,
                         uint64_t);
     RawNodes* execution_roots(RawScheduler*);
 
@@ -191,16 +193,21 @@ def extern_store_list(context_handle, vals_ptr, vals_len, merge):
   vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr, vals_len))
   if merge:
     # Expect each obj to represent a list, and do a de-duping merge.
-    merged = OrderedSet()
-    for outer_val in vals:
-      merged.update(outer_val)
-    vals = tuple(merged)
+    merged_set = set()
+    def merged():
+      for outer_val in vals:
+        for inner_val in outer_val:
+          if inner_val in merged_set:
+            continue
+          merged_set.add(inner_val)
+          yield inner_val
+    vals = tuple(merged())
   return c.to_value(vals)
 
 
 @_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
 def extern_project(context_handle, val, field, type_id):
-  """Given a Key for `obj`, a field name, and a type, project the field as a new Key."""
+  """Given a Value for `obj`, a field name, and a type, project the field as a new Value."""
   c = _FFI.from_handle(context_handle)
   obj = c.from_value(val)
   field_name = c.from_key(field)
@@ -222,6 +229,14 @@ def extern_project_multi(context_handle, val, field):
 
   projected = tuple(c.to_value(p) for p in getattr(obj, field_name))
   return (c.vals_buf(projected), len(projected))
+
+
+@_FFI.callback("Value(ExternContext*, uint8_t*, uint64_t)")
+def extern_create_exception(context_handle, msg_ptr, msg_len):
+  """Given a utf8 message string, create an Exception object."""
+  c = _FFI.from_handle(context_handle)
+  msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
+  return c.to_value(Exception(msg))
 
 
 class Value(datatype('Value', ['handle', 'type_id'])):

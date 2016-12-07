@@ -46,12 +46,6 @@ level, the steps are:
 -   Get a code review.
 -   Commit your change to master.
 
-Please note--despite being hosted on GitHub--we do not use pull
-requests to merge to master; we prefer to maintain a linear commit
-history and to do code reviews with Review Board. You will however
-need to create a Github pull request in order to kick off CI and test
-coverage runs.
-
 ### Identify the change
 
 It's a good idea to make sure the work you'll be embarking on is
@@ -115,13 +109,13 @@ You can always run the pre-commit checks manually via:
     :::bash
     $ ./build-support/bin/pre-commit.sh
 
-**Pro tip:** If you want your local master branch to be an exact copy of
+**Pro tip:** If you are certain that you have not accidentally committed anything to
+the `master` branch that you want to keep, and you want to reset to an _exact_ copy of
 the `pantsbuild/pants` repo's master branch, use these commands:
 
     :::bash
-    $ git co master
     $ git fetch upstream
-    $ git reset --hard upstream/master
+    $ git checkout master && git reset --hard upstream/master
 
 ### Making the Change
 
@@ -149,112 +143,64 @@ run relevant tests. If you're not sure what those are,
 
 ### Code Review
 
-Now that your change is complete, post it for review. We use `rbcommons.com` to host code reviews:
+Now that your change is complete, post it for review. We use `github.com` pull requests
+to host code reviews:
 
 #### Posting the First Draft
 
-**Before posting your first review,** you need to both subscribe to the [pants-reviews
-Google Group](https://groups.google.com/forum/#!forum/pants-reviews) and create an
-[RBCommons](https://rbcommons.com) account.  Its critical that the email address you use for each
-of these is the same, and it's also recommended that you have that same email address registered as
-one of your [email addresses](https://github.com/settings/emails) with Github.
+When <a pantsref="dev_run_all_tests">all of the tests are green on travis</a>, you're
+probably ready to request review for the change!
 
-_A special warning to `@twitter.com` contributors:_ The twitter.com email domain does not permit
-emails being sent on behalf of its members by RBCommons. As such, you should use a personal email
-address or some other non-`@twitter.com` email address to subscribe to both RBCommons and
-pants-reviews.
+To get your pull request reviewed, you should:
 
-To create your RBCommons account, visit <https://rbcommons.com/account/login/> and click "Create
-one now.".  To sign up for pants-reviews@googlegroups.com, just browse to
-<https://groups.google.com/forum/#!forum/pants-reviews/join>.
+- Include a short and descriptive title.
+- Fill in each of the sections of the pull request template, and include links to any
+  relevant github issues for the change.
+- Mention (usually in a comment on the PR) any specific
+  [pants committers](https://github.com/orgs/pantsbuild/teams/committers)
+  who should review your change. Running `git log -- $filename` on one or more of the files that
+  you changed is a good way to find potential reviewers!
 
-To set up local tools, run `./rbt help`. (`./rbt` is a wrapper around
-the usual RBTools [rbt](http://www.reviewboard.org/docs/rbtools/dev/)
-script.) The first time this runs it will bootstrap: you'll see a lot of
-building info.
-
-Before you post your review to Review Board you should <a
-pantsref="dev_run_all_tests">create a Github pull request</a> in order
-to kick off a Travis-CI run against your change.
-
-Post your change for review:
-
-    :::bash
-    $ ./rbt post -o -g
-
-The first time you `post`, rbt asks you to log in. Subsequent runs use
-your cached login credentials.
-
-This `post` creates a new review, but does not yet publish it.
-
-At the provided URL, there's a web form. To get your change reviewed,
-you must fill in the change description, reviewers, testing done, etc.
-To make sure it gets seen by the appropriate people and that they have
-the appropriate context, add:
-
-- `pants-reviews` to the Groups field
-- Any specific [pants committers](https://www.rbcommons.com/s/twitter/users/)
-  who should review your change to the People field
-- The pull request number from your Github pull request in the Bug field
-- Your git branch name in the Branch field.
-
-When the review looks good, publish it. An email will be sent to the
-`pants-reviews` mailing list and the reviewers will take a look. (For
-your first review, double-check that the mail got sent; rbcommons tries
-to "spoof" mail from you and it doesn't work for everybody's email
-address. If your address doesn't work, you might want to use another
-one.)
-
-Note that while only committers are available to add in the People field,
-users with an rbcommons account may still post reviews if you provide
-them with a link manually or they see it in the google group.
+You can see a list of all actively `reviewable` reviews [here](
+https://github.com/pantsbuild/pants/pulls?utf8=%E2%9C%93&q=is%3Apr%20is%3Aopen%20status%3Asuccess).
 
 #### Iterating
 
-If reviewers have feedback, there might be a few iterations before
-finally getting a Ship It. As reviewers enter feedback, the rbcommons
-page updates; it should also send you mail (but sometimes its "spoof"
-fails).
+If reviewers post any feedback
+([for more information on providing feedback see](
+https://help.github.com/articles/reviewing-proposed-changes-in-a-pull-request/)),
+there might be a few iterations before finally getting a Ship It. As reviewers enter
+feedback, the github page updates; it should also send
+you mail as long as you are `Subscribed` to notifications for the pull request.
 
-If those reviews inspire you to change some code, great. Change some
-code, commit locally. To update the code review with the new diff where
-`<RB_ID>` is a review number like `123`:
+Github pull requests currently lack the ability to mark a review comment as "blocking"
+for a change, so it's important for contributors and reviewers to communicate clearly which
+comments they view as blocking. If it's unclear whether a reviewer feels strongly about
+a particular point, please bias toward clearing up the uncertainty before proceeding.
+
+If those reviews inspire you to change some code, great.  Change some
+code and commit locally. When you're ready to update the pull request with your changes,
+push to the relevant branch on your fork as you did before:
 
     :::bash
-    $ ./rbt post -o -r <RB_ID>
+    $ git push <your-username> $FEATURE_BRANCH
 
-Look over the fields in the web form; perhaps some could use updating.
-Press the web form's Publish button.
+Look over the fields in the pull request you created earlier; perhaps some could use updating.
+Press the web form's `edit` button.
 
-If need a reminder of your review number, you can get a quick list with:
+If at any point you need to make changes that will fundamentally overhaul a review,
+consider temporarily removing the `reviewable` label in order to let reviewers know
+to hold off until the code is ready.
 
-    :::bash
-    $ ./rbt status
-    r/1234 - Make pants go even faster
+### Committing a Change
 
-### Commit Your Change
-
-At this point you've made a change, had it reviewed and are ready to
-complete things by getting your change in master. (If you're not a
+At this point you've made a change, had it reviewed (and received one or more Ship Its!) and
+are ready to complete things by getting your change in master. (If you're not a
 committer, please ask one to do this section for you.)
 
-    :::bash
-    $ cd /path/to/pants/repo
-    $ ./build-support/bin/ci.sh
-    $ git checkout master
-    $ git pull
-    $ ./rbt patch -c <RB_ID>
+A committer should push the `Squash and merge` button on the PR, and ensure that the
+commit message generated from the review summary is accurate. In particular, the title should
+contain a useful summary of the change, and the description should follow the pull request
+template (defined in the root of the repo at `PULL_REQUEST_TEMPLATE.md`).
 
-Here, ensure that the commit message generated from the review summary
-is accurate, and that the resulting commit contains the changes you
-expect. (If `rbt` gives mysterious errors, pass `--debug` for more info.
-If that doesn't clarify the problem, mail pants-devel (and include that
-`--debug` output).)
-
-Finally,
-
-    :::bash
-    $ git push origin master
-
-The very last step is closing the review as "Submitted". The change is
-now complete. Huzzah!
+Finally, the committer will select `Confirm squash and merge`. The change is now complete. Huzzah!

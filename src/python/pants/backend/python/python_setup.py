@@ -23,12 +23,13 @@ class PythonSetup(Subsystem):
     super(PythonSetup, cls).register_options(register)
     register('--interpreter-requirement', advanced=True, default='CPython>=2.7,<3',
              help='The interpreter requirement string for this python environment.')
-    register('--setuptools-version', advanced=True, default='5.4.1',
+    register('--setuptools-version', advanced=True, default='30.0.0',
              help='The setuptools version for this python environment.')
     register('--wheel-version', advanced=True, default='0.29.0',
              help='The wheel version for this python environment.')
-    register('--platforms', advanced=True, type=list, default=['current'],
-             help='The wheel version for this python environment.')
+    register('--platforms', advanced=True, type=list, metavar='<platform>', default=['current'],
+             help='A list of platforms to be supported by this python environment. Each platform'
+                  'is a string, as returned by pkg_resources.get_supported_platform().')
     register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the interpreter cache. '
                   'If unspecified, a standard path under the workdir is used.')

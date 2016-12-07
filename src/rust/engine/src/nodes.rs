@@ -1,5 +1,5 @@
 use graph::{Entry, Graph};
-use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
 use selectors;
@@ -38,7 +38,7 @@ pub enum State<T> {
 pub enum Complete {
   Noop(&'static str, Option<Node>),
   Return(Value),
-  Throw(String),
+  Throw(Value),
 }
 
 pub struct StepContext<'g, 't> {
@@ -88,14 +88,6 @@ impl<'g, 't> StepContext<'g, 't> {
         None
       }
     })
-  }
-
-  fn type_address(&self) -> &TypeConstraint {
-    &self.tasks.type_address
-  }
-
-  fn type_has_variants(&self) -> &TypeConstraint {
-    &self.tasks.type_has_variants
   }
 
   fn has_products(&self, item: &Value) -> bool {
@@ -155,8 +147,11 @@ impl<'g, 't> StepContext<'g, 't> {
     self.tasks.externs.project_multi(item, field)
   }
 
-  fn id_to_str(&self, item: Id) -> String {
-    self.tasks.externs.id_to_str(item)
+  /**
+   * Creates a Throw state with the given exception message.
+   */
+  fn throw(&self, msg: String) -> Complete {
+    Complete::Throw(self.tasks.externs.create_exception(msg))
   }
 }
 
@@ -237,38 +232,8 @@ impl Select {
 
 impl Step for Select {
   fn step(&self, context: StepContext) -> State<Node> {
-    // Request default Variants for the subject, so that if there are any we can propagate
-    // them to task nodes.
-    let variants =
-      if context.satisfied_by(context.type_address(), self.subject.type_id()) &&
-        self.product() != context.type_has_variants() {
-        let variants_node =
-          Node::create(
-            Selector::select(context.type_has_variants().clone()),
-            self.subject.clone(),
-            self.variants.clone(),
-          );
-        match context.get(&variants_node) {
-          Some(&Complete::Return(ref variants_value)) =>
-            return State::Complete(
-              Complete::Throw(
-                format!(
-                  "TODO: Merging variants is not yet implemented: see #4020. Needed to merge {} with {:?}",
-                  context.id_to_str(context.key_for(variants_value).id()),
-                  self.variants
-                )
-              )
-            ),
-          Some(&Complete::Noop(_, _)) =>
-            &self.variants,
-          Some(&Complete::Throw(ref msg)) =>
-            return State::Complete(Complete::Throw(msg.clone())),
-          None =>
-            return State::Waiting(vec![variants_node]),
-        }
-      } else {
-        &self.variants
-      };
+    // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
+    let variants = &self.variants;
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
     let variant_value: Option<&str> =
@@ -302,9 +267,8 @@ impl Step for Select {
         },
         Some(&Complete::Noop(_, _)) =>
           continue,
-        Some(&Complete::Throw(ref msg)) =>
-          // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg.clone())),
+        Some(&Complete::Throw(msg)) =>
+          return State::Complete(Complete::Throw(msg)),
         None =>
           dependencies.push(dep_node),
       }
@@ -320,9 +284,7 @@ impl Step for Select {
       // by adding support for "mergeable" products. see:
       //   https://github.com/pantsbuild/pants/issues/2526
       return State::Complete(
-        Complete::Throw(
-          format!("Conflicting values produced for subject and type.")
-        )
+        context.throw(format!("Conflicting values produced for subject and type."))
       );
     }
 
@@ -382,11 +344,11 @@ impl SelectDependencies {
       Some(&Complete::Noop(_, _)) =>
         Err(
           State::Complete(
-          Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
+            Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
           )
         ),
-      Some(&Complete::Throw(ref msg)) =>
-        Err(State::Complete(Complete::Throw(msg.clone()))),
+      Some(&Complete::Throw(msg)) =>
+        Err(State::Complete(Complete::Throw(msg))),
       None =>
         Err(State::Waiting(vec![dep_product_node])),
     }
@@ -447,7 +409,7 @@ impl Step for SelectDependencies {
           dep_values.push(&value),
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            Complete::Throw(
+            context.throw(
               format!(
                 "No source of explicit dep {}",
                 dep_node.format(&context.tasks.externs)
@@ -520,7 +482,7 @@ impl Step for SelectProjection {
         State::Complete(Complete::Return(value)),
       Some(&Complete::Noop(_, _)) =>
         State::Complete(
-          Complete::Throw(
+          context.throw(
             format!(
               "No source of projected dependency {}",
               output_node.format(&context.tasks.externs)

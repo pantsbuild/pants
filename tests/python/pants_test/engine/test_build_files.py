@@ -196,13 +196,12 @@ class InlinedGraphTest(GraphTestBase):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     root, state = self._populate(scheduler, parsed_address)
     self.assertEqual(type(state), Throw)
-    trace_message = scheduler.trace([root])
+    trace_message = '\n'.join(scheduler.trace())
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
     if expected_string:
       self.assertIn(expected_string, trace_message)
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
   def do_test_cycle(self, address_str):
     scheduler = self.create_json()
     parsed_address = Address.parse(address_str)
@@ -214,8 +213,8 @@ class InlinedGraphTest(GraphTestBase):
 
     def assert_equal_or_more_indentation(more_indented_line, less_indented_line):
       self.assertTrue(indent_of(more_indented_line) >= indent_of(less_indented_line),
-                      '\n"{}"\nshould have more equal or more indentation than\n"{}"'.format(more_indented_line,
-                                                                                             less_indented_line))
+                      '\n"{}"\nshould have more equal or more indentation than\n"{}"\n{}'.format(more_indented_line,
+                                                                                             less_indented_line, error_msg))
 
     lines = error_msg.splitlines()
     line_indices_of_throws = [i for i, v in enumerate(lines) if throw_name in v]
@@ -237,26 +236,30 @@ class InlinedGraphTest(GraphTestBase):
   def test_cycle_indirect(self):
     self.do_test_cycle('graph_test:indirect_cycle')
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
   def test_type_mismatch_error(self):
     scheduler = self.create_json()
     mismatch = Address.parse('graph_test:type_mismatch')
-    self.assertEquals(type(self.resolve_failure(scheduler, mismatch)), ResolvedTypeMismatchError)
+    self.assert_resolve_failure_type(ResolvedTypeMismatchError, mismatch, scheduler)
     self.do_test_trace_message(scheduler, mismatch)
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
   def test_not_found_but_family_exists(self):
     scheduler = self.create_json()
     dne = Address.parse('graph_test:this_addressable_does_not_exist')
-    self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
+    self.assert_resolve_failure_type(ResolveError, dne, scheduler)
     self.do_test_trace_message(scheduler, dne)
 
-  @unittest.skip('Skipped to expedite landing #3821; see: #4007.')
   def test_not_found_and_family_does_not_exist(self):
     scheduler = self.create_json()
     dne = Address.parse('this/dir/does/not/exist')
-    self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
+    self.assert_resolve_failure_type(ResolveError, dne, scheduler)
     self.do_test_trace_message(scheduler, dne)
+
+  def assert_resolve_failure_type(self, expected_type, mismatch, scheduler):
+
+    failure = self.resolve_failure(scheduler, mismatch)
+    self.assertEquals(type(failure),
+                      expected_type,
+                      'type was not {}. Instead was {}, {!r}'.format(expected_type.__name__, type(failure).__name__, failure))
 
 
 class LazyResolvingGraphTest(GraphTestBase):

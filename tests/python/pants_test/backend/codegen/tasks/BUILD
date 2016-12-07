@@ -83,20 +83,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'simple_codegen_task',
-  sources = ['test_simple_codegen_task.py'],
-  dependencies = [
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/tasks:simple_codegen_task',
-    'src/python/pants/backend/codegen:plugin',
-    'src/python/pants/build_graph',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
-  ],
-)
-
-python_tests(
   name = 'wire_gen',
   sources = ['test_wire_gen.py'],
   dependencies = [

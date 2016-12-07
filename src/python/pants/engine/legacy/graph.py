@@ -20,7 +20,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import Addresses, Collection
 from pants.engine.fs import Files, FilesDigest, PathGlobs
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.nodes import Return, State, Throw
+from pants.engine.nodes import Return
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
@@ -77,12 +77,10 @@ class LegacyBuildGraph(BuildGraph):
 
     # Index the ProductGraph.
     for node, state in roots.items():
-      if type(state) is Throw:
-        trace = 'TODO: restore trace!\n  {}'.format(state) #'\n'.join(self._graph.trace(node))
+      if type(state) is not Return:
+        trace = '\n'.join(self._scheduler.trace())
         raise AddressLookupError(
             'Build graph construction failed for {}:\n{}'.format(node, trace))
-      elif type(state) is not Return:
-        State.raise_unrecognized(state)
       if type(state.value) is not HydratedTargets:
         raise TypeError('Expected roots to hold {}; got: {}'.format(
           HydratedTargets, type(state.value)))
@@ -235,8 +233,23 @@ class LegacyBuildGraph(BuildGraph):
           yield address
 
 
-class HydratedTarget(datatype('HydratedTarget', ['adaptor', 'dependencies'])):
-  """A wrapper for a fully hydrated TargetAdaptor object."""
+class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
+  """A wrapper for a fully hydrated TargetAdaptor object.
+
+  Transitive graph walks collect ordered sets of HydratedTargets which involve a huge amount
+  of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
+  """
+
+  def __eq__(self, other):
+    if type(self) != type(other):
+      return False
+    return self.address == other.address
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __hash__(self):
+    return hash(self.address)
 
 
 # TODO: Only used (currently) to represent transitive hydrated targets. Consider renaming.
@@ -253,7 +266,9 @@ def hydrate_target(target_adaptor, hydrated_fields):
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(TargetAdaptor(**kwargs), tuple(target_adaptor.dependencies))
+  return HydratedTarget(target_adaptor.address,
+                        TargetAdaptor(**kwargs),
+                        tuple(target_adaptor.dependencies))
 
 
 def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):
