@@ -153,11 +153,6 @@ _FFI.cdef(
                                                 TypeConstraint,
                                                 Field,
                                                 bool);
-    void execution_next(RawScheduler*,
-                        EntryId*,
-                        Value*,
-                        bool*,
-                        uint64_t);
     void execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 

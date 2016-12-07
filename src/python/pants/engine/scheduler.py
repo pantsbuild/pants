@@ -17,7 +17,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
 from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
-from pants.engine.nodes import Return, Runnable, Throw
+from pants.engine.nodes import Return, Throw
 from pants.engine.rules import NodeBuilder, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, constraint_for)
@@ -318,42 +318,6 @@ class LocalScheduler(object):
     with self._product_graph_lock:
       return self._native.lib.graph_len(self._scheduler)
 
-  def _execution_next(self, completed):
-    # Unzip into three arrays.
-    states_ids, states_values, states_are_throws = [], [], []
-    for cid, c in completed:
-      states_ids.append(cid)
-      if type(c) is Return:
-        states_values.append(self._to_value(c.value))
-        states_are_throws.append(False)
-      elif type(c) is Throw:
-        states_values.append(self._to_value(c.exc))
-        states_are_throws.append(True)
-      else:
-        raise ValueError("Unexpected `Completed` state from Runnable execution: {}".format(c))
-
-    # Run, then collect the outputs from the Scheduler's RawExecution struct.
-    self._native.lib.execution_next(self._scheduler,
-                                    states_ids,
-                                    states_values,
-                                    states_are_throws,
-                                    len(states_ids))
-
-    def decode_runnable(raw):
-      return (
-          raw.id,
-          Runnable(self._from_id(raw.func.id_),
-                   tuple(self._from_value(arg)
-                         for arg in self._native.unpack(raw.args_ptr, raw.args_len)),
-                   bool(raw.cacheable))
-        )
-
-    runnables = [decode_runnable(r)
-                 for r in self._native.unpack(self._scheduler.execution.runnables_ptr,
-                                              self._scheduler.execution.runnables_len)]
-    # Rezip from two arrays.
-    return runnables
-
   def _execution_add_roots(self, execution_request):
     if self._execution_request is not None:
       self._native.lib.execution_reset(self._scheduler)
@@ -383,6 +347,7 @@ class LocalScheduler(object):
 
     with self._product_graph_lock:
       start_time = time.time()
+      runnable_count, scheduling_iterations = 0, 0
       # Reset execution, and add any roots from the request.
       self._execution_add_roots(execution_request)
       self._native.lib.execution_execute(self._scheduler)
@@ -408,16 +373,16 @@ class LocalScheduler(object):
       #   runnable_count += len(runnable_batch)
       #   scheduling_iterations += 1
       #
-      # if self._native.visualize_to_dir is not None:
-      #   name = 'run.{}.dot'.format(self._run_count)
-      #   self._run_count += 1
-      #   self.visualize_graph_to_file(os.path.join(self._native.visualize_to_dir, name))
-      #
-      # logger.debug(
-      #   'ran %s scheduling iterations and %s runnables in %f seconds. '
-      #   'there are %s total nodes.',
-      #   scheduling_iterations,
-      #   runnable_count,
-      #   time.time() - start_time,
-      #   self._native.lib.graph_len(self._scheduler)
-      # )
+      if self._native.visualize_to_dir is not None:
+        name = 'run.{}.dot'.format(self._run_count)
+        self._run_count += 1
+        self.visualize_graph_to_file(os.path.join(self._native.visualize_to_dir, name))
+
+      logger.debug(
+        'ran %s scheduling iterations and %s runnables in %f seconds. '
+        'there are %s total nodes.',
+        scheduling_iterations,
+        runnable_count,
+        time.time() - start_time,
+        self._native.lib.graph_len(self._scheduler)
+      )

@@ -40,10 +40,6 @@ pub struct RawScheduler {
 }
 
 impl RawScheduler {
-  fn next(&mut self, completed: Vec<(EntryId, Complete)>) {
-    self.execution.update(self.scheduler.next(completed));
-  }
-
   fn reset(&mut self) {
     self.scheduler.reset();
     self.execution.update(Vec::new());
@@ -283,35 +279,6 @@ pub extern fn execution_add_root_select_dependencies(
       field,
       transitive,
     );
-  })
-}
-
-#[no_mangle]
-pub extern fn execution_next(
-  scheduler_ptr: *mut RawScheduler,
-  states_ptr: *mut EntryId,
-  states_values_ptr: *mut Value,
-  states_are_throws_ptr: *mut bool,
-  states_len: u64,
-) {
-  with_scheduler(scheduler_ptr, |raw| {
-    with_vec(states_ptr, states_len as usize, |states_ids| {
-      with_vec(states_values_ptr, states_len as usize, |states_values| {
-        with_vec(states_are_throws_ptr, states_len as usize, |states_are_throws| {
-          let states =
-            states_ids.iter().zip(states_values.iter()).zip(states_are_throws.iter())
-              .map(|((&id, value), &is_throw)| {
-                if is_throw {
-                  (id, Complete::Throw(value.clone()))
-                } else {
-                  (id, Complete::Return(value.clone()))
-                }
-              })
-              .collect();
-          raw.next(states);
-        })
-      })
-    })
   })
 }
 
