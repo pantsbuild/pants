@@ -46,6 +46,7 @@ function calculate_current_hash() {
 }
 
 function ensure_build_prerequisites() {
+  set -euxo pipefail
   # Control a pants-specific rust toolchain, optionally ensuring the given target toolchain is
   # installed.
   local readonly target=$1
@@ -76,9 +77,11 @@ function ensure_build_prerequisites() {
       ${RUSTUP_HOME}/bin/rustup target add ${target}
     fi
   fi
+  set +euo pipefail
 }
 
 function build_native_code() {
+  set -euxo pipefail
   # Builds the native code, optionally taking an explicit target triple arg, and echos the path of
   # the built binary.
   local readonly target=$1
@@ -94,9 +97,11 @@ function build_native_code() {
     ${build_cmd} --target ${target} || echo "FAILED to build for target ${target}"
     echo "${NATIVE_ROOT}/target/${target}/${MODE}/libengine.${LIB_EXTENSION}"
   fi
+  set +euo pipefail
 }
 
 function bootstrap_native_code() {
+  set -euxo pipefail
   # Bootstraps the native code and overwrites the native_engine_version to the resulting hash
   # version if needed.
   local native_engine_version="$(calculate_current_hash)"
@@ -123,4 +128,5 @@ function bootstrap_native_code() {
     #  src/python/pants/engine/subsystem/README.md
     echo ${native_engine_version} > ${NATIVE_ENGINE_VERSION_RESOURCE}
   fi
+  set +euo pipefail
 }
