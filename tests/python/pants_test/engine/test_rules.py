@@ -14,7 +14,6 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, create_fs_tasks
-from pants.engine.graph import create_graph_tasks
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import GraphMaker, Rule, RuleIndex, RulesetValidator
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
