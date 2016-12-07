@@ -62,6 +62,9 @@ function ensure_build_prerequisites() {
     sh ${rustup} -y --no-modify-path 1>&2
     rm -f ${rustup}
     ${RUSTUP_HOME}/bin/rustup override set stable 1>&2
+    case "$OSTYPE" in
+      linux*) ${RUSTUP_HOME}/bin/rustup target add x86_64-unknown-linux-musl ;;
+    esac
   fi
 
   if [[ -n "${target}" ]]
@@ -98,12 +101,24 @@ function bootstrap_native_code() {
   local target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
   if [ ! -f "${target_binary}" ]
   then
-    local readonly native_binary="$(build_native_code)"
+    case "$OSTYPE" in
+      linux*) platform_target='x86_64-unknown-linux-musl' ;;
+      *)      platform_target='' ;;
+    esac
+
+    local readonly native_binary="$(build_native_code ${platform_target})"
 
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
     target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/native-engine"
 
+    set -x
+    ls -al ${native_binary}
+    file ${native_binary}
+    case "$OSTYPE" in
+      linux*) ldd ${native_binary} ;;
+    esac
+    set +x
     mkdir -p "$(dirname ${target_binary})"
     cp "${native_binary}" ${target_binary}
 
