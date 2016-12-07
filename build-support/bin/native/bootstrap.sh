@@ -46,7 +46,6 @@ function calculate_current_hash() {
 }
 
 function ensure_build_prerequisites() {
-  set -euxo pipefail
   # Control a pants-specific rust toolchain, optionally ensuring the given target toolchain is
   # installed.
   local readonly target=$1
@@ -63,8 +62,6 @@ function ensure_build_prerequisites() {
     sh ${rustup} -y --no-modify-path 1>&2
     rm -f ${rustup}
     ${RUSTUP_HOME}/bin/rustup override set stable 1>&2
-
-    # Install the musl-based std library for static compilation on Linux.
     case "$OSTYPE" in
       linux*) ${RUSTUP_HOME}/bin/rustup target add x86_64-unknown-linux-musl ;;
     esac
@@ -77,11 +74,9 @@ function ensure_build_prerequisites() {
       ${RUSTUP_HOME}/bin/rustup target add ${target}
     fi
   fi
-  set +euo pipefail
 }
 
 function build_native_code() {
-  set -euxo pipefail
   # Builds the native code, optionally taking an explicit target triple arg, and echos the path of
   # the built binary.
   local readonly target=$1
@@ -97,11 +92,9 @@ function build_native_code() {
     ${build_cmd} --target ${target} || echo "FAILED to build for target ${target}"
     echo "${NATIVE_ROOT}/target/${target}/${MODE}/libengine.${LIB_EXTENSION}"
   fi
-  set +euo pipefail
 }
 
 function bootstrap_native_code() {
-  set -euxo pipefail
   # Bootstraps the native code and overwrites the native_engine_version to the resulting hash
   # version if needed.
   local native_engine_version="$(calculate_current_hash)"
@@ -109,7 +102,6 @@ function bootstrap_native_code() {
   if [ ! -f "${target_binary}" ]
   then
     case "$OSTYPE" in
-      # This avoids dynamic linking against the system's libc, which improves portability on Linux.
       linux*) platform_target='x86_64-unknown-linux-musl' ;;
       *)      platform_target='' ;;
     esac
@@ -128,5 +120,4 @@ function bootstrap_native_code() {
     #  src/python/pants/engine/subsystem/README.md
     echo ${native_engine_version} > ${NATIVE_ENGINE_VERSION_RESOURCE}
   fi
-  set +euo pipefail
 }
