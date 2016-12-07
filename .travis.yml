@@ -11,9 +11,9 @@ env:
     # See: http://docs.travis-ci.com/user/encryption-keys/
     - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
     # User for bintray deploys: BINTRAY_USER
-    - secure: dNk5tUtvxKE6c80vOvZWjJHskv4wF4DT9AKwb90htxNB2xpAgEW5uLBzmS+wR5fozCVKtglUpd4hW7QmC4ZyH+XB6QcfSXr49U/4f+OYC+obFtMahGVQ72g7tsVZq5zLO6I2FeT2OlBExZ6R3tabh8whRy1msE2qffBXd3Aczzs=
+    - secure: eXGuKvbp297wi/z74jFqGyxzRDCFic9HUb0z2UYDXDmobErILZdgT0KCvqeyAx7QX/JQSp5oQAQNisE8RLrain5lXAIa2ZuswTPsh6yXGmFgwdx/X+Am7CPO27b0P5OxiJAN3kfYglN7qY+opRM1jud4anzEaTJnm7jENFfDXwk=
     # Key for bintray deploys: BINTRAY_KEY
-    - secure: l8GH/orBqtiB70drfGSq5jyYeOHkOlAfmqvFctLk+Yv4hpcO7yKqR6B2qpg7nC2vl0uU4Z/Zy+MPJVJsO92NzBm3oNt7Im42aI3j1oZ5Pjr0D8A1KaKd/XOkyfdPzqLgrSfOLCEkC8iazqPIOCG3/9U/jBk0Z7adre3x09Pylkc=
+    - secure: qid/ot1XIWOpNaN+RhgdJq8IEajcpHI5EFvy2ywkYHJO2hKYawyX2M4gFd0Vq8+xmeGB4MUmpPW8D8gijLi5JB+0aZ3+5JHs5r9NWkK7HVMpVnok3CywknzXBgeo+UoEQv9ugYvRr1Sm9Dj9IezAhM0tw1uS95Ap+JLbnWFB830=
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
