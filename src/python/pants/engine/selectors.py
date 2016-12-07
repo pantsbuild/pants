@@ -97,11 +97,15 @@ class SelectDependencies(datatype('Dependencies',
   `dep_product`.
   """
 
-  def __new__(cls, product, dep_product, field='dependencies', field_types=tuple(), transitive=False):
+  DEFAULT_FIELD = 'dependencies'
+
+  optional = False
+
+  def __new__(cls, product, dep_product, field=DEFAULT_FIELD, field_types=tuple(), transitive=False):
     return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types, transitive)
 
   @property
-  def dep_product_selector(self):
+  def input_product_selector(self):
     return Select(self.dep_product)
 
   @property
@@ -113,12 +117,17 @@ class SelectDependencies(datatype('Dependencies',
       field_types_portion = ', field_types=({},)'.format(', '.join(f.__name__ for f in self.field_types))
     else:
       field_types_portion = ''
+    if self.field is not self.DEFAULT_FIELD:
+      field_name_portion = ', {}'.format(repr(self.field))
+    else:
+      field_name_portion = ''
     return '{}({}, {}{}{}{})'.format(type(self).__name__,
                                      type_or_constraint_repr(self.product),
                                      type_or_constraint_repr(self.dep_product),
-                                     ', {}'.format(repr(self.field)) if self.field else '',
+                                     field_name_portion,
+                                     field_types_portion,
                                      ', transitive=True' if self.transitive else '',
-                                     field_types_portion)
+                                     )
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):

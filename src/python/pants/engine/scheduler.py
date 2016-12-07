@@ -18,7 +18,7 @@ from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
 from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
 from pants.engine.nodes import Return, Runnable, Throw
-from pants.engine.rules import NodeBuilder, RulesetValidator
+from pants.engine.rules import RuleIndex, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
@@ -111,11 +111,11 @@ class LocalScheduler(object):
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     singletons = create_snapshot_singletons(project_tree)
-    node_builder = NodeBuilder.create(tasks, intrinsics, singletons)
-    RulesetValidator(node_builder, goals, root_selector_fns).validate()
-    self._register_tasks(node_builder.tasks)
-    self._register_intrinsics(node_builder.intrinsics)
-    self._register_singletons(node_builder.singletons)
+    rule_index = RuleIndex.create(tasks, intrinsics, singletons)
+    RulesetValidator(rule_index, goals, root_selector_fns).validate()
+    self._register_tasks(rule_index.tasks)
+    self._register_intrinsics(rule_index.intrinsics)
+    self._register_singletons(rule_index.singletons)
 
   def _to_value(self, obj):
     return self._context.to_value(obj)

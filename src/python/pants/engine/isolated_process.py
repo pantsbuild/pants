@@ -199,7 +199,9 @@ def create_snapshot_singletons(project_tree):
 
 def create_snapshot_intrinsics(project_tree):
   def ptree(func):
-    return functools.partial(func, project_tree, snapshot_directory(project_tree))
+    partial = functools.partial(func, project_tree, snapshot_directory(project_tree))
+    partial.__name__ = '{}_intrinsic'.format(func.__name__)
+    return partial
   return [
       (Snapshot, Files, ptree(create_snapshot_archive)),
     ]
@@ -213,7 +215,9 @@ def create_snapshot_tasks(project_tree):
   uncacheable singleton.
   """
   def ptree(func):
-    return functools.partial(func, project_tree, snapshot_directory(project_tree))
+    partial = functools.partial(func, project_tree, snapshot_directory(project_tree))
+    partial.__name__ = '{}_task'.format(func.__name__)
+    return partial
   return [
       (Snapshot, [Select(Files)], ptree(create_snapshot_archive)),
     ]
