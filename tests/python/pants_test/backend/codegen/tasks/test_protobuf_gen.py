@@ -79,4 +79,5 @@ class ProtobufGenTest(TaskTestBase):
     task = self.create_task(context)
     result = task._calculate_sources(target)
     self.assertEquals(1, len(result.keys()))
-    self.assertEquals(OrderedSet(['project/src/main/proto/proto-lib/foo.proto']), result['project/src/main/proto'])
+    self.assertEquals(OrderedSet(['project/src/main/proto/proto-lib/foo.proto']),
+                      result['project/src/main/proto'])

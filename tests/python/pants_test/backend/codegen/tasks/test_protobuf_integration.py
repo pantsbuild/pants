@@ -15,6 +15,12 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
+  def test_import_from_buildroot(self):
+    pants_run = self.run_pants(
+      ['gen.protoc', '--import-from-root',
+       'testprojects/src/protobuf/org/pantsbuild/testproject/import_from_buildroot/bar'])
+    self.assert_success(pants_run)
+
   def test_bundle_protobuf_normal(self):
     with self.pants_results(['bundle.jvm',
                               '--deployjar',
@@ -42,10 +48,11 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
       out_path = os.path.join(get_buildroot(), 'dist',
                               ('examples.src.java.org.pantsbuild.example.protobuf.imports'
                                '.imports-bundle'))
-      java_run = subprocess.Popen(['java', '-cp', 'protobuf-imports-example.jar',
-                                   'org.pantsbuild.example.protobuf.imports.ExampleProtobufImports'],
-                                  stdout=subprocess.PIPE,
-                                  cwd=out_path)
+      java_run = subprocess.Popen(
+        ['java', '-cp', 'protobuf-imports-example.jar',
+         'org.pantsbuild.example.protobuf.imports.ExampleProtobufImports'],
+        stdout=subprocess.PIPE,
+        cwd=out_path)
       java_retcode = java_run.wait()
       java_out = java_run.stdout.read()
       self.assertEquals(java_retcode, 0)

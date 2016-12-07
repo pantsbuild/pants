@@ -63,6 +63,10 @@ class ProtobufGen(SimpleCodegenTask):
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
              default=['3rdparty:protobuf-java'])
+    register('--import-from-root', type=bool, advanced=True,
+             help='If set, add the buildroot to the path protoc searches for imports. '
+                  'This enables using import paths relative to the build root in .proto files, '
+                  'as recommended by the protoc documentation.')
 
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
@@ -115,6 +119,8 @@ class ProtobufGen(SimpleCodegenTask):
 
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports([target]))
+    if self.get_options().import_from_root:
+      bases.add('.')
 
     gen_flag = '--java_out'
 
