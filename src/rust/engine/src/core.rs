@@ -11,7 +11,15 @@ use std::sync::Mutex;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
-type Handle = *const raw::c_void;
+#[repr(C)]
+#[derive(Clone, Debug)]
+pub struct Handle(*const raw::c_void);
+
+impl Default for Handle {
+  fn default() -> Self {
+    Handle(ptr::null() as *const raw::c_void)
+  }
+}
 
 /**
  * A static queue of Handles which used to be owned by `Value`s. When a Value is dropped, its
@@ -22,7 +30,7 @@ type Handle = *const raw::c_void;
  * to drop themselves directly, but would increase their size.
  */
 lazy_static! {
-  pub static ref DROPPED_HANDLES: Mutex<VecDeque<Value>> = Mutex::new(VecDeque::new());
+  pub static ref DROPPED_HANDLES: Mutex<VecDeque<Handle>> = Mutex::new(VecDeque::new());
 }
 
 /**
@@ -78,11 +86,11 @@ pub struct Function(pub Id);
 
 // The name of a field.
 #[repr(C)]
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Field(pub Key);
 
 #[repr(C)]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Key {
   id: Id,
   value: Rc<Value>,
@@ -124,17 +132,17 @@ impl Key {
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Value {
-  handle: *const raw::c_void,
+  handle: Handle,
   type_id: TypeId,
 }
 
-unsafe impl Send for Value { }
+unsafe impl Send for Handle { }
 
-unsafe impl Sync for Value { }
+unsafe impl Sync for Handle { }
 
 impl Drop for Value {
   fn drop(&mut self) {
-    DROPPED_HANDLES.lock().unwrap().push_back(self);
+    DROPPED_HANDLES.lock().unwrap().push_back(self.handle);
   }
 }
 
@@ -147,7 +155,7 @@ impl Value {
 impl Default for Value {
   fn default() -> Self {
     Value {
-      handle: ptr::null() as *const raw::c_void,
+      handle: Handle::default(),
       type_id: TypeId(0),
     }
   }

@@ -127,7 +127,7 @@ pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RunnableComplete {
   pub value: Value,
   pub is_throw: bool,
