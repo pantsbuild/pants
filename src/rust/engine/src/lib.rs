@@ -7,6 +7,8 @@ mod selectors;
 mod tasks;
 
 extern crate fnv;
+#[macro_use]
+extern crate lazy_static;
 
 use std::ffi::CStr;
 use std::mem;

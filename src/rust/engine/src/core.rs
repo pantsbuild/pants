@@ -1,11 +1,27 @@
 use fnv::FnvHasher;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash;
+use std::marker::Sync;
 use std::os::raw;
 use std::ptr;
+use std::sync::RwLock;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
+
+type Handle = *const raw::c_void;
+
+/**
+ * A static queue of Handles which used to be owned by `Value`s. When a Value is dropped, its
+ * Handle is added to this queue. Some thread with access to the ExternContext should periodically
+ * consume this queue to drop the relevant handles on the python side.
+ *
+ * This queue avoids giving every `Value` a reference to the ExternContext, which would allow them
+ * to drop themselves directly, but would increase their size.
+ */
+lazy_static! {
+  pub static ref DROPPED_HANDLES: RwLock<VecDeque<Value>> = RwLock::new(VecDeque::new());
+}
 
 /**
  * Variants represent a string->string map. For hashability purposes, they're stored
@@ -109,6 +125,9 @@ pub struct Value {
   handle: *const raw::c_void,
   type_id: TypeId,
 }
+
+unsafe impl Send for Value { }
+unsafe impl Sync for Value { }
 
 impl Value {
   pub fn type_id(&self) -> &TypeId {
