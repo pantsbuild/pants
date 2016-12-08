@@ -19,6 +19,7 @@ use externs::{
   ExternContext,
   Externs,
   IdToStrExtern,
+  InvokeRunnable,
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
@@ -28,84 +29,25 @@ use externs::{
   ValToStrExtern,
   with_vec,
 };
-use graph::{Graph, EntryId};
-use nodes::{Complete, Runnable};
+use graph::Graph;
+use nodes::Complete;
 use scheduler::Scheduler;
 use tasks::Tasks;
 
 pub struct RawScheduler {
-  execution: RawExecution,
   scheduler: Scheduler,
 }
 
 impl RawScheduler {
-  fn next(&mut self, completed: Vec<(EntryId, Complete)>) {
-    self.execution.update(self.scheduler.next(completed));
-  }
-
   fn reset(&mut self) {
     self.scheduler.reset();
-    self.execution.update(Vec::new());
-  }
-}
-
-/**
- * An unzipped, raw-pointer form of the return value of Scheduler.next().
- */
-pub struct RawExecution {
-  runnables_ptr: *const RawRunnable,
-  runnables_len: u64,
-  runnables: Vec<(EntryId, Runnable)>,
-  raw_runnables: Vec<RawRunnable>,
-}
-
-impl RawExecution {
-  fn new() -> RawExecution {
-    let mut execution =
-      RawExecution {
-        runnables_ptr: Vec::new().as_ptr(),
-        runnables_len: 0,
-        runnables: Vec::new(),
-        raw_runnables: Vec::new(),
-      };
-    // NB: Unsafe: because we need a raw pointer to a value in the struct, we started by
-    // initializing it to a meaningless value above (since we don't know where it will be
-    // in memory during struct construction), and then here we update it to be valid.
-    execution.update(Vec::new());
-    execution
-  }
-
-  fn update(&mut self, ready_entries: Vec<(EntryId, Runnable)>) {
-    self.runnables = ready_entries;
-
-    self.raw_runnables =
-      self.runnables.iter()
-        .map(|&(id, ref runnable)| {
-          RawRunnable {
-            id: id,
-            func: runnable.func() as *const Function,
-            args_ptr: runnable.args().as_ptr(),
-            args_len: runnable.args().len() as u64,
-            cacheable: runnable.cacheable(),
-          }
-        })
-        .collect();
-
-    self.runnables_ptr = self.raw_runnables.as_mut_ptr();
-    self.runnables_len = self.raw_runnables.len() as u64;
   }
 }
 
 #[repr(C)]
-pub struct RawRunnable {
-  id: EntryId,
-  // Single Key.
-  func: *const Function,
-  // Array of args.
-  args_ptr: *const Value,
-  args_len: u64,
-  // Boolean value indicating whether the runnable is cacheable.
-  cacheable: bool,
+pub struct ExecutionStat {
+  runnable_count: usize,
+  scheduling_iterations: usize,
 }
 
 #[repr(C)]
@@ -197,6 +139,7 @@ pub extern fn scheduler_create(
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
+  invoke_runnable: InvokeRunnable,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -216,11 +159,11 @@ pub extern fn scheduler_create(
       project,
       project_multi,
       create_exception,
+      invoke_runnable,
     );
   Box::into_raw(
     Box::new(
       RawScheduler {
-        execution: RawExecution::new(),
         scheduler: Scheduler::new(
           Graph::new(),
           Tasks::new(
@@ -284,31 +227,33 @@ pub extern fn execution_add_root_select_dependencies(
 }
 
 #[no_mangle]
-pub extern fn execution_next(
+pub extern fn execution_execute(
   scheduler_ptr: *mut RawScheduler,
-  states_ptr: *mut EntryId,
-  states_values_ptr: *mut Value,
-  states_are_throws_ptr: *mut bool,
-  states_len: u64,
-) {
+) -> ExecutionStat {
   with_scheduler(scheduler_ptr, |raw| {
-    with_vec(states_ptr, states_len as usize, |states_ids| {
-      with_vec(states_values_ptr, states_len as usize, |states_values| {
-        with_vec(states_are_throws_ptr, states_len as usize, |states_are_throws| {
-          let states =
-            states_ids.iter().zip(states_values.iter()).zip(states_are_throws.iter())
-              .map(|((&id, value), &is_throw)| {
-                if is_throw {
-                  (id, Complete::Throw(value.clone()))
-                } else {
-                  (id, Complete::Return(value.clone()))
-                }
-              })
-              .collect();
-          raw.next(states);
-        })
-      })
-    })
+    let mut runnable_count: usize = 0;
+    let mut scheduling_iterations: usize = 0;
+    let mut completed = Vec::new();
+    loop {
+      let runnable_batch = raw.scheduler.next(completed);
+      if runnable_batch.len() == 0 {
+        break;
+      }
+      runnable_count += runnable_batch.len();
+      completed =
+        runnable_batch.iter()
+          .map(|&(id, ref runnable)| {
+            let result = raw.scheduler.tasks.externs.invoke_runnable(runnable);
+            if result.is_throw {
+              (id, Complete::Throw(result.value))
+            } else {
+              (id, Complete::Return(result.value))
+            }
+          })
+          .collect();
+      scheduling_iterations += 1;
+    }
+    ExecutionStat{runnable_count: runnable_count, scheduling_iterations: scheduling_iterations}
   })
 }
 

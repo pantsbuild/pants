@@ -4,7 +4,8 @@ use std::mem;
 use std::os::raw;
 use std::string::FromUtf8Error;
 
-use core::{Field, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
+use nodes::Runnable;
 
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = raw::c_void;
@@ -24,6 +25,7 @@ pub struct Externs {
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
+  invoke_runnable: InvokeRunnable,
 }
 
 impl Externs {
@@ -37,6 +39,7 @@ impl Externs {
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
+    invoke_runnable: InvokeRunnable,
   ) -> Externs {
     Externs {
       context: ext_context,
@@ -49,6 +52,7 @@ impl Externs {
       id_to_str: id_to_str,
       val_to_str: val_to_str,
       create_exception: create_exception,
+      invoke_runnable: invoke_runnable,
     }
   }
 
@@ -101,6 +105,16 @@ impl Externs {
   pub fn create_exception(&self, msg: String) -> Value {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
+
+  pub fn invoke_runnable(&self, runnable: &Runnable) -> RunnableComplete {
+    (self.invoke_runnable)(
+      self.context,
+      runnable.func(),
+      runnable.args().as_ptr(),
+      runnable.args().len() as u64,
+      runnable.cacheable()
+    )
+  }
 }
 
 pub type KeyForExtern =
@@ -111,6 +125,13 @@ pub type StoreListExtern =
 
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RunnableComplete {
+  pub value: Value,
+  pub is_throw: bool,
+}
 
 #[repr(C)]
 pub struct ValueBuffer {
@@ -144,6 +165,9 @@ pub type ValToStrExtern =
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
+
+pub type InvokeRunnable =
+  extern "C" fn(*const ExternContext, *const Function, *const Value, u64, bool) -> RunnableComplete;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {

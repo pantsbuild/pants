@@ -159,20 +159,5 @@ class Engine(AbstractClass):
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
-  def _run(self, runnable):
-    return runnable.func(*runnable.args)
-
   def reduce(self, execution_request):
-    generator = self._scheduler.schedule(execution_request)
-    for runnable_batch in generator:
-      completed = []
-      for entry, runnable in runnable_batch:
-        key, result = self._maybe_cache_get(entry, runnable)
-        if result is None:
-          try:
-            result = Return(self._run(runnable))
-            self._maybe_cache_put(key, result)
-          except Exception as e:
-            result = Throw(e)
-        completed.append((entry, result))
-      generator.send(completed)
+    self._scheduler.schedule(execution_request)
