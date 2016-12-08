@@ -117,10 +117,13 @@ class ProtobufGen(SimpleCodegenTask):
     sources_by_base = self._calculate_sources(target)
     sources = target.sources_relative_to_buildroot()
 
-    bases = OrderedSet(sources_by_base.keys())
-    bases.update(self._proto_path_imports([target]))
+    bases = OrderedSet()
+    # Note that the root import must come first, otherwise protoc can get confused
+    # when trying to resolve imports from the root against the import's source root.
     if self.get_options().import_from_root:
       bases.add('.')
+    bases.update(sources_by_base.keys())
+    bases.update(self._proto_path_imports([target]))
 
     gen_flag = '--java_out'
 
