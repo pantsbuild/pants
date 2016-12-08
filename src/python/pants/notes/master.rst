@@ -16,10 +16,10 @@ Bugfixes
 * Redirect bootstrapping calls in pants binary to stderr (#4131)
   `PR #4131 <https://github.com/pantsbuild/pants/pull/4131>`_
 
-* Ensure that the protoc root import path is examined first
+* Ensure that the protoc root import path is examined first (#4129)
   `PR #4129 <https://github.com/pantsbuild/pants/pull/4129>`_
 
-* Allow the buildroot to be a source root
+* Allow the buildroot to be a source root (#4093)
   `PR #4093 <https://github.com/pantsbuild/pants/issues/4093>`_
 
 * A flag to add the buildroot to protoc's import path.
@@ -54,7 +54,7 @@ Refactoring, Improvements, and Tooling
 Documentation
 ~~~~~~~~~~~~~
 
-* [docs] Add section for building multiplatform python binaries with native dependencies
+* [docs] Add section for building multiplatform python binaries with native dependencies (#4119)
   `PR #4119 <https://github.com/pantsbuild/pants/pull/4119>`_
 
 
