@@ -17,15 +17,15 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
 from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
-from pants.engine.nodes import Return, Runnable, Throw
+from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import (ExternContext, Function, TypeConstraint, TypeId,
                                            extern_create_exception, extern_id_to_str,
-                                           extern_key_for, extern_project, extern_project_multi,
-                                           extern_satisfied_by, extern_store_list,
+                                           extern_invoke_runnable, extern_key_for, extern_project,
+                                           extern_project_multi, extern_satisfied_by, extern_store_list,
                                            extern_val_to_str)
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
@@ -87,6 +87,7 @@ class LocalScheduler(object):
                                             extern_project,
                                             extern_project_multi,
                                             extern_create_exception,
+                                            extern_invoke_runnable,
                                             self._to_key('name'),
                                             self._to_key('products'),
                                             self._to_key('default'),
@@ -317,42 +318,6 @@ class LocalScheduler(object):
     with self._product_graph_lock:
       return self._native.lib.graph_len(self._scheduler)
 
-  def _execution_next(self, completed):
-    # Unzip into three arrays.
-    states_ids, states_values, states_are_throws = [], [], []
-    for cid, c in completed:
-      states_ids.append(cid)
-      if type(c) is Return:
-        states_values.append(self._to_value(c.value))
-        states_are_throws.append(False)
-      elif type(c) is Throw:
-        states_values.append(self._to_value(c.exc))
-        states_are_throws.append(True)
-      else:
-        raise ValueError("Unexpected `Completed` state from Runnable execution: {}".format(c))
-
-    # Run, then collect the outputs from the Scheduler's RawExecution struct.
-    self._native.lib.execution_next(self._scheduler,
-                                    states_ids,
-                                    states_values,
-                                    states_are_throws,
-                                    len(states_ids))
-
-    def decode_runnable(raw):
-      return (
-          raw.id,
-          Runnable(self._from_id(raw.func.id_),
-                   tuple(self._from_value(arg)
-                         for arg in self._native.unpack(raw.args_ptr, raw.args_len)),
-                   bool(raw.cacheable))
-        )
-
-    runnables = [decode_runnable(r)
-                 for r in self._native.unpack(self._scheduler.execution.runnables_ptr,
-                                              self._scheduler.execution.runnables_len)]
-    # Rezip from two arrays.
-    return runnables
-
   def _execution_add_roots(self, execution_request):
     if self._execution_request is not None:
       self._native.lib.execution_reset(self._scheduler)
@@ -384,25 +349,11 @@ class LocalScheduler(object):
       start_time = time.time()
       # Reset execution, and add any roots from the request.
       self._execution_add_roots(execution_request)
-
-      # Yield nodes that are Runnable, and then compute new ones.
-      completed = []
-      outstanding_runnable = set()
-      runnable_count, scheduling_iterations = 0, 0
-      while True:
-        # Call the scheduler to create Runnables for the Engine.
-        runnable = self._execution_next(completed)
-        outstanding_runnable.difference_update(i for i, _ in completed)
-        outstanding_runnable.update(i for i, _ in runnable)
-        if not runnable and not outstanding_runnable:
-          # Finished.
-          break
-        # The double yield here is intentional, and assumes consumption of this generator in
-        # a `for` loop with a `generator.send(completed)` call in the body of the loop.
-        completed = yield runnable
-        yield
-        runnable_count += len(runnable)
-        scheduling_iterations += 1
+      # Execute in native engine.
+      execution_stat = self._native.lib.execution_execute(self._scheduler)
+      # Receive execution statistics.
+      runnable_count = execution_stat.runnable_count
+      scheduling_iterations = execution_stat.scheduling_iterations
 
       if self._native.visualize_to_dir is not None:
         name = 'run.{}.dot'.format(self._run_count)
