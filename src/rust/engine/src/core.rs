@@ -3,9 +3,11 @@ use fnv::FnvHasher;
 use std::collections::{HashMap, VecDeque};
 use std::hash;
 use std::marker::Sync;
+use std::ops::Drop;
 use std::os::raw;
 use std::ptr;
-use std::sync::RwLock;
+use std::rc::Rc;
+use std::sync::Mutex;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -20,7 +22,7 @@ type Handle = *const raw::c_void;
  * to drop themselves directly, but would increase their size.
  */
 lazy_static! {
-  pub static ref DROPPED_HANDLES: RwLock<VecDeque<Value>> = RwLock::new(VecDeque::new());
+  pub static ref DROPPED_HANDLES: Mutex<VecDeque<Value>> = Mutex::new(VecDeque::new());
 }
 
 /**
@@ -76,14 +78,14 @@ pub struct Function(pub Id);
 
 // The name of a field.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Field(pub Key);
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Key {
   id: Id,
-  value: Value,
+  value: Rc<Value>,
   type_id: TypeId,
 }
 
@@ -120,14 +122,21 @@ impl Key {
  * the equality/identity of a Value matters, a Key should be computed for it and used instead.
  */
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Value {
   handle: *const raw::c_void,
   type_id: TypeId,
 }
 
 unsafe impl Send for Value { }
+
 unsafe impl Sync for Value { }
+
+impl Drop for Value {
+  fn drop(&mut self) {
+    DROPPED_HANDLES.lock().unwrap().push_back(self);
+  }
+}
 
 impl Value {
   pub fn type_id(&self) -> &TypeId {
