@@ -212,8 +212,8 @@ impl Select {
     variant_value: Option<&str>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
-    if let Some(&candidate) = self.select_literal_single(context, candidate, variant_value) {
-      return Some(candidate)
+    if let Some(&ref candidate) = self.select_literal_single(context, candidate, variant_value) {
+      return Some(candidate.clone())
     }
 
     // Else, check whether it has-a instance of the product.
@@ -221,8 +221,8 @@ impl Select {
     // define mergeability for products.
     if context.has_products(candidate) {
       for child in context.field_products(candidate) {
-        if let Some(&child) = self.select_literal_single(context, &child, variant_value) {
-          return Some(child);
+        if let Some(&ref child) = self.select_literal_single(context, &child, variant_value) {
+          return Some(child.clone());
         }
       }
     }
@@ -267,8 +267,8 @@ impl Step for Select {
         },
         Some(&Complete::Noop(_, _)) =>
           continue,
-        Some(&Complete::Throw(msg)) =>
-          return State::Complete(Complete::Throw(msg)),
+        Some(&Complete::Throw(ref msg)) =>
+          return State::Complete(Complete::Throw(msg.clone())),
         None =>
           dependencies.push(dep_node),
       }
@@ -335,7 +335,7 @@ impl SelectDependencies {
     let dep_product_node =
       Node::create(
         Selector::select(self.selector.dep_product),
-        self.subject,
+        self.subject.clone(),
         self.variants.clone()
       );
     match context.get(&dep_product_node) {
@@ -347,8 +347,8 @@ impl SelectDependencies {
             Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
           )
         ),
-      Some(&Complete::Throw(msg)) =>
-        Err(State::Complete(Complete::Throw(msg))),
+      Some(&Complete::Throw(ref msg)) =>
+        Err(State::Complete(Complete::Throw(msg.clone()))),
       None =>
         Err(State::Waiting(vec![dep_product_node])),
     }
@@ -445,7 +445,7 @@ impl Step for SelectProjection {
     let input_node =
       Node::create(
         Selector::select(self.selector.input_product),
-        self.subject,
+        self.subject.clone(),
         self.variants.clone()
       );
     let dep_product =
@@ -478,8 +478,8 @@ impl Step for SelectProjection {
         self.variants.clone()
       );
     match context.get(&output_node) {
-      Some(&Complete::Return(value)) =>
-        State::Complete(Complete::Return(value)),
+      Some(&Complete::Return(ref value)) =>
+        State::Complete(Complete::Return(value.clone())),
       Some(&Complete::Noop(_, _)) =>
         State::Complete(
           context.throw(
@@ -515,7 +515,7 @@ impl Step for Task {
       let dep_node =
         Node::create(
           selector.clone(),
-          self.subject,
+          self.subject.clone(),
           self.variants.clone()
         );
       match context.get(&dep_node) {
@@ -608,7 +608,7 @@ impl Node {
       Selector::SelectLiteral(s) =>
         // NB: Intentionally ignores subject parameter to provide a literal subject.
         Node::SelectLiteral(SelectLiteral {
-          subject: s.subject,
+          subject: s.subject.clone(),
           variants: variants,
           selector: s,
         }),

@@ -142,7 +142,7 @@ unsafe impl Sync for Handle { }
 
 impl Drop for Value {
   fn drop(&mut self) {
-    DROPPED_HANDLES.lock().unwrap().push_back(self.handle);
+    DROPPED_HANDLES.lock().unwrap().push_back(self.handle.clone());
   }
 }
 

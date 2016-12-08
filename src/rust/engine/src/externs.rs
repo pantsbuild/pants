@@ -77,7 +77,7 @@ impl Externs {
     }
 
     // Execute extern.
-    let values_clone: Vec<Value> = values.into_iter().map(|&v| v).collect();
+    let values_clone: Vec<Value> = values.into_iter().cloned().collect();
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
   }
 
