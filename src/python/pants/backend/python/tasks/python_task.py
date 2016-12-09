@@ -17,6 +17,7 @@ from pex.pex_info import PexInfo
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
+from pants.backend.python.targets.python_binary import PythonBinary
 from pants.base import hash_utils
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
@@ -118,8 +119,11 @@ class PythonTask(Task):
     pex_info = PexInfo.from_pex(path)
     # Now create a PythonChroot wrapper without dumping it.
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
-    if targets[0].shebang:
-      builder.set_shebang(targets[0].shebang)
+
+    binary_target = filter(lambda x: isinstance(x, PythonBinary), targets)
+    if len(binary_target)==1 and binary_target[0].shebang:
+      builder.set_shebang(binary_target[0].shebang)
+
     return self.create_chroot(interpreter=interpreter,
                               builder=builder,
                               targets=targets,
@@ -140,8 +144,11 @@ class PythonTask(Task):
                      extra_requirements=None, executable_file_content=None):
     """Create a PythonChroot with the specified args."""
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
-    if targets[0].shebang:
-      builder.set_shebang(targets[0].shebang)
+
+    binary_target = filter(lambda x: isinstance(x, PythonBinary), targets)
+    if len(binary_target)==1 and binary_target[0].shebang:
+      builder.set_shebang(binary_target[0].shebang)
+
     with self.context.new_workunit('chroot'):
       chroot = self.create_chroot(
         interpreter=interpreter,
