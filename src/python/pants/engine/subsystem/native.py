@@ -38,7 +38,6 @@ _FFI.cdef(
 
     typedef struct {
       Id       id_;
-      Value    value;
       TypeId   type_id;
     } Key;
 
@@ -64,6 +63,7 @@ _FFI.cdef(
     typedef void ExternContext;
 
     typedef Key              (*extern_key_for)(ExternContext*, Value*);
+    typedef Value            (*extern_val_for)(ExternContext*, Key*);
     typedef UTF8Buffer       (*extern_id_to_str)(ExternContext*, Id);
     typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
@@ -98,6 +98,7 @@ _FFI.cdef(
 
     RawScheduler* scheduler_create(ExternContext*,
                                    extern_key_for,
+                                   extern_val_for,
                                    extern_id_to_str,
                                    extern_val_to_str,
                                    extern_satisfied_by,
@@ -152,6 +153,13 @@ def extern_key_for(context_handle, val):
   """Return a Key for a Value."""
   c = _FFI.from_handle(context_handle)
   return c.value_to_key(val)
+
+
+@_FFI.callback("Value(ExternContext*, Key*)")
+def extern_val_for(context_handle, key):
+  """Return a Value for a Key."""
+  c = _FFI.from_handle(context_handle)
+  return c.key_to_value(key)
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id)")
@@ -249,7 +257,7 @@ class Value(datatype('Value', ['handle', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
-class Key(datatype('Key', ['id_', 'value', 'type_id'])):
+class Key(datatype('Key', ['id_', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -278,7 +286,7 @@ class ExternContext(object):
   for multi-processing or cache lookups).
   """
 
-  def __init__(self):
+  def __init__(self, native):
     # Memoized object Ids.
     self._id_generator = 0
     self._id_to_obj = dict()
@@ -290,6 +298,10 @@ class ExternContext(object):
     # Buffers for transferring strings and arrays of Keys.
     self._resize_utf8(256)
     self._resize_keys(64)
+
+    # Finally, create a handle to this object to ensure that the native wrapper survives
+    # at least as long as this object.
+    self.handle = native.new_handle(self)
 
   def _resize_utf8(self, size):
     self._utf8_cap = size
@@ -321,12 +333,6 @@ class ExternContext(object):
   def from_value(self, val):
     return _FFI.from_handle(val.handle)
 
-  def key_from_native(self, cdata):
-    return Key(cdata.key, TypeId(cdata.type_id.id_))
-
-  def _type_id_from_native(self, cdata):
-    return TypeId(cdata.key)
-
   def put(self, obj):
     # If we encounter an existing id, return it.
     new_id = self._id_generator
@@ -349,17 +355,20 @@ class ExternContext(object):
   def value_to_key(self, val):
     obj = self.from_value(val)
     type_id = TypeId(val.type_id.id_)
-    return Key(self.put(obj), Value(val.handle, type_id), type_id)
+    return Key(self.put(obj), type_id)
+
+  def key_to_value(self, key):
+    return self.to_value(self.get(key.id_), type_id=key.type_id)
 
   def to_key(self, obj):
     type_id = TypeId(self.put(type(obj)))
-    return Key(self.put(obj), self.to_value(obj, type_id=type_id), type_id)
+    return Key(self.put(obj), type_id)
 
   def from_id(self, cdata):
     return self.get(cdata)
 
   def from_key(self, cdata):
-    return self.from_value(cdata.value)
+    return self.get(cdata.id_)
 
 
 class Native(object):
@@ -440,3 +449,33 @@ class Native(object):
 
   def buffer(self, cdata):
     return _FFI.buffer(cdata)
+
+  def new_scheduler(self, has_products_constraint, address_constraint, variants_constraint):
+    """Create and return an ExternContext and native Scheduler."""
+    context = ExternContext(self)
+
+    # TODO: The only (?) case where we use inheritance rather than exact type unions.
+    has_products_constraint = TypeConstraint(context.to_id(has_products_constraint))
+    address_constraint = TypeConstraint(context.to_id(address_constraint))
+    variants_constraint = TypeConstraint(context.to_id(variants_constraint))
+
+    scheduler = self.lib.scheduler_create(context.handle,
+                                          extern_key_for,
+                                          extern_val_for,
+                                          extern_id_to_str,
+                                          extern_val_to_str,
+                                          extern_satisfied_by,
+                                          extern_store_list,
+                                          extern_project,
+                                          extern_project_multi,
+                                          extern_create_exception,
+                                          extern_invoke_runnable,
+                                          context.to_key('name'),
+                                          context.to_key('products'),
+                                          context.to_key('default'),
+                                          address_constraint,
+                                          has_products_constraint,
+                                          variants_constraint)
+    scheduler = self.gc(scheduler, self.lib.scheduler_destroy)
+
+    return context, scheduler

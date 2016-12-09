@@ -22,11 +22,7 @@ from pants.engine.rules import RuleIndex, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import (ExternContext, Function, TypeConstraint, TypeId,
-                                           extern_create_exception, extern_id_to_str,
-                                           extern_invoke_runnable, extern_key_for, extern_project,
-                                           extern_project_multi, extern_satisfied_by, extern_store_list,
-                                           extern_val_to_str)
+from pants.engine.subsystem.native import Function, TypeConstraint, TypeId
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
 
@@ -70,38 +66,17 @@ class LocalScheduler(object):
     self._product_graph_lock = graph_lock or threading.RLock()
     self._run_count = 0
 
-    # Create a handle for the ExternContext (which must be kept alive as long as this object), and
-    # the native Scheduler.
-    self._context = ExternContext()
-    self._context_handle = native.new_handle(self._context)
-
-    # TODO: The only (?) case where we use inheritance rather than exact type unions.
-    has_products_constraint = TypeConstraint(self._to_id(SubclassesOf(HasProducts)))
-
-    scheduler = native.lib.scheduler_create(self._context_handle,
-                                            extern_key_for,
-                                            extern_id_to_str,
-                                            extern_val_to_str,
-                                            extern_satisfied_by,
-                                            extern_store_list,
-                                            extern_project,
-                                            extern_project_multi,
-                                            extern_create_exception,
-                                            extern_invoke_runnable,
-                                            self._to_key('name'),
-                                            self._to_key('products'),
-                                            self._to_key('default'),
-                                            self._to_constraint(Address),
-                                            has_products_constraint,
-                                            self._to_constraint(Variants))
-    self._scheduler = native.gc(scheduler, native.lib.scheduler_destroy)
+    # Create the ExternContext, and the native Scheduler.
+    self._context, self._scheduler = native.new_scheduler(SubclassesOf(HasProducts),
+                                                          constraint_for(Address),
+                                                          constraint_for(Variants))
     self._execution_request = None
 
     # Validate and register all provided and intrinsic tasks.
-    select_product = lambda product: Select(product)
     # TODO: This bounding of input Subject types allows for closed-world validation, but is not
     # strictly necessary for execution. We might eventually be able to remove it by only executing
     # validation below the execution roots (and thus not considering paths that aren't in use).
+    select_product = lambda product: Select(product)
     root_selector_fns = {
       Address: select_product,
       AscendantAddresses: select_product,

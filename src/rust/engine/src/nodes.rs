@@ -119,6 +119,10 @@ impl<'g, 't> StepContext<'g, 't> {
     self.tasks.externs.key_for(val)
   }
 
+  fn val_for(&self, key: &Key) -> Value {
+    self.tasks.externs.val_for(key)
+  }
+
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
@@ -251,7 +255,7 @@ impl Step for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, self.subject.value(), variant_value) {
+    if let Some(literal_value) = self.select_literal(&context, &context.val_for(&self.subject), variant_value) {
       return State::Complete(Complete::Return(literal_value));
     }
 
@@ -308,8 +312,8 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, _: StepContext) -> State<Node> {
-    State::Complete(Complete::Return(self.selector.subject.value().clone()))
+  fn step(&self, context: StepContext) -> State<Node> {
+    State::Complete(Complete::Return(context.val_for(&self.selector.subject)))
   }
 }
 

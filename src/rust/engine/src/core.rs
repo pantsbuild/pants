@@ -62,14 +62,13 @@ pub struct Function(pub Id);
 
 // The name of a field.
 #[repr(C)]
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Field(pub Key);
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Key {
   id: Id,
-  value: Value,
   type_id: TypeId,
 }
 
@@ -90,10 +89,6 @@ impl hash::Hash for Key {
 impl Key {
   pub fn id(&self) -> Id {
     self.id
-  }
-
-  pub fn value(&self) -> &Value {
-    &self.value
   }
 
   pub fn type_id(&self) -> &TypeId {
