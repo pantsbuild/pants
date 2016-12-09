@@ -7,9 +7,6 @@ not undergo the vetting associated with ``stable`` releases.
 1.3.0.dev4 (12/08/2016)
 -----------------------
 
-API Changes
-~~~~~~~~~~~
-
 Bugfixes
 ~~~~~~~~
 
