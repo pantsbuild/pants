@@ -4,6 +4,57 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0.dev4 (12/08/2016)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Redirect bootstrapping calls in pants binary to stderr (#4131)
+  `PR #4131 <https://github.com/pantsbuild/pants/pull/4131>`_
+
+* Ensure that the protoc root import path is examined first (#4129)
+  `PR #4129 <https://github.com/pantsbuild/pants/pull/4129>`_
+
+* Allow the buildroot to be a source root (#4093)
+  `PR #4093 <https://github.com/pantsbuild/pants/issues/4093>`_
+
+* A flag to add the buildroot to protoc's import path (#4122)
+  `PR #4122 <https://github.com/pantsbuild/pants/pull/4122>`_
+
+* Drop libc dependency from native engine (#4124)
+  `PR #4124 <https://github.com/pantsbuild/pants/pull/4124>`_
+
+* Execute traces for all non-Return values (#4118)
+  `PR #4118 <https://github.com/pantsbuild/pants/pull/4118>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* directly invoke runnable from native code (#4128)
+  `PR #4128 <https://github.com/pantsbuild/pants/pull/4128>`_
+
+* Bump pex version.
+
+* [engine] model snapshots in validation, make root rules a dict instead of a set (#4125)
+  `PR #4125 <https://github.com/pantsbuild/pants/pull/4125>`_
+
+* classmap: a jvm console task that outputs mapping from class products to their targets (#4081)
+  `PR #4081 <https://github.com/pantsbuild/pants/pull/4081>`_
+
+* Update bintray deploys to use a shared account. (#4126)
+  `PR #4126 <https://github.com/pantsbuild/pants/pull/4126>`_
+
+* Plumb a configurable worker count to thrift linter. (#4121)
+  `PR #4121 <https://github.com/pantsbuild/pants/pull/4121>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* [docs] Add section for building multiplatform python binaries with native dependencies (#4119)
+  `PR #4119 <https://github.com/pantsbuild/pants/pull/4119>`_
+
+
 1.3.0.dev3 (12/02/2016)
 -----------------------
 

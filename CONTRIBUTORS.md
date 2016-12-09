@@ -1,4 +1,4 @@
-Created by running `./build-support/bin/contributors.sh`.
+Created by running `build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
 + Alan Paulin
@@ -39,6 +39,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Eugene Burmako
 + Evan Jones
 + Fedor Korotkov
++ Fiona Condone
 + Florian Leibert
 + Gabriel Gonzalez
 + Garrett Malmquist
