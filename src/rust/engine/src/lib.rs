@@ -1,6 +1,7 @@
 mod core;
 mod externs;
 mod graph;
+mod handles;
 mod nodes;
 mod scheduler;
 mod selectors;

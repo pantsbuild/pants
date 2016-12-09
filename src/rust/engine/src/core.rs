@@ -1,37 +1,13 @@
 use fnv::FnvHasher;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::hash;
-use std::marker::Sync;
 use std::ops::Drop;
-use std::os::raw;
 use std::ptr;
-use std::rc::Rc;
-use std::sync::Mutex;
+
+use handles::{Handle, drop_handle};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
-
-#[repr(C)]
-#[derive(Clone, Debug)]
-pub struct Handle(*const raw::c_void);
-
-impl Default for Handle {
-  fn default() -> Self {
-    Handle(ptr::null() as *const raw::c_void)
-  }
-}
-
-/**
- * A static queue of Handles which used to be owned by `Value`s. When a Value is dropped, its
- * Handle is added to this queue. Some thread with access to the ExternContext should periodically
- * consume this queue to drop the relevant handles on the python side.
- *
- * This queue avoids giving every `Value` a reference to the ExternContext, which would allow them
- * to drop themselves directly, but would increase their size.
- */
-lazy_static! {
-  pub static ref DROPPED_HANDLES: Mutex<VecDeque<Handle>> = Mutex::new(VecDeque::new());
-}
 
 /**
  * Variants represent a string->string map. For hashability purposes, they're stored
@@ -93,7 +69,7 @@ pub struct Field(pub Key);
 #[derive(Clone, Debug)]
 pub struct Key {
   id: Id,
-  value: Rc<Value>,
+  value: Value,
   type_id: TypeId,
 }
 
@@ -136,13 +112,9 @@ pub struct Value {
   type_id: TypeId,
 }
 
-unsafe impl Send for Handle { }
-
-unsafe impl Sync for Handle { }
-
 impl Drop for Value {
   fn drop(&mut self) {
-    DROPPED_HANDLES.lock().unwrap().push_back(self.handle.clone());
+    drop_handle(self.handle);
   }
 }
 
@@ -155,7 +127,7 @@ impl Value {
 impl Default for Value {
   fn default() -> Self {
     Value {
-      handle: Handle::default(),
+      handle: ptr::null() as Handle,
       type_id: TypeId(0),
     }
   }
