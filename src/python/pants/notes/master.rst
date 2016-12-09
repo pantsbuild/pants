@@ -22,7 +22,7 @@ Bugfixes
 * Allow the buildroot to be a source root (#4093)
   `PR #4093 <https://github.com/pantsbuild/pants/issues/4093>`_
 
-* A flag to add the buildroot to protoc's import path.
+* A flag to add the buildroot to protoc's import path (#4122)
   `PR #4122 <https://github.com/pantsbuild/pants/pull/4122>`_
 
 * Drop libc dependency from native engine (#4124)
