@@ -6,6 +6,7 @@ use std::string::FromUtf8Error;
 
 use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
+use handles::Handle;
 
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = raw::c_void;
@@ -19,6 +20,7 @@ pub struct Externs {
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
+  drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
@@ -36,6 +38,7 @@ impl Externs {
     key_for: KeyForExtern,
     val_for: ValForExtern,
     clone_val: CloneValExtern,
+    drop_handles: DropHandlesExtern,
     id_to_str: IdToStrExtern,
     val_to_str: ValToStrExtern,
     satisfied_by: SatisfiedByExtern,
@@ -50,6 +53,7 @@ impl Externs {
       key_for: key_for,
       val_for: val_for,
       clone_val: clone_val,
+      drop_handles: drop_handles,
       satisfied_by: satisfied_by,
       satisfied_by_cache: RefCell::new(HashMap::new()),
       store_list: store_list,
@@ -72,6 +76,10 @@ impl Externs {
 
   pub fn clone_val(&self, val: &Value) -> Value {
     (self.clone_val)(self.context, val)
+  }
+
+  pub fn drop_handles(&self, handles: Vec<Handle>) {
+    (self.drop_handles)(self.context, handles.as_ptr(), handles.len() as u64)
   }
 
   pub fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
@@ -143,6 +151,9 @@ pub type ValForExtern =
 
 pub type CloneValExtern =
   extern "C" fn(*const ExternContext, *const Value) -> Value;
+
+pub type DropHandlesExtern =
+  extern "C" fn(*const ExternContext, *const Handle, u64);
 
 pub type StoreListExtern =
   extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;

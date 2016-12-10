@@ -20,6 +20,7 @@ use std::ptr;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   CloneValExtern,
+  DropHandlesExtern,
   CreateExceptionExtern,
   ExternContext,
   Externs,
@@ -140,6 +141,7 @@ pub extern fn scheduler_create(
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
+  drop_handles: DropHandlesExtern,
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
@@ -162,6 +164,7 @@ pub extern fn scheduler_create(
       key_for,
       val_for,
       clone_val,
+      drop_handles,
       id_to_str,
       val_to_str,
       satisfied_by,

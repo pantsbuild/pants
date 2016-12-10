@@ -5,6 +5,7 @@ use std::path::Path;
 
 use core::{FNV, Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
+use handles::drain_handles;
 use nodes::{Complete, Node, Runnable, State};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
@@ -172,6 +173,7 @@ impl Scheduler {
     }
 
     self.runnable.clear();
+    self.tasks.externs.drop_handles(drain_handles());
     ready
   }
 }

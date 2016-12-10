@@ -5,7 +5,7 @@ use std::hash;
 use std::ops::Drop;
 use std::ptr;
 
-use handles::{Handle, drop_handle};
+use handles::{Handle, enqueue_drop_handle};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -113,7 +113,7 @@ pub struct Value {
 
 impl Drop for Value {
   fn drop(&mut self) {
-    drop_handle(self.handle);
+    enqueue_drop_handle(self.handle);
   }
 }
 

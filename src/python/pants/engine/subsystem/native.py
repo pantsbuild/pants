@@ -17,7 +17,8 @@ from pants.util.objects import datatype
 _FFI = FFI()
 _FFI.cdef(
     '''
-    typedef uint64_t Id;
+    typedef uint64_t   Id;
+    typedef void*      Handle;
 
     typedef struct {
       Id id_;
@@ -32,7 +33,7 @@ _FFI.cdef(
     } Function;
 
     typedef struct {
-      void*    handle;
+      Handle   handle;
       TypeId   type_id;
     } Value;
 
@@ -65,6 +66,7 @@ _FFI.cdef(
     typedef Key              (*extern_key_for)(ExternContext*, Value*);
     typedef Value            (*extern_val_for)(ExternContext*, Key*);
     typedef Value            (*extern_clone_val)(ExternContext*, Value*);
+    typedef void             (*extern_drop_handles)(ExternContext*, Handle*, uint64_t);
     typedef UTF8Buffer       (*extern_id_to_str)(ExternContext*, Id);
     typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
@@ -101,6 +103,7 @@ _FFI.cdef(
                                    extern_key_for,
                                    extern_val_for,
                                    extern_clone_val,
+                                   extern_drop_handles,
                                    extern_id_to_str,
                                    extern_val_to_str,
                                    extern_satisfied_by,
@@ -166,10 +169,21 @@ def extern_val_for(context_handle, key):
 
 @_FFI.callback("Value(ExternContext*, Value*)")
 def extern_clone_val(context_handle, val):
-  """Clone the given Value."""
+  """Clone the given Value.
+
+  TODO: Doesn't need to take an entire Value... could just clone a Handle.
+  """
   c = _FFI.from_handle(context_handle)
   item = _FFI.from_handle(val.handle)
   return c.to_value(item, type_id=val.type_id)
+
+
+@_FFI.callback("void(ExternContext*, Handle*, uint64_t)")
+def extern_drop_handles(context_handle, handles_ptr, handles_len):
+  """Drop the given Handles."""
+  c = _FFI.from_handle(context_handle)
+  handles = _FFI.unpack(handles_ptr, handles_len)
+  c.drop_handles(handles)
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id)")
@@ -343,6 +357,9 @@ class ExternContext(object):
   def from_value(self, val):
     return _FFI.from_handle(val.handle)
 
+  def drop_handles(self, handles):
+    self._handles -= set(handles)
+
   def put(self, obj):
     # If we encounter an existing id, return it.
     new_id = self._id_generator
@@ -473,6 +490,7 @@ class Native(object):
                                           extern_key_for,
                                           extern_val_for,
                                           extern_clone_val,
+                                          extern_drop_handles,
                                           extern_id_to_str,
                                           extern_val_to_str,
                                           extern_satisfied_by,
