@@ -18,6 +18,7 @@ pub struct Externs {
   context: *const ExternContext,
   key_for: KeyForExtern,
   val_for: ValForExtern,
+  clone_val: CloneValExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
@@ -34,6 +35,7 @@ impl Externs {
     ext_context: *const ExternContext,
     key_for: KeyForExtern,
     val_for: ValForExtern,
+    clone_val: CloneValExtern,
     id_to_str: IdToStrExtern,
     val_to_str: ValToStrExtern,
     satisfied_by: SatisfiedByExtern,
@@ -47,6 +49,7 @@ impl Externs {
       context: ext_context,
       key_for: key_for,
       val_for: val_for,
+      clone_val: clone_val,
       satisfied_by: satisfied_by,
       satisfied_by_cache: RefCell::new(HashMap::new()),
       store_list: store_list,
@@ -65,6 +68,10 @@ impl Externs {
 
   pub fn val_for(&self, key: &Key) -> Value {
     (self.val_for)(self.context, key)
+  }
+
+  pub fn clone_val(&self, val: &Value) -> Value {
+    (self.clone_val)(self.context, val)
   }
 
   pub fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
@@ -129,6 +136,9 @@ pub type KeyForExtern =
 
 pub type ValForExtern =
   extern "C" fn(*const ExternContext, *const Key) -> Value;
+
+pub type CloneValExtern =
+  extern "C" fn(*const ExternContext, *const Value) -> Value;
 
 pub type StoreListExtern =
   extern "C" fn(*const ExternContext, *const Value, u64, bool) -> Value;

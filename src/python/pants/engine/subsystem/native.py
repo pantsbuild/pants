@@ -64,6 +64,7 @@ _FFI.cdef(
 
     typedef Key              (*extern_key_for)(ExternContext*, Value*);
     typedef Value            (*extern_val_for)(ExternContext*, Key*);
+    typedef Value            (*extern_clone_val)(ExternContext*, Value*);
     typedef UTF8Buffer       (*extern_id_to_str)(ExternContext*, Id);
     typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
@@ -99,6 +100,7 @@ _FFI.cdef(
     RawScheduler* scheduler_create(ExternContext*,
                                    extern_key_for,
                                    extern_val_for,
+                                   extern_clone_val,
                                    extern_id_to_str,
                                    extern_val_to_str,
                                    extern_satisfied_by,
@@ -160,6 +162,14 @@ def extern_val_for(context_handle, key):
   """Return a Value for a Key."""
   c = _FFI.from_handle(context_handle)
   return c.key_to_value(key)
+
+
+@_FFI.callback("Value(ExternContext*, Value*)")
+def extern_clone_val(context_handle, val):
+  """Clone the given Value."""
+  c = _FFI.from_handle(context_handle)
+  item = _FFI.from_handle(val.handle)
+  return c.to_value(item, type_id=val.type_id)
 
 
 @_FFI.callback("UTF8Buffer(ExternContext*, Id)")
@@ -462,6 +472,7 @@ class Native(object):
     scheduler = self.lib.scheduler_create(context.handle,
                                           extern_key_for,
                                           extern_val_for,
+                                          extern_clone_val,
                                           extern_id_to_str,
                                           extern_val_to_str,
                                           extern_satisfied_by,

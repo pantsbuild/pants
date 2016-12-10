@@ -18,18 +18,19 @@ use std::path::Path;
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
+  CloneValExtern,
   CreateExceptionExtern,
   ExternContext,
   Externs,
   IdToStrExtern,
   InvokeRunnable,
   KeyForExtern,
-  ValForExtern,
   ProjectExtern,
   ProjectMultiExtern,
   SatisfiedByExtern,
   StoreListExtern,
   UTF8Buffer,
+  ValForExtern,
   ValToStrExtern,
   with_vec,
 };
@@ -137,6 +138,7 @@ pub extern fn scheduler_create(
   ext_context: *const ExternContext,
   key_for: KeyForExtern,
   val_for: ValForExtern,
+  clone_val: CloneValExtern,
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
@@ -158,6 +160,7 @@ pub extern fn scheduler_create(
       ext_context,
       key_for,
       val_for,
+      clone_val,
       id_to_str,
       val_to_str,
       satisfied_by,
