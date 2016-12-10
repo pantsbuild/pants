@@ -105,7 +105,7 @@ impl Key {
  * back to Python to clone the underlying CFFI handle.
  */
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Value {
   handle: Handle,
   type_id: TypeId,

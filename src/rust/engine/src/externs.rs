@@ -86,12 +86,12 @@ impl Externs {
     if merge && values.len() == 1 {
       // We're merging, but there is only one input value: return it immediately.
       if let Some(&first) = values.first() {
-        return first.clone();
+        return self.clone_val(first);
       }
     }
 
     // Execute extern.
-    let values_clone: Vec<Value> = values.into_iter().cloned().collect();
+    let values_clone: Vec<*const Value> = values.into_iter().map(|v| v as *const Value).collect();
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
   }
 
@@ -101,7 +101,7 @@ impl Externs {
 
   pub fn project_multi(&self, value: &Value, field: &Field) -> Vec<Value> {
     let buf = (self.project_multi)(self.context, value, field);
-    with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| value_vec.clone())
+    with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| *value_vec)
   }
 
   pub fn id_to_str(&self, digest: Id) -> String {
@@ -141,13 +141,13 @@ pub type CloneValExtern =
   extern "C" fn(*const ExternContext, *const Value) -> Value;
 
 pub type StoreListExtern =
-  extern "C" fn(*const ExternContext, *const Value, u64, bool) -> Value;
+  extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;
 
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
 
 #[repr(C)]
-#[derive(Clone, Debug, Default)]
+#[derive(Debug)]
 pub struct RunnableComplete {
   pub value: Value,
   pub is_throw: bool,

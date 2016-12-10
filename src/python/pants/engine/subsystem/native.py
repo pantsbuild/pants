@@ -68,7 +68,7 @@ _FFI.cdef(
     typedef UTF8Buffer       (*extern_id_to_str)(ExternContext*, Id);
     typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
-    typedef Value            (*extern_store_list)(ExternContext*, Value*, uint64_t, bool);
+    typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -85,8 +85,8 @@ _FFI.cdef(
       Key             subject;
       TypeConstraint  product;
       uint8_t         union_tag;
-      Value           union_return;
-      Value           union_throw;
+      Value*          union_return;
+      Value*          union_throw;
       bool            union_noop;
     } RawNode;
 
@@ -193,11 +193,11 @@ def extern_satisfied_by(context_handle, constraint_id, cls_id):
   return c.from_id(constraint_id.id_).satisfied_by_type(c.from_id(cls_id.id_))
 
 
-@_FFI.callback("Value(ExternContext*, Value*, uint64_t, bool)")
-def extern_store_list(context_handle, vals_ptr, vals_len, merge):
+@_FFI.callback("Value(ExternContext*, Value**, uint64_t, bool)")
+def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
   """Given storage and an array of Values, return a new Value to represent the list."""
   c = _FFI.from_handle(context_handle)
-  vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr, vals_len))
+  vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr_ptr, vals_len))
   if merge:
     # Expect each obj to represent a list, and do a de-duping merge.
     merged_set = set()

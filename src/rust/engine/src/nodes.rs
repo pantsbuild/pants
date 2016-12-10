@@ -123,6 +123,10 @@ impl<'g, 't> StepContext<'g, 't> {
     self.tasks.externs.val_for(key)
   }
 
+  fn clone_val(&self, val: &Value) -> Value {
+    self.tasks.externs.clone_val(val)
+  }
+
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
@@ -217,7 +221,7 @@ impl Select {
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
     if let Some(&ref candidate) = self.select_literal_single(context, candidate, variant_value) {
-      return Some(candidate.clone())
+      return Some(context.clone_val(candidate))
     }
 
     // Else, check whether it has-a instance of the product.
@@ -226,7 +230,7 @@ impl Select {
     if context.has_products(candidate) {
       for child in context.field_products(candidate) {
         if let Some(&ref child) = self.select_literal_single(context, &child, variant_value) {
-          return Some(child.clone());
+          return Some(context.clone_val(child));
         }
       }
     }
@@ -272,7 +276,7 @@ impl Step for Select {
         Some(&Complete::Noop(_, _)) =>
           continue,
         Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(msg.clone())),
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
           dependencies.push(dep_node),
       }
@@ -344,7 +348,7 @@ impl SelectDependencies {
       );
     match context.get(&dep_product_node) {
       Some(&Complete::Return(ref value)) =>
-        Ok(value.clone()),
+        Ok(context.clone_val(value)),
       Some(&Complete::Noop(_, _)) =>
         Err(
           State::Complete(
@@ -352,7 +356,7 @@ impl SelectDependencies {
           )
         ),
       Some(&Complete::Throw(ref msg)) =>
-        Err(State::Complete(Complete::Throw(msg.clone()))),
+        Err(State::Complete(Complete::Throw(context.clone_val(msg)))),
       None =>
         Err(State::Waiting(vec![dep_product_node])),
     }
@@ -422,7 +426,7 @@ impl Step for SelectDependencies {
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg.clone())),
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
           dependencies.push(dep_node),
       }
@@ -461,7 +465,7 @@ impl Step for SelectProjection {
             Complete::Noop("Could not compute {} to project its field.", Some(input_node))
           ),
         Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(msg.clone())),
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
           return State::Waiting(vec![input_node]),
       };
@@ -483,7 +487,7 @@ impl Step for SelectProjection {
       );
     match context.get(&output_node) {
       Some(&Complete::Return(ref value)) =>
-        State::Complete(Complete::Return(value.clone())),
+        State::Complete(Complete::Return(context.clone_val(value))),
       Some(&Complete::Noop(_, _)) =>
         State::Complete(
           context.throw(
@@ -495,7 +499,7 @@ impl Step for SelectProjection {
         ),
       Some(&Complete::Throw(ref msg)) =>
         // NB: propagate thrown exception directly.
-        State::Complete(Complete::Throw(msg.clone())),
+        State::Complete(Complete::Throw(context.clone_val(msg))),
       None =>
         State::Waiting(vec![output_node]),
     }
@@ -531,7 +535,7 @@ impl Step for Task {
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg.clone())),
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
           dependencies.push(dep_node),
       }
@@ -544,7 +548,7 @@ impl Step for Task {
       // Ready to run!
       State::Runnable(Runnable {
         func: self.selector.func,
-        args: dep_values.into_iter().cloned().collect(),
+        args: dep_values.iter().map(|v| context.clone_val(v)).collect(),
         cacheable: self.selector.cacheable,
       })
     }
