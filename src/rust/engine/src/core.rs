@@ -121,6 +121,16 @@ impl Value {
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
   }
+
+  /**
+   * An escape hatch to allow for cloning a Value: you should generally not do this unless you
+   * are certain the cloned Value has been mem::forgotten (otherwise it will be `Drop`ed twice).
+   */
+  pub unsafe fn clone(&self) -> Value {
+    Value {
+      ..*self
+    }
+  }
 }
 
 impl Default for Value {

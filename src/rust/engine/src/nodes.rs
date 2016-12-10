@@ -6,7 +6,7 @@ use selectors;
 use tasks::Tasks;
 
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Runnable {
   func: Function,
   args: Vec<Value>,
@@ -27,14 +27,14 @@ impl Runnable {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum State<T> {
   Waiting(Vec<T>),
   Complete(Complete),
   Runnable(Runnable),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Complete {
   Noop(&'static str, Option<Node>),
   Return(Value),

@@ -101,7 +101,11 @@ impl Externs {
 
   pub fn project_multi(&self, value: &Value, field: &Field) -> Vec<Value> {
     let buf = (self.project_multi)(self.context, value, field);
-    with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| *value_vec)
+    with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| {
+      unsafe {
+        value_vec.iter().map(|v| v.clone()).collect()
+      }
+    })
   }
 
   pub fn id_to_str(&self, digest: Id) -> String {
