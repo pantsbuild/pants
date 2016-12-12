@@ -20,7 +20,6 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.contextutil import open_zip
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -82,10 +81,9 @@ class JvmDependencyAnalyzer(object):
 
   def _jar_classfiles(self, jar_file):
     """Returns an iterator over the classfiles inside jar_file."""
-    with open_zip(jar_file, 'r') as jar:
-      for cls in jar.namelist():
-        if cls.endswith(b'.class'):
-          yield cls
+    for cls in ClasspathUtil.classpath_entries_contents([jar_file]):
+      if cls.endswith(b'.class'):
+        yield cls
 
   def count_products(self, target):
     contents = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)

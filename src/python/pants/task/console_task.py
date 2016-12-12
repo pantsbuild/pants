@@ -55,7 +55,7 @@ class ConsoleTask(QuietTaskMixin, Task):
       try:
         targets = self.context.targets()
         for value in self.console_output(targets):
-          self._outstream.write(str(value))
+          self._outstream.write(value.encode('utf-8'))
           self._outstream.write(self._console_separator)
       finally:
         self._outstream.flush()

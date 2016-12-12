@@ -10,6 +10,7 @@ import os
 import re
 from collections import OrderedDict
 
+from pex.compatibility import to_bytes
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
@@ -154,7 +155,11 @@ class ClasspathUtil(object):
         # Walk the jar namelist.
         with open_zip(entry, mode='r') as jar:
           for name in jar.namelist():
-            yield name
+            # Zip entry names can come in any encoding and in practice we find some jars that have
+            # utf-8 encoded entry names, some not.  As a result we cannot simply decode in all cases
+            # and need to do this to_bytes(...).decode('utf-8') dance to stay safe across all entry
+            # name flavors and under all supported pythons.
+            yield to_bytes(name).decode('utf-8')
       elif os.path.isdir(entry):
         # Walk the directory, including subdirs.
         def rel_walk_name(abs_sub_dir, name):
