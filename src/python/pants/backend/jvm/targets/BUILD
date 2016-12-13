@@ -33,6 +33,8 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:six',
     'src/python/pants/backend/jvm/subsystems:java',
+    # TODO Fix the circular dependency https://github.com/pantsbuild/pants/issues/4138
+    # 'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:build_environment',
