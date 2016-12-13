@@ -26,7 +26,7 @@ class ShaderTest(unittest.TestCase):
     self.output_jar = '/not/really/shaded.jar'
 
   def populate_input_jar(self, *entries):
-    fd, input_jar_path = tempfile.mkstemp()
+    fd, input_jar_path = tempfile.mkstemp(suffix='.jar')
     os.close(fd)
     self.addCleanup(safe_delete, input_jar_path)
     with open_zip(input_jar_path, 'w') as jar:
