@@ -17,6 +17,9 @@ class ClassmapTaskIntegrationTest(PantsRunIntegrationTest):
                                  'testprojects/tests/java/org/pantsbuild/testproject/testjvms:base')
   EXTERNAL_MAPPING = ('org.junit.ClassRule 3rdparty:junit')
 
+  UNICODE_TEST_TARGET = 'testprojects/src/java/org/pantsbuild/testproject/unicode/cucumber'
+  UNICODE_MAPPING = 'cucumber.api.java.zh_cn.假如 3rdparty:cucumber-java'
+
   def test_classmap_none(self):
     pants_run = self.do_command('classmap', success=True)
     self.assertEqual(len(pants_run.stdout_data.strip().split()), 0)
@@ -38,3 +41,7 @@ class ClassmapTaskIntegrationTest(PantsRunIntegrationTest):
     self.assertIn(self.INTERNAL_MAPPING, pants_run.stdout_data)
     self.assertNotIn(self.INTERNAL_TRANSITIVE_MAPPING, pants_run.stdout_data)
     self.assertNotIn(self.EXTERNAL_MAPPING, pants_run.stdout_data)
+
+  def test_classmap_unicode(self):
+    pants_run = self.do_command('classmap', self.UNICODE_TEST_TARGET, success=True)
+    self.assertIn(self.UNICODE_MAPPING, pants_run.stdout_data)

@@ -15,6 +15,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_delete, safe_open, safe_walk
+from pants.util.strutil import ensure_text
 
 
 class MissingClasspathEntryError(Exception):
@@ -154,7 +155,7 @@ class ClasspathUtil(object):
         # Walk the jar namelist.
         with open_zip(entry, mode='r') as jar:
           for name in jar.namelist():
-            yield name
+            yield ensure_text(name)
       elif os.path.isdir(entry):
         # Walk the directory, including subdirs.
         def rel_walk_name(abs_sub_dir, name):
