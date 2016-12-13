@@ -145,7 +145,6 @@ python_library(
   sources = ['classpath_util.py'],
   dependencies = [
     ':classpath_products',
-    '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -173,7 +172,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/java/jar:manifest',
     'src/python/pants/option',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
   ],
 )
@@ -404,7 +402,6 @@ python_library(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ]
