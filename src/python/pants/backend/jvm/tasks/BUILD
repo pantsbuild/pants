@@ -148,6 +148,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:strutil',
   ],
 )
 
@@ -168,13 +169,9 @@ python_library(
   sources = ['detect_duplicates.py'],
   dependencies = [
     ':jvm_binary_task',
-    # TODO(pl): Use twitter.common.lang instead, but for the to_bytes helper, twitter.commons
-    # needs to be updated so the standard compatibility helpers act like the ones in pex
-    '3rdparty/python:pex',
     'src/python/pants/base:exceptions',
     'src/python/pants/java/jar:manifest',
     'src/python/pants/option',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
   ],
 )
@@ -405,7 +402,6 @@ python_library(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ]
