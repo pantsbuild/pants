@@ -80,7 +80,7 @@ class PythonBinary(PythonTarget):
       'indices': PrimitiveField(maybe_list(indices or [])),
       'ignore_errors': PrimitiveField(bool(ignore_errors)),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
-      'shebang': PrimitiveField(shebang or None),
+      'shebang': PrimitiveField(shebang),
     })
 
     sources = [] if source is None else [source]
@@ -133,11 +133,8 @@ class PythonBinary(PythonTarget):
 
   @property
   def shebang(self):
-    if self.payload.shebang:
-      return self.payload.shebang
-    else:
-      return None
-
+    return self.payload.shebang
+    
   @property
   def pexinfo(self):
     info = PexInfo.default()

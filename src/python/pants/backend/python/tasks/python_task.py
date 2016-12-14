@@ -120,9 +120,7 @@ class PythonTask(Task):
     # Now create a PythonChroot wrapper without dumping it.
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
 
-    binary_target = filter(lambda x: isinstance(x, PythonBinary), targets)
-    if len(binary_target)==1 and binary_target[0].shebang:
-      builder.set_shebang(binary_target[0].shebang)
+    self._configure_shebang(targets, builder)
 
     return self.create_chroot(interpreter=interpreter,
                               builder=builder,
@@ -145,9 +143,7 @@ class PythonTask(Task):
     """Create a PythonChroot with the specified args."""
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
 
-    binary_target = filter(lambda x: isinstance(x, PythonBinary), targets)
-    if len(binary_target)==1 and binary_target[0].shebang:
-      builder.set_shebang(binary_target[0].shebang)
+    self._configure_shebang(targets, builder)
 
     with self.context.new_workunit('chroot'):
       chroot = self.create_chroot(
@@ -200,3 +196,9 @@ class PythonTask(Task):
 
     fingerprint = hash_utils.hash_all(fingerprint_components)
     return os.path.join(self.chroot_cache_dir, fingerprint)
+
+  def _configure_shebang(self, targets, builder):
+    # binary_target = filter(lambda x: isinstance(x, PythonBinary), targets)
+    binary_targets = [target for target in targets if isinstance(target, PythonBinary)]
+    if len(binary_targets) == 1 and binary_targets[0].shebang:
+      builder.set_shebang(binary_targets[0].shebang)
