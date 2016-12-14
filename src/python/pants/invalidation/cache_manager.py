@@ -13,7 +13,7 @@ from hashlib import sha1
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.util.dirutil import relative_symlink, safe_mkdir
+from pants.util.dirutil import relative_symlink, safe_mkdir, safe_rmtree
 
 
 class VersionedTargetSet(object):
@@ -24,6 +24,11 @@ class VersionedTargetSet(object):
   When checking the artifact cache, this can also be used to represent a list of targets that are
   built together into a single artifact.
   """
+
+
+
+  class InvalidResultsDir(Exception):
+    """Indicate a problem interacting with a versioned target results directory."""
 
   @staticmethod
   def from_versioned_targets(versioned_targets):
@@ -117,6 +122,17 @@ class VersionedTargetSet(object):
       raise ValueError('There is no previous_results_dir for: {}'.format(self))
     return self._previous_results_dir
 
+  def _ensure_legal(self):
+    """Return True as long as a vt's results_dir state does not break any internal contracts."""
+    # Could also check that the current_results_dir exists and matches the os.realpath(results_dir).
+    # I am not sure it provides enough value to warrant burdening every VT with those checks, though.
+    if self._results_dir and not os.path.islink(self.results_dir):
+      raise self.InvalidResultsDir(
+        "The self.results_dir is no longer a symlink: {}\nThe results_dir should not be manually cleaned or recreated."
+        .format(self.results_dir)
+      )
+    return True
+
   def live_dirs(self):
     """Yields directories that must exist for this VersionedTarget to function."""
     if self.has_results_dir:
@@ -169,10 +185,12 @@ class VersionedTarget(VersionedTargetSet):
     )
 
   def create_results_dir(self, root_dir, allow_incremental):
-    """Ensures that a results_dir exists under the given root_dir for this versioned target.
+    """Ensures that a cleaned results_dir exists for invalid versioned targets.
 
     If incremental=True, attempts to clone the results_dir for the previous version of this target
-    to the new results dir. Otherwise, simply ensures that the results dir exists.
+    to the new results dir.
+
+    Only guarantees results_dirs for invalid VTs, pertinent result_dirs are assumed to exist for valid VTs.
     """
     # Generate unique and stable directory paths for this cache key.
     current_dir = self._results_dir_path(root_dir, self.cache_key, stable=False)
@@ -182,6 +200,11 @@ class VersionedTarget(VersionedTargetSet):
     if self.valid:
       # If the target is valid, both directories can be assumed to exist.
       return
+
+    # If the vt is invalid, clean. Deletes both because if the stable_dir has somehow been replaced with a real dir,
+    # the relative_symlink call below raises an uncaught exception when it attempts to unlink the real directory.
+    safe_rmtree(current_dir)
+    safe_rmtree(stable_dir)
 
     # Clone from the previous results_dir if incremental, or initialize.
     previous_dir = self._use_previous_dir(allow_incremental, root_dir, current_dir)
@@ -200,7 +223,7 @@ class VersionedTarget(VersionedTargetSet):
       # Not incremental.
       return None
     previous_dir = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
-    if not os.path.isdir(previous_dir) or os.path.isdir(current_dir):
+    if not os.path.isdir(previous_dir):
       # Could be useful, but no previous results are present.
       return None
     return previous_dir
@@ -264,11 +287,13 @@ class InvalidationCacheManager(object):
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
     for vt in vts.versioned_targets:
+      vt._ensure_legal()
       if not vt.valid:
         self._invalidator.update(vt.cache_key)
         vt.valid = True
         self._artifact_write_callback(vt)
     if not vts.valid:
+      vts._ensure_legal()
       self._invalidator.update(vts.cache_key)
       vts.valid = True
       self._artifact_write_callback(vts)

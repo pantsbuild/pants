@@ -58,6 +58,7 @@ class DummyTask(Task):
 class TaskTest(TaskTestBase):
 
   _filename = 'f'
+  _file_contents = 'results_string\n'
 
   @classmethod
   def task_type(cls):
@@ -74,10 +75,19 @@ class TaskTest(TaskTestBase):
     task._incremental = incremental
     return target, task
 
+  def _run_fixture(self, content=None, incremental=False):
+    content = content or self._file_contents
+    target, task = self._fixture(incremental=incremental)
+    self._create_clean_file(target, content)
+    vtA = task.execute()
+    return target, task, vtA
+
   def _create_clean_file(self, target, content):
     self.create_file(self._filename, content)
     target.mark_invalidation_hash_dirty()
 
+  # TODO(mateo): This test was relying on some implementation bugs and should probably be revisited, and either made
+  # more representative of the common case or provided with some additional coverage.
   def test_incremental(self):
     """Run three times with two unique fingerprints."""
 
@@ -95,15 +105,17 @@ class TaskTest(TaskTestBase):
     vtB = task.execute()
     self.assertContent(vtB, one + two)
 
-    # Incremental atop existing directory for vtA.
+    # vtC.previous_cache_key == vtB.cache_key so the task appends the file to vtB's results.
+    # This behavior used to be skipped because the current_dir existed when checked by cache_manager._use_previous_dir.
     self._create_clean_file(target, one)
     vtC = task.execute()
-    self.assertContent(vtC, one + one)
+    self.assertEqual(vtC.previous_cache_key, vtB.cache_key)
+    self.assertContent(vtC, one + two + one)
 
     # Confirm that there were two unique results dirs, and that the second was cloned.
-    self.assertContent(vtA, one + one)
+    self.assertContent(vtA, one + two + one)
     self.assertContent(vtB, one + two)
-    self.assertContent(vtC, one + one)
+    self.assertContent(vtC, one + two + one)
     self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
     self.assertEqual(vtA.current_results_dir, vtC.current_results_dir)
 
@@ -156,3 +168,17 @@ class TaskTest(TaskTestBase):
     self.assertContent(vtB, two)
     self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
     self.assertNotEqual(vtA.results_dir, vtB.results_dir)
+
+  def test_execute_cleans_invalid_result_dirs(self):
+    # Regression test to protect task.execute() from returning invalid dirs.
+    _, task, vt = self._run_fixture()
+    self.assertNotEqual(os.listdir(vt.results_dir), [])
+    self.assertTrue(os.path.islink(vt.results_dir))
+
+    # Mimic the failure case, where an invalid task is run twice, due to failed download or something.
+    vt.force_invalidate()
+
+    # But if this VT is invalid for a second run, the next invalidation deletes and recreates.
+    task.execute()
+    self.assertTrue(os.path.islink(vt.results_dir))
+    self.assertTrue(os.path.isdir(vt.current_results_dir))

@@ -25,7 +25,6 @@ class DummyLibrary(Target):
 
 
 class DummyTask(Task):
-  """A task that appends the content of a DummyLibrary's source into its results_dir."""
   options_scope = 'dummy'
 
   @property

@@ -5,11 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import shutil
 import tempfile
 
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.invalidation.build_invalidator import CacheKey, CacheKeyGenerator
-from pants.invalidation.cache_manager import InvalidationCacheManager, VersionedTarget
+from pants.invalidation.cache_manager import InvalidationCacheManager, VersionedTargetSet
 from pants_test.base_test import BaseTest
 
 
@@ -56,8 +58,33 @@ class InvalidationCacheManagerTest(BaseTest):
     shutil.rmtree(self._dir, ignore_errors=True)
     super(InvalidationCacheManagerTest, self).tearDown()
 
-  def make_vts(self, target):
-    return VersionedTarget(self.cache_manager, target, target.id)
+  def make_vt(self, invalid=False):
+    # Create an arbitrary VT. If invalid is False, it will mimic the state of the VT handed back by a task.
+    a_target = self.make_target(':a', dependencies=[])
+    ic = self.cache_manager.check([a_target])
+    vt = ic.all_vts[0]
+    if not invalid:
+      self.task_execute(vt)
+      vt.update()
+    return vt
+
+  def task_execute(self, vt):
+    vt.create_results_dir(self._dir, allow_incremental=False)
+    task_output = os.path.join(vt.results_dir, 'a_file')
+    self.create_file(task_output, 'foo')
+
+  def is_empty(self, dirname):
+    return not os.listdir(dirname)
+
+  def matching_result_dirs(self, vt):
+    # Ensure that the result_dirs contain the same files.
+    return self.is_empty(vt.results_dir) == self.is_empty(vt.current_results_dir)
+
+  def clobber_symlink(self, vt):
+    # Munge the state to mimic a common error found before we added the clean- it accidentally clobbers the symlink!
+    # Commonly caused by safe_mkdir(vt.results_dir, clean=True), broken up here to keep the test from being brittle.
+    safe_rmtree(vt.results_dir)
+    safe_mkdir(vt.results_dir)
 
   def test_check_marks_all_as_invalid_by_default(self):
     a = self.make_target(':a', dependencies=[])
@@ -77,3 +104,79 @@ class InvalidationCacheManagerTest(BaseTest):
     self.assertEquals(5, len(all_vts))
     vts_targets = [vt.targets[0] for vt in all_vts]
     self.assertEquals(set(targets), set(vts_targets))
+
+  def test_force_invalidate(self):
+    vt = self.make_vt()
+    self.assertTrue(vt.valid)
+    vt.force_invalidate()
+    self.assertFalse(vt.valid)
+
+  def test_invalid_vts_are_cleaned(self):
+    # Ensure that calling create_results_dir on an invalid target will wipe any pre-existing output.
+    vt = self.make_vt()
+    self.assertFalse(self.is_empty(vt.results_dir))
+    self.assertTrue(self.matching_result_dirs(vt))
+
+    vt.force_invalidate()
+    vt.create_results_dir(self._dir, allow_incremental=False)
+    self.assertTrue(self.is_empty(vt.results_dir))
+    self.assertTrue(self.matching_result_dirs(vt))
+    vt._ensure_legal()
+
+  def test_valid_vts_are_not_cleaned(self):
+    # No cleaning of results_dir occurs, since create_results_dir short-circuits if the VT is valid.
+    vt = self.make_vt()
+    self.assertFalse(self.is_empty(vt.results_dir))
+    vt.create_results_dir(self._dir, allow_incremental=False)
+    self.assertFalse(self.is_empty(vt.results_dir))
+    self.assertTrue(self.matching_result_dirs(vt))
+
+  def test_illegal_results_dir_cannot_be_updated_to_valid(self):
+    # A regression test for a former bug. Calling safe_mkdir(vt.results_dir, clean=True) would silently
+    # delete the results_dir symlink and yet leave any existing crufty content behind in the vt.current_results_dir.
+    # https://github.com/pantsbuild/pants/issues/4137
+    # https://github.com/pantsbuild/pants/issues/4051
+
+    with self.assertRaises(VersionedTargetSet.InvalidResultsDir):
+      # All is right with the world, mock task is generally well-behaved and output is placed in both result_dirs.
+      vt = self.make_vt()
+      self.assertFalse(self.is_empty(vt.results_dir))
+      self.assertTrue(self.matching_result_dirs(vt))
+      self.assertTrue(os.path.islink(vt.results_dir))
+      vt.force_invalidate()
+      self.clobber_symlink(vt)
+
+      # Arg, and the resultingly unlinked current_results_dir is uncleaned. The two directories have diverging contents!
+      # The product pipeline and the artifact cache will get different task output!
+      self.assertFalse(os.path.islink(vt.results_dir))
+      self.assertFalse(self.matching_result_dirs(vt))
+
+      # The main protection for this is the exception raised when the cache_manager attempts to mark the VT valid.
+      self.assertFalse(vt.valid)
+      vt.update()
+
+  def test_recreation_of_invalid_vt_result_dirs(self):
+    # Show that the invalidation recreates legal result_dirs.
+    vt = self.make_vt()
+    self.clobber_symlink(vt)
+    self.assertFalse(os.path.islink(vt.results_dir))
+
+    # This only is caught here if the VT is still invalid for some reason, otherwise it's caught by the update() method.
+    vt.force_invalidate()
+    vt.create_results_dir(self._dir, allow_incremental=False)
+    self.assertTrue(os.path.islink(vt.results_dir))
+    self.assertTrue(os.path.isdir(vt.current_results_dir))
+
+  def test_for_illegal_vt(self):
+    with self.assertRaises(VersionedTargetSet.InvalidResultsDir):
+      vt = self.make_vt()
+      self.clobber_symlink(vt)
+      vt._ensure_legal()
+
+  def test_for_illegal_vts(self):
+    # The update() checks this through vts._ensure_legal, checked here since those checks are on different branches.
+    with self.assertRaises(VersionedTargetSet.InvalidResultsDir):
+      vt = self.make_vt()
+      self.clobber_symlink(vt)
+      vts = VersionedTargetSet.from_versioned_targets([vt])
+      vts.update()
