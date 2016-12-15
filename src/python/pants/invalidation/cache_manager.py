@@ -122,8 +122,8 @@ class VersionedTargetSet(object):
       raise ValueError('There is no previous_results_dir for: {}'.format(self))
     return self._previous_results_dir
 
-  def _ensure_legal(self):
-    """Return True as long as a vt's results_dir state does not break any internal contracts."""
+  def ensure_legal(self):
+    """Return True as long as the state does not break any internal contracts."""
     # Could also check that the current_results_dir exists and matches the os.realpath(results_dir).
     # I am not sure it provides enough value to warrant burdening every VT with those checks, though.
     if self._results_dir and not os.path.islink(self.results_dir):
@@ -184,49 +184,45 @@ class VersionedTarget(VersionedTargetSet):
         self._STABLE_DIR_NAME if stable else sha1(key.hash).hexdigest()[:12]
     )
 
-  def create_results_dir(self, root_dir, allow_incremental):
+  def create_results_dir(self, root_dir):
     """Ensures that a cleaned results_dir exists for invalid versioned targets.
 
-    If incremental=True, attempts to clone the results_dir for the previous version of this target
-    to the new results dir.
-
-    Only guarantees results_dirs for invalid VTs, pertinent result_dirs are assumed to exist for valid VTs.
+    Only guarantees results_dirs for invalid VTs.
     """
-    # Generate unique and stable directory paths for this cache key.
-    current_dir = self._results_dir_path(root_dir, self.cache_key, stable=False)
-    self._current_results_dir = current_dir
-    stable_dir = self._results_dir_path(root_dir, self.cache_key, stable=True)
-    self._results_dir = stable_dir
-    if self.valid:
-      # If the target is valid, both directories can be assumed to exist.
-      return
+    self._current_results_dir = self._results_dir_path(root_dir, self.cache_key, stable=False)
+    self._results_dir = self._results_dir_path(root_dir, self.cache_key, stable=True)
 
-    # If the vt is invalid, clean. Deletes both because if the stable_dir has somehow been replaced with a real dir,
-    # the relative_symlink call below raises an uncaught exception when it attempts to unlink the real directory.
-    safe_rmtree(current_dir)
-    safe_rmtree(stable_dir)
+    # If the target is valid, both directories are assumed to exist.
+    if not self.valid:
+      # If the vt is invalid, clean the unique file path and create a symlink to be the stable path.
+      safe_mkdir(self._current_results_dir, clean=True)
+      relative_symlink(self._current_results_dir, self._results_dir)
 
-    # Clone from the previous results_dir if incremental, or initialize.
-    previous_dir = self._use_previous_dir(allow_incremental, root_dir, current_dir)
-    if previous_dir is not None:
+  def copy_previous_results(self, root_dir):
+    """Use the latest valid results_dir as the starting contents of the current results_dir.
+
+    Should be called after the cache is checked, since previous_results are not useful if there is a cached artifact.
+    """
+    # TODO(mateo): An immediate followup removes the root_dir param, it is identical to the task.workdir.
+    if not self.previous_cache_key:
+      return None
+    previous_path = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
+    if os.path.isdir(previous_path):
+      self._previous_results_dir = previous_path
       self.is_incremental = True
-      self._previous_results_dir = previous_dir
-      shutil.copytree(previous_dir, current_dir)
-    else:
-      safe_mkdir(current_dir)
+      safe_rmtree(self._current_results_dir)
+      shutil.copytree(self._previous_results_dir, self._current_results_dir)
+    safe_mkdir(self._current_results_dir)
+    relative_symlink(self._current_results_dir, self.results_dir)
 
-    # Finally, create the stable symlink.
-    relative_symlink(current_dir, stable_dir)
-
-  def _use_previous_dir(self, allow_incremental, root_dir, current_dir):
+  def _use_previous_dir(self, allow_incremental, root_dir):
     if not allow_incremental or not self.previous_cache_key:
       # Not incremental.
       return None
-    previous_dir = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
-    if not os.path.isdir(previous_dir):
+    if not os.path.isdir(self._previous_results_dir):
       # Could be useful, but no previous results are present.
       return None
-    return previous_dir
+    return self._previous_results_dir
 
   def __repr__(self):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')
@@ -287,13 +283,13 @@ class InvalidationCacheManager(object):
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
     for vt in vts.versioned_targets:
-      vt._ensure_legal()
+      vt.ensure_legal()
       if not vt.valid:
         self._invalidator.update(vt.cache_key)
         vt.valid = True
         self._artifact_write_callback(vt)
     if not vts.valid:
-      vts._ensure_legal()
+      vts.ensure_legal()
       self._invalidator.update(vts.cache_key)
       vts.valid = True
       self._artifact_write_callback(vts)
