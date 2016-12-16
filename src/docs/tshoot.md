@@ -45,7 +45,7 @@ Ivy Failures
 
 You can see an Ivy invocation's detailed outputs in the [[HTML report|pants('src/docs:reporting_server')]].
 
-You can get more verbose information from Ivy with the `--resolve-ivy-debug` option.
+You can get more verbose information from Ivy with the `--resolve-ivy-args=-debug` option.
 
 This setting does not affect the output of the Ivy tasks used for bootstrapping tools.
 
