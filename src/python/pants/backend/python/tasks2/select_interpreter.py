@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pex.interpreter import PythonInterpreter
+from pex.interpreter import PythonInterpreter, PythonIdentity
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
@@ -50,7 +50,7 @@ class SelectInterpreter(Task):
   @classmethod
   def register_options(cls, register):
     super(SelectInterpreter, cls).register_options(register)
-    # TODO: This will eventually supercede the global --interpreter flag.  That flag is only
+    # TODO: This supercedes the global --interpreter flag.  That flag is only
     # relevant in the python backend, and should never have been global to begin with.
     register('--constraints', advanced=True, default=[], type=list,
              metavar='<requirement>',
@@ -80,7 +80,7 @@ class SelectInterpreter(Task):
         # We filter the interpreter cache itself (and not just the interpreters we pull from it)
         # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
         # an escape hatch.
-        filters = self.get_options().interpreter or [b'']
+        filters = self.get_options().constraints or [b'']
 
         # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
         self.context.acquire_lock()
@@ -92,11 +92,20 @@ class SelectInterpreter(Task):
         interpreter = interpreter_cache.select_interpreter_for_targets(python_tgts)
         safe_mkdir_for(interpreter_path_file)
         with open(interpreter_path_file, 'w') as outfile:
-          outfile.write('{}\t{}'.format(interpreter.binary, interpreter.identity))
+          outfile.write('{}\t{}\n'.format(interpreter.binary, str(interpreter.identity)))
+          for dist, location in interpreter.extras.items():
+            dist_name, dist_version = dist
+            outfile.write('{}\t{}\t{}\n'.format(dist_name, dist_version, location))
 
     if not interpreter:
       with open(interpreter_path_file, 'r') as infile:
-        binary, identity = infile.read().split('\t')
-      interpreter = PythonInterpreter(binary, identity)
+        lines = infile.readlines()
+        binary, identity = lines[0].strip().split('\t')
+        extras = {}
+        for line in lines[1:]:
+          dist_name, dist_version, location = line.strip().split('\t')
+          extras[(dist_name, dist_version)] = location
+
+      interpreter = PythonInterpreter(binary, PythonIdentity.from_path(identity), extras)
 
     self.context.products.get_data(PythonInterpreter, lambda: interpreter)
