@@ -109,7 +109,6 @@ class TaskTest(TaskTestBase):
     one = '1\n'
     two = '2\n'
     three = '3\n'
-    four = '4\n'
     task, target = self._fixture(incremental=True)
 
     # Clean - this is the first run so the VT is invalid.
