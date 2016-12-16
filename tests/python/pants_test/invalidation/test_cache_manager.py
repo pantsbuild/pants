@@ -69,7 +69,7 @@ class InvalidationCacheManagerTest(BaseTest):
     return vt
 
   def task_execute(self, vt):
-    vt.create_results_dir(self._dir, allow_incremental=False)
+    vt.create_results_dir(self._dir)
     task_output = os.path.join(vt.results_dir, 'a_file')
     self.create_file(task_output, 'foo')
 
@@ -118,16 +118,16 @@ class InvalidationCacheManagerTest(BaseTest):
     self.assertTrue(self.matching_result_dirs(vt))
 
     vt.force_invalidate()
-    vt.create_results_dir(self._dir, allow_incremental=False)
+    vt.create_results_dir(self._dir)
     self.assertTrue(self.is_empty(vt.results_dir))
     self.assertTrue(self.matching_result_dirs(vt))
-    vt._ensure_legal()
+    vt.ensure_legal()
 
   def test_valid_vts_are_not_cleaned(self):
     # No cleaning of results_dir occurs, since create_results_dir short-circuits if the VT is valid.
     vt = self.make_vt()
     self.assertFalse(self.is_empty(vt.results_dir))
-    vt.create_results_dir(self._dir, allow_incremental=False)
+    vt.create_results_dir(self._dir)
     self.assertFalse(self.is_empty(vt.results_dir))
     self.assertTrue(self.matching_result_dirs(vt))
 
@@ -155,26 +155,25 @@ class InvalidationCacheManagerTest(BaseTest):
       self.assertFalse(vt.valid)
       vt.update()
 
-  def test_recreation_of_invalid_vt_result_dirs(self):
-    # Show that the invalidation recreates legal result_dirs.
+  def test_exception_for_invalid_vt_result_dirs(self):
+    # Show that the create_results_dir will error if a previous operation changed the results_dir from a symlink.
     vt = self.make_vt()
     self.clobber_symlink(vt)
     self.assertFalse(os.path.islink(vt.results_dir))
 
     # This only is caught here if the VT is still invalid for some reason, otherwise it's caught by the update() method.
     vt.force_invalidate()
-    vt.create_results_dir(self._dir, allow_incremental=False)
-    self.assertTrue(os.path.islink(vt.results_dir))
-    self.assertTrue(os.path.isdir(vt.current_results_dir))
+    with self.assertRaisesRegexp(ValueError, r'Path for link.*overwrite an existing directory*'):
+      vt.create_results_dir(self._dir)
 
   def test_for_illegal_vt(self):
     with self.assertRaises(VersionedTargetSet.InvalidResultsDir):
       vt = self.make_vt()
       self.clobber_symlink(vt)
-      vt._ensure_legal()
+      vt.ensure_legal()
 
   def test_for_illegal_vts(self):
-    # The update() checks this through vts._ensure_legal, checked here since those checks are on different branches.
+    # The update() checks this through vts.ensure_legal, checked here since those checks are on different branches.
     with self.assertRaises(VersionedTargetSet.InvalidResultsDir):
       vt = self.make_vt()
       self.clobber_symlink(vt)

@@ -47,7 +47,10 @@ python_tests(
 python_tests(
   sources=['test_task.py'],
   dependencies=[
+    'src/python/pants/base:payload',
+    'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
+    'src/python/pants/cache:cache',
     'src/python/pants/task',
     'tests/python/pants_test/tasks:task_test_base',
   ]

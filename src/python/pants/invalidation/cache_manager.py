@@ -208,12 +208,13 @@ class VersionedTarget(VersionedTargetSet):
       return None
     previous_path = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
     if os.path.isdir(previous_path):
-      self._previous_results_dir = previous_path
       self.is_incremental = True
       safe_rmtree(self._current_results_dir)
-      shutil.copytree(self._previous_results_dir, self._current_results_dir)
+      shutil.copytree(previous_path, self._current_results_dir)
     safe_mkdir(self._current_results_dir)
     relative_symlink(self._current_results_dir, self.results_dir)
+    # Set the self._previous last, so that it is only True after the copy completed.
+    self._previous_results_dir = previous_path
 
   def _use_previous_dir(self, allow_incremental, root_dir):
     if not allow_incremental or not self.previous_cache_key:
