@@ -473,7 +473,10 @@ class Target(AbstractTarget):
       def dep_hash_iter():
         for dep in self.dependencies:
           try:
-            dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth+1)
+            if getattr(self, 'strict_deps', None):
+              dep_hash = dep.invalidation_hash(fingerprint_strategy)
+            else:
+              dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth+1)
             if dep_hash is not None:
               yield dep_hash
           except self.RecursiveDepthError as e:
