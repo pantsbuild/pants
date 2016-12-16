@@ -25,9 +25,7 @@ class VersionedTargetSet(object):
   built together into a single artifact.
   """
 
-
-
-  class InvalidResultsDir(Exception):
+  class IllegalResultsDir(Exception):
     """Indicate a problem interacting with a versioned target results directory."""
 
   @staticmethod
@@ -124,13 +122,17 @@ class VersionedTargetSet(object):
 
   def ensure_legal(self):
     """Return True as long as the state does not break any internal contracts."""
-    # Could also check that the current_results_dir exists and matches the os.realpath(results_dir).
-    # I am not sure it provides enough value to warrant burdening every VT with those checks, though.
-    if self._results_dir and not os.path.islink(self.results_dir):
-      raise self.InvalidResultsDir(
-        "The self.results_dir is no longer a symlink: {}\nThe results_dir should not be manually cleaned or recreated."
-        .format(self.results_dir)
-      )
+    # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
+    if self._results_dir:
+      errors = ''
+      if not os.path.islink(self._results_dir):
+        errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self._results_dir)
+      if not os.path.isdir(self._current_results_dir):
+        errors += '\nThe current_results_dir directory was not found\n\t* {}'.format(self._current_results_dir)
+      if errors:
+        raise self.IllegalResultsDir(
+          '\nThe results_dirs state should not be manually cleaned or recreated by tasks.\n{}'.format(errors)
+        )
     return True
 
   def live_dirs(self):
@@ -193,7 +195,9 @@ class VersionedTarget(VersionedTargetSet):
     self._results_dir = self._results_dir_path(root_dir, self.cache_key, stable=True)
 
     # If the target is valid, both directories are assumed to exist.
-    if not self.valid:
+    if self.valid:
+      self.ensure_legal()
+    else:
       # If the vt is invalid, clean the unique file path and create a symlink to be the stable path.
       safe_mkdir(self._current_results_dir, clean=True)
       relative_symlink(self._current_results_dir, self._results_dir)
@@ -215,15 +219,6 @@ class VersionedTarget(VersionedTargetSet):
     relative_symlink(self._current_results_dir, self.results_dir)
     # Set the self._previous last, so that it is only True after the copy completed.
     self._previous_results_dir = previous_path
-
-  def _use_previous_dir(self, allow_incremental, root_dir):
-    if not allow_incremental or not self.previous_cache_key:
-      # Not incremental.
-      return None
-    if not os.path.isdir(self._previous_results_dir):
-      # Could be useful, but no previous results are present.
-      return None
-    return self._previous_results_dir
 
   def __repr__(self):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')

@@ -137,7 +137,7 @@ class InvalidationCacheManagerTest(BaseTest):
     # https://github.com/pantsbuild/pants/issues/4137
     # https://github.com/pantsbuild/pants/issues/4051
 
-    with self.assertRaises(VersionedTargetSet.InvalidResultsDir):
+    with self.assertRaises(VersionedTargetSet.IllegalResultsDir):
       # All is right with the world, mock task is generally well-behaved and output is placed in both result_dirs.
       vt = self.make_vt()
       self.assertFalse(self.is_empty(vt.results_dir))
@@ -166,15 +166,30 @@ class InvalidationCacheManagerTest(BaseTest):
     with self.assertRaisesRegexp(ValueError, r'Path for link.*overwrite an existing directory*'):
       vt.create_results_dir(self._dir)
 
-  def test_for_illegal_vt(self):
-    with self.assertRaises(VersionedTargetSet.InvalidResultsDir):
-      vt = self.make_vt()
-      self.clobber_symlink(vt)
+  def test_raises_for_clobbered_symlink(self):
+    vt = self.make_vt()
+    self.clobber_symlink(vt)
+    with self.assertRaisesRegexp(VersionedTargetSet.IllegalResultsDir, r'The.*symlink*'):
+      vt.ensure_legal()
+
+  def test_raises_missing_unique_results_dir(self):
+    vt = self.make_vt()
+    safe_rmtree(vt.current_results_dir)
+    with self.assertRaisesRegexp(VersionedTargetSet.IllegalResultsDir, r'The.*current_results_dir*'):
+      vt.ensure_legal()
+
+  def test_raises_both_clobbered_symlink_and_missing_unique_results_dir(self):
+    vt = self.make_vt()
+    self.clobber_symlink(vt)
+    safe_rmtree(vt.current_results_dir)
+    with self.assertRaisesRegexp(VersionedTargetSet.IllegalResultsDir, r'The.*symlink*'):
+      vt.ensure_legal()
+    with self.assertRaisesRegexp(VersionedTargetSet.IllegalResultsDir, r'The.*current_results_dir*'):
       vt.ensure_legal()
 
   def test_for_illegal_vts(self):
     # The update() checks this through vts.ensure_legal, checked here since those checks are on different branches.
-    with self.assertRaises(VersionedTargetSet.InvalidResultsDir):
+    with self.assertRaises(VersionedTargetSet.IllegalResultsDir):
       vt = self.make_vt()
       self.clobber_symlink(vt)
       vts = VersionedTargetSet.from_versioned_targets([vt])

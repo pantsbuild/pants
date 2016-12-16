@@ -10,9 +10,9 @@ import os
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
+from pants.cache.cache_setup import CacheSetup
 from pants.task.task import Task
 from pants_test.tasks.task_test_base import TaskTestBase
-from pants.cache.cache_setup import CacheSetup
 
 
 class DummyLibrary(Target):
