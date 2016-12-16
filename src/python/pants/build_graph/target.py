@@ -486,6 +486,8 @@ class Target(AbstractTarget):
       target_hash = self.invalidation_hash(fingerprint_strategy)
       if target_hash is None and not dep_hashes:
         return None
+
+      # TODO(mateo): The hash handling should be isolated into methods so that arbitrary slices aren't buried inline.
       dependencies_hash = hasher.hexdigest()[:12]
       combined_hash = '{target_hash}.{deps_hash}'.format(target_hash=target_hash,
                                                          deps_hash=dependencies_hash)

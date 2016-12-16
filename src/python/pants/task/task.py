@@ -279,6 +279,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     invalidation_report=self.context.invalidation_report,
                                     task_name=type(self).__name__,
                                     task_version=self.implementation_version_str(),
+                                    task_workdir=self.workdir,
                                     artifact_write_callback=self.maybe_write_artifact)
 
   @property
@@ -405,7 +406,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # Cache has been checked to create the full list of invalid VTs. Only copy previous_results for this subset of VTs.
     for vts in invalidation_check.invalid_vts:
       if self.incremental:
-        vts.copy_previous_results(self.workdir)
+        vts.copy_previous_results()
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
@@ -423,7 +424,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def maybe_write_artifact(self, vt):
     if self._should_cache_target_dir(vt):
-      self.update_artifact_cache([(vt, [vt.current_results_dir])])
+      self.update_artifact_cache([(vt, [vt.unique_results_dir])])
 
   def _launch_background_workdir_cleanup(self, vts):
     workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds, [(vts,)], 'workdir_build_cleanup')
@@ -440,19 +441,19 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes=live_dirs)
 
   def _should_cache_target_dir(self, vt):
-    """Return true if the given vt should be written to a cache (if configured)."""
+    """True if the given vt should be written to a cache."""
     return (
       self.cache_target_dirs and
       not vt.target.has_label('no_cache') and
-      (not vt.is_incremental or self.cache_incremental) and
+      (not vt.previous_results_dir or self.cache_incremental) and
       self.artifact_cache_writes_enabled()
     )
 
   def _maybe_create_results_dirs(self, vts):
-    """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
+    """Optionally create results directories for the vts."""
     if self.create_target_dirs:
       for vt in vts:
-        vt.create_results_dir(self.workdir)
+        vt.create_results_dir()
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
@@ -482,7 +483,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return [], [], []
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key, vt.current_results_dir if self.cache_target_dirs else None)
+
+    # TODO(mateo): This is currently the only place that explicitly reaches into the VT to get the unique_results_dir.
+    # Consider converting to the results_dir and dereferencing. As it stands, Products are constructed using one
+    # path (the results_dir) while cached artifacts are constructed with another, the unique_results_dir.
+    # While one should be a symlink to the other (and we have begun enforcing) it still opens up the possibility of more
+    # bugs/mistakes that cause Products and cached Artifacts for a VT to hold different things.
+    items = [(read_cache, vt.cache_key, vt.unique_results_dir if self.cache_target_dirs else None)
              for vt in vts]
     res = self.context.subproc_map(call_use_cached_files, items)
 

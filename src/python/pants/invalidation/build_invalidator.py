@@ -36,6 +36,10 @@ class CacheKeyGenerator(object):
   """Generates cache keys for versions of target sets."""
 
   @staticmethod
+  def hash_value(value):
+    return hashlib.sha1(value).hexdigest()[:12]
+
+  @staticmethod
   def combine_cache_keys(cache_keys):
     """Returns a cache key for a list of target sets that already have cache keys.
 
@@ -76,7 +80,7 @@ class CacheKeyGenerator(object):
 
     hasher = hashlib.sha1()
     hasher.update(self._cache_key_gen_version)
-    key_suffix = hasher.hexdigest()[:12]
+    key_suffix = key_suffix = self.hash_value(self._cache_key_gen_version)
     if transitive:
       target_key = target.transitive_invalidation_hash(fingerprint_strategy)
     else:

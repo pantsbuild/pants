@@ -683,11 +683,11 @@ class JvmCompile(NailgunTaskBase):
 
       Returns true if we should try to compile the target incrementally.
       """
-      if not vts.is_incremental:
-        return False
-      if not self._clear_invalid_analysis:
-        return True
-      return os.path.exists(ctx.analysis_file)
+      return (
+        vts.previous_results_dir and
+        not self._clear_invalid_analysis and
+        os.path.exists(ctx.analysis_file)
+      )
 
     def work_for_vts(vts, ctx):
       progress_message = ctx.target.address.spec
