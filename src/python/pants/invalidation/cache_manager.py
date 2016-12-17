@@ -187,20 +187,15 @@ class VersionedTarget(VersionedTargetSet):
     )
 
   def create_results_dir(self, root_dir):
-    """Ensures that a cleaned results_dir exists for invalid versioned targets.
-
-    Only guarantees results_dirs for invalid VTs.
-    """
+    """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
     self._current_results_dir = self._results_dir_path(root_dir, self.cache_key, stable=False)
     self._results_dir = self._results_dir_path(root_dir, self.cache_key, stable=True)
 
-    # If the target is valid, both directories are assumed to exist.
-    if self.valid:
-      self.ensure_legal()
-    else:
-      # If the vt is invalid, clean the unique file path and create a symlink to be the stable path.
+    if not self.valid:
+      # Clean the workspace for invalid vts.
       safe_mkdir(self._current_results_dir, clean=True)
       relative_symlink(self._current_results_dir, self._results_dir)
+    self.ensure_legal()
 
   def copy_previous_results(self, root_dir):
     """Use the latest valid results_dir as the starting contents of the current results_dir.
