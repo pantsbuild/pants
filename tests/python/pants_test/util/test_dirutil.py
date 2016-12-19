@@ -157,6 +157,24 @@ class DirutilTest(unittest.TestCase):
       with self.assertRaisesRegexp(ValueError, r'Path for link.*absolute'):
         relative_symlink(source, link)
 
+  def test_relative_symlink_overwrite_existing_file(self):
+    # Succeeds, since os.unlink can be safely called on files that aren't symlinks.
+    with temporary_dir() as tmpdir_1:  # source and link in same dir
+      source = os.path.join(tmpdir_1, 'source')
+      link_path = os.path.join(tmpdir_1, 'link')
+      touch(link_path)
+      relative_symlink(source, link_path)
+
+  def test_relative_symlink_exception_on_existing_dir(self):
+    # This historically was an uncaught exception, the tested behavior is to begin catching the error.
+    with temporary_dir() as tmpdir_1:
+      source = os.path.join(tmpdir_1, 'source')
+      link_path = os.path.join(tmpdir_1, 'link')
+
+      safe_mkdir(link_path)
+      with self.assertRaisesRegexp(ValueError, r'Path for link.*overwrite an existing directory*'):
+        relative_symlink(source, link_path)
+
   def test_get_basedir(self):
     self.assertEquals(get_basedir('foo/bar/baz'), 'foo')
     self.assertEquals(get_basedir('/foo/bar/baz'), '')
