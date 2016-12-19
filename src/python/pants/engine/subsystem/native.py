@@ -174,7 +174,7 @@ def extern_clone_val(context_handle, val):
   TODO: Doesn't need to take an entire Value... could just clone a Handle.
   """
   c = _FFI.from_handle(context_handle)
-  item = _FFI.from_handle(val.handle)
+  item = c.from_value(val)
   return c.to_value(item, type_id=val.type_id)
 
 
@@ -310,7 +310,7 @@ class ExternContext(object):
   for multi-processing or cache lookups).
   """
 
-  def __init__(self, native):
+  def __init__(self):
     # Memoized object Ids.
     self._id_generator = 0
     self._id_to_obj = dict()
@@ -325,7 +325,7 @@ class ExternContext(object):
 
     # Finally, create a handle to this object to ensure that the native wrapper survives
     # at least as long as this object.
-    self.handle = native.new_handle(self)
+    self.handle = _FFI.new_handle(self)
 
   def _resize_utf8(self, size):
     self._utf8_cap = size
@@ -471,17 +471,13 @@ class Native(object):
     """Given a pointer representing an array, and its count of entries, return a list."""
     return _FFI.unpack(cdata_ptr, count)
 
-  def new_handle(self, obj):
-    return _FFI.new_handle(obj)
-
   def buffer(self, cdata):
     return _FFI.buffer(cdata)
 
   def new_scheduler(self, has_products_constraint, address_constraint, variants_constraint):
     """Create and return an ExternContext and native Scheduler."""
-    context = ExternContext(self)
+    context = ExternContext()
 
-    # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = TypeConstraint(context.to_id(has_products_constraint))
     address_constraint = TypeConstraint(context.to_id(address_constraint))
     variants_constraint = TypeConstraint(context.to_id(variants_constraint))

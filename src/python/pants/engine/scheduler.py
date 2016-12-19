@@ -66,8 +66,11 @@ class LocalScheduler(object):
     self._product_graph_lock = graph_lock or threading.RLock()
     self._run_count = 0
 
+    # TODO: The only (?) case where we use inheritance rather than exact type unions.
+    has_products_constraint = SubclassesOf(HasProducts)
+
     # Create the ExternContext, and the native Scheduler.
-    self._context, self._scheduler = native.new_scheduler(SubclassesOf(HasProducts),
+    self._context, self._scheduler = native.new_scheduler(has_products_constraint,
                                                           constraint_for(Address),
                                                           constraint_for(Variants))
     self._execution_request = None
