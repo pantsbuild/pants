@@ -244,3 +244,22 @@ class TaskTest(TaskTestBase):
     # Verify the content. The task was invalid twice - the initial run and the run with the changed source file.
     # Only vtC (previous sucessful runs + cache miss) resulted in copying the previous_results.
     self.assertContent(vtC, first_contents + second_contents)
+
+  # live_dirs() is in cache_manager, but like all of these tests, only makes sense to test as a sequence of task runs.
+  def test_live_dirs(self):
+    task, vtA, _ = self._run_fixture(incremental=True)
+
+    vtA_live = list(vtA.live_dirs())
+    self.assertIn(vtA.results_dir, vtA_live)
+    self.assertIn(vtA.current_results_dir, vtA_live)
+    self.assertEqual(len(vtA_live), 2)
+
+    self._create_clean_file(vtA.target, 'foo')
+    vtB, _ = task.execute()
+    vtB_live = list(vtB.live_dirs())
+
+    # This time it contains the previous_results_dir.
+    self.assertIn(vtB.results_dir, vtB_live)
+    self.assertIn(vtB.current_results_dir, vtB_live)
+    self.assertIn(vtA.current_results_dir, vtB_live)
+    self.assertEqual(len(vtB_live), 3)

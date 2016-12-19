@@ -137,6 +137,8 @@ class VersionedTargetSet(object):
 
   def live_dirs(self):
     """Yields directories that must exist for this VersionedTarget to function."""
+    # The only caller of this function is the workdir cleaning pipeline. It is not clear that the previous_results_dir
+    # should be returned for that purpose. And, by the time this is called, the contents have already been copied.
     if self.has_results_dir:
       yield self.results_dir
       yield self.current_results_dir
@@ -203,6 +205,7 @@ class VersionedTarget(VersionedTargetSet):
     Should be called after the cache is checked, since previous_results are not useful if there is a cached artifact.
     """
     # TODO(mateo): An immediate followup removes the root_dir param, it is identical to the task.workdir.
+    # TODO(mateo): This should probably be managed by the task, which manages the rest of the incremental support.
     if not self.previous_cache_key:
       return None
     previous_path = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
