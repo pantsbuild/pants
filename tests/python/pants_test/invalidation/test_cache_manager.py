@@ -125,7 +125,7 @@ class InvalidationCacheManagerTest(BaseTest):
     self.clobber_symlink(vt)
 
     # Arg, and the resultingly unlinked current_results_dir is uncleaned. The two directories have diverging contents!
-    self.assertFalse(os.path.islink(vt.results_dir))
+    self.assertFalse(self.has_symlinked_result_dir(vt))
     self.assertFalse(self.has_symlinked_result_dir(vt))
 
     # Big consequences- the files used for Products(vt.results_dir) and the cache(vt.current_results_dir) have diverged!
