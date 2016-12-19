@@ -11,6 +11,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheSetup
+from pants.util.dirutil import safe_rmtree
 from pants.task.task import Task
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -254,7 +255,7 @@ class TaskTest(TaskTestBase):
     self.assertIn(vtA.current_results_dir, vtA_live)
     self.assertEqual(len(vtA_live), 2)
 
-    self._create_clean_file(vtA.target, 'foo')
+    self._create_clean_file(vtA.target, 'bar')
     vtB, _ = task.execute()
     vtB_live = list(vtB.live_dirs())
 
@@ -263,3 +264,12 @@ class TaskTest(TaskTestBase):
     self.assertIn(vtB.current_results_dir, vtB_live)
     self.assertIn(vtA.current_results_dir, vtB_live)
     self.assertEqual(len(vtB_live), 3)
+
+    # Delete vtB results_dir. live_dirs() should only return existing dirs, even if it knows the previous_cache_key.
+    safe_rmtree(vtB.current_results_dir)
+
+    self._create_clean_file(vtB.target, 'baz')
+    vtC, _ = task.execute()
+    vtC_live = list(vtC.live_dirs())
+    self.assertNotIn(vtB.current_results_dir, vtC_live)
+    self.assertEqual(len(vtC_live), 2)

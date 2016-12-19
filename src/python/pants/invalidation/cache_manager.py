@@ -86,7 +86,7 @@ class VersionedTargetSet(object):
 
   @property
   def has_previous_results_dir(self):
-    return self._previous_results_dir is not None
+    return self._previous_results_dir is not None and os.path.isdir(self._previous_results_dir)
 
   @property
   def results_dir(self):
@@ -116,7 +116,7 @@ class VersionedTargetSet(object):
     TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
     mutate them.
     """
-    if self._previous_results_dir is None:
+    if not self.has_previous_results_dir:
       raise ValueError('There is no previous_results_dir for: {}'.format(self))
     return self._previous_results_dir
 

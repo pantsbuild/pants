@@ -52,6 +52,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/cache:cache',
     'src/python/pants/task',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
