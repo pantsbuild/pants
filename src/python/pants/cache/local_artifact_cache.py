@@ -67,6 +67,10 @@ class BaseLocalArtifactCache(ArtifactCache):
       tarball = self._store_tarball(cache_key, tmp.name)
       artifact = self._artifact(tarball)
 
+      # NOTE(mateo): The two clean=True args passed in this method are likely safe, since the cache will by
+      # definition be dealing with unique results_dir, as opposed to the stable vt.results_dir (aka 'current').
+      # But if by chance it's passed the stable results_dir, safe_makedir(clean=True) will silently convert it
+      # from a symlink to a real dir and cause mysterious 'Operation not permitted' errors until the workdir is cleaned.
       if results_dir is not None:
         safe_mkdir(results_dir, clean=True)
 

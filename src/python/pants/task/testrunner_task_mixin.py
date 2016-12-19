@@ -24,7 +24,7 @@ class TestRunnerTaskMixin(object):
     super(TestRunnerTaskMixin, cls).register_options(register)
     register('--skip', type=bool, help='Skip running tests.')
     register('--timeouts', type=bool, default=True,
-             help='Enable test target timeouts. If timeouts are enabled then tests with a'
+             help='Enable test target timeouts. If timeouts are enabled then tests with a '
                   'timeout= parameter set on their target will time out after the given number of '
                   'seconds if not completed. If no timeout is set, then either the default timeout '
                   'is used or no timeout is configured. In the current implementation, all the '
