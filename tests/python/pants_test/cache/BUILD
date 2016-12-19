@@ -46,7 +46,6 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/build_graph:build_graph',
     'src/python/pants/cache:cache',
-    'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
@@ -67,6 +66,8 @@ python_library(
   sources = ['cache_server.py'],
   dependencies = [
     '3rdparty/python:six',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/testutils:file_test_util',
   ]
 )
