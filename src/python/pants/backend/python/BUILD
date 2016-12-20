@@ -11,6 +11,7 @@ python_library(
     ':python_requirements',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/backend/python/tasks2',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ]
