@@ -11,8 +11,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheSetup
-from pants.util.dirutil import safe_rmtree
 from pants.task.task import Task
+from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
