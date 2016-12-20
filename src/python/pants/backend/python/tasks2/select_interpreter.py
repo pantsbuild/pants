@@ -50,8 +50,9 @@ class SelectInterpreter(Task):
   @classmethod
   def register_options(cls, register):
     super(SelectInterpreter, cls).register_options(register)
-    # TODO: This supercedes the global --interpreter flag.  That flag is only
-    # relevant in the python backend, and should never have been global to begin with.
+    # Note: This replaces the global --interpreter flag in the old python tasks.
+    # That flag is only relevant in the python backend, and should never have been
+    # global to begin with.
     register('--constraints', advanced=True, default=[], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
@@ -92,10 +93,10 @@ class SelectInterpreter(Task):
         interpreter = interpreter_cache.select_interpreter_for_targets(python_tgts)
         safe_mkdir_for(interpreter_path_file)
         with open(interpreter_path_file, 'w') as outfile:
-          outfile.write('{}\t{}\n'.format(interpreter.binary, str(interpreter.identity)))
+          outfile.write(b'{}\t{}\n'.format(interpreter.binary, str(interpreter.identity)))
           for dist, location in interpreter.extras.items():
             dist_name, dist_version = dist
-            outfile.write('{}\t{}\t{}\n'.format(dist_name, dist_version, location))
+            outfile.write(b'{}\t{}\t{}\n'.format(dist_name, dist_version, location))
 
     if not interpreter:
       with open(interpreter_path_file, 'r') as infile:

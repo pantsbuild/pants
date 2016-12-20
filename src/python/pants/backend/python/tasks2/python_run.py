@@ -44,7 +44,7 @@ class PythonRun(Task):
     if isinstance(binary, PythonBinary):
       # We can't throw if binary isn't a PythonBinary, because perhaps we were called on a
       # jvm_binary, in which case we have to no-op and let jvm_run do its thing.
-      # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
+      # TODO(benjy): Use MutexTask to coordinate this.
       interpreter = self.context.products.get_data(PythonInterpreter)
 
       with temporary_dir() as tmpdir:
@@ -55,6 +55,8 @@ class PythonRun(Task):
         pexes = [self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
                  self.context.products.get_data(GatherSources.PYTHON_SOURCES)]
 
+        # TODO: Expose the path as a property in pex, instead of relying on
+        # fishing it out of the cmdline.
         pex_path = os.pathsep.join([pex.cmdline()[1] for pex in pexes])
 
         pex = PEX(tmpdir, interpreter)
@@ -65,7 +67,7 @@ class PythonRun(Task):
           for arg in self.get_options().args:
             args.extend(safe_shlex_split(arg))
           args += self.get_passthru_args()
-          po = pex.run(blocking=False, args=args, env={ 'PEX_PATH': pex_path })
+          po = pex.run(blocking=False, args=args, env={'PEX_PATH': pex_path})
           try:
             result = po.wait()
             if result != 0:

@@ -64,6 +64,5 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
                '--pyprep-interpreter-constraints=CPython>=2.6,<3',
                '--pyprep-interpreter-constraints=CPython>=3.3',
                '--quiet']
-    print('XXXXX ' + ' '.join(command))
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.rstrip().split('\n')[-1]
