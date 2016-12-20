@@ -220,7 +220,7 @@ impl Select {
     variant_value: Option<&str>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
-    if let Some(&ref candidate) = self.select_literal_single(context, candidate, variant_value) {
+    if let Some(candidate) = self.select_literal_single(context, candidate, variant_value) {
       return Some(context.clone_val(candidate))
     }
 
@@ -229,7 +229,7 @@ impl Select {
     // define mergeability for products.
     if context.has_products(candidate) {
       for child in context.field_products(candidate) {
-        if let Some(&ref child) = self.select_literal_single(context, &child, variant_value) {
+        if let Some(child) = self.select_literal_single(context, &child, variant_value) {
           return Some(context.clone_val(child));
         }
       }
