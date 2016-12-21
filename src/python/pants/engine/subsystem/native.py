@@ -170,10 +170,7 @@ def extern_val_for(context_handle, key):
 
 @_FFI.callback("Value(ExternContext*, Value*)")
 def extern_clone_val(context_handle, val):
-  """Clone the given Value.
-
-  TODO: Doesn't need to take an entire Value... could just clone a Handle.
-  """
+  """Clone the given Value."""
   c = _FFI.from_handle(context_handle)
   item = c.from_value(val)
   return c.to_value(item, type_id=val.type_id)

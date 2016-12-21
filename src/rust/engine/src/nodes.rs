@@ -195,17 +195,17 @@ impl Select {
     context: &StepContext,
     candidate: &'a Value,
     variant_value: Option<&str>
-  ) -> Option<&'a Value> {
+  ) -> bool {
     if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
-      return None;
+      return false;
     }
-    match variant_value {
+    return match variant_value {
       Some(vv) if context.field_name(candidate) != *vv =>
         // There is a variant value, and it doesn't match.
-        return None,
+        false,
       _ =>
-        return Some(candidate),
-    }
+        true,
+    };
   }
 
   /**
@@ -216,21 +216,21 @@ impl Select {
   fn select_literal(
     &self,
     context: &StepContext,
-    candidate: &Value,
+    candidate: Value,
     variant_value: Option<&str>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
-    if let Some(candidate) = self.select_literal_single(context, candidate, variant_value) {
-      return Some(context.clone_val(candidate))
+    if self.select_literal_single(context, &candidate, variant_value) {
+      return Some(candidate)
     }
 
     // Else, check whether it has-a instance of the product.
     // TODO: returning only the first literal configuration of a given type/variant. Need to
     // define mergeability for products.
-    if context.has_products(candidate) {
-      for child in context.field_products(candidate) {
-        if let Some(child) = self.select_literal_single(context, &child, variant_value) {
-          return Some(context.clone_val(child));
+    if context.has_products(&candidate) {
+      for child in context.field_products(&candidate) {
+        if self.select_literal_single(context, &child, variant_value) {
+          return Some(child);
         }
       }
     }
@@ -259,7 +259,7 @@ impl Step for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, &context.val_for(&self.subject), variant_value) {
+    if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), variant_value) {
       return State::Complete(Complete::Return(literal_value));
     }
 
@@ -269,7 +269,7 @@ impl Step for Select {
     for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) => {
-          if let Some(v) = self.select_literal(&context, value, variant_value) {
+          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
             matches.push(v);
           }
         },
@@ -338,7 +338,7 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_product(&self, context: &StepContext) -> Result<Value, State<Node>> {
+  fn dep_product<'a>(&self, context: &'a StepContext) -> Result<&'a Value, State<Node>> {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
@@ -348,7 +348,7 @@ impl SelectDependencies {
       );
     match context.get(&dep_product_node) {
       Some(&Complete::Return(ref value)) =>
-        Ok(context.clone_val(value)),
+        Ok(value),
       Some(&Complete::Noop(_, _)) =>
         Err(
           State::Complete(
