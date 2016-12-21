@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os.path
+from hashlib import sha1
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
@@ -143,3 +144,40 @@ class TargetTest(BaseTest):
     target_a.inject_dependency(Address.parse('c'))
     with self.assertRaises(Target.RecursiveDepthError):
       target_a.transitive_invalidation_hash()
+
+  def test_transitive_invalidation_hash(self):
+    target_a = self.make_target('a', Target)
+    target_b = self.make_target('b', Target, dependencies=[target_a])
+    target_c = self.make_target('c', Target, dependencies=[target_b])
+
+    hasher = sha1()
+    dep_hash = hasher.hexdigest()[:12]
+    target_hash = target_a.invalidation_hash()
+    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    self.assertEqual(hash_value, target_a.transitive_invalidation_hash())
+
+    hasher = sha1()
+    hasher.update(hash_value)
+    dep_hash = hasher.hexdigest()[:12]
+    target_hash = target_b.invalidation_hash()
+    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    self.assertEqual(hash_value, target_b.transitive_invalidation_hash())
+
+    hasher = sha1()
+    hasher.update(hash_value)
+    dep_hash = hasher.hexdigest()[:12]
+    target_hash = target_c.invalidation_hash()
+    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    self.assertEqual(hash_value, target_c.transitive_invalidation_hash())
+
+    # Mark following 3 dirty as they are used in the next test.
+    target_b.mark_invalidation_hash_dirty()
+    target_c.mark_invalidation_hash_dirty()
+    target_c.mark_transitive_invalidation_hash_dirty()
+
+    hasher = sha1()
+    hasher.update(target_b.invalidation_hash())
+    dep_hash = hasher.hexdigest()[:12]
+    target_hash = target_c.invalidation_hash()
+    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    self.assertEqual(hash_value, target_c.transitive_invalidation_hash(direct=True))
