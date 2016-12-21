@@ -1,16 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_tests(
-  name = 'apache_thrift_gen',
-  sources = ['test_apache_thrift_gen.py'],
-  dependencies = [
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/tasks:apache_thrift_gen',
-    'src/python/pants/backend/jvm/targets:java',
-    'tests/python/pants_test/tasks:task_test_base',
-  ],
-)
 
 python_tests(
   name = 'antlr_gen',

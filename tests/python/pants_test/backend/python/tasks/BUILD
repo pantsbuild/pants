@@ -113,6 +113,9 @@ python_tests(
     '3rdparty/python:mock',
     ':python_task_test_base',
 
+    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/codegen/thrift/python',
+
     # TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
     # in pants java since non-jvm backends depend on it to run things.
     'src/python/pants/backend/jvm/subsystems:jvm',
