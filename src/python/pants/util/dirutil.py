@@ -290,6 +290,10 @@ def relative_symlink(source_path, link_path):
     raise ValueError("Path for link:{} must be absolute".format(link_path))
   if source_path == link_path:
     raise ValueError("Path for link is identical to source:{}".format(source_path))
+  # The failure state below had a long life as an uncaught error. No behavior was changed here, it just adds a catch.
+  # Raising an exception does differ from absolute_symlink, which takes the liberty of deleting existing directories.
+  if os.path.isdir(link_path) and not os.path.islink(link_path):
+    raise ValueError("Path for link would overwrite an existing directory: {}".format(link_path))
   try:
     if os.path.lexists(link_path):
       os.unlink(link_path)

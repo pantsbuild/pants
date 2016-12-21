@@ -11,7 +11,6 @@ from pants.base.payload import Payload
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheSetup
 from pants.task.task import Task
-from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -25,7 +24,6 @@ class DummyLibrary(Target):
 
 
 class DummyTask(Task):
-  """A task that appends the content of a DummyLibrary's source into its results_dir."""
   options_scope = 'dummy'
 
   @property
@@ -75,8 +73,8 @@ class LocalCachingTest(TaskTestBase):
     # Executing the task for the first time the vt is expected to be in the invalid_vts list
     self.assertGreater(len(invalid_vts), 0)
     first_vt = invalid_vts[0]
-    # Delete .pants.d
-    safe_rmtree(self.task._workdir)
+    # Mark the target invalid.
+    self.target.mark_invalidation_hash_dirty()
     all_vts2, invalid_vts2 = self.task.execute()
     # Check that running the task a second time results in a valid vt,
     # implying the artifact cache was hit.

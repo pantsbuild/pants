@@ -11,6 +11,7 @@ python_library(
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/invalidation',
     'src/python/pants/task',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]
 )
