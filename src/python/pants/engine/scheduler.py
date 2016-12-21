@@ -70,9 +70,9 @@ class LocalScheduler(object):
     has_products_constraint = SubclassesOf(HasProducts)
 
     # Create the ExternContext, and the native Scheduler.
-    self._context, self._scheduler = native.new_scheduler(has_products_constraint,
-                                                          constraint_for(Address),
-                                                          constraint_for(Variants))
+    self._scheduler = native.new_scheduler(has_products_constraint,
+                                           constraint_for(Address),
+                                           constraint_for(Variants))
     self._execution_request = None
 
     # Validate and register all provided and intrinsic tasks.
@@ -97,22 +97,22 @@ class LocalScheduler(object):
     self._register_singletons(rule_index.singletons)
 
   def _to_value(self, obj):
-    return self._context.to_value(obj)
+    return self._native.context.to_value(obj)
 
   def _from_value(self, val):
-    return self._context.from_value(val)
+    return self._native.context.from_value(val)
 
   def _to_id(self, typ):
-    return self._context.to_id(typ)
+    return self._native.context.to_id(typ)
 
   def _to_key(self, obj):
-    return self._context.to_key(obj)
+    return self._native.context.to_key(obj)
 
   def _from_id(self, cdata):
-    return self._context.from_id(cdata)
+    return self._native.context.from_id(cdata)
 
   def _from_key(self, cdata):
-    return self._context.from_key(cdata)
+    return self._native.context.from_key(cdata)
 
   def _to_constraint(self, type_or_constraint):
     return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
@@ -164,9 +164,10 @@ class LocalScheduler(object):
             self._native.lib.task_add_select(self._scheduler,
                                              product_constraint)
           elif selector_type is SelectVariant:
+            key_buf = self._native.context.utf8_buf(selector.variant_key)
             self._native.lib.task_add_select_variant(self._scheduler,
                                                      product_constraint,
-                                                     self._context.utf8_buf(selector.variant_key))
+                                                     key_buf)
           elif selector_type is SelectLiteral:
             # NB: Intentionally ignores subject parameter to provide a literal subject.
             self._native.lib.task_add_select_literal(self._scheduler,

@@ -11,6 +11,7 @@ from cffi import FFI
 from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
 
@@ -441,21 +442,23 @@ class Native(object):
     self._supportdir = supportdir
     self._visualize_to_dir = visualize_to_dir
 
-    self._lib_field = None
-
   @property
   def visualize_to_dir(self):
     return self._visualize_to_dir
 
-  @property
+  @memoized_property
   def lib(self):
     """Load and return the `libgraph` module."""
-    if self._lib_field is None:
-      binary = self._binary_util.select_binary(self._supportdir,
+    binary = self._binary_util.select_binary(self._supportdir,
                                               self._version,
                                               'native-engine')
-      self._lib_field = _FFI.dlopen(binary)
-    return self._lib_field
+    return _FFI.dlopen(binary)
+
+  @memoized_property
+  def context(self):
+    # We statically initialize a ExternContext to correspond to the queue of dropped
+    # Handles that the native code maintains.
+    return _FFI.init_once(ExternContext, 'ExternContext singleton')
 
   def new(self, cdecl, init):
     return _FFI.new(cdecl, init)
@@ -476,13 +479,11 @@ class Native(object):
 
   def new_scheduler(self, has_products_constraint, address_constraint, variants_constraint):
     """Create and return an ExternContext and native Scheduler."""
-    context = ExternContext()
+    has_products_constraint = TypeConstraint(self.context.to_id(has_products_constraint))
+    address_constraint = TypeConstraint(self.context.to_id(address_constraint))
+    variants_constraint = TypeConstraint(self.context.to_id(variants_constraint))
 
-    has_products_constraint = TypeConstraint(context.to_id(has_products_constraint))
-    address_constraint = TypeConstraint(context.to_id(address_constraint))
-    variants_constraint = TypeConstraint(context.to_id(variants_constraint))
-
-    scheduler = self.lib.scheduler_create(context.handle,
+    scheduler = self.lib.scheduler_create(self.context.handle,
                                           extern_key_for,
                                           extern_val_for,
                                           extern_clone_val,
@@ -495,12 +496,10 @@ class Native(object):
                                           extern_project_multi,
                                           extern_create_exception,
                                           extern_invoke_runnable,
-                                          context.to_key('name'),
-                                          context.to_key('products'),
-                                          context.to_key('default'),
+                                          self.context.to_key('name'),
+                                          self.context.to_key('products'),
+                                          self.context.to_key('default'),
                                           address_constraint,
                                           has_products_constraint,
                                           variants_constraint)
-    scheduler = self.gc(scheduler, self.lib.scheduler_destroy)
-
-    return context, scheduler
+    return self.gc(scheduler, self.lib.scheduler_destroy)
