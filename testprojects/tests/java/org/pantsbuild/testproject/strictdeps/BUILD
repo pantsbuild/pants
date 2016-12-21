@@ -13,6 +13,12 @@ java_library(
 )
 
 java_library(
+  name='A3',
+  sources = ['A.java'],
+  dependencies=[':B'],
+)
+
+java_library(
   name='B',
   sources = ['B.java'],
   dependencies=[':C'],

@@ -62,7 +62,7 @@ class CacheKeyGenerator(object):
     self._cache_key_gen_version = '_'.join([cache_key_gen_version or '',
                                             GLOBAL_CACHE_KEY_GEN_VERSION])
 
-  def key_for_target(self, target, transitive=False, fingerprint_strategy=None):
+  def key_for_target(self, target, transitive=False, direct_checker=None, fingerprint_strategy=None):
     """Get a key representing the given target and its sources.
 
     A key for a set of targets can be created by calling combine_cache_keys()
@@ -77,10 +77,13 @@ class CacheKeyGenerator(object):
     hasher = hashlib.sha1()
     hasher.update(self._cache_key_gen_version)
     key_suffix = hasher.hexdigest()[:12]
-    if transitive:
-      target_key = target.transitive_invalidation_hash(fingerprint_strategy)
+    if direct_checker and direct_checker(target):
+      target_key = target.transitive_invalidation_hash(fingerprint_strategy, direct=True)
     else:
-      target_key = target.invalidation_hash(fingerprint_strategy)
+      if transitive:
+        target_key = target.transitive_invalidation_hash(fingerprint_strategy)
+      else:
+        target_key = target.invalidation_hash(fingerprint_strategy)
     if target_key is not None:
       full_key = '{target_key}_{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
       return CacheKey(target.id, full_key)

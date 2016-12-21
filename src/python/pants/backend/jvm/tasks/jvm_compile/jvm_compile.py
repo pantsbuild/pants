@@ -351,8 +351,34 @@ class JvmCompile(NailgunTaskBase):
   def _analysis_parser(self):
     return self._analysis_tools.parser
 
+  @staticmethod
+  def _compute_language_property(target, selector):
+    """Computes the a language property setting for the given target sources.
+
+    :param target The target whose language property will be calculated.
+    :param selector A function that takes a target or platform and returns the boolean value of the
+                    property for that target or platform, or None if that target or platform does
+                    not directly define the property.
+
+    If the target does not override the language property, returns true iff the property
+    is true for any of the matched languages for the target.
+    """
+    if selector(target) is not None:
+      return selector(target)
+
+    prop = False
+    if target.has_sources('.java'):
+      prop |= selector(Java.global_instance())
+    if target.has_sources('.scala'):
+      prop |= selector(ScalaPlatform.global_instance())
+    return prop
+
   def _fingerprint_strategy(self, classpath_products):
     return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
+
+  @staticmethod
+  def enable_strict_deps(target):
+    return JvmCompile._compute_language_property(target, lambda x: x.strict_deps)
 
   def _compile_context(self, target, target_workdir):
     analysis_file = JvmCompile._analysis_for_target(target_workdir, target)
@@ -360,7 +386,7 @@ class JvmCompile(NailgunTaskBase):
     classes_dir = os.path.join(target_workdir, 'classes')
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
-    strict_deps = self._compute_language_property(target, lambda x: x.strict_deps)
+    strict_deps = self.enable_strict_deps(target)
     return CompileContext(target,
                           analysis_file,
                           portable_analysis_file,
@@ -394,6 +420,7 @@ class JvmCompile(NailgunTaskBase):
     # all targets to finish.
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
+                          invalidate_direct_checker=JvmCompile.enable_strict_deps,
                           fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
 
@@ -825,27 +852,6 @@ class JvmCompile(NailgunTaskBase):
     if hasattr(target, 'java_sources') and target.java_sources:
       sources.extend(resolve_target_sources(target.java_sources))
     return sources
-
-  def _compute_language_property(self, target, selector):
-    """Computes the a language property setting for the given target sources.
-
-    :param target The target whose language property will be calculated.
-    :param selector A function that takes a target or platform and returns the boolean value of the
-                    property for that target or platform, or None if that target or platform does
-                    not directly define the property.
-
-    If the target does not override the language property, returns true iff the property
-    is true for any of the matched languages for the target.
-    """
-    if selector(target) is not None:
-      return selector(target)
-
-    prop = False
-    if target.has_sources('.java'):
-      prop |= selector(Java.global_instance())
-    if target.has_sources('.scala'):
-      prop |= selector(ScalaPlatform.global_instance())
-    return prop
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.
