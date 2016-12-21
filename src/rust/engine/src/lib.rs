@@ -1,20 +1,26 @@
 mod core;
 mod externs;
 mod graph;
+mod handles;
 mod nodes;
 mod scheduler;
 mod selectors;
 mod tasks;
 
 extern crate fnv;
+#[macro_use]
+extern crate lazy_static;
 
 use std::ffi::CStr;
 use std::mem;
 use std::os::raw;
 use std::path::Path;
+use std::ptr;
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
+  CloneValExtern,
+  DropHandlesExtern,
   CreateExceptionExtern,
   ExternContext,
   Externs,
@@ -26,6 +32,7 @@ use externs::{
   SatisfiedByExtern,
   StoreListExtern,
   UTF8Buffer,
+  ValForExtern,
   ValToStrExtern,
   with_vec,
 };
@@ -66,8 +73,8 @@ pub struct RawNode {
   // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
   // a stable release.
   state_tag: u8,
-  state_return: Value,
-  state_throw: Value,
+  state_return: *const Value,
+  state_throw: *const Value,
   state_noop: bool,
 }
 
@@ -84,12 +91,12 @@ impl RawNode {
           Some(&Complete::Noop(_, _)) => RawStateTag::Noop as u8,
         },
       state_return: match state {
-        Some(&Complete::Return(ref v)) => v.clone(),
-        _ => Default::default(),
+        Some(&Complete::Return(ref v)) => v,
+        _ => ptr::null(),
       },
       state_throw: match state {
-        Some(&Complete::Throw(ref v)) => v.clone(),
-        _ => Default::default(),
+        Some(&Complete::Throw(ref v)) => v,
+        _ => ptr::null(),
       },
       state_noop: match state {
         Some(&Complete::Noop(_, _)) => true,
@@ -132,6 +139,9 @@ impl RawNodes {
 pub extern fn scheduler_create(
   ext_context: *const ExternContext,
   key_for: KeyForExtern,
+  val_for: ValForExtern,
+  clone_val: CloneValExtern,
+  drop_handles: DropHandlesExtern,
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
@@ -152,6 +162,9 @@ pub extern fn scheduler_create(
     Externs::new(
       ext_context,
       key_for,
+      val_for,
+      clone_val,
+      drop_handles,
       id_to_str,
       val_to_str,
       satisfied_by,
