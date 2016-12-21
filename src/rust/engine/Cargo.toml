@@ -8,3 +8,4 @@ crate-type = ["dylib"]
 
 [dependencies]
 fnv = "1.0.3"
+lazy_static = "0.2.2"

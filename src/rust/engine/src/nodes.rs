@@ -6,7 +6,7 @@ use selectors;
 use tasks::Tasks;
 
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Runnable {
   func: Function,
   args: Vec<Value>,
@@ -27,14 +27,14 @@ impl Runnable {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum State<T> {
   Waiting(Vec<T>),
   Complete(Complete),
   Runnable(Runnable),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Complete {
   Noop(&'static str, Option<Node>),
   Return(Value),
@@ -119,6 +119,14 @@ impl<'g, 't> StepContext<'g, 't> {
     self.tasks.externs.key_for(val)
   }
 
+  fn val_for(&self, key: &Key) -> Value {
+    self.tasks.externs.val_for(key)
+  }
+
+  fn clone_val(&self, val: &Value) -> Value {
+    self.tasks.externs.clone_val(val)
+  }
+
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
@@ -187,17 +195,17 @@ impl Select {
     context: &StepContext,
     candidate: &'a Value,
     variant_value: Option<&str>
-  ) -> Option<&'a Value> {
+  ) -> bool {
     if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
-      return None;
+      return false;
     }
-    match variant_value {
+    return match variant_value {
       Some(vv) if context.field_name(candidate) != *vv =>
         // There is a variant value, and it doesn't match.
-        return None,
+        false,
       _ =>
-        return Some(candidate),
-    }
+        true,
+    };
   }
 
   /**
@@ -208,20 +216,20 @@ impl Select {
   fn select_literal(
     &self,
     context: &StepContext,
-    candidate: &Value,
+    candidate: Value,
     variant_value: Option<&str>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
-    if let Some(&candidate) = self.select_literal_single(context, candidate, variant_value) {
+    if self.select_literal_single(context, &candidate, variant_value) {
       return Some(candidate)
     }
 
     // Else, check whether it has-a instance of the product.
     // TODO: returning only the first literal configuration of a given type/variant. Need to
     // define mergeability for products.
-    if context.has_products(candidate) {
-      for child in context.field_products(candidate) {
-        if let Some(&child) = self.select_literal_single(context, &child, variant_value) {
+    if context.has_products(&candidate) {
+      for child in context.field_products(&candidate) {
+        if self.select_literal_single(context, &child, variant_value) {
           return Some(child);
         }
       }
@@ -251,7 +259,7 @@ impl Step for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, self.subject.value(), variant_value) {
+    if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), variant_value) {
       return State::Complete(Complete::Return(literal_value));
     }
 
@@ -261,14 +269,14 @@ impl Step for Select {
     for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
       match context.get(&dep_node) {
         Some(&Complete::Return(ref value)) => {
-          if let Some(v) = self.select_literal(&context, value, variant_value) {
+          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
             matches.push(v);
           }
         },
         Some(&Complete::Noop(_, _)) =>
           continue,
-        Some(&Complete::Throw(msg)) =>
-          return State::Complete(Complete::Throw(msg)),
+        Some(&Complete::Throw(ref msg)) =>
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
           dependencies.push(dep_node),
       }
@@ -308,8 +316,8 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, _: StepContext) -> State<Node> {
-    State::Complete(Complete::Return(self.selector.subject.value().clone()))
+  fn step(&self, context: StepContext) -> State<Node> {
+    State::Complete(Complete::Return(context.val_for(&self.selector.subject)))
   }
 }
 
@@ -330,25 +338,25 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_product(&self, context: &StepContext) -> Result<Value, State<Node>> {
+  fn dep_product<'a>(&self, context: &'a StepContext) -> Result<&'a Value, State<Node>> {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
         Selector::select(self.selector.dep_product),
-        self.subject,
+        self.subject.clone(),
         self.variants.clone()
       );
     match context.get(&dep_product_node) {
       Some(&Complete::Return(ref value)) =>
-        Ok(value.clone()),
+        Ok(value),
       Some(&Complete::Noop(_, _)) =>
         Err(
           State::Complete(
             Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
           )
         ),
-      Some(&Complete::Throw(msg)) =>
-        Err(State::Complete(Complete::Throw(msg))),
+      Some(&Complete::Throw(ref msg)) =>
+        Err(State::Complete(Complete::Throw(context.clone_val(msg)))),
       None =>
         Err(State::Waiting(vec![dep_product_node])),
     }
@@ -418,7 +426,7 @@ impl Step for SelectDependencies {
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg.clone())),
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
           dependencies.push(dep_node),
       }
@@ -445,7 +453,7 @@ impl Step for SelectProjection {
     let input_node =
       Node::create(
         Selector::select(self.selector.input_product),
-        self.subject,
+        self.subject.clone(),
         self.variants.clone()
       );
     let dep_product =
@@ -457,7 +465,7 @@ impl Step for SelectProjection {
             Complete::Noop("Could not compute {} to project its field.", Some(input_node))
           ),
         Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(msg.clone())),
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
           return State::Waiting(vec![input_node]),
       };
@@ -478,8 +486,8 @@ impl Step for SelectProjection {
         self.variants.clone()
       );
     match context.get(&output_node) {
-      Some(&Complete::Return(value)) =>
-        State::Complete(Complete::Return(value)),
+      Some(&Complete::Return(ref value)) =>
+        State::Complete(Complete::Return(context.clone_val(value))),
       Some(&Complete::Noop(_, _)) =>
         State::Complete(
           context.throw(
@@ -491,7 +499,7 @@ impl Step for SelectProjection {
         ),
       Some(&Complete::Throw(ref msg)) =>
         // NB: propagate thrown exception directly.
-        State::Complete(Complete::Throw(msg.clone())),
+        State::Complete(Complete::Throw(context.clone_val(msg))),
       None =>
         State::Waiting(vec![output_node]),
     }
@@ -515,7 +523,7 @@ impl Step for Task {
       let dep_node =
         Node::create(
           selector.clone(),
-          self.subject,
+          self.subject.clone(),
           self.variants.clone()
         );
       match context.get(&dep_node) {
@@ -527,7 +535,7 @@ impl Step for Task {
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(msg.clone())),
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
           dependencies.push(dep_node),
       }
@@ -540,7 +548,7 @@ impl Step for Task {
       // Ready to run!
       State::Runnable(Runnable {
         func: self.selector.func,
-        args: dep_values.into_iter().cloned().collect(),
+        args: dep_values.iter().map(|v| context.clone_val(v)).collect(),
         cacheable: self.selector.cacheable,
       })
     }
@@ -608,7 +616,7 @@ impl Node {
       Selector::SelectLiteral(s) =>
         // NB: Intentionally ignores subject parameter to provide a literal subject.
         Node::SelectLiteral(SelectLiteral {
-          subject: s.subject,
+          subject: s.subject.clone(),
           variants: variants,
           selector: s,
         }),

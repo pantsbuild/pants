@@ -2,8 +2,10 @@ use fnv::FnvHasher;
 
 use std::collections::HashMap;
 use std::hash;
-use std::os::raw;
+use std::ops::Drop;
 use std::ptr;
+
+use handles::{Handle, enqueue_drop_handle};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -60,14 +62,13 @@ pub struct Function(pub Id);
 
 // The name of a field.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Field(pub Key);
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct Key {
   id: Id,
-  value: Value,
   type_id: TypeId,
 }
 
@@ -90,10 +91,6 @@ impl Key {
     self.id
   }
 
-  pub fn value(&self) -> &Value {
-    &self.value
-  }
-
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
   }
@@ -102,24 +99,44 @@ impl Key {
 /**
  * Represents a handle to a python object, explicitly without equality or hashing. Whenever
  * the equality/identity of a Value matters, a Key should be computed for it and used instead.
+ *
+ * Additionally, since a Value corresponds one-to-one with a Python CFFI handle, Value does not
+ * directly implement Copy or Clone. Instead, there is an explicit extern `clone_value` that calls
+ * back to Python to clone the underlying CFFI handle.
  */
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct Value {
-  handle: *const raw::c_void,
+  handle: Handle,
   type_id: TypeId,
+}
+
+impl Drop for Value {
+  fn drop(&mut self) {
+    enqueue_drop_handle(self.handle);
+  }
 }
 
 impl Value {
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
   }
+
+  /**
+   * An escape hatch to allow for cloning a Value: you should generally not do this unless you
+   * are certain the cloned Value has been mem::forgotten (otherwise it will be `Drop`ed twice).
+   */
+  pub unsafe fn clone(&self) -> Value {
+    Value {
+      ..*self
+    }
+  }
 }
 
 impl Default for Value {
   fn default() -> Self {
     Value {
-      handle: ptr::null() as *const raw::c_void,
+      handle: ptr::null() as Handle,
       type_id: TypeId(0),
     }
   }
