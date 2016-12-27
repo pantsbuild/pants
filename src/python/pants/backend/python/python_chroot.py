@@ -19,7 +19,7 @@ from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
-from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_binary import PythonBinary

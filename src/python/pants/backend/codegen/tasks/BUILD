@@ -27,17 +27,7 @@ python_library(
   name = 'apache_thrift_gen',
   sources = ['apache_thrift_gen.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/codegen/subsystems:thrift_defaults',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
-    'src/python/pants/binaries:thrift_util',
-    'src/python/pants/option',
-    'src/python/pants/task',
-    'src/python/pants/util:memo',
+    'src/python/pants/backend/codegen/thrift/java',
   ],
 )
 

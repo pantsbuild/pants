@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import hashlib
 
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.base.fingerprint_strategy import FingerprintStrategy
 
 

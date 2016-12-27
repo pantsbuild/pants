@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from mock import Mock, patch
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import TaskTestBase
 

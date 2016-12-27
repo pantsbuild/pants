@@ -135,7 +135,6 @@ python_library(
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_thrift_library',
-    'src/python/pants/backend/codegen/subsystems:thrift_defaults',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',

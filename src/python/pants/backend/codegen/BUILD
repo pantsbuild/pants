@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/backend/codegen/tasks:all',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ]
