@@ -12,7 +12,7 @@ import sys
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.code_generator import CodeGenerator
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_walk

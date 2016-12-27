@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.codegen.tasks.apache_thrift_gen import ApacheThriftGen
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.apache_thrift_gen import ApacheThriftGen
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.tasks.task_test_base import TaskTestBase

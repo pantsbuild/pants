@@ -85,8 +85,8 @@ python_tests(
   name = 'what_changed',
   sources = ['test_what_changed.py'],
   dependencies = [
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/codegen/thrift/java',
+    'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',

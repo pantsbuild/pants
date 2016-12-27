@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import uuid
 from contextlib import contextmanager
 
-from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 

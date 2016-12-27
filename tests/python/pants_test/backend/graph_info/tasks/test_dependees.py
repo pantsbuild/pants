@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.graph_info.tasks.dependees import ReverseDepmap
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary

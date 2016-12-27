@@ -12,6 +12,7 @@ python_library(
     'jaxb_library.py',
   ],
   dependencies = [
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
@@ -29,10 +30,11 @@ python_library(
   dependencies = [
     # Note that this is part of a gnarly dependency chain:
     #  backend/python:thrift_builder ->
-    #  backend/codegen/targets:python ->
-    #  backend/python/targets:python
+    #  src/python/pants/backend/codegen/thrift/python ->
+    #  backend/python/targets
     # This isn't circular, but it's still bad that it crosses between backends and back again.
     # TODO: Clean this up. thrift_builder should almost certainly be in the codegen backend.
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/backend/codegen/thrift/python',
   ],
 )
