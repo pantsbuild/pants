@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.codegen.register import build_file_aliases as register_codegen
-from pants.backend.codegen.targets.jaxb_library import JaxbLibrary
-from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
+from pants.backend.codegen.jaxb.register import build_file_aliases as register_codegen
+from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
+from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.build_graph.register import build_file_aliases as register_core
 from pants_test.tasks.task_test_base import TaskTestBase
 
