@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
+from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest
 
