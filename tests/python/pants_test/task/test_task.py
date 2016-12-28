@@ -241,3 +241,34 @@ class TaskTest(TaskTestBase):
     # Verify the content. The task was invalid twice - the initial run and the run with the changed source file.
     # Only vtC (previous sucessful runs + cache miss) resulted in copying the previous_results.
     self.assertContent(vtC, first_contents + second_contents)
+
+  # Some sanity checks around the should_cache bool, since I am tired of only finding out it broke through int tests!
+  # The should_cache_target_dir inherited a bug from the CacheFactory - success returns a cache instance. So, we deal.
+  def test_should_cache_if_cache_available(self):
+    task, vtA, _ = self._run_fixture(artifact_cache=True)
+    self.assertIsNotNone(task._should_cache_target_dir(vtA))
+
+  def test_should_not_cache_if_not_cache_target_dirs(self):
+    task, vtA, _ = self._run_fixture(artifact_cache=True)
+    task._cache_target_dirs = False
+    self.assertFalse(task._should_cache_target_dir(vtA))
+
+  def test_should_cache_first_incremental_build(self):
+    task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
+    self.assertIsNotNone(task._should_cache_target_dir(vtA))
+
+  def test_should_not_cache_if_created_from_incremental_results(self):
+    task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
+    self._create_clean_file(vtA.target, 'bar')
+    vtB, _ = task.execute()
+    self.assertFalse(task._should_cache_target_dir(vtB))
+
+  def test_should_not_cache_if_no_available_cache(self):
+    task, vtA, _ = self._run_fixture(incremental=True)
+    self.assertFalse(task._should_cache_target_dir(vtA))
+
+  def test_should_respect_no_cache_label(self):
+    task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
+    self.assertIsNotNone(task._should_cache_target_dir(vtA))
+    vtA.target.add_labels('no_cache')
+    self.assertFalse(task._should_cache_target_dir(vtA))
