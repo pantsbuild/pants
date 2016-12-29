@@ -225,12 +225,15 @@ shows some useful idioms for JVM tasks.
 Enabling Artifact Caching For Tasks
 --------------------------
 
-Artifacts are the output created when a task processes a target. For example, the artifacts of a `JavaCompile` task on a target
-`java_library` would be the `.class` files produced by compiling the library.
+* **Artifacts** are the output created when a task processes a target.
+    - For example, the artifacts of a `JavaCompile` task on a target `java_library` would be the `.class` files produced by compiling the library.
 
-**Automatic results_dir caching**
+* **VersionedTarget** (VT) is a wrapper around a Pants target that is used to determine whether a task should do work for that target.
+    - If a task determines the VT has already been processed, that VT is considered "valid".
 
-Pants offers automatic caching of a target's output directory. Automatic caching works by assigning a results directory to each VersionedTarget (VT) of the InvalidationCheck yielded by `Task->invalidated`.
+**Automatic caching**
+
+Pants offers automatic caching of a target's output directory. Automatic caching works by assigning a results directory to each VT of the InvalidationCheck yielded by `Task->invalidated`.
 
 A task operating on a given VT should place the resulting artifacts in the VT's
 `results_dir`. After exiting the `invalidated` context block, these artifacts
