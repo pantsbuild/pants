@@ -264,7 +264,7 @@ class TaskTest(TaskTestBase):
     self.assertFalse(task._should_cache_target_dir(vtB))
 
   def test_should_not_cache_if_no_available_cache(self):
-    task, vtA, _ = self._run_fixture(incremental=True)
+    task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=False)
     self.assertFalse(task._should_cache_target_dir(vtA))
 
   def test_should_respect_no_cache_label(self):

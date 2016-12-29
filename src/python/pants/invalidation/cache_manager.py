@@ -100,7 +100,7 @@ class VersionedTargetSet(object):
 
   @memoized_property
   def _previous_results_path(self):
-    # File ath that would hold the previous VT.unique_results_dir. This can be None if no previous runs are known.
+    # File path that would hold the previous VT.unique_results_dir. This can be None if no previous runs are known.
     if not self.previous_cache_key:
       return None
     return self._generate_results_path(self.previous_cache_key)
@@ -151,6 +151,9 @@ class VersionedTargetSet(object):
     # until https://github.com/pantsbuild/pants/issues/2532 is resolved.
     self._cache_manager.force_invalidate(self)
 
+  def _has_results_dir(self):
+    return os.path.lexists(self._stable_results_path)
+
   def ensure_legal(self):
     """Return True as long as the state does not break any internal contracts.
 
@@ -187,14 +190,14 @@ class VersionedTargetSet(object):
       shutil.copytree(self.previous_results_dir, self.unique_results_dir)
 
   def live_dirs(self):
-    """Yield directories that should be preserved in order for this VersionedTarget to fully function.
-
-    These file paths are not guaranteed to exist through this method, use ensure_legal() as needed.
-    """
-    yield self._generate_results_path
-    yield self._unique_results_path
-    if self.previous_results_dir:
-      yield self.previous_results_dir
+    """Return directories that must be preserved in order for this VersionedTarget to function."""
+    # Returning paths instead of verified dirs since the only current caller subsumes errors in a background process.
+    # Not including previous_dir, since when this is called the contents of the previous dir have been copied as needed.
+    live = []
+    if self._has_results_dir():
+      live.append(self._stable_results_path)
+      live.append(self._unique_results_path)
+    return live
 
   def __repr__(self):
     return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
