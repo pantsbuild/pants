@@ -253,7 +253,7 @@ To implement caching for groupings of targets, you can override the `check_artif
 Pants allows more fine grained cache management, although it then becomes the responsibility of the task developer to manually upload VT / artifact pairs to the cache. Here is a template for how manual caching might be implemented:
 
     def execute(self):
-      targets = self.context.targets()
+      targets = self.context.targets(lambda t: isinstance(t, YourTarget)):
       with self.invalidated(targets) as invalidation_check:
 
         # Run your task over the invalid vts and cache the output.
