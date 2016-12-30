@@ -67,9 +67,9 @@ class VersionedTargetSet(object):
       cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key, self.valid, phase='init')
 
   @memoized_property
-  def _task_workdir(self):
+  def _root_dir(self):
     # Corresponds to the task.workdir under the current contract.
-    return self._cache_manager.task_workdir
+    return self._cache_manager.root_dir
 
   def _generate_results_path(self, key, stable=False):
     """Return a results directory path for the given key.
@@ -82,7 +82,7 @@ class VersionedTargetSet(object):
     task_hash = CacheKeyGenerator.hash_value(self._cache_manager.task_version)
     dir_name = self._STABLE_DIR_NAME if stable else CacheKeyGenerator.hash_value(key.hash)
     return os.path.join(
-        self._task_workdir,
+        self._root_dir,
         task_hash,
         key.id,
         dir_name,
@@ -123,6 +123,9 @@ class VersionedTargetSet(object):
     The unique_results_dir is derived from the VTS cache_key(s). The results_dir is a symlink to the unique_results_dir:
     consumers should generally prefer that stable location as referenced by results_dir.
     """
+    # TODO(mateo): This should be private,. It's not clear from the API that Pants prefers tasks use the symlink.
+    # The only external caller is the artifact cache, which means Product and ArtifactCache read different file paths!
+    # Tasks that truly need the unique_results_dir path should have to take the step of following the symlink.
     if not os.path.isdir(self._unique_results_path):
       raise ValueError('No results_dir was created for {}'.format(self))
     return self._unique_results_path
@@ -185,6 +188,7 @@ class VersionedTargetSet(object):
 
     Should be called after the cache is checked, since previous_results are not useful if there is a cached artifact.
     """
+    # TODO(mateo): This should be moved into Task or even its own class. The incremental results logic is a task detail.
     if self.previous_results_dir:
       safe_rmtree(self.unique_results_dir)
       shutil.copytree(self.previous_results_dir, self.unique_results_dir)
@@ -267,25 +271,25 @@ class InvalidationCacheManager(object):
                invalidation_report=None,
                task_name=None,
                task_version=None,
-               task_workdir=None,
+               root_dir=None,
                artifact_write_callback=lambda _: None):
     """
     :API: public
     """
-    # IMHO, most of these params should just be removed in favor of the task instance. If this needs to be public, the
-    # API would become much simpler, and the only levers surfaced to the task are invalidate_deps and fp_strategy.
-    # Every other param is a task attribute/option/callback.
-    self._cache_key_generator = cache_key_generator
+    # NOTE(mateo): This probably should acknowledge the deep coupling with Task and add a task instance argument.
+    # The __init__ could be reduced to InvalidationCacheManager(task, fp_strategy, invalidate_dependents).
+    self.invalidation_report = invalidation_report
+
+    # In practice, the root_dir corresponds with the task.workdir.
+    self._root_dir = root_dir
     self._task_name = task_name or 'UNKNOWN'
     self._task_version = task_version or 'Unknown_0'
 
-    # The workdir should at least become a required param, if the API is unable to be migrated for reasons.
-    self._task_workdir = task_workdir
+    self._cache_key_generator = cache_key_generator
     self._invalidate_dependents = invalidate_dependents
     self._invalidator = BuildInvalidator(build_invalidator_dir)
     self._fingerprint_strategy = fingerprint_strategy
     self._artifact_write_callback = artifact_write_callback
-    self.invalidation_report = invalidation_report
 
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
@@ -334,8 +338,8 @@ class InvalidationCacheManager(object):
     return self._task_version
 
   @property
-  def task_workdir(self):
-    return self._task_workdir
+  def root_dir(self):
+    return self._root_dir
 
   def wrap_targets(self, targets, topological_order=False):
     """Wrap targets and their computed cache keys in VersionedTargets.

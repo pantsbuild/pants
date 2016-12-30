@@ -279,7 +279,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     invalidation_report=self.context.invalidation_report,
                                     task_name=type(self).__name__,
                                     task_version=self.implementation_version_str(),
-                                    task_workdir=self.workdir,
+                                    root_dir=self.workdir,
                                     artifact_write_callback=self.maybe_write_artifact)
 
   @property

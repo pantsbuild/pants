@@ -24,7 +24,7 @@ class InvalidationCacheManagerTest(BaseTest):
       cache_key_generator=CacheKeyGenerator(),
       build_invalidator_dir=self._dir,
       invalidate_dependents=True,
-      task_workdir=self._task_workdir,
+      root_dir=self._task_workdir,
     )
 
   def tearDown(self):
@@ -167,3 +167,9 @@ class InvalidationCacheManagerTest(BaseTest):
       self.clobber_symlink(vt)
       vts = VersionedTargetSet.from_versioned_targets([vt])
       vts.update()
+
+  def test_has_results_dir(self):
+    vt = self.make_vt(invalid=True)
+    self.assertFalse(vt._has_results_dir())
+    vt.create_results_dir()
+    self.assertTrue(vt._has_results_dir())

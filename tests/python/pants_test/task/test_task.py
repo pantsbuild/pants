@@ -28,14 +28,21 @@ class DummyTask(Task):
   """A task that appends the content of a DummyLibrary's source into its results_dir."""
 
   _implementation_version = 0
+  _cache_target_dirs = True
+  _cache_incremental = False
+
+  @property
+  def cache_target_dirs(self):
+    return self._cache_target_dirs
 
   @property
   def incremental(self):
     return self._incremental
 
   @property
-  def cache_target_dirs(self):
-    return True
+  def cache_incremental(self):
+    # Task.py has this hard-coded as False but it is exposed here to get coverage for when/if it's enabled.
+    return self._cache_incremental
 
   @classmethod
   def implementation_version_str(cls):
@@ -250,18 +257,27 @@ class TaskTest(TaskTestBase):
 
   def test_should_not_cache_if_not_cache_target_dirs(self):
     task, vtA, _ = self._run_fixture(artifact_cache=True)
+    self.assertTrue(task.cache_target_dirs)
     task._cache_target_dirs = False
+    self.assertFalse(task.cache_target_dirs)
     self.assertFalse(task._should_cache_target_dir(vtA))
 
-  def test_should_cache_first_incremental_build(self):
+  def test_should_cache_clean_incremental_build(self):
     task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
     self.assertIsNotNone(task._should_cache_target_dir(vtA))
 
-  def test_should_not_cache_if_created_from_incremental_results(self):
+  def test_should_respect_disable_cache_when_created_from_incremental_results(self):
     task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
     self._create_clean_file(vtA.target, 'bar')
     vtB, _ = task.execute()
     self.assertFalse(task._should_cache_target_dir(vtB))
+
+  def test_should_respect_enable_cache_when_created_from_incremental_results(self):
+    task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
+    self._create_clean_file(vtA.target, 'bar')
+    task._cache_incremental = True
+    vtB, _ = task.execute()
+    self.assertTrue(task._should_cache_target_dir(vtB))
 
   def test_should_not_cache_if_no_available_cache(self):
     task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=False)
@@ -272,3 +288,4 @@ class TaskTest(TaskTestBase):
     self.assertIsNotNone(task._should_cache_target_dir(vtA))
     vtA.target.add_labels('no_cache')
     self.assertFalse(task._should_cache_target_dir(vtA))
+
