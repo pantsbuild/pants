@@ -56,8 +56,6 @@ class DummyTask(Task):
       vt = invalidation.all_vts[0]
       was_valid = vt.valid
       if not was_valid:
-        if vt.previous_results_dir:
-          assert os.path.isdir(vt.previous_results_dir)
         with open(os.path.join(get_buildroot(), vt.target.source), 'r') as infile:
           outfile_name = os.path.join(vt.results_dir, os.path.basename(vt.target.source))
           with open(outfile_name, 'a') as outfile:
@@ -112,7 +110,8 @@ class TaskTest(TaskTestBase):
 
   def test_incremental(self):
     """Run three times with two unique fingerprints."""
-
+    # Uses private API of the VT, vt._previous_results_dir. Not ideal, but that property is totally dependent on
+    # running a sequence of task.execute(). That being tested here is more evidence the abstraction leaks a bit.
     one = '1\n'
     two = '2\n'
     three = '3\n'
@@ -128,7 +127,7 @@ class TaskTest(TaskTestBase):
     self._create_clean_file(target, two)
     vtB, was_B_valid = task.execute()
     self.assertFalse(was_B_valid)
-    self.assertEqual(vtB.previous_results_dir, vtA.unique_results_dir)
+    self.assertEqual(vtB._previous_results_dir, vtA.unique_results_dir)
     self.assertEqual(vtB.previous_cache_key, vtA.cache_key)
     self.assertContent(vtB, one + two)
 
@@ -136,7 +135,7 @@ class TaskTest(TaskTestBase):
     self._create_clean_file(target, three)
     vtC, was_C_valid = task.execute()
     self.assertFalse(was_C_valid)
-    self.assertEqual(vtC.previous_results_dir, vtB.unique_results_dir)
+    self.assertEqual(vtC._previous_results_dir, vtB.unique_results_dir)
     self.assertContent(vtC, one + two + three)
 
     # Again create a clean file but this time reuse an old cache key - in this case vtB.
@@ -146,7 +145,7 @@ class TaskTest(TaskTestBase):
     # It will wipe the invalid vtB.unique_results_dir and followup by copying in the most recent results_dir, from vtC.
     vtD, was_D_valid = task.execute()
     self.assertFalse(was_D_valid)
-    self.assertEqual(vtD.previous_results_dir, vtC.unique_results_dir)
+    self.assertEqual(vtD._previous_results_dir, vtC.unique_results_dir)
     self.assertContent(vtD, one + two + three + two)
 
     # And that the results_dir was stable throughout.
@@ -190,8 +189,8 @@ class TaskTest(TaskTestBase):
     vtB, _ = task.execute()
 
     # No incrementalism.
-    self.assertFalse(vtA.previous_results_dir)
-    self.assertFalse(vtB.previous_results_dir)
+    self.assertFalse(self._incremental_vt(vtA))
+    self.assertFalse(self._incremental_vt(vtB))
 
     # Confirm two unassociated current directories, and unassociated stable directories.
     self.assertContent(vtA, one)
@@ -231,7 +230,7 @@ class TaskTest(TaskTestBase):
     vtB, was_B_valid = task.execute()
     self.assertEqual(vtA.cache_key.hash, vtB.cache_key.hash)
     self.assertTrue(was_B_valid)
-    self.assertFalse(vtB.previous_results_dir)
+    self.assertFalse(self._incremental_vt(vtB))
 
     # Change the cache_key and disable the cache_reads.
     # This results in an invalid vt, with no cache hit. It will then copy the vtB.previous_results into vtC.results_dir.
@@ -242,8 +241,6 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(vtB.cache_key.hash, vtC.cache_key.hash)
     self.assertEqual(vtC.previous_cache_key, vtB.cache_key)
     self.assertFalse(was_C_valid)
-
-    self.assertEqual(vtB.unique_results_dir, vtC.previous_results_dir)
 
     # Verify the content. The task was invalid twice - the initial run and the run with the changed source file.
     # Only vtC (previous sucessful runs + cache miss) resulted in copying the previous_results.

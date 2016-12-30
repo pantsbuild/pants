@@ -405,7 +405,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     # Cache has been checked to create the full list of invalid VTs. Only copy previous_results for this subset of VTs.
     for vts in invalidation_check.invalid_vts:
-      if self.incremental:
+      if self._incremental_vt(vt):
         vts.copy_previous_results()
 
     # Yield the result, and then mark the targets as up to date.
@@ -440,12 +440,15 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       root_dir = os.path.dirname(vt.results_dir)
       safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes=live_dirs)
 
+  def _incremental_vt(self, vt):
+    return self.incremental and vt.has_previous_results
+
   def _should_cache_target_dir(self, vt):
     """True if the given vt should be written to a cache."""
     return (
       self.cache_target_dirs and
       not vt.target.has_label('no_cache') and
-      (not vt.previous_results_dir or self.cache_incremental) and
+      (not self._incremental_vt or self.cache_incremental) and
       self.artifact_cache_writes_enabled()
     )
 

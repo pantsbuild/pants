@@ -71,6 +71,28 @@ class VersionedTargetSet(object):
     # Corresponds to the task.workdir under the current contract.
     return self._cache_manager.root_dir
 
+  def _has_results_dir(self):
+    return os.path.lexists(self._stable_results_path)
+
+  def _ensure_legal(self):
+    # Does not guarantee that the results directories exist - but if they do they are checked
+    if self._has_results_dir:
+      self._check_results_dirs
+    return True
+
+  def _check_results_dirs(self:)
+    # Check results_dirs and hard fail if they do not exist or are in an illegal state.
+    # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
+    errors = ''
+    if not os.path.islink(self.results_dir):
+      errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self.results_dir)
+    if not os.path.isdir(self.unique_results_dir):
+      errors += '\nThe unique_results_dir directory was not found\n\t* {}'.format(self.unique_results_dir)
+    if errors:
+      raise self.IllegalResultsDir(
+        '\nThe results_dirs should not be manually cleaned or recreated by tasks.\n{}'.format(errors)
+      )
+
   def _generate_results_path(self, key, stable=False):
     """Return a results directory path for the given key.
 
@@ -106,11 +128,19 @@ class VersionedTargetSet(object):
     return self._generate_results_path(self.previous_cache_key)
 
   @memoized_property
+  def _previous_results_dir(self):
+    # Return path the unique_results_dir of the most recent build of these targets or None if it does not exist.
+    # TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could mutate them.
+    if self._previous_results_path and os.path.isdir(self._previous_results_path):
+      return self._previous_results_path
+    return None
+
+  @memoized_property
   def results_dir(self):
     """Return file path that represents the stable output location for these targets.
 
-    The results_dir is represented by a stable symlink to the unique_results_dir: consumers
-    should generally prefer to access this stable directory.
+    The results_dir is represented by a stable symlink to the unique_results_dir.
+    Consumers should prefer to access this stable directory.
     """
     if not os.path.isdir(self._stable_results_path):
       raise ValueError('No results_dir was created for {}'.format(self))
@@ -120,78 +150,20 @@ class VersionedTargetSet(object):
   def unique_results_dir(self):
     """Return unique file path to use as an output directory by these targets.
 
-    The unique_results_dir is derived from the VTS cache_key(s). The results_dir is a symlink to the unique_results_dir:
-    consumers should generally prefer that stable location as referenced by results_dir.
+    The unique_results_dir is derived from the VTS cache_key(s). The results_dir is a symlink to the unique_results_dir.
+    Consumers should prefer that stable location as referenced by results_dir.
     """
-    # TODO(mateo): This should be private,. It's not clear from the API that Pants prefers tasks use the symlink.
+    # TODO(mateo): This should be private. It's not clear from the API that Pants prefers tasks use the symlink.
     # The only external caller is the artifact cache, which means Product and ArtifactCache read different file paths!
     # Tasks that truly need the unique_results_dir path should have to take the step of following the symlink.
     if not os.path.isdir(self._unique_results_path):
       raise ValueError('No results_dir was created for {}'.format(self))
     return self._unique_results_path
 
-  @memoized_property
-  def previous_results_dir(self):
-    """Return file path that corresponds to the unique_results_dir of the most recent build of these targets.
-
-    The previous_results_dir differs from results_dir and unique_results_dir since it is not required in order for
-    the task to function, even if the task enables incremental results.
-    Returns None if directory does not exist.
-    """
+  def has_previous_results(self, vt):
+    """Return True if the cache_manager can locate the results_dir for the previous exection of this VT."""
     # Only used by tasks that enable incremental results.
-    # TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could mutate them.
-    if self._previous_results_path and os.path.isdir(self._previous_results_path):
-      return self._previous_results_path
-    return None
-
-  def update(self):
-    self._cache_manager.update(self)
-
-  def force_invalidate(self):
-    # Note: This method isn't exposted as Public because the api is not yet
-    # finalized, however it is currently used by Square for plugins.  There is
-    # an open OSS issue to finalize this API.  Please take care when changing
-    # until https://github.com/pantsbuild/pants/issues/2532 is resolved.
-    self._cache_manager.force_invalidate(self)
-
-  def _has_results_dir(self):
-    return os.path.lexists(self._stable_results_path)
-
-  def ensure_legal(self):
-    """Return True as long as the state does not break any internal contracts.
-
-    Does not guarantee that the results directories exist - but if they do they must conform to the expected state.
-    """
-    # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
-    if os.path.lexists(self._stable_results_path):
-      errors = ''
-      if not os.path.islink(self.results_dir):
-        errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self.results_dir)
-      if not os.path.isdir(self.unique_results_dir):
-        errors += '\nThe unique_results_dir directory was not found\n\t* {}'.format(self.unique_results_dir)
-      if errors:
-        raise self.IllegalResultsDir(
-          '\nThe results_dirs should not be manually cleaned or recreated by tasks.\n{}'.format(errors)
-        )
-    return True
-
-  def create_results_dir(self):
-    """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
-    if not self.valid:
-      # Clean the workspace for invalid vts.
-      safe_mkdir(self._unique_results_path, clean=True)
-      relative_symlink(self._unique_results_path, self._stable_results_path)
-    self.ensure_legal()
-
-  def copy_previous_results(self):
-    """Use the latest valid results_dir as the starting contents of the current results_dir.
-
-    Should be called after the cache is checked, since previous_results are not useful if there is a cached artifact.
-    """
-    # TODO(mateo): This should be moved into Task or even its own class. The incremental results logic is a task detail.
-    if self.previous_results_dir:
-      safe_rmtree(self.unique_results_dir)
-      shutil.copytree(self.previous_results_dir, self.unique_results_dir)
+    return vt._previous_results_dir
 
   def live_dirs(self):
     """Return directories that must be preserved in order for this VersionedTarget to function."""
@@ -202,6 +174,36 @@ class VersionedTargetSet(object):
       live.append(self._stable_results_path)
       live.append(self._unique_results_path)
     return live
+
+  def update(self):
+    """Verify that the results_dirs for this vt are legal and if so, allow the cache_manager to update the vt."""
+    self._ensure_legal()
+    self._cache_manager.update(self)
+
+  def force_invalidate(self):
+    # Note: This method isn't exposted as Public because the api is not yet
+    # finalized, however it is currently used by Square for plugins.  There is
+    # an open OSS issue to finalize this API.  Please take care when changing
+    # until https://github.com/pantsbuild/pants/issues/2532 is resolved.
+    self._cache_manager.force_invalidate(self)
+
+  def create_results_dir(self):
+    """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
+    if not self.valid:
+      # Clean the workspace for invalid vts.
+      safe_mkdir(self._unique_results_path, clean=True)
+      relative_symlink(self._unique_results_path, self._stable_results_path)
+    self._ensure_legal()
+
+  def copy_previous_results(self):
+    """Use the latest valid results_dir as the starting contents of the current results_dir.
+
+    Should be called after the cache is checked, since previous_results are not useful if there is a cached artifact.
+    """
+    # TODO(mateo): The incremental logic should be moved to Task - the incremental implementation is a task detail.
+    if self._previous_results_dir:
+      safe_rmtree(self.unique_results_dir)
+      shutil.copytree(self._previous_results_dir, self.unique_results_dir)
 
   def __repr__(self):
     return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
@@ -293,14 +295,14 @@ class InvalidationCacheManager(object):
 
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
+    # TODO(mateo): The toggle of vt.valid should be at worst moved into the VTS class itself but still not gated on the
+    # success of the callback.
     for vt in vts.versioned_targets:
-      vt.ensure_legal()
       if not vt.valid:
         self._invalidator.update(vt.cache_key)
         vt.valid = True
         self._artifact_write_callback(vt)
     if not vts.valid:
-      vts.ensure_legal()
       self._invalidator.update(vts.cache_key)
       vts.valid = True
       self._artifact_write_callback(vts)

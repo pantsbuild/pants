@@ -684,7 +684,7 @@ class JvmCompile(NailgunTaskBase):
       Returns true if we should try to compile the target incrementally.
       """
       return (
-        vts.previous_results_dir and
+        self._incremental_vt(vts) and
         not self._clear_invalid_analysis and
         os.path.exists(ctx.analysis_file)
       )
