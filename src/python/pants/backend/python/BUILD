@@ -115,7 +115,7 @@ python_library(
     ':antlr_builder',
     ':python_requirement',
     ':thrift_builder',
-    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/codegen/antlr/python',
     'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',

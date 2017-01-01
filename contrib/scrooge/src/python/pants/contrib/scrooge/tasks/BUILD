@@ -51,7 +51,7 @@ python_library(
   name='java_thrift_library_fingerprint_strategy',
   sources=['java_thrift_library_fingerprint_strategy.py'],
   dependencies=[
-    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/base:fingerprint_strategy',
   ],
 )
