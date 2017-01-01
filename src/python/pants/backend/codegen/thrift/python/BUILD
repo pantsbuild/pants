@@ -3,6 +3,7 @@
 
 python_library(
   dependencies = [
+    'src/python/pants/backend/codegen/thrift/lib',
     # Note that this is part of a gnarly dependency chain:
     #  backend/python:thrift_builder ->
     #  backend/codegen/thrift/python ->

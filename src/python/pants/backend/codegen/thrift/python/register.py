@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.thrift.java.apache_thrift_java_gen import ApacheThriftJavaGen
-from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -14,10 +14,10 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      'java_thrift_library': JavaThriftLibrary,
+      'python_thrift_library': PythonThriftLibrary,
       }
     )
 
 
 def register_goals():
-  task(name='thrift-java', action=ApacheThriftJavaGen).install('gen')
+  task(name='thrift-py', action=ApacheThriftPyGen).install('gen')
