@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
-from pants.backend.codegen.tasks.ragel_gen import RagelGen, calculate_genfile
+from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
+from pants.backend.codegen.ragel.java.ragel_gen import RagelGen, calculate_genfile
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase

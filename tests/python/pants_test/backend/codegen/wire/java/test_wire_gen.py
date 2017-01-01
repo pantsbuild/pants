@@ -5,9 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.register import build_file_aliases as register_codegen
-from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
-from pants.backend.codegen.tasks.wire_gen import WireGen
+from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
+from pants.backend.codegen.wire.java.register import build_file_aliases as register_codegen
+from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core

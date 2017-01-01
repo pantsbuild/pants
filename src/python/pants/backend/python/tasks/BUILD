@@ -10,7 +10,7 @@ python_library(
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     '3rdparty/python:six',
-    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/codegen/antlr/python',
     'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:antlr_builder',

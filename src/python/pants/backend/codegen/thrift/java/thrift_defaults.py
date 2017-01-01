@@ -32,7 +32,7 @@ class ThriftDefaults(Subsystem):
     """Returns the thrift compiler to use for the given target.
 
     :param target: The target to extract the thrift compiler from.
-    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+    :type target: :class:`pants.backend.codegen.thrift.java.java_thrift_library.JavaThriftLibrary`
     :returns: The thrift compiler to use.
     :rtype: string
     """
@@ -43,7 +43,7 @@ class ThriftDefaults(Subsystem):
     """Returns the target language to generate thrift stubs for.
 
     :param target: The target to extract the target language from.
-    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+    :type target: :class:`pants.backend.codegen.thrift.java.java_thrift_library.JavaThriftLibrary`
     :returns: The target language to generate stubs for.
     :rtype: string
     """
@@ -54,7 +54,7 @@ class ThriftDefaults(Subsystem):
     """Returns the style of RPC stub to generate.
 
     :param target: The target to extract the RPC stub style from.
-    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+    :type target: :class:`pants.backend.codegen.thrift.java.java_thrift_library.JavaThriftLibrary`
     :returns: The RPC stub style to generate.
     :rtype: string
     """
