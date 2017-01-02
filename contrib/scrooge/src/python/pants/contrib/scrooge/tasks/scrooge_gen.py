@@ -10,8 +10,8 @@ import re
 import tempfile
 from collections import defaultdict, namedtuple
 
-from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address import Address

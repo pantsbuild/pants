@@ -9,16 +9,16 @@ import os
 import re
 import subprocess
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
-from pants.contrib.go.targets.go_thrift_library import GoThriftGenLibrary, GoThriftLibrary
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
+from twitter.common.collections import OrderedSet
+
+from pants.contrib.go.targets.go_thrift_library import GoThriftGenLibrary, GoThriftLibrary
 
 
 class GoThriftGen(SimpleCodegenTask):

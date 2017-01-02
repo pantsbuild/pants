@@ -12,8 +12,8 @@ from textwrap import dedent
 
 from twitter.common.dirutil.fileset import Fileset
 
-from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.antlr.java.antlr_gen import AntlrGen
+from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.util.dirutil import safe_mkdtemp
