@@ -17,8 +17,8 @@ from pants.backend.codegen.ragel.java.ragel_gen import RagelGen
 from pants.backend.codegen.thrift.java.apache_thrift_gen import ApacheThriftGen
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
-from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
+from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 

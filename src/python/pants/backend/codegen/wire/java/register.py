@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
+from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
