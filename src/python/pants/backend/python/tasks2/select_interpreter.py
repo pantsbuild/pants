@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pex.interpreter import PythonInterpreter, PythonIdentity
+from pex.interpreter import PythonIdentity, PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_setup import PythonRepos, PythonSetup

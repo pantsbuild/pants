@@ -13,8 +13,8 @@ from textwrap import dedent
 from pex.pex_builder import PEXBuilder
 from pex.platforms import Platform
 
-from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
-from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement

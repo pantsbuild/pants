@@ -18,7 +18,8 @@ python_tests(
   sources=['test_python_chroot.py'],
   dependencies=[
     '3rdparty/python:pex',
-    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/codegen/antlr/python',
+    'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_chroot',

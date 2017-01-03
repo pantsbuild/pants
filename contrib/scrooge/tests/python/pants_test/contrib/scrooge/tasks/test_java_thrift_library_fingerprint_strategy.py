@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants_test.base_test import BaseTest
 
 from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \

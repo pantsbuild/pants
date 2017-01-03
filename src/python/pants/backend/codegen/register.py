@@ -5,20 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
-from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
-from pants.backend.codegen.targets.jaxb_library import JaxbLibrary
-from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
-from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
-from pants.backend.codegen.tasks.antlr_gen import AntlrGen
-from pants.backend.codegen.tasks.apache_thrift_gen import ApacheThriftGen
-from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
-from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
-from pants.backend.codegen.tasks.ragel_gen import RagelGen
-from pants.backend.codegen.tasks.wire_gen import WireGen
+from pants.backend.codegen.antlr.java.antlr_gen import AntlrGen
+from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
+from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
+from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
+from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
+from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
+from pants.backend.codegen.protobuf.java.protobuf_gen import ProtobufGen
+from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
+from pants.backend.codegen.ragel.java.ragel_gen import RagelGen
+from pants.backend.codegen.thrift.java.apache_thrift_gen import ApacheThriftGen
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
+from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
+from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 

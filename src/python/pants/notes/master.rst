@@ -4,6 +4,48 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0.dev5 (12/30/2016)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade default go to 1.7.4. (#4149)
+  `PR #4149 <https://github.com/pantsbuild/pants/pull/4149>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix instructions for ivy debug logging (#4141)
+  `PR #4141 <https://github.com/pantsbuild/pants/pull/4141>`_
+
+* Handle unicode in classpath entries (#4136)
+  `PR #4136 <https://github.com/pantsbuild/pants/pull/4136>`_
+
+* Ensure that invalid vts have results_dir cleaned before passing to ta… (#4139)
+  `PR #4139 <https://github.com/pantsbuild/pants/pull/4139>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* [docs] Update the cache section on the Task developer page. (#4152)
+  `PR #4152 <https://github.com/pantsbuild/pants/pull/4152>`_
+
+* Prepare notes for 1.2.1.rc0 (#4146)
+  `PR #4146 <https://github.com/pantsbuild/pants/pull/4146>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Start breaking up the codegen backend. (#4147)
+  `PR #4147 <https://github.com/pantsbuild/pants/pull/4147>`_
+
+* Cleanup unused cffi handles to free memory (#4135)
+  `PR #4135 <https://github.com/pantsbuild/pants/pull/4135>`_
+
+* A new Python run task. (#4142)
+  `PR #4142 <https://github.com/pantsbuild/pants/pull/4142>`_
+
 1.3.0.dev4 (12/08/2016)
 -----------------------
 

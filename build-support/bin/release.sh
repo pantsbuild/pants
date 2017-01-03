@@ -342,7 +342,7 @@ function get_owners() {
 
   latest_package_path=$(
     curl -s https://pypi.python.org/pypi/${package_name} | \
-        grep -oE  "/pypi/${package_name}/[0-9]+\.[0-9]+\.[0-9]+(-?(rc|dev)[0-9]+)?" | head -n1
+        grep -oE  "/pypi/${package_name}/[0-9]+\.[0-9]+\.[0-9]+([-.]?(rc|dev)[0-9]+)?" | head -n1
   )
   curl -s "https://pypi.python.org${latest_package_path}" | \
     grep -A1 "Owner" | tail -1 | \

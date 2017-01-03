@@ -11,13 +11,15 @@ from cffi import FFI
 from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
 
 _FFI = FFI()
 _FFI.cdef(
     '''
-    typedef uint64_t Id;
+    typedef uint64_t   Id;
+    typedef void*      Handle;
 
     typedef struct {
       Id id_;
@@ -32,13 +34,12 @@ _FFI.cdef(
     } Function;
 
     typedef struct {
-      void*    handle;
+      Handle   handle;
       TypeId   type_id;
     } Value;
 
     typedef struct {
       Id       id_;
-      Value    value;
       TypeId   type_id;
     } Key;
 
@@ -64,10 +65,13 @@ _FFI.cdef(
     typedef void ExternContext;
 
     typedef Key              (*extern_key_for)(ExternContext*, Value*);
+    typedef Value            (*extern_val_for)(ExternContext*, Key*);
+    typedef Value            (*extern_clone_val)(ExternContext*, Value*);
+    typedef void             (*extern_drop_handles)(ExternContext*, Handle*, uint64_t);
     typedef UTF8Buffer       (*extern_id_to_str)(ExternContext*, Id);
     typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
-    typedef Value            (*extern_store_list)(ExternContext*, Value*, uint64_t, bool);
+    typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -84,8 +88,8 @@ _FFI.cdef(
       Key             subject;
       TypeConstraint  product;
       uint8_t         union_tag;
-      Value           union_return;
-      Value           union_throw;
+      Value*          union_return;
+      Value*          union_throw;
       bool            union_noop;
     } RawNode;
 
@@ -98,6 +102,9 @@ _FFI.cdef(
 
     RawScheduler* scheduler_create(ExternContext*,
                                    extern_key_for,
+                                   extern_val_for,
+                                   extern_clone_val,
+                                   extern_drop_handles,
                                    extern_id_to_str,
                                    extern_val_to_str,
                                    extern_satisfied_by,
@@ -154,6 +161,29 @@ def extern_key_for(context_handle, val):
   return c.value_to_key(val)
 
 
+@_FFI.callback("Value(ExternContext*, Key*)")
+def extern_val_for(context_handle, key):
+  """Return a Value for a Key."""
+  c = _FFI.from_handle(context_handle)
+  return c.key_to_value(key)
+
+
+@_FFI.callback("Value(ExternContext*, Value*)")
+def extern_clone_val(context_handle, val):
+  """Clone the given Value."""
+  c = _FFI.from_handle(context_handle)
+  item = c.from_value(val)
+  return c.to_value(item, type_id=val.type_id)
+
+
+@_FFI.callback("void(ExternContext*, Handle*, uint64_t)")
+def extern_drop_handles(context_handle, handles_ptr, handles_len):
+  """Drop the given Handles."""
+  c = _FFI.from_handle(context_handle)
+  handles = _FFI.unpack(handles_ptr, handles_len)
+  c.drop_handles(handles)
+
+
 @_FFI.callback("UTF8Buffer(ExternContext*, Id)")
 def extern_id_to_str(context_handle, id_):
   """Given an Id for `obj`, write str(obj) and return it."""
@@ -175,11 +205,11 @@ def extern_satisfied_by(context_handle, constraint_id, cls_id):
   return c.from_id(constraint_id.id_).satisfied_by_type(c.from_id(cls_id.id_))
 
 
-@_FFI.callback("Value(ExternContext*, Value*, uint64_t, bool)")
-def extern_store_list(context_handle, vals_ptr, vals_len, merge):
+@_FFI.callback("Value(ExternContext*, Value**, uint64_t, bool)")
+def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
   """Given storage and an array of Values, return a new Value to represent the list."""
   c = _FFI.from_handle(context_handle)
-  vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr, vals_len))
+  vals = tuple(c.from_value(val) for val in _FFI.unpack(vals_ptr_ptr, vals_len))
   if merge:
     # Expect each obj to represent a list, and do a de-duping merge.
     merged_set = set()
@@ -249,7 +279,7 @@ class Value(datatype('Value', ['handle', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
-class Key(datatype('Key', ['id_', 'value', 'type_id'])):
+class Key(datatype('Key', ['id_', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -291,6 +321,10 @@ class ExternContext(object):
     self._resize_utf8(256)
     self._resize_keys(64)
 
+    # Finally, create a handle to this object to ensure that the native wrapper survives
+    # at least as long as this object.
+    self.handle = _FFI.new_handle(self)
+
   def _resize_utf8(self, size):
     self._utf8_cap = size
     self._utf8_buf = _FFI.new('char[]', self._utf8_cap)
@@ -321,11 +355,8 @@ class ExternContext(object):
   def from_value(self, val):
     return _FFI.from_handle(val.handle)
 
-  def key_from_native(self, cdata):
-    return Key(cdata.key, TypeId(cdata.type_id.id_))
-
-  def _type_id_from_native(self, cdata):
-    return TypeId(cdata.key)
+  def drop_handles(self, handles):
+    self._handles -= set(handles)
 
   def put(self, obj):
     # If we encounter an existing id, return it.
@@ -349,17 +380,20 @@ class ExternContext(object):
   def value_to_key(self, val):
     obj = self.from_value(val)
     type_id = TypeId(val.type_id.id_)
-    return Key(self.put(obj), Value(val.handle, type_id), type_id)
+    return Key(self.put(obj), type_id)
+
+  def key_to_value(self, key):
+    return self.to_value(self.get(key.id_), type_id=key.type_id)
 
   def to_key(self, obj):
     type_id = TypeId(self.put(type(obj)))
-    return Key(self.put(obj), self.to_value(obj, type_id=type_id), type_id)
+    return Key(self.put(obj), type_id)
 
   def from_id(self, cdata):
     return self.get(cdata)
 
   def from_key(self, cdata):
-    return self.from_value(cdata.value)
+    return self.get(cdata.id_)
 
 
 class Native(object):
@@ -405,21 +439,23 @@ class Native(object):
     self._supportdir = supportdir
     self._visualize_to_dir = visualize_to_dir
 
-    self._lib_field = None
-
   @property
   def visualize_to_dir(self):
     return self._visualize_to_dir
 
-  @property
+  @memoized_property
   def lib(self):
     """Load and return the `libgraph` module."""
-    if self._lib_field is None:
-      binary = self._binary_util.select_binary(self._supportdir,
+    binary = self._binary_util.select_binary(self._supportdir,
                                               self._version,
                                               'native-engine')
-      self._lib_field = _FFI.dlopen(binary)
-    return self._lib_field
+    return _FFI.dlopen(binary)
+
+  @memoized_property
+  def context(self):
+    # We statically initialize a ExternContext to correspond to the queue of dropped
+    # Handles that the native code maintains.
+    return _FFI.init_once(ExternContext, 'ExternContext singleton')
 
   def new(self, cdecl, init):
     return _FFI.new(cdecl, init)
@@ -435,8 +471,32 @@ class Native(object):
     """Given a pointer representing an array, and its count of entries, return a list."""
     return _FFI.unpack(cdata_ptr, count)
 
-  def new_handle(self, obj):
-    return _FFI.new_handle(obj)
-
   def buffer(self, cdata):
     return _FFI.buffer(cdata)
+
+  def new_scheduler(self, has_products_constraint, address_constraint, variants_constraint):
+    """Create and return an ExternContext and native Scheduler."""
+    has_products_constraint = TypeConstraint(self.context.to_id(has_products_constraint))
+    address_constraint = TypeConstraint(self.context.to_id(address_constraint))
+    variants_constraint = TypeConstraint(self.context.to_id(variants_constraint))
+
+    scheduler = self.lib.scheduler_create(self.context.handle,
+                                          extern_key_for,
+                                          extern_val_for,
+                                          extern_clone_val,
+                                          extern_drop_handles,
+                                          extern_id_to_str,
+                                          extern_val_to_str,
+                                          extern_satisfied_by,
+                                          extern_store_list,
+                                          extern_project,
+                                          extern_project_multi,
+                                          extern_create_exception,
+                                          extern_invoke_runnable,
+                                          self.context.to_key('name'),
+                                          self.context.to_key('products'),
+                                          self.context.to_key('default'),
+                                          address_constraint,
+                                          has_products_constraint,
+                                          variants_constraint)
+    return self.gc(scheduler, self.lib.scheduler_destroy)

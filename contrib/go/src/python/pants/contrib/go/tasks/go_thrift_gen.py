@@ -9,7 +9,6 @@ import os
 import re
 import subprocess
 
-from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -39,8 +38,7 @@ class GoThriftGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(GoThriftGen, cls).subsystem_dependencies() +
-            (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))
+    return super(GoThriftGen, cls).subsystem_dependencies() + (ThriftBinary.Factory.scoped(cls),)
 
   @memoized_property
   def _thrift_binary(self):

@@ -6,6 +6,7 @@ use std::string::FromUtf8Error;
 
 use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
+use handles::Handle;
 
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = raw::c_void;
@@ -17,6 +18,9 @@ pub type SatisfiedByExtern =
 pub struct Externs {
   context: *const ExternContext,
   key_for: KeyForExtern,
+  val_for: ValForExtern,
+  clone_val: CloneValExtern,
+  drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
@@ -32,6 +36,9 @@ impl Externs {
   pub fn new(
     ext_context: *const ExternContext,
     key_for: KeyForExtern,
+    val_for: ValForExtern,
+    clone_val: CloneValExtern,
+    drop_handles: DropHandlesExtern,
     id_to_str: IdToStrExtern,
     val_to_str: ValToStrExtern,
     satisfied_by: SatisfiedByExtern,
@@ -44,6 +51,9 @@ impl Externs {
     Externs {
       context: ext_context,
       key_for: key_for,
+      val_for: val_for,
+      clone_val: clone_val,
+      drop_handles: drop_handles,
       satisfied_by: satisfied_by,
       satisfied_by_cache: RefCell::new(HashMap::new()),
       store_list: store_list,
@@ -60,6 +70,18 @@ impl Externs {
     (self.key_for)(self.context, val)
   }
 
+  pub fn val_for(&self, key: &Key) -> Value {
+    (self.val_for)(self.context, key)
+  }
+
+  pub fn clone_val(&self, val: &Value) -> Value {
+    (self.clone_val)(self.context, val)
+  }
+
+  pub fn drop_handles(&self, handles: Vec<Handle>) {
+    (self.drop_handles)(self.context, handles.as_ptr(), handles.len() as u64)
+  }
+
   pub fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
     self.satisfied_by_cache.borrow_mut().entry((*constraint, *cls))
       .or_insert_with(||
@@ -69,15 +91,7 @@ impl Externs {
   }
 
   pub fn store_list(&self, values: Vec<&Value>, merge: bool) -> Value {
-    if merge && values.len() == 1 {
-      // We're merging, but there is only one input value: return it immediately.
-      if let Some(&first) = values.first() {
-        return first.clone();
-      }
-    }
-
-    // Execute extern.
-    let values_clone: Vec<Value> = values.into_iter().map(|&v| v).collect();
+    let values_clone: Vec<*const Value> = values.into_iter().map(|v| v as *const Value).collect();
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
   }
 
@@ -87,7 +101,11 @@ impl Externs {
 
   pub fn project_multi(&self, value: &Value, field: &Field) -> Vec<Value> {
     let buf = (self.project_multi)(self.context, value, field);
-    with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| value_vec.clone())
+    with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| {
+      unsafe {
+        value_vec.iter().map(|v| v.clone()).collect()
+      }
+    })
   }
 
   pub fn id_to_str(&self, digest: Id) -> String {
@@ -120,14 +138,23 @@ impl Externs {
 pub type KeyForExtern =
   extern "C" fn(*const ExternContext, *const Value) -> Key;
 
+pub type ValForExtern =
+  extern "C" fn(*const ExternContext, *const Key) -> Value;
+
+pub type CloneValExtern =
+  extern "C" fn(*const ExternContext, *const Value) -> Value;
+
+pub type DropHandlesExtern =
+  extern "C" fn(*const ExternContext, *const Handle, u64);
+
 pub type StoreListExtern =
-  extern "C" fn(*const ExternContext, *const Value, u64, bool) -> Value;
+  extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;
 
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Debug)]
 pub struct RunnableComplete {
   pub value: Value,
   pub is_throw: bool,
