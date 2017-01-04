@@ -63,7 +63,9 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
     return hasher.hexdigest()
 
   def direct(self, target):
-    return JvmCompile.enable_strict_deps(target)
+    if getattr(target, 'strict_deps', None):
+      return JvmCompile.enable_strict_deps(target)
+    return False
 
   def __hash__(self):
     return hash((type(self), self._task.fingerprint))
