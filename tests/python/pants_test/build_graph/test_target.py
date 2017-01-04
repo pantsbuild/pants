@@ -9,6 +9,7 @@ import os.path
 from hashlib import sha1
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
@@ -170,14 +171,15 @@ class TargetTest(BaseTest):
     hash_value = '{}.{}'.format(target_hash, dep_hash)
     self.assertEqual(hash_value, target_c.transitive_invalidation_hash())
 
-    # Mark following 3 dirty as they are used in the next test.
-    target_b.mark_invalidation_hash_dirty()
-    target_c.mark_invalidation_hash_dirty()
-    target_c.mark_transitive_invalidation_hash_dirty()
+    # Check direct invalidation.
+    class TestFingerprintStrategy(DefaultFingerprintStrategy):
+      def direct(self, target):
+        return True
 
+    fingerprint_strategy = TestFingerprintStrategy()
     hasher = sha1()
-    hasher.update(target_b.invalidation_hash())
+    hasher.update(target_b.invalidation_hash(fingerprint_strategy=fingerprint_strategy))
     dep_hash = hasher.hexdigest()[:12]
-    target_hash = target_c.invalidation_hash()
+    target_hash = target_c.invalidation_hash(fingerprint_strategy=fingerprint_strategy)
     hash_value = '{}.{}'.format(target_hash, dep_hash)
-    self.assertEqual(hash_value, target_c.transitive_invalidation_hash(direct=True))
+    self.assertEqual(hash_value, target_c.transitive_invalidation_hash(fingerprint_strategy=fingerprint_strategy))

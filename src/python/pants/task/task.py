@@ -261,7 +261,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """Invalidates all targets for this task."""
     BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
 
-  def create_cache_manager(self, invalidate_dependents, invalidate_direct_checker=None, fingerprint_strategy=None):
+  def create_cache_manager(self, invalidate_dependents, fingerprint_strategy=None):
     """Creates a cache manager that can be used to invalidate targets on behalf of this task.
 
     Use this if you need to check for invalid targets but can't use the contextmanager created by
@@ -275,7 +275,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return InvalidationCacheManager(self._cache_key_generator,
                                     self._build_invalidator_dir,
                                     invalidate_dependents,
-                                    invalidate_direct_checker=invalidate_direct_checker,
                                     fingerprint_strategy=fingerprint_strategy,
                                     invalidation_report=self.context.invalidation_report,
                                     task_name=type(self).__name__,
@@ -336,7 +335,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def invalidated(self,
                   targets,
                   invalidate_dependents=False,
-                  invalidate_direct_checker=None,
                   silent=False,
                   fingerprint_strategy=None,
                   topological_order=False):
@@ -360,7 +358,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     fingerprint_strategy = fingerprint_strategy or TaskIdentityFingerprintStrategy(self)
     cache_manager = self.create_cache_manager(invalidate_dependents,
-                                              invalidate_direct_checker=invalidate_direct_checker,
                                               fingerprint_strategy=fingerprint_strategy)
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)

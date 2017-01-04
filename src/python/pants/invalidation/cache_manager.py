@@ -257,7 +257,6 @@ class InvalidationCacheManager(object):
                cache_key_generator,
                build_invalidator_dir,
                invalidate_dependents,
-               invalidate_direct_checker=None,
                fingerprint_strategy=None,
                invalidation_report=None,
                task_name=None,
@@ -270,7 +269,6 @@ class InvalidationCacheManager(object):
     self._task_name = task_name or 'UNKNOWN'
     self._task_version = task_version or 'Unknown_0'
     self._invalidate_dependents = invalidate_dependents
-    self._invalidate_direct_checker = invalidate_direct_checker
     self._invalidator = BuildInvalidator(build_invalidator_dir)
     self._fingerprint_strategy = fingerprint_strategy
     self._artifact_write_callback = artifact_write_callback
@@ -349,7 +347,6 @@ class InvalidationCacheManager(object):
     try:
       return self._cache_key_generator.key_for_target(target,
                                                       transitive=self._invalidate_dependents,
-                                                      direct_checker=self._invalidate_direct_checker,
                                                       fingerprint_strategy=self._fingerprint_strategy)
     except Exception as e:
       # This is a catch-all for problems we haven't caught up with and given a better diagnostic.

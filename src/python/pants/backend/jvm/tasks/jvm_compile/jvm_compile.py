@@ -62,6 +62,9 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
         hasher.update(str(entry.coordinate))
     return hasher.hexdigest()
 
+  def direct(self, target):
+    return JvmCompile.enable_strict_deps(target)
+
   def __hash__(self):
     return hash((type(self), self._task.fingerprint))
 
@@ -420,7 +423,6 @@ class JvmCompile(NailgunTaskBase):
     # all targets to finish.
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
-                          invalidate_direct_checker=JvmCompile.enable_strict_deps,
                           fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
 

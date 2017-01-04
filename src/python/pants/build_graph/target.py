@@ -450,7 +450,7 @@ class Target(AbstractTarget):
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
-  def transitive_invalidation_hash(self, fingerprint_strategy=None, depth=0, direct=False):
+  def transitive_invalidation_hash(self, fingerprint_strategy=None, depth=0):
     """
     :API: public
 
@@ -473,7 +473,7 @@ class Target(AbstractTarget):
       def dep_hash_iter():
         for dep in self.dependencies:
           try:
-            if direct:
+            if fingerprint_strategy.direct(self):
               dep_hash = dep.invalidation_hash(fingerprint_strategy)
             else:
               dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth+1)
