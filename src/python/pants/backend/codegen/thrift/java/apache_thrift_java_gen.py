@@ -14,8 +14,9 @@ from pants.binaries.thrift_binary import ThriftBinary
 
 
 class ApacheThriftJavaGen(ApacheThriftGenBase):
+  """Generate Java source files from thrift IDL files."""
   deprecated_options_scope = 'gen.thrift'  # New scope is gen.thrift-java.
-  deprecated_options_scope_removal_version = '1.5.0'
+  deprecated_options_scope_removal_version = '1.5.0dev0'
 
   thrift_library_target_type = JavaThriftLibrary
   thrift_generator = 'java'
@@ -30,7 +31,7 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(ApacheThriftJavaGen, cls).implementation_version() + [('ApacheThriftGen', 2)]
+    return super(ApacheThriftJavaGen, cls).implementation_version() + [('ApacheThriftJavaGen', 2)]
 
   def __init__(self, *args, **kwargs):
     super(ApacheThriftJavaGen, self).__init__(*args, **kwargs)

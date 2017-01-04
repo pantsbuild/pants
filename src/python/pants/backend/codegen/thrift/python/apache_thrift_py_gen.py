@@ -13,6 +13,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 
 
 class ApacheThriftPyGen(ApacheThriftGenBase):
+  """Generate Python source files from thrift IDL files."""
   thrift_library_target_type = PythonThriftLibrary
   thrift_generator = 'py'
   default_gen_options_map = {

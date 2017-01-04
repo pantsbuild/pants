@@ -47,7 +47,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
     # and reluctantly use the clunky name --gen-options-map for the new, map-typed options.
     # TODO: Once --gen-options is gone, do a deprecation cycle to restore the old name.
     register('--gen-options', advanced=True, fingerprint=True,
-             removal_version='1.5.0', removal_hint='Use --gen-options-map instead',
+             removal_version='1.5.0dev0', removal_hint='Use --gen-options-map instead',
              help='Use these options for the {} generator.'.format(cls.thrift_generator))
     register('--gen-options-map', type=dict, advanced=True, fingerprint=True,
              default=cls.default_gen_options_map,
