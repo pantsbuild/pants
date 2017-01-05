@@ -7,18 +7,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.codegen.thrift.java.apache_thrift_gen import ApacheThriftGen
+from pants.backend.codegen.thrift.java.apache_thrift_java_gen import ApacheThriftJavaGen
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class ApacheThriftGenTest(TaskTestBase):
+class ApacheThriftJavaGenTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return ApacheThriftGen
+    return ApacheThriftJavaGen
 
   def generate_single_thrift_target(self, java_thrift_library):
     context = self.context(target_roots=[java_thrift_library])

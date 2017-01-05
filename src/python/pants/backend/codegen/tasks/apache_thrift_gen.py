@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.thrift.java.apache_thrift_gen import ApacheThriftGen
+from pants.backend.codegen.thrift.java.apache_thrift_java_gen import ApacheThriftJavaGen
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0', 'Use pants.backend.codegen.thrift.java instead')
+deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.thrift.java instead')
 
-ApacheThriftGen = ApacheThriftGen
+ApacheThriftGen = ApacheThriftJavaGen
