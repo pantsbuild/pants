@@ -9,6 +9,6 @@ from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0', 'Use pants.backend.codegen.wire.java instead')
+deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.wire.java instead')
 
 WireGen = WireGen

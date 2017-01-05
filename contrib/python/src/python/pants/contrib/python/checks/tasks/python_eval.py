@@ -104,6 +104,9 @@ class PythonEval(PythonTask):
       if isinstance(target, PythonBinary):
         source = 'entry_point {}'.format(target.entry_point)
         components = target.entry_point.rsplit(':', 1)
+        if not all([x.strip() for x in components]):
+          raise TaskError('Invalid entry point {} for target {}'.format(
+            target.entry_point, target.address.spec))
         module = components[0]
         if len(components) == 2:
           function = components[1]
@@ -121,8 +124,9 @@ class PythonEval(PythonTask):
               module_path, _ = os.path.splitext(path)
             source = 'file {}'.format(os.path.join(target.target_base, path))
             module = module_path.replace(os.path.sep, '.')
-            data = TemplateData(source=source, import_statement='import {}'.format(module))
-            modules.append(data)
+            if module:
+              data = TemplateData(source=source, import_statement='import {}'.format(module))
+              modules.append(data)
 
       if not modules:
         # Nothing to eval, so a trivial compile success.

@@ -132,6 +132,10 @@ class SimpleCodegenTask(Task):
     """
     raise NotImplementedError
 
+  def ignore_dup(self, tgt1, tgt2, rel_src):
+    """Subclasses can override to omit a specific generated source file from dup checking."""
+    return False
+
   def codegen_targets(self):
     """Finds codegen targets in the dependency graph.
 
@@ -308,7 +312,8 @@ class SimpleCodegenTask(Task):
     def record_duplicates(dep):
       if dep == target or not self.is_gentarget(dep.concrete_derived_from):
         return
-      duped_sources = [s for s in dep.sources_relative_to_source_root() if s in by_target]
+      duped_sources = [s for s in dep.sources_relative_to_source_root() if s in by_target and
+                       not self.ignore_dup(target, dep, s)]
       if duped_sources:
         duplicates_by_target[dep] = duped_sources
     target.walk(record_duplicates)

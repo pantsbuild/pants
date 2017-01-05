@@ -9,6 +9,6 @@ from pants.base.deprecated import deprecated_module
 from pants.task.simple_codegen_task import SimpleCodegenTask
 
 
-deprecated_module('1.5.0', 'Use pants.task.simple_codegen_task instead')
+deprecated_module('1.5.0dev0', 'Use pants.task.simple_codegen_task instead')
 
 SimpleCodegenTask = SimpleCodegenTask

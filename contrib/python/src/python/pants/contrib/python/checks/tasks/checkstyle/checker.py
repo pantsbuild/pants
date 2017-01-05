@@ -74,7 +74,8 @@ class PythonCheckStyleTask(PythonTask):
     return True
 
   def _is_checked(self, target):
-    return isinstance(target, PythonTarget) and target.has_sources(self._PYTHON_SOURCE_EXTENSION)
+    return (not target.is_synthetic and isinstance(target, PythonTarget) and
+            target.has_sources(self._PYTHON_SOURCE_EXTENSION))
 
   @classmethod
   def clear_plugins(cls):
@@ -168,7 +169,7 @@ class PythonCheckStyleTask(PythonTask):
     return failure_count
 
   def execute(self):
-    """Run Checkstyle on all found source files."""
+    """Run Checkstyle on all found non-synthetic source files."""
     if self.options.skip:
       return
 

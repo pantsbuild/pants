@@ -70,8 +70,9 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       thrift_target_name = ('examples.src.thrift.org.pantsbuild.example.precipitation'
                             '.precipitation-java')
       codegen_target_regex = os.path.join(os.path.relpath(workdir, get_buildroot()),
-                                          'gen/thrift/[^/]*/[^/:]*/[^/:]*:{0}'.format(thrift_target_name))
+                                          'gen/thrift-java/[^/]*/[^/:]*/[^/:]*:{0}'.format(thrift_target_name))
       p = re.compile(codegen_target_regex)
+      print(json_data.get('targets').keys())
       self.assertTrue(any(p.match(target) for target in json_data.get('targets').keys()))
 
   def test_export_json_transitive_jar(self):

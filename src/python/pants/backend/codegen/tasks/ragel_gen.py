@@ -9,6 +9,6 @@ from pants.backend.codegen.ragel.java.ragel_gen import RagelGen
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0', 'Use pants.backend.codegen.ragel.java instead')
+deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.ragel.java instead')
 
 RagelGen = RagelGen
