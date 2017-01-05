@@ -14,8 +14,9 @@ from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtob
 from pants.backend.codegen.protobuf.java.protobuf_gen import ProtobufGen
 from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.ragel.java.ragel_gen import RagelGen
-from pants.backend.codegen.thrift.java.apache_thrift_gen import ApacheThriftGen
+from pants.backend.codegen.thrift.java.apache_thrift_java_gen import ApacheThriftJavaGen
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.wire.java.wire_gen import WireGen
@@ -39,7 +40,8 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='thrift', action=ApacheThriftGen).install('gen')
+  task(name='thrift-java', action=ApacheThriftJavaGen).install('gen')
+  task(name='thrift-py', action=ApacheThriftPyGen).install('gen')
 
   # TODO(Garrett Malmquist): 'protoc' depends on a nonlocal goal (imports is in the jvm register).
   # This should be cleaned up, with protobuf stuff moved to its own backend. (See John's comment on

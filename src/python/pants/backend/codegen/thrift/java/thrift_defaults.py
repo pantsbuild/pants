@@ -10,9 +10,13 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class ThriftDefaults(Subsystem):
-  """Tracks defaults for thrift target attributes that influence code generation."""
+  """Tracks defaults for java thrift target attributes that influence code generation."""
   options_scope = 'thrift-defaults'
 
+  # TODO: These exist to support alternate compilers (specifically scrooge), but this should
+  # probably be a scrooge-specific subsystem, tied to a scrooge_thrift_library target type.
+  # These options (e.g., rpc_style, language) are relevant to scrooge but may have no meaning
+  # in some other compiler (they certainly don't in the apache thrift compiler).
   @classmethod
   def register_options(cls, register):
     register('--compiler', type=str, advanced=True, default='thrift',

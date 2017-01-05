@@ -9,6 +9,6 @@ from pants.backend.codegen.antlr.java.antlr_gen import AntlrGen
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0', 'Use pants.backend.codegen.antlr.java instead')
+deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.antlr.java instead')
 
 AntlrGen = AntlrGen
