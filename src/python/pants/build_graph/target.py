@@ -471,7 +471,7 @@ class Target(AbstractTarget):
       hasher = sha1()
 
       def dep_hash_iter():
-        for dep in self.dependencies:
+        for dep in fingerprint_strategy.dependencies(self):
           try:
             if fingerprint_strategy.direct(self):
               dep_hash = dep.invalidation_hash(fingerprint_strategy)

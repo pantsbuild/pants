@@ -19,7 +19,8 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
+from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext,
+                                                                 strict_dependencies)
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -41,9 +42,10 @@ from pants.util.memo import memoized_property
 class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
 
-  def __init__(self, task, classpath_products):
+  def __init__(self, task, classpath_products, dep_context):
     super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
     self._classpath_products = classpath_products
+    self._dep_context = dep_context
 
   def compute_fingerprint(self, target):
     if isinstance(target, Resources):
@@ -67,6 +69,11 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
     if isinstance(target, JvmTarget):
       return JvmCompile.enable_strict_deps(target)
     return False
+
+  def dependencies(self, target):
+    if self.direct(target):
+      return strict_dependencies(target, self._dep_context)
+    return super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).dependencies(target)
 
   def __hash__(self):
     return hash((type(self), self._task.fingerprint))
@@ -380,7 +387,7 @@ class JvmCompile(NailgunTaskBase):
     return prop
 
   def _fingerprint_strategy(self, classpath_products):
-    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
+    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products, self._dep_context)
 
   @staticmethod
   def enable_strict_deps(target):

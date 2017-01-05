@@ -13,6 +13,36 @@ from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
 
 
+def _resolve_aliases(target):
+  for declared in target.dependencies:
+    if type(declared) in (AliasTarget, Target):
+      # Is an alias. Recurse to expand.
+      for r in _resolve_aliases(declared):
+        yield r
+    else:
+      yield declared
+
+
+def strict_dependencies(target, dep_context):
+  """Compute the 'strict' compile target dependencies for this target.
+
+  Results the declared dependencies of a target after alias expansion, with the addition
+  of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
+  """
+  for declared in _resolve_aliases(target):
+    if isinstance(declared, dep_context.compiler_plugin_types):
+      for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
+        yield r
+    else:
+      yield declared
+
+
+def all_dependencies(target, dep_context):
+  """All transitive dependencies of the context's target."""
+  for dep in target.closure(bfs=True, **dep_context.target_closure_kwargs):
+    yield dep
+
+
 class DependencyContext(object):
   def __init__(self, compiler_plugin_types, target_closure_kwargs):
     """
@@ -50,36 +80,9 @@ class CompileContext(object):
   def dependencies(self, dep_context):
     """Yields the compile time dependencies of this target, in the given DependencyContext."""
     if self.strict_deps:
-      return self.strict_dependencies(dep_context)
+      return strict_dependencies(self.target, dep_context)
     else:
-      return self.all_dependencies(dep_context)
-
-  def _resolve_aliases(self, t):
-    for declared in t.dependencies:
-      if type(declared) in (AliasTarget, Target):
-        # Is an alias. Recurse to expand.
-        for r in self._resolve_aliases(declared):
-          yield r
-      else:
-        yield declared
-
-  def strict_dependencies(self, dep_context):
-    """Compute the 'strict' compile target dependencies for this target.
-
-    Results the declared dependencies of a target after alias expansion, with the addition
-    of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
-    """
-    for declared in self._resolve_aliases(self.target):
-      if isinstance(declared, dep_context.compiler_plugin_types):
-        for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
-          yield r
-      else:
-        yield declared
-
-  def all_dependencies(self, dep_context):
-    """All transitive dependencies of the context's target."""
-    for dep in self.target.closure(bfs=True, **dep_context.target_closure_kwargs):
-      yield dep
+      return all_dependencies(self.target, dep_context)
 
   @property
   def _id(self):

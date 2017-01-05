@@ -19,6 +19,13 @@ java_library(
 )
 
 java_library(
+  name='B1',
+  sources = ['B.java'],
+  dependencies=[':D'],
+  strict_deps=True,
+)
+
+java_library(
   name='B',
   sources = ['B.java'],
   dependencies=[':C'],
@@ -27,4 +34,9 @@ java_library(
 java_library(
   name='C',
   sources = ['C.java'],
+)
+
+target(
+  name='D',
+  dependencies=[':C'],
 )
