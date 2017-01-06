@@ -1,4 +1,4 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
 + Alan Paulin
@@ -104,6 +104,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Nick Howard
 + Nik Shkrob
 + Nitay Joffe
++ Ny Saechao
 + Oliver Gould
 + Patrick Lawson
 + Paul Groudas
