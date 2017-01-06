@@ -434,7 +434,7 @@ class JvmCompile(NailgunTaskBase):
     assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
 
     # This ensures the workunit for the worker pool is set before attempting to compile.
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self.name())) \
             as workunit:
       # This uses workunit.parent as the WorkerPool's parent so that child workunits
       # of different pools will show up in order in the html output. This way the current running
@@ -509,7 +509,7 @@ class JvmCompile(NailgunTaskBase):
         ' (',
         progress_message,
         ').')
-      with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]):
+      with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
         # The compiler may delete classfiles, then later exit on a compilation error. Then if the
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
@@ -522,6 +522,7 @@ class JvmCompile(NailgunTaskBase):
         self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
                      log_file, settings, fatal_warnings, zinc_file_manager,
                      javac_plugins_to_exclude)
+        print(compile_workunit.name)
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
