@@ -4,6 +4,35 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.3.0.dev6 (1/06/2017)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Refactor the thrift codegen task. (#4155)
+  `PR #4155 <https://github.com/pantsbuild/pants/pull/4155>`_
+
+* Finish splitting up the codegen backend. (#4147)
+  `PR #4147 <https://github.com/pantsbuild/pants/pull/4147>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix import order issues introduced by a previous commit. (#4156)
+  `PR #4156 <https://github.com/pantsbuild/pants/pull/4156>`_
+
+* Bump default nodejs version to 6.9.1 from 6.2.0 (#4161)
+  `PR #4161 <https://github.com/pantsbuild/pants/pull/4161>`_
+
+* Make post_stat async (#4157)
+  `PR #4157 <https://github.com/pantsbuild/pants/pull/4157>`_
+
+* Fix release script owners check.
+  `Commit <https://github.com/pantsbuild/pants/commit/a40234429cc05f6483f91b08f10037429710b5b4>`_
+
+
 1.3.0.dev5 (12/30/2016)
 -----------------------
 
