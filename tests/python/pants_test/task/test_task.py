@@ -18,8 +18,9 @@ from pants_test.tasks.task_test_base import TaskTestBase
 class DummyLibrary(Target):
   def __init__(self, address, source, *args, **kwargs):
     payload = Payload()
-    payload.add_fields({'sources': self.create_sources_field(sources=[source],
-                                                             sources_rel_path=address.spec_path)})
+    payload.add_fields({
+      'sources': self.create_sources_field(sources=[source], sources_rel_path=address.spec_path)
+    })
     self.source = source
     super(DummyLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
 
@@ -111,7 +112,7 @@ class TaskTest(TaskTestBase):
   def test_incremental(self):
     """Run three times with two unique fingerprints."""
     # Uses private API of the VT, vt._previous_results_dir. Not ideal, but that property is totally dependent on
-    # running a sequence of task.execute(). That being tested here is more evidence the abstraction leaks a bit.
+    # running a sequence of task executions. Being tested here is more evidence the abstraction leaks a bit.
     one = '1\n'
     two = '2\n'
     three = '3\n'
@@ -128,7 +129,7 @@ class TaskTest(TaskTestBase):
     vtB, was_B_valid = task.execute()
     self.assertFalse(was_B_valid)
     self.assertEqual(vtB._previous_results_dir, vtA.unique_results_dir)
-    self.assertEqual(vtB.previous_cache_key, vtA.cache_key)
+    self.assertEqual(vtB._previous_cache_key, vtA.cache_key)
     self.assertContent(vtB, one + two)
 
     # Another changed source means a new cache_key. The previous_results_dir is copied.
@@ -239,7 +240,7 @@ class TaskTest(TaskTestBase):
 
     vtC, was_C_valid = task.execute()
     self.assertNotEqual(vtB.cache_key.hash, vtC.cache_key.hash)
-    self.assertEqual(vtC.previous_cache_key, vtB.cache_key)
+    self.assertEqual(vtC._previous_cache_key, vtB.cache_key)
     self.assertFalse(was_C_valid)
 
     # Verify the content. The task was invalid twice - the initial run and the run with the changed source file.
@@ -263,13 +264,13 @@ class TaskTest(TaskTestBase):
     task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
     self.assertIsNotNone(task._should_cache_target_dir(vtA))
 
-  def test_should_respect_disable_cache_when_created_from_incremental_results(self):
+  def test_disable_cache_when_created_from_incremental_results(self):
     task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
     self._create_clean_file(vtA.target, 'bar')
     vtB, _ = task.execute()
     self.assertFalse(task._should_cache_target_dir(vtB))
 
-  def test_should_respect_enable_cache_when_created_from_incremental_results(self):
+  def test_enable_cache_when_created_from_incremental_results(self):
     task, vtA, _ = self._run_fixture(incremental=True, artifact_cache=True)
     self._create_clean_file(vtA.target, 'bar')
     task._cache_incremental = True

@@ -93,7 +93,7 @@ class InvalidationCacheManagerTest(BaseTest):
     vt.create_results_dir()
     self.assertTrue(self.is_empty(vt.results_dir))
     self.assertTrue(self.matching_result_dirs(vt))
-    vt.ensure_legal()
+    vt._ensure_legal()
 
   def test_valid_vts_are_not_cleaned(self):
     # No cleaning of results_dir occurs, since create_results_dir short-circuits if the VT is valid.
@@ -109,22 +109,22 @@ class InvalidationCacheManagerTest(BaseTest):
     # https://github.com/pantsbuild/pants/issues/4137
     # https://github.com/pantsbuild/pants/issues/4051
 
+    # All is right with the world, mock task is generally well-behaved and output is placed in both result_dirs.
+    vt = self.make_vt()
+    self.assertFalse(self.is_empty(vt.results_dir))
+    self.assertTrue(self.matching_result_dirs(vt))
+    self.assertTrue(os.path.islink(vt.results_dir))
+    vt.force_invalidate()
+    self.clobber_symlink(vt)
+
+    # Arg, and the resultingly unlinked unique_results_dir is uncleaned. The two directories have diverging contents!
+    # The product pipeline and the artifact cache will get different task output!
+    self.assertFalse(os.path.islink(vt.results_dir))
+    self.assertFalse(self.matching_result_dirs(vt))
+
+    # The main protection for this is the exception raised when the cache_manager attempts to mark the VT valid.
+    self.assertFalse(vt.valid)
     with self.assertRaises(VersionedTargetSet.IllegalResultsDir):
-      # All is right with the world, mock task is generally well-behaved and output is placed in both result_dirs.
-      vt = self.make_vt()
-      self.assertFalse(self.is_empty(vt.results_dir))
-      self.assertTrue(self.matching_result_dirs(vt))
-      self.assertTrue(os.path.islink(vt.results_dir))
-      vt.force_invalidate()
-      self.clobber_symlink(vt)
-
-      # Arg, and the resultingly unlinked unique_results_dir is uncleaned. The two directories have diverging contents!
-      # The product pipeline and the artifact cache will get different task output!
-      self.assertFalse(os.path.islink(vt.results_dir))
-      self.assertFalse(self.matching_result_dirs(vt))
-
-      # The main protection for this is the exception raised when the cache_manager attempts to mark the VT valid.
-      self.assertFalse(vt.valid)
       vt.update()
 
   def test_invalid_result_dirs_during_create(self):
@@ -142,30 +142,31 @@ class InvalidationCacheManagerTest(BaseTest):
     vt = self.make_vt()
     self.clobber_symlink(vt)
     with self.assertRaisesRegexp(VersionedTargetSet.IllegalResultsDir, r'{}'.format(vt.results_dir)):
-      vt.ensure_legal()
+      vt._ensure_legal()
 
   def test_raises_missing_unique_results_dir(self):
     vt = self.make_vt()
     safe_rmtree(vt.unique_results_dir)
     with self.assertRaisesRegexp(VersionedTargetSet.IllegalResultsDir, r'{}'.format(vt.unique_results_dir)):
-      vt.ensure_legal()
+      vt._ensure_legal()
 
   def test_raises_both_clobbered_symlink_and_missing_unique_results_dir(self):
     # If multiple results_dirs are in illegal state, the error should list all the problems at once.
     vt = self.make_vt()
+    # Overwrite the symlink and delete the unique_results_dir.
     self.clobber_symlink(vt)
     safe_rmtree(vt.unique_results_dir)
     with self.assertRaisesRegexp(VersionedTargetSet.IllegalResultsDir, r'{}'.format(vt.results_dir)):
-      vt.ensure_legal()
+      vt._ensure_legal()
     with self.assertRaisesRegexp(VersionedTargetSet.IllegalResultsDir, r'{}'.format(vt.unique_results_dir)):
-      vt.ensure_legal()
+      vt._ensure_legal()
 
   def test_for_illegal_vts(self):
     # The update() checks this through vts.ensure_legal, checked here since those checks are on different branches.
+    vt = self.make_vt()
+    self.clobber_symlink(vt)
+    vts = VersionedTargetSet.from_versioned_targets([vt])
     with self.assertRaises(VersionedTargetSet.IllegalResultsDir):
-      vt = self.make_vt()
-      self.clobber_symlink(vt)
-      vts = VersionedTargetSet.from_versioned_targets([vt])
       vts.update()
 
   def test_has_results_dir(self):

@@ -56,12 +56,10 @@ class VersionedTargetSet(object):
 
     # The following line is a no-op if cache_key was set in the VersionedTarget __init__ method.
     self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key for vt in versioned_targets])
-
-    # NB: previous_cache_key may be None on the first build of a target.
-    self.previous_cache_key = cache_manager.previous_key(self.cache_key)
-
+    # NB: _previous_cache_key may be None on the first build of a target.
+    self._previous_cache_key = cache_manager.previous_key(self.cache_key)
     # NOTE: VTs can be forced invalid, which currently involves resetting 'self.valid' to False.
-    self.valid = self.previous_cache_key == self.cache_key
+    self.valid = self._previous_cache_key == self.cache_key
 
     if cache_manager.invalidation_report:
       cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key, self.valid, phase='init')
@@ -72,22 +70,23 @@ class VersionedTargetSet(object):
     return self._cache_manager.root_dir
 
   def _has_results_dir(self):
-    return os.path.lexists(self._stable_results_path)
+    # Must check the unique_path because the stable_path could have been created for an earlier cache key.
+    return os.path.lexists(self._unique_results_path)
 
   def _ensure_legal(self):
-    # Does not guarantee that the results directories exist - but if they do they are checked
-    if self._has_results_dir:
-      self._check_results_dirs
+    # Does not guarantee that the results directories exist - but if they do they are checked for illegal state.
+    if self._has_results_dir():
+      self._check_results_dirs()
     return True
 
-  def _check_results_dirs(self:)
+  def _check_results_dirs(self):
     # Check results_dirs and hard fail if they do not exist or are in an illegal state.
     # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
     errors = ''
-    if not os.path.islink(self.results_dir):
-      errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self.results_dir)
-    if not os.path.isdir(self.unique_results_dir):
-      errors += '\nThe unique_results_dir directory was not found\n\t* {}'.format(self.unique_results_dir)
+    if not os.path.islink(self._stable_results_path):
+      errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self._stable_results_path)
+    if not os.path.isdir(self._unique_results_path):
+      errors += '\nThe unique_results_dir directory was not found\n\t* {}'.format(self._unique_results_path)
     if errors:
       raise self.IllegalResultsDir(
         '\nThe results_dirs should not be manually cleaned or recreated by tasks.\n{}'.format(errors)
@@ -123,9 +122,9 @@ class VersionedTargetSet(object):
   @memoized_property
   def _previous_results_path(self):
     # File path that would hold the previous VT.unique_results_dir. This can be None if no previous runs are known.
-    if not self.previous_cache_key:
+    if not self._previous_cache_key:
       return None
-    return self._generate_results_path(self.previous_cache_key)
+    return self._generate_results_path(self._previous_cache_key)
 
   @memoized_property
   def _previous_results_dir(self):
@@ -161,8 +160,8 @@ class VersionedTargetSet(object):
     return self._unique_results_path
 
   def has_previous_results(self, vt):
-    """Return True if the cache_manager can locate the results_dir for the previous exection of this VT."""
-    # Only used by tasks that enable incremental results.
+    """Return True if the cache_manager can locate the results_dir for the previous execution of this VT."""
+    # Designed for use by incremental tasks, this verifies that the directory exists at this moment, nothing more.
     return vt._previous_results_dir
 
   def live_dirs(self):
