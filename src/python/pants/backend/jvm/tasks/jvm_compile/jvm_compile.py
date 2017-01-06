@@ -27,12 +27,13 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
-from pants.base.workunit import WorkUnitLabel
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
+                                safe_walk)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_property
 
@@ -519,10 +520,16 @@ class JvmCompile(NailgunTaskBase):
 
         # If compiling a plugin, don't try to use it on itself.
         javac_plugins_to_exclude = (t.plugin for t in vts.targets if isinstance(t, JavacPlugin))
-        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings, fatal_warnings, zinc_file_manager,
-                     javac_plugins_to_exclude)
-        print(compile_workunit.name)
+        try:
+          self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
+                       log_file, settings, fatal_warnings, zinc_file_manager,
+                       javac_plugins_to_exclude)
+        except TaskError:
+          for child in compile_workunit.children:
+            for output_name, outpath in child.output_paths().items():
+              if child.name == self.name() and output_name == 'stdout' and child.outcome() == WorkUnit.FAILURE:
+                self._check_missing_deps(read_file(outpath))
+          raise
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -626,6 +633,9 @@ class JvmCompile(NailgunTaskBase):
       else:
         self.context.log.warn('Target {} had {}\n'.format(
           compile_context.target.address.spec, unused_msg))
+
+  def _check_missing_deps(self, compile_output):
+    print('Invoking missing deps check: \n{}'.format(compile_output))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
