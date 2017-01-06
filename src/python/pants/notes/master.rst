@@ -30,7 +30,7 @@ Refactoring, Improvements, and Tooling
   `PR #4157 <https://github.com/pantsbuild/pants/pull/4157>`_
 
 * Fix release script owners check.
-  `Commit <https://github.com/pantsbuild/pants/commit/a40234429cc05f6483f91b08f10037429710b5b4>`
+  `Commit <https://github.com/pantsbuild/pants/commit/a40234429cc05f6483f91b08f10037429710b5b4>`_
 
 
 1.3.0.dev5 (12/30/2016)
