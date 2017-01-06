@@ -1,4 +1,4 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
 + Alan Paulin
@@ -135,3 +135,4 @@ Created by running `build-support/bin/contributors.sh`.
 + Wolfram Arnold
 + Yi Cheng
 + Yujie Chen
++ nsaechao
