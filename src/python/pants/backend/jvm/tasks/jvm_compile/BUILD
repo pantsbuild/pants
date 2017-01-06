@@ -131,3 +131,10 @@ python_binary(
     'src/python/pants/util:dirutil',
   ],
 )
+
+python_binary(
+  name = 'missing_dependency_finder',
+  source = 'missing_dependency_finder.py',
+  dependencies = [
+  ],
+)

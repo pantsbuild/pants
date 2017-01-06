@@ -525,10 +525,16 @@ class JvmCompile(NailgunTaskBase):
                        log_file, settings, fatal_warnings, zinc_file_manager,
                        javac_plugins_to_exclude)
         except TaskError:
-          for child in compile_workunit.children:
-            for output_name, outpath in child.output_paths().items():
-              if child.name == self.name() and output_name == 'stdout' and child.outcome() == WorkUnit.FAILURE:
-                self._check_missing_deps(read_file(outpath))
+          def find_failed_compile_log(workunits):
+            for wu in workunits:
+              for output_name, outpath in wu.output_paths().items():
+                if (wu.name == self.name() and output_name == 'stdout'
+                    and wu.outcome() == WorkUnit.FAILURE):
+                  return outpath
+            return None
+          log_path = find_failed_compile_log(compile_workunit.children)
+          if log_path:
+            self._suggest_missing_deps(read_file(log_path))
           raise
 
   def check_artifact_cache(self, vts):
@@ -634,8 +640,9 @@ class JvmCompile(NailgunTaskBase):
         self.context.log.warn('Target {} had {}\n'.format(
           compile_context.target.address.spec, unused_msg))
 
-  def _check_missing_deps(self, compile_output):
-    print('Invoking missing deps check: \n{}'.format(compile_output))
+  def _suggest_missing_deps(self, compile_output):
+    with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
+      print('Invoking missing deps check: \n{}'.format(compile_output))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""

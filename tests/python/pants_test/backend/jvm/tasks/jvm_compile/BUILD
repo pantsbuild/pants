@@ -30,3 +30,11 @@ python_tests(
   ],
   tags={'integration'},
 )
+
+python_tests(
+  name='missing_dependency_finder',
+  sources=['test_missing_dependency_finder.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/tasks/jvm_compile:missing_dependency_finder',
+  ],
+)
