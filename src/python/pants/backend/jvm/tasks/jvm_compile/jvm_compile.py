@@ -534,7 +534,7 @@ class JvmCompile(NailgunTaskBase):
             return None
           log_path = find_failed_compile_log(compile_workunit.children)
           if log_path:
-            self._suggest_missing_deps(read_file(log_path))
+            self._find_missing_deps(read_file(log_path))
           raise
 
   def check_artifact_cache(self, vts):
@@ -640,7 +640,7 @@ class JvmCompile(NailgunTaskBase):
         self.context.log.warn('Target {} had {}\n'.format(
           compile_context.target.address.spec, unused_msg))
 
-  def _suggest_missing_deps(self, compile_output):
+  def _find_missing_deps(self, compile_output):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
       print('Invoking missing deps check: \n{}'.format(compile_output))
 

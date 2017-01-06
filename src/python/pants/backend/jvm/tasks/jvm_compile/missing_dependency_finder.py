@@ -12,6 +12,13 @@ from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
 
 
+def normalize_classname(classname):
+  """
+  Ensure the dot separated class name.
+  """
+  return classname.replace('$', '.').replace('/', '.')
+
+
 class ClassNotFoundError(namedtuple('CompileError', ['source', 'lineno', 'classname'])):
   """Compilation error specifically about class not found."""
   pass
@@ -25,7 +32,7 @@ class CompileErrorExtractor(object):
   def __init__(self, error_patterns=CLASS_NOT_FOUND_ERROR_PATTERNS):
     self._error_patterns = error_patterns
 
-  def extract(self, compile_output, first_only=True):
+  def extract(self, compile_output):
     def safe_get_named_group(match, name, default=None):
       try:
         return match.group(name)
@@ -42,7 +49,7 @@ class CompileErrorExtractor(object):
         if classnameonly and packagename:
           classname = '.'.join([packagename, classnameonly])
       if classname:
-        classname = self._normalize_classname(classname)
+        classname = normalize_classname(classname)
       return ClassNotFoundError(source, lineno, classname)
 
     errors = []
@@ -61,16 +68,7 @@ class CompileErrorExtractor(object):
       errors.append(get_matched_error(first_match))
       start = first_match.end() + 1
 
-      if first_only:
-        break
-
     return errors
-
-  def _normalize_classname(self, classname):
-    """
-    Ensure the dot separated class name.
-    """
-    return classname.replace('$', '.').replace('/', '.')
 
 
 class StringSimilarityRanker(object):

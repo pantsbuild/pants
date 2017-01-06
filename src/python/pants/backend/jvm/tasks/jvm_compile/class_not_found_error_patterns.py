@@ -44,6 +44,8 @@ _CLASS_NOT_FOUND_ERROR_ZINC_PATTERNS = [
    '\s+\[error\] Type (?P<classname>\S+) not present'),
   (r'\s+\[error\] ## Exception when compiling (?P<filename>\S+) and others\.\.\.\n'
    '\s+\[error\] java.lang.NoClassDefFoundError: (?P<classname>\S+)'),
+  # This is a javac pattern but places here below the more specific pattern above since
+  # we want to match the more specific pattern first
   (r'.*java.lang.NoClassDefFoundError: (?P<classname>\S+)'),
 ]
 
