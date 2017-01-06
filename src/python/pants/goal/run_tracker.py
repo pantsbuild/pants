@@ -305,6 +305,7 @@ class RunTracker(Subsystem):
     stats_url = self.get_options().stats_upload_url
     if stats_url:
       t = threading.Thread(target=self.post_stats, args=(stats_url, stats, self.get_options().stats_upload_timeout))
+      t.daemon = True
       t.start()
 
     # Write stats to local json file.
