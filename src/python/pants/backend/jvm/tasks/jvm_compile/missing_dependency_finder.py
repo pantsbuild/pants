@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 from difflib import SequenceMatcher
 
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
@@ -85,3 +85,39 @@ class StringSimilarityRanker(object):
   def sort(self, strings):
     return sorted(strings, key=lambda str: SequenceMatcher(a=self._base_str, b=str).ratio(),
       reverse=True)
+
+
+class MissingDependencyFinder(object):
+  """
+  Try to find missing dependencies from target's transitive dependencies.
+  """
+
+  def __init__(self, dep_analyzer, logger):
+    self.dep_analyzer = dep_analyzer
+    self.logger = logger
+    self.compile_error_extractor = CompileErrorExtractor()
+
+  def find(self, compile_failure_log, target):
+    not_found_classes = [err.classname for err in
+                         self.compile_error_extractor.extract(compile_failure_log)]
+    return self.select_target_candidates_for_class(not_found_classes, target)
+
+  def select_target_candidates_for_class(self, classnames, target):
+    """Select top candidate for a given classname.
+
+    When multiple candidates are available, sometimes common in 3rdparty dependencies,
+    they are ranked according to their similiarities with the classname because the way
+    3rdparty targets are conventionally named.
+    """
+    candiates = OrderedDict()
+    for classname in classnames:
+      if classname not in candiates:
+        candidates_for_class = [tgt.address.spec for tgt in
+                                self.dep_analyzer.targets_for_class(target, classname)]
+        if candidates_for_class:
+          candidates_for_class = StringSimilarityRanker(classname).sort(candidates_for_class)
+          candiates[classname] = candidates_for_class[0]
+        self.logger.debug('Found {} candidate dependencies of {} for {}: {}'
+                          .format(len(candidates_for_class), target.address.spec, classname,
+                                  ', '.join(candidates_for_class)))
+    return candiates

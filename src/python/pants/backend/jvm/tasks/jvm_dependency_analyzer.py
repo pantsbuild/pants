@@ -79,6 +79,20 @@ class JvmDependencyAnalyzer(object):
 
     return targets_by_file
 
+  def targets_for_class(self, target, classname):
+    """Search which targets from `target`'s transitie dependencies contain `classname`."""
+    return self._targets_by_class(target.closure()).get(classname)
+
+  def _targets_by_class(self, targets):
+    targets_by_class = defaultdict(set)
+    for target in targets:
+      contents = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)
+      for f in contents:
+        classname = ClasspathUtil.classname_for_rel_classfile(f)
+        if classname:
+          targets_by_class[classname].add(target)
+    return targets_by_class
+
   def _jar_classfiles(self, jar_file):
     """Returns an iterator over the classfiles inside jar_file."""
     for cls in ClasspathUtil.classpath_entries_contents([jar_file]):

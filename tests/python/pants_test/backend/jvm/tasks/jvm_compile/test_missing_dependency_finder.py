@@ -50,7 +50,7 @@ class CompileErrorExtractorTest(unittest.TestCase):
       [error] missing or invalid dependency detected while loading class file 'Logging.class'.
       [error] Could not access type Future in value com.twitter.util,""",
     r"""
-      [error] Class a.b.c.X not found - continuing with a stub."""
+      [error] Class a.b.c.X not found - continuing with a stub.""",
   ]
 
   EXPECTED_ERRORS = [

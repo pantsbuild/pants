@@ -21,6 +21,7 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
+from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import MissingDependencyFinder
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
@@ -163,6 +164,9 @@ class JvmCompile(NailgunTaskBase):
              fingerprint=True,
              help='Controls whether unused deps are checked, and whether they cause warnings or '
                   'errors.')
+
+    register('--suggest-missing-deps', advanced=False, type=bool,
+             help='Suggest missing dependencies on compilation failures.')
 
     register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True,
              help='Use jar files on the compile_classpath. Note: Using this option degrades '
@@ -322,6 +326,7 @@ class JvmCompile(NailgunTaskBase):
     self._capture_log = self.get_options().capture_log
     self._delete_scratch = self.get_options().delete_scratch
     self._clear_invalid_analysis = self.get_options().clear_invalid_analysis
+    self._missing_dependency_finder = MissingDependencyFinder(self._dep_analyzer, self.context.log)
 
     try:
       worker_count = self.get_options().worker_count
@@ -478,7 +483,7 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text.encode('utf-8'))
 
-  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
+  def _compile_vts(self, vts, target, sources, analysis_file, upstream_analysis, classpath, outdir,
                    log_file, progress_message, settings, fatal_warnings, zinc_file_manager,
                    counter):
     """Compiles sources for the given vts into the given output dir.
@@ -532,9 +537,10 @@ class JvmCompile(NailgunTaskBase):
                     and wu.outcome() == WorkUnit.FAILURE):
                   return outpath
             return None
-          log_path = find_failed_compile_log(compile_workunit.children)
-          if log_path:
-            self._find_missing_deps(read_file(log_path))
+          if self.get_options().suggest_missing_deps:
+            log_path = find_failed_compile_log(compile_workunit.children)
+            if log_path:
+              self._find_missing_deps(read_file(log_path), target)
           raise
 
   def check_artifact_cache(self, vts):
@@ -640,9 +646,10 @@ class JvmCompile(NailgunTaskBase):
         self.context.log.warn('Target {} had {}\n'.format(
           compile_context.target.address.spec, unused_msg))
 
-  def _find_missing_deps(self, compile_output):
+  def _find_missing_deps(self, compile_failure_log, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
-      print('Invoking missing deps check: \n{}'.format(compile_output))
+      missing_dep_suggestions = self._missing_dependency_finder.find(compile_failure_log, target)
+      self.context.log.info('Found missing dependency suggestions: {}'.format(missing_dep_suggestions))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -735,6 +742,7 @@ class JvmCompile(NailgunTaskBase):
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
         self._compile_vts(vts,
+                          ctx.target,
                           ctx.sources,
                           ctx.analysis_file,
                           upstream_analysis,
