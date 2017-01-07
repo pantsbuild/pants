@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 from difflib import SequenceMatcher
 
+from colors import strip_color
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
@@ -56,6 +57,7 @@ class CompileErrorExtractor(object):
 
     errors = []
     start = 0
+    compile_output = strip_color(compile_output)
     while start < len(compile_output):
       first_match = None
       for p in self._error_patterns:
