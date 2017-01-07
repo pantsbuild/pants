@@ -326,7 +326,7 @@ class JvmCompile(NailgunTaskBase):
     self._capture_log = self.get_options().capture_log
     self._delete_scratch = self.get_options().delete_scratch
     self._clear_invalid_analysis = self.get_options().clear_invalid_analysis
-    self._missing_dependency_finder = MissingDependencyFinder(self._dep_analyzer, self.context.log)
+    self._missing_dependency_finder = MissingDependencyFinder(self._dep_analyzer)
 
     try:
       worker_count = self.get_options().worker_count
@@ -649,7 +649,28 @@ class JvmCompile(NailgunTaskBase):
   def _find_missing_deps(self, compile_failure_log, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
       missing_dep_suggestions = self._missing_dependency_finder.find(compile_failure_log, target)
-      self.context.log.info('Found missing dependency suggestions: {}'.format(missing_dep_suggestions))
+
+      if not missing_dep_suggestions:
+        return
+
+      self.context.log.info('Found the following dependencies that contain '
+                            'the reported not found classes:')
+      suggested_deps = set()
+      for classname, candidates in missing_dep_suggestions.items():
+        if candidates:
+          suggested_deps.add(list(candidates)[0])
+          candidates_msg = ', '.join(candidates)
+        else:
+          candidates_msg = 'N/A'
+        self.context.log.info('  {}: {}'.format(classname, candidates_msg))
+
+      if suggested_deps:
+        suggestion_msg = (
+          '\nIf the above information is correct, '
+          'please add the following to the dependencies of ({}):\n  {}\n'
+          .format(target.address.spec, '\n    '.join(sorted(list(suggested_deps))))
+        )
+        self.context.log.info(suggestion_msg)
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""

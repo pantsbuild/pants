@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 
+
 _CLASS_NOT_FOUND_ERROR_JAVAC_PATTERNS = [
   (r'\s*\[error\] (?P<filename>\S+):(?P<lineno>\d+):(\d+): cannot find symbol\n'
    '\s*\[error\]   symbol:   class (\S+)\n'

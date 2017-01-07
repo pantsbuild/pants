@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from difflib import SequenceMatcher
+
+from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
@@ -92,9 +94,8 @@ class MissingDependencyFinder(object):
   Try to find missing dependencies from target's transitive dependencies.
   """
 
-  def __init__(self, dep_analyzer, logger):
+  def __init__(self, dep_analyzer):
     self.dep_analyzer = dep_analyzer
-    self.logger = logger
     self.compile_error_extractor = CompileErrorExtractor()
 
   def find(self, compile_failure_log, target):
@@ -109,15 +110,14 @@ class MissingDependencyFinder(object):
     they are ranked according to their similiarities with the classname because the way
     3rdparty targets are conventionally named.
     """
-    candiates = OrderedDict()
+    candiates = {}
     for classname in classnames:
       if classname not in candiates:
         candidates_for_class = [tgt.address.spec for tgt in
                                 self.dep_analyzer.targets_for_class(target, classname)]
         if candidates_for_class:
           candidates_for_class = StringSimilarityRanker(classname).sort(candidates_for_class)
-          candiates[classname] = candidates_for_class[0]
-        self.logger.debug('Found {} candidate dependencies of {} for {}: {}'
-                          .format(len(candidates_for_class), target.address.spec, classname,
-                                  ', '.join(candidates_for_class)))
+          candiates[classname] = OrderedSet(candidates_for_class)
+        else:
+          candiates[classname] = set()
     return candiates
