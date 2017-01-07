@@ -307,7 +307,7 @@ class RunTracker(Subsystem):
       pid = os.fork()
       if pid == 0:
         self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
-        exit(0)
+        os._exit(0)
 
     # Write stats to local json file.
     stats_json_file_name = self.get_options().stats_local_json_file
