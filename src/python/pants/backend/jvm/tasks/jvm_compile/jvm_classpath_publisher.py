@@ -5,8 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.java.util import safe_classpath
 from pants.task.task import Task
@@ -14,6 +13,10 @@ from pants.task.task import Task
 
 class RuntimeClasspathPublisher(Task):
   """Create stable symlinks for runtime classpath entries for JVM targets."""
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(RuntimeClasspathPublisher, cls).subsystem_dependencies() + (JVM.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
@@ -25,12 +28,8 @@ class RuntimeClasspathPublisher(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data('runtime_classpath')
 
-  @property
-  def _output_folder(self):
-    return self.options_scope.replace('.', os.sep)
-
   def execute(self):
-    basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
+    basedir = JVM.scoped_instance(self).get_options().classpath_export
     runtime_classpath = self.context.products.get_data('runtime_classpath')
     targets = self.context.targets()
     if self.get_options().manifest_jar_only:

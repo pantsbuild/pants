@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_concurrent_rename, safe_rmtree
@@ -22,6 +23,10 @@ class Clean(Task):
   The clean-all method allows for both synchronous and asynchronous options with the --async option."""
 
   @classmethod
+  def subsystem_dependencies(cls):
+    return super(Clean, cls).subsystem_dependencies() + (JVM.scoped(cls),)
+
+  @classmethod
   def register_options(cls, register):
     super(Clean, cls).register_options(register)
     register('--async', type=bool, default=False,
@@ -29,6 +34,10 @@ class Clean(Task):
                   'for large pants workdirs.')
 
   def execute(self):
+    export_classpath_dir = JVM.scoped_instance(self).get_options().classpath_export
+    logger.debug("Removing {}".format(export_classpath_dir))
+    safe_rmtree(export_classpath_dir)
+
     pants_wd = self.get_options().pants_workdir
     pants_trash = os.path.join(pants_wd, "trash")
 
