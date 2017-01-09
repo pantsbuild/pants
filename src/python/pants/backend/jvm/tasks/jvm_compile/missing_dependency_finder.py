@@ -17,13 +17,13 @@ from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
 
 def normalize_classname(classname):
   """
-  Ensure the dot separated class name.
+  Ensure the dot separated class name (zinc reported class not found may contain '/')
   """
-  return classname.replace('$', '.').replace('/', '.')
+  return classname.replace('/', '.')
 
 
 class ClassNotFoundError(namedtuple('CompileError', ['source', 'lineno', 'classname'])):
-  """Compilation error specifically about class not found."""
+  """Represents class not found compile errors."""
   pass
 
 
@@ -36,11 +36,11 @@ class CompileErrorExtractor(object):
     self._error_patterns = error_patterns
 
   def extract(self, compile_output):
-    def safe_get_named_group(match, name, default=None):
+    def safe_get_named_group(match, name):
       try:
         return match.group(name)
       except IndexError:
-        return default
+        return None
 
     def get_matched_error(match):
       source = safe_get_named_group(match, 'filename')
@@ -101,26 +101,32 @@ class MissingDependencyFinder(object):
     self.compile_error_extractor = CompileErrorExtractor()
 
   def find(self, compile_failure_log, target):
+    """Find missing deps best-effort from target's transitive dependencies.
+
+    Returns (class2deps, no_dep_found) tuple. `class2deps` contains classname
+    to deps that contain the class mapping. `no_dep_found` are the classnames that are
+    unable to find the deps.
+    """
     not_found_classnames = [err.classname for err in
-                         self.compile_error_extractor.extract(compile_failure_log)]
+                            self.compile_error_extractor.extract(compile_failure_log)]
     return self.select_target_candidates_for_class(not_found_classnames, target)
 
   def select_target_candidates_for_class(self, classnames, target):
-    """Select top candidate for a given classname.
+    """Select a target that contains the given classname.
 
     When multiple candidates are available, not uncommon in 3rdparty dependencies,
     they are ranked according to their string similiarities with the classname because
     the way 3rdparty targets are conventionally named often shares similar naming
     structure.
     """
-    candiates, no_target_candidates = {}, set()
+    class2deps, no_dep_found = {}, set()
     for classname in classnames:
-      if classname not in candiates:
+      if classname not in class2deps:
         candidates_for_class = [tgt.address.spec for tgt in
                                 self.dep_analyzer.targets_for_class(target, classname)]
         if candidates_for_class:
           candidates_for_class = StringSimilarityRanker(classname).sort(candidates_for_class)
-          candiates[classname] = OrderedSet(candidates_for_class)
+          class2deps[classname] = OrderedSet(candidates_for_class)
         else:
-          no_target_candidates.add(classname)
-    return candiates, no_target_candidates
+          no_dep_found.add(classname)
+    return class2deps, no_dep_found

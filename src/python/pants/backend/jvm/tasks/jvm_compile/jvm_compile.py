@@ -166,7 +166,8 @@ class JvmCompile(NailgunTaskBase):
                   'errors.')
 
     register('--suggest-missing-deps', advanced=False, type=bool,
-             help='Suggest missing dependencies on compilation failures.')
+             help='Suggest missing dependencies best-effort from target\'s transitive deps '
+                  'for compilation failures that are due to class not found.')
 
     register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True,
              help='Use jar files on the compile_classpath. Note: Using this option degrades '
@@ -531,10 +532,10 @@ class JvmCompile(NailgunTaskBase):
                        javac_plugins_to_exclude)
         except TaskError:
           def find_failed_compile_log(workunits):
-            for wu in workunits:
-              for output_name, outpath in wu.output_paths().items():
-                if (wu.name == self.name() and output_name == 'stdout'
-                    and wu.outcome() == WorkUnit.FAILURE):
+            for workunit in workunits:
+              for output_name, outpath in workunit.output_paths().items():
+                if (workunit.name == self.name() and output_name == 'stdout'
+                    and workunit.outcome() == WorkUnit.FAILURE):
                   return outpath
             return None
           if self.get_options().suggest_missing_deps:

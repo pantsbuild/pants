@@ -80,9 +80,10 @@ class JvmDependencyAnalyzer(object):
     return targets_by_file
 
   def targets_for_class(self, target, classname):
-    """Search which targets from `target`'s transitie dependencies contain `classname`."""
-    return self._targets_by_class(target.closure()).get(classname, set())
+    """Search which targets from `target`'s transitive dependencies contain `classname`."""
+    return self._targets_by_class(tuple(target.closure())).get(classname, set())
 
+  @memoized_method
   def _targets_by_class(self, targets):
     targets_by_class = defaultdict(set)
     for target in targets:
