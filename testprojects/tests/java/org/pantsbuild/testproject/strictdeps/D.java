@@ -3,9 +3,7 @@
 
 package org.pantsbuild.testproject.strictdeps;
 
-public class C {
-  public void foo_c() {
-    D d = new D();
-    d.foo_d();
+public class D {
+  public void foo_d() {
   }
 }

@@ -19,10 +19,9 @@ java_library(
 )
 
 java_library(
-  name='B1',
-  sources = ['B.java'],
-  dependencies=[':D'],
-  strict_deps=True,
+  name='A4',
+  sources = ['A.java'],
+  dependencies=[':B1'],
 )
 
 java_library(
@@ -32,11 +31,31 @@ java_library(
 )
 
 java_library(
+  name='B1',
+  sources = ['B.java'],
+  dependencies=[':C'],
+  strict_deps=True,
+)
+
+java_library(
   name='C',
   sources = ['C.java'],
+  dependencies=[':D'],
+)
+
+java_library(
+  name='C1',
+  sources = ['C.java'],
+  dependencies=[':E'],
+  strict_deps=True,
+)
+
+java_library(
+  name='D',
+  sources = ['D.java'],
 )
 
 target(
-  name='D',
-  dependencies=[':C'],
+  name='E',
+  dependencies=[':D'],
 )

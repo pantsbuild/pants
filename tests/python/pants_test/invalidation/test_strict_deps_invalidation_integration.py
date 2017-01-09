@@ -16,6 +16,10 @@ class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
 
   TEST_SRC = 'testprojects/tests/java/org/pantsbuild/testproject/strictdeps'
 
+  @classmethod
+  def hermetic(cls):
+    return True
+
   def modify_transitive_deps_and_compile(self, target_name, invalidate_root_target_expected, *extra_args):
     with self.temporary_sourcedir() as tmp_src:
       src_dir = os.path.relpath(os.path.join(tmp_src, os.path.basename(self.TEST_SRC)), get_buildroot())
@@ -26,7 +30,7 @@ class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)
 
-        with open(os.path.join(src_dir, 'C.java'), 'ab') as fh:
+        with open(os.path.join(src_dir, 'D.java'), 'ab') as fh:
           fh.write('\n')
 
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
@@ -48,7 +52,13 @@ class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
     self.modify_transitive_deps_and_compile('A3', True, '--java-strict-deps=False')
 
   def test_strict_deps_alias_target(self):
-    # B1 depends on D, which is an alias target. D depends on C.
-    # When C is changed, even though B1 has strict_deps set to True,
-    # we expect B1 to be invalidated.
-    self.modify_transitive_deps_and_compile('B1', True)
+    # C1 depends on E, which is an alias target. E depends on D.
+    # When D is changed, even though C1 has strict_deps set to True,
+    # we expect C1 to be invalidated.
+    self.modify_transitive_deps_and_compile('C1', True)
+
+  def test_non_strict_deps_root_with_strict_deps_dependency(self):
+    # A4 depends on B1 which has strict_deps set to True. However, since A4 has
+    # strict_deps set to False, changing transitive deps of A4 should trigger
+    # recompilation of A4.
+    self.modify_transitive_deps_and_compile('A4', True)

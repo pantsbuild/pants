@@ -367,7 +367,8 @@ class Target(AbstractTarget):
     self.labels = set()
 
     self._cached_fingerprint_map = {}
-    self._cached_transitive_fingerprint_map = {}
+    self._cached_all_transitive_fingerprint_map = {}
+    self._cached_direct_transitive_fingerprint_map = {}
     if no_cache:
       self.add_labels('no_cache')
     if kwargs:
@@ -446,7 +447,8 @@ class Target(AbstractTarget):
     :API: public
     """
     self._cached_fingerprint_map = {}
-    self._cached_transitive_fingerprint_map = {}
+    self._cached_all_transitive_fingerprint_map = {}
+    self._cached_direct_transitive_fingerprint_map = {}
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
@@ -467,13 +469,21 @@ class Target(AbstractTarget):
       raise self.RecursiveDepthError("Max depth of {} exceeded.".format(self._MAX_RECURSION_DEPTH))
 
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
-    if fingerprint_strategy not in self._cached_transitive_fingerprint_map:
+
+    direct = (depth == 0 and fingerprint_strategy.direct(self))
+    if direct:
+      fingerprint_map = self._cached_direct_transitive_fingerprint_map
+    else:
+      fingerprint_map = self._cached_all_transitive_fingerprint_map
+
+    if fingerprint_strategy not in fingerprint_map:
       hasher = sha1()
 
       def dep_hash_iter():
-        for dep in fingerprint_strategy.dependencies(self):
+        dep_list = fingerprint_strategy.dependencies(self) if direct else self.dependencies
+        for dep in dep_list:
           try:
-            if fingerprint_strategy.direct(self):
+            if direct:
               dep_hash = dep.invalidation_hash(fingerprint_strategy)
             else:
               dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth+1)
@@ -492,14 +502,15 @@ class Target(AbstractTarget):
       dependencies_hash = hasher.hexdigest()[:12]
       combined_hash = '{target_hash}.{deps_hash}'.format(target_hash=target_hash,
                                                          deps_hash=dependencies_hash)
-      self._cached_transitive_fingerprint_map[fingerprint_strategy] = combined_hash
-    return self._cached_transitive_fingerprint_map[fingerprint_strategy]
+      fingerprint_map[fingerprint_strategy] = combined_hash
+    return fingerprint_map[fingerprint_strategy]
 
   def mark_transitive_invalidation_hash_dirty(self):
     """
     :API: public
     """
-    self._cached_transitive_fingerprint_map = {}
+    self._cached_all_transitive_fingerprint_map = {}
+    self._cached_direct_transitive_fingerprint_map = {}
     self.mark_extra_transitive_invalidation_hash_dirty()
 
   def mark_extra_transitive_invalidation_hash_dirty(self):
