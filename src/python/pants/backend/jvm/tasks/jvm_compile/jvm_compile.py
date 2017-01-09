@@ -670,7 +670,7 @@ class JvmCompile(NailgunTaskBase):
         self.context.log.info('Unable to find any deps from target\'s transitive '
                               'dependencies that contain the following not found classes:')
         no_suggestion_msg = '\n    '.join(sorted(list(no_suggestions)))
-        self.context.log.info(no_suggestion_msg)
+        self.context.log.info('  {}'.format(no_suggestion_msg))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""

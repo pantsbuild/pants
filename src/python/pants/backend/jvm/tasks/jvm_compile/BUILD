@@ -139,4 +139,8 @@ python_library(
     'class_not_found_error_patterns.py',
     'missing_dependency_finder.py'
   ],
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+  ],
 )

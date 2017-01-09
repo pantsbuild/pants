@@ -9,7 +9,7 @@ import re
 
 
 _CLASS_NOT_FOUND_ERROR_PATTERNS = [
-  # javac errors
+  # javac errors.
   (r'\s*\[error\] (?P<filename>\S+):(?P<lineno>\d+):(\d+): cannot find symbol\n'
    '\s*\[error\]   symbol:   class (\S+)\n'
    '\s*\[error\]   location: package (\S+)\n'
@@ -24,8 +24,9 @@ _CLASS_NOT_FOUND_ERROR_PATTERNS = [
   (r'\s*\[error\] (?P<filename>\S+):(?P<lineno>\d+):(\d+): '
    'package (?P<packagename>\S+) does not exist\n'
    '\s*\[error\] .*\W(?P<classname>(?P=packagename)\.\w+)\W.*'),
+  (r'.*java.lang.NoClassDefFoundError: (?P<classname>\S+)'),
 
-  # scalac errors
+  # scalac errors. More work undergoing to improve scalac error messages.
   (r'\s*\[error\] missing or invalid dependency detected while loading class file '
    '\'(?P<dependee_classname>\S+)\.class\'\.\n'
    '\s*\[error\] Could not access type (?P<classnameonly>\S+) in (value|package) '
@@ -37,15 +38,11 @@ _CLASS_NOT_FOUND_ERROR_PATTERNS = [
    '\s*\[error\] import (?P<classname>\S+)'),
   (r'\s*\[error\] Class (?P<classname>\S+) not found \- continuing with a stub\.'),
 
-
-  # zinc errors
+  # zinc errors.
   (r'\s*\[error\] ## Exception when compiling (?P<filename>\S+) and others\.\.\.\n'
    '\s*\[error\] Type (?P<classname>\S+) not present'),
   (r'\s*\[error\] ## Exception when compiling (?P<filename>\S+) and others\.\.\.\n'
    '\s*\[error\] java.lang.NoClassDefFoundError: (?P<classname>\S+)'),
-
-  # javac error but needs to be after the more specific pattern
-  (r'.*java.lang.NoClassDefFoundError: (?P<classname>\S+)'),
 ]
 
 
