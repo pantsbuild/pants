@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import random
 import unittest
 
 from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (ClassNotFoundError,
@@ -83,14 +84,15 @@ class CompileErrorExtractorTest(unittest.TestCase):
 
 class StringSimilarityRankerTest(unittest.TestCase):
   def test_rank_dependency_candidates(self):
+    not_found_classname = 'com.google.inject.Inject'
+
+    # Expect 3rdparty/jvm/com/google/inject:guice is more similar to the missing class name.
     expected = [
       '3rdparty/jvm/com/google/inject:guice',
       '3rdparty/jvm/com/google/guava:guava',
       '3rdparty/jvm/cascading:cascading-local',
     ]
-    self.assertEqual(expected,
-      StringSimilarityRanker('com.google.inject.Inject').sort([
-        '3rdparty/jvm/cascading:cascading-local',
-        '3rdparty/jvm/com/google/guava:guava',
-        '3rdparty/jvm/com/google/inject:guice',
-      ]))
+
+    shuffled = list(expected)
+    random.shuffle(shuffled)
+    self.assertEqual(expected, StringSimilarityRanker(not_found_classname).sort(shuffled))

@@ -534,6 +534,7 @@ class JvmCompile(NailgunTaskBase):
           def find_failed_compile_log(workunits):
             for workunit in workunits:
               for output_name, outpath in workunit.output_paths().items():
+                # Locate failure log from child compilation workunit's stdout
                 if (workunit.name == self.name() and output_name == 'stdout'
                     and workunit.outcome() == WorkUnit.FAILURE):
                   return outpath

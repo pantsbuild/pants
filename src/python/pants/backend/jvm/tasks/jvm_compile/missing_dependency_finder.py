@@ -17,7 +17,7 @@ from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
 
 def normalize_classname(classname):
   """
-  Ensure the dot separated class name (zinc reported class not found may contain '/')
+  Ensure the dot separated class name (zinc reported class not found may use '/' separator)
   """
   return classname.replace('/', '.')
 
@@ -109,9 +109,9 @@ class MissingDependencyFinder(object):
     """
     not_found_classnames = [err.classname for err in
                             self.compile_error_extractor.extract(compile_failure_log)]
-    return self.select_target_candidates_for_class(not_found_classnames, target)
+    return self._select_target_candidates_for_class(not_found_classnames, target)
 
-  def select_target_candidates_for_class(self, classnames, target):
+  def _select_target_candidates_for_class(self, classnames, target):
     """Select a target that contains the given classname.
 
     When multiple candidates are available, not uncommon in 3rdparty dependencies,

@@ -21,6 +21,7 @@ class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
   def test_missing_deps_not_found(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
     run = self.run_pants(['compile', target, '--compile-zinc-suggest-missing-deps'])
+    self.assert_failure(run)
     self.assertTrue('Unable to find any deps from target\'s transitive dependencies '
                     'that contain the following not found classes:\n'
                     '  System2.out', run.stdout_data)
