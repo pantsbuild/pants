@@ -108,8 +108,7 @@ python_tests(
   sources = ['test_target.py'],
   dependencies = [
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:payload',
-    'src/python/pants/base:payload_field',
+    'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
