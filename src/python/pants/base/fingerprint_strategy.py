@@ -44,6 +44,12 @@ class FingerprintStrategy(AbstractClass):
     else:
       return None
 
+  def direct(self, target):
+    return False
+
+  def dependencies(self, target):
+    return target.dependencies
+
   @abstractmethod
   def __hash__(self):
     """Subclasses must implement a hash so computed fingerprints can be safely memoized."""
