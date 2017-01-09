@@ -327,7 +327,6 @@ class JvmCompile(NailgunTaskBase):
     self._capture_log = self.get_options().capture_log
     self._delete_scratch = self.get_options().delete_scratch
     self._clear_invalid_analysis = self.get_options().clear_invalid_analysis
-    self._missing_dependency_finder = MissingDependencyFinder(self._dep_analyzer)
 
     try:
       worker_count = self.get_options().worker_count
@@ -353,6 +352,10 @@ class JvmCompile(NailgunTaskBase):
     return JvmDependencyAnalyzer(get_buildroot(),
                                  self.context.products.get_data('runtime_classpath'),
                                  self.context.products.get_data('product_deps_by_src'))
+
+  @memoized_property
+  def _missing_deps_finder(self):
+    return MissingDependencyFinder(self._dep_analyzer)
 
   @property
   def _analysis_parser(self):
@@ -650,7 +653,7 @@ class JvmCompile(NailgunTaskBase):
 
   def _find_missing_deps(self, compile_failure_log, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
-      missing_dep_suggestions, no_suggestions = self._missing_dependency_finder.find(
+      missing_dep_suggestions, no_suggestions = self._missing_deps_finder.find(
         compile_failure_log, target)
 
       if missing_dep_suggestions:
