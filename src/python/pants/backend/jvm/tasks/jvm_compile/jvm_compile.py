@@ -67,7 +67,7 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
 
   def direct(self, target):
     if isinstance(target, JvmTarget):
-      return JvmCompile.enable_strict_deps(target)
+      return JvmCompile.strict_deps_enabled(target)
     return False
 
   def dependencies(self, target):
@@ -366,7 +366,7 @@ class JvmCompile(NailgunTaskBase):
 
   @staticmethod
   def _compute_language_property(target, selector):
-    """Computes the a language property setting for the given target sources.
+    """Computes a language property setting for the given target sources.
 
     :param target The target whose language property will be calculated.
     :param selector A function that takes a target or platform and returns the boolean value of the
@@ -390,7 +390,7 @@ class JvmCompile(NailgunTaskBase):
     return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products, self._dep_context)
 
   @staticmethod
-  def enable_strict_deps(target):
+  def strict_deps_enabled(target):
     return JvmCompile._compute_language_property(target, lambda x: x.strict_deps)
 
   def _compile_context(self, target, target_workdir):
@@ -399,7 +399,7 @@ class JvmCompile(NailgunTaskBase):
     classes_dir = os.path.join(target_workdir, 'classes')
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
-    strict_deps = self.enable_strict_deps(target)
+    strict_deps = self.strict_deps_enabled(target)
     return CompileContext(target,
                           analysis_file,
                           portable_analysis_file,
