@@ -101,18 +101,19 @@ class MissingDependencyFinder(object):
     self.compile_error_extractor = CompileErrorExtractor()
 
   def find(self, compile_failure_log, target):
-    not_found_classes = [err.classname for err in
+    not_found_classnames = [err.classname for err in
                          self.compile_error_extractor.extract(compile_failure_log)]
-    return self.select_target_candidates_for_class(not_found_classes, target)
+    return self.select_target_candidates_for_class(not_found_classnames, target)
 
   def select_target_candidates_for_class(self, classnames, target):
     """Select top candidate for a given classname.
 
-    When multiple candidates are available, sometimes common in 3rdparty dependencies,
-    they are ranked according to their similiarities with the classname because the way
-    3rdparty targets are conventionally named.
+    When multiple candidates are available, not uncommon in 3rdparty dependencies,
+    they are ranked according to their string similiarities with the classname because
+    the way 3rdparty targets are conventionally named often shares similar naming
+    structure.
     """
-    candiates = {}
+    candiates, no_target_candidates = {}, set()
     for classname in classnames:
       if classname not in candiates:
         candidates_for_class = [tgt.address.spec for tgt in
@@ -121,5 +122,5 @@ class MissingDependencyFinder(object):
           candidates_for_class = StringSimilarityRanker(classname).sort(candidates_for_class)
           candiates[classname] = OrderedSet(candidates_for_class)
         else:
-          candiates[classname] = set()
-    return candiates
+          no_target_candidates.add(classname)
+    return candiates, no_target_candidates
