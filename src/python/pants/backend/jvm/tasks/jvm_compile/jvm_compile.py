@@ -583,7 +583,7 @@ class JvmCompile(NailgunTaskBase):
                        javac_plugins_to_exclude)
         except TaskError:
           if self.get_options().suggest_missing_deps:
-            log_path = self.find_failed_compile_log(compile_workunit)
+            log_path = self._find_failed_compile_log(compile_workunit)
             if log_path:
               self._find_missing_deps(read_file(log_path), target)
           raise

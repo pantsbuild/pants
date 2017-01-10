@@ -81,18 +81,26 @@ class JvmDependencyAnalyzer(object):
 
   def targets_for_class(self, target, classname):
     """Search which targets from `target`'s transitive dependencies contain `classname`."""
-    return self._targets_by_class(tuple(target.closure())).get(classname, set())
+    targets_with_class = set()
+    for target in target.closure():
+      if classname in self._target_classes(target):
+        targets_with_class.add(target)
+
+    return targets_with_class
 
   @memoized_method
-  def _targets_by_class(self, targets):
-    targets_by_class = defaultdict(set)
-    for target in targets:
-      contents = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)
-      for f in contents:
-        classname = ClasspathUtil.classname_for_rel_classfile(f)
-        if classname:
-          targets_by_class[classname].add(target)
-    return targets_by_class
+  def _target_classes(self, target):
+    """Set of target's provided classes.
+
+    Call at the target level is to memoize efficiently.
+    """
+    target_classes = set()
+    contents = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)
+    for f in contents:
+      classname = ClasspathUtil.classname_for_rel_classfile(f)
+      if classname:
+        target_classes.add(classname)
+    return target_classes
 
   def _jar_classfiles(self, jar_file):
     """Returns an iterator over the classfiles inside jar_file."""
