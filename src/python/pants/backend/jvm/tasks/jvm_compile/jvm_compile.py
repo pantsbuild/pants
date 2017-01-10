@@ -19,11 +19,14 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
+  CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext,
                                                                  strict_dependencies)
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
-from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import MissingDependencyFinder
+from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (CompileErrorExtractor,
+                                                                           MissingDependencyFinder)
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
@@ -135,7 +138,7 @@ class JvmCompile(NailgunTaskBase):
              help='Extra compiler args to use when warnings are disabled.')
 
     register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
-             default=list(cls.get_fatal_warnings_enabled_args_default()),
+             default=CLASS_NOT_FOUND_ERROR_PATTERNS,
              help='Extra compiler args to use when fatal warnings are enabled.')
 
     register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
@@ -178,9 +181,14 @@ class JvmCompile(NailgunTaskBase):
              help='Controls whether unused deps are checked, and whether they cause warnings or '
                   'errors.')
 
-    register('--suggest-missing-deps', advanced=False, type=bool,
+    register('--suggest-missing-deps', type=bool,
              help='Suggest missing dependencies best-effort from target\'s transitive deps '
                   'for compilation failures that are due to class not found.')
+
+    register('--class-not-found-error-patterns', advanced=True, type=list,
+             default=CLASS_NOT_FOUND_ERROR_PATTERNS,
+             help='List of regular expression patterns that extract class not found '
+                  'compile errors.')
 
     register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True,
              help='Use jar files on the compile_classpath. Note: Using this option degrades '
@@ -368,7 +376,8 @@ class JvmCompile(NailgunTaskBase):
 
   @memoized_property
   def _missing_deps_finder(self):
-    return MissingDependencyFinder(self._dep_analyzer)
+    return MissingDependencyFinder(self._dep_analyzer, CompileErrorExtractor(
+      self.get_options().class_not_found_error_patterns))
 
   @property
   def _analysis_parser(self):

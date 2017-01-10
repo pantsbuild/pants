@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import random
 import unittest
 
+from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
+  CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (ClassNotFoundError,
                                                                            CompileErrorExtractor,
                                                                            StringSimilarityRanker)
@@ -70,7 +72,7 @@ class CompileErrorExtractorTest(unittest.TestCase):
   ]
 
   def setUp(self):
-    self.compile_error_finder = CompileErrorExtractor()
+    self.compile_error_finder = CompileErrorExtractor(CLASS_NOT_FOUND_ERROR_PATTERNS)
 
   def test_extract_single_error(self):
     for error_message, expected_error in zip(self.ERROR_MESSAGES, self.EXPECTED_ERRORS):

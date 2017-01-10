@@ -5,10 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import re
 
-
-_CLASS_NOT_FOUND_ERROR_PATTERNS = [
+CLASS_NOT_FOUND_ERROR_PATTERNS = [
   # javac errors.
   (r'\s*\[error\] (?P<filename>\S+):(?P<lineno>\d+):(\d+): cannot find symbol\n'
    '\s*\[error\]   symbol:   class (\S+)\n'
@@ -44,6 +42,3 @@ _CLASS_NOT_FOUND_ERROR_PATTERNS = [
   (r'\s*\[error\] ## Exception when compiling (?P<filename>\S+) and others\.\.\.\n'
    '\s*\[error\] java.lang.NoClassDefFoundError: (?P<classname>\S+)'),
 ]
-
-
-CLASS_NOT_FOUND_ERROR_PATTERNS = [re.compile(p) for p in _CLASS_NOT_FOUND_ERROR_PATTERNS]

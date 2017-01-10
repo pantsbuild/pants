@@ -5,14 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
 from collections import namedtuple
 from difflib import SequenceMatcher
 
 from colors import strip_color
 from twitter.common.collections import OrderedSet
-
-from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
-  CLASS_NOT_FOUND_ERROR_PATTERNS
 
 
 def normalize_classname(classname):
@@ -32,8 +30,8 @@ class CompileErrorExtractor(object):
   Extract `ClassNotFoundError`s from pants compile log.
   """
 
-  def __init__(self, error_patterns=CLASS_NOT_FOUND_ERROR_PATTERNS):
-    self._error_patterns = error_patterns
+  def __init__(self, error_patterns):
+    self._error_patterns = [re.compile(p) for p in error_patterns]
 
   def extract(self, compile_output):
     def safe_get_named_group(match, name):
@@ -96,9 +94,9 @@ class MissingDependencyFinder(object):
   Try to find missing dependencies from target's transitive dependencies.
   """
 
-  def __init__(self, dep_analyzer):
+  def __init__(self, dep_analyzer, error_extractor):
     self.dep_analyzer = dep_analyzer
-    self.compile_error_extractor = CompileErrorExtractor()
+    self.compile_error_extractor = error_extractor
 
   def find(self, compile_failure_log, target):
     """Find missing deps best-effort from target's transitive dependencies.
