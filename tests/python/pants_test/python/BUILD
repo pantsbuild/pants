@@ -8,9 +8,7 @@ python_tests(
   sources = ['test_antlr_builder.py'],
   dependencies = [
     '3rdparty/python:antlr-3.1.3',
-    'testprojects/src/antlr/pants/backend/python/test:csv',
-    'testprojects/src/antlr/pants/backend/python/test:eval',
-    'src/python/pants/backend/python:python_setup',
+    'testprojects/src/antlr/python/test:eval',
   ],
 )
 
