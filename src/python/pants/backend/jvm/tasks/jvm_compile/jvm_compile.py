@@ -138,7 +138,7 @@ class JvmCompile(NailgunTaskBase):
              help='Extra compiler args to use when warnings are disabled.')
 
     register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
-             default=CLASS_NOT_FOUND_ERROR_PATTERNS,
+             default=list(cls.get_fatal_warnings_enabled_args_default()),
              help='Extra compiler args to use when fatal warnings are enabled.')
 
     register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
@@ -589,7 +589,7 @@ class JvmCompile(NailgunTaskBase):
           raise
 
   def _find_failed_compile_log(self, compile_workunit):
-    '''One of the compile child workunits actually calls compiler, locate its stdout.'''
+    """One of the compile child workunits actually calls compiler, this is to locate its stdout."""
     for workunit in compile_workunit.children:
       for output_name, outpath in workunit.output_paths().items():
         # Workunit that runs compiler is id-ed by the task name.
