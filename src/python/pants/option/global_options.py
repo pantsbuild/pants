@@ -65,6 +65,13 @@ class GlobalOptionsRegistrar(Optionable):
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.codegen',
+                      'pants.backend.codegen.antlr.java',
+                      'pants.backend.codegen.jaxb',
+                      'pants.backend.codegen.protobuf.java',
+                      'pants.backend.codegen.ragel.java',
+                      'pants.backend.codegen.thrift.java',
+                      'pants.backend.codegen.thrift.python',
+                      'pants.backend.codegen.wire.java',
                       'pants.backend.project_info'],
              help='Load backends from these packages that are already on the path. '
                   'Add contrib and custom backends to this list.')
