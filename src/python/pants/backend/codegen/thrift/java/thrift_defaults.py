@@ -25,12 +25,18 @@ class ThriftDefaults(Subsystem):
              help='The default language to generate for java_thrift_library targets.')
     register('--rpc-style', type=str, advanced=True, default='sync',
              help='The default rpc-style to generate for java_thrift_library targets.')
+    register('--default-java-namespace', type=str, advanced=True, default=None,
+             help='The default Java namespace to generate for java_thrift_library targets.')
+    register('--namespace-map', type=dict, advanced=True, default={},
+             help='The default namespace map to generate for java_thrift_library targets, {old: new}.')
 
   def __init__(self, *args, **kwargs):
     super(ThriftDefaults, self).__init__(*args, **kwargs)
     self._default_compiler = self.get_options().compiler
     self._default_language = self.get_options().language
     self._default_rpc_style = self.get_options().rpc_style
+    self._default_default_java_namespace = self.get_options().default_java_namespace
+    self._default_namespace_map = self.get_options().namespace_map
 
   def compiler(self, target):
     """Returns the thrift compiler to use for the given target.
@@ -53,6 +59,28 @@ class ThriftDefaults(Subsystem):
     """
     self._check_target(target)
     return target.language or self._default_language
+
+  def namespace_map(self, target):
+    """Returns the namespace_map used for Thrift generation.
+
+    :param target: The target to extract the namespace_map from.
+    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+    :returns: The namespaces to remap (old to new).
+    :rtype: dictionary
+    """
+    self._check_target(target)
+    return target.namespace_map or self._default_namespace_map
+
+  def default_java_namespace(self, target):
+    """Returns the default_java_namespace used for Thrift generation.
+
+    :param target: The target to extract the default_java_namespace from.
+    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+    :returns: The default Java namespace used when not specified in the IDL.
+    :rtype: string
+    """
+    self._check_target(target)
+    return target.default_java_namespace or self._default_default_java_namespace
 
   def rpc_style(self, target):
     """Returns the style of RPC stub to generate.

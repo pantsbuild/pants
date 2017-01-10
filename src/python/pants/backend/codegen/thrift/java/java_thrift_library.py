@@ -27,6 +27,8 @@ class JavaThriftLibrary(JvmTarget):
                rpc_style=None,
                namespace_map=None,
                thrift_linter_strict=None,
+               default_java_namespace=None,
+               include_paths=None,
                **kwargs):
     """
     :API: public
@@ -39,6 +41,11 @@ class JavaThriftLibrary(JvmTarget):
       in the global options under ``--thrift-default-rpc-style``.
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
     :param thrift_linter_strict: If True, fail if thrift linter produces any warnings.
+    :param default_java_namespace: The namespace used for Java generated code when a Java
+      namespace is not explicitly specified in the IDL. The default is defined in the global
+      options under ``--thrift-default-default-java-namespace``.
+    :param include_paths: The include_path(s) used to search for included IDL files. The default
+      is defined in the global options under ``--thrift-default-include-paths``.
     """
     super(JavaThriftLibrary, self).__init__(**kwargs)
 
@@ -56,6 +63,8 @@ class JavaThriftLibrary(JvmTarget):
 
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict
+    self._default_java_namespace = default_java_namespace
+    self._include_paths = include_paths
 
   @property
   def compiler(self):
@@ -68,6 +77,14 @@ class JavaThriftLibrary(JvmTarget):
   @property
   def rpc_style(self):
     return self._rpc_style
+
+  @property
+  def default_java_namespace(self):
+    return self._default_java_namespace
+
+  @property
+  def include_paths(self):
+    return self._include_paths
 
   # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   @property
