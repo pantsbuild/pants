@@ -583,20 +583,21 @@ class JvmCompile(NailgunTaskBase):
                        javac_plugins_to_exclude)
         except TaskError:
           if self.get_options().suggest_missing_deps:
-            log_path = self._find_failed_compile_log(compile_workunit)
-            if log_path:
-              self._find_missing_deps(read_file(log_path), target)
+            logs = self._find_failed_compile_logs(compile_workunit)
+            if logs:
+              self._find_missing_deps('\n'.join([read_file(log) for log in logs]), target)
           raise
 
-  def _find_failed_compile_log(self, compile_workunit):
+  def _find_failed_compile_logs(self, compile_workunit):
     """One of the compile child workunits actually calls compiler, this is to locate its stdout."""
+    logs = []
     for workunit in compile_workunit.children:
       for output_name, outpath in workunit.output_paths().items():
         # Workunit that runs compiler is id-ed by the task name.
-        if (workunit.name == self.name() and output_name == 'stdout'
+        if (workunit.name == self.name() and output_name in ('stdout', 'stderr')
             and workunit.outcome() == WorkUnit.FAILURE):
-          return outpath
-    return None
+          logs.append(outpath)
+    return logs
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
