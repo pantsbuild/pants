@@ -61,6 +61,7 @@ python_library(
   dependencies = [
     ':compile_context',
     ':execution_graph',
+    ':missing_dependency_finder',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
@@ -129,5 +130,17 @@ python_binary(
     ':anonymizer',
     ':zinc',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'missing_dependency_finder',
+  sources = [
+    'class_not_found_error_patterns.py',
+    'missing_dependency_finder.py'
+  ],
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
 )
