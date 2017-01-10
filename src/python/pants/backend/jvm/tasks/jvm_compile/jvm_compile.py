@@ -722,7 +722,7 @@ class JvmCompile(NailgunTaskBase):
 
       if no_suggestions:
         self.context.log.debug('Unable to find any deps from target\'s transitive '
-                               'dependencies that contain the following not found classes:')
+                               'dependencies that provide the following missing classes:')
         no_suggestion_msg = '\n     '.join(sorted(list(no_suggestions)))
         self.context.log.debug('  {}'.format(no_suggestion_msg))
 
