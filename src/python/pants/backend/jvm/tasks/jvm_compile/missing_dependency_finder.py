@@ -99,7 +99,7 @@ class MissingDependencyFinder(object):
     self.compile_error_extractor = error_extractor
 
   def find(self, compile_failure_log, target):
-    """Find missing deps best-effort from target's transitive dependencies.
+    """Find missing deps on a best-effort basis from target's transitive dependencies.
 
     Returns (class2deps, no_dep_found) tuple. `class2deps` contains classname
     to deps that contain the class mapping. `no_dep_found` are the classnames that are

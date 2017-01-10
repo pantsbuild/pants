@@ -182,8 +182,8 @@ class JvmCompile(NailgunTaskBase):
                   'errors.')
 
     register('--suggest-missing-deps', type=bool,
-             help='Suggest missing dependencies best-effort from target\'s transitive deps '
-                  'for compilation failures that are due to class not found.')
+             help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
+                  'deps for compilation failures that are due to class not found.')
 
     register('--class-not-found-error-patterns', advanced=True, type=list,
              default=CLASS_NOT_FOUND_ERROR_PATTERNS,
@@ -582,19 +582,21 @@ class JvmCompile(NailgunTaskBase):
                        log_file, settings, fatal_warnings, zinc_file_manager,
                        javac_plugins_to_exclude)
         except TaskError:
-          def find_failed_compile_log(workunits):
-            for workunit in workunits:
-              for output_name, outpath in workunit.output_paths().items():
-                # Locate failure log from child compilation workunit's stdout
-                if (workunit.name == self.name() and output_name == 'stdout'
-                    and workunit.outcome() == WorkUnit.FAILURE):
-                  return outpath
-            return None
           if self.get_options().suggest_missing_deps:
-            log_path = find_failed_compile_log(compile_workunit.children)
+            log_path = self.find_failed_compile_log(compile_workunit)
             if log_path:
               self._find_missing_deps(read_file(log_path), target)
           raise
+
+  def _find_failed_compile_log(self, compile_workunit):
+    '''One of the compile child workunits actually calls compiler, locate its stdout.'''
+    for workunit in compile_workunit.children:
+      for output_name, outpath in workunit.output_paths().items():
+        # Workunit that runs compiler is id-ed by the task name.
+        if (workunit.name == self.name() and output_name == 'stdout'
+            and workunit.outcome() == WorkUnit.FAILURE):
+          return outpath
+    return None
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -706,7 +708,7 @@ class JvmCompile(NailgunTaskBase):
 
       if missing_dep_suggestions:
         self.context.log.info('Found the following deps from target\'s transitive '
-                              'dependencies that contain the not found classes:')
+                              'dependencies that provide the missing classes:')
         suggested_deps = set()
         for classname, candidates in missing_dep_suggestions.items():
           suggested_deps.add(list(candidates)[0])
@@ -719,10 +721,10 @@ class JvmCompile(NailgunTaskBase):
         self.context.log.info(suggestion_msg)
 
       if no_suggestions:
-        self.context.log.info('Unable to find any deps from target\'s transitive '
-                              'dependencies that contain the following not found classes:')
-        no_suggestion_msg = '\n    '.join(sorted(list(no_suggestions)))
-        self.context.log.info('  {}'.format(no_suggestion_msg))
+        self.context.log.debug('Unable to find any deps from target\'s transitive '
+                               'dependencies that contain the following not found classes:')
+        no_suggestion_msg = '\n     '.join(sorted(list(no_suggestions)))
+        self.context.log.debug('  {}'.format(no_suggestion_msg))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
