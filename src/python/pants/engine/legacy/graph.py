@@ -271,7 +271,7 @@ def hydrate_target(target_adaptor, hydrated_fields):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):
+def _eager_fileset_with_spec(spec_path, filespec, snapshot, excluded_source_files):
   excluded = {f.path for f in excluded_source_files.dependencies}
   file_tuples = [(fast_relpath(fd.path, spec_path), fd.digest)
                  for fd in source_files_digest.dependencies
@@ -299,14 +299,14 @@ def hydrate_sources(sources_field, source_files_digest, excluded_source_files):
   return HydratedField(sources_field.arg, fileset_with_spec)
 
 
-def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
+def hydrate_bundles(bundles_field, snapshot_list, excluded_files_list):
   """Given a BundlesField and FilesDigest for each of its filesets create a list of BundleAdaptors."""
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
-               files_digest_list,
+               snapshot_list,
                excluded_files_list)
-  for bundle, filespecs, files_digest, excluded_files in zipped:
+  for bundle, filespecs, snapshot, excluded_files in zipped:
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
     kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
@@ -341,7 +341,7 @@ def create_legacy_graph_tasks(symbol_table_cls):
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),
-      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list', field_types=(PathGlobs,)),
+      SelectDependencies(Snapshot, BundlesField, 'path_globs_list', field_types=(PathGlobs,)),
       SelectDependencies(Files, BundlesField, 'excluded_path_globs_list', field_types=(PathGlobs,))],
      hydrate_bundles),
   ]

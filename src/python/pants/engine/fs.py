@@ -430,49 +430,60 @@ def create_fs_tasks():
   return [
     # Glob execution: to avoid memoizing lots of incremental results, we recursively expand PathGlobs, and then
     # convert them to Paths independently.
+    # Public
     (Paths,
      [SelectDependencies(PathsExpansion,
                          PathGlobs,
                          field_types=(PathWildcard, PathDirWildcard, PathRoot),
                          transitive=True)],
      finalize_path_expansion),
+    # Private
     (PathsExpansion,
      [Select(PathRoot)],
      apply_path_root),
+    # Private
     (PathsExpansion,
      [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathWildcard),
       Select(PathWildcard)],
      apply_path_wildcard),
+    # Private
     (PathsExpansion,
      [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
       Select(PathDirWildcard)],
      apply_path_dir_wildcard),
+    # Private
     (FilteredPaths,
      [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathDirWildcard),
       Select(PathDirWildcard)],
      filter_paths),
   ] + [
     # Link resolution.
+    # Private
     (Dirs,
      [Select(Paths),
       SelectDependencies(Dirs, Paths, field='link_stats', field_types=(Link,))],
      resolve_dir_links),
+    # Public
     (Files,
      [Select(Paths),
       SelectDependencies(Files, Paths, field='link_stats', field_types=(Link,))],
      resolve_file_links),
+    # Private
     (Dirs,
      [SelectProjection(Dirs, PathGlobs, ('path_globs',), ReadLink)],
      resolve_link),
+    # Public
     (Files,
      [SelectProjection(Files, PathGlobs, ('path_globs',), ReadLink)],
      resolve_link),
   ] + [
     # File content.
+    # Public
     (FilesContent,
      [Select(Files),
       SelectDependencies(FileContent, Files, field='stats', field_types=(File,))],
      files_content),
+    # Public
     (FilesDigest,
      [Select(Files),
       SelectDependencies(FileDigest, Files, field='stats', field_types=(File,))],
