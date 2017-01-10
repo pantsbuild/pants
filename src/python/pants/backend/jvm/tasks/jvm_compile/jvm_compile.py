@@ -17,8 +17,10 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
+from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext,
+                                                                 strict_dependencies)
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import MissingDependencyFinder
@@ -42,9 +44,10 @@ from pants.util.memo import memoized_property
 class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
 
-  def __init__(self, task, classpath_products):
+  def __init__(self, task, classpath_products, dep_context):
     super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
     self._classpath_products = classpath_products
+    self._dep_context = dep_context
 
   def compute_fingerprint(self, target):
     if isinstance(target, Resources):
@@ -63,6 +66,16 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
     return hasher.hexdigest()
+
+  def direct(self, target):
+    if isinstance(target, JvmTarget):
+      return JvmCompile.strict_deps_enabled(target)
+    return False
+
+  def dependencies(self, target):
+    if self.direct(target):
+      return strict_dependencies(target, self._dep_context)
+    return super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).dependencies(target)
 
   def __hash__(self):
     return hash((type(self), self._task.fingerprint))
@@ -361,8 +374,34 @@ class JvmCompile(NailgunTaskBase):
   def _analysis_parser(self):
     return self._analysis_tools.parser
 
+  @staticmethod
+  def _compute_language_property(target, selector):
+    """Computes a language property setting for the given target sources.
+
+    :param target The target whose language property will be calculated.
+    :param selector A function that takes a target or platform and returns the boolean value of the
+                    property for that target or platform, or None if that target or platform does
+                    not directly define the property.
+
+    If the target does not override the language property, returns true iff the property
+    is true for any of the matched languages for the target.
+    """
+    if selector(target) is not None:
+      return selector(target)
+
+    prop = False
+    if target.has_sources('.java'):
+      prop |= selector(Java.global_instance())
+    if target.has_sources('.scala'):
+      prop |= selector(ScalaPlatform.global_instance())
+    return prop
+
   def _fingerprint_strategy(self, classpath_products):
-    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
+    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products, self._dep_context)
+
+  @staticmethod
+  def strict_deps_enabled(target):
+    return JvmCompile._compute_language_property(target, lambda x: x.strict_deps)
 
   def _compile_context(self, target, target_workdir):
     analysis_file = JvmCompile._analysis_for_target(target_workdir, target)
@@ -370,7 +409,7 @@ class JvmCompile(NailgunTaskBase):
     classes_dir = os.path.join(target_workdir, 'classes')
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
-    strict_deps = self._compute_language_property(target, lambda x: x.strict_deps)
+    strict_deps = self.strict_deps_enabled(target)
     return CompileContext(target,
                           analysis_file,
                           portable_analysis_file,
@@ -876,27 +915,6 @@ class JvmCompile(NailgunTaskBase):
     if hasattr(target, 'java_sources') and target.java_sources:
       sources.extend(resolve_target_sources(target.java_sources))
     return sources
-
-  def _compute_language_property(self, target, selector):
-    """Computes the a language property setting for the given target sources.
-
-    :param target The target whose language property will be calculated.
-    :param selector A function that takes a target or platform and returns the boolean value of the
-                    property for that target or platform, or None if that target or platform does
-                    not directly define the property.
-
-    If the target does not override the language property, returns true iff the property
-    is true for any of the matched languages for the target.
-    """
-    if selector(target) is not None:
-      return selector(target)
-
-    prop = False
-    if target.has_sources('.java'):
-      prop |= selector(Java.global_instance())
-    if target.has_sources('.scala'):
-      prop |= selector(ScalaPlatform.global_instance())
-    return prop
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.
