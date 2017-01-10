@@ -717,14 +717,14 @@ class JvmCompile(NailgunTaskBase):
         suggestion_msg = (
           '\nIf the above information is correct, '
           'please add the following to the dependencies of ({}):\n  {}\n'
-            .format(target.address.spec, '\n    '.join(sorted(list(suggested_deps))))
+            .format(target.address.spec, '\n  '.join(sorted(list(suggested_deps))))
         )
         self.context.log.info(suggestion_msg)
 
       if no_suggestions:
         self.context.log.debug('Unable to find any deps from target\'s transitive '
                                'dependencies that provide the following missing classes:')
-        no_suggestion_msg = '\n     '.join(sorted(list(no_suggestions)))
+        no_suggestion_msg = '\n   '.join(sorted(list(no_suggestions)))
         self.context.log.debug('  {}'.format(no_suggestion_msg))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):

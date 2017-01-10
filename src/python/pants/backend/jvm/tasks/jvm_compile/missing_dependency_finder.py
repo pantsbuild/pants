@@ -120,8 +120,11 @@ class MissingDependencyFinder(object):
     class2deps, no_dep_found = {}, set()
     for classname in classnames:
       if classname not in class2deps:
-        candidates_for_class = [tgt.address.spec for tgt in
-                                self.dep_analyzer.targets_for_class(target, classname)]
+        candidates_for_class = []
+        for tgt in self.dep_analyzer.targets_for_class(target, classname):
+          if tgt.is_synthetic and tgt.derived_from:
+            tgt = tgt.derived_from
+          candidates_for_class.append(tgt.address.spec)
         if candidates_for_class:
           candidates_for_class = StringSimilarityRanker(classname).sort(candidates_for_class)
           class2deps[classname] = OrderedSet(candidates_for_class)
