@@ -149,7 +149,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      scala_lang_lib = json_data.get('libraries').get('org.scala-lang:scala-library:2.10.6')
+      scala_lang_lib = json_data.get('libraries').get('org.scala-lang:scala-library:2.11.8')
       self.assertIsNotNone(scala_lang_lib)
       self.assertIsNotNone(scala_lang_lib['default'])
       self.assertIsNotNone(scala_lang_lib['sources'])

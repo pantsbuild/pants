@@ -9,10 +9,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.pantsbuild.testproject.publish</groupId>
-  <artifactId>classifiers_2.10</artifactId>
+  <artifactId>classifiers_2.11</artifactId>
   <packaging>jar</packaging>
   <version>0.0.1-SNAPSHOT</version>
-  <name>org.pantsbuild.testproject.publish:classifiers_2.10</name>
+  <name>org.pantsbuild.testproject.publish:classifiers_2.11</name>
   <description>This is a test. This is only a test.</description>
   <url>http://pantsbuild.github.io/</url>
   <licenses>
@@ -36,36 +36,9 @@
   </developers>
   <dependencies>
     <dependency>
-      <groupId>com.typesafe.sbt</groupId>
-      <artifactId>compiler-interface</artifactId>
-      <version>0.13.7</version>
-      <scope>compile</scope>
-      <classifier>sources</classifier>
-    </dependency>
-    <dependency>
-      <groupId>com.typesafe.sbt</groupId>
-      <artifactId>compiler-interface</artifactId>
-      <version>0.13.7</version>
-      <scope>compile</scope>
-      <classifier>javadoc</classifier>
-    </dependency>
-    <dependency>
-      <groupId>com.typesafe.sbt</groupId>
-      <artifactId>incremental-compiler</artifactId>
-      <version>0.13.7</version>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.typesafe.sbt</groupId>
-      <artifactId>sbt-interface</artifactId>
-      <version>0.13.7</version>
-      <scope>compile</scope>
-      <classifier>javadoc</classifier>
-    </dependency>
-    <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
-      <version>2.10.6</version>
+      <version>2.11.8</version>
       <scope>compile</scope>
     </dependency>
   </dependencies>
