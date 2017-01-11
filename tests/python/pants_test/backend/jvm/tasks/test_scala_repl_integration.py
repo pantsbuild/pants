@@ -40,7 +40,7 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
                   self.run_repl_helloworld(repl_args=['--jvm-options=-Dscala.usejavacp=true']))
 
   def test_run_repl_explicit_nousejavacp(self):
-    self.assertIn('Failed to initialize the REPL due to an unexpected error.',
+    self.assertIn('Failed to initialize compiler: object scala in compiler mirror not found.',
                   self.run_repl_helloworld(repl_args=['--jvm-options=-Dscala.usejavacp=false']))
 
   def test_run_repl_transitive(self):
