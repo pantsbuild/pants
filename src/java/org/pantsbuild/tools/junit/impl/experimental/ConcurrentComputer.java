@@ -5,9 +5,7 @@ package org.pantsbuild.tools.junit.impl.experimental;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -47,10 +45,12 @@ public class ConcurrentComputer extends Computer {
             new HashMap<Future<?>, Runnable>();
         private final ExecutorService fService = Executors.newFixedThreadPool(numParallelThreads);
 
+        @Override
         public void schedule(Runnable childStatement) {
           testResults.put(fService.submit(childStatement), childStatement);
         }
 
+        @Override
         public void finished() {
           try {
             fService.shutdown();
@@ -63,7 +63,7 @@ public class ConcurrentComputer extends Computer {
               if (testResult.isDone()) {
                 try {
                   testResult.get();
-                } catch(ExecutionException e){
+                } catch (ExecutionException e) {
                   Throwables.propagate(e);
                 }
               } else if (testResult.isCancelled()) {
