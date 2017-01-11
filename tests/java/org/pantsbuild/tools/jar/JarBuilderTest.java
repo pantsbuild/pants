@@ -3,18 +3,6 @@
 
 package org.pantsbuild.tools.jar;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.jar.Attributes.Name;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.jar.Manifest;
-import java.util.regex.Pattern;
-
 import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -28,7 +16,17 @@ import com.google.common.io.Closer;
 import com.google.common.io.Files;
 import com.google.common.reflect.TypeToken;
 import com.google.common.testing.TearDown;
-
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.jar.Attributes.Name;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
+import java.util.regex.Pattern;
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Rule;
@@ -39,7 +37,6 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.pantsbuild.testing.EasyMockTest;
 import org.pantsbuild.testing.TearDownTestCase;
-import org.pantsbuild.tools.jar.JarBuilder;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateAction;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateEntryException;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateHandler;
@@ -253,6 +250,7 @@ public class JarBuilderTest {
     }
   }
 
+  @SuppressWarnings("FunctionalInterfaceClash")
   public static class WriteTest extends WriteTestBase {
     private static void assertListing(JarFile jar, String... paths) {
       assertListing(jar, Arrays.asList(paths), true);

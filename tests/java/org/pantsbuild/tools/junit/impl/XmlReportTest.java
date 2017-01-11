@@ -373,7 +373,7 @@ public class XmlReportTest extends ConsoleRunnerTestBase {
 
   protected void sortTestCasesByName(List<AntJunitXmlReportListener.TestCase> testCases) {
     Collections.sort(testCases, new Comparator<AntJunitXmlReportListener.TestCase>() {
-      public int compare(AntJunitXmlReportListener.TestCase tc1,
+      @Override public int compare(AntJunitXmlReportListener.TestCase tc1,
           AntJunitXmlReportListener.TestCase tc2) {
         return tc1.getName().compareTo(tc2.getName());
       }

@@ -17,8 +17,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class MatcherTest {
 
-  class FooMatcher extends BaseMatcher<String> {
-
+  static class FooMatcher extends BaseMatcher<String> {
     @Override public boolean matches(Object o) {
       assertTrue(String.class.isInstance(o));
       String value = (String) o;
