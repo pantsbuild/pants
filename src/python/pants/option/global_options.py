@@ -64,7 +64,6 @@ class GlobalOptionsRegistrar(Optionable):
              default=['pants.backend.graph_info',
                       'pants.backend.python',
                       'pants.backend.jvm',
-                      'pants.backend.codegen',
                       'pants.backend.codegen.antlr.java',
                       'pants.backend.codegen.jaxb',
                       'pants.backend.codegen.protobuf.java',
