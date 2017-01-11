@@ -43,6 +43,7 @@ class WorkUnitLabel(object):
   RUN = 'RUN'             # Running a binary.
   REPL = 'REPL'           # Running a repl.
   PREP = 'PREP'           # Running a prep command
+  LINT = 'LINT'           # Running a lint or static analysis tool.
 
   @classmethod
   @memoized_method

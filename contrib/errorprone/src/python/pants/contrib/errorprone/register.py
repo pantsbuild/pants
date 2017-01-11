@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.findbugs.tasks.findbugs import FindBugs
+from pants.contrib.errorprone.tasks.errorprone import ErrorProne
 
 
 def register_goals():
-  task(name='findbugs', action=FindBugs).install('compile')
+  task(name='errorprone', action=ErrorProne).install('compile')

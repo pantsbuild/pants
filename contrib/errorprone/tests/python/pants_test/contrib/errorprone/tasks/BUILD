@@ -1,10 +1,10 @@
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources=['test_findbugs.py'],
+  sources=['test_errorprone.py'],
   dependencies=[
-    'contrib/findbugs/src/python/pants/contrib/findbugs/tasks',
+    'contrib/errorprone/src/python/pants/contrib/errorprone/tasks',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/option/util',
     'tests/python/pants_test:base_test',
@@ -13,7 +13,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=['test_findbugs_integration.py'],
+  sources=['test_errorprone_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
   ],

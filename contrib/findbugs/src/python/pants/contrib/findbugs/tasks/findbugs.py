@@ -57,7 +57,7 @@ class FindBugs(NailgunTask):
     register('--include-filter-file', type=file_option, fingerprint=True,
              help='Include only bugs matching given filter')
     register('--exclude-patterns', type=list, default=[], fingerprint=True,
-             help='Adds patterns for targets to be excluded from analysis.')
+             help='Patterns for targets to be excluded from analysis.')
 
     cls.register_jvm_tool(register,
                           'findbugs',
@@ -101,16 +101,14 @@ class FindBugs(NailgunTask):
     if self.get_options().skip:
       return
 
-    invalidate_deps=True
     if self.get_options().transitive:
       targets = self.context.targets(self._is_findbugs_target)
     else:
       targets = filter(self._is_findbugs_target, self.context.target_roots)
-      invalidate_deps=False
 
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
     target_count = 0
-    with self.invalidated(targets, invalidate_dependents=invalidate_deps) as invalidation_check:
+    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
       total_targets = len(invalidation_check.invalid_vts)
       for vt in invalidation_check.invalid_vts:
         target_count += 1
@@ -185,7 +183,7 @@ class FindBugs(NailgunTask):
                           jvm_options=self.get_options().jvm_options,
                           args=args,
                           workunit_name='findbugs',
-                          workunit_labels=[WorkUnitLabel.PREP])
+                          workunit_labels=[WorkUnitLabel.LINT])
     if result != 0:
       raise TaskError('java {main} ... exited non-zero ({result})'.format(
           main=self._FINDBUGS_MAIN, result=result))
