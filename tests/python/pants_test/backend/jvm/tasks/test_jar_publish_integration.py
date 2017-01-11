@@ -194,7 +194,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                           'ivy-0.0.1-SNAPSHOT.xml',
                         ]}),
                       [],
-                      assert_publish_config_contents=False)
+                      assert_publish_config_contents=True)
 
   def test_override_via_coord(self):
     self.publish_test(
@@ -205,7 +205,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       ]}),
       pushdb_files=[],
       extra_options=['--override=org.pantsbuild.testproject.publish#classifiers_2.11=1.2.3'],
-      assert_publish_config_contents=False)
+      assert_publish_config_contents=True)
 
   def test_override_via_address(self):
     target = 'testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers'
@@ -217,7 +217,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       ]}),
       pushdb_files=[],
       extra_options=['--override={}=1.2.3'.format(target)],
-      assert_publish_config_contents=False)
+      assert_publish_config_contents=True)
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True,
