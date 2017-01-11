@@ -24,5 +24,6 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
   tags = {'integration'},
+  timeout=180,
 )
 

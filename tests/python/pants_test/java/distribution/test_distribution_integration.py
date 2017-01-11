@@ -45,6 +45,8 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
       run = self.run_pants(['run', target_spec],
                            config={
                              'jvm-distributions': {
+                               'minimum_version': '1.7.0_00',
+                               'maximum_version': '1.8.0_99',
                                'paths': {
                                  os_name: [one.home],
                                }

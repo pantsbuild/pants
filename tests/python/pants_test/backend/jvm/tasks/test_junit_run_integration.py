@@ -18,7 +18,12 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
   def _testjvms(self, spec_name):
     spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)
-    self.assert_success(self.run_pants(['clean-all', 'test.junit', '--strict-jvm-version', spec]))
+    self.assert_success(self.run_pants(['clean-all',
+                                        'test.junit',
+                                        '--strict-jvm-version',
+                                        '--jvm-distributions-minimum-version={}'.format('1.6.0_00'),
+                                        '--jvm-distributions-maximum-version={}'.format('1.8.0_99'),
+                                        spec,]))
 
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_java_eight(self):
