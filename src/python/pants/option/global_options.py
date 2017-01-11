@@ -65,6 +65,7 @@ class GlobalOptionsRegistrar(Optionable):
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.codegen.antlr.java',
+                      'pants.backend.codegen.antlr.python',
                       'pants.backend.codegen.jaxb',
                       'pants.backend.codegen.protobuf.java',
                       'pants.backend.codegen.ragel.java',
