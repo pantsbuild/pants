@@ -85,7 +85,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'org.pantsbuild.testproject.publish.hello/welcome_2.11/publish.properties'],
                       extra_options=['--doc-scaladoc-skip'],
                       expected_primary_artifact_count=3,
-                      assert_publish_config_contents=False)
+                      assert_publish_config_contents=True)
 
   def test_java_publish(self):
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
