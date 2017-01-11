@@ -9,20 +9,20 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.pantsbuild.testproject.publish</groupId>
-  <artifactId>jvm-example-lib_2.10</artifactId>
+  <artifactId>jvm-example-lib_2.11</artifactId>
   <packaging>jar</packaging>
   <version>0.0.1-SNAPSHOT</version>
   <dependencies>
     <dependency>
       <groupId>org.pantsbuild.testproject.publish.hello</groupId>
-      <artifactId>welcome_2.10</artifactId>
+      <artifactId>welcome_2.11</artifactId>
       <version>0.0.1-SNAPSHOT</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
-      <version>2.10.6</version>
+      <version>2.11.8</version>
       <scope>compile</scope>
     </dependency>
   </dependencies>
