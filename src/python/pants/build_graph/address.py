@@ -11,7 +11,8 @@ from collections import namedtuple
 from pants.util.strutil import strip_prefix
 
 
-BANNED_ADDRESS_CHARS = '@'
+# @ is reserved for configuring variant, see `addressable.parse_variants`
+BANNED_CHARS_IN_TARGET_NAME = '@'
 
 
 def parse_spec(spec, relative_to=None):
@@ -136,7 +137,7 @@ class Address(object):
       if not name:
         raise ValueError('Spec {spec}:{name} has no name part'.format(spec=spec_path, name=name))
 
-      banned_chars = list(set(BANNED_ADDRESS_CHARS) & set(target_name))
+      banned_chars = list(set(BANNED_CHARS_IN_TARGET_NAME) & set(target_name))
       if banned_chars:
         raise ValueError('{banned_chars} not allowed in target name: {name}'
                          .format(banned_chars=banned_chars, name=target_name))
