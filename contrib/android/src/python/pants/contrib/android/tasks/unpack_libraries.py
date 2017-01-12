@@ -102,7 +102,8 @@ class UnpackLibraries(Task):
     jar_url = 'file://{0}'.format(jar_file)
     jar_dep = JarDependency(org=library.id, name=coordinate.artifact_filename, rev=coordinate.rev,
                             url=jar_url)
-    address = Address(self.workdir, '{}-classes.jar'.format(coordinate.artifact_filename))
+    address = Address(os.path.relpath(self.workdir, get_buildroot()),
+                      '{}-classes.jar'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, JarLibrary, jars=[jar_dep],
                                              derived_from=library)
     return new_target

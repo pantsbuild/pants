@@ -11,7 +11,7 @@ from collections import namedtuple
 from pants.util.strutil import strip_prefix
 
 
-BANNED_ADDRESS_CHARS = '/@' + os.sep
+BANNED_ADDRESS_CHARS = '@/'
 
 
 def parse_spec(spec, relative_to=None):
