@@ -72,7 +72,8 @@ class AaptGen(AaptTask):
       if sdk not in self._jar_library_by_sdk:
         jar_url = 'file://{0}'.format(self.android_jar(binary))
         jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
-        address = Address(self.workdir, 'android-{0}.jar'.format(sdk))
+        address = Address(os.path.relpath(self.workdir, get_buildroot()),
+                          'android-{0}.jar'.format(sdk))
         self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
       binary.inject_dependency(self._jar_library_by_sdk[sdk].address)
 
