@@ -4,5 +4,6 @@
 python_library(
   dependencies = [
     'src/python/pants/backend/python/targets:python',
+    'src/python/pants/build_graph',
   ],
 )
