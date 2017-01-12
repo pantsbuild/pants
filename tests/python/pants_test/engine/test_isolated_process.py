@@ -242,7 +242,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       return
     else:
       self.fail('Expected a Return, but found a {}. trace below:\n{}'
-                .format(state, scheduler.trace()))
+                .format(state, '\n'.join(scheduler.trace())))
 
   def assertPathContains(self, expected_files, path):
     for i in expected_files:

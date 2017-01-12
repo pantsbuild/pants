@@ -108,10 +108,11 @@ def _snapshotted_process(input_conversion,
 
 
 class Snapshot(datatype('Snapshot', ['fingerprint', 'dependencies'])):
-  """A snapshot of a collection of files fingerprinted by their contents.
+  """A snapshot is a collection of Files and Dirs fingerprinted by their names/content.
 
-  Snapshots are used to make it easier to isolate process execution by fixing the contents of the files being operated
-  on and easing their movement to and from isolated execution sandboxes.
+  Snapshots are used to make it easier to isolate process execution by fixing the contents
+  of the files being operated on and easing their movement to and from isolated execution
+  sandboxes.
   """
 
 
