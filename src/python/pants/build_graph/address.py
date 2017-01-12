@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import namedtuple
 
+from pants.base.deprecated import deprecated_conditional
 from pants.util.strutil import strip_prefix
 
 
@@ -137,10 +138,12 @@ class Address(object):
       if not name:
         raise ValueError('Spec {spec}:{name} has no name part'.format(spec=spec_path, name=name))
 
-      banned_chars = list(set(BANNED_CHARS_IN_TARGET_NAME) & set(target_name))
-      if banned_chars:
-        raise ValueError('{banned_chars} not allowed in target name: {name}'
-                         .format(banned_chars=banned_chars, name=target_name))
+      banned_chars = list(set(BANNED_CHARS_IN_TARGET_NAME) & set(name))
+      # raise ValueError after deprecation
+      deprecated_conditional(lambda: len(banned_chars), '1.4.0',
+                             'banned chars found in target name',
+                             '{banned_chars} not allowed in target name: {name}'
+                             .format(banned_chars=banned_chars, name=name))
 
     check_path(spec_path)
     check_target_name(target_name)
