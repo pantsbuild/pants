@@ -92,10 +92,12 @@ class ParseSpecTest(unittest.TestCase):
     self.do_test_bad_spec('//a/BUILD:b')
     self.do_test_bad_spec('//a/BUILD.suffix:b')
 
+  def test_banned_chars_in_target_name(self):
+    self.do_test_bad_spec('a/b@c')
+
   def do_test_bad_spec(self, spec):
     with self.assertRaises(ValueError):
-      path, target_name = parse_spec(spec)
-      Address(path, target_name)
+      Address(*parse_spec(spec))
 
 
 class BaseAddressTest(unittest.TestCase):

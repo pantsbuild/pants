@@ -11,7 +11,7 @@ from collections import namedtuple
 from pants.util.strutil import strip_prefix
 
 
-BANNED_ADDRESS_CHARS = '@/'
+BANNED_ADDRESS_CHARS = '@'
 
 
 def parse_spec(spec, relative_to=None):
@@ -126,15 +126,15 @@ class Address(object):
         raise ValueError("Spec has un-normalized path "
                          "part '{path}'".format(path=path))
       if components[-1].startswith('BUILD'):
-        raise ValueError("Spec path '{path}' has {trailing} as the last path part and BUILD is "
-                         "reserved files".format(path=path, trailing=components[-1]))
+        raise ValueError('Spec path {path} has {trailing} as the last path part and BUILD is '
+                         'reserved files'.format(path=path, trailing=components[-1]))
       if os.path.isabs(path):
-        raise ValueError("Spec has absolute path '{path}'; expected a path relative "
-                         "to the build root.".format(path=path))
+        raise ValueError('Spec has absolute path {path}; expected a path relative '
+                         'to the build root.'.format(path=path))
 
     def check_target_name(name):
       if not name:
-        raise ValueError("Spec path '{path}' has no name part".format(path=spec_path))
+        raise ValueError('Spec {spec}:{name} has no name part'.format(spec=spec_path, name=name))
 
       banned_chars = list(set(BANNED_ADDRESS_CHARS) & set(target_name))
       if banned_chars:

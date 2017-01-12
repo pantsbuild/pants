@@ -71,7 +71,7 @@ class BuildFileAddressMapperTest(BaseTest):
                                  '\s+when translating spec //non-existent-path:a'):
       self.address_mapper.spec_to_address('//non-existent-path:a')
     with self.assertRaisesRegexp(BuildFileAddressMapper.InvalidBuildFileReference,
-                                 "^Spec path '' has no name part\s+when translating spec :"):
+                                 '^Spec : has no name part\s+when translating spec :'):
       self.address_mapper.spec_to_address(':')
 
   def test_raises_address_not_in_one_build_file(self):

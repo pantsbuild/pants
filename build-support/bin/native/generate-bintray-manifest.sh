@@ -2,7 +2,6 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
-set -x
 # Indirectly defines:
 # + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
 # + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12
