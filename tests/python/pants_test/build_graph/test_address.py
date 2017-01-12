@@ -94,7 +94,8 @@ class ParseSpecTest(unittest.TestCase):
 
   def do_test_bad_spec(self, spec):
     with self.assertRaises(ValueError):
-      parse_spec(spec)
+      path, target_name = parse_spec(spec)
+      Address(path, target_name)
 
 
 class BaseAddressTest(unittest.TestCase):

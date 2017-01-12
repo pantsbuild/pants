@@ -114,7 +114,7 @@ class Address(object):
     return cls(spec_path, target_name)
 
   @classmethod
-  def check(cls, spec_path, target_name):
+  def sanity_check(cls, spec_path, target_name):
     def check_path(path):
       # A root or relative spec is OK
       if path == '':
@@ -123,18 +123,18 @@ class Address(object):
       normpath = os.path.normpath(path)
       components = normpath.split(os.sep)
       if components[0] in ('.', '..') or normpath != path:
-        raise ValueError('Spec has un-normalized path '
-                         'part {path}'.format(path=path))
+        raise ValueError("Spec has un-normalized path "
+                         "part '{path}'".format(path=path))
       if components[-1].startswith('BUILD'):
-        raise ValueError('Spec path {path} has {trailing} as the last path part and BUILD is '
-                         'reserved files'.format(path=path, trailing=components[-1]))
+        raise ValueError("Spec path '{path}' has {trailing} as the last path part and BUILD is "
+                         "reserved files".format(path=path, trailing=components[-1]))
       if os.path.isabs(path):
-        raise ValueError('Spec has absolute path {path}; expected a path relative '
-                         'to the build root.'.format(path=path))
+        raise ValueError("Spec has absolute path '{path}'; expected a path relative "
+                         "to the build root.".format(path=path))
 
     def check_target_name(name):
       if not name:
-        raise ValueError('Spec path {path} has no name part'.format(path=spec_path))
+        raise ValueError("Spec path '{path}' has no name part".format(path=spec_path))
 
       banned_chars = list(set(BANNED_ADDRESS_CHARS) & set(target_name))
       if banned_chars:
@@ -149,7 +149,7 @@ class Address(object):
     :param string spec_path: The path from the root of the repo to this Target.
     :param string target_name: The name of a target this Address refers to.
     """
-    self.check(spec_path, target_name)
+    self.sanity_check(spec_path, target_name)
     norm_path = os.path.normpath(spec_path)
     self._spec_path = norm_path if norm_path != '.' else ''
     self._target_name = target_name
