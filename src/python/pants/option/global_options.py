@@ -120,7 +120,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
     # This facilitates use of the v2 engine for BuildGraph construction, sans daemon.
-    register('--enable-v2-engine', advanced=True, type=bool, default=False,
+    register('--enable-v2-engine', advanced=True, type=bool, default=True,
              help='Enables use of the v2 engine. (Beta)')
 
   @classmethod
