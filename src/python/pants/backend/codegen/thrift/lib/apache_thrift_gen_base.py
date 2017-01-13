@@ -130,7 +130,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
       return item[0] if not item[1] else '{}={}'.format(*item)
 
     gen_opts_map = self.get_options().gen_options_map or {}
-    gen_opts = [opt_str(item) for item in gen_opts_map]
+    gen_opts = [opt_str(item) for item in gen_opts_map.iteritems()]
     if self.get_options().gen_options:  # Add the deprecated, old options.
       gen_opts.append(self.get_options().gen_options)
 
