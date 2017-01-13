@@ -13,7 +13,7 @@ import subprocess
 from abc import abstractproperty
 from hashlib import sha1
 
-from pants.engine.fs import Files
+from pants.engine.fs import Dirs, Files
 from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_mkdir
@@ -23,16 +23,18 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-def create_snapshot_archive(project_tree, snapshot_directory, file_list):
+def create_snapshot_archive(project_tree, snapshot_directory, file_list, dir_list):
   logger.debug('snapshotting files: {}'.format(file_list))
 
   # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
   with temporary_file_path(cleanup=False) as tmp_path:
     with open_tar(tmp_path, mode='w') as tar:
-      for file in file_list.dependencies:
+      for f in file_list.dependencies:
         # TODO handle GitProjectTree. Using add this this will fail with a non-filesystem project tree.
-        tar.add(os.path.join(project_tree.build_root, file.path), file.path)
-    snapshot = Snapshot(_fingerprint_files_in_tar(file_list, tmp_path))
+        tar.add(os.path.join(project_tree.build_root, f.path), f.path)
+      for d in dir_list.dependencies:
+        tar.add(os.path.join(project_tree.build_root, d.path), d.path, recursive=False)
+    snapshot = Snapshot(_fingerprint_files_in_tar(file_list, tmp_path), file_list + dir_list)
   tar_location = _snapshot_path(snapshot, snapshot_directory.root)
 
   shutil.move(tmp_path, tar_location)
@@ -41,6 +43,10 @@ def create_snapshot_archive(project_tree, snapshot_directory, file_list):
 
 
 def _fingerprint_files_in_tar(file_list, tar_location):
+  """
+  TODO: This could potentially be implemented by nuking any timestamp entries in
+  the tar file, and then fingerprinting the entire thing.
+  """
   hasher = sha1()
   with open_tar(tar_location, mode='r', errorlevel=1) as tar:
     for file in file_list.dependencies:
@@ -198,27 +204,11 @@ def create_snapshot_singletons(project_tree):
     ]
 
 
-def create_snapshot_intrinsics(project_tree):
-  def ptree(func):
-    partial = functools.partial(func, project_tree, snapshot_directory(project_tree))
-    partial.__name__ = '{}_intrinsic'.format(func.__name__)
-    return partial
-  return [
-      (Snapshot, Files, ptree(create_snapshot_archive)),
-    ]
-
-
 def create_snapshot_tasks(project_tree):
-  """TODO: Delete these.
-
-  Necessary because the intrinsic will not trigger conversions to `Files` on a PathGlobs object.
-  Instead, should replace the intrinsic with an uncacheable task, or have it depend on an
-  uncacheable singleton.
-  """
   def ptree(func):
     partial = functools.partial(func, project_tree, snapshot_directory(project_tree))
     partial.__name__ = '{}_task'.format(func.__name__)
     return partial
   return [
-      (Snapshot, [Select(Files)], ptree(create_snapshot_archive)),
+      (Snapshot, [Select(Files), Select(Dirs)], ptree(create_snapshot_archive)),
     ]
