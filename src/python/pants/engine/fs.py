@@ -463,7 +463,7 @@ def create_fs_tasks():
      [Select(Paths),
       SelectDependencies(Dirs, Paths, field='link_stats', field_types=(Link,))],
      resolve_dir_links),
-    # Public
+    # Private
     (Files,
      [Select(Paths),
       SelectDependencies(Files, Paths, field='link_stats', field_types=(Link,))],
