@@ -44,8 +44,6 @@ class JavaThriftLibrary(JvmTarget):
     :param default_java_namespace: The namespace used for Java generated code when a Java
       namespace is not explicitly specified in the IDL. The default is defined in the global
       options under ``--thrift-default-default-java-namespace``.
-    :param include_paths: The include_path(s) used to search for included IDL files. The default
-      is defined in the global options under ``--thrift-default-include-paths``.
     """
     super(JavaThriftLibrary, self).__init__(**kwargs)
 

@@ -175,8 +175,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
       for include_path in partial_cmd.include_paths:
         args.extend(['--include-path', include_path])
 
-    #raise TaskError('AHA! args are now: {}'.format(str(args)))
-
     if self.get_options().verbose:
       args.append('--verbose')
 
