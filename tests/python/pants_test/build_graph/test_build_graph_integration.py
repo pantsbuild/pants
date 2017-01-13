@@ -6,14 +6,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class BuildGraphIntegrationTest(PantsRunIntegrationTest):
 
-  # TODO: Disabled to expedite landing #3821: see #4007.
   # @ensure_engine
+  @unittest.skip('TODO: Disabled to expedite landing #3821: see #4007.')
   def test_cycle(self):
     prefix = 'testprojects/src/java/org/pantsbuild/testproject'
     with self.file_renamed(os.path.join(prefix, 'cycle1'), 'TEST_BUILD', 'BUILD'):
