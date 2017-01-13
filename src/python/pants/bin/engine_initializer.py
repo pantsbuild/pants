@@ -14,6 +14,7 @@ from pants.bin.options_initializer import OptionsInitializer
 from pants.engine.build_files import create_graph_tasks
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
+from pants.engine.isolated_process import create_snapshot_tasks
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
@@ -139,6 +140,7 @@ class EngineInitializer(object):
     tasks = (
       create_legacy_graph_tasks(symbol_table_cls) +
       create_fs_tasks() +
+      create_snapshot_tasks(project_tree) +
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
 

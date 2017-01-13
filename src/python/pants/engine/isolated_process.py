@@ -23,18 +23,18 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-def create_snapshot_archive(project_tree, snapshot_directory, file_list, dir_list):
-  logger.debug('snapshotting files: {}'.format(file_list))
+def create_snapshot_archive(project_tree, snapshot_directory, files, dirs):
+  logger.debug('snapshotting files: {}'.format(files))
 
   # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
   with temporary_file_path(cleanup=False) as tmp_path:
     with open_tar(tmp_path, mode='w') as tar:
-      for f in file_list.dependencies:
+      for f in files.dependencies:
         # TODO handle GitProjectTree. Using add this this will fail with a non-filesystem project tree.
         tar.add(os.path.join(project_tree.build_root, f.path), f.path)
-      for d in dir_list.dependencies:
+      for d in dirs.dependencies:
         tar.add(os.path.join(project_tree.build_root, d.path), d.path, recursive=False)
-    snapshot = Snapshot(_fingerprint_files_in_tar(file_list, tmp_path), file_list + dir_list)
+    snapshot = Snapshot(_fingerprint_files_in_tar(files, tmp_path), files.dependencies, dirs.dependencies)
   tar_location = _snapshot_path(snapshot, snapshot_directory.root)
 
   shutil.move(tmp_path, tar_location)
@@ -46,6 +46,8 @@ def _fingerprint_files_in_tar(file_list, tar_location):
   """
   TODO: This could potentially be implemented by nuking any timestamp entries in
   the tar file, and then fingerprinting the entire thing.
+
+  Also, it's currently ignoring directories, which hashing the entire tar would resolve.
   """
   hasher = sha1()
   with open_tar(tar_location, mode='r', errorlevel=1) as tar:
@@ -113,13 +115,17 @@ def _snapshotted_process(input_conversion,
     return output_conversion(process_result, sandbox_dir)
 
 
-class Snapshot(datatype('Snapshot', ['fingerprint', 'dependencies'])):
-  """A snapshot is a collection of Files and Dirs fingerprinted by their names/content.
+class Snapshot(datatype('Snapshot', ['fingerprint', 'files', 'dirs'])):
+  """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
   of the files being operated on and easing their movement to and from isolated execution
   sandboxes.
   """
+
+  @property
+  def dependencies(self):
+    return self.files + self.dirs
 
 
 class Binary(object):

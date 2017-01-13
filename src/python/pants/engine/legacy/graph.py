@@ -195,8 +195,12 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
-      pass
+    matched = set(self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]))
+    missing = addresses - matched
+    if missing:
+      # TODO: When SingleAddress resolution converted from projection of a directory
+      # and name to a match for PathGlobs, we lost our useful AddressLookupError formatting.
+      raise AddressLookupError('Addresses were not matched: {}'.format(missing))
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.

@@ -17,6 +17,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
+from pants.engine.isolated_process import Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -207,42 +208,27 @@ def identity(v):
   return v
 
 
-def address_from_address_family(address_family, single_address):
-  """Given an AddressFamily and a SingleAddress, return an Addresses object containing the Address.
-
-  Raises an exception if the SingleAddress does not match an existing Address.
-  """
-  name = single_address.name
-  if name is None:
-    name = basename(single_address.directory)
-  if name not in address_family.objects_by_name:
-    _raise_did_you_mean(address_family, single_address.name)
-  return Addresses(tuple([Address(address_family.namespace, name)]))
-
-
-def addresses_from_address_family(address_family):
-  """Given an AddressFamily, return an Addresses objects containing all of its `addressables`."""
-  return Addresses(tuple(address_family.addressables.keys()))
-
-
 def addresses_from_address_families(address_families):
   """Given a list of AddressFamilies, return an Addresses object containing all addressables."""
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
 
 
-def filter_build_dirs(address_mapper, build_files):
-  """Given Files matching a build pattern, return their parent directories as BuildDirs."""
-  dirnames = set(dirname(f.stat.path) for f in build_files.dependencies)
+def filter_build_dirs(address_mapper, snapshot):
+  """Given a Snapshot matching a build pattern, return parent directories as BuildDirs."""
+  dirnames = set(dirname(f.stat.path) for f in snapshot.files)
   ignored_dirnames = address_mapper.build_ignore_patterns.match_files('{}/'.format(dirname) for dirname in dirnames)
   ignored_dirnames = set(d.rstrip('/') for d in ignored_dirnames)
   return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
 
 
-def descendant_addresses_to_globs(address_mapper, descendant_addresses):
-  """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
+def single_or_sib_addresses_to_globs(address_mapper, single_or_sib_addresses):
+  """Given a SiblingAddresses or SingleAddress object, return a PathGlobs object for relevant build files."""
+  pattern = address_mapper.build_pattern
+  return PathGlobs.create_from_specs(single_or_sib_addresses.directory, [pattern])
 
-  This allows us to limit our AddressFamily requests to directories that contain build files.
-  """
+
+def descendant_addresses_to_globs(address_mapper, descendant_addresses):
+  """Given a DescendantAddresses object, return a PathGlobs object for matching build files."""
   pattern = address_mapper.build_pattern
   return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
 
@@ -298,24 +284,23 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
       Select(DirectoryListing)],
      filter_buildfile_paths),
   ] + [
-    # Simple spec handling.
-    (Addresses,
-     [SelectProjection(AddressFamily, Dir, ('directory',), SingleAddress),
-      Select(SingleAddress)],
-     address_from_address_family),
-    (Addresses,
-     [SelectProjection(AddressFamily, Dir, ('directory',), SiblingAddresses)],
-     addresses_from_address_family),
-  ] + [
-    # Recursive spec handling: locate directories that contain build files, and request
+    # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     (Addresses,
      [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,))],
      addresses_from_address_families),
     (BuildDirs,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(Files)],
+      Select(Snapshot)],
      filter_build_dirs),
+    (PathGlobs,
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(SiblingAddresses)],
+     single_or_sib_addresses_to_globs),
+    (PathGlobs,
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(SingleAddress)],
+     single_or_sib_addresses_to_globs),
     (PathGlobs,
      [SelectLiteral(address_mapper, AddressMapper),
       Select(DescendantAddresses)],
