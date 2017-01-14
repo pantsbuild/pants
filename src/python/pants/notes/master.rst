@@ -5,8 +5,45 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.3.0.dev7 (1/13/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade zinc and default scala-platform in pants repo to 2.11 (#4176)
+  `PR #4176 <https://github.com/pantsbuild/pants/pull/4176>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add contrib module for Error Prone http://errorprone.info/ (#4163)
+  `PR #4163 <https://github.com/pantsbuild/pants/pull/4163>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* add various codegen packages to default backend packages (#4175)
+  `PR #4175 <https://github.com/pantsbuild/pants/pull/4175>`_
+
+* Suggest missing dependencies from target's transitive dependencies (#4171)
+  `PR #4171 <https://github.com/pantsbuild/pants/pull/4171>`_
+
+* Reduce compilation invalidation scope of targets with strict_deps=True (#4143)
+  `PR #4143 <https://github.com/pantsbuild/pants/pull/4143>`_
+
+* Fork to post_stat (#4170)
+  `PR #4170 <https://github.com/pantsbuild/pants/pull/4170>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix a small bug in ApacheThriftGenBase class (#4181)
+  `PR #4181 <https://github.com/pantsbuild/pants/pull/4181>`_
+
+
 1.3.0.dev6 (1/06/2017)
------------------------
+----------------------
 
 API Changes
 ~~~~~~~~~~~
