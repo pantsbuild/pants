@@ -520,6 +520,9 @@ class BuildGraph(AbstractClass):
     :returns: The Addressable which address points to.
     """
 
+  @abstractmethod
+  def clone(self):
+    """Clone a buildgraph."""
 
 class CycleException(Exception):
   """Thrown when a circular dependency is detected.
