@@ -32,6 +32,10 @@ script fail:
     You might use the gpg implemntation of pgp and start here:
     https://www.gnupg.org/gph/en/manual/c14.html
 
+  - If using gpg, ensure that the gpg-agent is running (for OS X, see
+    instructions [here](https://blog.chendry.org/2015/03/13/starting-gpg-agent-in-osx.html)),
+    and ensure that gpg is set up to use it (e.g., set `use-agent` in `~/.gnupg/gpg.conf`).
+
   - Configure git to use your pgp key for signing release tags.
 
     A description of the configuration can be found here:
@@ -64,6 +68,10 @@ script fail:
         username: <fill me in>
         password: <fill me in>
         EOF
+        
+  - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
+    If you have another name for it, you should `git rename othername origin` before running
+    the release script, and rename it back afterwards.
 
 Prepare Release
 ---------------
