@@ -9,7 +9,6 @@ import errno
 import functools
 import shutil
 from abc import abstractproperty
-from binascii import hexlify
 from fnmatch import fnmatch
 from hashlib import sha1
 from itertools import chain
@@ -75,20 +74,6 @@ class FileContent(datatype('FileContent', ['path', 'content'])):
   def __repr__(self):
     content_str = '(len:{})'.format(len(self.content)) if self.content is not None else 'None'
     return 'FileContent(path={}, content={})'.format(self.path, content_str)
-
-  def __str__(self):
-    return repr(self)
-
-
-class FileDigest(datatype('FileDigest', ['path', 'digest'])):
-  """A unique fingerprint for the content of a File."""
-
-  @classmethod
-  def create(cls, path, content):
-    return cls(path, sha1(content).digest())
-
-  def __repr__(self):
-    return 'FileDigest(path={}, digest={})'.format(self.path, hexlify(self.digest)[:8])
 
   def __str__(self):
     return repr(self)
@@ -440,14 +425,6 @@ def file_content(project_tree, f):
   return FileContent(f.path, project_tree.content(f.path))
 
 
-def file_digest(project_tree, f):
-  """Return a FileDigest for a known-existing File.
-
-  See NB on file_content.
-  """
-  return FileDigest.create(f.path, project_tree.content(f.path))
-
-
 def resolve_link(stats):
   """Passes through the projected Files/Dirs for link resolution."""
   return stats
@@ -459,14 +436,7 @@ def files_content(files, file_values):
   return FilesContent(entries)
 
 
-def files_digest(files, file_values):
-  entries = tuple(FileDigest(f.path, f_value.digest)
-                  for f, f_value in zip(files.dependencies, file_values))
-  return FilesDigest(entries)
-
-
 FilesContent = Collection.of(FileContent)
-FilesDigest = Collection.of(FileDigest)
 
 
 def generate_fs_subjects(filenames):
@@ -501,7 +471,6 @@ def create_fs_intrinsics(project_tree):
   return [
     (DirectoryListing, Dir, ptree(scan_directory)),
     (FileContent, File, ptree(file_content)),
-    (FileDigest, File, ptree(file_digest)),
     (ReadLink, Link, ptree(read_link)),
   ]
 
@@ -568,11 +537,6 @@ def create_fs_tasks(project_tree):
      [Select(Files),
       SelectDependencies(FileContent, Files, field='stats', field_types=(File,))],
      files_content),
-    # Public
-    (FilesDigest,
-     [Select(Files),
-      SelectDependencies(FileDigest, Files, field='stats', field_types=(File,))],
-     files_digest),
   ] + [
     # Snapshot creation.
     # Public

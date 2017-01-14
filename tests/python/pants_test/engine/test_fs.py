@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import (DirectoryListing, Dirs, Files, FilesContent, FilesDigest, PathGlobs,
+from pants.engine.fs import (DirectoryListing, Dirs, Files, FilesContent, PathGlobs,
                              ReadLink, Snapshot, _snapshot_path)
 from pants.util.contextutil import open_tar
 from pants.util.meta import AbstractClass
@@ -49,11 +49,10 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
   def assert_digest(self, filespecs, expected_files):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
-      result = self.execute(scheduler, FilesDigest, self.specs('', *filespecs))[0]
+      result = self.execute(scheduler, Snapshot, self.specs('', *filespecs))[0]
       # Confirm all expected files were digested.
-      self.assertEquals(set(expected_files), set(f.path for f in result.dependencies))
-      # And that each distinct path had a distinct digest.
-      self.assertEquals(len(set(expected_files)), len(set(f.digest for f in result.dependencies)))
+      self.assertEquals(set(expected_files), set(f.path for f in result.files))
+      self.assertTrue(result.fingerprint is not None)
 
   def assert_fsnodes(self, ftype, filespecs, subject_product_pairs):
     with self.mk_project_tree(self._original_src) as project_tree:
