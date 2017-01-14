@@ -16,8 +16,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs
-from pants.engine.isolated_process import Snapshot
+from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import errno
 import functools
+import shutil
 from abc import abstractproperty
 from binascii import hexlify
 from fnmatch import fnmatch
@@ -22,6 +23,8 @@ from pants.base.project_tree import Dir, File, Link
 from pants.engine.addressable import Collection
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
+from pants.util.contextutil import open_tar, temporary_file_path
+from pants.util.dirutil import safe_mkdir
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -276,6 +279,74 @@ class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies'
   """
 
 
+class Snapshot(datatype('Snapshot', ['fingerprint', 'files', 'dirs'])):
+  """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
+
+  Snapshots are used to make it easier to isolate process execution by fixing the contents
+  of the files being operated on and easing their movement to and from isolated execution
+  sandboxes.
+  """
+
+  @property
+  def dependencies(self):
+    return self.files + self.dirs
+
+
+class _SnapshotDirectory(datatype('_SnapshotDirectory', ['root'])):
+  """Private singleton value for the snapshot directory."""
+
+
+def snapshot_directory(project_tree):
+  return _SnapshotDirectory(join(project_tree.build_root, '.snapshots'))
+
+
+def create_snapshot_archive(project_tree, snapshot_directory, files, dirs):
+  # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
+  with temporary_file_path(cleanup=False) as tmp_path:
+    with open_tar(tmp_path, mode='w') as tar:
+      for f in files.dependencies:
+        # TODO handle GitProjectTree. Using add this this will fail with a non-filesystem project tree.
+        tar.add(join(project_tree.build_root, f.path), f.path)
+      for d in dirs.dependencies:
+        tar.add(join(project_tree.build_root, d.path), d.path, recursive=False)
+    snapshot = Snapshot(_fingerprint_files_in_tar(files, tmp_path), files.dependencies, dirs.dependencies)
+  tar_location = _snapshot_path(snapshot, snapshot_directory.root)
+
+  shutil.move(tmp_path, tar_location)
+
+  return snapshot
+
+
+def _fingerprint_files_in_tar(file_list, tar_location):
+  """
+  TODO: This could potentially be implemented by nuking any timestamp entries in
+  the tar file, and then fingerprinting the entire thing.
+
+  Also, it's currently ignoring directories, which hashing the entire tar would resolve.
+  """
+  hasher = sha1()
+  with open_tar(tar_location, mode='r', errorlevel=1) as tar:
+    for file in file_list.dependencies:
+      hasher.update(file.path)
+      hasher.update(tar.extractfile(file.path).read())
+  return hasher.hexdigest()
+
+
+def _snapshot_path(snapshot, archive_root):
+  safe_mkdir(archive_root)
+  tar_location = join(archive_root, '{}.tar'.format(snapshot.fingerprint))
+  return tar_location
+
+
+def extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir):
+  with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
+    tar.extractall(sandbox_dir)
+
+
+def select_snapshot_directory():
+  return Select(_SnapshotDirectory)
+
+
 def scan_directory(project_tree, directory):
   """List Stat objects directly below the given path, relative to the ProjectTree.
 
@@ -412,6 +483,16 @@ def generate_fs_subjects(filenames):
       yield Dir('')
 
 
+def create_fs_singletons(project_tree):
+  def ptree(func):
+    p = functools.partial(func, project_tree)
+    p.__name__ = '{}_singleton'.format(func.__name__)
+    return p
+  return [
+      (_SnapshotDirectory, ptree(snapshot_directory))
+    ]
+
+
 def create_fs_intrinsics(project_tree):
   def ptree(func):
     p = functools.partial(func, project_tree)
@@ -425,8 +506,12 @@ def create_fs_intrinsics(project_tree):
   ]
 
 
-def create_fs_tasks():
+def create_fs_tasks(project_tree):
   """Creates tasks that consume the intrinsic filesystem types."""
+  def ptree(func):
+    p = functools.partial(func, project_tree)
+    p.__name__ = '{}_intrinsic'.format(func.__name__)
+    return p
   return [
     # Glob execution: to avoid memoizing lots of incremental results, we recursively expand PathGlobs, and then
     # convert them to Paths independently.
@@ -488,4 +573,12 @@ def create_fs_tasks():
      [Select(Files),
       SelectDependencies(FileDigest, Files, field='stats', field_types=(File,))],
      files_digest),
+  ] + [
+    # Snapshot creation.
+    # Public
+    (Snapshot,
+     [Select(_SnapshotDirectory),
+      Select(Files),
+      Select(Dirs)],
+     ptree(create_snapshot_archive)),
   ]

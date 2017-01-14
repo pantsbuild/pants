@@ -400,6 +400,8 @@ def setup_json_scheduler(build_root, native):
   source_roots = SourceRoots(('src/java','src/scala'))
   scrooge_tool_address = Address.parse('src/scala/scrooge')
 
+  project_tree = FileSystemProjectTree(build_root)
+
   goals = {
       'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
@@ -476,10 +478,9 @@ def setup_json_scheduler(build_root, native):
     ] + (
       create_graph_tasks(address_mapper, symbol_table_cls)
     ) + (
-      create_fs_tasks()
+      create_fs_tasks(project_tree)
     )
 
-  project_tree = FileSystemProjectTree(build_root)
   return LocalScheduler(goals,
                         tasks,
                         project_tree,

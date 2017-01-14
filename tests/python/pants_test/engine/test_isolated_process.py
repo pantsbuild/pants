@@ -9,10 +9,8 @@ import os
 import unittest
 
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import (Binary, Snapshot, SnapshottedProcess,
-                                           SnapshottedProcessRequest, _snapshot_path,
-                                           create_snapshot_tasks)
+from pants.engine.fs import Files, PathGlobs, Snapshot, _snapshot_path
+from pants.engine.isolated_process import Binary, SnapshottedProcess, SnapshottedProcessRequest
 from pants.engine.nodes import Return, Throw
 from pants.engine.selectors import Select, SelectLiteral
 from pants.util.contextutil import open_tar
@@ -106,23 +104,6 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
-
-  # TODO test exercising what happens if a snapshot file doesn't exist after hitting cache for snapshot node.
-  def test_gather_snapshot_of_pathglobs(self):
-    project_tree = self.mk_example_fs_tree()
-    scheduler = self.mk_scheduler(project_tree=project_tree, tasks=create_snapshot_tasks(project_tree))
-    snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
-
-    request = scheduler.execution_request([Snapshot],
-                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
-    LocalSerialEngine(scheduler).reduce(request)
-
-    root_entries = scheduler.root_entries(request).items()
-    self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler)
-    snapshot = state.value
-    self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], snapshot,
-                              snapshot_archive_root)
 
   def test_integration_concat_with_snapshot_subjects_test(self):
     scheduler = self.mk_scheduler_in_example_fs([
@@ -230,11 +211,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
 
   def mk_scheduler_in_example_fs(self, rules):
-    project_tree = self.mk_example_fs_tree()
-    # TODO: remove `create_snapshot_tasks`: see TODO there.
-    scheduler = self.mk_scheduler(tasks=(rules + create_snapshot_tasks(project_tree)),
-                                  project_tree=project_tree)
-    return scheduler
+    return self.mk_scheduler(tasks=rules, project_tree=self.mk_example_fs_tree())
 
   def assertReturn(self, state, scheduler):
     is_return = isinstance(state, Return)

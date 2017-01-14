@@ -8,64 +8,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import logging
 import os
-import shutil
 import subprocess
 from abc import abstractproperty
-from hashlib import sha1
 
-from pants.engine.fs import Dirs, Files
+from pants.engine.fs import extract_snapshot, select_snapshot_directory
 from pants.engine.selectors import Select
-from pants.util.contextutil import open_tar, temporary_dir, temporary_file_path
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
-
-
-def create_snapshot_archive(project_tree, snapshot_directory, files, dirs):
-  logger.debug('snapshotting files: {}'.format(files))
-
-  # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
-  with temporary_file_path(cleanup=False) as tmp_path:
-    with open_tar(tmp_path, mode='w') as tar:
-      for f in files.dependencies:
-        # TODO handle GitProjectTree. Using add this this will fail with a non-filesystem project tree.
-        tar.add(os.path.join(project_tree.build_root, f.path), f.path)
-      for d in dirs.dependencies:
-        tar.add(os.path.join(project_tree.build_root, d.path), d.path, recursive=False)
-    snapshot = Snapshot(_fingerprint_files_in_tar(files, tmp_path), files.dependencies, dirs.dependencies)
-  tar_location = _snapshot_path(snapshot, snapshot_directory.root)
-
-  shutil.move(tmp_path, tar_location)
-
-  return snapshot
-
-
-def _fingerprint_files_in_tar(file_list, tar_location):
-  """
-  TODO: This could potentially be implemented by nuking any timestamp entries in
-  the tar file, and then fingerprinting the entire thing.
-
-  Also, it's currently ignoring directories, which hashing the entire tar would resolve.
-  """
-  hasher = sha1()
-  with open_tar(tar_location, mode='r', errorlevel=1) as tar:
-    for file in file_list.dependencies:
-      hasher.update(file.path)
-      hasher.update(tar.extractfile(file.path).read())
-  return hasher.hexdigest()
-
-
-def _snapshot_path(snapshot, archive_root):
-  safe_mkdir(archive_root)
-  tar_location = os.path.join(archive_root, '{}.tar'.format(snapshot.fingerprint))
-  return tar_location
-
-
-def _extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir):
-  with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
-    tar.extractall(sandbox_dir)
 
 
 def _run_command(binary, sandbox_dir, process_request):
@@ -98,7 +51,7 @@ def _snapshotted_process(input_conversion,
   with temporary_dir(cleanup=False) as sandbox_dir:
     if process_request.snapshots:
       for snapshot in process_request.snapshots:
-        _extract_snapshot(snapshot_directory.root, snapshot, sandbox_dir)
+        extract_snapshot(snapshot_directory.root, snapshot, sandbox_dir)
 
     # All of the snapshots have been checked out now.
     if process_request.directories_to_create:
@@ -113,19 +66,6 @@ def _snapshotted_process(input_conversion,
                                                                              process_result.exit_code))
 
     return output_conversion(process_result, sandbox_dir)
-
-
-class Snapshot(datatype('Snapshot', ['fingerprint', 'files', 'dirs'])):
-  """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
-
-  Snapshots are used to make it easier to isolate process execution by fixing the contents
-  of the files being operated on and easing their movement to and from isolated execution
-  sandboxes.
-  """
-
-  @property
-  def dependencies(self):
-    return self.files + self.dirs
 
 
 class Binary(object):
@@ -166,14 +106,6 @@ class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', '
   """Contains the stdout, stderr and exit code from executing a process."""
 
 
-class _SnapshotDirectory(datatype('_SnapshotDirectory', ['root'])):
-  """Private singleton value for the snapshot directory."""
-
-
-def snapshot_directory(project_tree):
-  return _SnapshotDirectory(os.path.join(project_tree.build_root, '.snapshots'))
-
-
 class SnapshottedProcess(object):
   """A static helper for defining a task rule to execute a snapshotted process."""
 
@@ -185,7 +117,7 @@ class SnapshottedProcess(object):
     """TODO: Not clear that `binary_type` needs to be separate from the input selectors."""
 
     # Select the concatenation of the snapshot directory, binary, and input selectors.
-    inputs = (Select(_SnapshotDirectory), Select(binary_type)) + tuple(input_selectors)
+    inputs = (select_snapshot_directory(), Select(binary_type)) + tuple(input_selectors)
 
     # Apply the input/output conversions to a top-level process-execution function which
     # will receive all inputs, convert in, execute, and convert out.
@@ -198,23 +130,3 @@ class SnapshottedProcess(object):
 
     # Return a task triple that executes the function to produce the product type.
     return (product_type, inputs, func)
-
-
-def create_snapshot_singletons(project_tree):
-  def ptree(func):
-    p = functools.partial(func, project_tree)
-    p.__name__ = '{}_singleton'.format(func.__name__)
-    return p
-  return [
-      (_SnapshotDirectory, ptree(snapshot_directory))
-    ]
-
-
-def create_snapshot_tasks(project_tree):
-  def ptree(func):
-    partial = functools.partial(func, project_tree, snapshot_directory(project_tree))
-    partial.__name__ = '{}_task'.format(func.__name__)
-    return partial
-  return [
-      (Snapshot, [Select(Files), Select(Dirs)], ptree(create_snapshot_archive)),
-    ]

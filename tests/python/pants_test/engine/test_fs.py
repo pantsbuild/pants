@@ -13,7 +13,8 @@ from contextlib import contextmanager
 from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
 from pants.engine.fs import (DirectoryListing, Dirs, Files, FilesContent, FilesDigest, PathGlobs,
-                             ReadLink)
+                             ReadLink, Snapshot, _snapshot_path)
+from pants.util.contextutil import open_tar
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version, initialize_repo
@@ -226,6 +227,21 @@ class PosixFSTest(unittest.TestCase, FSTestBase):
   @contextmanager
   def mk_project_tree(self, build_root_src):
     yield self.mk_fs_tree(build_root_src)
+
+  # TODO test exercising what happens if a snapshot file doesn't exist after hitting cache for snapshot node.
+  def test_gather_snapshot_of_pathglobs(self):
+    with self.mk_project_tree(self._original_src) as project_tree:
+      scheduler = self.mk_scheduler(project_tree=project_tree)
+      snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
+
+      result = self.execute(scheduler, Snapshot, PathGlobs.create('', globs=['fs_test/a/b/*']))[0]
+
+      self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], result,
+                                snapshot_archive_root)
+
+  def assert_archive_files(self, expected_archive_files, snapshot, snapshot_archive_root):
+    with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
+      self.assertEqual(sorted(expected_archive_files), sorted(tar.getnames()))
 
 
 @unittest.skipIf(git_version() < MIN_REQUIRED_GIT_VERSION,

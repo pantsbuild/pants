@@ -336,8 +336,9 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_full_graph_for_planner_example(self):
     symbol_table_cls = TargetTable
     address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
-    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks()
-    intrinsics = create_fs_intrinsics('Let us pretend that this is a ProjectTree!')
+    project_tree = 'Let us pretend that this is a ProjectTree!'
+    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks(project_tree)
+    intrinsics = create_fs_intrinsics(project_tree)
 
     rule_index = RuleIndex.create(tasks, intrinsics)
     graphmaker = GraphMaker(rule_index,

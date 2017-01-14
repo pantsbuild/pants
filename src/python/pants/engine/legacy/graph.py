@@ -18,8 +18,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import Addresses, Collection
-from pants.engine.fs import Paths, PathGlobs
-from pants.engine.isolated_process import Snapshot
+from pants.engine.fs import PathGlobs, Paths, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
