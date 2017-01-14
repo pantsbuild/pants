@@ -1,5 +1,6 @@
 mod core;
 mod externs;
+mod fs;
 mod graph;
 mod handles;
 mod nodes;
