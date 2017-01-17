@@ -16,8 +16,10 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
   @ensure_engine
   def test_cycle(self):
     prefix = 'testprojects/src/java/org/pantsbuild/testproject'
-    with self.file_renamed(os.path.join(get_buildroot(), prefix, 'cycle1'), 'TEST_BUILD', 'BUILD'):
-      with self.file_renamed(os.path.join(get_buildroot(), prefix, 'cycle2'), 'TEST_BUILD', 'BUILD'):
+    with self.file_renamed(os.path.join(get_buildroot(), prefix, 'cycle1'),
+                           'TEST_BUILD', 'BUILD'):
+      with self.file_renamed(os.path.join(get_buildroot(), prefix, 'cycle2'),
+                             'TEST_BUILD', 'BUILD'):
         pants_run = self.run_pants(['compile', os.path.join(prefix, 'cycle1')])
         self.assert_failure(pants_run)
         self.assertIn('cycle', pants_run.stderr_data.lower())
