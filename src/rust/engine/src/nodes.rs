@@ -1,9 +1,13 @@
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+
 use graph::{Entry, Graph};
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Field, FNV, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
+use fs::{FSContext, PathGlob, PathGlobs, PathStat, Stat, Link};
 
 
 #[derive(Debug)]
@@ -55,22 +59,38 @@ impl<'g, 't> StepContext<'g, 't> {
    * (analogous to NodeBuilder.gen_nodes)
    */
   fn gen_nodes(&self, subject: &Key, product: &TypeConstraint, variants: &Variants) -> Vec<Node> {
-    self.tasks.gen_tasks(subject.type_id(), product)
-      .map(|tasks| {
-        tasks.iter()
-          .map(|task|
-            Node::Task(
-              Task {
-                subject: subject.clone(),
-                product: product.clone(),
-                variants: variants.clone(),
-                selector: task.clone(),
-              }
+    // If the requested product is a Snapshot, use a Snapshot Node.
+    if product == self.type_snapshot() {
+      vec![
+        // TODO: Hack... should have an intermediate Node to Select PathGlobs for the subject
+        // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
+        // different subjects but identical PathGlobs will cause redundant work.
+        Node::Snapshot(
+          Snapshot {
+            subject: subject.clone(),
+            product: product.clone(),
+            variants: variants.clone(),
+          }
+        )
+      ]
+    } else {
+      self.tasks.gen_tasks(subject.type_id(), product)
+        .map(|tasks| {
+          tasks.iter()
+            .map(|task|
+              Node::Task(
+                Task {
+                  subject: subject.clone(),
+                  product: product.clone(),
+                  variants: variants.clone(),
+                  selector: task.clone(),
+                }
+              )
             )
-          )
-          .collect()
-      })
-      .unwrap_or_else(|| Vec::new())
+            .collect()
+        })
+        .unwrap_or_else(|| Vec::new())
+    }
   }
 
   fn get(&self, node: &Node) -> Option<&Complete> {
@@ -155,11 +175,37 @@ impl<'g, 't> StepContext<'g, 't> {
     self.tasks.externs.project_multi(item, field)
   }
 
+  fn type_path_globs(&self) -> &TypeConstraint {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn type_snapshot(&self) -> &TypeConstraint {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn lift_path_globs(&self, item: &Value) -> PathGlobs {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn store_snapshot(&self, item: &Snapshot) -> Value {
+    panic!("TODO: Not implemented!");
+  }
+
   /**
    * Creates a Throw state with the given exception message.
    */
   fn throw(&self, msg: String) -> Complete {
     Complete::Throw(self.tasks.externs.create_exception(msg))
+  }
+}
+
+impl<'g, 't> FSContext<Node> for StepContext<'g, 't> {
+  fn read_link(&self, link: &Link) -> Result<PathBuf, Node> {
+
+  }
+
+  fn stat(&self, path: &Path) -> Result<Stat, Node> {
+
   }
 }
 
@@ -507,6 +553,98 @@ impl Step for SelectProjection {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Snapshot {
+  subject: Key,
+  product: TypeConstraint,
+  variants: Variants,
+}
+
+impl Step for Snapshot {
+  fn step(&self, context: StepContext) -> State<Node> {
+    // Compute PathGlobs for the subject.
+    let path_globs = {
+      let node =
+        Node::create(
+          Selector::select(context.type_path_globs().clone()),
+          self.subject.clone(),
+          self.variants.clone()
+        );
+      match context.get(&node) {
+        Some(&Complete::Return(ref value)) =>
+          context.lift_path_globs(value)
+        ,
+        Some(&Complete::Noop(_, _)) =>
+          return State::Complete(
+            Complete::Noop("Could not compute PathGlobs for input {}.", Some(node))
+          ),
+        Some(&Complete::Throw(ref msg)) =>
+          // NB: propagate thrown exception directly.
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
+        None =>
+          return State::Waiting(vec![node]),
+      }
+    };
+
+    // Recursively expand PathGlobs into PathStats, building a set of relevant Node dependencies.
+    let mut dependencies = Vec::new();
+    let mut stack = path_globs.0.clone();
+    let mut outputs_set: HashSet<PathStat, FNV> = HashSet::default();
+    let mut outputs: Vec<&PathStat> = Vec::new();
+    while let Some(path_glob) = stack.pop() {
+      // Compute matching PathStats for each PathGlob.
+      let path_stats =
+        match path_glob {
+          PathGlob::Root =>
+            vec![
+              PathGlob::root_stat()
+            ],
+          w @ PathGlob::Wildcard { .. } => {
+            let directory_listing = panic!("TODO: implement DirectoryListing.");
+            // TODO: Need to expand any unexpanded Link stats here: the contents
+            // of a Snapshot must always be only Dirs and Files.
+            panic!("TODO: implement filtering of a DirectoryListing.")
+          },
+          dw @ PathGlob::DirWildcard { .. } => {
+            // Compute a DirectoryListing, and filter to Dirs (also, recursively expand symlinks
+            // to determine whether they represent Dirs).
+            let dir_list = panic!("TODO: implement DirectoryListing.");
+            // expand dirs
+            panic!("TODO: implement filtering and expanding a DirectoryListing to Dirs.")
+          },
+        };
+      // Then extend.
+      outputs.extend(
+        path_stats.into_iter()
+          .filter_map(|ps| {
+            if outputs_set.insert(ps) {
+              Some(&ps)
+            } else {
+              None
+            }
+          })
+      );
+    }
+
+    assert!(
+      outputs.iter().all(|ps| {
+        match ps.stat {
+          Stat::Dir(_) | Stat::File(_) => true,
+          _ => false,
+        }
+      }),
+      "A Snapshot must only contain Dirs and Files: never Links."
+    );
+
+    // If the walk has finished, Snapshot and store the matched paths.
+    if dependencies.is_empty() {
+      State::Complete(Complete::Return(context.store_snapshot(panic!("TODO: Create a snapshot!"))))
+    } else {
+      State::Waiting(dependencies)
+    }
+  }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   subject: Key,
   product: TypeConstraint,
@@ -555,12 +693,15 @@ impl Step for Task {
   }
 }
 
+// TODO: Likely that these could be inline struct definitions, rather than independently
+// defined structs.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Node {
   Select(Select),
   SelectLiteral(SelectLiteral),
   SelectDependencies(SelectDependencies),
   SelectProjection(SelectProjection),
+  Snapshot(Snapshot),
   Task(Task),
 }
 
@@ -572,6 +713,7 @@ impl Node {
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
       &Node::Task(ref t) => format!("Task({})", externs.id_to_str(t.selector.func.0)),
+      &Node::Snapshot(ref t) => "Snapshot".to_string(),
     }
   }
 
@@ -582,6 +724,7 @@ impl Node {
       &Node::SelectDependencies(ref s) => &s.subject,
       &Node::SelectProjection(ref s) => &s.subject,
       &Node::Task(ref t) => &t.subject,
+      &Node::Snapshot(ref t) => &t.subject,
     }
   }
 
@@ -592,16 +735,7 @@ impl Node {
       &Node::SelectDependencies(ref s) => &s.selector.product,
       &Node::SelectProjection(ref s) => &s.selector.product,
       &Node::Task(ref t) => &t.selector.product,
-    }
-  }
-
-  pub fn selector(&self) -> Selector {
-    match self {
-      &Node::Select(ref s) => Selector::Select(s.selector.clone()),
-      &Node::SelectLiteral(ref s) => Selector::SelectLiteral(s.selector.clone()),
-      &Node::SelectDependencies(ref s) => Selector::SelectDependencies(s.selector.clone()),
-      &Node::SelectProjection(ref s) => Selector::SelectProjection(s.selector.clone()),
-      &Node::Task(ref t) => Selector::Task(t.selector.clone()),
+      &Node::Snapshot(ref t) => &t.product,
     }
   }
 
@@ -655,6 +789,7 @@ impl Node {
       &Node::SelectLiteral(ref n) => n.step(context),
       &Node::SelectProjection(ref n) => n.step(context),
       &Node::Task(ref n) => n.step(context),
+      &Node::Snapshot(ref n) => n.step(context),
     }
   }
 }

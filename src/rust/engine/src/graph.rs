@@ -80,7 +80,7 @@ impl Entry {
       "{}:{}:{} == {}",
       self.node.format(externs),
       externs.id_to_str(self.node.subject().id()),
-      externs.id_to_str(self.node.selector().product().0),
+      externs.id_to_str(self.node.product().0),
       state,
     ).replace("\"", "\\\"")
   }
@@ -359,7 +359,7 @@ impl Graph {
           Some(Complete::Throw(_)) => "tomato".to_string(),
           Some(Complete::Return(_)) => {
             let viz_colors_len = viz_colors.len();
-            viz_colors.entry(entry.node.selector().product().clone()).or_insert_with(|| {
+            viz_colors.entry(entry.node.product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
             }).clone()
           },

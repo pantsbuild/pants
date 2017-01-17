@@ -1,17 +1,18 @@
 use std::ffi::{OsString, OsStr};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
-enum Stat {
+#[derive(Eq, Hash, PartialEq)]
+pub enum Stat {
   Link(Link),
   Dir(Dir),
   File(File),
 }
 
-#[derive(Eq, PartialEq)]
-struct Link(PathBuf);
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct Link(PathBuf);
 
-#[derive(Eq, PartialEq)]
-struct Dir(PathBuf);
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct Dir(PathBuf);
 
 impl Clone for Dir {
   fn clone(&self) -> Dir {
@@ -19,17 +20,35 @@ impl Clone for Dir {
   }
 }
 
-#[derive(Eq, PartialEq)]
-struct File(PathBuf);
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct File(PathBuf);
 
-enum PathGlob {
-  PathRoot,
-  PathWildcard {
+enum LinkExpansion {
+  // Successfully resolved to a File.
+  File(File),
+  // Successfully resolved to a Dir.
+  Dir(Dir),
+  // Failed to resolve due to a Loop.
+  Loop(String),
+}
+
+#[derive(Eq, Hash, PartialEq)]
+pub struct PathStat {
+  // The symbolic name of some filesystem Path, which is context specific.
+  pub path: PathBuf,
+  // The canonical Stat that underlies the Path.
+  pub stat: Stat,
+}
+
+#[derive(Clone)]
+pub enum PathGlob {
+  Root,
+  Wildcard {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: OsString,
   },
-  PathDirWildcard {
+  DirWildcard {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: OsString,
@@ -38,8 +57,15 @@ enum PathGlob {
 }
 
 impl PathGlob {
+  pub fn root_stat() -> PathStat {
+    PathStat {
+      path: PathBuf::new(),
+      stat: Stat::Dir(Dir(PathBuf::new())),
+    }
+  }
+
   fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: OsString) -> PathGlob {
-    PathGlob::PathWildcard {
+    PathGlob::Wildcard {
       canonical_dir: canonical_dir,
       symbolic_path: symbolic_path,
       wildcard: wildcard,
@@ -47,7 +73,7 @@ impl PathGlob {
   }
 
   fn dir_wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: OsString, remainder: PathBuf) -> PathGlob {
-    PathGlob::PathDirWildcard {
+    PathGlob::DirWildcard {
       canonical_dir: canonical_dir,
       symbolic_path: symbolic_path,
       wildcard: wildcard,
@@ -56,10 +82,12 @@ impl PathGlob {
   }
 }
 
-struct PathGlobs(Vec<PathGlob>);
+pub struct PathGlobs(pub Vec<PathGlob>);
 
 const SINGLE_STAR: &'static str ="*";
 const DOUBLE_STAR: &'static str = "**";
+
+const MAX_LINK_EXPANSION_ATTEMPTS: usize = 64;
 
 fn join(components: &[&OsStr]) -> PathBuf {
   let mut out = PathBuf::new();
@@ -74,7 +102,7 @@ impl PathGlobs {
     PathGlobs(
       filespecs.iter()
         .flat_map(|filespec| {
-          PathGlobs::expand(relative_to, relative_to.0.as_path(), filespec)
+          PathGlobs::parse(relative_to, relative_to.0.as_path(), filespec)
         })
         .collect()
     )
@@ -92,15 +120,15 @@ impl PathGlobs {
   }
 
   /**
-   * Given a filespec, return the PathGlob objects it expands to.
+   * Given a filespec String, parse it to a series of PathGlob objects.
    */
-  fn expand(canonical_dir: &Dir, symbolic_path: &Path, filespec: &Path) -> Vec<PathGlob> {
+  fn parse(canonical_dir: &Dir, symbolic_path: &Path, filespec: &Path) -> Vec<PathGlob> {
     let mut parts: Vec<&OsStr> = Path::new(filespec).iter().collect();
     PathGlobs::normalize_doublestar(&mut parts);
 
     if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && parts[0] == "." {
       // A request for the root path.
-      vec![PathGlob::PathRoot]
+      vec![PathGlob::Root]
     } else if DOUBLE_STAR == parts[0] {
       if parts.len() == 1 {
          // Per https://git-scm.com/docs/gitignore:
@@ -166,6 +194,48 @@ impl PathGlobs {
           join(&parts[1..])
         )
       ]
+    }
+  }
+}
+
+pub trait FSContext<Incomplete> {
+  fn read_link(&self, link: &Link) -> Result<PathBuf, Incomplete>;
+  fn stat(&self, path: &Path) -> Result<Stat, Incomplete>;
+
+  /**
+   * Recursively expand a symlink to an underlying non-link Stat.
+   */
+  fn expand_link<T, C: FSContext<T>>(mut link: &Link, context: &C) -> Result<LinkExpansion, T> {
+    let mut attempts = 0;
+    loop {
+      attempts += 1;
+      if attempts > MAX_LINK_EXPANSION_ATTEMPTS {
+        return Ok(
+          LinkExpansion::Loop(
+            format!("Encountered a symlink loop while expanding {:?}", link)
+          )
+        );
+      }
+
+      // Read the link.
+      let path =
+        match context.read_link(link) {
+          Result::Ok(path) => path,
+          Result::Err(t) => return Result::Err(t),
+        };
+      // Stat the destination.
+      match context.stat(path.as_path()) {
+        Ok(Stat::Link(ref l)) => {
+          // The link pointed to another link. Continue.
+          link = l;
+        },
+        Ok(Stat::Dir(d)) =>
+          return Ok(LinkExpansion::Dir(d)),
+        Ok(Stat::File(f)) =>
+          return Ok(LinkExpansion::File(f)),
+        Err(t) =>
+          return Err(t),
+      };
     }
   }
 }
