@@ -22,6 +22,13 @@ from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
 
 
+class InvalidZipPath(zipfile.BadZipfile):
+  """Raise instead of passing unchecked falsey values through to zipfile.ZipFile.
+
+  zipfile.ZipFile does not truth check and just raises an AttributeError when passed falsey file paths.
+  """
+
+
 @contextmanager
 def environment_as(**kwargs):
   """Update the environment to the supplied values, for example:
@@ -170,11 +177,14 @@ def open_zip(path_or_file, *args, **kwargs):
 
     :API: public
   """
+  if not path_or_file:
+    raise InvalidZipPath('Invalid zip location: {}'.format(path_or_file))
+  allowZip64 = kwargs.pop('allowZip64', True)
   try:
-    allowZip64 = kwargs.pop('allowZip64', True)
     zf = zipfile.ZipFile(path_or_file, *args, allowZip64=allowZip64, **kwargs)
   except zipfile.BadZipfile as bze:
-    raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(path_or_file, bze))
+    # Print the realpath in order to follow symlinks back to the problem source file.
+    raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(os.path.realpath(path_or_file), bze))
   try:
     yield zf
   finally:

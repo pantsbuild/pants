@@ -11,10 +11,11 @@ import shutil
 import subprocess
 import sys
 import unittest
+import zipfile
 
 import mock
 
-from pants.util.contextutil import (HardSystemExit, Timer, environment_as, exception_logging,
+from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, environment_as, exception_logging,
                                     hard_exit_handler, maybe_profiled, open_zip, pushd, stdio_as,
                                     temporary_dir, temporary_file)
 
@@ -159,6 +160,22 @@ class ContextutilTest(unittest.TestCase):
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=False) as zf:
         self.assertFalse(zf._allowZip64)
+
+  def test_open_zip_raises_exception_on_falsey_paths(self):
+    falsey = (None, '', False)
+    for invalid in falsey:
+      with self.assertRaises(InvalidZipPath):
+        open_zip(invalid).gen.next()
+
+  def test_open_zip_returns_realpath_on_badzipfile(self):
+    # In case of file corruption, deleting a Pants-constructed symlink would not resolve the error.
+    with temporary_file() as not_zip:
+      with temporary_dir() as tempdir:
+        file_symlink = os.path.join(tempdir, 'foo')
+        os.symlink(not_zip.name, file_symlink)
+        self.assertEquals(os.path.realpath(file_symlink), os.path.realpath(not_zip.name))
+        with self.assertRaisesRegexp(zipfile.BadZipfile, r'{}'.format(not_zip.name)):
+          open_zip(file_symlink).gen.next()
 
   def test_stdio_as(self):
     old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
