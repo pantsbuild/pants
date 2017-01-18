@@ -196,6 +196,7 @@ class ListTargetsTest(BaseListTargetsTest):
     )
 
   def test_no_synthetic_resources_in_output(self):
+    # `python_library` w/o `sources` requires initializing the needed subsystem.
     init_subsystem(Target.Arguments)
     self.add_to_build_file('BUILD', dedent("""
     python_library(
@@ -203,6 +204,7 @@ class ListTargetsTest(BaseListTargetsTest):
       resources = ['BUILD'],
     )
     """))
+
     output = self.execute_console_task(targets=self.targets('::'))
     self.assertIn('//:lib', output)
     self.assertTrue(all('synthetic' not in line for line in output))

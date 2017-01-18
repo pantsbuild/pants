@@ -48,7 +48,7 @@ class LegacyBuildGraph(BuildGraph):
 
   @staticmethod
   def create(scheduler, engine, symbol_table_cls):
-    """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
+    """Create a graph given a Scheduler, Engine, and a SymbolTable class.
 
     :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
     :param engine: An Engine subclass to execute calls to `inject`.
@@ -63,7 +63,7 @@ class LegacyBuildGraph(BuildGraph):
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
 
-  def clone(self):
+  def fork(self):
     return LegacyBuildGraph(self._scheduler, self._engine, self._target_types)
 
   @staticmethod

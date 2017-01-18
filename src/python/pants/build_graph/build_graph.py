@@ -521,8 +521,11 @@ class BuildGraph(AbstractClass):
     """
 
   @abstractmethod
-  def clone(self):
-    """Clone a buildgraph."""
+  def fork(self):
+    """Fork a buildgraph from scratch without copying its state.
+
+    The new buildgraph will be used for a different set of addresses.
+    """
 
 
 class CycleException(Exception):
