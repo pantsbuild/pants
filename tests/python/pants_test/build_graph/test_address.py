@@ -12,7 +12,8 @@ from contextlib import contextmanager
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.build_graph.address import Address, BuildFileAddress, parse_spec
+from pants.build_graph.address import (Address, BuildFileAddress, InvalidateTargetName,
+                                       InvalidSpecPath, parse_spec)
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
 
@@ -54,50 +55,53 @@ class ParseSpecTest(unittest.TestCase):
     self.assertEqual(target_name, 'c')
 
   def test_parse_bad_spec_non_normalized(self):
-    self.do_test_bad_spec('')
-    self.do_test_bad_spec('..')
-    self.do_test_bad_spec('.')
+    self.do_test_bad_spec_path('..')
+    self.do_test_bad_spec_path('.')
 
-    self.do_test_bad_spec('//')
-    self.do_test_bad_spec('//..')
-    self.do_test_bad_spec('//.')
+    self.do_test_bad_spec_path('//..')
+    self.do_test_bad_spec_path('//.')
 
-    self.do_test_bad_spec('a/.')
-    self.do_test_bad_spec('a/..')
-    self.do_test_bad_spec('../a')
-    self.do_test_bad_spec('a/../a')
+    self.do_test_bad_spec_path('a/.')
+    self.do_test_bad_spec_path('a/..')
+    self.do_test_bad_spec_path('../a')
+    self.do_test_bad_spec_path('a/../a')
 
-    self.do_test_bad_spec('a/')
-    self.do_test_bad_spec('a/b/')
+    self.do_test_bad_spec_path('a/')
+    self.do_test_bad_spec_path('a/b/')
 
   def test_parse_bad_spec_bad_path(self):
-    self.do_test_bad_spec('/a')
-    self.do_test_bad_spec('///a')
+    self.do_test_bad_spec_path('/a')
+    self.do_test_bad_spec_path('///a')
 
   def test_parse_bad_spec_bad_name(self):
-    self.do_test_bad_spec('a:')
-    self.do_test_bad_spec('a::')
+    self.do_test_bad_target_name('a:')
+    self.do_test_bad_target_name('a::')
+    self.do_test_bad_target_name('//')
 
   def test_parse_bad_spec_build_trailing_path_component(self):
-    self.do_test_bad_spec('BUILD')
-    self.do_test_bad_spec('BUILD.suffix')
-    self.do_test_bad_spec('//BUILD')
-    self.do_test_bad_spec('//BUILD.suffix')
-    self.do_test_bad_spec('a/BUILD')
-    self.do_test_bad_spec('a/BUILD.suffix')
-    self.do_test_bad_spec('//a/BUILD')
-    self.do_test_bad_spec('//a/BUILD.suffix')
-    self.do_test_bad_spec('a/BUILD:b')
-    self.do_test_bad_spec('a/BUILD.suffix:b')
-    self.do_test_bad_spec('//a/BUILD:b')
-    self.do_test_bad_spec('//a/BUILD.suffix:b')
+    self.do_test_bad_spec_path('BUILD')
+    self.do_test_bad_spec_path('BUILD.suffix')
+    self.do_test_bad_spec_path('//BUILD')
+    self.do_test_bad_spec_path('//BUILD.suffix')
+    self.do_test_bad_spec_path('a/BUILD')
+    self.do_test_bad_spec_path('a/BUILD.suffix')
+    self.do_test_bad_spec_path('//a/BUILD')
+    self.do_test_bad_spec_path('//a/BUILD.suffix')
+    self.do_test_bad_spec_path('a/BUILD:b')
+    self.do_test_bad_spec_path('a/BUILD.suffix:b')
+    self.do_test_bad_spec_path('//a/BUILD:b')
+    self.do_test_bad_spec_path('//a/BUILD.suffix:b')
 
   def test_banned_chars_in_target_name(self):
-    # move to do_test_bad_spec after deprecation
+    # move to do_test_bad_spec_path after deprecation
     self.assertEquals('c@d', Address(*parse_spec('a/b:c@d')).target_name)
 
-  def do_test_bad_spec(self, spec):
-    with self.assertRaises(ValueError):
+  def do_test_bad_spec_path(self, spec):
+    with self.assertRaises(InvalidSpecPath):
+      Address(*parse_spec(spec))
+
+  def do_test_bad_target_name(self, spec):
+    with self.assertRaises(InvalidateTargetName):
       Address(*parse_spec(spec))
 
 
