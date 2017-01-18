@@ -50,6 +50,8 @@ import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
  */
@@ -289,8 +291,8 @@ public class ConsoleRunnerImpl {
         if (caseCaptures.containsKey(failure.getDescription())) {
           InMemoryStreamCapture capture = caseCaptures.remove(failure.getDescription());
           capture.close();
-          swappableOut.getOriginal().append(new String(capture.readOut()));
-          swappableErr.getOriginal().append(new String(capture.readErr()));
+          swappableOut.getOriginal().append(new String(capture.readOut(), UTF_8));
+          swappableErr.getOriginal().append(new String(capture.readErr(), UTF_8));
         } else {
           // Do nothing.
           // In case of exception in @BeforeClass method testFailure executes without testStarted.
@@ -322,7 +324,7 @@ public class ConsoleRunnerImpl {
   /**
    * A run listener that will stop the test run after the first test failure.
    */
-  public class FailFastListener extends RunListener {
+  public static class FailFastListener extends RunListener {
     private final RunNotifier runNotifier;
     private final Result result = new Result();
 
@@ -343,7 +345,7 @@ public class ConsoleRunnerImpl {
    * A runner that wraps the original test runner so we can add a listener
    * to stop the tests after the first test failure.
    */
-  public class FailFastRunner extends Runner {
+  public static class FailFastRunner extends Runner {
     private final Runner wrappedRunner;
 
     public FailFastRunner(Runner wrappedRunner) {

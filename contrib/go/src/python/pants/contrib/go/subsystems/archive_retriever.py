@@ -34,7 +34,7 @@ class ArchiveRetriever(Subsystem):
              default=10 * 1024,  # 10KB in case jumbo frames are in play.
              help='The number of bytes of archive content to buffer in memory before flushing to '
                   'disk when downloading an archive.')
-    register('--retries', default=1, advanced=True,
+    register('--retries', type=int, default=1, advanced=True,
              help='How many times to retry when fetching a remote archive.')
 
   def fetch_archive(self, archive_url, strip_level, dest):

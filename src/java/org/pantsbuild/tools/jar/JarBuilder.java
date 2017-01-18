@@ -289,7 +289,7 @@ public class JarBuilder implements Closeable {
       this.source = source;
     }
 
-    public String name() {
+    @Override public String name() {
       return source.getPath();
     }
   }
