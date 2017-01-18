@@ -183,7 +183,27 @@ impl<'g, 't> StepContext<'g, 't> {
     panic!("TODO: Not implemented!");
   }
 
+  fn type_stat(&self) -> &TypeConstraint {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn type_read_link(&self) -> &TypeConstraint {
+    panic!("TODO: Not implemented!");
+  }
+
   fn lift_path_globs(&self, item: &Value) -> PathGlobs {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn lift_read_link(&self, item: &Value) -> PathBuf {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn lift_stat(&self, item: &Value) -> Stat {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn store_path(&self, item: &Path) -> Value {
     panic!("TODO: Not implemented!");
   }
 
@@ -199,13 +219,44 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 }
 
+// TODO: Hm. Consider doing these with externs instead? Lifting Values is
+// a lot of overhead.
+//
+// At which point, there would be a separate cache of FS operations somewhere
+// to begin invalidation from... neat, I think?
 impl<'g, 't> FSContext<Node> for StepContext<'g, 't> {
   fn read_link(&self, link: &Link) -> Result<PathBuf, Node> {
-
+    let node =
+      Node::create(
+        Selector::select(self.type_read_link().clone()),
+        self.key_for(&self.store_path(link.0.as_path())),
+        Variants::default(),
+      );
+    match self.get(&node) {
+      Some(&Complete::Return(ref value)) =>
+        Ok(self.lift_read_link(value)),
+      _ =>
+        // TODO: This isn't great... punting like this will mean the caller
+        // needs to re-execute the get.
+        Err(node),
+    }
   }
 
   fn stat(&self, path: &Path) -> Result<Stat, Node> {
-
+    let node =
+      Node::create(
+        Selector::select(self.type_stat().clone()),
+        self.key_for(&self.store_path(path)),
+        Variants::default(),
+      );
+    match self.get(&node) {
+      Some(&Complete::Return(ref value)) =>
+        Ok(self.lift_stat(value)),
+      _ =>
+        // TODO: This isn't great... punting like this will mean the caller
+        // needs to re-execute the get.
+        Err(node),
+    }
   }
 }
 

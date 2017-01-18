@@ -9,10 +9,10 @@ pub enum Stat {
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-pub struct Link(PathBuf);
+pub struct Link(pub PathBuf);
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-pub struct Dir(PathBuf);
+pub struct Dir(pub PathBuf);
 
 impl Clone for Dir {
   fn clone(&self) -> Dir {
@@ -21,7 +21,7 @@ impl Clone for Dir {
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
-pub struct File(PathBuf);
+pub struct File(pub PathBuf);
 
 enum LinkExpansion {
   // Successfully resolved to a File.
