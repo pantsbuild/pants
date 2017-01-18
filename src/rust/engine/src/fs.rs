@@ -1,26 +1,20 @@
 use std::ffi::{OsString, OsStr};
 use std::path::{Path, PathBuf};
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum Stat {
   Link(Link),
   Dir(Dir),
   File(File),
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Link(pub PathBuf);
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
 
-impl Clone for Dir {
-  fn clone(&self) -> Dir {
-    Dir(self.0.to_owned())
-  }
-}
-
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct File(pub PathBuf);
 
 enum LinkExpansion {
@@ -32,7 +26,7 @@ enum LinkExpansion {
   Loop(String),
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PathStat {
   // The symbolic name of some filesystem Path, which is context specific.
   pub path: PathBuf,
@@ -205,7 +199,8 @@ pub trait FSContext<Incomplete> {
   /**
    * Recursively expand a symlink to an underlying non-link Stat.
    */
-  fn expand_link<T, C: FSContext<T>>(mut link: &Link, context: &C) -> Result<LinkExpansion, T> {
+  fn expand_link<T, C: FSContext<T>>(link: &Link, context: &C) -> Result<LinkExpansion, T> {
+    let mut link: Link = (*link).clone();
     let mut attempts = 0;
     loop {
       attempts += 1;
@@ -219,13 +214,13 @@ pub trait FSContext<Incomplete> {
 
       // Read the link.
       let path =
-        match context.read_link(link) {
+        match context.read_link(&link) {
           Result::Ok(path) => path,
           Result::Err(t) => return Result::Err(t),
         };
       // Stat the destination.
       match context.stat(path.as_path()) {
-        Ok(Stat::Link(ref l)) => {
+        Ok(Stat::Link(l)) => {
           // The link pointed to another link. Continue.
           link = l;
         },

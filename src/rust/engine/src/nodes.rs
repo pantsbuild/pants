@@ -219,11 +219,6 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 }
 
-// TODO: Hm. Consider doing these with externs instead? Lifting Values is
-// a lot of overhead.
-//
-// At which point, there would be a separate cache of FS operations somewhere
-// to begin invalidation from... neat, I think?
 impl<'g, 't> FSContext<Node> for StepContext<'g, 't> {
   fn read_link(&self, link: &Link) -> Result<PathBuf, Node> {
     let node =
@@ -640,7 +635,7 @@ impl Step for Snapshot {
     let mut dependencies = Vec::new();
     let mut stack = path_globs.0.clone();
     let mut outputs_set: HashSet<PathStat, FNV> = HashSet::default();
-    let mut outputs: Vec<&PathStat> = Vec::new();
+    let mut outputs: Vec<PathStat> = Vec::new();
     while let Some(path_glob) = stack.pop() {
       // Compute matching PathStats for each PathGlob.
       let path_stats =
@@ -667,8 +662,8 @@ impl Step for Snapshot {
       outputs.extend(
         path_stats.into_iter()
           .filter_map(|ps| {
-            if outputs_set.insert(ps) {
-              Some(&ps)
+            if outputs_set.insert(ps.clone()) {
+              Some(ps)
             } else {
               None
             }
