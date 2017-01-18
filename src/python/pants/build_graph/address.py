@@ -87,7 +87,7 @@ class InvalidSpecPath(ValueError):
   """Indicate an invalid spec path for `Address`."""
 
 
-class InvalidateTargetName(ValueError):
+class InvalidTargetName(ValueError):
   """Indicate an invalid target name for `Address`."""
 
 
@@ -144,7 +144,7 @@ class Address(object):
   @classmethod
   def check_target_name(cls, spec_path, name):
     if not name:
-      raise InvalidateTargetName('Spec {spec}:{name} has no name part'
+      raise InvalidTargetName('Spec {spec}:{name} has no name part'
                                  .format(spec=spec_path, name=name))
 
     banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(name)
