@@ -121,6 +121,17 @@ function pkg_cpp_install_test() {
       --explain compile | grep "cpp" &> /dev/null
 }
 
+PKG_ERRORPRONE=(
+  "pantsbuild.pants.contrib.errorprone"
+  "//contrib/errorprone/src/python/pants/contrib/errorprone:plugin"
+  "pkg_errorprone_install_test"
+)
+function pkg_errorprone_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.errorprone==$(local_version)']" \
+      --explain compile | grep "errorprone" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -132,4 +143,5 @@ CONTRIB_PACKAGES=(
   PKG_SCALAJS
   PKG_FINDBUGS
   PKG_CPP
+  PKG_ERRORPRONE
 )

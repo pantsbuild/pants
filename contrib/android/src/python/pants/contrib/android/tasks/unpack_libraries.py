@@ -102,7 +102,8 @@ class UnpackLibraries(Task):
     jar_url = 'file://{0}'.format(jar_file)
     jar_dep = JarDependency(org=library.id, name=coordinate.artifact_filename, rev=coordinate.rev,
                             url=jar_url)
-    address = Address(self.workdir, '{}-classes.jar'.format(coordinate.artifact_filename))
+    address = Address(os.path.relpath(self.workdir, get_buildroot()),
+                      '{}-classes.jar'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, JarLibrary, jars=[jar_dep],
                                              derived_from=library)
     return new_target
@@ -120,7 +121,8 @@ class UnpackLibraries(Task):
     :rtype::class:`pants.contrib.android.targets.AndroidResources`
     """
 
-    address = Address(self.workdir, '{}-resources'.format(coordinate.artifact_filename))
+    address = Address(os.path.relpath(self.workdir, get_buildroot()),
+                      '{}-resources'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidResources,
                                              manifest=manifest, resource_dir=resource_dir,
                                              derived_from=library)
@@ -164,7 +166,8 @@ class UnpackLibraries(Task):
         # filtered classes and put them on the compile classpath, either as a jar or as source.
         self._created_targets[jar_file] =  self.create_classes_jar_target(library, coordinate, jar_file)
       binary.inject_dependency(self._created_targets[jar_file].address)
-    address = Address(self.workdir, '{}-android_library'.format(coordinate.artifact_filename))
+    address = Address(os.path.relpath(self.workdir, get_buildroot()),
+                      '{}-android_library'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidLibrary,
                                              manifest=manifest,
                                              include_patterns=library.payload.include_patterns,

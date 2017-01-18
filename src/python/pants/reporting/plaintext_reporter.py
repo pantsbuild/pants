@@ -76,10 +76,11 @@ class PlainTextReporter(PlainTextReporterBase):
   TOOL_OUTPUT_FORMATTING = {
     WorkUnitLabel.MULTITOOL: ToolOutputFormat.SUPPRESS,
     WorkUnitLabel.BOOTSTRAP: ToolOutputFormat.SUPPRESS,
-    WorkUnitLabel.COMPILER : ToolOutputFormat.INDENT,
-    WorkUnitLabel.TEST : ToolOutputFormat.INDENT,
-    WorkUnitLabel.REPL : ToolOutputFormat.UNINDENTED,
-    WorkUnitLabel.RUN : ToolOutputFormat.UNINDENTED
+    WorkUnitLabel.COMPILER: ToolOutputFormat.INDENT,
+    WorkUnitLabel.TEST: ToolOutputFormat.INDENT,
+    WorkUnitLabel.REPL: ToolOutputFormat.UNINDENTED,
+    WorkUnitLabel.RUN: ToolOutputFormat.UNINDENTED,
+    WorkUnitLabel.LINT: ToolOutputFormat.INDENT
   }
 
   # Format the labels from these workunit types as specified.  If no format is specified, the

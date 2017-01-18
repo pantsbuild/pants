@@ -20,4 +20,4 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='proto', action=ProtobufGen).install('gen')
+  task(name='protoc', action=ProtobufGen).install('gen')

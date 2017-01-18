@@ -297,7 +297,7 @@ class LazyResolvingGraphTest(GraphTestBase):
                                 version='0.9.2',
                                 strict=True,
                                 lang='java',
-                                dependencies=[address(thrift2_address)]
+                                dependencies=[thrift2_address]
                               ),
                             ])
 
