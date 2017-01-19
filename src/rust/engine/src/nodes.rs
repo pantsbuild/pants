@@ -7,7 +7,7 @@ use externs::Externs;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
-use fs::{FSContext, PathGlob, PathGlobs, PathStat, Stat, Link};
+use fs::{Dir, FSContext, PathGlob, PathGlobs, PathStat, Stat, Link};
 
 
 #[derive(Debug)]
@@ -191,6 +191,10 @@ impl<'g, 't> StepContext<'g, 't> {
     panic!("TODO: Not implemented!");
   }
 
+  fn type_directory_listing(&self) -> &TypeConstraint {
+    panic!("TODO: Not implemented!");
+  }
+
   fn lift_path_globs(&self, item: &Value) -> PathGlobs {
     panic!("TODO: Not implemented!");
   }
@@ -203,7 +207,19 @@ impl<'g, 't> StepContext<'g, 't> {
     panic!("TODO: Not implemented!");
   }
 
+  fn lift_stats(&self, item: &Value) -> Vec<Stat> {
+    panic!("TODO: Not implemented!");
+  }
+
   fn store_path(&self, item: &Path) -> Value {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn store_link(&self, item: &Link) -> Value {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn store_dir(&self, item: &Dir) -> Value {
     panic!("TODO: Not implemented!");
   }
 
@@ -224,16 +240,12 @@ impl<'g, 't> FSContext<Node> for StepContext<'g, 't> {
     let node =
       Node::create(
         Selector::select(self.type_read_link().clone()),
-        self.key_for(&self.store_path(link.0.as_path())),
+        self.key_for(&self.store_link(link)),
         Variants::default(),
       );
     match self.get(&node) {
-      Some(&Complete::Return(ref value)) =>
-        Ok(self.lift_read_link(value)),
-      _ =>
-        // TODO: This isn't great... punting like this will mean the caller
-        // needs to re-execute the get.
-        Err(node),
+      Some(&Complete::Return(ref value)) => Ok(self.lift_read_link(value)),
+      _ => Err(node),
     }
   }
 
@@ -245,12 +257,21 @@ impl<'g, 't> FSContext<Node> for StepContext<'g, 't> {
         Variants::default(),
       );
     match self.get(&node) {
-      Some(&Complete::Return(ref value)) =>
-        Ok(self.lift_stat(value)),
-      _ =>
-        // TODO: This isn't great... punting like this will mean the caller
-        // needs to re-execute the get.
-        Err(node),
+      Some(&Complete::Return(ref value)) => Ok(self.lift_stat(value)),
+      _ => Err(node),
+    }
+  }
+
+  fn scandir(&self, dir: &Dir) -> Result<Vec<Stat>, Node> {
+    let node =
+      Node::create(
+        Selector::select(self.type_directory_listing().clone()),
+        self.key_for(&self.store_dir(dir)),
+        Variants::default(),
+      );
+    match self.get(&node) {
+      Some(&Complete::Return(ref value)) => Ok(self.lift_stats(value)),
+      _ => Err(node),
     }
   }
 }
@@ -639,23 +660,11 @@ impl Step for Snapshot {
     while let Some(path_glob) = stack.pop() {
       // Compute matching PathStats for each PathGlob.
       let path_stats =
-        match path_glob {
-          PathGlob::Root =>
-            vec![
-              PathGlob::root_stat()
-            ],
-          w @ PathGlob::Wildcard { .. } => {
-            let directory_listing = panic!("TODO: implement DirectoryListing.");
-            // TODO: Need to expand any unexpanded Link stats here: the contents
-            // of a Snapshot must always be only Dirs and Files.
-            panic!("TODO: implement filtering of a DirectoryListing.")
-          },
-          dw @ PathGlob::DirWildcard { .. } => {
-            // Compute a DirectoryListing, and filter to Dirs (also, recursively expand symlinks
-            // to determine whether they represent Dirs).
-            let dir_list = panic!("TODO: implement DirectoryListing.");
-            // expand dirs
-            panic!("TODO: implement filtering and expanding a DirectoryListing to Dirs.")
+        match context.apply_path_glob(&path_glob) {
+          Ok(path_stats) => path_stats,
+          Err(nodes) => {
+            dependencies.extend(nodes);
+            continue;
           },
         };
       // Then extend.
@@ -682,11 +691,31 @@ impl Step for Snapshot {
     );
 
     // If the walk has finished, Snapshot and store the matched paths.
-    if dependencies.is_empty() {
-      State::Complete(Complete::Return(context.store_snapshot(panic!("TODO: Create a snapshot!"))))
-    } else {
-      State::Waiting(dependencies)
+    if !dependencies.is_empty() {
+      return State::Complete(Complete::Return(context.store_snapshot(panic!("TODO: Create a snapshot!"))));
     }
+
+    // Validate that dependency Nodes haven't failed.
+    // NB: This is because the dependency gathering above doesn't actually inspect failed states.
+    for d in &dependencies {
+      match context.get(&d) {
+        Some(&Complete::Noop(..)) =>
+          return State::Complete(
+            context.throw(
+              format!(
+                "No source of explicit dep {}",
+                d.format(&context.tasks.externs)
+              )
+            )
+          ),
+        Some(&Complete::Throw(ref msg)) =>
+          return State::Complete(Complete::Throw(context.clone_val(msg))),
+        _ => {},
+      }
+    }
+
+    // Then declare them.
+    State::Waiting(dependencies)
   }
 }
 
@@ -759,7 +788,7 @@ impl Node {
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
       &Node::Task(ref t) => format!("Task({})", externs.id_to_str(t.selector.func.0)),
-      &Node::Snapshot(ref t) => "Snapshot".to_string(),
+      &Node::Snapshot(_) => "Snapshot".to_string(),
     }
   }
 
@@ -811,13 +840,6 @@ impl Node {
           subject: subject,
           variants: variants,
           selector: s,
-        }),
-      Selector::Task(t) =>
-        Node::Task(Task {
-          subject: subject,
-          product: t.product,
-          variants: variants,
-          selector: t,
         }),
     }
   }

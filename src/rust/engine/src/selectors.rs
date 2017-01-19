@@ -46,7 +46,6 @@ pub enum Selector {
   SelectDependencies(SelectDependencies),
   SelectProjection(SelectProjection),
   SelectLiteral(SelectLiteral),
-  Task(Task),
 }
 
 impl Selector {
@@ -57,15 +56,5 @@ impl Selector {
         variant_key: None,
       }
     )
-  }
-
-  pub fn product(&self) -> &TypeConstraint {
-    match self {
-      &Selector::Select(ref s) => &s.product,
-      &Selector::SelectLiteral(ref s) => &s.product,
-      &Selector::SelectDependencies(ref s) => &s.product,
-      &Selector::SelectProjection(ref s) => &s.product,
-      &Selector::Task(ref t) => &t.product,
-    }
   }
 }

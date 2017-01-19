@@ -192,9 +192,14 @@ impl PathGlobs {
   }
 }
 
-pub trait FSContext<Incomplete> {
-  fn read_link(&self, link: &Link) -> Result<PathBuf, Incomplete>;
-  fn stat(&self, path: &Path) -> Result<Stat, Incomplete>;
+/**
+ * A context for filesystem operations parameterized on a continuation type 'K'. An operation
+ * resulting in K indicates that more information is needed to complete the operation.
+ */
+pub trait FSContext<K> {
+  fn read_link(&self, link: &Link) -> Result<PathBuf, K>;
+  fn stat(&self, path: &Path) -> Result<Stat, K>;
+  fn scandir(&self, dir: &Dir) -> Result<Vec<Stat>, K>;
 
   /**
    * Recursively expand a symlink to an underlying non-link Stat.
@@ -212,14 +217,8 @@ pub trait FSContext<Incomplete> {
         );
       }
 
-      // Read the link.
-      let path =
-        match context.read_link(&link) {
-          Result::Ok(path) => path,
-          Result::Err(t) => return Result::Err(t),
-        };
-      // Stat the destination.
-      match context.stat(path.as_path()) {
+      // Read the link and stat the destination.
+      match context.stat(context.read_link(&link)?.as_path()) {
         Ok(Stat::Link(l)) => {
           // The link pointed to another link. Continue.
           link = l;
@@ -231,6 +230,30 @@ pub trait FSContext<Incomplete> {
         Err(t) =>
           return Err(t),
       };
+    }
+  }
+
+  /**
+   * Apply a PathGlob, returning either PathStats on success (which may not be distinct) or
+   * continuations if more information is needed.
+   */
+  fn apply_path_glob(&self, path_glob: &PathGlob) -> Result<Vec<PathStat>, Vec<K>> {
+    match path_glob {
+      &PathGlob::Root =>
+        Ok(vec![PathGlob::root_stat()]),
+      &PathGlob::Wildcard { ref canonical_dir, .. } => {
+        let directory_listing = self.scandir(canonical_dir).map_err(|k| vec![k])?;
+        // TODO: Need to expand any unexpanded Link stats here: the contents
+        // of a Snapshot must always be only Dirs and Files.
+        panic!("TODO: implement filtering of a DirectoryListing.")
+      },
+      &PathGlob::DirWildcard { .. } => {
+        // Compute a DirectoryListing, and filter to Dirs (also, recursively expand symlinks
+        // to determine whether they represent Dirs).
+        let dir_list = panic!("TODO: implement DirectoryListing.");
+        // expand dirs
+        panic!("TODO: implement filtering and expanding a DirectoryListing to Dirs.")
+      },
     }
   }
 }
