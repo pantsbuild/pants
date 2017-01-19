@@ -9,6 +9,7 @@ mod selectors;
 mod tasks;
 
 extern crate fnv;
+extern crate globset;
 #[macro_use]
 extern crate lazy_static;
 
