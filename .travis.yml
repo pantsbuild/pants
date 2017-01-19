@@ -371,9 +371,13 @@ deploy:
   key: ${BINTRAY_KEY}
   dry-run: false
   on:
-    # NB: Pull requests do not trigger deploys, so this setting means we always build a
-    # native-engine binary for master and each of our long-term branches.
-    all_branches: true
+    # NB: Deploys are always tagged as part of the deploy process encoded in
+    # `build-support/bin/release.sh`, so this ensures we release an appropriate native engine binary
+    # for all releases. Unfortunately, CI only runs after the release tag hits master and so there
+    # will be a lag of roughly 30 minutes until a pypi release has its paired native engine version
+    # available on bintray for OSX and linux. This trade-off (vs releasing for all branch builds),
+    # helps us use bintray in a friendly way.
+    tags: true
 
 # We accept the default travis-ci email author+committer notification
 # for now which is enabled even with no `notifications` config.
