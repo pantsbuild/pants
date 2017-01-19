@@ -9,6 +9,4 @@ crate-type = ["dylib"]
 [dependencies]
 fnv = "1.0.3"
 lazy_static = "0.2.2"
-# TODO: When it is time to port ProjectTree to rust, consider switching
-# to https://github.com/BurntSushi/ripgrep/tree/master/ignore
 globset = "0.1.3"

@@ -1,4 +1,4 @@
-use std::ffi::{OsString, OsStr};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use globset::Glob;
@@ -35,8 +35,6 @@ enum LinkExpansion {
   File(File),
   // Successfully resolved to a Dir.
   Dir(Dir),
-  // Failed to resolve due to a Loop.
-  Loop(String),
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -45,6 +43,15 @@ pub struct PathStat {
   pub path: PathBuf,
   // The canonical Stat that underlies the Path.
   pub stat: Stat,
+}
+
+impl PathStat {
+  fn new(path: PathBuf, stat: Stat) -> PathStat {
+    PathStat {
+      path: path,
+      stat: stat,
+    }
+  }
 }
 
 #[derive(Clone)]
@@ -93,8 +100,6 @@ pub struct PathGlobs(pub Vec<PathGlob>);
 
 const SINGLE_STAR: &'static str ="*";
 const DOUBLE_STAR: &'static str = "**";
-
-const MAX_LINK_EXPANSION_ATTEMPTS: usize = 64;
 
 fn join(components: &[&OsStr]) -> PathBuf {
   let mut out = PathBuf::new();
@@ -226,20 +231,13 @@ pub trait FSContext<K> {
 
   /**
    * Recursively expand a symlink to an underlying non-link Stat.
+   *
+   * TODO: Should handle symlink loops, but probably not here... this will not
+   * detect a loop that traverses multiple directories.
    */
   fn expand_link(&self, link: &Link) -> Result<LinkExpansion, K> {
     let mut link: Link = (*link).clone();
-    let mut attempts = 0;
     loop {
-      attempts += 1;
-      if attempts > MAX_LINK_EXPANSION_ATTEMPTS {
-        return Ok(
-          LinkExpansion::Loop(
-            format!("Encountered a symlink loop while expanding {:?}", link)
-          )
-        );
-      }
-
       // Read the link and stat the destination.
       match self.stat(self.read_link(&link)?.as_path()) {
         Ok(Stat::Link(l)) => {
@@ -257,25 +255,65 @@ pub trait FSContext<K> {
   }
 
   /**
-   * Apply a PathGlob, returning either PathStats on success (which may not be distinct) or
+   * Canonicalize the Stat for the given PathStat to an underlying File or Dir. May result
+   * in None if the PathStat represents a Link containing a cycle.
+   */
+  fn canonicalize(&self, path_stat: PathStat) -> Result<PathStat, K> {
+    let expansion =
+      match path_stat.stat {
+        Stat::Link(ref l) =>
+          self.expand_link(&l)?,
+        _ =>
+          return Ok(path_stat),
+      };
+    let canonical_stat =
+      match expansion {
+        LinkExpansion::Dir(d) => Stat::Dir(d),
+        LinkExpansion::File(f) => Stat::File(f),
+      };
+    Ok(PathStat::new(path_stat.path, canonical_stat))
+  }
+
+  /**
+   * Apply a PathGlob, returning either PathStats on success or
    * continuations if more information is needed.
    */
   fn apply_path_glob(&self, path_glob: &PathGlob) -> Result<Vec<PathStat>, Vec<K>> {
     match path_glob {
       &PathGlob::Root =>
         Ok(vec![PathGlob::root_stat()]),
-      &PathGlob::Wildcard { ref canonical_dir, .. } => {
-        // List the directory, and match any relevant Stats.
-        let matched_stats =
-          self.scandir(canonical_dir).map_err(|k| vec![k])?.iter()
-            .filter(|s| {
-              s.path()
+      &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } => {
+        // List the directory, match any relevant Stats, and join them into PathStats.
+        let glob_matcher = wildcard.compile_matcher();
+        let matched =
+          self.scandir(canonical_dir).map_err(|k| vec![k])?.into_iter()
+            .filter_map(|stat| {
+              let p = stat.path().clone();
+              p.file_name().and_then(|file_name| {
+                if glob_matcher.is_match(file_name) {
+                  let mut path = symbolic_path.clone();
+                  path.push(file_name);
+                  Some(PathStat::new(path, stat))
+                } else {
+                  None
+                }
+              })
             });
-        // Expand the Stats to PathStats.
 
-        // TODO: Need to expand any unexpanded Link stats here: the contents
-        // of a Snapshot must always be only Dirs and Files.
-        panic!("TODO: implement filtering of a DirectoryListing.")
+        // Batch-canonicalize matched PathStats.
+        let mut path_stats = Vec::new();
+        let mut continuations = Vec::new();
+        for path_stat in matched {
+          match self.canonicalize(path_stat) {
+            Ok(ps) => path_stats.push(ps),
+            Err(k) => continuations.push(k),
+          }
+        }
+        if continuations.is_empty() {
+          Ok(path_stats)
+        } else {
+          Err(continuations)
+        }
       },
       &PathGlob::DirWildcard { .. } => {
         // Compute a DirectoryListing, and filter to Dirs (also, recursively expand symlinks

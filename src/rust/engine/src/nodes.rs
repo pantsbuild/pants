@@ -7,7 +7,7 @@ use externs::Externs;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
-use fs::{Dir, FSContext, PathGlob, PathGlobs, PathStat, Stat, Link};
+use fs::{Dir, FSContext, PathGlobs, PathStat, Stat, Link};
 
 
 #[derive(Debug)]
