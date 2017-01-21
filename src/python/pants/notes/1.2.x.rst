@@ -4,6 +4,11 @@
 This document describes releases leading up to the ``1.2.x`` ``stable`` series.
 
 
+1.2.1 (01/20/2017)
+------------------
+
+Promotion of the 1.2.1rc0 release to a stable release, with no changes.
+
 1.2.1rc0 (12/19/2016)
 ---------------------
 
