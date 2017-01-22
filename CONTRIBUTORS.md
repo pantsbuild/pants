@@ -1,4 +1,4 @@
-Created by running `./build-support/bin/contributors.sh`.
+Created by running `build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
 + Alan Paulin
@@ -73,6 +73,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Justin Trobec
 + Karin Lundberg
 + Ken Kawamoto
++ Kevin Oliver
 + Kevin Sweeney
 + Kris Wilson
 + Kushal Dave
