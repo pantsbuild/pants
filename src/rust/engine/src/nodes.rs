@@ -680,16 +680,6 @@ impl Step for Snapshot {
       path_globs_set.insert(path_glob);
     }
 
-    assert!(
-      outputs.iter().all(|(ps, _)| {
-        match ps.stat {
-          Stat::Dir(_) | Stat::File(_) => true,
-          _ => false,
-        }
-      }),
-      "A Snapshot must only contain Dirs and Files: never Links."
-    );
-
     // If the walk has finished, Snapshot and store the matched paths.
     if !dependencies.is_empty() {
       return State::Complete(Complete::Return(context.store_snapshot(panic!("TODO: Create a snapshot!"))));

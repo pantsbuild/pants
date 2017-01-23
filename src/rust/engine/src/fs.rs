@@ -32,7 +32,7 @@ pub struct Dir(pub PathBuf);
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct File(pub PathBuf);
 
-enum LinkExpansion {
+pub enum LinkExpansion {
   // Successfully resolved to a File.
   File(File),
   // Successfully resolved to a Dir.
@@ -40,16 +40,31 @@ enum LinkExpansion {
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub struct PathStat {
-  // The symbolic name of some filesystem Path, which is context specific.
-  pub path: PathBuf,
-  // The canonical Stat that underlies the Path.
-  pub stat: Stat,
+pub enum PathStat {
+  Dir {
+    // The symbolic name of some filesystem Path, which is context specific.
+    path: PathBuf,
+    // The canonical Stat that underlies the Path.
+    stat: Dir,
+  },
+  File {
+    // The symbolic name of some filesystem Path, which is context specific.
+    path: PathBuf,
+    // The canonical Stat that underlies the Path.
+    stat: File,
+  }
 }
 
 impl PathStat {
-  fn new(path: PathBuf, stat: Stat) -> PathStat {
-    PathStat {
+  fn dir(path: PathBuf, stat: Dir) -> PathStat {
+    PathStat::Dir {
+      path: path,
+      stat: stat,
+    }
+  }
+
+  fn file(path: PathBuf, stat: File) -> PathStat {
+    PathStat::File {
       path: path,
       stat: stat,
     }
@@ -99,10 +114,7 @@ impl hash::Hash for PathGlob {
 
 impl PathGlob {
   pub fn root_stat() -> PathStat {
-    PathStat {
-      path: PathBuf::new(),
-      stat: Stat::Dir(Dir(PathBuf::new())),
-    }
+    PathStat::dir(PathBuf::new(), Dir(PathBuf::new()))
   }
 
   fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Glob) -> PathGlob {
@@ -283,20 +295,11 @@ pub trait FSContext<K> {
    * Canonicalize the Stat for the given PathStat to an underlying File or Dir. May result
    * in None if the PathStat represents a Link containing a cycle.
    */
-  fn canonicalize(&self, path_stat: PathStat) -> Result<PathStat, K> {
-    let expansion =
-      match path_stat.stat {
-        Stat::Link(ref l) =>
-          self.expand_link(&l)?,
-        _ =>
-          return Ok(path_stat),
-      };
-    let canonical_stat =
-      match expansion {
-        LinkExpansion::Dir(d) => Stat::Dir(d),
-        LinkExpansion::File(f) => Stat::File(f),
-      };
-    Ok(PathStat::new(path_stat.path, canonical_stat))
+  fn canonicalize(&self, path: &Path, stat: &Link) -> Result<PathStat, K> {
+    match self.expand_link(stat)? {
+      LinkExpansion::Dir(d) => Ok(PathStat::dir(path.to_owned(), d)),
+      LinkExpansion::File(f) => Ok(PathStat::file(path.to_owned(), f)),
+    }
   }
 
   fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Glob) -> Result<Vec<PathStat>, Vec<K>> {
@@ -304,28 +307,29 @@ pub trait FSContext<K> {
     let glob_matcher = wildcard.compile_matcher();
     let matched =
       self.scandir(canonical_dir).map_err(|k| vec![k])?.into_iter()
-        .filter_map(|stat| {
-          let p = stat.path().clone();
-          p.file_name().and_then(|file_name| {
-            if glob_matcher.is_match(file_name) {
-              let mut path = symbolic_path.to_owned();
-              path.push(file_name);
-              Some(PathStat::new(path, stat))
-            } else {
-              None
-            }
-          })
+        .filter(|stat| {
+          // Match relevant filenames.
+          stat.path().file_name().map(|file_name| glob_matcher.is_match(file_name)).unwrap_or(false)
         });
 
     // Batch-canonicalize matched PathStats.
     let mut path_stats = Vec::new();
     let mut continuations = Vec::new();
-    for path_stat in matched {
-      match self.canonicalize(path_stat) {
-        Ok(ps) => path_stats.push(ps),
-        Err(k) => continuations.push(k),
-      }
+    for stat in matched {
+      match stat {
+        Stat::Link(l) =>
+          match self.canonicalize(symbolic_path, &l) {
+            Ok(ps) => path_stats.push(ps),
+            Err(k) => continuations.push(k),
+          },
+        Stat::Dir(d) =>
+          path_stats.push(PathStat::dir(symbolic_path.to_owned(), d)),
+        Stat::File(f) =>
+          path_stats.push(PathStat::file(symbolic_path.to_owned(), f)),
+      };
     }
+
+    // If there were no continuations, all PathStats were completely expanded.
     if continuations.is_empty() {
       Ok(path_stats)
     } else {
@@ -353,8 +357,8 @@ pub trait FSContext<K> {
             path_stats.into_iter()
               .filter_map(|ps| {
                 match ps {
-                  PathStat { ref path, stat: Stat::Dir(ref d) } =>
-                    Some(PathGlobs::expand(d, path.as_path(), remainder)),
+                  PathStat::Dir { ref path, ref stat } =>
+                    Some(PathGlobs::expand(stat, path.as_path(), remainder)),
                   _ => None,
                 }
               })
