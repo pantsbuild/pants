@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::hash;
 
 use globset::Glob;
 use globset;
@@ -54,7 +55,7 @@ impl PathStat {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum PathGlob {
   Root,
   Wildcard {
@@ -66,8 +67,33 @@ pub enum PathGlob {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Glob,
-    remainder: PathBuf,
+    remainder: Vec<Glob>,
   },
+}
+
+// TODO: `Glob` does not implement Hash.
+//   see: https://github.com/BurntSushi/ripgrep/pull/339
+impl hash::Hash for PathGlob {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    let (cd, sp, w) =
+      match self {
+        &PathGlob::Root => {
+          0.hash(state);
+          return;
+        },
+        &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } =>
+          (canonical_dir, symbolic_path, wildcard),
+        &PathGlob::DirWildcard { ref canonical_dir, ref symbolic_path, ref wildcard, ref remainder } => {
+          for r in remainder {
+            r.glob().hash(state);
+          }
+          (canonical_dir, symbolic_path, wildcard)
+        }
+      };
+    cd.hash(state);
+    sp.hash(state);
+    w.glob().hash(state);
+  }
 }
 
 impl PathGlob {
@@ -86,7 +112,7 @@ impl PathGlob {
     }
   }
 
-  fn dir_wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Glob, remainder: PathBuf) -> PathGlob {
+  fn dir_wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Glob, remainder: Vec<Glob>) -> PathGlob {
     PathGlob::DirWildcard {
       canonical_dir: canonical_dir,
       symbolic_path: symbolic_path,
@@ -98,15 +124,11 @@ impl PathGlob {
 
 pub struct PathGlobs(pub Vec<PathGlob>);
 
-const SINGLE_STAR: &'static str ="*";
-const DOUBLE_STAR: &'static str = "**";
-
-fn join(components: &[&OsStr]) -> PathBuf {
-  let mut out = PathBuf::new();
-  for component in components {
-    out.push(component);
-  }
-  out
+lazy_static! {
+  static ref SINGLE_DOT_GLOB: Glob = Glob::new(".").unwrap();
+  static ref SINGLE_STAR_GLOB: Glob = Glob::new("*").unwrap();
+  static ref DOUBLE_STAR: &'static str = "**";
+  static ref DOUBLE_STAR_GLOB: Glob = Glob::new("**").unwrap();
 }
 
 impl PathGlobs {
@@ -123,48 +145,54 @@ impl PathGlobs {
   /**
    * Eliminate consecutive '**'s to avoid repetitive traversing.
    */
-  fn normalize_doublestar(parts: &mut Vec<&OsStr>) {
+  fn split_path(filespec: &String) -> Vec<&OsStr> {
+    let mut parts: Vec<&OsStr> = Path::new(filespec).iter().collect();
     let mut idx = 1;
-    while idx < parts.len() && DOUBLE_STAR == parts[idx] {
+    while idx < parts.len() && *DOUBLE_STAR == parts[idx] {
       idx += 1;
     }
     parts.drain(..idx);
+    parts
   }
 
   /**
    * Given a filespec String, parse it to a series of PathGlob objects.
    */
   fn parse(canonical_dir: &Dir, symbolic_path: &Path, filespec: &String) -> Result<Vec<PathGlob>, globset::Error> {
-    // NB: Because the filespec is a String input, calls to `to_str_lossy` below are never lossy; the
-    // use of `Path` is strictly for os-independent Path parsing.
-    let lossy_glob = |s: &OsStr| { Glob::new(&s.to_string_lossy()) };
+    let mut parts = Vec::new();
+    for part in PathGlobs::split_path(filespec) {
+      // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
+      // use of `Path` is strictly for os-independent Path parsing.
+      parts.push(Glob::new(&part.to_string_lossy())?);
+    }
+    Ok(PathGlobs::expand(canonical_dir, symbolic_path, &parts))
+  }
 
-    let mut parts: Vec<&OsStr> = Path::new(filespec).iter().collect();
-    PathGlobs::normalize_doublestar(&mut parts);
-
-    if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && parts[0] == "." {
+  /**
+   * Given a filespec String, parse it to a series of PathGlob objects.
+   */
+  fn expand(canonical_dir: &Dir, symbolic_path: &Path, parts: &Vec<Glob>) -> Vec<PathGlob> {
+    if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && *SINGLE_DOT_GLOB == parts[0] {
       // A request for the root path.
-      Ok(vec![PathGlob::Root])
-    } else if DOUBLE_STAR == parts[0] {
+      vec![PathGlob::Root]
+    } else if *DOUBLE_STAR_GLOB == parts[0] {
       if parts.len() == 1 {
         // Per https://git-scm.com/docs/gitignore:
         //  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
         //   directory "abc", relative to the location of the .gitignore file, with infinite depth."
-        return Ok(
-          vec![
-            PathGlob::dir_wildcard(
-              canonical_dir.clone(),
-              symbolic_path.to_owned(),
-              Glob::new(SINGLE_STAR)?,
-              PathBuf::from(DOUBLE_STAR)
-            ),
-            PathGlob::wildcard(
-              canonical_dir.clone(),
-              symbolic_path.to_owned(),
-              Glob::new(SINGLE_STAR)?
-            ),
-          ]
-        );
+        return vec![
+          PathGlob::dir_wildcard(
+            canonical_dir.clone(),
+            symbolic_path.to_owned(),
+            SINGLE_STAR_GLOB.clone(),
+            vec![DOUBLE_STAR_GLOB.clone()]
+          ),
+          PathGlob::wildcard(
+            canonical_dir.clone(),
+            symbolic_path.to_owned(),
+            SINGLE_STAR_GLOB.clone()
+          ),
+        ];
       }
 
       // There is a double-wildcard in a dirname of the path: double wildcards are recursive,
@@ -174,48 +202,44 @@ impl PathGlobs {
         PathGlob::dir_wildcard(
           canonical_dir.clone(),
           symbolic_path.to_owned(),
-          Glob::new(SINGLE_STAR)?,
-          join(&parts[0..])
+          SINGLE_STAR_GLOB.clone(),
+          parts[0..].to_vec()
         );
       let pathglob_no_doublestar =
         if parts.len() == 2 {
           PathGlob::wildcard(
             canonical_dir.clone(),
             symbolic_path.to_owned(),
-            lossy_glob(parts[1])?
+            parts[1].clone()
           )
         } else {
           PathGlob::dir_wildcard(
             canonical_dir.clone(),
             symbolic_path.to_owned(),
-            lossy_glob(parts[1])?,
-            join(&parts[2..])
+            parts[1].clone(),
+            parts[2..].to_vec()
           )
         };
-      Ok(vec![pathglob_with_doublestar, pathglob_no_doublestar])
+      vec![pathglob_with_doublestar, pathglob_no_doublestar]
     } else if parts.len() == 1 {
       // This is the path basename.
-      Ok(
-        vec![
-          PathGlob::wildcard(
-            canonical_dir.clone(),
-            symbolic_path.to_owned(),
-            lossy_glob(parts[0])?
-          )
-        ]
-      )
+      vec![
+        PathGlob::wildcard(
+          canonical_dir.clone(),
+          symbolic_path.to_owned(),
+          parts[0].clone()
+        )
+      ]
     } else {
       // This is a path dirname.
-      Ok(
-        vec![
-          PathGlob::dir_wildcard(
-            canonical_dir.clone(),
-            symbolic_path.to_owned(),
-            lossy_glob(parts[0])?,
-            join(&parts[1..])
-          )
-        ]
-      )
+      vec![
+        PathGlob::dir_wildcard(
+          canonical_dir.clone(),
+          symbolic_path.to_owned(),
+          parts[0].clone(),
+          parts[1..].to_vec()
+        )
+      ]
     }
   }
 }
@@ -331,7 +355,7 @@ pub trait FSContext<K> {
               .filter_map(|ps| {
                 match ps {
                   PathStat { ref path, stat: Stat::Dir(ref d) } =>
-                    Some(PathGlobs::parse(d, path.as_path(), remainder)),
+                    Some(PathGlobs::expand(d, path.as_path(), remainder)),
                   _ => None,
                 }
               })

@@ -9,7 +9,7 @@ use externs::Externs;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
-use fs::{Dir, FSContext, PathGlobs, PathStat, Stat, Link};
+use fs::{Dir, FSContext, PathGlob, PathGlobs, PathStat, Stat, Link};
 
 
 #[derive(Debug)]
@@ -656,23 +656,28 @@ impl Step for Snapshot {
 
     // Recursively expand PathGlobs into PathStats, building a set of relevant Node dependencies.
     let mut dependencies = Vec::new();
-    let mut stack = path_globs.0.clone();
+    let mut path_globs_stack = path_globs.0.clone();
+    let mut path_globs_set: HashSet<PathGlob, FNV> = HashSet::default();
     let mut outputs: OrderMap<PathStat, (), FNV> = OrderMap::default();
-    while let Some(path_glob) = stack.pop() {
-      // Compute matching PathStats for each PathGlob.
-      // TODO
-      //let (path_stats, additional_path_globs) =
-      let path_stats =
-        match context.apply_path_glob(&path_glob) {
-          Ok(path_stats) => path_stats,
-          Err(nodes) => {
-            dependencies.extend(nodes);
-            continue;
-          },
-        };
+    while let Some(path_glob) = path_globs_stack.pop() {
+      if !path_globs_set.contains(&path_glob) {
+        continue;
+      }
 
-      // Then extend.
-      outputs.extend(path_stats.into_iter().map(|k| (k, ())));
+      // Compute matching PathStats and additional PathGlobs for each PathGlob.
+      match context.apply_path_glob(&path_glob) {
+        Ok((path_stats, path_globs)) => {
+          outputs.extend(path_stats.into_iter().map(|k| (k, ())));
+          path_globs_stack.extend(path_globs);
+        },
+        Err(nodes) => {
+          dependencies.extend(nodes);
+          continue;
+        },
+      };
+
+      // Ensure that we do not re-visit this PathGlob.
+      path_globs_set.insert(path_glob);
     }
 
     assert!(
