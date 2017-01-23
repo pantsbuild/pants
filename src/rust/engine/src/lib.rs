@@ -13,7 +13,9 @@ extern crate globset;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
+extern crate sha2;
 extern crate tar;
+extern crate tempdir;
 
 use std::ffi::CStr;
 use std::mem;

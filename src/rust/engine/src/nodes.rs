@@ -10,6 +10,7 @@ use selectors::Selector;
 use selectors;
 use tasks::Tasks;
 use fs::{Dir, FSContext, PathGlob, PathGlobs, PathStat, Stat, Link};
+use fs;
 
 
 #[derive(Debug)]
@@ -177,6 +178,14 @@ impl<'g, 't> StepContext<'g, 't> {
     self.tasks.externs.project_multi(item, field)
   }
 
+  fn snapshot_root(&self) -> &Dir {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn build_root(&self) -> &Dir {
+    panic!("TODO: Not implemented!");
+  }
+
   fn type_path_globs(&self) -> &TypeConstraint {
     panic!("TODO: Not implemented!");
   }
@@ -225,7 +234,7 @@ impl<'g, 't> StepContext<'g, 't> {
     panic!("TODO: Not implemented!");
   }
 
-  fn store_snapshot(&self, item: &Snapshot) -> Value {
+  fn store_snapshot(&self, item: &fs::Snapshot) -> Value {
     panic!("TODO: Not implemented!");
   }
 
@@ -682,7 +691,18 @@ impl Step for Snapshot {
 
     // If the walk has finished, Snapshot and store the matched paths.
     if !dependencies.is_empty() {
-      return State::Complete(Complete::Return(context.store_snapshot(panic!("TODO: Create a snapshot!"))));
+      let snapshot_res =
+        fs::Snapshot::create(
+          context.snapshot_root(),
+          context.build_root(),
+          outputs.into_iter().map(|(k, _)| k).collect()
+        );
+      return match snapshot_res {
+        Ok(snapshot) =>
+          State::Complete(Complete::Return(context.store_snapshot(&snapshot))),
+        Err(msg) =>
+          State::Complete(context.throw(msg)),
+      };
     }
 
     // Validate that dependency Nodes haven't failed.
@@ -693,7 +713,7 @@ impl Step for Snapshot {
           return State::Complete(
             context.throw(
               format!(
-                "No source of explicit dep {}",
+                "No source of snapshot dep: {}",
                 d.format(&context.tasks.externs)
               )
             )

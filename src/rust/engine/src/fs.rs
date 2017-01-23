@@ -1,10 +1,14 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::hash;
+use std::{hash, io};
+use std::fmt::Write;
+use std;
 
 use globset::Glob;
 use globset;
+use sha2::{Sha256, Digest};
 use tar;
+use tempdir::TempDir;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -39,7 +43,7 @@ pub enum LinkExpansion {
   Dir(Dir),
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathStat {
   Dir {
     // The symbolic name of some filesystem Path, which is context specific.
@@ -370,15 +374,68 @@ pub trait FSContext<K> {
   }
 }
 
-struct Snapshot {
+pub struct Snapshot {
   fingerprint: [u8;32],
   paths: Vec<PathStat>,
 }
 
-/*
 impl Snapshot {
-  fn create(paths: Vec<PathStat>) -> Snapshot {
-    
+  fn append<W: io::Write>(tar_builder: &mut tar::Builder<W>, path: &PathStat) -> Result<(), String> {
+    panic!("TODO: implement path appending");
+  }
+
+  fn fingerprint(path: &Path) -> Result<[u8;32], String> {
+    let mut hasher = Sha256::new();
+
+    // TODO
+    hasher.input(panic!("TODO: implement file walking"));
+
+    let mut fingerprint: [u8;32] = [0;32];
+    fingerprint.clone_from_slice(&hasher.result()[0..32]);
+    Ok(fingerprint)
+  }
+
+  fn hex(fingerprint: &[u8;32]) -> String {
+    let mut s = String::new();
+    for &byte in fingerprint {
+      write!(&mut s, "{:X}", byte).unwrap();
+    }
+    s
+  }
+
+  fn create_tar(dest: &Path, paths: &Vec<PathStat>) -> Result<(), String> {
+    let mut temp_file =
+      std::fs::File::create(dest)
+        .map_err(|e| format!("Failed to create tempfile: {:?}", e))?;
+    let mut tar_builder = tar::Builder::new(temp_file);
+    for path in paths {
+      Snapshot::append(&mut tar_builder, path)
+        .map_err(|e| format!("Failed to snapshot {:?}: {:?}", path, e))?;
+    }
+    // Finish the tar file, allowing the underlying file to be closed.
+    tar_builder.finish()
+      .map_err(|e| format!("Failed to finalize snapshot tar: {:?}", e))?;
+    Ok(())
+  }
+
+  pub fn create(snapshot_root: &Dir, build_root: &Dir, paths: Vec<PathStat>) -> Result<Snapshot, String> {
+    // Write the tar (with timestamps cleared) to a temporary file.
+    let temp_dir =
+      TempDir::new_in(snapshot_root.0.as_path(), ".create")
+        .map_err(|e| format!("Failed to create tempdir: {:?}", e))?;
+    let temp_path = temp_dir.path().join("snapshot.tar");
+    Snapshot::create_tar(temp_path.as_path(), &paths)?;
+
+    // Fingerprint the tar file and then rename it to create the Snapshot.
+    let fingerprint = Snapshot::fingerprint(temp_path.as_path())?;
+    let final_path = snapshot_root.0.join(format!("{:}.tar", Snapshot::hex(&fingerprint)));
+    std::fs::rename(temp_path, final_path)
+      .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
+    Ok(
+      Snapshot {
+        fingerprint: fingerprint,
+        paths: paths,
+      }
+    )
   }
 }
-*/

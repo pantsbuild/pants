@@ -8,7 +8,9 @@ crate-type = ["dylib"]
 
 [dependencies]
 fnv = "1.0.3"
-lazy_static = "0.2.2"
 globset = "0.1.3"
+lazy_static = "0.2.2"
 ordermap = "0.2.7"
+sha2 = "0.4"
 tar = "0.4.10"
+tempdir = "0.3"
