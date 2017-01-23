@@ -308,23 +308,37 @@ pub trait FSContext<K> {
     }
   }
 
+
+
   /**
-   * Apply a PathGlob, returning either PathStats on success or
-   * continuations if more information is needed.
+   * Apply a PathGlob, returning either PathStats and PathGlobs on success or continuations
+   * if more information is needed.
    */
-  fn apply_path_glob(&self, path_glob: &PathGlob) -> Result<Vec<PathStat>, Vec<K>> {
+  fn apply_path_glob(&self, path_glob: &PathGlob) -> Result<(Vec<PathStat>, Vec<PathGlob>), Vec<K>> {
     match path_glob {
       &PathGlob::Root =>
         // Always results in a single PathStat.
-        Ok(vec![PathGlob::root_stat()]),
+        Ok((vec![PathGlob::root_stat()], vec![])),
       &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } =>
-        // Is a filtered directory listing, with no continuation.
-        self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard),
-      &PathGlob::DirWildcard { ref canonical_dir, ref symbolic_path, ref wildcard, ref remainder } => {
-        // Apply directory filtering, and then 
-        let path_stats =
-          self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard);
-      },
+        // Filter directory listing to return PathStats, with no continuation.
+        self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard)
+          .map(|path_stats| (path_stats, vec![])),
+      &PathGlob::DirWildcard { ref canonical_dir, ref symbolic_path, ref wildcard, ref remainder } =>
+        // Filter directory listing and request additional PathGlobs for matched Dirs.
+        self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard)
+          .map(|path_stats| {
+            path_stats.into_iter()
+              .filter_map(|ps| {
+                match ps {
+                  PathStat { ref path, stat: Stat::Dir(ref d) } =>
+                    Some(PathGlobs::parse(d, path.as_path(), remainder)),
+                  _ => None,
+                }
+              })
+              .flat_map(|path_globs| path_globs.into_iter())
+              .collect()
+          })
+          .map(|path_globs| (vec![], path_globs)),
     }
   }
 }
