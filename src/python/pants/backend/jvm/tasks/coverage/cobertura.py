@@ -55,8 +55,7 @@ class Cobertura(Coverage):
     register_jvm_tool(register,
                       'cobertura-run',
                       classpath=[
-                        cobertura_jar(intransitive=True),
-                        slf4j_jar
+                        cobertura_jar(intransitive=True)
                       ])
 
     register_jvm_tool(register, 'cobertura-report', classpath=[cobertura_jar()])
