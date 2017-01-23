@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use ordermap::OrderMap;
+
 use graph::{Entry, Graph};
 use core::{Field, FNV, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
@@ -655,10 +657,11 @@ impl Step for Snapshot {
     // Recursively expand PathGlobs into PathStats, building a set of relevant Node dependencies.
     let mut dependencies = Vec::new();
     let mut stack = path_globs.0.clone();
-    let mut outputs_set: HashSet<PathStat, FNV> = HashSet::default();
-    let mut outputs: Vec<PathStat> = Vec::new();
+    let mut outputs: OrderMap<PathStat, (), FNV> = OrderMap::default();
     while let Some(path_glob) = stack.pop() {
       // Compute matching PathStats for each PathGlob.
+      // TODO
+      //let (path_stats, additional_path_globs) =
       let path_stats =
         match context.apply_path_glob(&path_glob) {
           Ok(path_stats) => path_stats,
@@ -667,21 +670,13 @@ impl Step for Snapshot {
             continue;
           },
         };
+
       // Then extend.
-      outputs.extend(
-        path_stats.into_iter()
-          .filter_map(|ps| {
-            if outputs_set.insert(ps.clone()) {
-              Some(ps)
-            } else {
-              None
-            }
-          })
-      );
+      outputs.extend(path_stats.into_iter().map(|k| (k, ())));
     }
 
     assert!(
-      outputs.iter().all(|ps| {
+      outputs.iter().all(|(ps, _)| {
         match ps.stat {
           Stat::Dir(_) | Stat::File(_) => true,
           _ => false,

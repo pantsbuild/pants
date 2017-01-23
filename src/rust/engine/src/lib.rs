@@ -12,6 +12,7 @@ extern crate fnv;
 extern crate globset;
 #[macro_use]
 extern crate lazy_static;
+extern crate ordermap;
 
 use std::ffi::CStr;
 use std::mem;

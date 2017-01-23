@@ -274,6 +274,40 @@ pub trait FSContext<K> {
     Ok(PathStat::new(path_stat.path, canonical_stat))
   }
 
+  fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Glob) -> Result<Vec<PathStat>, Vec<K>> {
+    // List the directory, match any relevant Stats, and join them into PathStats.
+    let glob_matcher = wildcard.compile_matcher();
+    let matched =
+      self.scandir(canonical_dir).map_err(|k| vec![k])?.into_iter()
+        .filter_map(|stat| {
+          let p = stat.path().clone();
+          p.file_name().and_then(|file_name| {
+            if glob_matcher.is_match(file_name) {
+              let mut path = symbolic_path.to_owned();
+              path.push(file_name);
+              Some(PathStat::new(path, stat))
+            } else {
+              None
+            }
+          })
+        });
+
+    // Batch-canonicalize matched PathStats.
+    let mut path_stats = Vec::new();
+    let mut continuations = Vec::new();
+    for path_stat in matched {
+      match self.canonicalize(path_stat) {
+        Ok(ps) => path_stats.push(ps),
+        Err(k) => continuations.push(k),
+      }
+    }
+    if continuations.is_empty() {
+      Ok(path_stats)
+    } else {
+      Err(continuations)
+    }
+  }
+
   /**
    * Apply a PathGlob, returning either PathStats on success or
    * continuations if more information is needed.
@@ -281,46 +315,15 @@ pub trait FSContext<K> {
   fn apply_path_glob(&self, path_glob: &PathGlob) -> Result<Vec<PathStat>, Vec<K>> {
     match path_glob {
       &PathGlob::Root =>
+        // Always results in a single PathStat.
         Ok(vec![PathGlob::root_stat()]),
-      &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } => {
-        // List the directory, match any relevant Stats, and join them into PathStats.
-        let glob_matcher = wildcard.compile_matcher();
-        let matched =
-          self.scandir(canonical_dir).map_err(|k| vec![k])?.into_iter()
-            .filter_map(|stat| {
-              let p = stat.path().clone();
-              p.file_name().and_then(|file_name| {
-                if glob_matcher.is_match(file_name) {
-                  let mut path = symbolic_path.clone();
-                  path.push(file_name);
-                  Some(PathStat::new(path, stat))
-                } else {
-                  None
-                }
-              })
-            });
-
-        // Batch-canonicalize matched PathStats.
-        let mut path_stats = Vec::new();
-        let mut continuations = Vec::new();
-        for path_stat in matched {
-          match self.canonicalize(path_stat) {
-            Ok(ps) => path_stats.push(ps),
-            Err(k) => continuations.push(k),
-          }
-        }
-        if continuations.is_empty() {
-          Ok(path_stats)
-        } else {
-          Err(continuations)
-        }
-      },
-      &PathGlob::DirWildcard { .. } => {
-        // Compute a DirectoryListing, and filter to Dirs (also, recursively expand symlinks
-        // to determine whether they represent Dirs).
-        let dir_list = panic!("TODO: implement DirectoryListing.");
-        // expand dirs
-        panic!("TODO: implement filtering and expanding a DirectoryListing to Dirs.")
+      &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } =>
+        // Is a filtered directory listing, with no continuation.
+        self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard),
+      &PathGlob::DirWildcard { ref canonical_dir, ref symbolic_path, ref wildcard, ref remainder } => {
+        // Apply directory filtering, and then 
+        let path_stats =
+          self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard);
       },
     }
   }
