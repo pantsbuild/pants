@@ -71,6 +71,7 @@ python_library(
     'src/python/pants/subsystem:subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants:version',
   ]
 )
 

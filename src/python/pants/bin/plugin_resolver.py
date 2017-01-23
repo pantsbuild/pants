@@ -24,7 +24,7 @@ from pants.option.global_options import GlobalOptionsRegistrar
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_property
-
+from pants.version import PANTS_SEMVER
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,8 @@ class PluginResolver(object):
                             context=self._python_repos.get_network_context(),
                             precedence=precedence,
                             cache=self.plugin_cache_dir,
-                            cache_ttl=self._python_setup.resolver_cache_ttl)
+                            cache_ttl=self._python_setup.resolver_cache_ttl,
+                            allow_prereleases=PANTS_SEMVER.is_prerelease)
 
   @memoized_property
   def plugin_cache_dir(self):
