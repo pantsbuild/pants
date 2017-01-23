@@ -4,6 +4,7 @@ use std::hash;
 
 use globset::Glob;
 use globset;
+use tar;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -332,8 +333,6 @@ pub trait FSContext<K> {
     }
   }
 
-
-
   /**
    * Apply a PathGlob, returning either PathStats and PathGlobs on success or continuations
    * if more information is needed.
@@ -366,3 +365,16 @@ pub trait FSContext<K> {
     }
   }
 }
+
+struct Snapshot {
+  fingerprint: [u8;32],
+  paths: Vec<PathStat>,
+}
+
+/*
+impl Snapshot {
+  fn create(paths: Vec<PathStat>) -> Snapshot {
+    
+  }
+}
+*/
