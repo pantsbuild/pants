@@ -151,6 +151,7 @@ class ResolveRequirements(Task):
           platform=None if platform == 'current' else platform,
           context=python_repos.get_network_context(),
           cache=requirements_cache_dir,
-          cache_ttl=python_setup.resolver_cache_ttl)
+          cache_ttl=python_setup.resolver_cache_ttl,
+          allow_prereleases=python_setup.resolver_allow_prereleases)
 
     return distributions
