@@ -169,8 +169,7 @@ def pushd(directory):
 
 @contextmanager
 def open_zip(path_or_file, *args, **kwargs):
-  """
-  A with-context for zip files.  Passes through positional and kwargs to zipfile.ZipFile.
+  """A with-context for zip files.  Passes through positional and kwargs to zipfile.ZipFile.
 
   :API: public
 
