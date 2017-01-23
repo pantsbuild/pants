@@ -1,8 +1,6 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::{hash, io};
-use std::fmt::Write;
-use std;
+use std::{fmt, fs, hash, io};
 
 use globset::Glob;
 use globset;
@@ -384,11 +382,27 @@ impl Snapshot {
     panic!("TODO: implement path appending");
   }
 
+  /**
+   * Fingerprint the given path ,or return an error string.
+   */
   fn fingerprint(path: &Path) -> Result<[u8;32], String> {
     let mut hasher = Sha256::new();
 
-    // TODO
-    hasher.input(panic!("TODO: implement file walking"));
+    let mut file =
+      fs::File::open(path)
+        .map_err(|e| format!("Could not open snapshot for fingerprinting: {:?}", e))?;
+    let mut buffer = [0;4096];
+    loop {
+      match io::Read::read(&mut file, &mut buffer) {
+        Ok(len) if len > 0 =>
+          hasher.input(&buffer[..len]),
+        Ok(_) =>
+          // EOF
+          break,
+        Err(e) =>
+          return Err(format!("Could not read from snapshot: {:?}", e)),
+      }
+    };
 
     let mut fingerprint: [u8;32] = [0;32];
     fingerprint.clone_from_slice(&hasher.result()[0..32]);
@@ -398,14 +412,17 @@ impl Snapshot {
   fn hex(fingerprint: &[u8;32]) -> String {
     let mut s = String::new();
     for &byte in fingerprint {
-      write!(&mut s, "{:X}", byte).unwrap();
+      fmt::Write::write_fmt(&mut s, format_args!("{:X}", byte)).unwrap();
     }
     s
   }
 
+  /**
+   * Create a tar file at the given path containing the given paths, or return an error string.
+   */
   fn create_tar(dest: &Path, paths: &Vec<PathStat>) -> Result<(), String> {
-    let mut temp_file =
-      std::fs::File::create(dest)
+    let temp_file =
+      fs::File::create(dest)
         .map_err(|e| format!("Failed to create tempfile: {:?}", e))?;
     let mut tar_builder = tar::Builder::new(temp_file);
     for path in paths {
@@ -429,7 +446,7 @@ impl Snapshot {
     // Fingerprint the tar file and then rename it to create the Snapshot.
     let fingerprint = Snapshot::fingerprint(temp_path.as_path())?;
     let final_path = snapshot_root.0.join(format!("{:}.tar", Snapshot::hex(&fingerprint)));
-    std::fs::rename(temp_path, final_path)
+    fs::rename(temp_path, final_path)
       .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
     Ok(
       Snapshot {

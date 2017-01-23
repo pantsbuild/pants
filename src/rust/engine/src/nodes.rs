@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use ordermap::OrderMap;
 
 use graph::{Entry, Graph};
-use core::{Field, FNV, Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
 use selectors;
@@ -666,8 +666,8 @@ impl Step for Snapshot {
     // Recursively expand PathGlobs into PathStats, building a set of relevant Node dependencies.
     let mut dependencies = Vec::new();
     let mut path_globs_stack = path_globs.0.clone();
-    let mut path_globs_set: HashSet<PathGlob, FNV> = HashSet::default();
-    let mut outputs: OrderMap<PathStat, (), FNV> = OrderMap::default();
+    let mut path_globs_set: HashSet<PathGlob> = HashSet::default();
+    let mut outputs: OrderMap<PathStat, ()> = OrderMap::default();
     while let Some(path_glob) = path_globs_stack.pop() {
       if !path_globs_set.contains(&path_glob) {
         continue;
