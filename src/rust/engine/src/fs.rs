@@ -184,7 +184,7 @@ impl PathGlobs {
   }
 
   /**
-   * Given a filespec String, parse it to a series of PathGlob objects.
+   * Given a filespec as Globs, create a series of PathGlob objects.
    */
   fn expand(canonical_dir: &Dir, symbolic_path: &Path, parts: &Vec<Glob>) -> Vec<PathGlob> {
     if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && *SINGLE_DOT_GLOB == parts[0] {
@@ -378,10 +378,6 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-  fn append<W: io::Write>(tar_builder: &mut tar::Builder<W>, path: &PathStat) -> Result<(), String> {
-    panic!("TODO: implement path appending");
-  }
-
   /**
    * Fingerprint the given path ,or return an error string.
    */
@@ -418,16 +414,61 @@ impl Snapshot {
   }
 
   /**
+   * Append the given PathStat to the given Builder, (re)using the given Header.
+   */
+  fn tar_header_populate(head: &mut tar::Header, path_stat: &PathStat, relative_to: &Dir) -> Result<(), String> {
+    let path =
+      match path_stat {
+        &PathStat::File { ref path, ref stat } => {
+          head.set_entry_type(tar::EntryType::file());
+          // TODO: Unnecessarily re-executing the syscall here. Could store the `size` info on
+          // File stats to avoid this.
+          let abs_path = relative_to.0.join(stat.0.as_path());
+          head.set_size(
+            abs_path.metadata()
+              .map_err(|e| format!("Failed to stat {:?}: {:?}", stat, e))?
+              .len()
+          );
+          path
+        },
+        &PathStat::Dir { ref path, .. } => {
+          head.set_entry_type(tar::EntryType::dir());
+          head.set_size(0);
+          path
+        },
+      };
+    head.set_path(path.as_path())
+      .map_err(|e| format!("Illegal path {:?}: {:?}", path, e))?;
+    head.set_cksum();
+    Ok(())
+  }
+
+  /**
    * Create a tar file at the given path containing the given paths, or return an error string.
    */
-  fn create_tar(dest: &Path, paths: &Vec<PathStat>) -> Result<(), String> {
-    let temp_file =
+  fn tar_create(dest: &Path, paths: &Vec<PathStat>, relative_to: &Dir) -> Result<(), String> {
+    let dest_file =
       fs::File::create(dest)
-        .map_err(|e| format!("Failed to create tempfile: {:?}", e))?;
-    let mut tar_builder = tar::Builder::new(temp_file);
+        .map_err(|e| format!("Failed to create destination file: {:?}", e))?;
+    let mut tar_builder = tar::Builder::new(dest_file);
+    let mut head = tar::Header::new_gnu();
     for path in paths {
-      Snapshot::append(&mut tar_builder, path)
-        .map_err(|e| format!("Failed to snapshot {:?}: {:?}", path, e))?;
+      // Populate the header for the File or Dir.
+      Snapshot::tar_header_populate(&mut head, &path, relative_to)?;
+      // And append.
+      match path {
+        &PathStat::File { ref stat, .. } => {
+          let input =
+            fs::File::open(relative_to.0.join(stat.0.as_path()))
+              .map_err(|e| format!("Failed to open {:?}: {:?}", stat, e))?;
+          tar_builder.append(&head, input)
+            .map_err(|e| format!("Failed to tar {:?}: {:?}", stat, e))?;
+        },
+        &PathStat::Dir { ref stat, .. } => {
+          tar_builder.append(&head, io::empty())
+            .map_err(|e| format!("Failed to tar {:?}: {:?}", stat, e))?;
+        },
+      }
     }
     // Finish the tar file, allowing the underlying file to be closed.
     tar_builder.finish()
@@ -441,7 +482,7 @@ impl Snapshot {
       TempDir::new_in(snapshot_root.0.as_path(), ".create")
         .map_err(|e| format!("Failed to create tempdir: {:?}", e))?;
     let temp_path = temp_dir.path().join("snapshot.tar");
-    Snapshot::create_tar(temp_path.as_path(), &paths)?;
+    Snapshot::tar_create(temp_path.as_path(), &paths, build_root)?;
 
     // Fingerprint the tar file and then rename it to create the Snapshot.
     let fingerprint = Snapshot::fingerprint(temp_path.as_path())?;
