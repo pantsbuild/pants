@@ -131,5 +131,6 @@ class MutableBuildGraph(BuildGraph):
       _, addressable = self._address_mapper.resolve(address)
       return addressable
 
-  def fork(self):
+  def recreate(self):
+    """Recreate a new `MutableBuildGraph` without copying the existing addresses."""
     return MutableBuildGraph(self._address_mapper)

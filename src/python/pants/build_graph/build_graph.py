@@ -521,8 +521,8 @@ class BuildGraph(AbstractClass):
     """
 
   @abstractmethod
-  def fork(self):
-    """Fork a buildgraph from scratch without copying its state.
+  def recreate(self):
+    """Recreate a buildgraph of the same type from scratch without copying existing addresses.
 
     The new buildgraph will be used for a different set of addresses.
     """

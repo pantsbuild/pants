@@ -63,7 +63,8 @@ class LegacyBuildGraph(BuildGraph):
     self._engine = engine
     super(LegacyBuildGraph, self).__init__()
 
-  def fork(self):
+  def recreate(self):
+    """Recreate a new `LegacyBuildGraph` without copying the existing addresses."""
     return LegacyBuildGraph(self._scheduler, self._engine, self._target_types)
 
   @staticmethod
