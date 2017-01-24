@@ -350,7 +350,7 @@ class Context(object):
     :param string root: The path to scan; by default, the build root.
     :returns: A new build graph encapsulating the targets found.
     """
-    build_graph = self.build_graph.fork()
+    build_graph = self.build_graph.recreate()
     for address in self.address_mapper.scan_addresses(root):
       build_graph.inject_address_closure(address)
     return build_graph
