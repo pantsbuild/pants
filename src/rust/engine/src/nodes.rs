@@ -202,7 +202,7 @@ impl<'g, 't> StepContext<'g, 't> {
     &self.types.directory_listing
   }
 
-  fn lift_path_globs(&self, item: &Value) -> Vec<PathGlob> {
+  fn lift_path_globs(&self, item: &Value) -> Vec<String> {
     panic!("TODO: Not implemented!");
   }
 
@@ -620,7 +620,7 @@ pub struct Snapshot {
 impl Step for Snapshot {
   fn step(&self, context: StepContext) -> State<Node> {
     // Compute PathGlobs for the subject.
-    let path_globs = {
+    let path_glob_strs = {
       let node =
         Node::create(
           Selector::select(context.type_path_globs().clone()),
@@ -641,6 +641,12 @@ impl Step for Snapshot {
           return State::Waiting(vec![node]),
       }
     };
+
+    let path_globs =
+      match PathGlob::create(&path_glob_strs) {
+        Ok(pgs) => pgs,
+        Err(e) => return State::Complete(context.throw(format!("Invalid filespecs: {}", e))),
+      };
 
     // Recursively expand PathGlobs into PathStats.
     match context.expand(&path_globs) {

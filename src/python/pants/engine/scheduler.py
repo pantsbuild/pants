@@ -15,7 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
-from pants.engine.fs import (PathGlobs, create_fs_intrinsics, create_fs_singletons,
+from pants.engine.fs import (PathGlobs, create_fs_intrinsics,
                              generate_fs_subjects, Snapshot, ReadLink, DirectoryListing)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, RulesetValidator
@@ -96,8 +96,7 @@ class LocalScheduler(object):
       SingleAddress: select_product,
     }
     intrinsics = create_fs_intrinsics(project_tree)
-    singletons = create_fs_singletons(project_tree)
-    rule_index = RuleIndex.create(tasks, intrinsics, singletons)
+    rule_index = RuleIndex.create(tasks, intrinsics, singleton_entries=[])
     RulesetValidator(rule_index, goals, root_selector_fns).validate()
     self._register_tasks(rule_index.tasks)
     self._register_intrinsics(rule_index.intrinsics)

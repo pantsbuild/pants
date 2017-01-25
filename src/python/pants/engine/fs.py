@@ -34,15 +34,6 @@ class ReadLink(datatype('ReadLink', ['symbolic_path'])):
   def __new__(cls, path):
     return super(ReadLink, cls).__new__(cls, six.text_type(path))
 
-  @property
-  def path_globs(self):
-    """Supports projecting the Path resulting from a ReadLink as a PathGlob.
-
-    Because symlinks may be dead or point inside of other symlinks, it's necessary to resolve
-    their components from the top of the buildroot.
-    """
-    return PathGlobs.create_from_specs('', [self.symbolic_path])
-
 
 class Dirs(datatype('Dirs', ['dependencies'])):
   """A collection of Path objects with Dir stats."""
@@ -109,111 +100,14 @@ class Paths(datatype('Paths', ['dependencies'])):
     return tuple(p.stat for p in self.links)
 
 
-class PathGlob(AbstractClass):
-  """A filename pattern.
-
-  All PathGlob subclasses represent in-progress recursion that may match zero or more Paths. The
-  leaves of a "tree" of PathGlobs will be Path objects which may or may not exist.
-  """
-
-  _DOUBLE = '**'
-
-  @abstractproperty
-  def canonical_stat(self):
-    """A Dir relative to the ProjectTree, to which the remainder of this PathGlob is relative."""
-
-  @abstractproperty
-  def symbolic_path(self):
-    """The symbolic name (specific to the execution of this PathGlob) for the canonical_stat."""
-
-  @classmethod
-  def _prune_doublestar(cls, parts):
-    # This is called only when parts[0] == '**'.
-    # Eliminating consecutive '**'s can prevent engine from doing repetitive traversing.
-    idx = 1
-    while idx < len(parts) and cls._DOUBLE == parts[idx]:
-      idx += 1
-    return parts[0:1] + parts[idx:]
-
-  @classmethod
-  def create_from_spec(cls, canonical_stat, symbolic_path, filespec):
-    """Given a filespec, return a tuple of PathGlob objects.
-
-    :param canonical_stat: A canonical Dir relative to the ProjectTree, to which the filespec
-      is relative.
-    :param symbolic_path: A symbolic name for the canonical_stat (or the same name, if no symlinks
-      were traversed while expanding it).
-    :param filespec: A filespec, relative to the canonical_stat.
-    """
-    if not isinstance(canonical_stat, Dir):
-      raise ValueError('Expected a Dir as the canonical_stat. Got: {}'.format(canonical_stat))
-
-    parts = normpath(filespec).split(os_sep)
-    if canonical_stat == Dir('') and len(parts) == 1 and parts[0] == '.':
-      # A request for the root path.
-      return (PathRoot(),)
-    elif cls._DOUBLE == parts[0]:
-      parts = cls._prune_doublestar(parts)
-
-      if len(parts) == 1:
-        # Per https://git-scm.com/docs/gitignore:
-        #
-        #  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
-        #   directory "abc", relative to the location of the .gitignore file, with infinite depth."
-        #
-        return (PathDirWildcard(canonical_stat, symbolic_path, '*', '**'),
-                PathWildcard(canonical_stat, symbolic_path, '*'))
-
-      # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
-      # so there are two remainder possibilities: one with the double wildcard included, and the
-      # other without.
-      pathglob_with_doublestar = PathDirWildcard(canonical_stat, symbolic_path, '*', join(*parts[0:]))
-      if len(parts) == 2:
-        pathglob_no_doublestar = PathWildcard(canonical_stat, symbolic_path, parts[1])
-      else:
-        pathglob_no_doublestar = PathDirWildcard(canonical_stat, symbolic_path, parts[1], join(*parts[2:]))
-      return (pathglob_with_doublestar, pathglob_no_doublestar)
-    elif len(parts) == 1:
-      # This is the path basename.
-      return (PathWildcard(canonical_stat, symbolic_path, parts[0]),)
-    else:
-      # This is a path dirname.
-      return (PathDirWildcard(canonical_stat, symbolic_path, parts[0], join(*parts[1:])),)
-
-
-class PathRoot(datatype('PathRoot', []), PathGlob):
-  """A PathGlob matching the root of the ProjectTree.
-
-  The root is special because it's the only symbolic path that we can implicit trust is
-  not a symlink due to ProjectTree-construction-time normalization.
-  """
-  canonical_stat = Dir('')
-  symbolic_path = ''
-
-  paths = Paths((Path(symbolic_path, canonical_stat),))
-
-
-class PathWildcard(datatype('PathWildcard', ['canonical_stat', 'symbolic_path', 'wildcard']), PathGlob):
-  """A PathGlob matching a basename."""
-
-
-class PathDirWildcard(datatype('PathDirWildcard', ['canonical_stat', 'symbolic_path', 'wildcard', 'remainder']), PathGlob):
-  """A PathGlob matching a dirname.
-
-  Remainder value is applied relative to each directory matched by the wildcard.
-  """
-
-
 class PathGlobs(datatype('PathGlobs', ['dependencies'])):
-  """A set of 'PathGlob' objects.
+  """A helper class (TODO: possibly unnecessary?) for converting various.
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
-  globs/rglobs/zglobs into 'filespecs'.
+  globs/rglobs/zglobs into 'filespecs' strings.
   """
 
-  element_types = (PathRoot, PathWildcard, PathDirWildcard)
-
-  @classmethod
+  @staticmethod
   def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
@@ -241,20 +135,7 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
       new_specs = res.get('globs', None)
       if new_specs:
         filespecs.update(new_specs)
-    return cls.create_from_specs(relative_to, filespecs)
-
-  @classmethod
-  def create_from_specs(cls, relative_to, filespecs):
-    path_globs = (PathGlob.create_from_spec(Dir(relative_to), relative_to, filespec) for filespec in filespecs)
-    return cls(tuple(chain.from_iterable(path_globs)))
-
-
-class PathsExpansion(datatype('PathsExpansion', ['paths', 'dependencies'])):
-  """Represents the (in-progress) expansion of one or more PathGlob objects.
-
-  The dependencies of a PathsExpansion are additional PathGlob objects to be expanded.
-  """
-  element_types = (PathRoot, PathWildcard, PathDirWildcard)
+    return PathGlobs(tuple(join(relative_to, f) for f in filespecs))
 
 
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):
@@ -277,29 +158,8 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'files', 'dirs'])):
     return self.files + self.dirs
 
 
-class _SnapshotDirectory(datatype('_SnapshotDirectory', ['root'])):
-  """Private singleton value for the snapshot directory."""
-
-
-def snapshot_directory(project_tree):
-  return _SnapshotDirectory(join(project_tree.build_root, '.snapshots'))
-
-
-def create_snapshot_archive(project_tree, snapshot_directory, files, dirs):
-  # Constructs the snapshot tar in a temporary location, then fingerprints it and moves it to the final path.
-  with temporary_file_path(cleanup=False) as tmp_path:
-    with open_tar(tmp_path, mode='w') as tar:
-      for f in files.dependencies:
-        # TODO handle GitProjectTree. Using add this this will fail with a non-filesystem project tree.
-        tar.add(join(project_tree.build_root, f.path), f.path)
-      for d in dirs.dependencies:
-        tar.add(join(project_tree.build_root, d.path), d.path, recursive=False)
-    snapshot = Snapshot(_fingerprint_files_in_tar(files, tmp_path), files.dependencies, dirs.dependencies)
-  tar_location = _snapshot_path(snapshot, snapshot_directory.root)
-
-  shutil.move(tmp_path, tar_location)
-
-  return snapshot
+def snapshot_noop(*args):
+  raise Exception('This task is replaced intrinsically, and should not run.')
 
 
 def _fingerprint_files_in_tar(file_list, tar_location):
@@ -326,6 +186,10 @@ def _snapshot_path(snapshot, archive_root):
 def extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir):
   with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
     tar.extractall(sandbox_dir)
+
+
+class _SnapshotDirectory(datatype('_SnapshotDirectory', ['root'])):
+  """Private singleton value for the snapshot directory."""
 
 
 def select_snapshot_directory():
@@ -356,32 +220,6 @@ def finalize_path_expansion(paths_expansion_list):
         merged_paths.append(p)
         path_seen.add(p)
   return Paths(tuple(merged_paths))
-
-
-def apply_path_root(path_root):
-  """Returns the `Paths` for the root of the repo."""
-  return PathsExpansion(path_root.paths, tuple())
-
-
-def apply_path_wildcard(stats, path_wildcard):
-  """Filter the given DirectoryListing object using the given PathWildcard."""
-  paths = Paths(tuple(Path(normpath(join(path_wildcard.symbolic_path, basename(s.path))), s)
-                      for s in stats.dependencies
-                      if fnmatch(basename(s.path), path_wildcard.wildcard)))
-  return PathsExpansion(paths, tuple())
-
-
-def apply_path_dir_wildcard(dirs, path_dir_wildcard):
-  """Given a PathDirWildcard, compute a PathGlobs object that encompasses its children.
-
-  The resulting PathGlobs will have longer canonical prefixes than this wildcard, in the
-  sense that they will be relative to known-canonical subdirectories.
-  """
-  # For each matching Path, create a PathGlob per remainder.
-  path_globs = tuple(pg
-                     for d in dirs.dependencies
-                     for pg in PathGlob.create_from_spec(d.stat, d.path, path_dir_wildcard.remainder))
-  return PathsExpansion(Paths(tuple()), path_globs)
 
 
 def _zip_links(links, linked_paths):
@@ -453,16 +291,6 @@ def generate_fs_subjects(filenames):
       yield Dir('')
 
 
-def create_fs_singletons(project_tree):
-  def ptree(func):
-    p = functools.partial(func, project_tree)
-    p.__name__ = '{}_singleton'.format(func.__name__)
-    return p
-  return [
-      (_SnapshotDirectory, ptree(snapshot_directory))
-    ]
-
-
 def create_fs_intrinsics(project_tree):
   def ptree(func):
     p = functools.partial(func, project_tree)
@@ -482,55 +310,6 @@ def create_fs_tasks(project_tree):
     p.__name__ = '{}_intrinsic'.format(func.__name__)
     return p
   return [
-    # Glob execution: to avoid memoizing lots of incremental results, we recursively expand PathGlobs, and then
-    # convert them to Paths independently.
-    # Public
-    (Paths,
-     [SelectDependencies(PathsExpansion,
-                         PathGlobs,
-                         field_types=(PathWildcard, PathDirWildcard, PathRoot),
-                         transitive=True)],
-     finalize_path_expansion),
-    # Private
-    (PathsExpansion,
-     [Select(PathRoot)],
-     apply_path_root),
-    # Private
-    (PathsExpansion,
-     [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathWildcard),
-      Select(PathWildcard)],
-     apply_path_wildcard),
-    # Private
-    (PathsExpansion,
-     [SelectProjection(Dirs, Paths, ('paths',), FilteredPaths),
-      Select(PathDirWildcard)],
-     apply_path_dir_wildcard),
-    # Private
-    (FilteredPaths,
-     [SelectProjection(DirectoryListing, Dir, ('canonical_stat',), PathDirWildcard),
-      Select(PathDirWildcard)],
-     filter_paths),
-  ] + [
-    # Link resolution.
-    # Private
-    (Dirs,
-     [Select(Paths),
-      SelectDependencies(Dirs, Paths, field='link_stats', field_types=(Link,))],
-     resolve_dir_links),
-    # Private
-    (Files,
-     [Select(Paths),
-      SelectDependencies(Files, Paths, field='link_stats', field_types=(Link,))],
-     resolve_file_links),
-    # Private
-    (Dirs,
-     [SelectProjection(Dirs, PathGlobs, ('path_globs',), ReadLink)],
-     resolve_link),
-    # Public
-    (Files,
-     [SelectProjection(Files, PathGlobs, ('path_globs',), ReadLink)],
-     resolve_link),
-  ] + [
     # File content.
     # Public
     (FilesContent,
@@ -539,10 +318,5 @@ def create_fs_tasks(project_tree):
      files_content),
   ] + [
     # Snapshot creation.
-    # Public
-    (Snapshot,
-     [Select(_SnapshotDirectory),
-      Select(Files),
-      Select(Dirs)],
-     ptree(create_snapshot_archive)),
+    (Snapshot, [], snapshot_noop),
   ]
