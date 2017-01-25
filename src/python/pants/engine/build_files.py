@@ -223,13 +223,13 @@ def filter_build_dirs(address_mapper, snapshot):
 def single_or_sib_addresses_to_globs(address_mapper, single_or_sib_addresses):
   """Given a SiblingAddresses or SingleAddress object, return a PathGlobs object for relevant build files."""
   pattern = address_mapper.build_pattern
-  return PathGlobs.create_from_specs(single_or_sib_addresses.directory, [pattern])
+  return PathGlobs.create(single_or_sib_addresses.directory, include=[pattern], exclude=[])
 
 
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files."""
   pattern = address_mapper.build_pattern
-  return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
+  return PathGlobs.create(descendant_addresses.directory, include=[pattern, join('**', pattern)], exclude=[])
 
 
 def _recursive_dirname(f):
@@ -251,7 +251,7 @@ def ascendant_addresses_to_globs(address_mapper, ascendant_addresses):
   """Given an AscendantAddresses object, return a PathGlobs object for matching build files."""
   pattern = address_mapper.build_pattern
   patterns = [join(f, pattern) for f in _recursive_dirname(ascendant_addresses.directory)]
-  return PathGlobs.create_from_specs('', patterns)
+  return PathGlobs.create('', include=patterns, exclude=[])
 
 
 def create_graph_tasks(address_mapper, symbol_table_cls):

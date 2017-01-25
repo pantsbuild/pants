@@ -55,10 +55,6 @@ class Links(datatype('Links', ['dependencies'])):
   """A collection of Path objects with Link stats."""
 
 
-class FilteredPaths(datatype('FilteredPaths', ['paths'])):
-  """A wrapper around a Paths object that has been filtered by some pattern."""
-
-
 class FileContent(datatype('FileContent', ['path', 'content'])):
   """The content of a file, or None if it did not exist."""
 
@@ -77,30 +73,7 @@ class Path(datatype('Path', ['path', 'stat'])):
   """
 
 
-class Paths(datatype('Paths', ['dependencies'])):
-  """A set of Path objects."""
-
-  def _filtered(self, cls):
-    return tuple(p for p in self.dependencies if type(p.stat) is cls)
-
-  @property
-  def files(self):
-    return self._filtered(File)
-
-  @property
-  def dirs(self):
-    return self._filtered(Dir)
-
-  @property
-  def links(self):
-    return self._filtered(Link)
-
-  @property
-  def link_stats(self):
-    return tuple(p.stat for p in self.links)
-
-
-class PathGlobs(datatype('PathGlobs', ['dependencies'])):
+class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
   """A helper class (TODO: possibly unnecessary?) for converting various.
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
@@ -108,34 +81,17 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   """
 
   @staticmethod
-  def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
+  def create(relative_to, include, exclude):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
     :param relative_to: The path that all patterns are relative to (which will itself be relative
       to the buildroot).
-    :param files: A list of relative file paths to include.
-    :type files: list of string.
-    :param string globs: A relative glob pattern of files to include.
-    :param string rglobs: A relative recursive glob pattern of files to include.
-    :param string zglobs: A relative zsh-style glob pattern of files to include.
-    :param zglobs: A relative zsh-style glob pattern of files to include.
+    :param included: A list of filespecs to include.
+    :param excluded: A list of filespecs to exclude.
     :rtype: :class:`PathGlobs`
     """
-    filespecs = OrderedSet()
-    for specs, pattern_cls in ((files, Globs),
-                               (globs, Globs),
-                               (rglobs, RGlobs),
-                               (zglobs, ZGlobs)):
-      if not specs:
-        continue
-      res = pattern_cls.to_filespec(specs)
-      exclude = res.get('exclude')
-      if exclude:
-        raise ValueError('Excludes not supported for PathGlobs. Got: {}'.format(exclude))
-      new_specs = res.get('globs', None)
-      if new_specs:
-        filespecs.update(new_specs)
-    return PathGlobs(tuple(join(relative_to, f) for f in filespecs))
+    return PathGlobs(tuple(join(relative_to, f) for f in include),
+                     tuple(join(relative_to, f) for f in exclude))
 
 
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):
@@ -160,21 +116,6 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'files', 'dirs'])):
 
 def snapshot_noop(*args):
   raise Exception('This task is replaced intrinsically, and should not run.')
-
-
-def _fingerprint_files_in_tar(file_list, tar_location):
-  """
-  TODO: This could potentially be implemented by nuking any timestamp entries in
-  the tar file, and then fingerprinting the entire thing.
-
-  Also, it's currently ignoring directories, which hashing the entire tar would resolve.
-  """
-  hasher = sha1()
-  with open_tar(tar_location, mode='r', errorlevel=1) as tar:
-    for file in file_list.dependencies:
-      hasher.update(file.path)
-      hasher.update(tar.extractfile(file.path).read())
-  return hasher.hexdigest()
 
 
 def _snapshot_path(snapshot, archive_root):
@@ -210,48 +151,8 @@ def scan_directory(project_tree, directory):
       raise e
 
 
-def finalize_path_expansion(paths_expansion_list):
-  """Finalize and merge PathExpansion lists into Paths."""
-  path_seen = set()
-  merged_paths = []
-  for paths_expansion in paths_expansion_list:
-    for p in paths_expansion.paths.dependencies:
-      if p not in path_seen:
-        merged_paths.append(p)
-        path_seen.add(p)
-  return Paths(tuple(merged_paths))
-
-
-def _zip_links(links, linked_paths):
-  """Given a set of Paths and a resolved collection per Link in the Paths, merge."""
-  # Alias the resolved destinations with the symbolic name of the Paths used to resolve them.
-  if len(links) != len(linked_paths):
-    raise ValueError('Expected to receive resolved Paths per Link. Got: {} and {}'.format(
-      links, linked_paths))
-  return tuple(Path(link.path, dest.dependencies[0].stat)
-               for link, dest in zip(links, linked_paths)
-               if len(dest.dependencies) > 0)
-
-
-def resolve_dir_links(direct_paths, linked_dirs):
-  return Dirs(direct_paths.dirs + _zip_links(direct_paths.links, linked_dirs))
-
-
-def resolve_file_links(direct_paths, linked_files):
-  return Files(direct_paths.files + _zip_links(direct_paths.links, linked_files))
-
-
 def read_link(project_tree, link):
   return ReadLink(project_tree.readlink(link.path))
-
-
-def filter_paths(stats, path_dir_wildcard):
-  """Filter the given DirectoryListing object into Paths matching the given PathDirWildcard."""
-  entries = [(s, basename(s.path)) for s in stats.dependencies]
-  paths = tuple(Path(join(path_dir_wildcard.symbolic_path, basename), stat)
-                for stat, basename in entries
-                if fnmatch(basename, path_dir_wildcard.wildcard))
-  return FilteredPaths(Paths(paths))
 
 
 def file_content(project_tree, f):

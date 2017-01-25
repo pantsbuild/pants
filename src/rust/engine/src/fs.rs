@@ -181,13 +181,13 @@ impl PathGlob {
       // use of `Path` is strictly for os-independent Path parsing.
       parts.push(Glob::new(&part.to_string_lossy())?);
     }
-    Ok(PathGlob::expand(canonical_dir, symbolic_path, &parts))
+    Ok(PathGlob::parse_globs(canonical_dir, symbolic_path, &parts))
   }
 
   /**
    * Given a filespec as Globs, create a series of PathGlob objects.
    */
-  fn expand(canonical_dir: &Dir, symbolic_path: &Path, parts: &Vec<Glob>) -> Vec<PathGlob> {
+  fn parse_globs(canonical_dir: &Dir, symbolic_path: &Path, parts: &Vec<Glob>) -> Vec<PathGlob> {
     if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && *SINGLE_DOT_GLOB == parts[0] {
       // A request for the root path.
       vec![PathGlob::Root]
@@ -260,6 +260,22 @@ impl PathGlob {
   }
 }
 
+pub struct PathGlobs {
+  include: Vec<PathGlob>,
+  exclude: Vec<PathGlob>,
+}
+
+impl PathGlobs {
+  pub fn create(include: &Vec<String>, exclude: &Vec<String>) -> Result<PathGlobs, globset::Error> {
+    Ok(
+      PathGlobs {
+        include: PathGlob::create(include)?,
+        exclude: PathGlob::create(exclude)?,
+      }
+    )
+  }
+}
+
 /**
  * A context for filesystem operations parameterized on a continuation type 'K'. An operation
  * resulting in K indicates that more information is needed to complete the operation.
@@ -279,7 +295,7 @@ pub trait FSContext<K> {
 
     // Assume either 0 or 1 destination (anything else would imply a symlink to a path
     // containing an escaped glob character... leaving that as a `TODO` I guess).
-    match self.expand(&link_globs)?.pop() {
+    match self.expand_multi(&link_globs)?.pop() {
       Some(PathStat::Dir { stat, .. }) =>
         Ok(LinkExpansion::Dir(stat)),
       Some(PathStat::File { stat, .. }) =>
@@ -338,9 +354,32 @@ pub trait FSContext<K> {
   }
 
   /**
+   * Recursively expands PathGlobs into PathStats while applying excludes and building a set
+   * of relevant dependencies.
+   *
+   * TODO: Eventually, it would be nice to be able to apply excludes as we go, to
+   * avoid walking into directories that aren't relevant.
+   */
+  fn expand(&self, path_globs: &PathGlobs) -> Result<Vec<PathStat>, Vec<K>> {
+    match (self.expand_multi(&path_globs.include), self.expand_multi(&path_globs.exclude)) {
+      (Ok(include), Ok(exclude)) => {
+        // Exclude matched paths.
+        let exclude_set: HashSet<_> = exclude.into_iter().collect();
+        Ok(include.into_iter().filter(|i| !exclude_set.contains(i)).collect())
+      },
+      (Err(include_deps), Err(exclude_deps)) =>
+        // Both sets still need dependencies.
+        Err(include_deps.into_iter().chain(exclude_deps.into_iter()).collect()),
+      (include_res, exclude_res) =>
+        // A mix of success and failure: return the first set of dependencies.
+        include_res.and(exclude_res),
+    }
+  }
+
+  /**
    * Recursively expands PathGlobs into PathStats, building a set of relevant dependencies.
    */
-  fn expand(&self, path_globs: &Vec<PathGlob>) -> Result<Vec<PathStat>, Vec<K>> {
+  fn expand_multi(&self, path_globs: &Vec<PathGlob>) -> Result<Vec<PathStat>, Vec<K>> {
     let mut dependencies = Vec::new();
     let mut path_globs_stack = path_globs.clone();
     let mut path_globs_set: HashSet<PathGlob> = HashSet::default();
@@ -394,7 +433,7 @@ pub trait FSContext<K> {
               .filter_map(|ps| {
                 match ps {
                   PathStat::Dir { ref path, ref stat } =>
-                    Some(PathGlob::expand(stat, path.as_path(), remainder)),
+                    Some(PathGlob::parse_globs(stat, path.as_path(), remainder)),
                   _ => None,
                 }
               })

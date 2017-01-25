@@ -7,7 +7,7 @@ use selectors::Selector;
 use selectors;
 use tasks::Tasks;
 use types::Types;
-use fs::{Dir, FSContext, PathGlob, PathStat, Stat, Link};
+use fs::{Dir, FSContext, PathGlobs, PathGlob, PathStat, Stat, Link};
 use fs;
 
 
@@ -202,7 +202,7 @@ impl<'g, 't> StepContext<'g, 't> {
     &self.types.directory_listing
   }
 
-  fn lift_path_globs(&self, item: &Value) -> Vec<String> {
+  fn lift_path_globs(&self, item: &Value) -> Result<PathGlobs, String> {
     panic!("TODO: Not implemented!");
   }
 
@@ -619,8 +619,8 @@ pub struct Snapshot {
 
 impl Step for Snapshot {
   fn step(&self, context: StepContext) -> State<Node> {
-    // Compute PathGlobs for the subject.
-    let path_glob_strs = {
+    // Compute and parse PathGlobs for the subject.
+    let path_globs_res = {
       let node =
         Node::create(
           Selector::select(context.type_path_globs().clone()),
@@ -643,7 +643,7 @@ impl Step for Snapshot {
     };
 
     let path_globs =
-      match PathGlob::create(&path_glob_strs) {
+      match path_globs_res {
         Ok(pgs) => pgs,
         Err(e) => return State::Complete(context.throw(format!("Invalid filespecs: {}", e))),
       };
