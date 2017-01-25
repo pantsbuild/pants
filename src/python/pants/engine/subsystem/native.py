@@ -118,6 +118,10 @@ _FFI.cdef(
                                    Field,
                                    TypeConstraint,
                                    TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
                                    TypeConstraint);
     void scheduler_destroy(RawScheduler*);
 
@@ -474,29 +478,42 @@ class Native(object):
   def buffer(self, cdata):
     return _FFI.buffer(cdata)
 
-  def new_scheduler(self, has_products_constraint, address_constraint, variants_constraint):
+  def new_scheduler(self, constraint_has_products, constraint_address, constraint_variants,
+                    constraint_path_globs, constraint_snapshot, constraint_read_link,
+                    constraint_directory_listing):
     """Create and return an ExternContext and native Scheduler."""
-    has_products_constraint = TypeConstraint(self.context.to_id(has_products_constraint))
-    address_constraint = TypeConstraint(self.context.to_id(address_constraint))
-    variants_constraint = TypeConstraint(self.context.to_id(variants_constraint))
 
-    scheduler = self.lib.scheduler_create(self.context.handle,
-                                          extern_key_for,
-                                          extern_val_for,
-                                          extern_clone_val,
-                                          extern_drop_handles,
-                                          extern_id_to_str,
-                                          extern_val_to_str,
-                                          extern_satisfied_by,
-                                          extern_store_list,
-                                          extern_project,
-                                          extern_project_multi,
-                                          extern_create_exception,
-                                          extern_invoke_runnable,
-                                          self.context.to_key('name'),
-                                          self.context.to_key('products'),
-                                          self.context.to_key('default'),
-                                          address_constraint,
-                                          has_products_constraint,
-                                          variants_constraint)
+    def tc(constraint):
+      return TypeConstraint(self.context.to_id(constraint))
+
+    scheduler =\
+      self.lib.scheduler_create(
+        # Context.
+        self.context.handle,
+        # Externs.
+        extern_key_for,
+        extern_val_for,
+        extern_clone_val,
+        extern_drop_handles,
+        extern_id_to_str,
+        extern_val_to_str,
+        extern_satisfied_by,
+        extern_store_list,
+        extern_project,
+        extern_project_multi,
+        extern_create_exception,
+        extern_invoke_runnable,
+        # Constants.
+        self.context.to_key('name'),
+        self.context.to_key('products'),
+        self.context.to_key('default'),
+        # TypeConstraints.
+        tc(constraint_address),
+        tc(constraint_has_products),
+        tc(constraint_variants),
+        tc(constraint_path_globs),
+        tc(constraint_snapshot),
+        tc(constraint_read_link),
+        tc(constraint_directory_listing),
+      )
     return self.gc(scheduler, self.lib.scheduler_destroy)

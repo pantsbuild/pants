@@ -1,7 +1,4 @@
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-
-use ordermap::OrderMap;
 
 use graph::{Entry, Graph};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
@@ -9,7 +6,7 @@ use externs::Externs;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
-use fs::{Dir, FSContext, PathGlob, PathGlobs, PathStat, Stat, Link};
+use fs::{Dir, FSContext, PathGlob, PathStat, Stat, Link};
 use fs;
 
 
@@ -206,11 +203,11 @@ impl<'g, 't> StepContext<'g, 't> {
     panic!("TODO: Not implemented!");
   }
 
-  fn lift_path_globs(&self, item: &Value) -> PathGlobs {
+  fn lift_path_globs(&self, item: &Value) -> Vec<PathGlob> {
     panic!("TODO: Not implemented!");
   }
 
-  fn lift_read_link(&self, item: &Value) -> PathBuf {
+  fn lift_read_link(&self, item: &Value) -> String {
     panic!("TODO: Not implemented!");
   }
 
@@ -247,30 +244,22 @@ impl<'g, 't> StepContext<'g, 't> {
 }
 
 impl<'g, 't> FSContext<Node> for StepContext<'g, 't> {
-  fn read_link(&self, link: &Link) -> Result<PathBuf, Node> {
+  fn read_link(&self, link: &Link) -> Result<Vec<PathGlob>, Node> {
     let node =
       Node::create(
         Selector::select(self.type_read_link().clone()),
         self.key_for(&self.store_link(link)),
         Variants::default(),
       );
-    match self.get(&node) {
-      Some(&Complete::Return(ref value)) => Ok(self.lift_read_link(value)),
-      _ => Err(node),
-    }
-  }
-
-  fn stat(&self, path: &Path) -> Result<Stat, Node> {
-    let node =
-      Node::create(
-        Selector::select(self.type_stat().clone()),
-        self.key_for(&self.store_path(path)),
-        Variants::default(),
-      );
-    match self.get(&node) {
-      Some(&Complete::Return(ref value)) => Ok(self.lift_stat(value)),
-      _ => Err(node),
-    }
+    let path =
+      match self.get(&node) {
+        Some(&Complete::Return(ref value)) =>
+          self.lift_read_link(value),
+        _ =>
+          return Err(node),
+      };
+    // If the link destination can't be parsed as PathGlob(s), it is broken.
+    Ok(PathGlob::create(&vec![path]).unwrap_or_else(|_| vec![]))
   }
 
   fn scandir(&self, dir: &Dir) -> Result<Vec<Stat>, Node> {
@@ -663,69 +652,48 @@ impl Step for Snapshot {
       }
     };
 
-    // Recursively expand PathGlobs into PathStats, building a set of relevant Node dependencies.
-    let mut dependencies = Vec::new();
-    let mut path_globs_stack = path_globs.0.clone();
-    let mut path_globs_set: HashSet<PathGlob> = HashSet::default();
-    let mut outputs: OrderMap<PathStat, ()> = OrderMap::default();
-    while let Some(path_glob) = path_globs_stack.pop() {
-      if !path_globs_set.contains(&path_glob) {
-        continue;
-      }
+    // Recursively expand PathGlobs into PathStats.
+    match context.expand(&path_globs) {
+      Ok(path_stats) => {
+        // The entire walk succeeded: ready to Snapshot.
+        let snapshot_res =
+          fs::Snapshot::create(
+            context.snapshot_root(),
+            context.build_root(),
+            path_stats
+          );
+        match snapshot_res {
+          Ok(snapshot) =>
+            State::Complete(Complete::Return(context.store_snapshot(&snapshot))),
+          Err(msg) =>
+            State::Complete(context.throw(msg)),
+        }
+      },
+      Err(dependencies) => {
+        // The walk has additional dependencies: validate that none of them are
+        // for failed Nodes. This is because the dependency gathering in FSContext
+        // will only use a value if it is successful.
+        for d in &dependencies {
+          match context.get(&d) {
+            Some(&Complete::Noop(..)) =>
+              return State::Complete(
+                context.throw(
+                  format!(
+                    "No source of snapshot dep: {}",
+                    d.format(&context.tasks.externs)
+                  )
+                )
+              ),
+            Some(&Complete::Throw(ref msg)) =>
+              return State::Complete(Complete::Throw(context.clone_val(msg))),
+            _ => {},
+          }
+        }
 
-      // Compute matching PathStats and additional PathGlobs for each PathGlob.
-      match context.apply_path_glob(&path_glob) {
-        Ok((path_stats, path_globs)) => {
-          outputs.extend(path_stats.into_iter().map(|k| (k, ())));
-          path_globs_stack.extend(path_globs);
-        },
-        Err(nodes) => {
-          dependencies.extend(nodes);
-          continue;
-        },
-      };
-
-      // Ensure that we do not re-visit this PathGlob.
-      path_globs_set.insert(path_glob);
-    }
-
-    // If the walk has finished, Snapshot and store the matched paths.
-    if !dependencies.is_empty() {
-      let snapshot_res =
-        fs::Snapshot::create(
-          context.snapshot_root(),
-          context.build_root(),
-          outputs.into_iter().map(|(k, _)| k).collect()
-        );
-      return match snapshot_res {
-        Ok(snapshot) =>
-          State::Complete(Complete::Return(context.store_snapshot(&snapshot))),
-        Err(msg) =>
-          State::Complete(context.throw(msg)),
-      };
-    }
-
-    // Validate that dependency Nodes haven't failed.
-    // NB: This is because the dependency gathering above doesn't actually inspect failed states.
-    for d in &dependencies {
-      match context.get(&d) {
-        Some(&Complete::Noop(..)) =>
-          return State::Complete(
-            context.throw(
-              format!(
-                "No source of snapshot dep: {}",
-                d.format(&context.tasks.externs)
-              )
-            )
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        _ => {},
+        // All dependencies are valid. Declare them.
+        State::Waiting(dependencies)
       }
     }
-
-    // Then declare them.
-    State::Waiting(dependencies)
   }
 }
 

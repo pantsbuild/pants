@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::{fmt, fs, hash, io};
 
 use globset::Glob;
 use globset;
+use ordermap::OrderMap;
 use sha2::{Sha256, Digest};
 use tar;
 use tempdir::TempDir;
@@ -39,6 +41,8 @@ pub enum LinkExpansion {
   File(File),
   // Successfully resolved to a Dir.
   Dir(Dir),
+  // Link destination does not exist.
+  Broken,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -71,6 +75,13 @@ impl PathStat {
       stat: stat,
     }
   }
+}
+
+lazy_static! {
+  static ref SINGLE_DOT_GLOB: Glob = Glob::new(".").unwrap();
+  static ref SINGLE_STAR_GLOB: Glob = Glob::new("*").unwrap();
+  static ref DOUBLE_STAR: &'static str = "**";
+  static ref DOUBLE_STAR_GLOB: Glob = Glob::new("**").unwrap();
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -135,26 +146,15 @@ impl PathGlob {
       remainder: remainder,
     }
   }
-}
 
-pub struct PathGlobs(pub Vec<PathGlob>);
-
-lazy_static! {
-  static ref SINGLE_DOT_GLOB: Glob = Glob::new(".").unwrap();
-  static ref SINGLE_STAR_GLOB: Glob = Glob::new("*").unwrap();
-  static ref DOUBLE_STAR: &'static str = "**";
-  static ref DOUBLE_STAR_GLOB: Glob = Glob::new("**").unwrap();
-}
-
-impl PathGlobs {
-  pub fn create(relative_to: &Dir, filespecs: &Vec<String>) -> Result<PathGlobs, globset::Error> {
+  pub fn create(filespecs: &Vec<String>) -> Result<Vec<PathGlob>, globset::Error> {
+    let canonical_dir = Dir(PathBuf::new());
+    let symbolic_path = PathBuf::new();
     let mut path_globs = Vec::new();
     for filespec in filespecs {
-      path_globs.extend(
-        PathGlobs::parse(relative_to, relative_to.0.as_path(), filespec)?
-      );
+      path_globs.extend(PathGlob::parse(&canonical_dir, &symbolic_path, filespec)?);
     }
-    Ok(PathGlobs(path_globs))
+    Ok(path_globs)
   }
 
   /**
@@ -171,16 +171,17 @@ impl PathGlobs {
   }
 
   /**
-   * Given a filespec String, parse it to a series of PathGlob objects.
+   * Given a filespec String relative to a canonical Dir and path, parse it to a
+   * series of PathGlob objects.
    */
   fn parse(canonical_dir: &Dir, symbolic_path: &Path, filespec: &String) -> Result<Vec<PathGlob>, globset::Error> {
     let mut parts = Vec::new();
-    for part in PathGlobs::split_path(filespec) {
+    for part in PathGlob::split_path(filespec) {
       // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
       // use of `Path` is strictly for os-independent Path parsing.
       parts.push(Glob::new(&part.to_string_lossy())?);
     }
-    Ok(PathGlobs::expand(canonical_dir, symbolic_path, &parts))
+    Ok(PathGlob::expand(canonical_dir, symbolic_path, &parts))
   }
 
   /**
@@ -264,43 +265,39 @@ impl PathGlobs {
  * resulting in K indicates that more information is needed to complete the operation.
  */
 pub trait FSContext<K> {
-  fn read_link(&self, link: &Link) -> Result<PathBuf, K>;
-  fn stat(&self, path: &Path) -> Result<Stat, K>;
+  fn read_link(&self, link: &Link) -> Result<Vec<PathGlob>, K>;
   fn scandir(&self, dir: &Dir) -> Result<Vec<Stat>, K>;
 
   /**
-   * Recursively expand a symlink to an underlying non-link Stat.
+   * Expand a symlink to an underlying non-link Stat.
    *
-   * TODO: Should handle symlink loops, but probably not here... this will not
-   * detect a loop that traverses multiple directories.
+   * TODO: Should handle symlink loops (which would exhibit as infinite recursion here afaict.
    */
-  fn expand_link(&self, link: &Link) -> Result<LinkExpansion, K> {
-    let mut link: Link = (*link).clone();
-    loop {
-      // Read the link and stat the destination.
-      match self.stat(self.read_link(&link)?.as_path()) {
-        Ok(Stat::Link(l)) => {
-          // The link pointed to another link. Continue.
-          link = l;
-        },
-        Ok(Stat::Dir(d)) =>
-          return Ok(LinkExpansion::Dir(d)),
-        Ok(Stat::File(f)) =>
-          return Ok(LinkExpansion::File(f)),
-        Err(t) =>
-          return Err(t),
-      };
+  fn expand_link(&self, link: &Link) -> Result<LinkExpansion, Vec<K>> {
+    // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
+    let link_globs = self.read_link(&link).map_err(|k| vec![k])?;
+
+    // Assume either 0 or 1 destination (anything else would imply a symlink to a path
+    // containing an escaped glob character... leaving that as a `TODO` I guess).
+    match self.expand(&link_globs)?.pop() {
+      Some(PathStat::Dir { stat, .. }) =>
+        Ok(LinkExpansion::Dir(stat)),
+      Some(PathStat::File { stat, .. }) =>
+        Ok(LinkExpansion::File(stat)),
+      None =>
+        Ok(LinkExpansion::Broken),
     }
   }
 
   /**
    * Canonicalize the Stat for the given PathStat to an underlying File or Dir. May result
-   * in None if the PathStat represents a Link containing a cycle.
+   * in None if the PathStat represents a broken or cyclic Link.
    */
-  fn canonicalize(&self, path: &Path, stat: &Link) -> Result<PathStat, K> {
+  fn canonicalize(&self, path: &Path, stat: &Link) -> Result<Option<PathStat>, Vec<K>> {
     match self.expand_link(stat)? {
-      LinkExpansion::Dir(d) => Ok(PathStat::dir(path.to_owned(), d)),
-      LinkExpansion::File(f) => Ok(PathStat::file(path.to_owned(), f)),
+      LinkExpansion::Broken => Ok(None),
+      LinkExpansion::Dir(d) => Ok(Some(PathStat::dir(path.to_owned(), d))),
+      LinkExpansion::File(f) => Ok(Some(PathStat::file(path.to_owned(), f))),
     }
   }
 
@@ -321,8 +318,9 @@ pub trait FSContext<K> {
       match stat {
         Stat::Link(l) =>
           match self.canonicalize(symbolic_path, &l) {
-            Ok(ps) => path_stats.push(ps),
-            Err(k) => continuations.push(k),
+            Ok(Some(ps)) => path_stats.push(ps),
+            Ok(None) => (),
+            Err(ks) => continuations.extend(ks),
           },
         Stat::Dir(d) =>
           path_stats.push(PathStat::dir(symbolic_path.to_owned(), d)),
@@ -340,10 +338,46 @@ pub trait FSContext<K> {
   }
 
   /**
+   * Recursively expands PathGlobs into PathStats, building a set of relevant dependencies.
+   */
+  fn expand(&self, path_globs: &Vec<PathGlob>) -> Result<Vec<PathStat>, Vec<K>> {
+    let mut dependencies = Vec::new();
+    let mut path_globs_stack = path_globs.clone();
+    let mut path_globs_set: HashSet<PathGlob> = HashSet::default();
+    let mut outputs: OrderMap<PathStat, ()> = OrderMap::default();
+    while let Some(path_glob) = path_globs_stack.pop() {
+      if !path_globs_set.contains(&path_glob) {
+        continue;
+      }
+
+      // Compute matching PathStats and additional PathGlobs for each PathGlob.
+      match self.expand_single(&path_glob) {
+        Ok((path_stats, path_globs)) => {
+          outputs.extend(path_stats.into_iter().map(|k| (k, ())));
+          path_globs_stack.extend(path_globs);
+        },
+        Err(nodes) => {
+          dependencies.extend(nodes);
+          continue;
+        },
+      };
+
+      // Ensure that we do not re-visit this PathGlob.
+      path_globs_set.insert(path_glob);
+    }
+
+    if dependencies.is_empty() {
+      Ok(outputs.into_iter().map(|(k, _)| k).collect())
+    } else {
+      Err(dependencies)
+    }
+  }
+
+  /**
    * Apply a PathGlob, returning either PathStats and PathGlobs on success or continuations
    * if more information is needed.
    */
-  fn apply_path_glob(&self, path_glob: &PathGlob) -> Result<(Vec<PathStat>, Vec<PathGlob>), Vec<K>> {
+  fn expand_single(&self, path_glob: &PathGlob) -> Result<(Vec<PathStat>, Vec<PathGlob>), Vec<K>> {
     match path_glob {
       &PathGlob::Root =>
         // Always results in a single PathStat.
@@ -360,7 +394,7 @@ pub trait FSContext<K> {
               .filter_map(|ps| {
                 match ps {
                   PathStat::Dir { ref path, ref stat } =>
-                    Some(PathGlobs::expand(stat, path.as_path(), remainder)),
+                    Some(PathGlob::expand(stat, path.as_path(), remainder)),
                   _ => None,
                 }
               })

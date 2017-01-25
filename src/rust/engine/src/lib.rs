@@ -162,6 +162,10 @@ pub extern fn scheduler_create(
   type_address: TypeConstraint,
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
+  type_path_globs: TypeConstraint,
+  type_snapshot: TypeConstraint,
+  type_read_link: TypeConstraint,
+  type_directory_listing: TypeConstraint,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let externs =

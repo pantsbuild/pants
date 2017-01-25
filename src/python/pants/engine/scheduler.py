@@ -16,7 +16,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import (PathGlobs, create_fs_intrinsics, create_fs_singletons,
-                             generate_fs_subjects)
+                             generate_fs_subjects, Snapshot, ReadLink, DirectoryListing)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -70,9 +70,16 @@ class LocalScheduler(object):
     has_products_constraint = SubclassesOf(HasProducts)
 
     # Create the ExternContext, and the native Scheduler.
-    self._scheduler = native.new_scheduler(has_products_constraint,
-                                           constraint_for(Address),
-                                           constraint_for(Variants))
+    self._scheduler =\
+      native.new_scheduler(
+        has_products_constraint,
+        constraint_for(Address),
+        constraint_for(Variants),
+        constraint_for(PathGlobs),
+        constraint_for(Snapshot),
+        constraint_for(ReadLink),
+        constraint_for(DirectoryListing)
+      )
     self._execution_request = None
 
     # Validate and register all provided and intrinsic tasks.
