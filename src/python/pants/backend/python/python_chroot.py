@@ -257,6 +257,7 @@ class PythonChroot(object):
         platform=platform,
         context=context,
         cache=requirements_cache_dir,
-        cache_ttl=self._python_setup.resolver_cache_ttl)
+        cache_ttl=self._python_setup.resolver_cache_ttl,
+        allow_prereleases=self._python_setup.resolver_allow_prereleases)
 
     return distributions

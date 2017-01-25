@@ -43,6 +43,8 @@ class PythonSetup(Subsystem):
              default=10 * 365 * 86400,  # 10 years.
              help='The time in seconds before we consider re-resolving an open-ended requirement, '
                   'e.g. "flask>=0.2" if a matching distribution is available on disk.')
+    register('--resolver-allow-prereleases', advanced=True, type=bool, default=False,
+             fingerprint=True, help='Whether to include pre-releases when resolving requirements.')
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the python artifact cache. '
                   'If unspecified, a standard path under the workdir is used.')
@@ -81,6 +83,10 @@ class PythonSetup(Subsystem):
   @property
   def resolver_cache_ttl(self):
     return self.get_options().resolver_cache_ttl
+
+  @property
+  def resolver_allow_prereleases(self):
+    return self.get_options().resolver_allow_prereleases
 
   @property
   def artifact_cache_dir(self):
