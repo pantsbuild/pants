@@ -4,17 +4,20 @@
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
+
 import math
 
-from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
-from pants_test.pants_run_integration_test import ensure_engine
 from pants.util.memo import memoized_property
+from pants_test.pants_run_integration_test import ensure_engine
+from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
 
 
 class TestProjectsIntegrationTest(ProjectIntegrationTest):
   # To avoid having a single test method which covers all of `testprojects` (which
   # would run for a very long time with no output, and be more difficult to iterate
   # on), we shard all of the targets under `testprojects` into _SHARDS test methods.
+  #
+  # NB: Do not change this value without matching the number of test methods.
   _SHARDS = 8
 
   @memoized_property
