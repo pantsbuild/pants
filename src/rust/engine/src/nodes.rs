@@ -210,15 +210,7 @@ impl<'g, 't> StepContext<'g, 't> {
     panic!("TODO: Not implemented!");
   }
 
-  fn lift_stat(&self, item: &Value) -> Stat {
-    panic!("TODO: Not implemented!");
-  }
-
   fn lift_stats(&self, item: &Value) -> Vec<Stat> {
-    panic!("TODO: Not implemented!");
-  }
-
-  fn store_path(&self, item: &Path) -> Value {
     panic!("TODO: Not implemented!");
   }
 
@@ -637,8 +629,7 @@ impl Step for Snapshot {
         );
       match context.get(&node) {
         Some(&Complete::Return(ref value)) =>
-          context.lift_path_globs(value)
-        ,
+          context.lift_path_globs(value),
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
             Complete::Noop("Could not compute PathGlobs for input {}.", Some(node))
