@@ -21,7 +21,7 @@ python_tests(
     'src/python/pants/util:contextutil',
   ],
   tags = {'integration'},
-  timeout=600,
+  timeout=800,
 )
 
 python_library(

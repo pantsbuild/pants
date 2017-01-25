@@ -5,15 +5,24 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.util.contextutil import environment_as
+import math
+
+from pants.util.memo import memoized_property
+from pants_test.pants_run_integration_test import ensure_engine
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
 
 
 class TestProjectsIntegrationTest(ProjectIntegrationTest):
+  # To avoid having a single test method which covers all of `testprojects` (which
+  # would run for a very long time with no output, and be more difficult to iterate
+  # on), we shard all of the targets under `testprojects` into _SHARDS test methods.
+  #
+  # NB: Do not change this value without matching the number of test methods.
+  _SHARDS = 8
 
-  def test_testprojects(self):
-    # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
-    # right now, just split them into two categories and ignore them.
+  @memoized_property
+  def targets(self):
+    """A sequence of target name strings."""
 
     # Targets that fail but shouldn't
     known_failing_targets = [
@@ -82,14 +91,52 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
                           timeout_targets + deliberately_conflicting_targets)
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
                        targets_to_exclude)
-    pants_run = self.pants_test(['testprojects::', '--jvm-platform-default-platform=java7',
-                                 '--gen-protoc-import-from-root'] + exclude_opts)
+
+    # Run list with exclude options, then parse and sort output.
+    pants_run = self.run_pants(['list', 'testprojects::'] + exclude_opts)
+    self.assert_success(pants_run)
+    return sorted(pants_run.stdout_data.split())
+
+  def targets_for_shard(self, shard):
+    if shard < 0 or shard >= self._SHARDS:
+      raise Exception('Invalid shard: {} / {}'.format(shard, self._SHARDS))
+
+    per_shard = int(math.ceil(len(self.targets) / self._SHARDS))
+    offset = (per_shard*shard)
+    return self.targets[offset:offset + per_shard]
+
+  @ensure_engine
+  def run_shard(self, shard):
+    targets = self.targets_for_shard(shard)
+    pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7',
+                                           '--gen-protoc-import-from-root'])
     self.assert_success(pants_run)
 
-  # This is a special case that we split into 2 tests instead of using ensure_engine.
-  # The reason is the original test with ensure_engine takes more than 10 minutes in travis ci,
-  # which will cause travis to terminate the build. By spliting, each test finishes in less than
-  # 10 min.
-  def test_testprojects_v2_engine(self):
-    with environment_as(PANTS_ENABLE_V2_ENGINE='true'):
-      self.test_testprojects()
+  def test_self(self):
+    self.assertEquals([t for s in range(0, self._SHARDS)
+                         for t in self.targets_for_shard(s)], 
+                      self.targets)
+
+  def test_shard_0(self):
+    self.run_shard(0)
+
+  def test_shard_1(self):
+    self.run_shard(1)
+
+  def test_shard_2(self):
+    self.run_shard(2)
+
+  def test_shard_3(self):
+    self.run_shard(3)
+
+  def test_shard_4(self):
+    self.run_shard(4)
+
+  def test_shard_5(self):
+    self.run_shard(5)
+
+  def test_shard_6(self):
+    self.run_shard(6)
+
+  def test_shard_7(self):
+    self.run_shard(7)
