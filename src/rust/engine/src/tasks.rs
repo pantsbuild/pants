@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
-use externs::Externs;
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
 
 /**
@@ -12,13 +11,9 @@ pub struct Tasks {
   intrinsics: HashMap<(TypeId, TypeConstraint), Vec<Task>, FNV>,
   singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
-  pub externs: Externs,
   pub field_name: Field,
   pub field_products: Field,
   pub field_variants: Field,
-  pub type_address: TypeConstraint,
-  pub type_has_products: TypeConstraint,
-  pub type_has_variants: TypeConstraint,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
 }
@@ -36,25 +31,17 @@ pub struct Tasks {
  */
 impl Tasks {
   pub fn new(
-    externs: Externs,
     field_name: Field,
     field_products: Field,
     field_variants: Field,
-    type_address: TypeConstraint,
-    type_has_products: TypeConstraint,
-    type_has_variants: TypeConstraint,
   ) -> Tasks {
     Tasks {
       intrinsics: Default::default(),
       singletons: Default::default(),
       tasks: Default::default(),
-      externs: externs,
       field_name: field_name,
       field_products: field_products,
       field_variants: field_variants,
-      type_address: type_address,
-      type_has_products: type_has_products,
-      type_has_variants: type_has_variants,
       preparing: None,
     }
   }

@@ -7,6 +7,7 @@ mod nodes;
 mod scheduler;
 mod selectors;
 mod tasks;
+mod types;
 
 extern crate fnv;
 extern crate globset;
@@ -46,6 +47,7 @@ use graph::Graph;
 use nodes::Complete;
 use scheduler::Scheduler;
 use tasks::Tasks;
+use types::Types;
 
 pub struct RawScheduler {
   scheduler: Scheduler,
@@ -168,35 +170,39 @@ pub extern fn scheduler_create(
   type_directory_listing: TypeConstraint,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  let externs =
-    Externs::new(
-      ext_context,
-      key_for,
-      val_for,
-      clone_val,
-      drop_handles,
-      id_to_str,
-      val_to_str,
-      satisfied_by,
-      store_list,
-      project,
-      project_multi,
-      create_exception,
-      invoke_runnable,
-    );
   Box::into_raw(
     Box::new(
       RawScheduler {
         scheduler: Scheduler::new(
           Graph::new(),
           Tasks::new(
-            externs,
             field_name,
             field_products,
             field_variants,
-            type_address,
-            type_has_products,
-            type_has_variants,
+          ),
+          Types {
+            address: type_address,
+            has_products: type_has_products,
+            has_variants: type_has_variants,
+            path_globs: type_path_globs,
+            snapshot: type_snapshot,
+            read_link: type_read_link,
+            directory_listing: type_directory_listing,
+          },
+          Externs::new(
+            ext_context,
+            key_for,
+            val_for,
+            clone_val,
+            drop_handles,
+            id_to_str,
+            val_to_str,
+            satisfied_by,
+            store_list,
+            project,
+            project_multi,
+            create_exception,
+            invoke_runnable,
           ),
         ),
       }
@@ -266,7 +272,7 @@ pub extern fn execution_execute(
       completed =
         runnable_batch.iter()
           .map(|&(id, ref runnable)| {
-            let result = raw.scheduler.tasks.externs.invoke_runnable(runnable);
+            let result = raw.scheduler.externs.invoke_runnable(runnable);
             if result.is_throw {
               (id, Complete::Throw(result.value))
             } else {

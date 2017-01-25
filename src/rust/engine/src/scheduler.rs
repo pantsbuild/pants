@@ -4,11 +4,13 @@ use std::io;
 use std::path::Path;
 
 use core::{FNV, Field, Key, TypeConstraint};
+use externs::Externs;
 use graph::{EntryId, Graph};
 use handles::drain_handles;
 use nodes::{Complete, Node, Runnable, State};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
+use types::Types;
 
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
@@ -16,6 +18,8 @@ use tasks::Tasks;
 pub struct Scheduler {
   pub graph: Graph,
   pub tasks: Tasks,
+  pub types: Types,
+  pub externs: Externs,
   // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Node>,
   // Candidates for execution.
@@ -31,24 +35,31 @@ impl Scheduler {
   /**
    * Creates a Scheduler with an initially empty set of roots.
    */
-  pub fn new(graph: Graph, tasks: Tasks) -> Scheduler {
+  pub fn new(
+    graph: Graph,
+    tasks: Tasks,
+    types: Types,
+    externs: Externs,
+  ) -> Scheduler {
     Scheduler {
       graph: graph,
       tasks: tasks,
+      types: types,
+      externs: externs,
       roots: Vec::new(),
-      candidates: VecDeque::new(),
-      outstanding: HashSet::default(),
-      runnable: HashSet::default(),
+      candidates: Default::default(),
+      outstanding: Default::default(),
+      runnable: Default::default(),
     }
   }
 
   pub fn visualize(&self, path: &Path) -> io::Result<()> {
-    self.graph.visualize(&self.roots, path, &self.tasks.externs)
+    self.graph.visualize(&self.roots, path, &self.externs)
   }
 
   pub fn trace(&self, path: &Path) -> io::Result<()> {
     for root in &self.roots {
-      let result = self.graph.trace(&root, path, &self.tasks.externs);
+      let result = self.graph.trace(&root, path, &self.externs);
       if result.is_err() {
         return result;
       }
@@ -109,7 +120,7 @@ impl Scheduler {
 
     // Run a step.
     let entry = self.graph.entry_for_id(id);
-    Some(entry.node().step(entry, &self.graph, &self.tasks))
+    Some(entry.node().step(entry, &self.graph, &self.tasks, &self.types, &self.externs))
   }
 
   /**
@@ -173,7 +184,7 @@ impl Scheduler {
     }
 
     self.runnable.clear();
-    self.tasks.externs.drop_handles(drain_handles());
+    self.externs.drop_handles(drain_handles());
     ready
   }
 }

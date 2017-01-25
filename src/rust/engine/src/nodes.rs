@@ -6,6 +6,7 @@ use externs::Externs;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
+use types::Types;
 use fs::{Dir, FSContext, PathGlob, PathStat, Stat, Link};
 use fs;
 
@@ -45,10 +46,12 @@ pub enum Complete {
   Throw(Value),
 }
 
-pub struct StepContext<'g, 't> {
+pub struct StepContext<'g, 's> {
   entry: &'g Entry,
   graph: &'g Graph,
-  tasks: &'t Tasks,
+  tasks: &'s Tasks,
+  types: &'s Types,
+  externs: &'s Externs,
 }
 
 impl<'g, 't> StepContext<'g, 't> {
@@ -111,7 +114,7 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 
   fn has_products(&self, item: &Value) -> bool {
-    self.tasks.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
+    self.externs.satisfied_by(&self.types.has_products, item.type_id())
   }
 
   /**
@@ -128,7 +131,7 @@ impl<'g, 't> StepContext<'g, 't> {
         &self.tasks.field_name,
         self.tasks.field_name.0.type_id()
       );
-    self.tasks.externs.val_to_str(&name_val)
+    self.externs.val_to_str(&name_val)
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
@@ -136,43 +139,43 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 
   fn key_for(&self, val: &Value) -> Key {
-    self.tasks.externs.key_for(val)
+    self.externs.key_for(val)
   }
 
   fn val_for(&self, key: &Key) -> Value {
-    self.tasks.externs.val_for(key)
+    self.externs.val_for(key)
   }
 
   fn clone_val(&self, val: &Value) -> Value {
-    self.tasks.externs.clone_val(val)
+    self.externs.clone_val(val)
   }
 
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
   fn store_list(&self, items: Vec<&Value>, merge: bool) -> Value {
-    self.tasks.externs.store_list(items, merge)
+    self.externs.store_list(items, merge)
   }
 
   /**
    * Calls back to Python for a satisfied_by check.
    */
   fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    self.tasks.externs.satisfied_by(constraint, cls)
+    self.externs.satisfied_by(constraint, cls)
   }
 
   /**
    * Calls back to Python to project a field.
    */
   fn project(&self, item: &Value, field: &Field, type_id: &TypeId) -> Value {
-    self.tasks.externs.project(item, field, type_id)
+    self.externs.project(item, field, type_id)
   }
 
   /**
    * Calls back to Python to project a field representing a collection.
    */
   fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
-    self.tasks.externs.project_multi(item, field)
+    self.externs.project_multi(item, field)
   }
 
   fn snapshot_root(&self) -> &Dir {
@@ -184,23 +187,19 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 
   fn type_path_globs(&self) -> &TypeConstraint {
-    panic!("TODO: Not implemented!");
+    &self.types.path_globs
   }
 
   fn type_snapshot(&self) -> &TypeConstraint {
-    panic!("TODO: Not implemented!");
-  }
-
-  fn type_stat(&self) -> &TypeConstraint {
-    panic!("TODO: Not implemented!");
+    &self.types.snapshot
   }
 
   fn type_read_link(&self) -> &TypeConstraint {
-    panic!("TODO: Not implemented!");
+    &self.types.read_link
   }
 
   fn type_directory_listing(&self) -> &TypeConstraint {
-    panic!("TODO: Not implemented!");
+    &self.types.directory_listing
   }
 
   fn lift_path_globs(&self, item: &Value) -> Vec<PathGlob> {
@@ -239,7 +238,7 @@ impl<'g, 't> StepContext<'g, 't> {
    * Creates a Throw state with the given exception message.
    */
   fn throw(&self, msg: String) -> Complete {
-    Complete::Throw(self.tasks.externs.create_exception(msg))
+    Complete::Throw(self.externs.create_exception(msg))
   }
 }
 
@@ -533,7 +532,7 @@ impl Step for SelectDependencies {
             context.throw(
               format!(
                 "No source of explicit dep {}",
-                dep_node.format(&context.tasks.externs)
+                dep_node.format(&context.externs)
               )
             )
           ),
@@ -606,7 +605,7 @@ impl Step for SelectProjection {
           context.throw(
             format!(
               "No source of projected dependency {}",
-              output_node.format(&context.tasks.externs)
+              output_node.format(&context.externs)
             )
           )
         ),
@@ -680,7 +679,7 @@ impl Step for Snapshot {
                 context.throw(
                   format!(
                     "No source of snapshot dep: {}",
-                    d.format(&context.tasks.externs)
+                    d.format(&context.externs)
                   )
                 )
               ),
@@ -822,12 +821,21 @@ impl Node {
     }
   }
 
-  pub fn step(&self, entry: &Entry, graph: &Graph, tasks: &Tasks) -> State<Node> {
+  pub fn step(
+    &self,
+    entry: &Entry,
+    graph: &Graph,
+    tasks: &Tasks,
+    types: &Types,
+    externs: &Externs,
+  ) -> State<Node> {
     let context =
       StepContext {
         entry: entry,
         graph: graph,
         tasks: tasks,
+        types: types,
+        externs: externs,
       };
     match self {
       &Node::Select(ref n) => n.step(context),
