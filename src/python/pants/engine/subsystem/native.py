@@ -116,6 +116,8 @@ _FFI.cdef(
                                    Field,
                                    Field,
                                    Field,
+                                   Field,
+                                   Field,
                                    TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint,
@@ -503,10 +505,13 @@ class Native(object):
         extern_project_multi,
         extern_create_exception,
         extern_invoke_runnable,
-        # Constants.
+        # Field names.
+        # TODO: See https://github.com/pantsbuild/pants/issues/4207
         self.context.to_key('name'),
         self.context.to_key('products'),
         self.context.to_key('default'),
+        self.context.to_key('include'),
+        self.context.to_key('exclude'),
         # TypeConstraints.
         tc(constraint_address),
         tc(constraint_has_products),

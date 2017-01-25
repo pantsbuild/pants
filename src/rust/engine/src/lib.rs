@@ -161,6 +161,8 @@ pub extern fn scheduler_create(
   field_name: Field,
   field_products: Field,
   field_variants: Field,
+  field_include: Field,
+  field_exclude: Field,
   type_address: TypeConstraint,
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
@@ -179,6 +181,8 @@ pub extern fn scheduler_create(
             field_name,
             field_products,
             field_variants,
+            field_include,
+            field_exclude,
           ),
           Types {
             address: type_address,

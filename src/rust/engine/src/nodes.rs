@@ -123,6 +123,8 @@ impl<'g, 't> StepContext<'g, 't> {
    * TODO: There are at least two hacks here. Because we don't have access to the appropriate
    * `str` type, we just assume that it has the same type as the name of the field. And more
    * importantly, there is no check that the object _has_ a name field.
+   *
+   * See https://github.com/pantsbuild/pants/issues/4207 about cleaning this up a bit.
    */
   fn field_name(&self, item: &Value) -> String {
     let name_val =
@@ -178,6 +180,12 @@ impl<'g, 't> StepContext<'g, 't> {
     self.externs.project_multi(item, field)
   }
 
+  fn project_multi_strs(&self, item: &Value, field: &Field) -> Vec<String> {
+    self.externs.project_multi(item, field).iter()
+      .map(|v| self.externs.val_to_str(v))
+      .collect()
+  }
+
   fn snapshot_root(&self) -> &Dir {
     panic!("TODO: Not implemented!");
   }
@@ -203,7 +211,12 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 
   fn lift_path_globs(&self, item: &Value) -> Result<PathGlobs, String> {
-    panic!("TODO: Not implemented!");
+    let include = self.project_multi_strs(item, &self.tasks.field_include);
+    let exclude = self.project_multi_strs(item, &self.tasks.field_exclude);
+    PathGlobs::create(&include, &exclude)
+      .map_err(|e| {
+        format!("Failed to parse PathGlobs for include({:?}), exclude({:?}): {}", include, exclude, e)
+      })
   }
 
   fn lift_read_link(&self, item: &Value) -> String {
