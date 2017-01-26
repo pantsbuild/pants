@@ -1,5 +1,8 @@
 use std::path::Path;
 
+// NB: Assuming unix allows us to zero-copy filesystem paths as bytes.
+use std::os::unix::ffi::OsStrExt;
+
 use graph::{Entry, Graph};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
@@ -7,7 +10,7 @@ use selectors::Selector;
 use selectors;
 use tasks::Tasks;
 use types::Types;
-use fs::{Dir, FSContext, PathGlobs, PathGlob, PathStat, Stat, Link};
+use fs::{Dir, File, FSContext, Link, PathGlobs, PathGlob, PathStat, Stat};
 use fs;
 
 
@@ -153,22 +156,73 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 
   /**
+   * NB: Panics on failure. Only recommended for use with built-in functions, such as
+   * those configured in types::Types.
+   */
+  fn invoke_unsafe(&self, func: &Function, args: &Vec<Value>) -> Value {
+    self.externs.invoke_runnable(func, args, false)
+      .unwrap_or_else(|e| {
+        panic!(
+          "Core function `{}` failed: {}",
+          self.externs.id_to_str(func.0),
+          self.externs.val_to_str(&e)
+        );
+      })
+  }
+
+  /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
   fn store_list(&self, items: Vec<&Value>, merge: bool) -> Value {
     self.externs.store_list(items, merge)
   }
 
-  fn store_link(&self, item: &Link) -> Value {
-    panic!("TODO: Not implemented!");
+  fn store_bytes(&self, item: &[u8]) -> Value {
+    self.externs.store_bytes(item)
+  }
+
+  fn store_path(&self, item: &Path) -> Value {
+    self.externs.store_bytes(item.as_os_str().as_bytes())
+  }
+
+  fn store_path_stat(&self, item: &PathStat) -> Value {
+    let args =
+      match item {
+        &PathStat::Dir { ref path, ref stat } =>
+          vec![self.store_path(path), self.store_dir(stat)],
+        &PathStat::File { ref path, ref stat } =>
+          vec![self.store_path(path), self.store_file(stat)],
+      };
+    self.invoke_unsafe(&self.types.construct_path_stat, &args)
   }
 
   fn store_dir(&self, item: &Dir) -> Value {
-    panic!("TODO: Not implemented!");
+    let args = vec![self.store_path(item.0.as_path())];
+    self.invoke_unsafe(&self.types.construct_dir, &args)
+  }
+
+  fn store_link(&self, item: &Link) -> Value {
+    let args = vec![self.store_path(item.0.as_path())];
+    self.invoke_unsafe(&self.types.construct_link, &args)
+  }
+
+  fn store_file(&self, item: &File) -> Value {
+    let args = vec![self.store_path(item.0.as_path())];
+    self.invoke_unsafe(&self.types.construct_file, &args)
   }
 
   fn store_snapshot(&self, item: &fs::Snapshot) -> Value {
-    panic!("TODO: Not implemented!");
+    let path_stats: Vec<_> =
+      item.path_stats.iter()
+        .map(|ps| self.store_path_stat(ps))
+        .collect();
+    self.invoke_unsafe(
+      &self.types.construct_snapshot,
+      &vec![
+        self.store_bytes(&item.fingerprint),
+        self.store_list(path_stats.iter().collect(), false),
+      ],
+    )
   }
 
   /**

@@ -72,7 +72,7 @@ _FFI.cdef(
     typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
-    typedef Value            (*extern_store_str)(ExternContext*, uint8_t*, uint64_t);
+    typedef Value            (*extern_store_bytes)(ExternContext*, uint8_t*, uint64_t);
     typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -110,7 +110,7 @@ _FFI.cdef(
                                    extern_val_to_str,
                                    extern_satisfied_by,
                                    extern_store_list,
-                                   extern_store_str,
+                                   extern_store_bytes,
                                    extern_project,
                                    extern_project_multi,
                                    extern_create_exception,
@@ -120,6 +120,11 @@ _FFI.cdef(
                                    Field,
                                    Field,
                                    Field,
+                                   Function,
+                                   Function,
+                                   Function,
+                                   Function,
+                                   Function,
                                    TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint,
@@ -233,10 +238,10 @@ def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
 
 
 @_FFI.callback("Value(ExternContext*, uint8_t*, uint64_t)")
-def extern_store_str(context_handle, utf8_ptr, utf8_len):
-  """Given a context storage and some UTF8 data, return a new Value to represent a string."""
+def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
+  """Given a context and raw bytes, return a new Value to represent the content."""
   c = _FFI.from_handle(context_handle)
-  return c.to_value(bytes(_FFI.buffer(utf8_ptr, utf8_len)).decode('utf-8'))
+  return c.to_value(bytes(_FFI.buffer(bytes_ptr, bytes_len)))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
@@ -489,8 +494,18 @@ class Native(object):
   def buffer(self, cdata):
     return _FFI.buffer(cdata)
 
-  def new_scheduler(self, constraint_has_products, constraint_address, constraint_variants,
-                    constraint_path_globs, constraint_snapshot, constraint_read_link,
+  def new_scheduler(self,
+                    construct_snapshot,
+                    construct_path_stat,
+                    construct_dir,
+                    construct_file,
+                    construct_link,
+                    constraint_has_products,
+                    constraint_address,
+                    constraint_variants,
+                    constraint_path_globs,
+                    constraint_snapshot,
+                    constraint_read_link,
                     constraint_directory_listing):
     """Create and return an ExternContext and native Scheduler."""
 
@@ -510,7 +525,7 @@ class Native(object):
         extern_val_to_str,
         extern_satisfied_by,
         extern_store_list,
-        extern_store_str,
+        extern_store_bytes,
         extern_project,
         extern_project_multi,
         extern_create_exception,
@@ -522,6 +537,12 @@ class Native(object):
         self.context.to_key('default'),
         self.context.to_key('include'),
         self.context.to_key('exclude'),
+        # Constructors/functions.
+        Function(self.context.to_id(construct_snapshot)),
+        Function(self.context.to_id(construct_path_stat)),
+        Function(self.context.to_id(construct_dir)),
+        Function(self.context.to_id(construct_file)),
+        Function(self.context.to_id(construct_link)),
         # TypeConstraints.
         tc(constraint_address),
         tc(constraint_has_products),

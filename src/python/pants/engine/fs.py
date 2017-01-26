@@ -111,11 +111,11 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
 
   @property
   def dirs(self):
-    return [p for p in path_stats if type(p.stat) == Dir]
+    return [p for p in self.path_stats if type(p.stat) == Dir]
 
   @property
   def files(self):
-    return [p for p in path_stats if type(p.stat) == File]
+    return [p for p in self.path_stats if type(p.stat) == File]
 
 
 def snapshot_noop(*args):

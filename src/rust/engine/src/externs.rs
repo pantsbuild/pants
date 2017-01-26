@@ -5,7 +5,6 @@ use std::os::raw;
 use std::string::FromUtf8Error;
 
 use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
-use nodes::Runnable;
 use handles::Handle;
 
 // An opaque pointer to a context used by the extern functions.
@@ -24,7 +23,7 @@ pub struct Externs {
   satisfied_by: SatisfiedByExtern,
   satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
-  store_str: StoreStrExtern,
+  store_bytes: StoreBytesExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   id_to_str: IdToStrExtern,
@@ -44,7 +43,7 @@ impl Externs {
     val_to_str: ValToStrExtern,
     satisfied_by: SatisfiedByExtern,
     store_list: StoreListExtern,
-    store_str: StoreStrExtern,
+    store_bytes: StoreBytesExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
@@ -59,7 +58,7 @@ impl Externs {
       satisfied_by: satisfied_by,
       satisfied_by_cache: RefCell::new(HashMap::new()),
       store_list: store_list,
-      store_str: store_str,
+      store_bytes: store_bytes,
       project: project,
       project_multi: project_multi,
       id_to_str: id_to_str,
@@ -98,9 +97,8 @@ impl Externs {
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
   }
 
-  pub fn store_str(&self, value: &str) -> Value {
-    let bytes = value.as_bytes();
-    (self.store_str)(self.context, bytes.as_ptr(), bytes.len() as u64)
+  pub fn store_bytes(&self, bytes: &[u8]) -> Value {
+    (self.store_bytes)(self.context, bytes.as_ptr(), bytes.len() as u64)
   }
 
   pub fn project(&self, value: &Value, field: &Field, type_id: &TypeId) -> Value {
@@ -132,14 +130,20 @@ impl Externs {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
 
-  pub fn invoke_runnable(&self, runnable: &Runnable) -> RunnableComplete {
-    (self.invoke_runnable)(
-      self.context,
-      runnable.func(),
-      runnable.args().as_ptr(),
-      runnable.args().len() as u64,
-      runnable.cacheable()
-    )
+  pub fn invoke_runnable(&self, func: &Function, args: &Vec<Value>, cacheable: bool) -> Result<Value, Value> {
+    let result =
+      (self.invoke_runnable)(
+        self.context,
+        func,
+        args.as_ptr(),
+        args.len() as u64,
+        cacheable
+      );
+    if result.is_throw {
+      Err(result.value)
+    } else {
+      Ok(result.value)
+    }
   }
 }
 
@@ -158,7 +162,7 @@ pub type DropHandlesExtern =
 pub type StoreListExtern =
   extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;
 
-pub type StoreStrExtern =
+pub type StoreBytesExtern =
   extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
 
 pub type ProjectExtern =
@@ -167,8 +171,8 @@ pub type ProjectExtern =
 #[repr(C)]
 #[derive(Debug)]
 pub struct RunnableComplete {
-  pub value: Value,
-  pub is_throw: bool,
+  value: Value,
+  is_throw: bool,
 }
 
 #[repr(C)]

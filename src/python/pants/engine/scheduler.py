@@ -15,8 +15,8 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
-from pants.engine.fs import (PathGlobs, create_fs_intrinsics,
-                             generate_fs_subjects, Snapshot, ReadLink, DirectoryListing)
+from pants.engine.fs import (Dir, DirectoryListing, File, Link, Path, PathGlobs, ReadLink, Snapshot,
+                             create_fs_intrinsics, generate_fs_subjects)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -72,6 +72,11 @@ class LocalScheduler(object):
     # Create the ExternContext, and the native Scheduler.
     self._scheduler =\
       native.new_scheduler(
+        Snapshot,
+        Path,
+        Dir,
+        File,
+        Link,
         has_products_constraint,
         constraint_for(Address),
         constraint_for(Variants),

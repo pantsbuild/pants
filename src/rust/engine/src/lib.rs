@@ -38,7 +38,7 @@ use externs::{
   ProjectMultiExtern,
   SatisfiedByExtern,
   StoreListExtern,
-  StoreStrExtern,
+  StoreBytesExtern,
   UTF8Buffer,
   ValForExtern,
   ValToStrExtern,
@@ -155,7 +155,7 @@ pub extern fn scheduler_create(
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
   store_list: StoreListExtern,
-  store_str: StoreStrExtern,
+  store_bytes: StoreBytesExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -165,6 +165,11 @@ pub extern fn scheduler_create(
   field_variants: Field,
   field_include: Field,
   field_exclude: Field,
+  construct_snapshot: Function,
+  construct_path_stat: Function,
+  construct_dir: Function,
+  construct_file: Function,
+  construct_link: Function,
   type_address: TypeConstraint,
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
@@ -187,6 +192,11 @@ pub extern fn scheduler_create(
             field_exclude,
           ),
           Types {
+            construct_snapshot: construct_snapshot,
+            construct_path_stat: construct_path_stat,
+            construct_dir: construct_dir,
+            construct_file: construct_file,
+            construct_link: construct_link,
             address: type_address,
             has_products: type_has_products,
             has_variants: type_has_variants,
@@ -205,7 +215,7 @@ pub extern fn scheduler_create(
             val_to_str,
             satisfied_by,
             store_list,
-            store_str,
+            store_bytes,
             project,
             project_multi,
             create_exception,
@@ -278,12 +288,10 @@ pub extern fn execution_execute(
       runnable_count += runnable_batch.len();
       completed =
         runnable_batch.iter()
-          .map(|&(id, ref runnable)| {
-            let result = raw.scheduler.externs.invoke_runnable(runnable);
-            if result.is_throw {
-              (id, Complete::Throw(result.value))
-            } else {
-              (id, Complete::Return(result.value))
+          .map(|&(id, ref r)| {
+            match raw.scheduler.externs.invoke_runnable(r.func(), r.args(), r.cacheable()) {
+              Ok(v) => (id, Complete::Return(v)),
+              Err(v) => (id, Complete::Throw(v)),
             }
           })
           .collect();
