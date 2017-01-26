@@ -290,29 +290,8 @@ impl<'g, 't> StepContext<'g, 't> {
     panic!("TODO: Not implemented!");
   }
 
-  fn lift_stats(&self, item: &Value) -> Vec<Stat> {
-    self.project_multi(item, &self.tasks.field_dependencies).iter()
-      .filter_map(|v| {
-        let path_str =
-          self.externs.val_to_str(
-            &self.project(
-              v,
-              &self.tasks.field_path,
-              self.tasks.field_path.0.type_id()
-            )
-          );
-        let path = Path::new(path_str.as_str()).to_owned();
-        if self.satisfied_by(&self.types.dir, v.type_id()) {
-          Some(Stat::Dir(Dir(path)))
-        } else if self.satisfied_by(&self.types.file, v.type_id()) {
-          Some(Stat::File(File(path)))
-        } else if self.satisfied_by(&self.types.link, v.type_id()) {
-          Some(Stat::Link(Link(path)))
-        } else {
-          panic!("Invalid Stat type in {}", self.externs.val_to_str(item));
-        }
-      })
-      .collect()
+  fn lift_directory_listing(&self, item: &Value) -> Vec<Stat> {
+    self.externs.lift_directory_listing(item)
   }
 
   /**
@@ -350,7 +329,7 @@ impl<'g, 't> FSContext<Node> for StepContext<'g, 't> {
         Variants::default(),
       );
     match self.get(&node) {
-      Some(&Complete::Return(ref value)) => Ok(self.lift_stats(value)),
+      Some(&Complete::Return(ref value)) => Ok(self.lift_directory_listing(value)),
       _ => Err(node),
     }
   }

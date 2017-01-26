@@ -1,9 +1,13 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
 use std::mem;
 use std::os::raw;
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 use std::string::FromUtf8Error;
 
+use fs::{Dir, File, Link, Stat};
 use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
 
@@ -24,6 +28,7 @@ pub struct Externs {
   satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
+  lift_directory_listing: LiftDirectoryListingExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   id_to_str: IdToStrExtern,
@@ -44,6 +49,7 @@ impl Externs {
     satisfied_by: SatisfiedByExtern,
     store_list: StoreListExtern,
     store_bytes: StoreBytesExtern,
+    lift_directory_listing: LiftDirectoryListingExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
@@ -59,6 +65,7 @@ impl Externs {
       satisfied_by_cache: RefCell::new(HashMap::new()),
       store_list: store_list,
       store_bytes: store_bytes,
+      lift_directory_listing: lift_directory_listing,
       project: project,
       project_multi: project_multi,
       id_to_str: id_to_str,
@@ -126,6 +133,22 @@ impl Externs {
     })
   }
 
+  pub fn lift_directory_listing(&self, val: &Value) -> Vec<Stat> {
+    let raw_stats = (self.lift_directory_listing)(self.context, val);
+    with_vec(raw_stats.stats_ptr, raw_stats.stats_len as usize, |stats_vec| {
+      stats_vec.iter()
+        .map(|raw_stat| {
+          let path = Path::new(raw_stat.path.to_os_string().as_os_str()).to_owned();
+          match raw_stat.tag {
+            RawStatTag::Dir => Stat::Dir(Dir(path)),
+            RawStatTag::File => Stat::File(File(path)),
+            RawStatTag::Link => Stat::Link(Link(path)),
+          }
+        })
+        .collect()
+    })
+  }
+
   pub fn create_exception(&self, msg: String) -> Value {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
@@ -165,8 +188,35 @@ pub type StoreListExtern =
 pub type StoreBytesExtern =
   extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
 
+pub type LiftDirectoryListingExtern =
+  extern "C" fn(*const ExternContext, *const Value) -> RawStats;
+
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
+
+// This enum is only ever constructed from the python side.
+#[allow(dead_code)]
+#[repr(C)]
+#[repr(u8)]
+pub enum RawStatTag {
+  Dir = 0,
+  File = 1,
+  Link = 2,
+}
+
+#[repr(C)]
+pub struct RawStat {
+  path: UTF8Buffer,
+  tag: RawStatTag,
+}
+
+#[repr(C)]
+pub struct RawStats {
+  stats_ptr: *mut RawStat,
+  stats_len: u64,
+  // A handle to hold the underlying stats buffer alive.
+  _value: Value,
+}
 
 #[repr(C)]
 #[derive(Debug)]
@@ -184,16 +234,12 @@ pub struct ValueBuffer {
 pub type ProjectMultiExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field) -> ValueBuffer;
 
-/**
- * A struct that points at a python-allocated UTF8 buffer, which is owned by the
- * attached value. The Value isn't intended to be accessed: it just represents a handle
- * to the underlying python object.
- */
 #[repr(C)]
 pub struct UTF8Buffer {
   str_ptr: *mut u8,
   str_len: u64,
-  value: Value,
+  // A handle to hold the underlying string buffer alive.
+  _value: Value,
 }
 
 impl UTF8Buffer {
@@ -201,6 +247,12 @@ impl UTF8Buffer {
     with_vec(self.str_ptr, self.str_len as usize, |char_vec| {
       // Attempt to decode from unicode.
       String::from_utf8(char_vec.clone())
+    })
+  }
+
+  pub fn to_os_string(&self) -> OsString {
+    with_vec(self.str_ptr, self.str_len as usize, |bytes_vec| {
+      OsStr::from_bytes(bytes_vec).to_owned()
     })
   }
 }

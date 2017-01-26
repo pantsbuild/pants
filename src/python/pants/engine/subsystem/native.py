@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import pkg_resources
 from cffi import FFI
 
+from pants.base.project_tree import Dir, File, Link
 from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
@@ -48,13 +49,24 @@ _FFI.cdef(
     typedef struct {
       char*    str_ptr;
       uint64_t str_len;
-      Value    value;
+      Value    _value;
     } UTF8Buffer;
 
     typedef struct {
       Value*     values_ptr;
       uint64_t   values_len;
     } ValueBuffer;
+
+    typedef struct {
+      UTF8Buffer   path;
+      uint8_t      tag;
+    } RawStat;
+
+    typedef struct {
+      RawStat*     stats_ptr;
+      uint64_t     stats_len;
+      Value        _value;
+    } RawStats;
 
     typedef struct {
       Value  value;
@@ -74,6 +86,7 @@ _FFI.cdef(
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_store_bytes)(ExternContext*, uint8_t*, uint64_t);
+    typedef RawStats         (*extern_lift_directory_listing)(ExternContext*, Value*);
     typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -112,6 +125,7 @@ _FFI.cdef(
                                    extern_satisfied_by,
                                    extern_store_list,
                                    extern_store_bytes,
+                                   extern_lift_directory_listing,
                                    extern_project,
                                    extern_project_multi,
                                    extern_create_exception,
@@ -250,6 +264,28 @@ def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
   return c.to_value(bytes(_FFI.buffer(bytes_ptr, bytes_len)))
 
 
+@_FFI.callback("RawStats(ExternContext*, Value*)")
+def extern_lift_directory_listing(context_handle, directory_listing_val):
+  """Given a context and a Value representing a DirectoryListing, return RawStats."""
+  c = _FFI.from_handle(context_handle)
+  directory_listing = c.from_value(directory_listing_val)
+
+  raw_stats_len = len(directory_listing.dependencies)
+  raw_stats = _FFI.new('RawStat[]', raw_stats_len)
+  for i, stat in enumerate(directory_listing.dependencies):
+    raw_stats[i].path = c.utf8_buf(stat.path)
+    if type(stat) == Dir:
+      raw_stats[i].tag = 0
+    elif type(stat) == File:
+      raw_stats[i].tag = 1
+    elif type(stat) == Link:
+      raw_stats[i].tag = 2
+    else:
+      raise Exception('Unrecognized stat type: {}'.format(stat))
+
+  return (raw_stats, raw_stats_len, c.to_value(raw_stats, type_id=c.bytes_id))
+
+
 @_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
 def extern_project(context_handle, val, field, type_id):
   """Given a Value for `obj`, a field name, and a type, project the field as a new Value."""
@@ -339,7 +375,7 @@ class ExternContext(object):
     self._id_generator = 0
     self._id_to_obj = dict()
     self._obj_to_id = dict()
-    self._bytes_id = TypeId(self.to_id(bytes))
+    self.bytes_id = TypeId(self.to_id(bytes))
 
     # Outstanding FFI object handles.
     self._handles = set()
@@ -358,7 +394,7 @@ class ExternContext(object):
   def utf8_buf(self, string):
     utf8 = string.encode('utf-8')
     buf = _FFI.new('char[]', utf8)
-    return (buf, len(utf8), self.to_value(buf, type_id=self._bytes_id))
+    return (buf, len(utf8), self.to_value(buf, type_id=self.bytes_id))
 
   def vals_buf(self, keys):
     if self._keys_cap < len(keys):
@@ -529,6 +565,7 @@ class Native(object):
         extern_satisfied_by,
         extern_store_list,
         extern_store_bytes,
+        extern_lift_directory_listing,
         extern_project,
         extern_project_multi,
         extern_create_exception,
