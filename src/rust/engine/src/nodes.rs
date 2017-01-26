@@ -154,7 +154,7 @@ impl<'g, 't> StepContext<'g, 't> {
  * Defines executing a single step for the given context.
  */
 trait Step {
-  fn step(&self, context: &mut StepContext) -> State;
+  fn step(&self, context: StepContext) -> State;
 }
 
 /**
@@ -226,7 +226,7 @@ impl Select {
 }
 
 impl Step for Select {
-  fn step(&self, context: &mut StepContext) -> State {
+  fn step(&self, context: StepContext) -> State {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
     let variants = &self.variants;
 
@@ -303,7 +303,7 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, context: &mut StepContext) -> State {
+  fn step(&self, context: StepContext) -> State {
     State::Complete(Complete::Return(context.val_for(&self.selector.subject)))
   }
 }
@@ -386,7 +386,7 @@ impl SelectDependencies {
 }
 
 impl Step for SelectDependencies {
-  fn step(&self, context: &mut StepContext) -> State {
+  fn step(&self, context: StepContext) -> State {
     // Select the product holding the dependency list.
     let dep_product =
       match self.dep_product(&context) {
@@ -435,7 +435,7 @@ pub struct SelectProjection {
 }
 
 impl Step for SelectProjection {
-  fn step(&self, context: &mut StepContext) -> State {
+  fn step(&self, context: StepContext) -> State {
     // Request the product we need to compute the subject.
     let input_node =
       Node::create(
@@ -502,7 +502,7 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: &mut StepContext) -> State {
+  fn step(&self, context: StepContext) -> State {
     // Compute dependencies for the Node, or determine whether it is a Noop.
     let mut has_dependencies = false;
     let mut dep_values: Vec<&Value> = Vec::new();
@@ -630,18 +630,18 @@ impl Node {
   }
 
   pub fn step(&self, entry_id: EntryId, graph: &mut Graph, tasks: &Tasks) -> State {
-    let mut context =
+    let context =
       StepContext {
         entry_id: entry_id,
         graph: graph,
         tasks: tasks,
       };
     match self {
-      &Node::Select(ref n) => n.step(&mut context),
-      &Node::SelectDependencies(ref n) => n.step(&mut context),
-      &Node::SelectLiteral(ref n) => n.step(&mut context),
-      &Node::SelectProjection(ref n) => n.step(&mut context),
-      &Node::Task(ref n) => n.step(&mut context),
+      &Node::Select(ref n) => n.step(context),
+      &Node::SelectDependencies(ref n) => n.step(context),
+      &Node::SelectLiteral(ref n) => n.step(context),
+      &Node::SelectProjection(ref n) => n.step(context),
+      &Node::Task(ref n) => n.step(context),
     }
   }
 }
