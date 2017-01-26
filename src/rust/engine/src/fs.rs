@@ -158,23 +158,28 @@ impl PathGlob {
   }
 
   /**
-   * Eliminate consecutive '**'s to avoid repetitive traversing.
+   * Split a filespec string into path components while eliminating
+   * consecutive '**'s (to avoid repetitive traversing).
    */
-  fn split_path(filespec: &String) -> Vec<&OsStr> {
-    let mut parts: Vec<&OsStr> = Path::new(filespec).iter().collect();
-    let mut idx = 1;
-    while idx < parts.len() && *DOUBLE_STAR == parts[idx] {
-      idx += 1;
+  fn split_path(filespec: &str) -> Vec<&OsStr> {
+    let mut out = Vec::new();
+    let mut prev_was_doublestar = false;
+    for part in Path::new(filespec).iter() {
+      let cur_is_doublestar = *DOUBLE_STAR == part;
+      if prev_was_doublestar && cur_is_doublestar {
+        continue;
+      }
+      out.push(part);
+      prev_was_doublestar = cur_is_doublestar;
     }
-    parts.drain(..idx);
-    parts
+    out
   }
 
   /**
    * Given a filespec String relative to a canonical Dir and path, parse it to a
    * series of PathGlob objects.
    */
-  fn parse(canonical_dir: &Dir, symbolic_path: &Path, filespec: &String) -> Result<Vec<PathGlob>, globset::Error> {
+  fn parse(canonical_dir: &Dir, symbolic_path: &Path, filespec: &str) -> Result<Vec<PathGlob>, globset::Error> {
     let mut parts = Vec::new();
     for part in PathGlob::split_path(filespec) {
       // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
@@ -332,18 +337,23 @@ pub trait FSContext<K> {
     let mut path_stats = Vec::new();
     let mut continuations = Vec::new();
     for stat in matched {
-      match stat {
-        Stat::Link(l) =>
-          match self.canonicalize(symbolic_path, &l) {
-            Ok(Some(ps)) => path_stats.push(ps),
-            Ok(None) => (),
-            Err(ks) => continuations.extend(ks),
-          },
-        Stat::Dir(d) =>
-          path_stats.push(PathStat::dir(symbolic_path.to_owned(), d)),
-        Stat::File(f) =>
-          path_stats.push(PathStat::file(symbolic_path.to_owned(), f)),
-      };
+      let stat_symbolic_path =
+        stat.path().file_name()
+          .map(|file_name| symbolic_path.join(file_name));
+      if let Some(ssp) = stat_symbolic_path {
+        match stat {
+          Stat::Link(l) =>
+            match self.canonicalize(ssp.as_path(), &l) {
+              Ok(Some(ps)) => path_stats.push(ps),
+              Ok(None) => (),
+              Err(ks) => continuations.extend(ks),
+            },
+          Stat::Dir(d) =>
+            path_stats.push(PathStat::dir(ssp.to_owned(), d)),
+          Stat::File(f) =>
+            path_stats.push(PathStat::file(ssp.to_owned(), f)),
+        }
+      }
     }
 
     // If there were no continuations, all PathStats were completely expanded.
