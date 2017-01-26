@@ -167,11 +167,7 @@ fi
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
-    targets=$(
-      ./pants.pex list pants-plugins/tests/python:: | \
-      xargs ./pants.pex filter --filter-type=python_tests
-    ) && \
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest ${targets}
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest pants-plugins/tests/python::
   ) || die "Internal backend python test failure"
 fi
 
@@ -181,14 +177,10 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   banner "Running core python tests${shard_desc}"
   (
-    targets=$(
-      ./pants.pex list tests/python:: | \
-      xargs ./pants.pex --tag='-integration' filter --filter-type=python_tests
-    ) && \
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
       --coverage=paths:pants/ \
       --test-pytest-test-shard=${python_unit_shard} \
-      ${targets}
+      tests/python::
   ) || die "Core python test failure"
 fi
 
@@ -199,7 +191,8 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     # test (ie: pants_test.contrib) namespace packages.
     # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
     #  https://github.com/pantsbuild/pants/issues/1149
-    ./pants.pex ${PANTS_ARGS[@]}  --exclude-target-regexp='.*/testprojects/.*' --build-ignore=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
+    ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
+    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
   ) || die "Contrib python test failure"
 fi
 
@@ -209,11 +202,9 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
-    targets=$(
-      ./pants.pex list tests/python:: | \
-      xargs ./pants.pex --tag='+integration' filter --filter-type=python_tests
-    ) && \
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --test-pytest-test-shard=${python_intg_shard} ${targets}
+    ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test.pytest \
+      --test-pytest-test-shard=${python_intg_shard} \
+      tests/python::
   ) || die "Pants Integration test failure"
 fi
 
