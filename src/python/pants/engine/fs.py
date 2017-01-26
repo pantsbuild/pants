@@ -9,6 +9,7 @@ import errno
 import functools
 import shutil
 from abc import abstractproperty
+from binascii import hexlify
 from fnmatch import fnmatch
 from hashlib import sha1
 from itertools import chain
@@ -116,6 +117,12 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
   @property
   def files(self):
     return [p for p in self.path_stats if type(p.stat) == File]
+
+  def __repr__(self):
+    return '''Snapshot(fingerprint='{}', entries={})'''.format(hexlify(self.fingerprint)[:8], len(self.path_stats))
+
+  def __str__(self):
+    return repr(self)
 
 
 def snapshot_noop(*args):
