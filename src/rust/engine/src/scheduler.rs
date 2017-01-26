@@ -102,14 +102,18 @@ impl Scheduler {
    * Attempt to run a step with the currently available dependencies of the given Node. If
    * a step runs, the new State of the Node will be returned.
    */
-  fn attempt_step(&self, id: EntryId) -> Option<State<Node>> {
+  fn attempt_step(&mut self, id: EntryId) -> Option<State> {
     if !self.graph.is_ready_entry(id) {
       return None;
     }
 
     // Run a step.
-    let entry = self.graph.entry_for_id(id);
-    Some(entry.node().step(entry, &self.graph, &self.tasks))
+    // NB: Needing to clone the Node here is unfortunate, but allows the Node to be borrowed
+    // immutably while the graph is borrowed mutably for the declaration of new dependencies.
+    Some(
+      self.graph.entry_for_id(id).node().clone()
+        .step(id, &mut self.graph, &self.tasks)
+    )
   }
 
   /**
@@ -148,9 +152,8 @@ impl Scheduler {
           self.graph.complete(entry_id, s);
           self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
         },
-        Some(State::Waiting(w)) => {
-          // Add the new dependencies.
-          self.graph.add_dependencies(entry_id, w);
+        Some(State::Waiting) => {
+          // Node is waiting on dependencies which it declared via the StepContext.
           let ref graph = self.graph;
           let mut incomplete_deps =
             self.graph.entry_for_id(entry_id).dependencies().iter()

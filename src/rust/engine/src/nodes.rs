@@ -1,4 +1,4 @@
-use graph::{Entry, Graph};
+use graph::{EntryId, Graph};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
@@ -28,8 +28,8 @@ impl Runnable {
 }
 
 #[derive(Debug)]
-pub enum State<T> {
-  Waiting(Vec<T>),
+pub enum State {
+  Waiting,
   Complete(Complete),
   Runnable(Runnable),
 }
@@ -42,8 +42,8 @@ pub enum Complete {
 }
 
 pub struct StepContext<'g, 't> {
-  entry: &'g Entry,
-  graph: &'g Graph,
+  entry_id: EntryId,
+  graph: &'g mut Graph,
   tasks: &'t Tasks,
 }
 
@@ -73,21 +73,8 @@ impl<'g, 't> StepContext<'g, 't> {
       .unwrap_or_else(|| Vec::new())
   }
 
-  fn get(&self, node: &Node) -> Option<&Complete> {
-    self.graph.entry(node).and_then(|dep_entry| {
-      // The entry exists. If it's a declared dep, return it immediately.
-      if self.entry.dependencies().contains(&dep_entry.id()) {
-        dep_entry.state()
-      } else if self.entry.cyclic_dependencies().contains(&dep_entry.id()) {
-        // Declared, but cyclic.
-        Some(self.graph.cyclic_singleton())
-      } else {
-        // Undeclared. In theory we could still immediately return the dep here, but unfortunately
-        // that occasionally allows Nodes to finish executing before all of their declared deps are
-        // available.
-        None
-      }
-    })
+  fn get(&mut self, node: &Node) -> Option<&Complete> {
+    self.graph.get(self.entry_id, node)
   }
 
   fn has_products(&self, item: &Value) -> bool {
@@ -167,7 +154,7 @@ impl<'g, 't> StepContext<'g, 't> {
  * Defines executing a single step for the given context.
  */
 trait Step {
-  fn step(&self, context: StepContext) -> State<Node>;
+  fn step(&self, context: &mut StepContext) -> State;
 }
 
 /**
@@ -239,7 +226,7 @@ impl Select {
 }
 
 impl Step for Select {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn step(&self, context: &mut StepContext) -> State {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
     let variants = &self.variants;
 
@@ -286,7 +273,7 @@ impl Step for Select {
     // a value was successfully selected.
     if !dependencies.is_empty() {
       // A dependency has not run yet.
-      return State::Waiting(dependencies);
+      return State::Waiting;
     } else if matches.len() > 1 {
       // TODO: Multiple successful tasks are not currently supported. We should allow for this
       // by adding support for "mergeable" products. see:
@@ -316,7 +303,7 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn step(&self, context: &mut StepContext) -> State {
     State::Complete(Complete::Return(context.val_for(&self.selector.subject)))
   }
 }
@@ -338,7 +325,7 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_product<'a>(&self, context: &'a StepContext) -> Result<&'a Value, State<Node>> {
+  fn dep_product<'a>(&self, context: &'a StepContext) -> Result<&'a Value, State> {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
@@ -358,7 +345,7 @@ impl SelectDependencies {
       Some(&Complete::Throw(ref msg)) =>
         Err(State::Complete(Complete::Throw(context.clone_val(msg)))),
       None =>
-        Err(State::Waiting(vec![dep_product_node])),
+        Err(State::Waiting),
     }
   }
 
@@ -399,7 +386,7 @@ impl SelectDependencies {
 }
 
 impl Step for SelectDependencies {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn step(&self, context: &mut StepContext) -> State {
     // Select the product holding the dependency list.
     let dep_product =
       match self.dep_product(&context) {
@@ -408,7 +395,7 @@ impl Step for SelectDependencies {
       };
 
     // The product and its dependency list are available.
-    let mut dependencies = Vec::new();
+    let mut has_dependencies = false;
     let mut dep_values: Vec<&Value> = Vec::new();
     for dep_subject in context.project_multi(&dep_product, &self.selector.field) {
       let dep_node = self.dep_node(&context, &dep_subject);
@@ -428,12 +415,12 @@ impl Step for SelectDependencies {
           // NB: propagate thrown exception directly.
           return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
-          dependencies.push(dep_node),
+          has_dependencies = true,
       }
     }
 
-    if dependencies.len() > 0 {
-      State::Waiting(dependencies)
+    if has_dependencies {
+      State::Waiting
     } else {
       State::Complete(Complete::Return(self.store(&context, &dep_product, dep_values)))
     }
@@ -448,7 +435,7 @@ pub struct SelectProjection {
 }
 
 impl Step for SelectProjection {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn step(&self, context: &mut StepContext) -> State {
     // Request the product we need to compute the subject.
     let input_node =
       Node::create(
@@ -467,7 +454,7 @@ impl Step for SelectProjection {
         Some(&Complete::Throw(ref msg)) =>
           return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
-          return State::Waiting(vec![input_node]),
+          return State::Waiting,
       };
 
     // The input product is available: use it to construct the new Subject.
@@ -501,7 +488,7 @@ impl Step for SelectProjection {
         // NB: propagate thrown exception directly.
         State::Complete(Complete::Throw(context.clone_val(msg))),
       None =>
-        State::Waiting(vec![output_node]),
+        State::Waiting,
     }
   }
 }
@@ -515,9 +502,9 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn step(&self, context: &mut StepContext) -> State {
     // Compute dependencies for the Node, or determine whether it is a Noop.
-    let mut dependencies = Vec::new();
+    let mut has_dependencies = false;
     let mut dep_values: Vec<&Value> = Vec::new();
     for selector in &self.selector.clause {
       let dep_node =
@@ -537,13 +524,13 @@ impl Step for Task {
           // NB: propagate thrown exception directly.
           return State::Complete(Complete::Throw(context.clone_val(msg))),
         None =>
-          dependencies.push(dep_node),
+          has_dependencies = true,
       }
     }
 
-    if !dependencies.is_empty() {
+    if has_dependencies {
       // A clause was still waiting on dependencies.
-      State::Waiting(dependencies)
+      State::Waiting
     } else {
       // Ready to run!
       State::Runnable(Runnable {
@@ -642,19 +629,19 @@ impl Node {
     }
   }
 
-  pub fn step(&self, entry: &Entry, graph: &Graph, tasks: &Tasks) -> State<Node> {
-    let context =
+  pub fn step(&self, entry_id: EntryId, graph: &mut Graph, tasks: &Tasks) -> State {
+    let mut context =
       StepContext {
-        entry: entry,
+        entry_id: entry_id,
         graph: graph,
         tasks: tasks,
       };
     match self {
-      &Node::Select(ref n) => n.step(context),
-      &Node::SelectDependencies(ref n) => n.step(context),
-      &Node::SelectLiteral(ref n) => n.step(context),
-      &Node::SelectProjection(ref n) => n.step(context),
-      &Node::Task(ref n) => n.step(context),
+      &Node::Select(ref n) => n.step(&mut context),
+      &Node::SelectDependencies(ref n) => n.step(&mut context),
+      &Node::SelectLiteral(ref n) => n.step(&mut context),
+      &Node::SelectProjection(ref n) => n.step(&mut context),
+      &Node::Task(ref n) => n.step(&mut context),
     }
   }
 }
