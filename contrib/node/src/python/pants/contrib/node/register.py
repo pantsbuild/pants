@@ -15,6 +15,7 @@ from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest as NodeTestTarget
+from pants.contrib.node.tasks.node_bundle import NodeBundle
 from pants.contrib.node.tasks.node_repl import NodeRepl
 from pants.contrib.node.tasks.node_resolve import NodeResolve
 from pants.contrib.node.tasks.node_run import NodeRun
@@ -37,6 +38,7 @@ def register_goals():
   task(name='node', action=NodeResolve).install('resolve')
   task(name='node', action=NodeRun).install('run')
   task(name='node', action=NodeTestTask).install('test')
+  task(name='node', action=NodeBundle).install('bundle')
 
 
 def global_subsystems():

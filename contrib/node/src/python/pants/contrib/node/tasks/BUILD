@@ -3,6 +3,7 @@
 
 target(
   dependencies=[
+    ':node_bundle',
     ':node_repl',
     ':node_resolve',
     ':node_run',
@@ -13,6 +14,17 @@ target(
 python_library(
   name='node_paths',
   sources=['node_paths.py']
+)
+
+python_library(
+  name='node_bundle',
+  sources=['node_bundle.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/fs',
+  ]
 )
 
 python_library(

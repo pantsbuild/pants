@@ -1,6 +1,43 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+target(
+  name='all',
+  dependencies=[
+    ':integration',
+    ':unit',
+  ]
+)
+
+target(
+  name='integration',
+  dependencies=[
+    ':node_bundle_integration',
+    ':node_repl_integration',
+    ':node_run_integration',
+    ':node_test_integration',
+    ':node_resolve_integration',
+  ]
+)
+
+target(
+  name='unit',
+  dependencies=[
+    ':node_task',
+    ':node_resolve',
+  ]
+)
+
+python_tests(
+  name='node_bundle_integration',
+  sources=['test_node_bundle_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
 python_tests(
   name='node_repl_integration',
   sources=['test_node_repl_integration.py'],
