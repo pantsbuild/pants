@@ -537,7 +537,7 @@ impl Snapshot {
       fs::File::create(dest)
         .map_err(|e| format!("Failed to create destination file: {:?}", e))?;
     let mut tar_builder = tar::Builder::new(dest_file);
-    let mut head = tar::Header::new_gnu();
+    let mut head = tar::Header::new_ustar();
     for path in paths {
       // Populate the header for the File or Dir.
       Snapshot::tar_header_populate(&mut head, &path, relative_to)?;
