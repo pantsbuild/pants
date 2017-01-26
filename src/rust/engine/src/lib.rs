@@ -10,7 +10,7 @@ mod tasks;
 mod types;
 
 extern crate fnv;
-extern crate globset;
+extern crate glob;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;

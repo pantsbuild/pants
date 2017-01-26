@@ -1,10 +1,9 @@
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::{fmt, fs, hash, io};
+use std::{fmt, fs, io};
 
-use globset::Glob;
-use globset;
+use glob::{Pattern, PatternError};
 use ordermap::OrderMap;
 use sha2::{Sha256, Digest};
 use tar;
@@ -78,51 +77,26 @@ impl PathStat {
 }
 
 lazy_static! {
-  static ref SINGLE_DOT_GLOB: Glob = Glob::new(".").unwrap();
-  static ref SINGLE_STAR_GLOB: Glob = Glob::new("*").unwrap();
+  static ref SINGLE_DOT_GLOB: Pattern = Pattern::new(".").unwrap();
+  static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
   static ref DOUBLE_STAR: &'static str = "**";
-  static ref DOUBLE_STAR_GLOB: Glob = Glob::new("**").unwrap();
+  static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new("**").unwrap();
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathGlob {
   Root,
   Wildcard {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
-    wildcard: Glob,
+    wildcard: Pattern,
   },
   DirWildcard {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
-    wildcard: Glob,
-    remainder: Vec<Glob>,
+    wildcard: Pattern,
+    remainder: Vec<Pattern>,
   },
-}
-
-// TODO: `Glob` does not implement Hash.
-//   see: https://github.com/BurntSushi/ripgrep/pull/339
-impl hash::Hash for PathGlob {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    let (cd, sp, w) =
-      match self {
-        &PathGlob::Root => {
-          0.hash(state);
-          return;
-        },
-        &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } =>
-          (canonical_dir, symbolic_path, wildcard),
-        &PathGlob::DirWildcard { ref canonical_dir, ref symbolic_path, ref wildcard, ref remainder } => {
-          for r in remainder {
-            r.glob().hash(state);
-          }
-          (canonical_dir, symbolic_path, wildcard)
-        }
-      };
-    cd.hash(state);
-    sp.hash(state);
-    w.glob().hash(state);
-  }
 }
 
 impl PathGlob {
@@ -130,7 +104,7 @@ impl PathGlob {
     PathStat::dir(PathBuf::new(), Dir(PathBuf::new()))
   }
 
-  fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Glob) -> PathGlob {
+  fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern) -> PathGlob {
     PathGlob::Wildcard {
       canonical_dir: canonical_dir,
       symbolic_path: symbolic_path,
@@ -138,7 +112,7 @@ impl PathGlob {
     }
   }
 
-  fn dir_wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Glob, remainder: Vec<Glob>) -> PathGlob {
+  fn dir_wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern, remainder: Vec<Pattern>) -> PathGlob {
     PathGlob::DirWildcard {
       canonical_dir: canonical_dir,
       symbolic_path: symbolic_path,
@@ -147,7 +121,7 @@ impl PathGlob {
     }
   }
 
-  pub fn create(filespecs: &Vec<String>) -> Result<Vec<PathGlob>, globset::Error> {
+  pub fn create(filespecs: &Vec<String>) -> Result<Vec<PathGlob>, PatternError> {
     let canonical_dir = Dir(PathBuf::new());
     let symbolic_path = PathBuf::new();
     let mut path_globs = Vec::new();
@@ -179,20 +153,20 @@ impl PathGlob {
    * Given a filespec String relative to a canonical Dir and path, parse it to a
    * series of PathGlob objects.
    */
-  fn parse(canonical_dir: &Dir, symbolic_path: &Path, filespec: &str) -> Result<Vec<PathGlob>, globset::Error> {
+  fn parse(canonical_dir: &Dir, symbolic_path: &Path, filespec: &str) -> Result<Vec<PathGlob>, PatternError> {
     let mut parts = Vec::new();
     for part in PathGlob::split_path(filespec) {
       // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
       // use of `Path` is strictly for os-independent Path parsing.
-      parts.push(Glob::new(&part.to_string_lossy())?);
+      parts.push(Pattern::new(&part.to_string_lossy())?);
     }
     Ok(PathGlob::parse_globs(canonical_dir, symbolic_path, &parts))
   }
 
   /**
-   * Given a filespec as Globs, create a series of PathGlob objects.
+   * Given a filespec as Patterns, create a series of PathGlob objects.
    */
-  fn parse_globs(canonical_dir: &Dir, symbolic_path: &Path, parts: &Vec<Glob>) -> Vec<PathGlob> {
+  fn parse_globs(canonical_dir: &Dir, symbolic_path: &Path, parts: &Vec<Pattern>) -> Vec<PathGlob> {
     if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && *SINGLE_DOT_GLOB == parts[0] {
       // A request for the root path.
       vec![PathGlob::Root]
@@ -272,7 +246,7 @@ pub struct PathGlobs {
 }
 
 impl PathGlobs {
-  pub fn create(include: &Vec<String>, exclude: &Vec<String>) -> Result<PathGlobs, globset::Error> {
+  pub fn create(include: &Vec<String>, exclude: &Vec<String>) -> Result<PathGlobs, PatternError> {
     Ok(
       PathGlobs {
         include: PathGlob::create(include)?,
@@ -323,36 +297,40 @@ pub trait FSContext<K> {
     }
   }
 
-  fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Glob) -> Result<Vec<PathStat>, Vec<K>> {
+  fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Pattern) -> Result<Vec<PathStat>, Vec<K>> {
     // List the directory, match any relevant Stats, and join them into PathStats.
-    let glob_matcher = wildcard.compile_matcher();
     let matched =
       self.scandir(canonical_dir).map_err(|k| vec![k])?.into_iter()
         .filter(|stat| {
           // Match relevant filenames.
-          stat.path().file_name().map(|file_name| glob_matcher.is_match(file_name)).unwrap_or(false)
+          stat.path().file_name()
+            .map(|file_name| wildcard.matches_path(Path::new(file_name)))
+            .unwrap_or(false)
+        })
+        .filter_map(|stat| {
+          // Append matched filenames.
+          stat.path().file_name()
+            .map(|file_name| {
+              symbolic_path.join(file_name)
+            })
+            .map(|stat_symbolic_path| (stat_symbolic_path, stat))
         });
 
     // Batch-canonicalize matched PathStats.
     let mut path_stats = Vec::new();
     let mut continuations = Vec::new();
-    for stat in matched {
-      let stat_symbolic_path =
-        stat.path().file_name()
-          .map(|file_name| symbolic_path.join(file_name));
-      if let Some(ssp) = stat_symbolic_path {
-        match stat {
-          Stat::Link(l) =>
-            match self.canonicalize(ssp.as_path(), &l) {
-              Ok(Some(ps)) => path_stats.push(ps),
-              Ok(None) => (),
-              Err(ks) => continuations.extend(ks),
-            },
-          Stat::Dir(d) =>
-            path_stats.push(PathStat::dir(ssp.to_owned(), d)),
-          Stat::File(f) =>
-            path_stats.push(PathStat::file(ssp.to_owned(), f)),
-        }
+    for (stat_symbolic_path, stat) in matched {
+      match stat {
+        Stat::Link(l) =>
+          match self.canonicalize(stat_symbolic_path.as_path(), &l) {
+            Ok(Some(ps)) => path_stats.push(ps),
+            Ok(None) => (),
+            Err(ks) => continuations.extend(ks),
+          },
+        Stat::Dir(d) =>
+          path_stats.push(PathStat::dir(stat_symbolic_path.to_owned(), d)),
+        Stat::File(f) =>
+          path_stats.push(PathStat::file(stat_symbolic_path.to_owned(), f)),
       }
     }
 
