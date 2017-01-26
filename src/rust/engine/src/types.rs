@@ -13,4 +13,7 @@ pub struct Types {
   pub snapshot: TypeConstraint,
   pub read_link: TypeConstraint,
   pub directory_listing: TypeConstraint,
+  pub dir: TypeConstraint,
+  pub file: TypeConstraint,
+  pub link: TypeConstraint,
 }

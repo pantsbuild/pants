@@ -17,6 +17,7 @@ pub struct Tasks {
   pub field_include: Field,
   pub field_exclude: Field,
   pub field_dependencies: Field,
+  pub field_path: Field,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
 }
@@ -40,6 +41,7 @@ impl Tasks {
     field_include: Field,
     field_exclude: Field,
     field_dependencies: Field,
+    field_path: Field,
   ) -> Tasks {
     Tasks {
       intrinsics: Default::default(),
@@ -51,6 +53,7 @@ impl Tasks {
       field_include: field_include,
       field_exclude: field_exclude,
       field_dependencies: field_dependencies,
+      field_path: field_path,
       preparing: None,
     }
   }

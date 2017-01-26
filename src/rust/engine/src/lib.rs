@@ -166,6 +166,7 @@ pub extern fn scheduler_create(
   field_include: Field,
   field_exclude: Field,
   field_dependencies: Field,
+  field_path: Field,
   construct_snapshot: Function,
   construct_path_stat: Function,
   construct_dir: Function,
@@ -178,6 +179,9 @@ pub extern fn scheduler_create(
   type_snapshot: TypeConstraint,
   type_read_link: TypeConstraint,
   type_directory_listing: TypeConstraint,
+  type_dir: TypeConstraint,
+  type_file: TypeConstraint,
+  type_link: TypeConstraint,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
@@ -192,6 +196,7 @@ pub extern fn scheduler_create(
             field_include,
             field_exclude,
             field_dependencies,
+            field_path,
           ),
           Types {
             construct_snapshot: construct_snapshot,
@@ -206,6 +211,9 @@ pub extern fn scheduler_create(
             snapshot: type_snapshot,
             read_link: type_read_link,
             directory_listing: type_directory_listing,
+            dir: type_dir,
+            file: type_file,
+            link: type_link,
           },
           Externs::new(
             ext_context,

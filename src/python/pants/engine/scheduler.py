@@ -83,7 +83,10 @@ class LocalScheduler(object):
         constraint_for(PathGlobs),
         constraint_for(Snapshot),
         constraint_for(ReadLink),
-        constraint_for(DirectoryListing)
+        constraint_for(DirectoryListing),
+        constraint_for(Dir),
+        constraint_for(File),
+        constraint_for(Link),
       )
     self._execution_request = None
 

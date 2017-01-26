@@ -292,7 +292,26 @@ impl<'g, 't> StepContext<'g, 't> {
 
   fn lift_stats(&self, item: &Value) -> Vec<Stat> {
     self.project_multi(item, &self.tasks.field_dependencies).iter()
-      .map(|v| self.externs.lift_stat(v))
+      .filter_map(|v| {
+        let path_str =
+          self.externs.val_to_str(
+            &self.project(
+              v,
+              &self.tasks.field_path,
+              self.tasks.field_path.0.type_id()
+            )
+          );
+        let path = Path::new(path_str.as_str()).to_owned();
+        if self.satisfied_by(&self.types.dir, v.type_id()) {
+          Some(Stat::Dir(Dir(path)))
+        } else if self.satisfied_by(&self.types.file, v.type_id()) {
+          Some(Stat::File(File(path)))
+        } else if self.satisfied_by(&self.types.link, v.type_id()) {
+          Some(Stat::Link(Link(path)))
+        } else {
+          panic!("Invalid Stat type in {}", self.externs.val_to_str(item));
+        }
+      })
       .collect()
   }
 

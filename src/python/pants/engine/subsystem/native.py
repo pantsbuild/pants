@@ -121,11 +121,15 @@ _FFI.cdef(
                                    Field,
                                    Field,
                                    Field,
+                                   Field,
                                    Function,
                                    Function,
                                    Function,
                                    Function,
                                    Function,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint,
@@ -507,7 +511,10 @@ class Native(object):
                     constraint_path_globs,
                     constraint_snapshot,
                     constraint_read_link,
-                    constraint_directory_listing):
+                    constraint_directory_listing,
+                    constraint_dir,
+                    constraint_file,
+                    constraint_link):
     """Create and return an ExternContext and native Scheduler."""
 
     def tc(constraint):
@@ -539,6 +546,7 @@ class Native(object):
         self.context.to_key('include'),
         self.context.to_key('exclude'),
         self.context.to_key('dependencies'),
+        self.context.to_key('path'),
         # Constructors/functions.
         Function(self.context.to_id(construct_snapshot)),
         Function(self.context.to_id(construct_path_stat)),
@@ -553,5 +561,8 @@ class Native(object):
         tc(constraint_snapshot),
         tc(constraint_read_link),
         tc(constraint_directory_listing),
+        tc(constraint_dir),
+        tc(constraint_file),
+        tc(constraint_link),
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
