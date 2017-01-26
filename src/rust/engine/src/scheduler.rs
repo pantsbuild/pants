@@ -110,10 +110,8 @@ impl Scheduler {
     // Run a step.
     // NB: Needing to clone the Node here is unfortunate, but allows the Node to be borrowed
     // immutably while the graph is borrowed mutably for the declaration of new dependencies.
-    Some(
-      self.graph.entry_for_id(id).node().clone()
-        .step(id, &mut self.graph, &self.tasks)
-    )
+    let node = self.graph.entry_for_id(id).node().clone();
+    Some(node.step(&mut self.graph.context(id), &self.tasks))
   }
 
   /**

@@ -117,6 +117,13 @@ impl Graph {
     self.entries.len()
   }
 
+  pub fn context(&mut self, entry_id: EntryId) -> GraphContext {
+    GraphContext {
+      entry_id: entry_id,
+      graph: self,
+    }
+  }
+
   pub fn is_complete_entry(&self, id: EntryId) -> bool {
     self.entry_for_id(id).is_complete()
   }
@@ -467,6 +474,21 @@ impl Graph {
 }
 
 /**
+ * Represents a view of the graph from the context of a particular source Node. Helps to
+ * lower the surface area of the API that is exposed to running Nodes.
+ */
+pub struct GraphContext<'g> {
+  entry_id: EntryId,
+  graph: &'g mut Graph,
+}
+
+impl<'g> GraphContext<'g> {
+  pub fn get(&mut self, node: &Node) -> Option<&Complete> {
+    self.graph.get(self.entry_id, node)
+  }
+}
+
+/**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
  */
@@ -507,6 +529,7 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
 }
 
 type Level = u32;
+
 /**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.

@@ -1,4 +1,4 @@
-use graph::{EntryId, Graph};
+use graph::GraphContext;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
@@ -41,13 +41,13 @@ pub enum Complete {
   Throw(Value),
 }
 
-pub struct StepContext<'g, 't> {
-  entry_id: EntryId,
-  graph: &'g mut Graph,
+pub struct StepContext<'g, 't, 'e> {
+  graph: &'g mut GraphContext<'g>,
   tasks: &'t Tasks,
+  externs: &'e Externs,
 }
 
-impl<'g, 't> StepContext<'g, 't> {
+impl<'g, 't, 'e> StepContext<'g, 't, 'e> {
   /**
    * Create Nodes for each Task that might be able to compute the given product for the
    * given subject and variants.
@@ -73,12 +73,8 @@ impl<'g, 't> StepContext<'g, 't> {
       .unwrap_or_else(|| Vec::new())
   }
 
-  fn get(&mut self, node: &Node) -> Option<&Complete> {
-    self.graph.get(self.entry_id, node)
-  }
-
   fn has_products(&self, item: &Value) -> bool {
-    self.tasks.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
+    self.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
   }
 
   /**
@@ -90,63 +86,45 @@ impl<'g, 't> StepContext<'g, 't> {
    */
   fn field_name(&self, item: &Value) -> String {
     let name_val =
-      self.project(
+      self.externs.project(
         item,
         &self.tasks.field_name,
         self.tasks.field_name.0.type_id()
       );
-    self.tasks.externs.val_to_str(&name_val)
+    self.externs.val_to_str(&name_val)
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
-    self.project_multi(item, &self.tasks.field_products)
+    self.externs.project_multi(item, &self.tasks.field_products)
   }
 
   fn key_for(&self, val: &Value) -> Key {
-    self.tasks.externs.key_for(val)
+    self.externs.key_for(val)
   }
 
   fn val_for(&self, key: &Key) -> Value {
-    self.tasks.externs.val_for(key)
-  }
-
-  fn clone_val(&self, val: &Value) -> Value {
-    self.tasks.externs.clone_val(val)
+    self.externs.val_for(key)
   }
 
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
   fn store_list(&self, items: Vec<&Value>, merge: bool) -> Value {
-    self.tasks.externs.store_list(items, merge)
+    self.externs.store_list(items, merge)
   }
 
   /**
    * Calls back to Python for a satisfied_by check.
    */
   fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    self.tasks.externs.satisfied_by(constraint, cls)
-  }
-
-  /**
-   * Calls back to Python to project a field.
-   */
-  fn project(&self, item: &Value, field: &Field, type_id: &TypeId) -> Value {
-    self.tasks.externs.project(item, field, type_id)
-  }
-
-  /**
-   * Calls back to Python to project a field representing a collection.
-   */
-  fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
-    self.tasks.externs.project_multi(item, field)
+    self.externs.satisfied_by(constraint, cls)
   }
 
   /**
    * Creates a Throw state with the given exception message.
    */
   fn throw(&self, msg: String) -> Complete {
-    Complete::Throw(self.tasks.externs.create_exception(msg))
+    Complete::Throw(self.externs.create_exception(msg))
   }
 }
 
@@ -254,16 +232,16 @@ impl Step for Select {
     let mut dependencies = Vec::new();
     let mut matches: Vec<Value> = Vec::new();
     for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
-      match context.get(&dep_node) {
+      match context.graph.get(&dep_node) {
         Some(&Complete::Return(ref value)) => {
-          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
+          if let Some(v) = self.select_literal(&context, context.externs.clone_val(value), variant_value) {
             matches.push(v);
           }
         },
         Some(&Complete::Noop(_, _)) =>
           continue,
         Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
+          return State::Complete(Complete::Throw(context.externs.clone_val(msg))),
         None =>
           dependencies.push(dep_node),
       }
@@ -333,7 +311,7 @@ impl SelectDependencies {
         self.subject.clone(),
         self.variants.clone()
       );
-    match context.get(&dep_product_node) {
+    match context.graph.get(&dep_product_node) {
       Some(&Complete::Return(ref value)) =>
         Ok(value),
       Some(&Complete::Noop(_, _)) =>
@@ -343,7 +321,7 @@ impl SelectDependencies {
           )
         ),
       Some(&Complete::Throw(ref msg)) =>
-        Err(State::Complete(Complete::Throw(context.clone_val(msg)))),
+        Err(State::Complete(Complete::Throw(context.externs.clone_val(msg)))),
       None =>
         Err(State::Waiting),
     }
@@ -397,9 +375,9 @@ impl Step for SelectDependencies {
     // The product and its dependency list are available.
     let mut has_dependencies = false;
     let mut dep_values: Vec<&Value> = Vec::new();
-    for dep_subject in context.project_multi(&dep_product, &self.selector.field) {
+    for dep_subject in context.externs.project_multi(&dep_product, &self.selector.field) {
       let dep_node = self.dep_node(&context, &dep_subject);
-      match context.get(&dep_node) {
+      match context.graph.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
           dep_values.push(&value),
         Some(&Complete::Noop(_, _)) =>
@@ -407,13 +385,13 @@ impl Step for SelectDependencies {
             context.throw(
               format!(
                 "No source of explicit dep {}",
-                dep_node.format(&context.tasks.externs)
+                dep_node.format(&context.externs)
               )
             )
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
+          return State::Complete(Complete::Throw(context.externs.clone_val(msg))),
         None =>
           has_dependencies = true,
       }
@@ -444,7 +422,7 @@ impl Step for SelectProjection {
         self.variants.clone()
       );
     let dep_product =
-      match context.get(&input_node) {
+      match context.graph.get(&input_node) {
         Some(&Complete::Return(ref value)) =>
           value,
         Some(&Complete::Noop(_, _)) =>
@@ -452,14 +430,14 @@ impl Step for SelectProjection {
             Complete::Noop("Could not compute {} to project its field.", Some(input_node))
           ),
         Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
+          return State::Complete(Complete::Throw(context.externs.clone_val(msg))),
         None =>
           return State::Waiting,
       };
 
     // The input product is available: use it to construct the new Subject.
     let projected_subject =
-      context.project(
+      context.externs.project(
         dep_product,
         &self.selector.field,
         &self.selector.projected_subject
@@ -472,21 +450,21 @@ impl Step for SelectProjection {
         context.key_for(&projected_subject),
         self.variants.clone()
       );
-    match context.get(&output_node) {
+    match context.graph.get(&output_node) {
       Some(&Complete::Return(ref value)) =>
-        State::Complete(Complete::Return(context.clone_val(value))),
+        State::Complete(Complete::Return(context.externs.clone_val(value))),
       Some(&Complete::Noop(_, _)) =>
         State::Complete(
           context.throw(
             format!(
               "No source of projected dependency {}",
-              output_node.format(&context.tasks.externs)
+              output_node.format(&context.externs)
             )
           )
         ),
       Some(&Complete::Throw(ref msg)) =>
         // NB: propagate thrown exception directly.
-        State::Complete(Complete::Throw(context.clone_val(msg))),
+        State::Complete(Complete::Throw(context.externs.clone_val(msg))),
       None =>
         State::Waiting,
     }
@@ -505,7 +483,7 @@ impl Step for Task {
   fn step(&self, context: StepContext) -> State {
     // Compute dependencies for the Node, or determine whether it is a Noop.
     let mut has_dependencies = false;
-    let mut dep_values: Vec<&Value> = Vec::new();
+    let mut dep_values: Vec<Value> = Vec::new();
     for selector in &self.selector.clause {
       let dep_node =
         Node::create(
@@ -513,16 +491,16 @@ impl Step for Task {
           self.subject.clone(),
           self.variants.clone()
         );
-      match context.get(&dep_node) {
+      match context.graph.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
-          dep_values.push(&value),
+          dep_values.push(context.externs.clone_val(value)),
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
             Complete::Noop("Was missing (at least) input {}.", Some(dep_node))
           ),
         Some(&Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
+          return State::Complete(Complete::Throw(context.externs.clone_val(msg))),
         None =>
           has_dependencies = true,
       }
@@ -533,9 +511,10 @@ impl Step for Task {
       State::Waiting
     } else {
       // Ready to run!
+      let tasks = &context.tasks;
       State::Runnable(Runnable {
         func: self.selector.func,
-        args: dep_values.iter().map(|v| context.clone_val(v)).collect(),
+        args: dep_values,
         cacheable: self.selector.cacheable,
       })
     }
@@ -629,12 +608,12 @@ impl Node {
     }
   }
 
-  pub fn step(&self, entry_id: EntryId, graph: &mut Graph, tasks: &Tasks) -> State {
+  pub fn step<'g>(&self, graph: &'g mut GraphContext<'g>, tasks: &Tasks) -> State {
     let context =
       StepContext {
-        entry_id: entry_id,
         graph: graph,
         tasks: tasks,
+        externs: &tasks.externs,
       };
     match self {
       &Node::Select(ref n) => n.step(context),
