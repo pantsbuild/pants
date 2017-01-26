@@ -386,7 +386,7 @@ pub trait FSContext<K> {
     let mut path_globs_set: HashSet<PathGlob> = HashSet::default();
     let mut outputs: OrderMap<PathStat, ()> = OrderMap::default();
     while let Some(path_glob) = path_globs_stack.pop() {
-      if !path_globs_set.contains(&path_glob) {
+      if path_globs_set.contains(&path_glob) {
         continue;
       }
 

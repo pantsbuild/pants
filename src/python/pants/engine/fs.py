@@ -95,7 +95,7 @@ class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
                      tuple(join(relative_to, f) for f in exclude))
 
 
-class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies', 'exists'])):
+class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies'])):
   """A list of Stat objects representing a directory listing.
 
   If exists=False, then the entries list will be empty.
@@ -153,13 +153,7 @@ def scan_directory(project_tree, directory):
 
   :returns: A DirectoryListing.
   """
-  try:
-    return DirectoryListing(directory, tuple(project_tree.scandir(directory.path)), exists=True)
-  except (IOError, OSError) as e:
-    if e.errno == errno.ENOENT:
-      return DirectoryListing(directory, tuple(), exists=False)
-    else:
-      raise e
+  return DirectoryListing(directory, tuple(project_tree.scandir(directory.path)))
 
 
 def read_link(project_tree, link):

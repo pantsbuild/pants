@@ -42,9 +42,6 @@ class BuildFiles(datatype('BuildFiles', ['files'])):
 
 
 def filter_buildfile_paths(address_mapper, directory_listing):
-  if not directory_listing.exists:
-    raise ResolveError('Directory "{}" does not exist.'.format(directory_listing.directory.path))
-
   build_pattern = address_mapper.build_pattern
   def match(stat):
     # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
