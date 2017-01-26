@@ -77,54 +77,12 @@ impl<'g, 't, 'e> StepContext<'g, 't, 'e> {
     self.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
   }
 
-  /**
-   * Returns the `name` field of the given item.
-   *
-   * TODO: There are at least two hacks here. Because we don't have access to the appropriate
-   * `str` type, we just assume that it has the same type as the name of the field. And more
-   * importantly, there is no check that the object _has_ a name field.
-   */
-  fn field_name(&self, item: &Value) -> String {
-    let name_val =
-      self.externs.project(
-        item,
-        &self.tasks.field_name,
-        self.tasks.field_name.0.type_id()
-      );
-    self.externs.val_to_str(&name_val)
-  }
-
-  fn field_products(&self, item: &Value) -> Vec<Value> {
-    self.externs.project_multi(item, &self.tasks.field_products)
-  }
-
   fn key_for(&self, val: &Value) -> Key {
     self.externs.key_for(val)
   }
 
   fn val_for(&self, key: &Key) -> Value {
     self.externs.val_for(key)
-  }
-
-  /**
-   * Stores a list of Keys, resulting in a Key for the list.
-   */
-  fn store_list(&self, items: Vec<&Value>, merge: bool) -> Value {
-    self.externs.store_list(items, merge)
-  }
-
-  /**
-   * Calls back to Python for a satisfied_by check.
-   */
-  fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    self.externs.satisfied_by(constraint, cls)
-  }
-
-  /**
-   * Creates a Throw state with the given exception message.
-   */
-  fn throw(&self, msg: String) -> Complete {
-    Complete::Throw(self.externs.create_exception(msg))
   }
 }
 
@@ -155,17 +113,30 @@ impl Select {
     &self.selector.product
   }
 
+  /**
+   * Returns the `name` field of the given item.
+   *
+   * TODO: There are at least two hacks here. Because we don't have access to the appropriate
+   * `str` type, we just assume that it has the same type as the name of the field. And more
+   * importantly, there is no check that the object _has_ a name field.
+   */
+  fn field_name(tasks: &Tasks, externs: &Externs, item: &Value) -> String {
+    let name_val = externs.project(item, &tasks.field_name, tasks.field_name.0.type_id());
+    externs.val_to_str(&name_val)
+  }
+
   fn select_literal_single<'a>(
     &self,
-    context: &StepContext,
+    tasks: &Tasks,
+    externs: &Externs,
     candidate: &'a Value,
     variant_value: Option<&str>
   ) -> bool {
-    if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
+    if !externs.satisfied_by(&self.selector.product, candidate.type_id()) {
       return false;
     }
     return match variant_value {
-      Some(vv) if context.field_name(candidate) != *vv =>
+      Some(vv) if Select::field_name(tasks, externs, candidate) != *vv =>
         // There is a variant value, and it doesn't match.
         false,
       _ =>
@@ -180,21 +151,22 @@ impl Select {
    */
   fn select_literal(
     &self,
-    context: &StepContext,
+    tasks: &Tasks,
+    externs: &Externs,
     candidate: Value,
     variant_value: Option<&str>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
-    if self.select_literal_single(context, &candidate, variant_value) {
+    if self.select_literal_single(tasks, externs, &candidate, variant_value) {
       return Some(candidate)
     }
 
     // Else, check whether it has-a instance of the product.
     // TODO: returning only the first literal configuration of a given type/variant. Need to
     // define mergeability for products.
-    if context.has_products(&candidate) {
-      for child in context.field_products(&candidate) {
-        if self.select_literal_single(context, &child, variant_value) {
+    if externs.satisfied_by(&tasks.type_has_products, candidate.type_id()) {
+      for child in externs.project_multi(&candidate, &tasks.field_products) {
+        if self.select_literal_single(tasks, externs, &child, variant_value) {
           return Some(child);
         }
       }
@@ -224,7 +196,13 @@ impl Step for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), variant_value) {
+    if let Some(literal_value) =
+      self.select_literal(
+        context.tasks,
+        context.externs,
+        context.externs.val_for(&self.subject),
+        variant_value
+      ) {
       return State::Complete(Complete::Return(literal_value));
     }
 
@@ -234,7 +212,13 @@ impl Step for Select {
     for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
       match context.graph.get(&dep_node) {
         Some(&Complete::Return(ref value)) => {
-          if let Some(v) = self.select_literal(&context, context.externs.clone_val(value), variant_value) {
+          if let Some(v) =
+            self.select_literal(
+              context.tasks,
+              context.externs,
+              context.externs.clone_val(value),
+              variant_value
+            ) {
             matches.push(v);
           }
         },
@@ -257,7 +241,11 @@ impl Step for Select {
       // by adding support for "mergeable" products. see:
       //   https://github.com/pantsbuild/pants/issues/2526
       return State::Complete(
-        context.throw(format!("Conflicting values produced for subject and type."))
+        Complete::Throw(
+          context.externs.create_exception(
+            format!("Conflicting values produced for subject and type.")
+          )
+        )
       );
     }
 
@@ -303,7 +291,7 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_product<'a>(&self, context: &'a StepContext) -> Result<&'a Value, State> {
+  fn dep_product<'g>(&self, graph: &'g mut GraphContext, externs: &Externs) -> Result<&'g Value, State> {
     // Request the product we need in order to request dependencies.
     let dep_product_node =
       Node::create(
@@ -311,7 +299,7 @@ impl SelectDependencies {
         self.subject.clone(),
         self.variants.clone()
       );
-    match context.graph.get(&dep_product_node) {
+    match graph.get(&dep_product_node) {
       Some(&Complete::Return(ref value)) =>
         Ok(value),
       Some(&Complete::Noop(_, _)) =>
@@ -321,7 +309,7 @@ impl SelectDependencies {
           )
         ),
       Some(&Complete::Throw(ref msg)) =>
-        Err(State::Complete(Complete::Throw(context.externs.clone_val(msg)))),
+        Err(State::Complete(Complete::Throw(externs.clone_val(msg)))),
       None =>
         Err(State::Waiting),
     }
@@ -347,18 +335,18 @@ impl SelectDependencies {
     }
   }
 
-  fn store(&self, context: &StepContext, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if self.selector.transitive && context.satisfied_by(&self.selector.product, dep_product.type_id())  {
+  fn store(&self, externs: &Externs, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
+    if self.selector.transitive && externs.satisfied_by(&self.selector.product, dep_product.type_id())  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
       // TODO: would be nice to do this in one operation.
-      let prepend = context.store_list(vec![dep_product], false);
+      let prepend = externs.store_list(vec![dep_product], false);
       let mut prepended = dep_values;
       prepended.insert(0, &prepend);
-      context.store_list(prepended, self.selector.transitive)
+      externs.store_list(prepended, self.selector.transitive)
     } else {
       // Not an inner node, or not a traversal.
-      context.store_list(dep_values, self.selector.transitive)
+      externs.store_list(dep_values, self.selector.transitive)
     }
   }
 }
@@ -367,25 +355,27 @@ impl Step for SelectDependencies {
   fn step(&self, context: StepContext) -> State {
     // Select the product holding the dependency list.
     let dep_product =
-      match self.dep_product(&context) {
-        Ok(dep_product) => dep_product,
+      match self.dep_product(context.graph, context.externs) {
+        Ok(dep_product) => context.externs.clone_val(dep_product),
         Err(state) => return state,
       };
 
     // The product and its dependency list are available.
     let mut has_dependencies = false;
-    let mut dep_values: Vec<&Value> = Vec::new();
+    let mut dep_values = Vec::new();
     for dep_subject in context.externs.project_multi(&dep_product, &self.selector.field) {
       let dep_node = self.dep_node(&context, &dep_subject);
       match context.graph.get(&dep_node) {
         Some(&Complete::Return(ref value)) =>
-          dep_values.push(&value),
+          dep_values.push(context.externs.clone_val(value)),
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
-            context.throw(
-              format!(
-                "No source of explicit dep {}",
-                dep_node.format(&context.externs)
+            Complete::Throw(
+              context.externs.create_exception(
+                format!(
+                  "No source of explicit dep {}",
+                  dep_node.format(&context.externs)
+                )
               )
             )
           ),
@@ -400,7 +390,11 @@ impl Step for SelectDependencies {
     if has_dependencies {
       State::Waiting
     } else {
-      State::Complete(Complete::Return(self.store(&context, &dep_product, dep_values)))
+      State::Complete(
+        Complete::Return(
+          self.store(context.externs, &dep_product, dep_values.iter().collect())
+        )
+      )
     }
   }
 }
@@ -424,7 +418,7 @@ impl Step for SelectProjection {
     let dep_product =
       match context.graph.get(&input_node) {
         Some(&Complete::Return(ref value)) =>
-          value,
+          context.externs.clone_val(value),
         Some(&Complete::Noop(_, _)) =>
           return State::Complete(
             Complete::Noop("Could not compute {} to project its field.", Some(input_node))
@@ -438,7 +432,7 @@ impl Step for SelectProjection {
     // The input product is available: use it to construct the new Subject.
     let projected_subject =
       context.externs.project(
-        dep_product,
+        &dep_product,
         &self.selector.field,
         &self.selector.projected_subject
       );
@@ -455,10 +449,12 @@ impl Step for SelectProjection {
         State::Complete(Complete::Return(context.externs.clone_val(value))),
       Some(&Complete::Noop(_, _)) =>
         State::Complete(
-          context.throw(
-            format!(
-              "No source of projected dependency {}",
-              output_node.format(&context.externs)
+          Complete::Throw(
+            context.externs.create_exception(
+              format!(
+                "No source of projected dependency {}",
+                output_node.format(&context.externs)
+              )
             )
           )
         ),
