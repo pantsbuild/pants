@@ -84,7 +84,7 @@ lazy_static! {
   static ref DOUBLE_STAR_GLOB: Glob = Glob::new("**").unwrap();
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PathGlob {
   Root,
   Wildcard {
@@ -260,6 +260,7 @@ impl PathGlob {
   }
 }
 
+#[derive(Debug)]
 pub struct PathGlobs {
   include: Vec<PathGlob>,
   exclude: Vec<PathGlob>,
@@ -445,16 +446,18 @@ pub trait FSContext<K> {
   }
 }
 
+pub type Fingerprint = [u8;32];
+
 pub struct Snapshot {
-  fingerprint: [u8;32],
-  paths: Vec<PathStat>,
+  pub fingerprint: Fingerprint,
+  pub path_stats: Vec<PathStat>,
 }
 
 impl Snapshot {
   /**
    * Fingerprint the given path ,or return an error string.
    */
-  fn fingerprint(path: &Path) -> Result<[u8;32], String> {
+  fn fingerprint(path: &Path) -> Result<Fingerprint, String> {
     let mut hasher = Sha256::new();
 
     let mut file =
@@ -473,15 +476,15 @@ impl Snapshot {
       }
     };
 
-    let mut fingerprint: [u8;32] = [0;32];
+    let mut fingerprint: Fingerprint = [0;32];
     fingerprint.clone_from_slice(&hasher.result()[0..32]);
     Ok(fingerprint)
   }
 
-  fn hex(fingerprint: &[u8;32]) -> String {
+  fn hex(fingerprint: &Fingerprint) -> String {
     let mut s = String::new();
     for &byte in fingerprint {
-      fmt::Write::write_fmt(&mut s, format_args!("{:X}", byte)).unwrap();
+      fmt::Write::write_fmt(&mut s, format_args!("{:x}", byte)).unwrap();
     }
     s
   }
@@ -552,7 +555,10 @@ impl Snapshot {
   pub fn create(snapshot_root: &Dir, build_root: &Dir, paths: Vec<PathStat>) -> Result<Snapshot, String> {
     // Write the tar (with timestamps cleared) to a temporary file.
     let temp_dir =
-      TempDir::new_in(snapshot_root.0.as_path(), ".create")
+      fs::create_dir_all(snapshot_root.0.as_path())
+        .and_then(|_| {
+          TempDir::new_in(snapshot_root.0.as_path(), ".create")
+        })
         .map_err(|e| format!("Failed to create tempdir: {:?}", e))?;
     let temp_path = temp_dir.path().join("snapshot.tar");
     Snapshot::tar_create(temp_path.as_path(), &paths, build_root)?;
@@ -565,7 +571,7 @@ impl Snapshot {
     Ok(
       Snapshot {
         fingerprint: fingerprint,
-        paths: paths,
+        path_stats: paths,
       }
     )
   }

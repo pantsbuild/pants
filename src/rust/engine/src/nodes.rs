@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use graph::{Entry, Graph};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
@@ -159,6 +159,18 @@ impl<'g, 't> StepContext<'g, 't> {
     self.externs.store_list(items, merge)
   }
 
+  fn store_link(&self, item: &Link) -> Value {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn store_dir(&self, item: &Dir) -> Value {
+    panic!("TODO: Not implemented!");
+  }
+
+  fn store_snapshot(&self, item: &fs::Snapshot) -> Value {
+    self.externs.store_snapshot(&item.fingerprint, &item.path_stats)
+  }
+
   /**
    * Calls back to Python for a satisfied_by check.
    */
@@ -186,12 +198,14 @@ impl<'g, 't> StepContext<'g, 't> {
       .collect()
   }
 
-  fn snapshot_root(&self) -> &Dir {
-    panic!("TODO: Not implemented!");
+  fn snapshot_root(&self) -> Dir {
+    // TODO
+    Dir(Path::new(".snapshot").to_owned())
   }
 
-  fn build_root(&self) -> &Dir {
-    panic!("TODO: Not implemented!");
+  fn build_root(&self) -> Dir {
+    // TODO
+    Dir(Path::new("").to_owned())
   }
 
   fn type_path_globs(&self) -> &TypeConstraint {
@@ -224,18 +238,6 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 
   fn lift_stats(&self, item: &Value) -> Vec<Stat> {
-    panic!("TODO: Not implemented!");
-  }
-
-  fn store_link(&self, item: &Link) -> Value {
-    panic!("TODO: Not implemented!");
-  }
-
-  fn store_dir(&self, item: &Dir) -> Value {
-    panic!("TODO: Not implemented!");
-  }
-
-  fn store_snapshot(&self, item: &fs::Snapshot) -> Value {
     panic!("TODO: Not implemented!");
   }
 
@@ -667,8 +669,8 @@ impl Step for Snapshot {
         // The entire walk succeeded: ready to Snapshot.
         let snapshot_res =
           fs::Snapshot::create(
-            context.snapshot_root(),
-            context.build_root(),
+            &context.snapshot_root(),
+            &context.build_root(),
             path_stats
           );
         match snapshot_res {

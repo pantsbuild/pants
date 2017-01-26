@@ -101,7 +101,7 @@ class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies'
   """
 
 
-class Snapshot(datatype('Snapshot', ['fingerprint', 'files', 'dirs'])):
+class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
   """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
@@ -110,8 +110,12 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'files', 'dirs'])):
   """
 
   @property
-  def dependencies(self):
-    return self.files + self.dirs
+  def dirs(self):
+    return [p for p in path_stats if type(p.stat) == Dir]
+
+  @property
+  def files(self):
+    return [p for p in path_stats if type(p.stat) == File]
 
 
 def snapshot_noop(*args):

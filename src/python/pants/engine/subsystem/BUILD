@@ -9,6 +9,7 @@ python_library(
     '3rdparty/python:setuptools',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/subsystem:subsystem',
+    'src/python/pants/engine:fs',
   ],
   resource_targets=[
     ':native_engine_version'
