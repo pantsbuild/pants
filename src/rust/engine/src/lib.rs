@@ -165,6 +165,7 @@ pub extern fn scheduler_create(
   field_variants: Field,
   field_include: Field,
   field_exclude: Field,
+  field_dependencies: Field,
   construct_snapshot: Function,
   construct_path_stat: Function,
   construct_dir: Function,
@@ -190,6 +191,7 @@ pub extern fn scheduler_create(
             field_variants,
             field_include,
             field_exclude,
+            field_dependencies,
           ),
           Types {
             construct_snapshot: construct_snapshot,

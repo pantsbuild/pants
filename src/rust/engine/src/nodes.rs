@@ -1,7 +1,6 @@
-use std::path::Path;
 
-// NB: Assuming unix allows us to zero-copy filesystem paths as bytes.
 use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 
 use graph::{Entry, Graph};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
@@ -292,7 +291,9 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 
   fn lift_stats(&self, item: &Value) -> Vec<Stat> {
-    panic!("TODO: Not implemented!");
+    self.project_multi(item, &self.tasks.field_dependencies).iter()
+      .map(|v| self.externs.lift_stat(v))
+      .collect()
   }
 
   /**

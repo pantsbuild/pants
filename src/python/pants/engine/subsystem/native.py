@@ -120,6 +120,7 @@ _FFI.cdef(
                                    Field,
                                    Field,
                                    Field,
+                                   Field,
                                    Function,
                                    Function,
                                    Function,
@@ -537,6 +538,7 @@ class Native(object):
         self.context.to_key('default'),
         self.context.to_key('include'),
         self.context.to_key('exclude'),
+        self.context.to_key('dependencies'),
         # Constructors/functions.
         Function(self.context.to_id(construct_snapshot)),
         Function(self.context.to_id(construct_path_stat)),

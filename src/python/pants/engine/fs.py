@@ -96,10 +96,7 @@ class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
 
 
 class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies'])):
-  """A list of Stat objects representing a directory listing.
-
-  If exists=False, then the entries list will be empty.
-  """
+  """A list of Stat objects representing a directory listing."""
 
 
 class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
