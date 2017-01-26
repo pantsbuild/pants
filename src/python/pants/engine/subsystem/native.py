@@ -48,6 +48,7 @@ _FFI.cdef(
     typedef struct {
       char*    str_ptr;
       uint64_t str_len;
+      Value    value;
     } UTF8Buffer;
 
     typedef struct {
@@ -338,21 +339,17 @@ class ExternContext(object):
     self._id_generator = 0
     self._id_to_obj = dict()
     self._obj_to_id = dict()
+    self._bytes_id = TypeId(self.to_id(bytes))
 
     # Outstanding FFI object handles.
     self._handles = set()
 
-    # Buffers for transferring strings and arrays of Keys.
-    self._resize_utf8(256)
+    # Buffer for transferring arrays of Keys.
     self._resize_keys(64)
 
     # Finally, create a handle to this object to ensure that the native wrapper survives
     # at least as long as this object.
     self.handle = _FFI.new_handle(self)
-
-  def _resize_utf8(self, size):
-    self._utf8_cap = size
-    self._utf8_buf = _FFI.new('char[]', self._utf8_cap)
 
   def _resize_keys(self, size):
     self._keys_cap = size
@@ -360,10 +357,8 @@ class ExternContext(object):
 
   def utf8_buf(self, string):
     utf8 = string.encode('utf-8')
-    if self._utf8_cap < len(utf8):
-      self._resize_utf8(max(len(utf8), 2 * self._utf8_cap))
-    self._utf8_buf[0:len(utf8)] = utf8
-    return (self._utf8_buf, len(utf8))
+    buf = _FFI.new('char[]', utf8)
+    return (buf, len(utf8), self.to_value(buf, type_id=self._bytes_id))
 
   def vals_buf(self, keys):
     if self._keys_cap < len(keys):

@@ -184,10 +184,16 @@ pub struct ValueBuffer {
 pub type ProjectMultiExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field) -> ValueBuffer;
 
+/**
+ * A struct that points at a python-allocated UTF8 buffer, which is owned by the
+ * attached value. The Value isn't intended to be accessed: it just represents a handle
+ * to the underlying python object.
+ */
 #[repr(C)]
 pub struct UTF8Buffer {
   str_ptr: *mut u8,
   str_len: u64,
+  value: Value,
 }
 
 impl UTF8Buffer {
