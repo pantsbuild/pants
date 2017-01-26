@@ -168,7 +168,7 @@ impl<'g, 't> StepContext<'g, 't> {
   }
 
   fn store_snapshot(&self, item: &fs::Snapshot) -> Value {
-    self.externs.store_snapshot(&item.fingerprint, &item.path_stats)
+    panic!("TODO: Not implemented!");
   }
 
   /**

@@ -24,6 +24,7 @@ pub struct Externs {
   satisfied_by: SatisfiedByExtern,
   satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
+  store_str: StoreStrExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   id_to_str: IdToStrExtern,
@@ -43,6 +44,7 @@ impl Externs {
     val_to_str: ValToStrExtern,
     satisfied_by: SatisfiedByExtern,
     store_list: StoreListExtern,
+    store_str: StoreStrExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
@@ -57,6 +59,7 @@ impl Externs {
       satisfied_by: satisfied_by,
       satisfied_by_cache: RefCell::new(HashMap::new()),
       store_list: store_list,
+      store_str: store_str,
       project: project,
       project_multi: project_multi,
       id_to_str: id_to_str,
@@ -93,6 +96,11 @@ impl Externs {
   pub fn store_list(&self, values: Vec<&Value>, merge: bool) -> Value {
     let values_clone: Vec<*const Value> = values.into_iter().map(|v| v as *const Value).collect();
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
+  }
+
+  pub fn store_str(&self, value: &str) -> Value {
+    let bytes = value.as_bytes();
+    (self.store_str)(self.context, bytes.as_ptr(), bytes.len() as u64)
   }
 
   pub fn project(&self, value: &Value, field: &Field, type_id: &TypeId) -> Value {
@@ -149,6 +157,9 @@ pub type DropHandlesExtern =
 
 pub type StoreListExtern =
   extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;
+
+pub type StoreStrExtern =
+  extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
 
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;

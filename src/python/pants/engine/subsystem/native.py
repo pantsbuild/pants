@@ -72,6 +72,7 @@ _FFI.cdef(
     typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
+    typedef Value            (*extern_store_str)(ExternContext*, uint8_t*, uint64_t);
     typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -109,6 +110,7 @@ _FFI.cdef(
                                    extern_val_to_str,
                                    extern_satisfied_by,
                                    extern_store_list,
+                                   extern_store_str,
                                    extern_project,
                                    extern_project_multi,
                                    extern_create_exception,
@@ -228,6 +230,13 @@ def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
           yield inner_val
     vals = tuple(merged())
   return c.to_value(vals)
+
+
+@_FFI.callback("Value(ExternContext*, uint8_t*, uint64_t)")
+def extern_store_str(context_handle, utf8_ptr, utf8_len):
+  """Given a context storage and some UTF8 data, return a new Value to represent a string."""
+  c = _FFI.from_handle(context_handle)
+  return c.to_value(bytes(_FFI.buffer(utf8_ptr, utf8_len)).decode('utf-8'))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
@@ -501,6 +510,7 @@ class Native(object):
         extern_val_to_str,
         extern_satisfied_by,
         extern_store_list,
+        extern_store_str,
         extern_project,
         extern_project_multi,
         extern_create_exception,
