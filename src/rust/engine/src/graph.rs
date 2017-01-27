@@ -268,10 +268,10 @@ impl Graph {
     }
   }
 
-/**
- *  Begins a topological walk from the given roots. Provides both the current entry as well as the
- *  depth from the root.
- */
+  /**
+   * Begins a topological walk from the given roots. Provides both the current entry as well as the
+   * depth from the root.
+   */
   fn leveled_walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
     where P: Fn(&Entry, Level) -> bool {
     let rrr = roots.iter().map(|&r| (r, 0)).collect::<VecDeque<_>>();
