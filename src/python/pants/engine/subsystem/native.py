@@ -9,6 +9,7 @@ import pkg_resources
 from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
+from pants.engine.storage import Key, Storage
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -309,10 +310,7 @@ class ExternContext(object):
   """
 
   def __init__(self):
-    # Memoized object Ids.
-    self._id_generator = 0
-    self._id_to_obj = dict()
-    self._obj_to_id = dict()
+    self._storage = Storage.create()
 
     # Outstanding FFI object handles.
     self._handles = set()
@@ -360,19 +358,10 @@ class ExternContext(object):
 
   def put(self, obj):
     # If we encounter an existing id, return it.
-    new_id = self._id_generator
-    _id = self._obj_to_id.setdefault(obj, new_id)
-    if _id is not new_id:
-      # Object already existed.
-      return _id
-
-    # Object is new/unique.
-    self._id_to_obj[_id] = obj
-    self._id_generator += 1
-    return _id
+    return self._storage.put(obj).digest
 
   def get(self, id_):
-    return self._id_to_obj[id_]
+    return self._storage.get(Key.create_from_digest(id_))
 
   def to_id(self, typ):
     return self.put(typ)
