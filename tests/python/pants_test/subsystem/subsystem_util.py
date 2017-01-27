@@ -19,7 +19,7 @@ _deprecation_msg = ("Use the for_subsystems and options arguments to BaseTest.co
                     "the methods init_subsystem(), global_subsystem_instance() in this module.")
 
 
-@deprecated('1.4.0', _deprecation_msg)
+@deprecated('1.4.0.dev0', _deprecation_msg)
 def create_subsystem(subsystem_type, scope='test-scope', **options):
   """Creates a Subsystem for test.
 
@@ -39,7 +39,7 @@ def create_subsystem(subsystem_type, scope='test-scope', **options):
 
 
 @contextmanager
-@deprecated('1.4.0', _deprecation_msg)
+@deprecated('1.4.0.dev0', _deprecation_msg)
 def subsystem_instance(subsystem_type, scope=None, **options):
   """Creates a Subsystem instance for test.
 
