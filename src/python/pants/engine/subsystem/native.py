@@ -9,7 +9,7 @@ import pkg_resources
 from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
-from pants.engine.storage import Key, Storage
+from pants.engine.storage import Storage
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
