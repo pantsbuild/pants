@@ -50,8 +50,8 @@ impl Entry {
     &self.node
   }
 
-  pub fn state(&self) -> Option<&Complete> {
-    self.state.as_ref()
+  pub fn state(&self) -> &Option<Complete> {
+    &self.state
   }
 
   pub fn dependencies(&self) -> &DepSet {
@@ -96,7 +96,7 @@ pub struct Graph {
   id_generator: usize,
   nodes: Nodes,
   entries: Entries,
-  cyclic_singleton: Complete,
+  cyclic_singleton: Option<Complete>,
 }
 
 impl Graph {
@@ -105,11 +105,11 @@ impl Graph {
       id_generator: 0,
       nodes: HashMap::default(),
       entries: HashMap::default(),
-      cyclic_singleton: Complete::Noop("Dep would be cyclic.", None),
+      cyclic_singleton: Some(Complete::Noop("Dep would be cyclic.", None)),
     }
   }
 
-  pub fn cyclic_singleton(&self) -> &Complete {
+  pub fn cyclic_singleton(&self) -> &Option<Complete> {
     &(self.cyclic_singleton)
   }
 
@@ -205,7 +205,7 @@ impl Graph {
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  pub fn get(&mut self, src_id: EntryId, dst_node: &Node) -> Option<&Complete> {
+  pub fn get(&mut self, src_id: EntryId, dst_node: &Node) -> &Option<Complete> {
     assert!(
       !self.is_complete_entry(src_id),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
@@ -224,11 +224,11 @@ impl Graph {
       self.entry_for_id(dst_id).state()
     } else if self.entry_for_id(src_id).cyclic_dependencies().contains(&dst_id) {
       // Declared but cyclic.
-      Some(self.cyclic_singleton())
+      self.cyclic_singleton()
     } else if self.detect_cycle(src_id, dst_id) {
       // Undeclared but cyclic.
       self.entry_for_id_mut(src_id).cyclic_dependencies.push(dst_id);
-      Some(self.cyclic_singleton())
+      self.cyclic_singleton()
     } else {
       // Undeclared and valid.
       self.entry_for_id_mut(src_id).dependencies.push(dst_id);
@@ -484,7 +484,7 @@ pub struct GraphContext<'g> {
 }
 
 impl<'g> GraphContext<'g> {
-  pub fn get(&mut self, node: &Node) -> Option<&Complete> {
+  pub fn get(&mut self, node: &Node) -> &Option<Complete> {
     self.graph.get(self.entry_id, node)
   }
 }

@@ -207,7 +207,7 @@ impl Step for Select {
     let mut matches: Vec<Value> = Vec::new();
     for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
       match context.graph.get(&dep_node) {
-        Some(&Complete::Return(ref value)) => {
+        &Some(Complete::Return(ref value)) => {
           if let Some(v) =
             self.select_literal(
               context.tasks,
@@ -218,11 +218,11 @@ impl Step for Select {
             matches.push(v);
           }
         },
-        Some(&Complete::Noop(_, _)) =>
+        &Some(Complete::Noop(_, _)) =>
           continue,
-        Some(&Complete::Throw(ref msg)) =>
+        &Some(Complete::Throw(ref msg)) =>
           return State::Complete(Complete::Throw(context.externs.clone_val(msg))),
-        None =>
+        &None =>
           dependencies.push(dep_node),
       }
     }
@@ -296,17 +296,17 @@ impl SelectDependencies {
         self.variants.clone()
       );
     match graph.get(&dep_product_node) {
-      Some(&Complete::Return(ref value)) =>
+      &Some(Complete::Return(ref value)) =>
         Ok(value),
-      Some(&Complete::Noop(_, _)) =>
+      &Some(Complete::Noop(_, _)) =>
         Err(
           State::Complete(
             Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
           )
         ),
-      Some(&Complete::Throw(ref msg)) =>
+      &Some(Complete::Throw(ref msg)) =>
         Err(State::Complete(Complete::Throw(externs.clone_val(msg)))),
-      None =>
+      &None =>
         Err(State::Waiting),
     }
   }
@@ -362,9 +362,9 @@ impl Step for SelectDependencies {
     for dep_subject in context.externs.project_multi(&dep_product, &self.selector.field) {
       let dep_node = self.dep_node(&context, &dep_subject);
       match context.graph.get(&dep_node) {
-        Some(&Complete::Return(ref value)) =>
+        &Some(Complete::Return(ref value)) =>
           dep_values.push(context.externs.clone_val(value)),
-        Some(&Complete::Noop(_, _)) =>
+        &Some(Complete::Noop(_, _)) =>
           return State::Complete(
             Complete::Throw(
               context.externs.create_exception(
@@ -375,10 +375,10 @@ impl Step for SelectDependencies {
               )
             )
           ),
-        Some(&Complete::Throw(ref msg)) =>
+        &Some(Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
           return State::Complete(Complete::Throw(context.externs.clone_val(msg))),
-        None =>
+        &None =>
           has_dependencies = true,
       }
     }
@@ -413,15 +413,15 @@ impl Step for SelectProjection {
       );
     let dep_product =
       match context.graph.get(&input_node) {
-        Some(&Complete::Return(ref value)) =>
+        &Some(Complete::Return(ref value)) =>
           context.externs.clone_val(value),
-        Some(&Complete::Noop(_, _)) =>
+        &Some(Complete::Noop(_, _)) =>
           return State::Complete(
             Complete::Noop("Could not compute {} to project its field.", Some(input_node))
           ),
-        Some(&Complete::Throw(ref msg)) =>
+        &Some(Complete::Throw(ref msg)) =>
           return State::Complete(Complete::Throw(context.externs.clone_val(msg))),
-        None =>
+        &None =>
           return State::Waiting,
       };
 
@@ -441,9 +441,9 @@ impl Step for SelectProjection {
         self.variants.clone()
       );
     match context.graph.get(&output_node) {
-      Some(&Complete::Return(ref value)) =>
+      &Some(Complete::Return(ref value)) =>
         State::Complete(Complete::Return(context.externs.clone_val(value))),
-      Some(&Complete::Noop(_, _)) =>
+      &Some(Complete::Noop(_, _)) =>
         State::Complete(
           Complete::Throw(
             context.externs.create_exception(
@@ -454,10 +454,10 @@ impl Step for SelectProjection {
             )
           )
         ),
-      Some(&Complete::Throw(ref msg)) =>
+      &Some(Complete::Throw(ref msg)) =>
         // NB: propagate thrown exception directly.
         State::Complete(Complete::Throw(context.externs.clone_val(msg))),
-      None =>
+      &None =>
         State::Waiting,
     }
   }
@@ -484,16 +484,16 @@ impl Step for Task {
           self.variants.clone()
         );
       match context.graph.get(&dep_node) {
-        Some(&Complete::Return(ref value)) =>
+        &Some(Complete::Return(ref value)) =>
           dep_values.push(context.externs.clone_val(value)),
-        Some(&Complete::Noop(_, _)) =>
+        &Some(Complete::Noop(_, _)) =>
           return State::Complete(
             Complete::Noop("Was missing (at least) input {}.", Some(dep_node))
           ),
-        Some(&Complete::Throw(ref msg)) =>
+        &Some(Complete::Throw(ref msg)) =>
           // NB: propagate thrown exception directly.
           return State::Complete(Complete::Throw(context.externs.clone_val(msg))),
-        None =>
+        &None =>
           has_dependencies = true,
       }
     }
