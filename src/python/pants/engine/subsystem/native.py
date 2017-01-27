@@ -306,6 +306,7 @@ class IdGenerator(object):
   The id is uniquely derived from the digest computed when an object is stored via storage.py,
   because object's content could change.
   """
+
   def __init__(self):
     self._storage = Storage.create()
     # Memoized object Ids.
