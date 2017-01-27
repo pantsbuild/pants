@@ -152,20 +152,20 @@ impl Scheduler {
         },
         Some(State::Waiting) => {
           // Node is waiting on dependencies which it declared via the StepContext.
-          let ref graph = self.graph;
+          let graph = &self.graph;
           let mut incomplete_deps =
             self.graph.entry_for_id(entry_id).dependencies().iter()
               .map(|&d| graph.entry_for_id(d))
               .filter(|e| !e.is_complete())
               .map(|e| e.id())
               .peekable();
-          if incomplete_deps.peek().is_some() {
-            // Mark incomplete deps as candidates for steps.
-            self.candidates.extend(incomplete_deps);
-          } else {
-            // All newly declared deps are already completed: still a candidate.
-            self.candidates.push_front(entry_id);
-          }
+          assert!(
+            incomplete_deps.peek().is_some(),
+            "Node {:?} returned `Waiting` without declaring dependencies.",
+            graph.entry_for_id(entry_id),
+          );
+          // Mark incomplete deps as candidates for steps.
+          self.candidates.extend(incomplete_deps);
         },
         None =>
           // Not ready to step.
