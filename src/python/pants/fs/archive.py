@@ -56,13 +56,13 @@ class TarArchiver(Archiver):
     self.mode = mode
     self.extension = extension
 
-  def create(self, basedir, outdir, name, prefix=None):
+  def create(self, basedir, outdir, name, prefix=None, dereference=True):
     """
     :API: public
     """
     basedir = ensure_text(basedir)
     tarpath = os.path.join(outdir, '{}.{}'.format(ensure_text(name), self.extension))
-    with open_tar(tarpath, self.mode, dereference=True, errorlevel=1) as tar:
+    with open_tar(tarpath, self.mode, dereference=dereference, errorlevel=1) as tar:
       tar.add(basedir, arcname=prefix or '.')
     return tarpath
 

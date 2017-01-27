@@ -24,7 +24,7 @@ class NodeBundle(NodeTask):
              default='tgz',
              fingerprint=True,
              help='Create an archive of this type.')
-    register('--archive-prefix', action='store_true', default=False,
+    register('--archive-prefix', type=bool, default=False,
              fingerprint=True,
              help='If --archive is specified, use the target basename as the path prefix.')
 
@@ -48,6 +48,7 @@ class NodeBundle(NodeTask):
           node_paths.node_path(target),
           self._outdir,
           target.package_name,
-          prefix=target.package_name if self._prefix else None
+          prefix=target.package_name if self._prefix else None,
+          dereference=False
         )
         self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
