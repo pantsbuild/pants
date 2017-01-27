@@ -51,6 +51,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Ity Kaul
 + Jackson Davis
 + Jake Donham
++ James Bench
 + James Mouradian
 + Jason Jackson
 + Jeff Jenkins
