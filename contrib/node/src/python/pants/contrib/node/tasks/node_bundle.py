@@ -45,12 +45,12 @@ class NodeBundle(NodeTask):
     node_paths = self.context.products.get_data(NodePaths)
 
     for target in self.context.target_roots:
-      build_dir = node_paths.node_path(target)
-      if os.path.islink(build_dir):
-        # Dereference build_dir if it is a symlink.  dereference option for tar is set to False.
-        build_dir = os.path.realpath(build_dir)
-      self.context.log.info('archiving %s' % build_dir)
       if self.is_node_module(target):
+        build_dir = node_paths.node_path(target)
+        if os.path.islink(build_dir):
+          # Dereference build_dir if it is a symlink.  dereference option for tar is set to False.
+          build_dir = os.path.realpath(build_dir)
+        self.context.log.debug('archiving %s' % build_dir)
         archivepath = archiver.create(
           build_dir,
           self._outdir,
