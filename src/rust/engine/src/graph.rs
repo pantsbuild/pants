@@ -232,6 +232,7 @@ impl Graph {
     } else {
       // Undeclared and valid.
       self.entry_for_id_mut(src_id).dependencies.push(dst_id);
+      self.entry_for_id_mut(dst_id).dependents.push(src_id);
       self.entry_for_id(dst_id).state()
     }
   }
