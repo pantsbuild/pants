@@ -324,6 +324,7 @@ class IdGenerator(object):
   def get(self, id_):
     return self._storage.get(self._id_to_key[id_])
 
+
 class ExternContext(object):
   """A wrapper around python objects used in static extern functions in this module.
 
