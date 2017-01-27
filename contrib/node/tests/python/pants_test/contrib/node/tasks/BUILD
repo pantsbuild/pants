@@ -35,7 +35,8 @@ python_tests(
     'tests/python/pants_test:int-test',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  timeout=120,
 )
 
 python_tests(

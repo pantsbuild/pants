@@ -27,6 +27,8 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
         set(os.listdir(temp_dir)),
         set(['src', 'test', 'node_modules', 'package.json', 'webpack.config.js'])
       )
+      # Make sure .bin symlinks remains as symlinks.
+      self.assertTrue(os.path.islink(os.path.join(temp_dir, 'node_modules', '.bin', 'mocha')))
 
   def test_bundle_node_preinstalled_module(self):
     command = ['bundle',
@@ -41,19 +43,13 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
         set(['src', 'test', 'node_modules', 'package.json'])
       )
 
-  def test_bundle_node_zip_archive(self):
+  def test_no_bundle_node_zip_archive(self):
     command = ['bundle',
                'contrib/node/examples/src/node/preinstalled-project',
                '--bundle-node-archive=zip']
     pants_run = self.run_pants(command=command)
 
-    self.assert_success(pants_run)
-
-    with self._extract_archive('dist/preinstalled-project.zip') as temp_dir:
-      self.assertEquals(
-        set(os.listdir(temp_dir)),
-        set(['src', 'test', 'node_modules', 'package.json'])
-      )
+    self.assert_failure(pants_run)
 
   def test_bundle_node_with_prefix(self):
     command = ['bundle',

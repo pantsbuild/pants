@@ -20,7 +20,9 @@ class NodeBundle(NodeTask):
   @classmethod
   def register_options(cls, register):
     super(NodeBundle, cls).register_options(register)
-    register('--archive', choices=list(archive.TYPE_NAMES),
+    # Some node modules depend on symlink to function.  Thus we can only support archival type
+    # that can preserve symlinks.
+    register('--archive', choices=list(archive.TYPE_NAMES_PRESERVE_SYMLINKS),
              default='tgz',
              fingerprint=True,
              help='Create an archive of this type.')
@@ -43,9 +45,14 @@ class NodeBundle(NodeTask):
     node_paths = self.context.products.get_data(NodePaths)
 
     for target in self.context.target_roots:
+      build_dir = node_paths.node_path(target)
+      if os.path.islink(build_dir):
+        # Dereference build_dir if it is a symlink.  dereference option for tar is set to False.
+        build_dir = os.path.realpath(build_dir)
+      self.context.log.info('archiving %s' % build_dir)
       if self.is_node_module(target):
         archivepath = archiver.create(
-          node_paths.node_path(target),
+          build_dir,
           self._outdir,
           target.package_name,
           prefix=target.package_name if self._prefix else None,

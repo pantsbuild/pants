@@ -60,6 +60,7 @@ class TarArchiver(Archiver):
     """
     :API: public
     """
+
     basedir = ensure_text(basedir)
     tarpath = os.path.join(outdir, '{}.{}'.format(ensure_text(name), self.extension))
     with open_tar(tarpath, self.mode, dereference=dereference, errorlevel=1) as tar:
@@ -134,6 +135,8 @@ ZIP = ZipArchiver(ZIP_DEFLATED, archive_extensions['zip'])
 _ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
+TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset('zip')
+TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
 
 
 def archiver(typename):
