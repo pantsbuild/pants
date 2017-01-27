@@ -249,10 +249,18 @@ impl Graph {
       return false;
     }
 
+    // Search either forward from the dst, or backward from the src.
+    let (root, needle, dependents) =
+      if self.entry_for_id(dst_id).dependencies().len() < self.entry_for_id(src_id).dependents().len() {
+        (dst_id, src_id, false)
+      } else {
+        (src_id, dst_id, true)
+      };
+
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
-    roots.push_back(dst_id);
-    self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src_id)
+    roots.push_back(root);
+    self.walk(roots, { |e| !e.is_complete() }, dependents).any(|e| e.id == needle)
   }
 
   /**
