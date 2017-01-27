@@ -1,5 +1,5 @@
 use graph::GraphContext;
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Function, Key, TypeConstraint, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
 use selectors;
@@ -71,10 +71,6 @@ impl<'g, 't, 'e> StepContext<'g, 't, 'e> {
           .collect()
       })
       .unwrap_or_else(|| Vec::new())
-  }
-
-  fn has_products(&self, item: &Value) -> bool {
-    self.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
   }
 
   fn key_for(&self, val: &Value) -> Key {
@@ -507,7 +503,6 @@ impl Step for Task {
       State::Waiting
     } else {
       // Ready to run!
-      let tasks = &context.tasks;
       State::Runnable(Runnable {
         func: self.selector.func,
         args: dep_values,

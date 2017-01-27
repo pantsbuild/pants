@@ -115,6 +115,24 @@ impl Scheduler {
   }
 
   /**
+   * Collects incomplete deps into the candidates list, asserting that there is at least one.
+   */
+  fn collect_candidates(graph: &Graph, candidates: &mut VecDeque<EntryId>, entry_id: EntryId) {
+    let mut incomplete_deps =
+      graph.entry_for_id(entry_id).dependencies().iter()
+        .map(|&d| graph.entry_for_id(d))
+        .filter(|e| !e.is_complete())
+        .map(|e| e.id())
+        .peekable();
+    assert!(
+      incomplete_deps.peek().is_some(),
+      "Node {:?} returned `Waiting` without declaring dependencies.",
+      graph.entry_for_id(entry_id),
+    );
+    candidates.extend(incomplete_deps);
+  }
+
+  /**
    * Continues execution after the given runnables have completed execution.
    *
    * Returns an ordered batch of `Staged<EntryId>` for which every `StagedArg::Promise` is
@@ -146,26 +164,18 @@ impl Scheduler {
           self.outstanding.insert(entry_id);
         },
         Some(State::Complete(s)) => {
-          // Node completed statically; mark any dependents of the Node as candidates.
-          self.graph.complete(entry_id, s);
-          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
+          if self.graph.is_ready_entry(entry_id) {
+            // Node completed statically; mark any dependents of the Node as candidates.
+            self.graph.complete(entry_id, s);
+            self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
+          } else {
+            // Node cannot complete until its dependencies do.
+            Scheduler::collect_candidates(&self.graph, &mut self.candidates, entry_id);
+          }
         },
         Some(State::Waiting) => {
-          // Node is waiting on dependencies which it declared via the StepContext.
-          let graph = &self.graph;
-          let mut incomplete_deps =
-            self.graph.entry_for_id(entry_id).dependencies().iter()
-              .map(|&d| graph.entry_for_id(d))
-              .filter(|e| !e.is_complete())
-              .map(|e| e.id())
-              .peekable();
-          assert!(
-            incomplete_deps.peek().is_some(),
-            "Node {:?} returned `Waiting` without declaring dependencies.",
-            graph.entry_for_id(entry_id),
-          );
-          // Mark incomplete deps as candidates for steps.
-          self.candidates.extend(incomplete_deps);
+          // Node cannot complete until its dependencies do.
+          Scheduler::collect_candidates(&self.graph, &mut self.candidates, entry_id);
         },
         None =>
           // Not ready to step.
