@@ -300,6 +300,30 @@ class RunnableComplete(datatype('RunnableComplete', ['value', 'is_throw'])):
   """Corresponds to the native object of the same name."""
 
 
+class IdGenerator(object):
+  def __init__(self):
+    self._storage = Storage.create()
+    # Memoized object Ids.
+    self._id_generator = 0
+    self._id_to_key = dict()
+    self._key_to_id = dict()
+
+  def put(self, obj):
+    key = self._storage.put(obj)
+    new_id = self._id_generator
+    _id = self._key_to_id.setdefault(key, new_id)
+    if _id is not new_id:
+      # Object already existed.
+      return _id
+
+    # Object is new/unique.
+    self._id_to_key[_id] = key
+    self._id_generator += 1
+    return _id
+
+  def get(self, id_):
+    return self._storage.get(self._id_to_key[id_])
+
 class ExternContext(object):
   """A wrapper around python objects used in static extern functions in this module.
 
@@ -310,7 +334,8 @@ class ExternContext(object):
   """
 
   def __init__(self):
-    self._storage = Storage.create()
+    # Memoized object Ids.
+    self._id_generator = IdGenerator()
 
     # Outstanding FFI object handles.
     self._handles = set()
@@ -358,10 +383,10 @@ class ExternContext(object):
 
   def put(self, obj):
     # If we encounter an existing id, return it.
-    return self._storage.put(obj).digest
+    return self._id_generator.put(obj)
 
   def get(self, id_):
-    return self._storage.get(Key.create_from_digest(id_))
+    return self._id_generator.get(id_)
 
   def to_id(self, typ):
     return self.put(typ)
