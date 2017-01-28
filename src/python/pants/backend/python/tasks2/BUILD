@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/backend/python:python_setup',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/build_graph',
     'src/python/pants/invalidation',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',

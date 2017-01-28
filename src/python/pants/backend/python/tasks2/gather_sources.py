@@ -51,13 +51,11 @@ class GatherSources(Task):
       else:
         target_set_id = 'no_targets'
 
-      path = os.path.join(self.workdir, target_set_id)
-      path_tmp = path + '.tmp'
-
-      shutil.rmtree(path_tmp, ignore_errors=True)
-
       interpreter = self.context.products.get_data(PythonInterpreter)
+      path = os.path.join(self.workdir, target_set_id)
       if not os.path.isdir(path):
+        path_tmp = path + '.tmp'
+        shutil.rmtree(path_tmp, ignore_errors=True)
         self._build_pex(interpreter, path_tmp, invalidation_check.all_vts)
         shutil.move(path_tmp, path)
 

@@ -10,4 +10,4 @@ from colors import green
 
 def greet(greetee):
   """Given the name, return a greeting for a person of that name."""
-  return green('Hello, %s!' % greetee)
+  return green('Hello, {}!'.format(greetee))
