@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use futures::future::Future;
 use futures::future;
-use futures_cpupool::CpuPool;
+use futures_cpupool::{CpuFuture, CpuPool};
 
-use graph::{EntryId, Graph};
+use graph::{EntryId, GraphContext};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
@@ -54,13 +54,12 @@ pub enum Failure {
   Throw(Value),
 }
 
-// TODO: Naming.
-type CompleteFuture = Future<Item=Value, Error=Failure>;
+pub type StepFuture = Future<Item=Value, Error=Failure>;
 
 #[derive(Clone)]
 pub struct StepContext {
   entry_id: EntryId,
-  graph: Arc<Graph>,
+  graph: GraphContext,
   tasks: Arc<Tasks>,
   pool: CpuPool,
 }
@@ -92,10 +91,10 @@ impl StepContext {
   }
 
   /**
-   * TODO: switch from reference to value.
+   * Get the future value for the given Node.
    */
-  fn get(&self, node: &Node) -> Box<CompleteFuture> {
-    unimplemented!();
+  fn get(&self, node: &Node) -> Box<StepFuture> {
+    self.graph.get(node)
   }
 
   fn has_products(&self, item: &Value) -> bool {
@@ -170,14 +169,12 @@ impl StepContext {
     Failure::Throw(self.tasks.externs.create_exception(msg))
   }
 
-  fn invoke_runnable(&self, runnable: Runnable) -> Box<CompleteFuture> {
+  fn invoke_runnable(&self, runnable: Runnable) -> CpuFuture<Value, Failure> {
     let externs = self.tasks.externs;
-    Box::new(
-      self.pool.spawn_fn(|| {
-        externs.invoke_runnable(&runnable)
-          .map_err(|v| Failure::Throw(v))
-      })
-    )
+    self.pool.spawn_fn(|| {
+      externs.invoke_runnable(&runnable)
+        .map_err(|v| Failure::Throw(v))
+    })
   }
 }
 
@@ -185,13 +182,13 @@ impl StepContext {
  * Defines executing a single step for the given context.
  */
 trait Step {
-  fn step(&self, context: StepContext) -> Box<CompleteFuture>;
+  fn step(&self, context: StepContext) -> Box<StepFuture>;
 
-  fn ok(&self, value: Value) -> Box<CompleteFuture> {
+  fn ok(&self, value: Value) -> Box<StepFuture> {
     Box::new(future::ok(value))
   }
 
-  fn err(&self, failure: Failure) -> Box<CompleteFuture> {
+  fn err(&self, failure: Failure) -> Box<StepFuture> {
     Box::new(future::err(failure))
   }
 }
@@ -307,7 +304,7 @@ impl Select {
 }
 
 impl Step for Select {
-  fn step(&self, context: StepContext) -> Box<CompleteFuture> {
+  fn step(&self, context: StepContext) -> Box<StepFuture> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
@@ -359,7 +356,7 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, context: StepContext) -> Box<CompleteFuture> {
+  fn step(&self, context: StepContext) -> Box<StepFuture> {
     self.ok(context.val_for(&self.selector.subject))
   }
 }
@@ -418,7 +415,7 @@ impl SelectDependencies {
 }
 
 impl Step for SelectDependencies {
-  fn step(&self, context: StepContext) -> Box<CompleteFuture> {
+  fn step(&self, context: StepContext) -> Box<StepFuture> {
     let node = self.clone();
 
     Box::new(
@@ -460,7 +457,7 @@ pub struct SelectProjection {
 }
 
 impl Step for SelectProjection {
-  fn step(&self, context: StepContext) -> Box<CompleteFuture> {
+  fn step(&self, context: StepContext) -> Box<StepFuture> {
     let node = self.clone();
 
     Box::new(
@@ -506,7 +503,7 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: StepContext) -> Box<CompleteFuture> {
+  fn step(&self, context: StepContext) -> Box<StepFuture> {
     let deps =
       future::join_all(
         self.selector.clause.iter()
@@ -618,7 +615,7 @@ impl Node {
     }
   }
 
-  pub fn step(&self, entry_id: EntryId, graph: Arc<Graph>, tasks: Arc<Tasks>, pool: CpuPool) -> Box<CompleteFuture> {
+  pub fn step(&self, entry_id: EntryId, graph: GraphContext, tasks: Arc<Tasks>, pool: CpuPool) -> Box<StepFuture> {
     let context =
       StepContext {
         entry_id: entry_id,

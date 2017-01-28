@@ -5,10 +5,13 @@ use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
+use std::sync::Arc;
+
+use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Node, Complete};
+use nodes::{Node, StepFuture, Complete};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -88,6 +91,8 @@ impl Entry {
 
 type Nodes = HashMap<Node, EntryId, FNV>;
 type Entries = HashMap<EntryId, Entry, FNV>;
+
+pub type NodeFuture = future::Shared<Box<StepFuture>>;
 
 /**
  * A DAG (enforced on mutation) of Entries.
@@ -193,38 +198,41 @@ impl Graph {
   }
 
   /**
-   * Adds the given dst Nodes as dependencies of the src Node, and returns true if any of them
-   * were cyclic.
+   * In the context of the given src Node, declare a dependency on the given dst Node and
+   * immediately return its State if possible.
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  pub fn add_dependencies(&mut self, src_id: EntryId, dst_nodes: Vec<Node>) {
+  pub fn get(&mut self, src_id: EntryId, dst_node: &Node) -> NodeFuture {
     assert!(
       !self.is_complete_entry(src_id),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
       src_id,
-      dst_nodes,
+      dst_node,
     );
 
-    let dsts: Vec<EntryId> = dst_nodes.into_iter().map(|n| self.ensure_entry(n)).collect();
+    // Get or create the destination.
+    let dst_id =
+      self.entry(dst_node)
+        .map(|e| e.id())
+        .unwrap_or_else(|| self.ensure_entry(dst_node.clone()));
 
-    // Determine whether each awaited dep is cyclic.
-    let (deps, cyclic_deps): (DepSet, DepSet) = {
-      let src = self.entry_for_id(src_id);
-      dsts.into_iter()
-        .filter(|dst_id| !(src.dependencies.contains(dst_id) || src.cyclic_dependencies.contains(dst_id)))
-        .partition(|&dst_id| !self.detect_cycle(src_id, dst_id))
-    };
-
-    // Add the source as a dependent of each non-cyclic dep.
-    for &dep in &deps {
-      self.entry_for_id_mut(dep).dependents.push(src_id);
+    if self.entry_for_id(src_id).dependencies().contains(&dst_id) {
+      // Declared and valid.
+      self.entry_for_id(dst_id).state()
+    } else if self.entry_for_id(src_id).cyclic_dependencies().contains(&dst_id) {
+      // Declared but cyclic.
+      self.cyclic_singleton()
+    } else if self.detect_cycle(src_id, dst_id) {
+      // Undeclared but cyclic.
+      self.entry_for_id_mut(src_id).cyclic_dependencies.push(dst_id);
+      self.cyclic_singleton()
+    } else {
+      // Undeclared and valid.
+      self.entry_for_id_mut(src_id).dependencies.push(dst_id);
+      self.entry_for_id_mut(dst_id).dependents.push(src_id);
+      self.entry_for_id(dst_id).state()
     }
-
-    // Finally, add all deps to the source.
-    let src = self.entry_for_id_mut(src_id);
-    src.dependencies.extend(deps);
-    src.cyclic_dependencies.extend(cyclic_deps);
   }
 
   /**
@@ -461,6 +469,29 @@ impl Graph {
 
     try!(f.write_all(b"\n"));
     Ok(())
+  }
+}
+
+/**
+ * Represents a view of the graph from the context of a particular source Node. Helps to
+ * lower the surface area of the API that is exposed to running Nodes.
+ */
+#[derive(Clone)]
+pub struct GraphContext {
+  graph: Arc<Graph>,
+  entry_id: EntryId,
+}
+
+impl GraphContext {
+  pub fn create(graph: Arc<Graph>, entry_id: EntryId) -> GraphContext {
+    GraphContext {
+      graph: graph,
+      entry_id: entry_id,
+    }
+  }
+
+  pub fn get(&self, node: &Node) -> NodeFuture {
+    self.graph.get(self.entry_id, node)
   }
 }
 
