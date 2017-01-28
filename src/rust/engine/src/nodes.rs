@@ -372,30 +372,6 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_product<'a>(&self, context: &'a StepContext) -> Result<&'a Value, State> {
-    // Request the product we need in order to request dependencies.
-    let dep_product_node =
-      Node::create(
-        Selector::select(self.selector.dep_product),
-        self.subject.clone(),
-        self.variants.clone()
-      );
-    match context.get(&dep_product_node) {
-      Some(&Complete::Return(ref value)) =>
-        Ok(value),
-      Some(&Complete::Noop(_, _)) =>
-        Err(
-          State::Complete(
-            Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
-          )
-        ),
-      Some(&Complete::Throw(ref msg)) =>
-        Err(State::Complete(Complete::Throw(context.clone_val(msg)))),
-      None =>
-        Err(State::Waiting(vec![dep_product_node])),
-    }
-  }
-
   fn dep_node(&self, context: &StepContext, dep_subject: &Value) -> Node {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
@@ -434,43 +410,35 @@ impl SelectDependencies {
 
 impl Step for SelectDependencies {
   fn step(&self, context: StepContext) -> Box<CompleteFuture> {
-    // Select the product holding the dependency list.
-    let dep_product =
-      match self.dep_product(&context) {
-        Ok(dep_product) => dep_product,
-        Err(state) => return state,
-      };
+    let node = self.clone();
 
-    // The product and its dependency list are available.
-    let mut dependencies = Vec::new();
-    let mut dep_values: Vec<&Value> = Vec::new();
-    for dep_subject in context.project_multi(&dep_product, &self.selector.field) {
-      let dep_node = self.dep_node(&context, &dep_subject);
-      match context.get(&dep_node) {
-        Some(&Complete::Return(ref value)) =>
-          dep_values.push(&value),
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            context.throw(
-              format!(
-                "No source of explicit dep {}",
-                dep_node.format(&context.tasks.externs)
-              )
-            )
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        None =>
-          dependencies.push(dep_node),
-      }
-    }
-
-    if dependencies.len() > 0 {
-      State::Waiting(dependencies)
-    } else {
-      State::Complete(Complete::Return(self.store(&context, &dep_product, dep_values)))
-    }
+    Box::new(
+      context
+        .get(
+          // Select the product holding the dependency list.
+          &Node::create(
+            Selector::select(self.selector.dep_product),
+            self.subject.clone(),
+            self.variants.clone()
+          )
+        )
+        .and_then(move |dep_product| {
+          // The product and its dependency list are available: project them.
+          let deps =
+            future::join_all(
+              context.project_multi(&dep_product, &node.selector.field).iter()
+                .map(|dep_subject| node.dep_node(&context, &dep_subject))
+                .collect()
+            );
+          deps.map(move |dep_values| {
+            (node, context, dep_product, dep_values)
+          })
+        })
+        .map(|(node, context, dep_product, dep_values)| {
+          // Finally, store the resulting values.
+          node.store(&context, &dep_product, dep_values)
+        })
+    )
   }
 }
 
