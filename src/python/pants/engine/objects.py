@@ -151,3 +151,11 @@ class Closable(object):
   def close(self):
     """A no-op implementation, overwrite to actually clean up resources etc."""
     return
+
+
+class Mutable(AbstractClass):
+  """Marks a class whose instances are subject to change.
+
+  Immutability is the default. Immutable objects can be id-ed by the hashes, not necessarily
+  based on their content, which is more expensive to compute.
+  """
