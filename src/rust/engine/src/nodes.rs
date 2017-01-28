@@ -1,9 +1,8 @@
 
 use std::sync::Arc;
 
-use futures::future::Future;
+use futures::future::{BoxFuture, Future};
 use futures::future;
-use futures_cpupool::{CpuFuture, CpuPool};
 
 use graph::{EntryId, GraphContext};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
@@ -54,14 +53,17 @@ pub enum Failure {
   Throw(Value),
 }
 
-pub type StepFuture = Future<Item=Value, Error=Failure>;
+// Individual Steps will be pulled by the Scheduler's pool, and thus need not be shareable.
+pub type StepFuture = BoxFuture<Value, Failure>;
+
+// Because multiple callers may wait on the same Node, the Future for a Node must be shareable.
+pub type NodeFuture = future::Shared<StepFuture>;
 
 #[derive(Clone)]
 pub struct StepContext {
   entry_id: EntryId,
   graph: GraphContext,
   tasks: Arc<Tasks>,
-  pool: CpuPool,
 }
 
 impl StepContext {
@@ -93,7 +95,7 @@ impl StepContext {
   /**
    * Get the future value for the given Node.
    */
-  fn get(&self, node: &Node) -> Box<StepFuture> {
+  fn get(&self, node: &Node) -> NodeFuture {
     self.graph.get(node)
   }
 
@@ -169,12 +171,40 @@ impl StepContext {
     Failure::Throw(self.tasks.externs.create_exception(msg))
   }
 
-  fn invoke_runnable(&self, runnable: Runnable) -> CpuFuture<Value, Failure> {
-    let externs = self.tasks.externs;
-    self.pool.spawn_fn(|| {
-      externs.invoke_runnable(&runnable)
-        .map_err(|v| Failure::Throw(v))
-    })
+  fn invoke_runnable(&self, runnable: Runnable) -> Result<Value, Failure> {
+    self.tasks.externs.invoke_runnable(&runnable)
+      .map_err(|v| Failure::Throw(v))
+  }
+
+  /**
+   * A helper to take ownership of the given Failure, while indicating that the value
+   * represented by the Failure was an optional value.
+   */
+  fn was_optional(&self, failure: future::SharedError<Failure>, msg: &str) -> Failure {
+    match failure.item {
+      Failure::Noop(..) =>
+        Failure::Noop(msg, None),
+      Failure::Throw(ref msg) =>
+        Failure::Throw(self.clone_val(msg)),
+    }
+  }
+
+  /**
+   * A helper to take ownership of the given Failure, while indicating that the value
+   * represented by the Failure was required, and thus fatal if not present.
+   */
+  fn was_required(&self, context: &StepContext) -> Failure {
+    match failure.item {
+      Failure::Noop(..) =>
+        self.throw(
+          format!(
+            "No source of projected dependency {}",
+            output_node.format(&context.tasks.externs)
+          )
+        ),
+      Failure::Throw(ref msg) =>
+        Failure::Throw(self.clone_val(msg)),
+    }
   }
 }
 
@@ -182,14 +212,14 @@ impl StepContext {
  * Defines executing a single step for the given context.
  */
 trait Step {
-  fn step(&self, context: StepContext) -> Box<StepFuture>;
+  fn step(&self, context: StepContext) -> StepFuture;
 
-  fn ok(&self, value: Value) -> Box<StepFuture> {
-    Box::new(future::ok(value))
+  fn ok(&self, value: Value) -> StepFuture {
+    future::ok(value).boxed()
   }
 
-  fn err(&self, failure: Failure) -> Box<StepFuture> {
-    Box::new(future::err(failure))
+  fn err(&self, failure: Failure) -> StepFuture {
+    future::err(failure).boxed()
   }
 }
 
@@ -304,7 +334,7 @@ impl Select {
 }
 
 impl Step for Select {
-  fn step(&self, context: StepContext) -> Box<StepFuture> {
+  fn step(&self, context: StepContext) -> StepFuture {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
@@ -339,12 +369,11 @@ impl Step for Select {
 
     let variant_value = variant_value.map(|s| s.to_string());
     let node = self.clone();
-    Box::new(
-      deps_future
-        .and_then(move |dep_results| {
-          future::result(node.choose_task_result(context, dep_results, variant_value))
-        })
-    )
+    deps_future
+      .and_then(move |dep_results| {
+        future::result(node.choose_task_result(context, dep_results, variant_value))
+      })
+      .boxed()
   }
 }
 
@@ -356,7 +385,7 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, context: StepContext) -> Box<StepFuture> {
+  fn step(&self, context: StepContext) -> StepFuture {
     self.ok(context.val_for(&self.selector.subject))
   }
 }
@@ -415,37 +444,36 @@ impl SelectDependencies {
 }
 
 impl Step for SelectDependencies {
-  fn step(&self, context: StepContext) -> Box<StepFuture> {
+  fn step(&self, context: StepContext) -> StepFuture {
     let node = self.clone();
 
-    Box::new(
-      context
-        .get(
-          // Select the product holding the dependency list.
-          &Node::create(
-            Selector::select(self.selector.dep_product),
-            self.subject.clone(),
-            self.variants.clone()
-          )
+    context
+      .get(
+        // Select the product holding the dependency list.
+        &Node::create(
+          Selector::select(self.selector.dep_product),
+          self.subject.clone(),
+          self.variants.clone()
         )
-        .and_then(move |dep_product| {
-          // The product and its dependency list are available: project them.
-          let deps =
-            future::join_all(
-              context.project_multi(&dep_product, &node.selector.field).iter()
-                .map(|dep_subject| {
-                  context.get(&node.dep_node(&context, &dep_subject))
-                })
-            );
-          deps.map(move |dep_values| {
-            (node, context, dep_product, dep_values)
-          })
+      )
+      .and_then(move |dep_product| {
+        // The product and its dependency list are available: project them.
+        let deps =
+          future::join_all(
+            context.project_multi(&dep_product, &node.selector.field).iter()
+              .map(|dep_subject| {
+                context.get(&node.dep_node(&context, &dep_subject))
+              })
+          );
+        deps.map(move |dep_values| {
+          (node, context, dep_product, dep_values)
         })
-        .map(|(node, context, dep_product, dep_values)| {
-          // Finally, store the resulting values.
-          node.store(&context, &dep_product, dep_values.iter().collect())
-        })
-    )
+      })
+      .map(|(node, context, dep_product, dep_values)| {
+        // Finally, store the resulting values.
+        node.store(&context, &dep_product, dep_values.iter().collect())
+      })
+      .boxed()
   }
 }
 
@@ -457,40 +485,39 @@ pub struct SelectProjection {
 }
 
 impl Step for SelectProjection {
-  fn step(&self, context: StepContext) -> Box<StepFuture> {
+  fn step(&self, context: StepContext) -> StepFuture {
     let node = self.clone();
 
-    Box::new(
-      context
-        .get(
-          // Request the product we need to compute the subject.
+    context
+      .get(
+        // Request the product we need to compute the subject.
+        &Node::create(
+          Selector::select(self.selector.input_product),
+          self.subject.clone(),
+          self.variants.clone()
+        )
+      )
+      .map(move |dep_product| {
+        // And then project the relevant field.
+        let projected =
+          context.project(
+            &dep_product,
+            &node.selector.field,
+            &node.selector.projected_subject
+          );
+        (context, node, projected)
+      })
+      .and_then(|(context, node, projected_subject)| {
+        // When the output product is available, return it.
+        context.get(
           &Node::create(
-            Selector::select(self.selector.input_product),
-            self.subject.clone(),
-            self.variants.clone()
+            Selector::select(node.selector.product),
+            context.key_for(&projected_subject),
+            node.variants.clone()
           )
         )
-        .map(move |dep_product| {
-          // And then project the relevant field.
-          let projected =
-            context.project(
-              &dep_product,
-              &node.selector.field,
-              &node.selector.projected_subject
-            );
-          (context, node, projected)
-        })
-        .and_then(|(context, node, projected_subject)| {
-          // When the output product is available, return it.
-          context.get(
-            &Node::create(
-              Selector::select(node.selector.product),
-              context.key_for(&projected_subject),
-              node.variants.clone()
-            )
-          )
-        })
-    )
+      })
+      .boxed()
   }
 }
 
@@ -503,7 +530,7 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: StepContext) -> Box<StepFuture> {
+  fn step(&self, context: StepContext) -> StepFuture {
     let deps =
       future::join_all(
         self.selector.clause.iter()
@@ -514,17 +541,22 @@ impl Step for Task {
       );
 
     let selector = self.selector.clone();
-    Box::new(
-      deps.and_then(move |deps| {
-        context.invoke_runnable(
-          Runnable {
-            func: selector.func,
-            args: deps.iter().map(|v| context.clone_val(v)).collect(),
-            cacheable: selector.cacheable,
-          }
-        )
+    deps
+      .then(move |deps_result| {
+        match deps_result {
+          Ok(deps) =>
+            context.invoke_runnable(
+              Runnable {
+                func: selector.func,
+                args: deps.iter().map(|v| context.clone_val(v)).collect(),
+                cacheable: selector.cacheable,
+              }
+            ),
+          Err(err) =>
+            Err(context.was_optional(err, "Missing at least one input.")),
+        }
       })
-    )
+      .boxed()
   }
 }
 
@@ -615,13 +647,12 @@ impl Node {
     }
   }
 
-  pub fn step(&self, entry_id: EntryId, graph: GraphContext, tasks: Arc<Tasks>, pool: CpuPool) -> Box<StepFuture> {
+  pub fn step(&self, entry_id: EntryId, graph: GraphContext, tasks: Arc<Tasks>) -> StepFuture {
     let context =
       StepContext {
         entry_id: entry_id,
         graph: graph,
         tasks: tasks,
-        pool: pool,
       };
     match self {
       &Node::Select(ref n) => n.step(context),
