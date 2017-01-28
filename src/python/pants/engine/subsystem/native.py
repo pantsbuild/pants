@@ -275,7 +275,7 @@ def extern_lift_directory_listing(context_handle, directory_listing_val):
   raw_stats_len = len(directory_listing.dependencies)
   raw_stats = _FFI.new('RawStat[]', raw_stats_len)
   for i, stat in enumerate(directory_listing.dependencies):
-    raw_stats[i].path = c.utf8_buf(stat.path)
+    raw_stats[i].path = c.buf(stat.path)
     if type(stat) == Dir:
       raw_stats[i].tag = 0
     elif type(stat) == File:

@@ -226,7 +226,7 @@ def single_or_sib_addresses_to_globs(address_mapper, single_or_sib_addresses):
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files."""
   pattern = address_mapper.build_pattern
-  return PathGlobs.create(descendant_addresses.directory, include=[pattern, join('**', pattern)], exclude=[])
+  return PathGlobs.create(descendant_addresses.directory, include=[pattern, join(b'**', pattern)], exclude=[])
 
 
 def _recursive_dirname(f):

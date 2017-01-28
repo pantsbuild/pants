@@ -372,6 +372,10 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
    * Recursively expands PathGlobs into PathStats.
    */
   fn expand_multi(&self, path_globs: Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
+    if path_globs.is_empty() {
+      return future::ok(vec![]).boxed();
+    }
+
     let init =
       PathGlobsExpansion {
         context: self.clone(),

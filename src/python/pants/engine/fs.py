@@ -33,7 +33,7 @@ class ReadLink(datatype('ReadLink', ['path'])):
   """The result of reading a symbolic link."""
 
   def __new__(cls, path):
-    return super(ReadLink, cls).__new__(cls, six.text_type(path))
+    return super(ReadLink, cls).__new__(cls, six.binary_type(path))
 
 
 class Dirs(datatype('Dirs', ['dependencies'])):

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;
@@ -240,7 +240,7 @@ pub struct RawStats {
   stats_ptr: *mut RawStat,
   stats_len: u64,
   // A handle to hold the underlying stats buffer alive.
-  _value: Value,
+  value_: Value,
 }
 
 #[repr(C)]

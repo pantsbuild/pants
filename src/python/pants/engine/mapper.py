@@ -197,7 +197,7 @@ class AddressMapper(object):
     """
     self.symbol_table_cls = symbol_table_cls
     self.parser_cls = parser_cls
-    self.build_pattern = build_pattern or 'BUILD*'
+    self.build_pattern = build_pattern or b'BUILD*'
 
     self.build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
     self._exclude_target_regexps = exclude_target_regexps or []
