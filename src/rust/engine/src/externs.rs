@@ -135,7 +135,7 @@ impl Externs {
     })
   }
 
-  pub fn create_exception(&self, msg: String) -> Value {
+  pub fn create_exception(&self, msg: &str) -> Value {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
 
