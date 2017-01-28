@@ -167,7 +167,7 @@ impl StepContext {
   /**
    * Creates a Throw state with the given exception message.
    */
-  fn throw(&self, msg: String) -> Failure {
+  fn throw(&self, msg: &str) -> Failure {
     Failure::Throw(self.tasks.externs.create_exception(msg))
   }
 
@@ -180,8 +180,8 @@ impl StepContext {
    * A helper to take ownership of the given Failure, while indicating that the value
    * represented by the Failure was an optional value.
    */
-  fn was_optional(&self, failure: future::SharedError<Failure>, msg: &str) -> Failure {
-    match failure.item {
+  fn was_optional(&self, failure: future::SharedError<Failure>, msg: &'static str) -> Failure {
+    match *failure {
       Failure::Noop(..) =>
         Failure::Noop(msg, None),
       Failure::Throw(ref msg) =>
@@ -193,15 +193,10 @@ impl StepContext {
    * A helper to take ownership of the given Failure, while indicating that the value
    * represented by the Failure was required, and thus fatal if not present.
    */
-  fn was_required(&self, context: &StepContext) -> Failure {
-    match failure.item {
+  fn was_required(&self, failure: future::SharedError<Failure>) -> Failure {
+    match *failure {
       Failure::Noop(..) =>
-        self.throw(
-          format!(
-            "No source of projected dependency {}",
-            output_node.format(&context.tasks.externs)
-          )
-        ),
+        self.throw("No source of required dependencies"),
       Failure::Throw(ref msg) =>
         Failure::Throw(self.clone_val(msg)),
     }
@@ -318,7 +313,7 @@ impl Select {
       // TODO: Multiple successful tasks are not currently supported. We should allow for this
       // by adding support for "mergeable" products. see:
       //   https://github.com/pantsbuild/pants/issues/2526
-      return Err(context.throw(format!("Conflicting values produced for subject and type.")));
+      return Err(context.throw("Conflicting values produced for subject and type."));
     }
 
     match matches.pop() {
@@ -497,25 +492,36 @@ impl Step for SelectProjection {
           self.variants.clone()
         )
       )
-      .map(move |dep_product| {
-        // And then project the relevant field.
-        let projected =
-          context.project(
-            &dep_product,
-            &node.selector.field,
-            &node.selector.projected_subject
-          );
-        (context, node, projected)
-      })
-      .and_then(|(context, node, projected_subject)| {
-        // When the output product is available, return it.
-        context.get(
-          &Node::create(
-            Selector::select(node.selector.product),
-            context.key_for(&projected_subject),
-            node.variants.clone()
-          )
-        )
+      .then(move |dep_product_res| {
+        match dep_product_res {
+          Ok(dep_product) => {
+            // And then project the relevant field.
+            let projected_subject =
+              context.project(
+                &dep_product,
+                &node.selector.field,
+                &node.selector.projected_subject
+              );
+            context
+              .get(
+                &Node::create(
+                  Selector::select(node.selector.product),
+                  context.key_for(&projected_subject),
+                  node.variants.clone()
+                )
+              )
+              .then(move |output_res| {
+                // If the output product is available, return it.
+                match output_res {
+                  Ok(output) => Ok(context.clone_val(&output)),
+                  Err(failure) => Err(context.was_required(failure)),
+                }
+              })
+              .boxed()
+          },
+          Err(failure) =>
+            node.err(context.was_optional(failure, "No source of input product.")),
+        }
       })
       .boxed()
   }
