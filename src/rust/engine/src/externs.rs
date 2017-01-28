@@ -31,8 +31,9 @@ pub struct Externs {
   invoke_runnable: InvokeRunnable,
 }
 
-// The pointer to the context is safe to Send.
+// The pointer to the context is safe for sharing between threads.
 unsafe impl Sync for Externs {}
+unsafe impl Send for Externs {}
 
 impl Externs {
   pub fn new(

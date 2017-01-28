@@ -11,23 +11,18 @@ use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Node, StepFuture, Complete};
+use nodes::{Complete, Node, NodeFuture, StepFuture};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct EntryId(usize);
 
+// TODO: The average number of dependencies for a Node is somewhere between 1 and 2, but
+// we should still consider switching this to HashSet.
 pub type DepSet = Vec<EntryId>;
 
 /**
  * An Entry and its adjacencies.
- *
- * The dependencies and cyclic_dependencies sets are stored as vectors in order to expose
- * them more easily via the C API, but they should never contain dupes.
- *
- * NB: The average number of dependencies for a Node is somewhere between 1 and 2, so Vec is
- * not too crazy (although maintaining sorted order and then binary-searching in sufficiently
- * large Vecs would make sense).
  */
 #[derive(Debug)]
 pub struct Entry {
@@ -91,8 +86,6 @@ impl Entry {
 
 type Nodes = HashMap<Node, EntryId, FNV>;
 type Entries = HashMap<EntryId, Entry, FNV>;
-
-pub type NodeFuture = future::Shared<Box<StepFuture>>;
 
 /**
  * A DAG (enforced on mutation) of Entries.
