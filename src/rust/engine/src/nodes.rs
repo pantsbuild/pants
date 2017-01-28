@@ -180,14 +180,16 @@ impl StepContext {
   /**
    * Creates a Throw state with the given exception message.
    */
-  fn throw(&self, msg: String) -> Complete {
-    Complete::Throw(self.tasks.externs.create_exception(msg))
+  fn throw(&self, msg: String) -> Failure {
+    Failure::Throw(self.tasks.externs.create_exception(msg))
   }
 
   fn invoke_runnable(&self, runnable: Runnable) -> Box<CompleteFuture> {
+    let externs = self.tasks.externs;
     Box::new(
       self.pool.spawn_fn(|| {
-        self.tasks.externs.invoke_runnable(runnable)
+        externs.invoke_runnable(&runnable)
+          .map_err(|v| Failure::Throw(v))
       })
     )
   }
@@ -201,6 +203,10 @@ trait Step {
 
   fn ok(&self, value: Value) -> Box<CompleteFuture> {
     Box::new(future::ok(value))
+  }
+
+  fn err(&self, failure: Failure) -> Box<CompleteFuture> {
+    Box::new(future::err(failure))
   }
 }
 
@@ -228,7 +234,7 @@ impl Select {
     &self,
     context: &StepContext,
     candidate: &'a Value,
-    variant_value: Option<&str>
+    variant_value: Option<String>
   ) -> bool {
     if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
       return false;
@@ -251,7 +257,7 @@ impl Select {
     &self,
     context: &StepContext,
     candidate: Value,
-    variant_value: Option<&str>
+    variant_value: Option<String>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
     if self.select_literal_single(context, &candidate, variant_value) {
@@ -270,75 +276,92 @@ impl Select {
     }
     return None;
   }
+
+  /**
+   * Given the results of configured Task nodes, select a single successful value, or fail.
+   */
+  fn choose_task_result(
+    &self,
+    context: StepContext,
+    results: Vec<Result<Value, Failure>>,
+    variant_value: Option<String>,
+  ) -> Result<Value, Failure> {
+    let mut matches = Vec::new();
+    for result in results {
+      match result {
+        Ok(ref value) => {
+          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
+            matches.push(v);
+          }
+        },
+        Err(Failure::Noop(_, _)) =>
+          continue,
+        Err(Failure::Throw(ref msg)) =>
+          return Err(Failure::Throw(context.clone_val(msg))),
+      }
+    }
+
+    if matches.len() > 1 {
+      // TODO: Multiple successful tasks are not currently supported. We should allow for this
+      // by adding support for "mergeable" products. see:
+      //   https://github.com/pantsbuild/pants/issues/2526
+      return Err(context.throw(format!("Conflicting values produced for subject and type.")));
+    }
+
+    match matches.pop() {
+      Some(matched) =>
+        // Exactly one value was available.
+        Ok(matched),
+      None =>
+        Err(
+          Failure::Noop("No task was available to compute the value.", None)
+        ),
+    }
+  }
 }
 
 impl Step for Select {
   fn step(&self, context: StepContext) -> Box<CompleteFuture> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
-    let variants = &self.variants;
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
-    let variant_value: Option<&str> =
+    let variant_value: Option<String> =
       match self.selector.variant_key {
         Some(ref variant_key) => {
-          let variant_value = variants.find(variant_key);
+          let variant_value = self.variants.find(variant_key);
           if variant_value.is_none() {
-            return self.ok(
-              Complete::Noop("A matching variant key was not configured in variants.", None)
+            return self.err(
+              Failure::Noop("A matching variant key was not configured in variants.", None)
             );
           }
-          variant_value
+          variant_value.map(|v| v.to_string())
         },
         None => None,
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
     if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), variant_value) {
-      return self.ok(Complete::Return(literal_value));
+      return self.ok(literal_value);
     }
 
-    // Else, attempt to use a configured task to compute the value.
-    let mut dependencies = Vec::new();
-    let mut matches: Vec<Value> = Vec::new();
-    for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
-      match context.get(&dep_node) {
-        Some(&Complete::Return(ref value)) => {
-          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
-            matches.push(v);
-          }
-        },
-        Some(&Complete::Noop(_, _)) =>
-          continue,
-        Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        None =>
-          dependencies.push(dep_node),
-      }
-    }
-
-    // If any dependencies were unavailable, wait for them; otherwise, determine whether
-    // a value was successfully selected.
-    if !dependencies.is_empty() {
-      // A dependency has not run yet.
-      return State::Waiting(dependencies);
-    } else if matches.len() > 1 {
-      // TODO: Multiple successful tasks are not currently supported. We should allow for this
-      // by adding support for "mergeable" products. see:
-      //   https://github.com/pantsbuild/pants/issues/2526
-      return State::Complete(
-        context.throw(format!("Conflicting values produced for subject and type."))
+    // Else, attempt to use the configured tasks to compute the value.
+    let deps_future =
+      future::join_all(
+        context.gen_nodes(&self.subject, self.product(), &self.variants).iter()
+          .map(|task_node| {
+            // Attempt to get the value of each task Node, but don't fail the join if one fails.
+            context.get(&task_node).then(|r| future::ok(r))
+          })
       );
-    }
 
-    match matches.pop() {
-      Some(matched) =>
-        // Statically completed!
-        State::Complete(Complete::Return(matched)),
-      None =>
-        State::Complete(
-          Complete::Noop("No task was available to compute the value.", None)
-        ),
-    }
+    let variant_value = variant_value.map(|s| s.to_string());
+    let node = self.clone();
+    Box::new(
+      deps_future
+        .and_then(move |dep_results| {
+          future::result(node.choose_task_result(context, dep_results, variant_value))
+        })
+    )
   }
 }
 
@@ -477,7 +500,7 @@ impl Step for SelectProjection {
           // When the output product is available, return it.
           context.get(
             &Node::create(
-              Selector::select(selector.product),
+              Selector::select(node.selector.product),
               context.key_for(&projected_subject),
               node.variants.clone()
             )

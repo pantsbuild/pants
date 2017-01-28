@@ -258,11 +258,9 @@ pub extern fn execution_execute(
       completed =
         runnable_batch.iter()
           .map(|&(id, ref runnable)| {
-            let result = raw.scheduler.tasks.externs.invoke_runnable(runnable);
-            if result.is_throw {
-              (id, Complete::Throw(result.value))
-            } else {
-              (id, Complete::Return(result.value))
+            match raw.scheduler.tasks.externs.invoke_runnable(runnable) {
+              Ok(v) => (id, Complete::Return(v)),
+              Err(v) => (id, Complete::Throw(v)),
             }
           })
           .collect();
