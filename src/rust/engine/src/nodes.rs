@@ -199,8 +199,8 @@ impl StepContext {
 trait Step {
   fn step(&self, context: StepContext) -> Box<CompleteFuture>;
 
-  fn ok(&self, complete: Complete) -> Box<CompleteFuture> {
-    Box::new(future::ok(complete))
+  fn ok(&self, value: Value) -> Box<CompleteFuture> {
+    Box::new(future::ok(value))
   }
 }
 
@@ -351,7 +351,7 @@ pub struct SelectLiteral {
 
 impl Step for SelectLiteral {
   fn step(&self, context: StepContext) -> Box<CompleteFuture> {
-    State::Complete(Complete::Return(context.val_for(&self.selector.subject)))
+    self.ok(context.val_for(&self.selector.subject))
   }
 }
 
