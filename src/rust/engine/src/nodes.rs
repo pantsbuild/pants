@@ -95,21 +95,7 @@ impl StepContext {
    * TODO: switch from reference to value.
    */
   fn get(&self, node: &Node) -> Box<CompleteFuture> {
-    self.graph.entry(node).and_then(|dep_entry| {
-      // The entry exists. If it's a declared dep, return it immediately.
-      let entry = self.graph.entry_for_id(self.entry_id);
-      if entry.dependencies().contains(&dep_entry.id()) {
-        dep_entry.state()
-      } else if entry.cyclic_dependencies().contains(&dep_entry.id()) {
-        // Declared, but cyclic.
-        Some(self.graph.cyclic_singleton())
-      } else {
-        // Undeclared. In theory we could still immediately return the dep here, but unfortunately
-        // that occasionally allows Nodes to finish executing before all of their declared deps are
-        // available.
-        None
-      }
-    })
+    unimplemented!();
   }
 
   fn has_products(&self, item: &Value) -> bool {
@@ -450,8 +436,9 @@ impl Step for SelectDependencies {
           let deps =
             future::join_all(
               context.project_multi(&dep_product, &node.selector.field).iter()
-                .map(|dep_subject| node.dep_node(&context, &dep_subject))
-                .collect()
+                .map(|dep_subject| {
+                  context.get(&node.dep_node(&context, &dep_subject))
+                })
             );
           deps.map(move |dep_values| {
             (node, context, dep_product, dep_values)
@@ -459,7 +446,7 @@ impl Step for SelectDependencies {
         })
         .map(|(node, context, dep_product, dep_values)| {
           // Finally, store the resulting values.
-          node.store(&context, &dep_product, dep_values)
+          node.store(&context, &dep_product, dep_values.iter().collect())
         })
     )
   }
@@ -522,11 +509,11 @@ impl Step for Task {
   fn step(&self, context: StepContext) -> Box<CompleteFuture> {
     let deps =
       future::join_all(
-        &self.selector.clause.iter()
+        self.selector.clause.iter()
           .map(|selector| {
             context.get(&Node::create(selector.clone(), self.subject.clone(), self.variants.clone()))
           })
-          .collect()
+          .collect::<Vec<_>>()
       );
 
     let selector = self.selector.clone();
