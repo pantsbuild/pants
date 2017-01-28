@@ -1,8 +1,8 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::mem;
 use std::os::raw;
 use std::string::FromUtf8Error;
+use std::sync::RwLock;
 
 use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
@@ -14,7 +14,6 @@ pub type ExternContext = raw::c_void;
 pub type SatisfiedByExtern =
   extern "C" fn(*const ExternContext, *const TypeConstraint, *const TypeId) -> bool;
 
-#[derive(Clone)]
 pub struct Externs {
   context: *const ExternContext,
   key_for: KeyForExtern,
@@ -22,7 +21,7 @@ pub struct Externs {
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
-  satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
+  satisfied_by_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
@@ -31,6 +30,9 @@ pub struct Externs {
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
 }
+
+// The pointer to the context is safe to Send.
+unsafe impl Sync for Externs {}
 
 impl Externs {
   pub fn new(
@@ -55,7 +57,7 @@ impl Externs {
       clone_val: clone_val,
       drop_handles: drop_handles,
       satisfied_by: satisfied_by,
-      satisfied_by_cache: RefCell::new(HashMap::new()),
+      satisfied_by_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       project: project,
       project_multi: project_multi,
@@ -83,7 +85,19 @@ impl Externs {
   }
 
   pub fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    self.satisfied_by_cache.borrow_mut().entry((*constraint, *cls))
+    let key = (*constraint, *cls);
+
+    // See if a value already exists.
+    {
+      let read = self.satisfied_by_cache.read().unwrap();
+      if let Some(v) = read.get(&key) {
+        return *v;
+      }
+    }
+
+    // If not, compute and insert.
+    let write = self.satisfied_by_cache.write().unwrap();
+    write.entry(key)
       .or_insert_with(||
         (self.satisfied_by)(self.context, constraint, cls)
       )
@@ -124,14 +138,20 @@ impl Externs {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
 
-  pub fn invoke_runnable(&self, runnable: &Runnable) -> RunnableComplete {
-    (self.invoke_runnable)(
-      self.context,
-      runnable.func(),
-      runnable.args().as_ptr(),
-      runnable.args().len() as u64,
-      runnable.cacheable()
-    )
+  pub fn invoke_runnable(&self, runnable: &Runnable) -> Result<Value, Value> {
+    let result =
+      (self.invoke_runnable)(
+        self.context,
+        runnable.func(),
+        runnable.args().as_ptr(),
+        runnable.args().len() as u64,
+        runnable.cacheable()
+      );
+    if result.is_throw {
+      Err(result.value)
+    } else {
+      Ok(result.value)
+    }
   }
 }
 
