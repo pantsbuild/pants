@@ -57,6 +57,7 @@ pub enum Failure {
 // TODO: Naming.
 type CompleteFuture = Future<Item=Value, Error=Failure>;
 
+#[derive(Clone)]
 pub struct StepContext {
   entry_id: EntryId,
   graph: Arc<Graph>,
@@ -90,6 +91,9 @@ impl StepContext {
       .unwrap_or_else(|| Vec::new())
   }
 
+  /**
+   * TODO: switch from reference to value.
+   */
   fn get(&self, node: &Node) -> Box<CompleteFuture> {
     self.graph.entry(node).and_then(|dep_entry| {
       // The entry exists. If it's a declared dep, return it immediately.
@@ -479,60 +483,39 @@ pub struct SelectProjection {
 
 impl Step for SelectProjection {
   fn step(&self, context: StepContext) -> Box<CompleteFuture> {
-    // Request the product we need to compute the subject.
-    let input_node =
-      Node::create(
-        Selector::select(self.selector.input_product),
-        self.subject.clone(),
-        self.variants.clone()
-      );
-    let dep_product =
-      match context.get(&input_node) {
-        Some(&Complete::Return(ref value)) =>
-          value,
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            Complete::Noop("Could not compute {} to project its field.", Some(input_node))
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        None =>
-          return State::Waiting(vec![input_node]),
-      };
+    let node = self.clone();
 
-    // The input product is available: use it to construct the new Subject.
-    let projected_subject =
-      context.project(
-        dep_product,
-        &self.selector.field,
-        &self.selector.projected_subject
-      );
-
-    // When the output product is available, return it.
-    let output_node =
-      Node::create(
-        Selector::select(self.selector.product),
-        context.key_for(&projected_subject),
-        self.variants.clone()
-      );
-    match context.get(&output_node) {
-      Some(&Complete::Return(ref value)) =>
-        State::Complete(Complete::Return(context.clone_val(value))),
-      Some(&Complete::Noop(_, _)) =>
-        State::Complete(
-          context.throw(
-            format!(
-              "No source of projected dependency {}",
-              output_node.format(&context.tasks.externs)
+    Box::new(
+      context
+        .get(
+          // Request the product we need to compute the subject.
+          &Node::create(
+            Selector::select(self.selector.input_product),
+            self.subject.clone(),
+            self.variants.clone()
+          )
+        )
+        .map(move |dep_product| {
+          // And then project the relevant field.
+          let projected =
+            context.project(
+              &dep_product,
+              &node.selector.field,
+              &node.selector.projected_subject
+            );
+          (context, node, projected)
+        })
+        .and_then(|(context, node, projected_subject)| {
+          // When the output product is available, return it.
+          context.get(
+            &Node::create(
+              Selector::select(selector.product),
+              context.key_for(&projected_subject),
+              node.variants.clone()
             )
           )
-        ),
-      Some(&Complete::Throw(ref msg)) =>
-        // NB: propagate thrown exception directly.
-        State::Complete(Complete::Throw(context.clone_val(msg))),
-      None =>
-        State::Waiting(vec![output_node]),
-    }
+        })
+    )
   }
 }
 
