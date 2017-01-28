@@ -312,24 +312,25 @@ class IdGenerator(object):
     self._storage = Storage.create()
     # Memoized object Ids.
     self._next_id = 0
-    self._id_to_key = dict()
-    self._key_to_id = dict()
+    self._id_to_obj = dict()
+    self._obj_to_id = dict()
 
   def to_id(self, obj):
     key = self._storage.put(obj) if type(obj) is Mutable else obj
     new_id = self._next_id
-    _id = self._key_to_id.setdefault(key, new_id)
+    _id = self._obj_to_id.setdefault(key, new_id)
     if _id is not new_id:
       # Object already existed.
       return _id
 
     # Object is new/unique.
-    self._id_to_key[_id] = key
+    self._id_to_obj[_id] = key
     self._next_id += 1
     return _id
 
   def from_id(self, id_):
-    return self._storage.get(self._id_to_key[id_])
+    key = self._id_to_obj[id_]
+    return self._storage.get(key) if type(key) == Key else key
 
 
 class ExternContext(object):
