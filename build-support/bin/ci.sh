@@ -167,7 +167,8 @@ fi
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest pants-plugins/tests/python::
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --compile-python-eval-skip \
+    pants-plugins/tests/python::
   ) || die "Internal backend python test failure"
 fi
 
@@ -180,6 +181,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
     ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
       --coverage=paths:pants/ \
       --test-pytest-test-shard=${python_unit_shard} \
+      --compile-python-eval-skip \
       tests/python::
   ) || die "Core python test failure"
 fi
@@ -192,7 +194,9 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
     #  https://github.com/pantsbuild/pants/issues/1149
     ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
-    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
+    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest --no-fast \
+    --compile-python-eval-skip \
+    contrib:: \
   ) || die "Contrib python test failure"
 fi
 
@@ -203,6 +207,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests${shard_desc}"
   (
     ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test.pytest \
+      --compile-python-eval-skip \
       --test-pytest-test-shard=${python_intg_shard} \
       tests/python::
   ) || die "Pants Integration test failure"
