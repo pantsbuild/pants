@@ -29,6 +29,9 @@ class SimpleCodegenTask(Task):
 
   :API: public
   """
+  # Subclasses may override to provide the type of gen targets the target acts on.
+  # E.g., JavaThriftLibrary. If not provided, the subclass must implement is_gentarget.
+  gentarget_type = None
 
   def __init__(self, context, workdir):
     """
@@ -130,7 +133,10 @@ class SimpleCodegenTask(Task):
     :param Target target: The target to check.
     :return: True if this class can generate code for the given target, False otherwise.
     """
-    raise NotImplementedError
+    if self.gentarget_type:
+      return isinstance(target, self.gentarget_type)
+    else:
+      raise NotImplementedError
 
   def ignore_dup(self, tgt1, tgt2, rel_src):
     """Subclasses can override to omit a specific generated source file from dup checking."""
