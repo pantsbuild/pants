@@ -274,7 +274,7 @@ impl Context {
   }
 
   fn lift_read_link(&self, item: &Value) -> String {
-    panic!("TODO: Not implemented!");
+    self.core.externs.lift_read_link(item, &self.core.tasks.field_path)
   }
 
   fn lift_directory_listing(&self, item: &Value) -> Vec<Stat> {

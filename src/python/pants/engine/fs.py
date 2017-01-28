@@ -29,7 +29,7 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class ReadLink(datatype('ReadLink', ['symbolic_path'])):
+class ReadLink(datatype('ReadLink', ['path'])):
   """The result of reading a symbolic link."""
 
   def __new__(cls, path):
