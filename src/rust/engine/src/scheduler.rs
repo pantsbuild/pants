@@ -1,7 +1,10 @@
-use std::collections::{HashSet, VecDeque};
 
+use std::collections::{HashSet, VecDeque};
 use std::io;
 use std::path::Path;
+use std::sync::Arc;
+
+use futures_cpupool::CpuPool;
 
 use core::{FNV, Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
@@ -14,8 +17,9 @@ use tasks::Tasks;
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
 pub struct Scheduler {
-  pub graph: Graph,
-  pub tasks: Tasks,
+  pub graph: Arc<Graph>,
+  pub tasks: Arc<Tasks>,
+  pool: CpuPool,
   // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Node>,
   // Candidates for execution.
@@ -33,8 +37,9 @@ impl Scheduler {
    */
   pub fn new(graph: Graph, tasks: Tasks) -> Scheduler {
     Scheduler {
-      graph: graph,
-      tasks: tasks,
+      graph: Arc::new(graph),
+      tasks: Arc::new(tasks),
+      pool: CpuPool::new_num_cpus(),
       roots: Vec::new(),
       candidates: VecDeque::new(),
       outstanding: HashSet::default(),
@@ -102,14 +107,14 @@ impl Scheduler {
    * Attempt to run a step with the currently available dependencies of the given Node. If
    * a step runs, the new State of the Node will be returned.
    */
-  fn attempt_step(&self, id: EntryId) -> Option<State<Node>> {
+  fn attempt_step(&self, id: EntryId) -> Option<State> {
     if !self.graph.is_ready_entry(id) {
       return None;
     }
 
     // Run a step.
     let entry = self.graph.entry_for_id(id);
-    Some(entry.node().step(entry, &self.graph, &self.tasks))
+    Some(entry.node().step(id, self.graph, self.tasks, self.pool.clone()))
   }
 
   /**
