@@ -255,7 +255,7 @@ impl Select {
       return false;
     }
     return match variant_value {
-      Some(vv) if context.field_name(candidate) != *vv =>
+      Some(ref vv) if context.field_name(candidate) != *vv =>
         // There is a variant value, and it doesn't match.
         false,
       _ =>

@@ -11,7 +11,7 @@ use futures_cpupool::CpuPool;
 use core::{FNV, Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
 use handles::drain_handles;
-use nodes::{Failure, NodeResult, Node, Runnable, StepContext};
+use nodes::{Failure, Node, NodeFuture, NodeResult, Runnable, StepContext};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 
@@ -108,20 +108,20 @@ impl Scheduler {
 
     // Bootstrap tasks for the roots, and then wait for all of them.
     let roots_res =
-      self.pool.spawn(
-        future::join_all(
-          self.roots.iter()
-            .map(|root| {
-              let entry_id = self.graph.ensure_entry(root.clone());
+      future::join_all(
+        self.roots.iter()
+          .map(|root| {
+            // Spawn each Node, and then ignore its result to ensure the entire run succeeds.
+            let entry_id = self.graph.ensure_entry(root.clone());
+            self.pool.spawn::<NodeFuture>(
               self.graph.entry_for_id(entry_id)
                 .started(&StepContext::new(entry_id, self.graph, self.tasks))
-                .then(|_| {
-                  // Ignore the result of each Node to ensure the entire run succeeds.
-                  Ok(())
-                })
-            })
-            .collect()
-        )
+                .clone()
+            )
+            .map(|_| ())
+            .map_err(|_| ())
+          })
+          .collect::<Vec<_>>()
       );
 
     // Wait for all roots to complete.
