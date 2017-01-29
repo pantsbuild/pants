@@ -75,27 +75,27 @@ pub struct RawNode {
 }
 
 impl RawNode {
-  fn new(subject: &Key, product: &TypeConstraint, state: Option<&NodeResult>) -> RawNode {
+  fn new(subject: &Key, product: &TypeConstraint, state: Option<NodeResult>) -> RawNode {
     RawNode {
       subject: subject.clone(),
       product: product.clone(),
       state_tag:
         match state {
           None => RawStateTag::Empty as u8,
-          Some(&Ok(_)) => RawStateTag::Return as u8,
-          Some(&Err(Failure::Throw(..))) => RawStateTag::Throw as u8,
-          Some(&Err(Failure::Noop(..))) => RawStateTag::Noop as u8,
+          Some(Ok(_)) => RawStateTag::Return as u8,
+          Some(Err(Failure::Throw(..))) => RawStateTag::Throw as u8,
+          Some(Err(Failure::Noop(..))) => RawStateTag::Noop as u8,
         },
       state_return: match state {
-        Some(&Ok(ref v)) => v,
+        Some(Ok(ref v)) => v,
         _ => ptr::null(),
       },
       state_throw: match state {
-        Some(&Err(Failure::Throw(ref v))) => v,
+        Some(Err(Failure::Throw(ref v))) => v,
         _ => ptr::null(),
       },
       state_noop: match state {
-        Some(&Err(Failure::Noop(_, _))) => true,
+        Some(Err(Failure::Noop(_, _))) => true,
         _ => false,
       },
     }
@@ -109,7 +109,7 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn new(node_states: Vec<(&Key, &TypeConstraint, Option<&NodeResult>)>) -> Box<RawNodes> {
+  fn new(node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>) -> Box<RawNodes> {
     let nodes =
       node_states.iter()
         .map(|&(subject, product, state)|
