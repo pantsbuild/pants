@@ -451,22 +451,38 @@ impl Step for SelectDependencies {
           self.variants.clone()
         )
       )
-      .and_then(move |dep_product| {
-        // The product and its dependency list are available: project them.
-        let deps =
-          future::join_all(
-            context.project_multi(&dep_product, &node.selector.field).iter()
-              .map(|dep_subject| {
-                context.get(&node.dep_node(&context, &dep_subject))
+      .then(move |dep_product_res| {
+        match dep_product_res {
+          Ok(dep_product) => {
+            // The product and its dependency list are available: project them.
+            let deps =
+              future::join_all(
+                context.project_multi(&dep_product, &node.selector.field).iter()
+                  .map(|dep_subject| {
+                    context.get(&node.dep_node(&context, &dep_subject))
+                  })
+              );
+            deps
+              .then(move |dep_values_res| {
+                // Finally, store the resulting values.
+                match dep_values_res {
+                  Ok(dep_values) =>
+                    Ok(
+                      node.store(
+                        &context,
+                        &dep_product,
+                        dep_values.into_iter().map(|v| &*v).collect()
+                      )
+                    ),
+                  Err(failure) =>
+                    Err(context.was_required(failure)),
+                }
               })
-          );
-        deps.map(move |dep_values| {
-          (node, context, dep_product, dep_values)
-        })
-      })
-      .map(|(node, context, dep_product, dep_values)| {
-        // Finally, store the resulting values.
-        node.store(&context, &dep_product, dep_values.iter().collect())
+              .boxed()
+          },
+          Err(failure) =>
+            node.err(context.was_optional(failure, "No source of input product.")),
+        }
       })
       .boxed()
   }
