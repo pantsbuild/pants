@@ -7,7 +7,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 crate-type = ["dylib"]
 
 [dependencies]
-fnv = "1.0.3"
+fnv = "1.0.5"
 futures = "0.1.9"
 futures-cpupool = "0.1.2"
 lazy_static = "0.2.2"
