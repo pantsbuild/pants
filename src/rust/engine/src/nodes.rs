@@ -4,7 +4,7 @@ use std::sync::Arc;
 use futures::future::{BoxFuture, Future};
 use futures::future;
 
-use graph::{EntryId, GraphContext};
+use graph::EntryId;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
@@ -62,11 +62,30 @@ pub type NodeFuture = future::Shared<StepFuture>;
 #[derive(Clone)]
 pub struct StepContext {
   entry_id: EntryId,
-  graph: GraphContext,
+  graph: Arc<Graph>,
   tasks: Arc<Tasks>,
 }
 
 impl StepContext {
+  pub fn new(entry_id: EntryId, graph: Arc<Graph>, tasks: Arc<Tasks>) -> StepContext {
+    StepContext {
+      entry_id: entry_id,
+      graph: graph,
+      tasks: tasks,
+    }
+  }
+
+  /**
+   * Clones this StepContext for a new EntryId.
+   */
+  pub fn clone_for(&self, entry_id: EntryId) -> StepContext {
+    StepContext {
+      entry_id: entry_id,
+      graph: self.graph.clone(),
+      tasks: self.tasks.clone(),
+    }
+  }
+
   /**
    * Create Nodes for each Task that might be able to compute the given product for the
    * given subject and variants.
@@ -96,7 +115,7 @@ impl StepContext {
    * Get the future value for the given Node.
    */
   fn get(&self, node: &Node) -> NodeFuture {
-    self.graph.get(node)
+    self.graph.get(self.entry_id, self, node)
   }
 
   fn has_products(&self, item: &Value) -> bool {
@@ -673,13 +692,7 @@ impl Node {
     }
   }
 
-  pub fn step(&self, entry_id: EntryId, graph: GraphContext, tasks: Arc<Tasks>) -> StepFuture {
-    let context =
-      StepContext {
-        entry_id: entry_id,
-        graph: graph,
-        tasks: tasks,
-      };
+  pub fn step(&self, context: StepContext) -> StepFuture {
     match self {
       &Node::Select(ref n) => n.step(context),
       &Node::SelectDependencies(ref n) => n.step(context),
