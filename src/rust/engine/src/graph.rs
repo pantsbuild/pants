@@ -12,7 +12,7 @@ use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Complete, Failure, Node, NodeFuture, StepContext, StepFuture};
+use nodes::{Failure, Node, NodeFuture, NodeResult, StepContext, StepFuture};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -22,17 +22,26 @@ pub struct EntryId(usize);
 // we should still consider switching this to HashSet.
 pub type DepSet = Vec<EntryId>;
 
+enum EntryState {
+  // Has not yet been `started`.
+  Pending,
+  // Is running, or has not yet been explicitly `wait`ed to be marked finished.
+  Started(NodeFuture),
+  // Completed with the given result. Note that we always keep the underlying future
+  // around in order to pass it out to callers without initializing a new Shared future.
+  Finished(NodeResult, NodeFuture),
+}
+
 /**
  * An Entry and its adjacencies.
  */
-#[derive(Debug)]
 pub struct Entry {
   id: EntryId,
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  state: Option<NodeFuture>,
+  state: EntryState,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
   dependents: DepSet,
@@ -53,18 +62,49 @@ impl Entry {
    * If the Node has not already begun running, starts it with the given context.
    */
   pub fn started(&mut self, context: &StepContext) -> &NodeFuture {
-    if let Some(fut) = self.state {
-      &fut
-    } else {
-      // Launch the Node.
-      self.state = Some(future::Shared::new(self.node.step(context.clone_for(self.id))));
-      // Recurse to retry (TODO: see https://github.com/rust-lang/rfcs/issues/1405).
-      self.started(context)
+    match self.state {
+      EntryState::Pending => {
+        // Launch the Node.
+        let task = future::Shared::new(self.node.step(context.clone_for(self.id)));
+        self.state = EntryState::Started(task);
+        self.started(context)
+      },
+      EntryState::Started(ref task) | EntryState::Finished(_, ref task) => {
+        task
+      },
     }
   }
 
-  pub fn state(&self) -> &Option<Complete> {
-    &self.state
+  /**
+   * If the Node has Started and Finished, returns its Result, without blocking.
+   */
+  pub fn state(&mut self) -> Option<&NodeResult> {
+    match self.state {
+      EntryState::Pending | EntryState::Started(_) => None,
+      EntryState::Finished(ref res, _) => Some(res),
+    }
+  }
+
+  /**
+   * If the Node was started, _blocks_ for it to complete and then returns its value.
+   * Unlike the underlying `wait` call, this does not take ownership of the stored result.
+   */
+  pub fn wait(&mut self) -> Option<&NodeResult> {
+    match self.state {
+      EntryState::Pending => None,
+      EntryState::Started(task) => {
+        let res =
+          match task.clone().wait() {
+            Ok(value) => Ok(*value),
+            Err(failure) => Err(*failure),
+          };
+        self.state = EntryState::Finished(res, task);
+        self.state()
+      },
+      EntryState::Finished(ref res, _) => {
+        Some(res)
+      },
+    }
   }
 
   pub fn dependencies(&self) -> &DepSet {
@@ -79,11 +119,21 @@ impl Entry {
     &self.cyclic_dependencies
   }
 
+  /**
+   * TODO: This definition is now suspect, since we don't eagerly mark things Finished.
+   * Might need to remove that optimization from the cycle detection.
+   */
   pub fn is_complete(&self) -> bool {
-    self.state.is_some()
+    match self.state {
+      EntryState::Pending => false,
+      EntryState::Started(..) => false,
+      EntryState::Finished(..) => true,
+    }
   }
 
   fn format(&self, externs: &Externs) -> String {
+    unimplemented!();
+    /*
     let state =
       match self.state {
         Some(Complete::Return(ref v)) => externs.val_to_str(v),
@@ -96,6 +146,7 @@ impl Entry {
       externs.id_to_str(self.node.selector().product().0),
       state,
     ).replace("\"", "\\\"")
+    */
   }
 }
 
@@ -190,7 +241,7 @@ impl Graph {
       Entry {
         id: id,
         node: entry_node,
-        state: None,
+        state: EntryState::Pending,
         dependencies: Vec::new(),
         dependents: Vec::new(),
         cyclic_dependencies: Vec::new(),
@@ -357,6 +408,8 @@ impl Graph {
   }
 
   pub fn visualize(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
+    unimplemented!();
+    /*
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
@@ -408,14 +461,17 @@ impl Graph {
 
     try!(f.write_all(b"}\n"));
     Ok(())
+    */
   }
 
   pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
+    unimplemented!();
+    /*
     let file = try!(OpenOptions::new().append(true).open(path));
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
-      match entry.state {
+      match entry.state() {
         None => false,
         Some(Complete::Throw(_)) => false,
         Some(Complete::Noop(_, _)) => true,
@@ -447,7 +503,7 @@ impl Graph {
                            externs.id_to_str(entry.node.product().0),
                            externs.id_to_str(entry.node.subject().id()));
       if is_one_level_above_bottom(entry) {
-        let state_str = match entry.state {
+        let state_str = match entry.state() {
           Some(Complete::Return(ref x)) => format!("Return({})", externs.val_to_str(x)),
           Some(Complete::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
           Some(Complete::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
@@ -472,6 +528,7 @@ impl Graph {
 
     try!(f.write_all(b"\n"));
     Ok(())
+    */
   }
 }
 
