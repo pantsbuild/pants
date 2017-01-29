@@ -11,7 +11,7 @@ use futures_cpupool::{CpuPool, CpuFuture};
 use core::{FNV, Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
 use handles::drain_handles;
-use nodes::{Failure, Node, NodeFuture, NodeResult, Runnable, StepContext};
+use nodes::{Failure, Node, NodeFuture, NodeResult, Runnable, Context, ContextFactory};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 
@@ -25,12 +25,6 @@ pub struct Scheduler {
   // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Node>,
   // Candidates for execution.
-}
-
-#[repr(C)]
-pub struct ExecutionStat {
-  runnable_count: u64,
-  scheduling_iterations: u64,
 }
 
 impl Scheduler {
@@ -103,11 +97,7 @@ impl Scheduler {
    * success of the node.
    */
   fn launch(&self, node: &Node) -> CpuFuture<(), ()> {
-    self.pool.spawn(
-      self.graph.started(
-        node.clone(),
-        &StepContext::new(panic!("TODO: chicken and egg for EntryId"), self.graph.clone(), self.tasks.clone())
-      )
+    self.pool.spawn(self.graph.started(node.clone(), self)
       .then::<_, Result<(), ()>>(|_| Ok(()))
     )
   }
@@ -136,4 +126,16 @@ impl Scheduler {
       scheduling_iterations: scheduling_iterations,
     }
   }
+}
+
+impl ContextFactory for Scheduler {
+  fn create(&self, entry_id: EntryId) -> Context {
+    Context::new(entry_id, self.graph.clone(), self.tasks.clone())
+  }
+}
+
+#[repr(C)]
+pub struct ExecutionStat {
+  runnable_count: u64,
+  scheduling_iterations: u64,
 }

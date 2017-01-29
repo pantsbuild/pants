@@ -48,29 +48,18 @@ pub type StepFuture = BoxFuture<Value, Failure>;
 pub type NodeFuture = future::Shared<StepFuture>;
 
 #[derive(Clone)]
-pub struct StepContext {
+pub struct Context {
   entry_id: EntryId,
   graph: Arc<Graph>,
   tasks: Arc<Tasks>,
 }
 
-impl StepContext {
-  pub fn new(entry_id: EntryId, graph: Arc<Graph>, tasks: Arc<Tasks>) -> StepContext {
-    StepContext {
+impl Context {
+  pub fn new(entry_id: EntryId, graph: Arc<Graph>, tasks: Arc<Tasks>) -> Context {
+    Context {
       entry_id: entry_id,
       graph: graph,
       tasks: tasks,
-    }
-  }
-
-  /**
-   * Clones this StepContext for a new EntryId.
-   */
-  pub fn clone_for(&self, entry_id: EntryId) -> StepContext {
-    StepContext {
-      entry_id: entry_id,
-      graph: self.graph.clone(),
-      tasks: self.tasks.clone(),
     }
   }
 
@@ -210,11 +199,29 @@ impl StepContext {
   }
 }
 
+pub trait ContextFactory {
+  fn create(&self, entry_id: EntryId) -> Context;
+}
+
+impl ContextFactory for Context {
+  /**
+   * Clones this Context for a new EntryId. Because `graph` and `tasks` are Arcs, this
+   * is a shallow clone.
+   */
+  fn create(&self, entry_id: EntryId) -> Context {
+    Context {
+      entry_id: entry_id,
+      graph: self.graph.clone(),
+      tasks: self.tasks.clone(),
+    }
+  }
+}
+
 /**
  * Defines executing a single step for the given context.
  */
 trait Step {
-  fn step(&self, context: StepContext) -> StepFuture;
+  fn step(&self, context: Context) -> StepFuture;
 
   fn ok(&self, value: Value) -> StepFuture {
     future::ok(value).boxed()
@@ -247,7 +254,7 @@ impl Select {
 
   fn select_literal_single<'a>(
     &self,
-    context: &StepContext,
+    context: &Context,
     candidate: &'a Value,
     variant_value: &Option<String>
   ) -> bool {
@@ -270,7 +277,7 @@ impl Select {
    */
   fn select_literal(
     &self,
-    context: &StepContext,
+    context: &Context,
     candidate: Value,
     variant_value: &Option<String>
   ) -> Option<Value> {
@@ -297,7 +304,7 @@ impl Select {
    */
   fn choose_task_result(
     &self,
-    context: StepContext,
+    context: Context,
     results: Vec<Result<future::SharedItem<Value>, future::SharedError<Failure>>>,
     variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
@@ -340,7 +347,7 @@ impl Select {
 }
 
 impl Step for Select {
-  fn step(&self, context: StepContext) -> StepFuture {
+  fn step(&self, context: Context) -> StepFuture {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
@@ -392,7 +399,7 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, context: StepContext) -> StepFuture {
+  fn step(&self, context: Context) -> StepFuture {
     self.ok(context.val_for(&self.selector.subject))
   }
 }
@@ -414,7 +421,7 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_node(&self, context: &StepContext, dep_subject: &Value) -> Node {
+  fn dep_node(&self, context: &Context, dep_subject: &Value) -> Node {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
@@ -434,7 +441,7 @@ impl SelectDependencies {
     }
   }
 
-  fn store(&self, context: &StepContext, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
+  fn store(&self, context: &Context, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
     if self.selector.transitive && context.satisfied_by(&self.selector.product, dep_product.type_id())  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
@@ -451,7 +458,7 @@ impl SelectDependencies {
 }
 
 impl Step for SelectDependencies {
-  fn step(&self, context: StepContext) -> StepFuture {
+  fn step(&self, context: Context) -> StepFuture {
     let node = self.clone();
 
     context
@@ -507,7 +514,7 @@ pub struct SelectProjection {
 }
 
 impl Step for SelectProjection {
-  fn step(&self, context: StepContext) -> StepFuture {
+  fn step(&self, context: Context) -> StepFuture {
     let node = self.clone();
 
     context
@@ -563,7 +570,7 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: StepContext) -> StepFuture {
+  fn step(&self, context: Context) -> StepFuture {
     let deps =
       future::join_all(
         self.selector.clause.iter()
@@ -680,7 +687,7 @@ impl Node {
     }
   }
 
-  pub fn step(&self, context: StepContext) -> StepFuture {
+  pub fn step(&self, context: Context) -> StepFuture {
     match self {
       &Node::Select(ref n) => n.step(context),
       &Node::SelectDependencies(ref n) => n.step(context),
