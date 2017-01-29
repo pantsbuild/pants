@@ -107,20 +107,19 @@ impl Scheduler {
 
     // Bootstrap tasks for the roots, and then wait for all of them.
     let roots_res =
-      future::join_all(
-        self.roots.iter()
-          .map(|root| {
-            // Spawn each Node, and then ignore its result to ensure the entire run succeeds.
-            self.pool.spawn::<NodeFuture>(
+      self.pool.spawn(
+        future::join_all(
+          self.roots.iter()
+            .map(|root| {
+              // Spawn each Node, and then ignore its result to ensure the entire run succeeds.
               self.graph.started(
                 root.clone(),
                 &StepContext::new(panic!("TODO: chicken and egg for EntryId"), self.graph.clone(), self.tasks.clone())
               )
-            )
-            .map(|_| ())
-            .map_err(|_| ())
-          })
-          .collect::<Vec<_>>()
+              .then::<_, Result<(), ()>>(|_| Ok(()))
+            })
+            .collect::<Vec<_>>()
+        )
       );
 
     // Wait for all roots to complete.
