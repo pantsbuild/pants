@@ -7,11 +7,12 @@ use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
+use futures::future::Future;
 use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Complete, Node, NodeFuture, StepFuture};
+use nodes::{Complete, Failure, Node, NodeFuture, StepContext, StepFuture};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -31,7 +32,7 @@ pub struct Entry {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  state: Option<Complete>,
+  state: Option<NodeFuture>,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
   dependents: DepSet,
@@ -48,8 +49,22 @@ impl Entry {
     &self.node
   }
 
-  pub fn state(&self) -> Option<&Complete> {
-    self.state.as_ref()
+  /**
+   * If the Node has not already begun running, starts it with the given context.
+   */
+  pub fn started(&mut self, context: &StepContext) -> &NodeFuture {
+    if let Some(fut) = self.state {
+      &fut
+    } else {
+      // Launch the Node.
+      self.state = Some(future::Shared::new(self.node.step(context.clone_for(self.id))));
+      // Recurse to retry (TODO: see https://github.com/rust-lang/rfcs/issues/1405).
+      self.started(context)
+    }
+  }
+
+  pub fn state(&self) -> &Option<Complete> {
+    &self.state
   }
 
   pub fn dependencies(&self) -> &DepSet {
@@ -94,7 +109,7 @@ pub struct Graph {
   id_generator: usize,
   nodes: Nodes,
   entries: Entries,
-  cyclic_singleton: Complete,
+  cyclic_singleton: NodeFuture,
 }
 
 impl Graph {
@@ -103,11 +118,12 @@ impl Graph {
       id_generator: 0,
       nodes: HashMap::default(),
       entries: HashMap::default(),
-      cyclic_singleton: Complete::Noop("Dep would be cyclic.", None),
+      cyclic_singleton:
+        future::Shared::new(future::err(Failure::Noop("Dep would be cyclic.", None)).boxed()),
     }
   }
 
-  pub fn cyclic_singleton(&self) -> &Complete {
+  pub fn cyclic_singleton(&self) -> &NodeFuture {
     &(self.cyclic_singleton)
   }
 
@@ -184,19 +200,13 @@ impl Graph {
     id
   }
 
-  pub fn complete(&mut self, id: EntryId, state: Complete) {
-    assert!(self.is_ready_entry(id), "Node {:?} is already completed, or has incomplete deps.", self.entry_for_id(id));
-
-    self.entry_for_id_mut(id).state = Some(state);
-  }
-
   /**
    * In the context of the given src Node, declare a dependency on the given dst Node and
-   * immediately return its State if possible.
+   * begin its execution if it has not already started.
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  pub fn get(&mut self, src_id: EntryId, dst_node: &Node) -> NodeFuture {
+  pub fn get(&mut self, src_id: EntryId, context: &StepContext, dst_node: &Node) -> NodeFuture {
     assert!(
       !self.is_complete_entry(src_id),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
@@ -212,19 +222,19 @@ impl Graph {
 
     if self.entry_for_id(src_id).dependencies().contains(&dst_id) {
       // Declared and valid.
-      self.entry_for_id(dst_id).state()
+      self.entry_for_id(dst_id).started(context).clone()
     } else if self.entry_for_id(src_id).cyclic_dependencies().contains(&dst_id) {
       // Declared but cyclic.
-      self.cyclic_singleton()
+      self.cyclic_singleton().clone()
     } else if self.detect_cycle(src_id, dst_id) {
       // Undeclared but cyclic.
       self.entry_for_id_mut(src_id).cyclic_dependencies.push(dst_id);
-      self.cyclic_singleton()
+      self.cyclic_singleton().clone()
     } else {
       // Undeclared and valid.
       self.entry_for_id_mut(src_id).dependencies.push(dst_id);
       self.entry_for_id_mut(dst_id).dependents.push(src_id);
-      self.entry_for_id(dst_id).state()
+      self.entry_for_id(dst_id).started(context).clone()
     }
   }
 
@@ -260,10 +270,10 @@ impl Graph {
     }
   }
 
-/**
- *  Begins a topological walk from the given roots. Provides both the current entry as well as the
- *  depth from the root.
- */
+  /**
+   * Begins a topological walk from the given roots. Provides both the current entry as well as the
+   * depth from the root.
+   */
   fn leveled_walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
     where P: Fn(&Entry, Level) -> bool {
     let rrr = roots.iter().map(|&r| (r, 0)).collect::<VecDeque<_>>();
@@ -466,29 +476,6 @@ impl Graph {
 }
 
 /**
- * Represents a view of the graph from the context of a particular source Node. Helps to
- * lower the surface area of the API that is exposed to running Nodes.
- */
-#[derive(Clone)]
-pub struct GraphContext {
-  graph: Arc<Graph>,
-  entry_id: EntryId,
-}
-
-impl GraphContext {
-  pub fn create(graph: Arc<Graph>, entry_id: EntryId) -> GraphContext {
-    GraphContext {
-      graph: graph,
-      entry_id: entry_id,
-    }
-  }
-
-  pub fn get(&self, node: &Node) -> NodeFuture {
-    self.graph.get(self.entry_id, node)
-  }
-}
-
-/**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
  */
@@ -529,6 +516,7 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
 }
 
 type Level = u32;
+
 /**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.

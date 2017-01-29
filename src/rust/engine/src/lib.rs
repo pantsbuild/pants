@@ -40,7 +40,7 @@ use externs::{
 };
 use graph::Graph;
 use nodes::Complete;
-use scheduler::Scheduler;
+use scheduler::{Scheduler, ExecutionStat};
 use tasks::Tasks;
 
 pub struct RawScheduler {
@@ -51,12 +51,6 @@ impl RawScheduler {
   fn reset(&mut self) {
     self.scheduler.reset();
   }
-}
-
-#[repr(C)]
-pub struct ExecutionStat {
-  runnable_count: usize,
-  scheduling_iterations: usize,
 }
 
 #[repr(C)]
@@ -246,27 +240,7 @@ pub extern fn execution_execute(
   scheduler_ptr: *mut RawScheduler,
 ) -> ExecutionStat {
   with_scheduler(scheduler_ptr, |raw| {
-    let mut runnable_count: usize = 0;
-    let mut scheduling_iterations: usize = 0;
-    let mut completed = Vec::new();
-    loop {
-      let runnable_batch = raw.scheduler.next(completed);
-      if runnable_batch.len() == 0 {
-        break;
-      }
-      runnable_count += runnable_batch.len();
-      completed =
-        runnable_batch.iter()
-          .map(|&(id, ref runnable)| {
-            match raw.scheduler.tasks.externs.invoke_runnable(runnable) {
-              Ok(v) => (id, Complete::Return(v)),
-              Err(v) => (id, Complete::Throw(v)),
-            }
-          })
-          .collect();
-      scheduling_iterations += 1;
-    }
-    ExecutionStat{runnable_count: runnable_count, scheduling_iterations: scheduling_iterations}
+    raw.scheduler.execute()
   })
 }
 
