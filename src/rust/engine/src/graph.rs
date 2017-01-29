@@ -12,7 +12,7 @@ use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Failure, Node, NodeFuture, NodeResult, StepContext, StepFuture};
+use nodes::{Failure, Node, NodeFuture, NodeResult, ContextFactory, StepFuture};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -176,7 +176,7 @@ impl InnerGraph {
     self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  fn ensure_entry(&mut self, context: &StepContext, node: Node) -> EntryId {
+  fn ensure_entry(&mut self, context: &ContextFactory, node: Node) -> EntryId {
     InnerGraph::ensure_entry_internal(
       &mut self.entries,
       &mut self.nodes,
@@ -190,7 +190,7 @@ impl InnerGraph {
     entries: &'a mut Entries,
     nodes: &mut Nodes,
     id_generator: &mut usize,
-    context: &StepContext,
+    context: &ContextFactory,
     node: Node
   ) -> EntryId {
     // See TODO on Entry.
@@ -209,7 +209,7 @@ impl InnerGraph {
     *id_generator += 1;
     let state =
       EntryState::Started(
-        future::Shared::new(entry_node.step(context.clone_for(id)))
+        future::Shared::new(entry_node.step(context.create(id)))
       );
     entries.insert(
       id,
@@ -520,7 +520,7 @@ impl Graph {
    * TODO: Restore the invariant that completed Nodes may only depend on other completed Nodes
    * to make cycle detection cheaper.
    */
-  pub fn get(&self, src_id: EntryId, context: &StepContext, dst_node: &Node) -> NodeFuture {
+  pub fn get(&self, src_id: EntryId, context: &ContextFactory, dst_node: &Node) -> NodeFuture {
     // First, check whether the destination already exists, and the dep is already declared.
     {
       let inner = self.inner.read().unwrap();
@@ -560,7 +560,7 @@ impl Graph {
   /**
    * Started the given Node if it has not already started.
    */
-  pub fn started(&self, node: Node, context: &StepContext) -> NodeFuture {
+  pub fn started(&self, node: Node, context: &ContextFactory) -> NodeFuture {
     let mut inner = self.inner.write().unwrap();
     let id = inner.ensure_entry(context, node);
     inner.entry_for_id(id).get()
