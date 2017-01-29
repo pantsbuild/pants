@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use futures::future::Future;
 use futures::future;
-use futures_cpupool::CpuPool;
+use futures_cpupool::{CpuPool, CpuFuture};
 
 use core::{FNV, Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
@@ -99,6 +99,20 @@ impl Scheduler {
   }
 
   /**
+   * Starts running a Node, and returns a Future that will succeed regardless of the
+   * success of the node.
+   */
+  fn launch(&self, node: &Node) -> CpuFuture<(), ()> {
+    self.pool.spawn(
+      self.graph.started(
+        node.clone(),
+        &StepContext::new(panic!("TODO: chicken and egg for EntryId"), self.graph.clone(), self.tasks.clone())
+      )
+      .then::<_, Result<(), ()>>(|_| Ok(()))
+    )
+  }
+
+  /**
    * Starting from existing roots, execute a graph to completion.
    */
   pub fn execute(&mut self) -> ExecutionStat {
@@ -107,19 +121,10 @@ impl Scheduler {
 
     // Bootstrap tasks for the roots, and then wait for all of them.
     let roots_res =
-      self.pool.spawn(
-        future::join_all(
-          self.roots.iter()
-            .map(|root| {
-              // Spawn each Node, and then ignore its result to ensure the entire run succeeds.
-              self.graph.started(
-                root.clone(),
-                &StepContext::new(panic!("TODO: chicken and egg for EntryId"), self.graph.clone(), self.tasks.clone())
-              )
-              .then::<_, Result<(), ()>>(|_| Ok(()))
-            })
-            .collect::<Vec<_>>()
-        )
+      future::join_all(
+        self.roots.iter()
+          .map(|root| self.launch(root))
+          .collect::<Vec<_>>()
       );
 
     // Wait for all roots to complete.
