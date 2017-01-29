@@ -97,7 +97,7 @@ impl Externs {
     }
 
     // If not, compute and insert.
-    let write = self.satisfied_by_cache.write().unwrap();
+    let mut write = self.satisfied_by_cache.write().unwrap();
     write.entry(key)
       .or_insert_with(||
         (self.satisfied_by)(self.context, constraint, cls)

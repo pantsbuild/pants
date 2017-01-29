@@ -78,7 +78,7 @@ impl Entry {
   /**
    * If the Node has Started and Finished, returns its Result, without blocking.
    */
-  pub fn state(&mut self) -> Option<&NodeResult> {
+  pub fn state(&self) -> Option<&NodeResult> {
     match self.state {
       EntryState::Pending | EntryState::Started(_) => None,
       EntryState::Finished(ref res, _) => Some(res),
@@ -87,18 +87,17 @@ impl Entry {
 
   /**
    * If the Node was started, _blocks_ for it to complete and then returns its value.
-   * Unlike the underlying `wait` call, this does not take ownership of the stored result.
    */
   pub fn wait(&mut self) -> Option<&NodeResult> {
     match self.state {
       EntryState::Pending => None,
-      EntryState::Started(task) => {
+      EntryState::Started(ref task) => {
         let res =
           match task.clone().wait() {
             Ok(value) => Ok(*value),
             Err(failure) => Err(*failure),
           };
-        self.state = EntryState::Finished(res, task);
+        self.state = EntryState::Finished(res, task.clone());
         self.state()
       },
       EntryState::Finished(ref res, _) => {

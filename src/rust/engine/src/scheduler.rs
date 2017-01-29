@@ -115,7 +115,7 @@ impl Scheduler {
             let entry_id = self.graph.ensure_entry(root.clone());
             self.pool.spawn::<NodeFuture>(
               self.graph.entry_for_id(entry_id)
-                .started(&StepContext::new(entry_id, self.graph, self.tasks))
+                .started(&StepContext::new(entry_id, self.graph.clone(), self.tasks.clone()))
                 .clone()
             )
             .map(|_| ())
