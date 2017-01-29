@@ -21,8 +21,6 @@ pub struct EntryId(usize);
 pub type DepSet = HashSet<EntryId, FNV>;
 
 enum EntryState {
-  // Has not yet been `started`.
-  Pending,
   // Is running, or has not yet been explicitly `wait`ed to be marked finished.
   Started(NodeFuture),
   // Completed with the given result. Note that we always keep the underlying future
@@ -61,25 +59,18 @@ impl Entry {
    */
   fn state(&self) -> Option<&NodeResult> {
     match self.state {
-      EntryState::Pending | EntryState::Started(_) => None,
+      EntryState::Started(_) => None,
       EntryState::Finished(ref res, _) => Some(res),
     }
   }
 
   /**
-   * If the Node has not already begun running, starts it with the given context.
+   * Returns the Future for this Node.
    */
-  fn started(&mut self, context: &StepContext) -> NodeFuture {
+  fn get(&self) -> NodeFuture {
     match self.state {
-      EntryState::Pending => {
-        // Launch the Node.
-        let task = future::Shared::new(self.node.step(context.clone_for(self.id)));
-        self.state = EntryState::Started(task);
-        self.started(context)
-      },
-      EntryState::Started(ref task) | EntryState::Finished(_, ref task) => {
-        task.clone()
-      },
+      EntryState::Started(ref task) | EntryState::Finished(_, ref task) =>
+        task.clone(),
     }
   }
 
@@ -185,11 +176,12 @@ impl InnerGraph {
     self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  fn ensure_entry(&mut self, node: Node) -> EntryId {
+  fn ensure_entry(&mut self, context: &StepContext, node: Node) -> EntryId {
     InnerGraph::ensure_entry_internal(
       &mut self.entries,
       &mut self.nodes,
       &mut self.id_generator,
+      context,
       node
     )
   }
@@ -198,6 +190,7 @@ impl InnerGraph {
     entries: &'a mut Entries,
     nodes: &mut Nodes,
     id_generator: &mut usize,
+    context: &StepContext,
     node: Node
   ) -> EntryId {
     // See TODO on Entry.
@@ -212,14 +205,18 @@ impl InnerGraph {
       return id;
     }
 
-    // New entry.
+    // New entry. Launch the Node.
     *id_generator += 1;
+    let state =
+      EntryState::Started(
+        future::Shared::new(entry_node.step(context.clone_for(id)))
+      );
     entries.insert(
       id,
       Entry {
         id: id,
         node: entry_node,
-        state: EntryState::Pending,
+        state: state,
         dependencies: Default::default(),
         dependents: Default::default(),
         cyclic_dependencies: Default::default(),
@@ -509,7 +506,7 @@ impl Graph {
         e.state().map(|state| {
           match state {
             &Ok(ref v) => Ok(externs.clone_val(v)),
-            &Err(n @ Failure::Noop(..)) => Err(n),
+            &Err(Failure::Noop(msg, ref n)) => Err(Failure::Noop(msg, n.clone())),
             &Err(Failure::Throw(ref msg)) => Err(Failure::Throw(externs.clone_val(msg))),
           }
         })
@@ -531,7 +528,7 @@ impl Graph {
       if let Some(dst_entry) = inner.entry(dst_node) {
         if src_entry.dependencies().contains(&dst_entry.id) {
           // Declared and valid.
-          return dst_entry.started(context).clone();
+          return dst_entry.get();
         } else if src_entry.cyclic_dependencies().contains(&dst_entry.id) {
           // Declared but cyclic.
           return inner.cyclic_singleton();
@@ -544,7 +541,7 @@ impl Graph {
     // without a much more complicated algorithm.
     {
       let mut inner = self.inner.write().unwrap();
-      let dst_id = inner.ensure_entry(dst_node.clone());
+      let dst_id = inner.ensure_entry(context, dst_node.clone());
       if inner.detect_cycle(src_id, dst_id) {
         // Undeclared but cyclic.
         inner.entry_for_id_mut(src_id).cyclic_dependencies.insert(dst_id);
@@ -560,12 +557,16 @@ impl Graph {
     self.get(src_id, context, dst_node)
   }
 
+  /**
+   * Started the given Node if it has not already started.
+   */
   pub fn started(&self, node: Node, context: &StepContext) -> NodeFuture {
-    let inner = self.inner.write().unwrap();
-    inner.entry_for_id(inner.ensure_entry(node)).started(context)
+    let mut inner = self.inner.write().unwrap();
+    let id = inner.ensure_entry(context, node);
+    inner.entry_for_id(id).get()
   }
 
-  pub fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
+  pub fn invalidate(&self, subjects: HashSet<&Key, FNV>) -> usize {
     let mut inner = self.inner.write().unwrap();
     inner.invalidate(subjects)
   }

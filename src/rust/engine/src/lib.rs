@@ -111,8 +111,8 @@ pub struct RawNodes {
 impl RawNodes {
   fn new(node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>) -> Box<RawNodes> {
     let nodes =
-      node_states.iter()
-        .map(|&(subject, product, state)|
+      node_states.into_iter()
+        .map(|(subject, product, state)|
           RawNode::new(subject, product, state)
         )
         .collect();
