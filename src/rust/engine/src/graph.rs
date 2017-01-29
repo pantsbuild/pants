@@ -18,9 +18,7 @@ use nodes::{Failure, Node, NodeFuture, NodeResult, StepContext, StepFuture};
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct EntryId(usize);
 
-// TODO: The average number of dependencies for a Node is somewhere between 1 and 2, but
-// we should still consider switching this to HashSet.
-pub type DepSet = Vec<EntryId>;
+pub type DepSet = HashSet<EntryId, FNV>;
 
 enum EntryState {
   // Has not yet been `started`.
@@ -50,18 +48,18 @@ pub struct Entry {
 }
 
 impl Entry {
-  pub fn id(&self) -> EntryId {
+  fn id(&self) -> EntryId {
     self.id
   }
 
-  pub fn node(&self) -> &Node {
+  fn node(&self) -> &Node {
     &self.node
   }
 
   /**
    * If the Node has Started and Finished, returns its Result, without blocking.
    */
-  pub fn state(&self) -> Option<&NodeResult> {
+  fn state(&self) -> Option<&NodeResult> {
     match self.state {
       EntryState::Pending | EntryState::Started(_) => None,
       EntryState::Finished(ref res, _) => Some(res),
@@ -69,9 +67,26 @@ impl Entry {
   }
 
   /**
+   * If the Node has not already begun running, starts it with the given context.
+   */
+  fn started(&mut self, context: &StepContext) -> NodeFuture {
+    match self.state {
+      EntryState::Pending => {
+        // Launch the Node.
+        let task = future::Shared::new(self.node.step(context.clone_for(self.id)));
+        self.state = EntryState::Started(task);
+        self.started(context)
+      },
+      EntryState::Started(ref task) | EntryState::Finished(_, ref task) => {
+        task.clone()
+      },
+    }
+  }
+
+  /**
    * If the Node was started, _blocks_ for it to complete and then returns its value.
    */
-  pub fn wait(&mut self) -> Option<&NodeResult> {
+  fn wait(&mut self) -> Option<&NodeResult> {
     unimplemented!();
     /*
     match self.state {
@@ -92,15 +107,15 @@ impl Entry {
     */
   }
 
-  pub fn dependencies(&self) -> &DepSet {
+  fn dependencies(&self) -> &DepSet {
     &self.dependencies
   }
 
-  pub fn dependents(&self) -> &DepSet {
+  fn dependents(&self) -> &DepSet {
     &self.dependents
   }
 
-  pub fn cyclic_dependencies(&self) -> &DepSet {
+  fn cyclic_dependencies(&self) -> &DepSet {
     &self.cyclic_dependencies
   }
 
@@ -108,7 +123,7 @@ impl Entry {
    * TODO: This definition is now suspect, since we don't eagerly mark things Finished.
    * Might need to remove that optimization from the cycle detection.
    */
-  pub fn is_complete(&self) -> bool {
+  fn is_complete(&self) -> bool {
     unimplemented!();
     /*
     match self.state {
@@ -149,6 +164,10 @@ struct InnerGraph {
 }
 
 impl InnerGraph {
+  fn cyclic_singleton(&self) -> NodeFuture {
+    self.cyclic_singleton.clone()
+  }
+
   fn dependencies_all<P>(&self, id: EntryId, predicate: P) -> bool
       where P: Fn(&Entry)->bool {
     self.entry_for_id(id).dependencies.iter().all(|&d| predicate(self.entry_for_id(d)))
@@ -201,31 +220,13 @@ impl InnerGraph {
         id: id,
         node: entry_node,
         state: EntryState::Pending,
-        dependencies: Vec::new(),
-        dependents: Vec::new(),
-        cyclic_dependencies: Vec::new(),
+        dependencies: Default::default(),
+        dependents: Default::default(),
+        cyclic_dependencies: Default::default(),
       }
     );
 
     id
-  }
-
-  /**
-   * If the Node has not already begun running, starts it with the given context.
-   */
-  fn started(&mut self, entry_id: EntryId, context: &StepContext) -> NodeFuture {
-    let mut entry = self.entry_for_id_mut(entry_id);
-    match entry.state {
-      EntryState::Pending => {
-        // Launch the Node.
-        let task = future::Shared::new(entry.node.step(context.clone_for(entry_id)));
-        entry.state = EntryState::Started(task);
-        self.started(entry_id, context)
-      },
-      EntryState::Started(ref task) | EntryState::Finished(_, ref task) => {
-        task.clone()
-      },
-    }
   }
 
   /**
@@ -320,7 +321,7 @@ impl InnerGraph {
       let dep_ids = entries[&id].dependencies.clone();
       for dep_id in dep_ids {
         entries.get_mut(&dep_id).map(|entry| {
-          entry.dependents.retain(|&dependent| dependent != id);
+          entry.dependents.remove(&id);
         });
       }
 
@@ -493,11 +494,6 @@ impl Graph {
     }
   }
 
-  fn cyclic_singleton(&self) -> NodeFuture {
-    let inner = self.inner.read().unwrap();
-    inner.cyclic_singleton.clone()
-  }
-
   pub fn len(&self) -> usize {
     let inner = self.inner.read().unwrap();
     inner.entries.len()
@@ -528,39 +524,50 @@ impl Graph {
    * to make cycle detection cheaper.
    */
   pub fn get(&self, src_id: EntryId, context: &StepContext, dst_node: &Node) -> NodeFuture {
-    // Get or create the destination.
-    let dst_id =
-      self.entry(dst_node)
-        .map(|e| e.id())
-        .unwrap_or_else(|| self.ensure_entry(dst_node.clone()));
-
-    if self.entry_for_id(src_id).dependencies().contains(&dst_id) {
-      // Declared and valid.
-      self.entry_for_id(dst_id).started(context).clone()
-    } else if self.entry_for_id(src_id).cyclic_dependencies().contains(&dst_id) {
-      // Declared but cyclic.
-      self.cyclic_singleton()
-    } else if self.detect_cycle(src_id, dst_id) {
-      // Undeclared but cyclic.
-      self.entry_for_id_mut(src_id).cyclic_dependencies.push(dst_id);
-      self.cyclic_singleton()
-    } else {
-      // Undeclared and valid.
-      self.entry_for_id_mut(src_id).dependencies.push(dst_id);
-      self.entry_for_id_mut(dst_id).dependents.push(src_id);
-      self.entry_for_id(dst_id).started(context).clone()
+    // First, check whether the destination already exists, and the dep is already declared.
+    {
+      let inner = self.inner.read().unwrap();
+      let src_entry = inner.entry_for_id(src_id);
+      if let Some(dst_entry) = inner.entry(dst_node) {
+        if src_entry.dependencies().contains(&dst_entry.id) {
+          // Declared and valid.
+          return dst_entry.started(context).clone();
+        } else if src_entry.cyclic_dependencies().contains(&dst_entry.id) {
+          // Declared but cyclic.
+          return inner.cyclic_singleton();
+        }
+      }
     }
+
+    // Get or create the destination, and then insert the dep.
+    // TODO: doing cycle detection under the writelock... unfortunate, but probably unavoidable
+    // without a much more complicated algorithm.
+    {
+      let mut inner = self.inner.write().unwrap();
+      let dst_id = inner.ensure_entry(dst_node.clone());
+      if inner.detect_cycle(src_id, dst_id) {
+        // Undeclared but cyclic.
+        inner.entry_for_id_mut(src_id).cyclic_dependencies.insert(dst_id);
+      } else {
+        // Undeclared and valid.
+        inner.entry_for_id_mut(src_id).dependencies.insert(dst_id);
+        inner.entry_for_id_mut(dst_id).dependents.insert(src_id);
+      }
+    }
+
+    // Recurse to retry (which should always succeed the first time).
+    // TODO: will look up the Node multiple times.
+    self.get(src_id, context, dst_node)
   }
 
   pub fn started(&self, node: Node, context: &StepContext) -> NodeFuture {
     let inner = self.inner.write().unwrap();
-    let entry_id = inner.ensure_entry(node);
-    inner.started(entry_id, context)
+    inner.entry_for_id(inner.ensure_entry(node)).started(context)
   }
 
   pub fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
     let mut inner = self.inner.write().unwrap();
-    inner.invalidate(subjects);
+    inner.invalidate(subjects)
   }
 
   pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
