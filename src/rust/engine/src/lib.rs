@@ -18,6 +18,7 @@ use std::mem;
 use std::os::raw;
 use std::path::Path;
 use std::ptr;
+use std::sync::Arc;
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
@@ -261,8 +262,8 @@ pub extern fn intrinsic_task_add(
   input_constraint: TypeConstraint,
   output_constraint: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
   })
 }
 
@@ -272,8 +273,8 @@ pub extern fn singleton_task_add(
   func: Function,
   output_constraint: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.singleton_add(func, output_constraint);
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.singleton_add(func, output_constraint);
   })
 }
 
@@ -283,8 +284,8 @@ pub extern fn task_add(
   func: Function,
   output_type: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.task_add(func, output_type);
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.task_add(func, output_type);
   })
 }
 
@@ -293,8 +294,8 @@ pub extern fn task_add_select(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select(product, None);
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.add_select(product, None);
   })
 }
 
@@ -306,8 +307,8 @@ pub extern fn task_add_select_variant(
 ) {
   let variant_key =
     variant_key_buf.to_string().expect("Failed to decode key for select_variant");
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select(product, Some(variant_key));
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.add_select(product, Some(variant_key));
   })
 }
 
@@ -317,8 +318,8 @@ pub extern fn task_add_select_literal(
   subject: Key,
   product: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select_literal(subject, product);
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.add_select_literal(subject, product);
   })
 }
 
@@ -330,8 +331,8 @@ pub extern fn task_add_select_dependencies(
   field: Field,
   transitive: bool,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select_dependencies(product, dep_product, field, transitive);
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.add_select_dependencies(product, dep_product, field, transitive);
   })
 }
 
@@ -343,15 +344,15 @@ pub extern fn task_add_select_projection(
   field: Field,
   input_product: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select_projection(product, projected_subject, field, input_product);
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.add_select_projection(product, projected_subject, field, input_product);
   })
 }
 
 #[no_mangle]
 pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.task_end();
+  with_tasks(scheduler_ptr, |tasks| {
+    tasks.task_end();
   })
 }
 
@@ -414,4 +415,23 @@ fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
   let t = f(&mut scheduler);
   mem::forget(scheduler);
   t
+}
+
+/**
+ * A helper to allow for mutation of the Tasks struct. This method is unsafe because
+ * it must only be called while the Scheduler is not executing any work (usually during
+ * initialization).
+ *
+ * TODO: An alternative to this method would be to move construction of the Tasks struct
+ * before construction of the Scheduler, which would allow it to be mutated before it
+ * needed to become atomic for usage in the Scheduler.
+ */
+fn with_tasks<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
+    where F: FnOnce(&mut Tasks)->T {
+  with_scheduler(scheduler_ptr, |raw| {
+    let tasks =
+      Arc::get_mut(&mut raw.scheduler.tasks)
+        .expect("Tasks may not be mutated once the Scheduler has started.");
+    f(tasks)
+  })
 }
