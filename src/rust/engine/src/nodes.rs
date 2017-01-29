@@ -291,7 +291,7 @@ impl Select {
   fn choose_task_result(
     &self,
     context: StepContext,
-    results: Vec<Result<Value, Failure>>,
+    results: Vec<Result<future::SharedItem<Value>, future::SharedError<Failure>>>,
     variant_value: Option<String>,
   ) -> Result<Value, Failure> {
     let mut matches = Vec::new();
@@ -302,10 +302,14 @@ impl Select {
             matches.push(v);
           }
         },
-        Err(Failure::Noop(_, _)) =>
-          continue,
-        Err(Failure::Throw(ref msg)) =>
-          return Err(Failure::Throw(context.clone_val(msg))),
+        Err(err) => {
+          match *err {
+            Failure::Noop(_, _) =>
+              continue,
+            Failure::Throw(ref msg) =>
+              return Err(Failure::Throw(context.clone_val(msg))),
+          }
+        },
       }
     }
 
