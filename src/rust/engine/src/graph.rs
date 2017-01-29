@@ -5,7 +5,7 @@ use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use futures::future::Future;
 use futures::future;
@@ -59,23 +59,6 @@ impl Entry {
   }
 
   /**
-   * If the Node has not already begun running, starts it with the given context.
-   */
-  pub fn started(&mut self, context: &StepContext) -> &NodeFuture {
-    match self.state {
-      EntryState::Pending => {
-        // Launch the Node.
-        let task = future::Shared::new(self.node.step(context.clone_for(self.id)));
-        self.state = EntryState::Started(task);
-        self.started(context)
-      },
-      EntryState::Started(ref task) | EntryState::Finished(_, ref task) => {
-        task
-      },
-    }
-  }
-
-  /**
    * If the Node has Started and Finished, returns its Result, without blocking.
    */
   pub fn state(&self) -> Option<&NodeResult> {
@@ -89,6 +72,8 @@ impl Entry {
    * If the Node was started, _blocks_ for it to complete and then returns its value.
    */
   pub fn wait(&mut self) -> Option<&NodeResult> {
+    unimplemented!();
+    /*
     match self.state {
       EntryState::Pending => None,
       EntryState::Started(ref task) => {
@@ -104,6 +89,7 @@ impl Entry {
         Some(res)
       },
     }
+    */
   }
 
   pub fn dependencies(&self) -> &DepSet {
@@ -123,11 +109,14 @@ impl Entry {
    * Might need to remove that optimization from the cycle detection.
    */
   pub fn is_complete(&self) -> bool {
+    unimplemented!();
+    /*
     match self.state {
       EntryState::Pending => false,
       EntryState::Started(..) => false,
       EntryState::Finished(..) => true,
     }
+    */
   }
 
   fn format(&self, externs: &Externs) -> String {
@@ -152,62 +141,33 @@ impl Entry {
 type Nodes = HashMap<Node, EntryId, FNV>;
 type Entries = HashMap<EntryId, Entry, FNV>;
 
-/**
- * A DAG (enforced on mutation) of Entries.
- */
-pub struct Graph {
+struct InnerGraph {
   id_generator: usize,
   nodes: Nodes,
   entries: Entries,
   cyclic_singleton: NodeFuture,
 }
 
-impl Graph {
-  pub fn new() -> Graph {
-    Graph {
-      id_generator: 0,
-      nodes: HashMap::default(),
-      entries: HashMap::default(),
-      cyclic_singleton:
-        future::Shared::new(future::err(Failure::Noop("Dep would be cyclic.", None)).boxed()),
-    }
-  }
-
-  pub fn cyclic_singleton(&self) -> &NodeFuture {
-    &(self.cyclic_singleton)
-  }
-
-  pub fn len(&self) -> usize {
-    self.entries.len()
-  }
-
-  pub fn is_complete_entry(&self, id: EntryId) -> bool {
-    self.entry_for_id(id).is_complete()
-  }
-
-  pub fn is_ready_entry(&self, id: EntryId) -> bool {
-    !self.is_complete_entry(id) && self.dependencies_all(id, |e| e.is_complete())
-  }
-
-  pub fn dependencies_all<P>(&self, id: EntryId, predicate: P) -> bool
+impl InnerGraph {
+  fn dependencies_all<P>(&self, id: EntryId, predicate: P) -> bool
       where P: Fn(&Entry)->bool {
     self.entry_for_id(id).dependencies.iter().all(|&d| predicate(self.entry_for_id(d)))
   }
 
-  pub fn entry(&self, node: &Node) -> Option<&Entry> {
+  fn entry(&self, node: &Node) -> Option<&Entry> {
     self.nodes.get(node).map(|&id| self.entry_for_id(id))
   }
 
-  pub fn entry_for_id(&self, id: EntryId) -> &Entry {
+  fn entry_for_id(&self, id: EntryId) -> &Entry {
     self.entries.get(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  pub fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
+  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
     self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  pub fn ensure_entry(&mut self, node: Node) -> EntryId {
-    Graph::ensure_entry_internal(
+  fn ensure_entry(&mut self, node: Node) -> EntryId {
+    InnerGraph::ensure_entry_internal(
       &mut self.entries,
       &mut self.nodes,
       &mut self.id_generator,
@@ -251,40 +211,20 @@ impl Graph {
   }
 
   /**
-   * In the context of the given src Node, declare a dependency on the given dst Node and
-   * begin its execution if it has not already started.
-   *
-   * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
+   * If the Node has not already begun running, starts it with the given context.
    */
-  pub fn get(&mut self, src_id: EntryId, context: &StepContext, dst_node: &Node) -> NodeFuture {
-    assert!(
-      !self.is_complete_entry(src_id),
-      "Node {:?} is already completed, and may not have new dependencies added: {:?}",
-      src_id,
-      dst_node,
-    );
-
-    // Get or create the destination.
-    let dst_id =
-      self.entry(dst_node)
-        .map(|e| e.id())
-        .unwrap_or_else(|| self.ensure_entry(dst_node.clone()));
-
-    if self.entry_for_id(src_id).dependencies().contains(&dst_id) {
-      // Declared and valid.
-      self.entry_for_id(dst_id).started(context).clone()
-    } else if self.entry_for_id(src_id).cyclic_dependencies().contains(&dst_id) {
-      // Declared but cyclic.
-      self.cyclic_singleton().clone()
-    } else if self.detect_cycle(src_id, dst_id) {
-      // Undeclared but cyclic.
-      self.entry_for_id_mut(src_id).cyclic_dependencies.push(dst_id);
-      self.cyclic_singleton().clone()
-    } else {
-      // Undeclared and valid.
-      self.entry_for_id_mut(src_id).dependencies.push(dst_id);
-      self.entry_for_id_mut(dst_id).dependents.push(src_id);
-      self.entry_for_id(dst_id).started(context).clone()
+  fn started(&mut self, entry_id: EntryId, context: &StepContext) -> NodeFuture {
+    let mut entry = self.entry_for_id_mut(entry_id);
+    match entry.state {
+      EntryState::Pending => {
+        // Launch the Node.
+        let task = future::Shared::new(entry.node.step(context.clone_for(entry_id)));
+        entry.state = EntryState::Started(task);
+        self.started(entry_id, context)
+      },
+      EntryState::Started(ref task) | EntryState::Finished(_, ref task) => {
+        task.clone()
+      },
     }
   }
 
@@ -339,7 +279,7 @@ impl Graph {
   /**
    * Finds all Nodes with the given subjects, and invalidates their transitive dependents.
    */
-  pub fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
+  fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
     // Collect all entries that will be deleted.
     let ids: HashSet<EntryId, FNV> = {
       let root_ids =
@@ -356,7 +296,7 @@ impl Graph {
     };
 
     // Then remove all entries in one shot.
-    Graph::invalidate_internal(
+    InnerGraph::invalidate_internal(
       &mut self.entries,
       &mut self.nodes,
       &ids,
@@ -532,11 +472,114 @@ impl Graph {
 }
 
 /**
+ * A DAG (enforced on mutation) of Entries.
+ */
+pub struct Graph {
+  inner: RwLock<InnerGraph>,
+}
+
+impl Graph {
+  pub fn new() -> Graph {
+    let inner =
+      InnerGraph {
+        id_generator: 0,
+        nodes: HashMap::default(),
+        entries: HashMap::default(),
+        cyclic_singleton:
+          future::Shared::new(future::err(Failure::Noop("Dep would be cyclic.", None)).boxed()),
+      };
+    Graph {
+      inner: RwLock::new(inner),
+    }
+  }
+
+  fn cyclic_singleton(&self) -> NodeFuture {
+    let inner = self.inner.read().unwrap();
+    inner.cyclic_singleton.clone()
+  }
+
+  pub fn len(&self) -> usize {
+    let inner = self.inner.read().unwrap();
+    inner.entries.len()
+  }
+
+  /**
+   * Returns a clone of the state of the given Node.
+   */
+  pub fn state(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
+    let inner = self.inner.read().unwrap();
+    inner.entry(node)
+      .and_then(|e| {
+        e.state().map(|state| {
+          match state {
+            &Ok(ref v) => Ok(externs.clone_val(v)),
+            &Err(n @ Failure::Noop(..)) => Err(n),
+            &Err(Failure::Throw(ref msg)) => Err(Failure::Throw(externs.clone_val(msg))),
+          }
+        })
+      })
+  }
+
+  /**
+   * In the context of the given src Node, declare a dependency on the given dst Node and
+   * begin its execution if it has not already started.
+   *
+   * TODO: Restore the invariant that completed Nodes may only depend on other completed Nodes
+   * to make cycle detection cheaper.
+   */
+  pub fn get(&self, src_id: EntryId, context: &StepContext, dst_node: &Node) -> NodeFuture {
+    // Get or create the destination.
+    let dst_id =
+      self.entry(dst_node)
+        .map(|e| e.id())
+        .unwrap_or_else(|| self.ensure_entry(dst_node.clone()));
+
+    if self.entry_for_id(src_id).dependencies().contains(&dst_id) {
+      // Declared and valid.
+      self.entry_for_id(dst_id).started(context).clone()
+    } else if self.entry_for_id(src_id).cyclic_dependencies().contains(&dst_id) {
+      // Declared but cyclic.
+      self.cyclic_singleton()
+    } else if self.detect_cycle(src_id, dst_id) {
+      // Undeclared but cyclic.
+      self.entry_for_id_mut(src_id).cyclic_dependencies.push(dst_id);
+      self.cyclic_singleton()
+    } else {
+      // Undeclared and valid.
+      self.entry_for_id_mut(src_id).dependencies.push(dst_id);
+      self.entry_for_id_mut(dst_id).dependents.push(src_id);
+      self.entry_for_id(dst_id).started(context).clone()
+    }
+  }
+
+  pub fn started(&self, node: Node, context: &StepContext) -> NodeFuture {
+    let inner = self.inner.write().unwrap();
+    let entry_id = inner.ensure_entry(node);
+    inner.started(entry_id, context)
+  }
+
+  pub fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
+    let mut inner = self.inner.write().unwrap();
+    inner.invalidate(subjects);
+  }
+
+  pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
+    let inner = self.inner.read().unwrap();
+    inner.trace(root, path, externs)
+  }
+
+  pub fn visualize(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
+    let inner = self.inner.read().unwrap();
+    inner.visualize(roots, path, externs)
+  }
+}
+
+/**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
  */
 struct Walk<'a, P: Fn(&Entry)->bool> {
-  graph: &'a Graph,
+  graph: &'a InnerGraph,
   dependents: bool,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
@@ -578,7 +621,7 @@ type Level = u32;
  * has the same lifetime as the Graph itself.
  */
 struct LeveledWalk<'a, P: Fn(&Entry, Level)->bool> {
-  graph: &'a Graph,
+  graph: &'a InnerGraph,
   dependents: bool,
   deque: VecDeque<(EntryId, Level)>,
   walked: HashSet<EntryId, FNV>,

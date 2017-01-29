@@ -480,7 +480,9 @@ impl Step for SelectDependencies {
                 // Finally, store the resulting values.
                 match dep_values_res {
                   Ok(dep_values) => {
-                    let dv: Vec<Value> = dep_values.into_iter().map(|v| *v).collect();
+                    // TODO: cloning to go from a `SharedValue` list to a list of values...
+                    // there ought to be a better way.
+                    let dv: Vec<Value> = dep_values.iter().map(|v| context.clone_val(v)).collect();
                     Ok(node.store(&context, &dep_product, dv.iter().collect()))
                   },
                   Err(failure) =>

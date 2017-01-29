@@ -64,11 +64,10 @@ impl Scheduler {
     self.roots.clear();
   }
 
-  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<&NodeResult>)> {
+  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<NodeResult>)> {
     self.roots.iter()
       .map(|root| {
-        let state = self.graph.entry(root).and_then(|e| e.state());
-        (root.subject(), root.product(), state)
+        (root.subject(), root.product(), self.graph.state(root, &self.tasks.externs))
       })
       .collect()
   }
@@ -112,11 +111,11 @@ impl Scheduler {
         self.roots.iter()
           .map(|root| {
             // Spawn each Node, and then ignore its result to ensure the entire run succeeds.
-            let entry_id = self.graph.ensure_entry(root.clone());
             self.pool.spawn::<NodeFuture>(
-              self.graph.entry_for_id(entry_id)
-                .started(&StepContext::new(entry_id, self.graph.clone(), self.tasks.clone()))
-                .clone()
+              self.graph.started(
+                root.clone(),
+                &StepContext::new(panic!("TODO: chicken and egg for EntryId"), self.graph.clone(), self.tasks.clone())
+              )
             )
             .map(|_| ())
             .map_err(|_| ())
