@@ -11,7 +11,7 @@ use futures_cpupool::CpuPool;
 use core::{FNV, Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
 use handles::drain_handles;
-use nodes::{Complete, Node, Runnable, State, StepContext};
+use nodes::{Failure, NodeResult, Node, Runnable, StepContext};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 
@@ -64,7 +64,7 @@ impl Scheduler {
     self.roots.clear();
   }
 
-  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<&Complete>)> {
+  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<&NodeResult>)> {
     self.roots.iter()
       .map(|root| {
         let state = self.graph.entry(root).and_then(|e| e.state());
@@ -108,17 +108,20 @@ impl Scheduler {
 
     // Bootstrap tasks for the roots, and then wait for all of them.
     let roots_res =
-      future::join_all(
-        self.roots.iter()
-          .map(|root| {
-            let entry_id = self.graph.ensure_entry(root.clone());
-            self.graph.entry_for_id(entry_id)
-              .started(&StepContext::new(entry_id, self.graph, self.tasks))
-              .then(|_| {
-                // Ignore the result of each Node to ensure the entire run succeeds.
-                Ok(())
-              })
-          })
+      self.pool.spawn(
+        future::join_all(
+          self.roots.iter()
+            .map(|root| {
+              let entry_id = self.graph.ensure_entry(root.clone());
+              self.graph.entry_for_id(entry_id)
+                .started(&StepContext::new(entry_id, self.graph, self.tasks))
+                .then(|_| {
+                  // Ignore the result of each Node to ensure the entire run succeeds.
+                  Ok(())
+                })
+            })
+            .collect()
+        )
       );
 
     // Wait for all roots to complete.

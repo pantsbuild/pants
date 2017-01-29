@@ -4,7 +4,7 @@ use std::sync::Arc;
 use futures::future::{BoxFuture, Future};
 use futures::future;
 
-use graph::EntryId;
+use graph::{EntryId, Graph};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use selectors::Selector;
@@ -34,24 +34,12 @@ impl Runnable {
 }
 
 #[derive(Debug)]
-pub enum State {
-  Waiting(Vec<Node>),
-  Complete(Complete),
-  Runnable(Runnable),
-}
-
-#[derive(Debug)]
-pub enum Complete {
-  Noop(&'static str, Option<Node>),
-  Return(Value),
-  Throw(Value),
-}
-
-#[derive(Debug)]
 pub enum Failure {
   Noop(&'static str, Option<Node>),
   Throw(Value),
 }
+
+pub type NodeResult = Result<Value, Failure>;
 
 // Individual Steps will be pulled by the Scheduler's pool, and thus need not be shareable.
 pub type StepFuture = BoxFuture<Value, Failure>;
