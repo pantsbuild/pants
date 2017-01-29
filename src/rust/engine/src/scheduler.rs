@@ -96,8 +96,13 @@ impl Scheduler {
    * Starts running a Node, and returns a Future that will succeed regardless of the
    * success of the node.
    */
-  fn launch(&self, node: &Node) -> CpuFuture<(), ()> {
-    self.pool.spawn(self.graph.started(node.clone(), self)
+  fn launch(&self, node: Node) -> CpuFuture<(), ()> {
+    let context =
+      BootstrapContextFactory {
+        graph: self.graph.clone(),
+        tasks: self.tasks.clone(),
+      };
+    self.pool.spawn_fn(move || context.graph.started(node, &context)
       .then::<_, Result<(), ()>>(|_| Ok(()))
     )
   }
@@ -113,7 +118,7 @@ impl Scheduler {
     let roots_res =
       future::join_all(
         self.roots.iter()
-          .map(|root| self.launch(root))
+          .map(|root| self.launch(root.clone()))
           .collect::<Vec<_>>()
       );
 
@@ -128,7 +133,12 @@ impl Scheduler {
   }
 }
 
-impl ContextFactory for Scheduler {
+struct BootstrapContextFactory {
+  graph: Arc<Graph>,
+  tasks: Arc<Tasks>,
+}
+
+impl ContextFactory for BootstrapContextFactory {
   fn create(&self, entry_id: EntryId) -> Context {
     Context::new(entry_id, self.graph.clone(), self.tasks.clone())
   }
