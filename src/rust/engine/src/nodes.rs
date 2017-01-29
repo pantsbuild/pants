@@ -249,13 +249,13 @@ impl Select {
     &self,
     context: &StepContext,
     candidate: &'a Value,
-    variant_value: Option<String>
+    variant_value: &Option<String>
   ) -> bool {
     if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
       return false;
     }
     return match variant_value {
-      Some(ref vv) if context.field_name(candidate) != *vv =>
+      &Some(ref vv) if context.field_name(candidate) != *vv =>
         // There is a variant value, and it doesn't match.
         false,
       _ =>
@@ -272,7 +272,7 @@ impl Select {
     &self,
     context: &StepContext,
     candidate: Value,
-    variant_value: Option<String>
+    variant_value: &Option<String>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
     if self.select_literal_single(context, &candidate, variant_value) {
@@ -299,7 +299,7 @@ impl Select {
     &self,
     context: StepContext,
     results: Vec<Result<future::SharedItem<Value>, future::SharedError<Failure>>>,
-    variant_value: Option<String>,
+    variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
     let mut matches = Vec::new();
     for result in results {
@@ -359,7 +359,7 @@ impl Step for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), variant_value) {
+    if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), &variant_value) {
       return self.ok(literal_value);
     }
 
@@ -371,13 +371,14 @@ impl Step for Select {
             // Attempt to get the value of each task Node, but don't fail the join if one fails.
             context.get(&task_node).then(|r| future::ok(r))
           })
+          .collect::<Vec<_>>()
       );
 
     let variant_value = variant_value.map(|s| s.to_string());
     let node = self.clone();
     deps_future
       .and_then(move |dep_results| {
-        future::result(node.choose_task_result(context, dep_results, variant_value))
+        future::result(node.choose_task_result(context, dep_results, &variant_value))
       })
       .boxed()
   }
@@ -472,19 +473,16 @@ impl Step for SelectDependencies {
                   .map(|dep_subject| {
                     context.get(&node.dep_node(&context, &dep_subject))
                   })
+                  .collect::<Vec<_>>()
               );
             deps
               .then(move |dep_values_res| {
                 // Finally, store the resulting values.
                 match dep_values_res {
-                  Ok(dep_values) =>
-                    Ok(
-                      node.store(
-                        &context,
-                        &dep_product,
-                        dep_values.into_iter().map(|v| &*v).collect()
-                      )
-                    ),
+                  Ok(dep_values) => {
+                    let dv: Vec<Value> = dep_values.into_iter().map(|v| *v).collect();
+                    Ok(node.store(&context, &dep_product, dv.iter().collect()))
+                  },
                   Err(failure) =>
                     Err(context.was_required(failure)),
                 }
