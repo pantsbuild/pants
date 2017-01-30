@@ -328,36 +328,50 @@ impl Context {
   }
 }
 
-impl FSContext<Node> for Context {
-  fn read_link(&self, link: &Link) -> Result<Vec<PathGlob>, Node> {
-    let node =
-      Node::create(
-        Selector::select(self.type_read_link().clone()),
-        self.key_for(&self.store_link(link)),
-        Variants::default(),
-      );
-    let path =
-      match self.get(&node) {
-        Some(&Complete::Return(ref value)) =>
-          self.lift_read_link(value),
-        _ =>
-          return Err(node),
-      };
-    // If the link destination can't be parsed as PathGlob(s), it is broken.
-    Ok(PathGlob::create(&vec![path]).unwrap_or_else(|_| vec![]))
+impl FSContext<Failure> for Context {
+  fn read_link(&self, link: &Link) -> BoxFuture<Vec<PathGlob>, Failure> {
+    let context = self.clone();
+    self
+      .get(
+        &Node::create(
+          Selector::select(self.type_read_link().clone()),
+          self.key_for(&self.store_link(link)),
+          Variants::default(),
+        )
+      )
+      .then(move |read_link_res| {
+        match read_link_res {
+          Ok(ref read_link) =>
+            Ok(context.lift_read_link(read_link)),
+          Err(failure) =>
+            Err(context.was_required(failure)),
+        }
+      })
+      .map(|dest_path| {
+        // If the link destination can't be parsed as PathGlob(s), it is broken.
+        PathGlob::create(&vec![dest_path]).unwrap_or_else(|_| vec![])
+      })
+      .boxed()
   }
 
-  fn scandir(&self, dir: &Dir) -> Result<Vec<Stat>, Node> {
+  fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, Failure> {
+    let context = self.clone();
     let node =
       Node::create(
         Selector::select(self.type_directory_listing().clone()),
         self.key_for(&self.store_dir(dir)),
         Variants::default(),
       );
-    match self.get(&node) {
-      Some(&Complete::Return(ref value)) => Ok(self.lift_directory_listing(value)),
-      _ => Err(node),
-    }
+    self.get(&node)
+      .then(move |dir_listing_res| {
+        match dir_listing_res {
+          Ok(ref dir_listing) =>
+            Ok(context.lift_directory_listing(dir_listing)),
+          Err(failure) =>
+            Err(context.was_required(failure)),
+        }
+      })
+      .boxed()
   }
 }
 
@@ -721,41 +735,13 @@ pub struct Snapshot {
   variants: Variants,
 }
 
-impl Step for Snapshot {
-  fn step(&self, context: Context) -> State<Node> {
-    // Compute and parse PathGlobs for the subject.
-    let path_globs_res = {
-      let node =
-        Node::create(
-          Selector::select(context.type_path_globs().clone()),
-          self.subject.clone(),
-          self.variants.clone()
-        );
-      match context.get(&node) {
-        Some(&Complete::Return(ref value)) =>
-          context.lift_path_globs(value),
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            Complete::Noop("Could not compute PathGlobs for input {}.", Some(node))
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        None =>
-          return State::Waiting(vec![node]),
-      }
-    };
-
-    let path_globs =
-      match path_globs_res {
-        Ok(pgs) => pgs,
-        Err(e) => return State::Complete(context.throw(format!("Invalid filespecs: {}", e))),
-      };
-
+impl Snapshot {
+  fn create(context: Context, path_globs: PathGlobs) -> StepFuture {
     // Recursively expand PathGlobs into PathStats.
-    match context.expand(&path_globs) {
-      Ok(path_stats) => {
-        // The entire walk succeeded: ready to Snapshot.
+    context
+      .expand(&path_globs)
+      .and_then(move |path_stats| {
+        // And then create a Snapshot.
         let snapshot_res =
           fs::Snapshot::create(
             &context.snapshot_root(),
@@ -764,36 +750,41 @@ impl Step for Snapshot {
           );
         match snapshot_res {
           Ok(snapshot) =>
-            State::Complete(Complete::Return(context.store_snapshot(&snapshot))),
-          Err(msg) =>
-            State::Complete(context.throw(msg)),
+            Ok(context.store_snapshot(&snapshot)),
+          Err(err) =>
+            Err(context.throw(&format!("Snapshot failed: {}", err)))
         }
-      },
-      Err(dependencies) => {
-        // The walk has additional dependencies: validate that none of them are
-        // for failed Nodes. This is because the dependency gathering in FSContext
-        // will only use a value if it is successful.
-        for d in &dependencies {
-          match context.get(&d) {
-            Some(&Complete::Noop(..)) =>
-              return State::Complete(
-                context.throw(
-                  format!(
-                    "No source of snapshot dep: {}",
-                    d.format(&context.core.externs)
-                  ).as_str()
-                )
-              ),
-            Some(&Complete::Throw(ref msg)) =>
-              return State::Complete(Complete::Throw(context.clone_val(msg))),
-            _ => {},
-          }
-        }
+      })
+      .boxed()
+  }
+}
 
-        // All dependencies are valid. Declare them.
-        State::Waiting(dependencies)
-      }
-    }
+impl Step for Snapshot {
+  fn step(&self, context: Context) -> StepFuture {
+    // Compute and parse PathGlobs for the subject.
+    context
+      .get(
+        &Node::create(
+          Selector::select(context.type_path_globs().clone()),
+          self.subject.clone(),
+          self.variants.clone()
+        )
+      )
+      .then(move |path_globs_res| {
+        match path_globs_res {
+          Ok(path_globs_val) => {
+            match context.lift_path_globs(&path_globs_val) {
+              Ok(pgs) =>
+                Snapshot::create(context, pgs),
+              Err(e) =>
+                context.err(context.throw(&format!("Failed to parse PathGlobs: {}", e))),
+            }
+          },
+          Err(failure) =>
+            context.err(context.was_optional(failure, "No source of PathGlobs."))
+        }
+      })
+      .boxed()
   }
 }
 

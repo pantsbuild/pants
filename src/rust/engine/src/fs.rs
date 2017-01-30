@@ -3,6 +3,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::{fmt, fs, io};
 
+use futures::future::{BoxFuture, Future};
+
 use glob::{Pattern, PatternError};
 use ordermap::OrderMap;
 use sha2::{Sha256, Digest};
@@ -257,19 +259,18 @@ impl PathGlobs {
 }
 
 /**
- * A context for filesystem operations parameterized on a continuation type 'K'. An operation
- * resulting in K indicates that more information is needed to complete the operation.
+ * A context for filesystem operations parameterized on an error type 'E'.
  */
-pub trait FSContext<K> {
-  fn read_link(&self, link: &Link) -> Result<Vec<PathGlob>, K>;
-  fn scandir(&self, dir: &Dir) -> Result<Vec<Stat>, K>;
+pub trait FSContext<E> {
+  fn read_link(&self, link: &Link) -> BoxFuture<Vec<PathGlob>, E>;
+  fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, E>;
 
   /**
    * Expand a symlink to an underlying non-link Stat.
    *
    * TODO: Should handle symlink loops (which would exhibit as infinite recursion here afaict.
    */
-  fn expand_link(&self, link: &Link) -> Result<LinkExpansion, Vec<K>> {
+  fn expand_link(&self, link: &Link) -> BoxFuture<LinkExpansion, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let link_globs = self.read_link(&link).map_err(|k| vec![k])?;
 
@@ -289,7 +290,7 @@ pub trait FSContext<K> {
    * Canonicalize the Stat for the given PathStat to an underlying File or Dir. May result
    * in None if the PathStat represents a broken or cyclic Link.
    */
-  fn canonicalize(&self, path: &Path, stat: &Link) -> Result<Option<PathStat>, Vec<K>> {
+  fn canonicalize(&self, path: &Path, stat: &Link) -> BoxFuture<Option<PathStat>, E> {
     match self.expand_link(stat)? {
       LinkExpansion::Broken => Ok(None),
       LinkExpansion::Dir(d) => Ok(Some(PathStat::dir(path.to_owned(), d))),
@@ -297,7 +298,7 @@ pub trait FSContext<K> {
     }
   }
 
-  fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Pattern) -> Result<Vec<PathStat>, Vec<K>> {
+  fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Pattern) -> BoxFuture<Vec<PathStat>, E> {
     // List the directory, match any relevant Stats, and join them into PathStats.
     let matched =
       self.scandir(canonical_dir).map_err(|k| vec![k])?.into_iter()
@@ -349,7 +350,7 @@ pub trait FSContext<K> {
    * TODO: Eventually, it would be nice to be able to apply excludes as we go, to
    * avoid walking into directories that aren't relevant.
    */
-  fn expand(&self, path_globs: &PathGlobs) -> Result<Vec<PathStat>, Vec<K>> {
+  fn expand(&self, path_globs: &PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
     match (self.expand_multi(&path_globs.include), self.expand_multi(&path_globs.exclude)) {
       (Ok(include), Ok(exclude)) => {
         // Exclude matched paths.
@@ -368,7 +369,7 @@ pub trait FSContext<K> {
   /**
    * Recursively expands PathGlobs into PathStats, building a set of relevant dependencies.
    */
-  fn expand_multi(&self, path_globs: &Vec<PathGlob>) -> Result<Vec<PathStat>, Vec<K>> {
+  fn expand_multi(&self, path_globs: &Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
     let mut dependencies = Vec::new();
     let mut path_globs_stack = path_globs.clone();
     let mut path_globs_set: HashSet<PathGlob> = HashSet::default();
@@ -405,7 +406,7 @@ pub trait FSContext<K> {
    * Apply a PathGlob, returning either PathStats and PathGlobs on success or continuations
    * if more information is needed.
    */
-  fn expand_single(&self, path_glob: &PathGlob) -> Result<(Vec<PathStat>, Vec<PathGlob>), Vec<K>> {
+  fn expand_single(&self, path_glob: &PathGlob) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
     match path_glob {
       &PathGlob::Root =>
         // Always results in a single PathStat.
