@@ -61,7 +61,7 @@ impl Scheduler {
   pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<NodeResult>)> {
     self.roots.iter()
       .map(|root| {
-        (root.subject(), root.product(), self.graph.state(root, &self.tasks.externs))
+        (root.subject(), root.product(), self.graph.wait(root, &self.tasks.externs))
       })
       .collect()
   }
@@ -101,6 +101,7 @@ impl Scheduler {
       BootstrapContextFactory {
         graph: self.graph.clone(),
         tasks: self.tasks.clone(),
+        pool: self.pool.clone(),
       };
     self.pool.spawn_fn(move || context.graph.started(node, &context)
       .then::<_, Result<(), ()>>(|_| Ok(()))
@@ -136,11 +137,12 @@ impl Scheduler {
 struct BootstrapContextFactory {
   graph: Arc<Graph>,
   tasks: Arc<Tasks>,
+  pool: CpuPool,
 }
 
 impl ContextFactory for BootstrapContextFactory {
   fn create(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.graph.clone(), self.tasks.clone())
+    Context::new(entry_id, self.graph.clone(), self.tasks.clone(), self.pool.clone())
   }
 }
 
