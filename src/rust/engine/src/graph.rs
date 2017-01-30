@@ -63,21 +63,6 @@ impl Entry {
     &self.cyclic_dependencies
   }
 
-  /**
-   * TODO: This definition is now suspect, since we don't eagerly mark things Finished.
-   * Might need to remove that optimization from the cycle detection.
-   */
-  fn is_complete(&self) -> bool {
-    unimplemented!();
-    /*
-    match self.state {
-      EntryState::Pending => false,
-      EntryState::Started(..) => false,
-      EntryState::Finished(..) => true,
-    }
-    */
-  }
-
   fn format(&self, externs: &Externs) -> String {
     unimplemented!();
     /*
@@ -195,16 +180,18 @@ impl InnerGraph {
    * Returns true if a cycle would be created by adding an edge from src->dst.
    */
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
-    // If dst has no (incomplete) dependencies (a very common case), don't even allocate the
-    // structures to begin the walk.
-    if self.dependencies_all(dst_id, |e| e.is_complete()) {
-      return false;
-    }
+    // Search either forward from the dst, or backward from the src.
+    let (root, needle, dependents) =
+      if self.entry_for_id(dst_id).dependencies().len() < self.entry_for_id(src_id).dependents().len() {
+        (dst_id, src_id, false)
+      } else {
+        (src_id, dst_id, true)
+      };
 
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
-    roots.push_back(dst_id);
-    self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src_id)
+    roots.push_back(root);
+    self.walk(roots, { |_| true }, dependents).any(|e| e.id == needle)
   }
 
   /**
@@ -274,10 +261,6 @@ impl InnerGraph {
 
     for &id in ids {
       // Remove the entries from their dependencies' dependents lists.
-      // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
-      // I can't figure out how to iterate over one immutable Entry while mutating a different
-      // mutable Entry... so I clone() here. Perhaps this is completely sane, because what's to say
-      // they're not the same Entry after all? But regardless, less efficient than it could be.
       let dep_ids = entries[&id].dependencies.clone();
       for dep_id in dep_ids {
         entries.get_mut(&dep_id).map(|entry| {

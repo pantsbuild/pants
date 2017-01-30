@@ -70,35 +70,33 @@ pub struct RawNode {
   // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
   // a stable release.
   state_tag: u8,
-  state_return: *const Value,
-  state_throw: *const Value,
-  state_noop: bool,
+  state_value: Value
 }
 
 impl RawNode {
-  fn new(subject: &Key, product: &TypeConstraint, state: Option<NodeResult>) -> RawNode {
+  fn create(
+    externs: &Externs,
+    subject: &Key,
+    product: &TypeConstraint,
+    state: Option<NodeResult>,
+  ) -> RawNode {
+    let (state_tag, state_value) =
+      match state {
+        None =>
+          (RawStateTag::Empty as u8, externs.create_exception("No value")),
+        Some(Ok(v)) =>
+          (RawStateTag::Return as u8, v),
+        Some(Err(Failure::Throw(msg))) =>
+          (RawStateTag::Throw as u8, msg),
+        Some(Err(Failure::Noop(msg, _))) =>
+          (RawStateTag::Noop as u8, externs.create_exception(msg)),
+      };
+
     RawNode {
       subject: subject.clone(),
       product: product.clone(),
-      state_tag:
-        match state {
-          None => RawStateTag::Empty as u8,
-          Some(Ok(_)) => RawStateTag::Return as u8,
-          Some(Err(Failure::Throw(..))) => RawStateTag::Throw as u8,
-          Some(Err(Failure::Noop(..))) => RawStateTag::Noop as u8,
-        },
-      state_return: match state {
-        Some(Ok(ref v)) => v,
-        _ => ptr::null(),
-      },
-      state_throw: match state {
-        Some(Err(Failure::Throw(ref v))) => v,
-        _ => ptr::null(),
-      },
-      state_noop: match state {
-        Some(Err(Failure::Noop(_, _))) => true,
-        _ => false,
-      },
+      state_tag: state_tag,
+      state_value: state_value,
     }
   }
 }
@@ -110,11 +108,14 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn new(node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>) -> Box<RawNodes> {
+  fn create(
+    externs: &Externs,
+    node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>
+  ) -> Box<RawNodes> {
     let nodes =
       node_states.into_iter()
         .map(|(subject, product, state)|
-          RawNode::new(subject, product, state)
+          RawNode::create(externs, subject, product, state)
         )
         .collect();
     let mut raw_nodes =
@@ -250,7 +251,12 @@ pub extern fn execution_roots(
   scheduler_ptr: *mut RawScheduler,
 ) -> *const RawNodes {
   with_scheduler(scheduler_ptr, |raw| {
-    Box::into_raw(RawNodes::new(raw.scheduler.root_states()))
+    Box::into_raw(
+      RawNodes::create(
+        &raw.scheduler.tasks.externs,
+        raw.scheduler.root_states()
+      )
+    )
   })
 }
 
