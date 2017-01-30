@@ -47,8 +47,26 @@ impl Entry {
     &self.node
   }
 
+  /**
+   * Returns the Future for this Node.
+   */
   fn get(&self) -> &NodeFuture {
     &self.state
+  }
+
+  /**
+   * Waits for the Future for this Node to have completed and returns a clone of its value.
+   */
+  fn wait(&self, externs: &Externs) -> NodeResult {
+    match self.get().clone().wait() {
+      Ok(ref v) => Ok(externs.clone_val(v)),
+      Err(shared_err) => {
+        match *shared_err {
+          Failure::Noop(msg, ref n) => Err(Failure::Noop(msg, n.clone())),
+          Failure::Throw(ref msg) => Err(Failure::Throw(externs.clone_val(msg))),
+        }
+      },
+    }
   }
 
   fn dependencies(&self) -> &DepSet {
@@ -64,12 +82,11 @@ impl Entry {
   }
 
   fn format(&self, externs: &Externs) -> String {
-    unimplemented!();
-    /*
     let state =
-      match self.state {
-        Some(Complete::Return(ref v)) => externs.val_to_str(v),
-        ref x => format!("{:?}", x),
+      match self.wait(externs) {
+        Ok(ref v) => externs.val_to_str(v),
+        Err(Failure::Throw(ref v)) => externs.val_to_str(v),
+        Err(ref x) => format!("{:?}", x),
       };
     format!(
       "{}:{}:{} == {}",
@@ -78,7 +95,6 @@ impl Entry {
       externs.id_to_str(self.node.selector().product().0),
       state,
     ).replace("\"", "\\\"")
-    */
   }
 }
 
@@ -291,8 +307,6 @@ impl InnerGraph {
   }
 
   pub fn visualize(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
-    unimplemented!();
-    /*
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
@@ -300,11 +314,10 @@ impl InnerGraph {
     let viz_max_colors = 12;
     let mut format_color =
       |entry: &Entry| {
-        match entry.state {
-          None => "white".to_string(),
-          Some(Complete::Noop(_, _)) => "white".to_string(),
-          Some(Complete::Throw(_)) => "tomato".to_string(),
-          Some(Complete::Return(_)) => {
+        match entry.wait(externs) {
+          Err(Failure::Noop(_, _)) => "white".to_string(),
+          Err(Failure::Throw(_)) => "tomato".to_string(),
+          Ok(_) => {
             let viz_colors_len = viz_colors.len();
             viz_colors.entry(entry.node.selector().product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
@@ -344,21 +357,17 @@ impl InnerGraph {
 
     try!(f.write_all(b"}\n"));
     Ok(())
-    */
   }
 
   pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
-    unimplemented!();
-    /*
     let file = try!(OpenOptions::new().append(true).open(path));
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
-      match entry.state() {
-        None => false,
-        Some(Complete::Throw(_)) => false,
-        Some(Complete::Noop(_, _)) => true,
-        Some(Complete::Return(_)) => true
+      match entry.wait(externs) {
+        Ok(_) => true,
+        Err(Failure::Throw(_)) => false,
+        Err(Failure::Noop(..)) => true,
       }
     };
 
@@ -386,11 +395,10 @@ impl InnerGraph {
                            externs.id_to_str(entry.node.product().0),
                            externs.id_to_str(entry.node.subject().id()));
       if is_one_level_above_bottom(entry) {
-        let state_str = match entry.state() {
-          Some(Complete::Return(ref x)) => format!("Return({})", externs.val_to_str(x)),
-          Some(Complete::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
-          Some(Complete::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
-          None => String::new(),
+        let state_str = match entry.wait(externs) {
+          Ok(ref x) => format!("Return({})", externs.val_to_str(x)),
+          Err(Failure::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
+          Err(Failure::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {
@@ -411,7 +419,6 @@ impl InnerGraph {
 
     try!(f.write_all(b"\n"));
     Ok(())
-    */
   }
 }
 
@@ -447,19 +454,7 @@ impl Graph {
    */
   pub fn wait(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
     let inner = self.inner.read().unwrap();
-    inner.entry(node)
-      .map(|e| {
-        // Wait for the Node, and then clone and convert its state
-        match e.get().clone().wait() {
-          Ok(ref v) => Ok(externs.clone_val(v)),
-          Err(shared_err) => {
-            match *shared_err {
-              Failure::Noop(msg, ref n) => Err(Failure::Noop(msg, n.clone())),
-              Failure::Throw(ref msg) => Err(Failure::Throw(externs.clone_val(msg))),
-            }
-          },
-        }
-      })
+    inner.entry(node).map(|e| e.wait(externs))
   }
 
   /**
