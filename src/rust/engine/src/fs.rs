@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::{fmt, fs, io};
 
 use futures::future::{BoxFuture, Future};
+use futures::future;
 
 use glob::{Pattern, PatternError};
 use ordermap::OrderMap;
@@ -258,61 +259,57 @@ impl PathGlobs {
   }
 }
 
+#[derive(Debug)]
 struct PathGlobsExpansion {
-  // Globs that have yet to be expanded.
-  path_globs_stack: Vec<PathGlob>,
+  // Globs that have yet to be expanded, in order.
+  todo: Vec<PathGlob>,
   // Globs that have already been expanded.
-  path_globs_set: HashSet<PathGlob>,
-  // Paths that have been matched, in order.
+  completed: HashSet<PathGlob>,
+  // Unique Paths that have been matched, in order.
   outputs: OrderMap<PathStat, ()>,
 }
 
 /**
  * A context for filesystem operations parameterized on an error type 'E'.
  */
-pub trait FSContext<E: 'static> {
+pub trait FSContext<E: Send + 'static> : Clone + Send + 'static {
   fn read_link(&self, link: &Link) -> BoxFuture<Vec<PathGlob>, E>;
   fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, E>;
 
   /**
-   * Expand a symlink to an underlying non-link Stat.
+   * Canonicalize the Link for the given Path to an underlying File or Dir. May result
+   * in None if the PathStat represents a broken Link.
    *
-   * TODO: Should handle symlink loops (which would exhibit as infinite recursion here afaict.
+   * TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand_multi).
    */
-  fn expand_link(&self, link: &Link) -> BoxFuture<LinkExpansion, E> {
+  fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
-    let link_globs = self.read_link(&link).map_err(|k| vec![k])?;
-
-    // Assume either 0 or 1 destination (anything else would imply a symlink to a path
-    // containing an escaped glob character... leaving that as a `TODO` I guess).
-    match self.expand_multi(&link_globs)?.pop() {
-      Some(PathStat::Dir { stat, .. }) =>
-        Ok(LinkExpansion::Dir(stat)),
-      Some(PathStat::File { stat, .. }) =>
-        Ok(LinkExpansion::File(stat)),
-      None =>
-        Ok(LinkExpansion::Broken),
-    }
-  }
-
-  /**
-   * Canonicalize the Stat for the given PathStat to an underlying File or Dir. May result
-   * in None if the PathStat represents a broken or cyclic Link.
-   */
-  fn canonicalize(&self, path: &Path, stat: &Link) -> BoxFuture<Option<PathStat>, E> {
-    match self.expand_link(stat)? {
-      LinkExpansion::Broken => Ok(None),
-      LinkExpansion::Dir(d) => Ok(Some(PathStat::dir(path.to_owned(), d))),
-      LinkExpansion::File(f) => Ok(Some(PathStat::file(path.to_owned(), f))),
-    }
+    let context = self.clone();
+    self.read_link(&link)
+      .and_then(move |link_globs| {
+        context.expand_multi(link_globs)
+      })
+      .map(|mut path_stats| {
+        // Assume either 0 or 1 destination (anything else would imply a symlink to a path
+        // containing an escaped glob character... leaving that as a `TODO` I guess).
+        path_stats.pop().map(|ps| {
+          // Merge the input symbolic Path to the underlying Stat.
+          match ps {
+            PathStat::Dir { stat, .. } => PathStat::dir(symbolic_path, stat),
+            PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),
+          }
+        })
+      })
+      .boxed()
   }
 
   fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Pattern) -> BoxFuture<Vec<PathStat>, E> {
     // List the directory.
-    self.scandir(canonical_dir).map_err(|k| vec![k])
-      .and_then(|dir_listing| {
+    let context = self.clone();
+    self.scandir(canonical_dir)
+      .and_then(move |dir_listing| {
         // Match any relevant Stats, and join them into PathStats.
-        future::join(
+        future::join_all(
           dir_listing.into_iter()
             .filter(|stat| {
               // Match relevant filenames.
@@ -329,16 +326,24 @@ pub trait FSContext<E: 'static> {
             })
             .map(|(stat_symbolic_path, stat)| {
               // Canonicalize matched PathStats.
+              // TODO: Boxing every Stat here, when technically we only need to box for Link
+              // expansion. Could fix this by partitioning into Links and non-links first, but
+              // that would lose ordering.
               match stat {
                 Stat::Link(l) =>
-                  self.canonicalize(stat_symbolic_path.as_path(), &l),
+                  context.canonicalize(stat_symbolic_path, l),
                 Stat::Dir(d) =>
-                  future::ok(PathStat::dir(stat_symbolic_path.to_owned(), d)),
+                  future::ok(Some(PathStat::dir(stat_symbolic_path.to_owned(), d))).boxed(),
                 Stat::File(f) =>
-                  future::ok(PathStat::file(stat_symbolic_path.to_owned(), f)),
+                  future::ok(Some(PathStat::file(stat_symbolic_path.to_owned(), f))).boxed(),
               }
             })
+            .collect::<Vec<_>>()
         )
+      })
+      .map(|path_stats| {
+        // See the TODO above.
+        path_stats.into_iter().filter_map(|pso| pso).collect()
       })
       .boxed()
   }
@@ -361,11 +366,11 @@ pub trait FSContext<E: 'static> {
   }
 
   /**
-   * Recursively expands PathGlobs into PathStats, building a set of relevant dependencies.
+   * "Recursively" expands PathGlobs into PathStats, building a set of relevant dependencies.
    */
   fn expand_multi(&self, path_globs: Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
     let init =
-      GlobsExpansion {
+      PathGlobsExpansion {
         todo: path_globs,
         completed: HashSet::default(),
         outputs: OrderMap::default()
@@ -373,28 +378,27 @@ pub trait FSContext<E: 'static> {
     future::loop_fn(init, |mut expansion| {
       // Request the expansion of all outstanding PathGlobs as a batch.
       let round =
-        future::join(
+        future::join_all(
           expansion.todo.drain(..)
             .map(|path_glob| self.expand_single(&path_glob))
             .collect::<Vec<_>>()
         );
       round
-        .map(move |pats_and_globs| {
-          // Gather the results and dedupe.
-          let (paths, globs) = stats_and_globs.into_iter().unzip();
-
+        .map(move |paths_and_globs| {
           // Collect distinct new PathStats and PathGlobs
-          expansion.outputs.extend(paths);
-          expansion.todo.extend(
-            globs.into_iter()
-              .filter(|pg| expansion.completed.insert(pg.clone()))
-          );
+          for (paths, globs) in paths_and_globs.into_iter() {
+            expansion.outputs.extend(paths.into_iter().map(|p| (p, ())));
+            expansion.todo.extend(
+              globs.into_iter()
+                .filter(|pg| expansion.completed.insert(pg.clone()))
+            );
+          }
 
           // If there were any new PathGlobs, continue the expansion.
           if expansion.todo.is_empty() {
-            Loop::Break(expansion)
+            future::Loop::Break(expansion)
           } else {
-            Loop::Continue(expansion)
+            future::Loop::Continue(expansion)
           }
         })
     })
@@ -405,7 +409,7 @@ pub trait FSContext<E: 'static> {
         expansion
       );
       // Finally, capture the resulting PathStats from the expansion.
-      expansion.outputs
+      expansion.outputs.into_iter().map(|(k, _)| k).collect()
     })
     .boxed()
   }
