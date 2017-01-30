@@ -32,7 +32,7 @@ class NodeBundle(NodeTask):
 
   @classmethod
   def product_types(cls):
-    return ['node_bundles']
+    return ['node_bundles', 'deployable_archives']
 
   def __init__(self, *args, **kwargs):
     super(NodeBundle, self).__init__(*args, **kwargs)
@@ -43,6 +43,8 @@ class NodeBundle(NodeTask):
   def execute(self):
     archiver = archive.archiver(self._archiver_type)
     node_paths = self.context.products.get_data(NodePaths)
+
+    bundle_archive_product = self.context.products.get('deployable_archives')
 
     for target in self.context.target_roots:
       if self.is_node_module(target):
@@ -57,4 +59,6 @@ class NodeBundle(NodeTask):
           prefix=target.package_name if self._prefix else None,
           dereference=False
         )
+        bundle_archive_product.add(
+          target, os.path.dirname(archivepath)).append(os.path.basename(archivepath))
         self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
