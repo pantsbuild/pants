@@ -410,11 +410,12 @@ pub trait FSContext<E> {
     match path_glob {
       &PathGlob::Root =>
         // Always results in a single PathStat.
-        Ok((vec![PathGlob::root_stat()], vec![])),
+        future::ok(vec![PathGlob::root_stat()]).boxed(),
       &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard)
-          .map(|path_stats| (path_stats, vec![])),
+          .map(|path_stats| (path_stats, vec![]))
+          .boxed(),
       &PathGlob::DirWildcard { ref canonical_dir, ref symbolic_path, ref wildcard, ref remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
         self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard)
@@ -430,7 +431,8 @@ pub trait FSContext<E> {
               .flat_map(|path_globs| path_globs.into_iter())
               .collect()
           })
-          .map(|path_globs| (vec![], path_globs)),
+          .map(|path_globs| (vec![], path_globs))
+          .boxed(),
     }
   }
 }
