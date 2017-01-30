@@ -65,9 +65,7 @@ enum RawStateTag {
 pub struct RawNode {
   subject: Key,
   product: TypeConstraint,
-  // The following values represent a union.
-  // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
-  // a stable release.
+  // The Value represents a union tagged with RawStateTag.
   state_tag: u8,
   state_value: Value
 }

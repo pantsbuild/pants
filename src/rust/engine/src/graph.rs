@@ -29,7 +29,8 @@ pub struct Entry {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  // To avoid holding the Graph's lock longer than necessary, a Node should initializes lazily.
+  // To avoid holding the Graph's lock longer than necessary, a Node initializes on a CpuPool.
+  // TODO: See comment in ensure_entry_internal.
   state: NodeFuture,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
@@ -489,9 +490,10 @@ impl Graph {
   }
 
   /**
-   * Started the given Node if it has not already started.
+   * Create the given Node. If it does not already exist, this will cause it to begin executing
+   * immediately.
    */
-  pub fn started(&self, node: Node, context: &ContextFactory) -> NodeFuture {
+  pub fn create(&self, node: Node, context: &ContextFactory) -> NodeFuture {
     let mut inner = self.inner.write().unwrap();
     let id = inner.ensure_entry(context, node);
     inner.entry_for_id(id).get().clone()
