@@ -143,10 +143,10 @@ impl Externs {
     let result =
       (self.invoke_runnable)(
         self.context,
-        runnable.func(),
-        runnable.args().as_ptr(),
-        runnable.args().len() as u64,
-        runnable.cacheable()
+        &runnable.func,
+        runnable.args.as_ptr(),
+        runnable.args.len() as u64,
+        runnable.cacheable
       );
     if result.is_throw {
       Err(result.value)
