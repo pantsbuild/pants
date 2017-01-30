@@ -12,7 +12,7 @@ use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Failure, Node, NodeFuture, NodeResult, ContextFactory, StepFuture};
+use nodes::{Failure, Node, NodeFuture, NodeResult, Context, ContextFactory};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -52,50 +52,6 @@ impl Entry {
 
   fn node(&self) -> &Node {
     &self.node
-  }
-
-  /**
-   * If the Node has Started and Finished, returns its Result, without blocking.
-   */
-  fn state(&self) -> Option<&NodeResult> {
-    match self.state {
-      EntryState::Started(_) => None,
-      EntryState::Finished(ref res, _) => Some(res),
-    }
-  }
-
-  /**
-   * Returns the Future for this Node.
-   */
-  fn get(&self) -> NodeFuture {
-    match self.state {
-      EntryState::Started(ref task) | EntryState::Finished(_, ref task) =>
-        task.clone(),
-    }
-  }
-
-  /**
-   * If the Node was started, _blocks_ for it to complete and then returns its value.
-   */
-  fn wait(&mut self) -> Option<&NodeResult> {
-    unimplemented!();
-    /*
-    match self.state {
-      EntryState::Pending => None,
-      EntryState::Started(ref task) => {
-        let res =
-          match task.clone().wait() {
-            Ok(value) => Ok(*value),
-            Err(failure) => Err(*failure),
-          };
-        self.state = EntryState::Finished(res, task.clone());
-        self.state()
-      },
-      EntryState::Finished(ref res, _) => {
-        Some(res)
-      },
-    }
-    */
   }
 
   fn dependencies(&self) -> &DepSet {
@@ -207,16 +163,12 @@ impl InnerGraph {
 
     // New entry. Launch the Node.
     *id_generator += 1;
-    let state =
-      EntryState::Started(
-        future::Shared::new(entry_node.step(context.create(id)))
-      );
     entries.insert(
       id,
       Entry {
         id: id,
         node: entry_node,
-        state: state,
+        state: EntryState::Pending(context.create(id)),
         dependencies: Default::default(),
         dependents: Default::default(),
         cyclic_dependencies: Default::default(),
@@ -499,17 +451,16 @@ impl Graph {
   /**
    * Returns a clone of the state of the given Node.
    */
-  pub fn state(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
+  pub fn wait(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
     let inner = self.inner.read().unwrap();
     inner.entry(node)
-      .and_then(|e| {
-        e.state().map(|state| {
-          match state {
-            &Ok(ref v) => Ok(externs.clone_val(v)),
-            &Err(Failure::Noop(msg, ref n)) => Err(Failure::Noop(msg, n.clone())),
-            &Err(Failure::Throw(ref msg)) => Err(Failure::Throw(externs.clone_val(msg))),
-          }
-        })
+      .map(|e| {
+        // Wait for the Node, and then clone and convert its state
+        match e.get().wait() {
+          &Ok(ref v) => Ok(externs.clone_val(v)),
+          &Err(Failure::Noop(msg, ref n)) => Err(Failure::Noop(msg, n.clone())),
+          &Err(Failure::Throw(ref msg)) => Err(Failure::Throw(externs.clone_val(msg))),
+        }
       })
   }
 

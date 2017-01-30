@@ -41,7 +41,6 @@ pub enum Failure {
 
 pub type NodeResult = Result<Value, Failure>;
 
-// Individual Steps will be pulled by the Scheduler's pool, and thus need not be shareable.
 pub type StepFuture = BoxFuture<Value, Failure>;
 
 // Because multiple callers may wait on the same Node, the Future for a Node must be shareable.
