@@ -13,7 +13,7 @@ from hashlib import sha1
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.util.dirutil import relative_symlink, safe_mkdir, safe_rmtree
+from pants.util.dirutil import relative_symlink, safe_delete, safe_mkdir, safe_rmtree
 
 
 class VersionedTargetSet(object):
@@ -172,6 +172,22 @@ class VersionedTarget(VersionedTargetSet):
     super(VersionedTarget, self).__init__(cache_manager, [self])
     self.id = target.id
 
+  def _results_dir_prefix(self, root_dir):
+    """Return the prefix of the results directory path.
+
+    The prefix is qualified by the task version, and a stable symlink is
+    created to the currently active prefix, for convenience.  Note that this
+    stable symlink is distinct from the stable symlinks to specific results
+    directories under this prefix.
+    """
+    task_version = self._cache_manager.task_version
+    task_version_prefix = os.path.join(root_dir, sha1(task_version).hexdigest()[:12])
+    stable_prefix = os.path.join(root_dir, self._STABLE_DIR_NAME)
+    safe_mkdir(task_version_prefix)
+    safe_delete(stable_prefix)
+    relative_symlink(task_version_prefix, stable_prefix)
+    return task_version_prefix
+
   def _results_dir_path(self, root_dir, key, stable):
     """Return a results directory path for the given key.
 
@@ -179,13 +195,11 @@ class VersionedTarget(VersionedTargetSet):
     :param stable: True to use a stable subdirectory, false to use a portion of the cache key to
       generate a path unique to the key.
     """
-    task_version = self._cache_manager.task_version
     # TODO: Shorten cache_key hashes in general?
     return os.path.join(
-        root_dir,
-        sha1(task_version).hexdigest()[:12],
-        key.id,
-        self._STABLE_DIR_NAME if stable else sha1(key.hash).hexdigest()[:12]
+      self._results_dir_prefix(root_dir),
+      key.id,
+      self._STABLE_DIR_NAME if stable else sha1(key.hash).hexdigest()[:12]
     )
 
   def create_results_dir(self, root_dir):
