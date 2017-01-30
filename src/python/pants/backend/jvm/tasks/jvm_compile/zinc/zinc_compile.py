@@ -56,6 +56,8 @@ class BaseZincCompile(JvmCompile):
 
   _supports_concurrent_execution = True
 
+  _name = 'zinc'
+
   @staticmethod
   def _write_scalac_plugin_info(resources_dir, scalac_plugin_target):
     scalac_plugin_info_file = os.path.join(resources_dir, _SCALAC_PLUGIN_INFO_FILE)
@@ -381,7 +383,7 @@ class BaseZincCompile(JvmCompile):
                     main=self._ZINC_MAIN,
                     jvm_options=jvm_options,
                     args=zinc_args,
-                    workunit_name='zinc',
+                    workunit_name=self.name(),
                     workunit_labels=[WorkUnitLabel.COMPILER]):
       raise TaskError('Zinc compile failed.')
 
@@ -410,8 +412,6 @@ class BaseZincCompile(JvmCompile):
 
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code using Zinc."""
-
-  _name = 'zinc'
 
   @classmethod
   def register_options(cls, register):

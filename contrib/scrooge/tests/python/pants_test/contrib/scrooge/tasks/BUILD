@@ -29,6 +29,15 @@ python_tests(
 )
 
 python_tests(
+  name='scrooge_gen_integration',
+  sources=['test_scrooge_gen_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+)
+
+python_tests(
   name='thrift_linter_integration',
   sources=['test_thrift_linter_integration.py'],
   dependencies=[

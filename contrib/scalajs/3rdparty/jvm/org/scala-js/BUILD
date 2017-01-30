@@ -1,4 +1,4 @@
-SCALAJS_REV = '0.6.5'
+SCALAJS_REV = '0.6.14'
 
 jar_library(name = 'cli',
   jars = [
@@ -8,7 +8,7 @@ jar_library(name = 'cli',
 
 jar_library(name = 'compiler',
   jars = [
-    jar(org='org.scala-js', name='scalajs-compiler_2.10.4', rev=SCALAJS_REV),
+    jar(org='org.scala-js', name='scalajs-compiler_2.11.8', rev=SCALAJS_REV),
   ],
 )
 

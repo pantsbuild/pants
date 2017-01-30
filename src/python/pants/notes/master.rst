@@ -5,8 +5,85 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.3.0.dev8 (1/20/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Bump pex version to 1.1.20 (#4191)
+  `PR #4191 <https://github.com/pantsbuild/pants/pull/4191>`_
+
+* Ban some characters in target name (#4180)
+  `PR #4180 <https://github.com/pantsbuild/pants/pull/4180>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Scrooge codegen improvements (#4177)
+  `PR #4177 <https://github.com/pantsbuild/pants/pull/4177>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Kill review tooling remnants. (#4192)
+  `PR #4192 <https://github.com/pantsbuild/pants/pull/4192>`_
+
+* Only release native-engine for pants releases. (#4189)
+  `PR #4189 <https://github.com/pantsbuild/pants/pull/4189>`_
+
+* Add some useful tips to the release documentation. (#4183)
+  `PR #4183 <https://github.com/pantsbuild/pants/pull/4183>`_
+
+Bugfixes
+~~~~~~~~
+
+* Add __init__.py for tests/python directories (#4193)
+  `PR #4193 <https://github.com/pantsbuild/pants/pull/4193>`_
+
+* Fix `str`-typed options with `int` defaults. (#4184)
+  `PR #4184 <https://github.com/pantsbuild/pants/pull/4184>`_
+
+
+1.3.0.dev7 (1/13/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade zinc and default scala-platform in pants repo to 2.11 (#4176)
+  `PR #4176 <https://github.com/pantsbuild/pants/pull/4176>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add contrib module for Error Prone http://errorprone.info/ (#4163)
+  `PR #4163 <https://github.com/pantsbuild/pants/pull/4163>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* add various codegen packages to default backend packages (#4175)
+  `PR #4175 <https://github.com/pantsbuild/pants/pull/4175>`_
+
+* Suggest missing dependencies from target's transitive dependencies (#4171)
+  `PR #4171 <https://github.com/pantsbuild/pants/pull/4171>`_
+
+* Reduce compilation invalidation scope of targets with strict_deps=True (#4143)
+  `PR #4143 <https://github.com/pantsbuild/pants/pull/4143>`_
+
+* Fork to post_stat (#4170)
+  `PR #4170 <https://github.com/pantsbuild/pants/pull/4170>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix a small bug in ApacheThriftGenBase class (#4181)
+  `PR #4181 <https://github.com/pantsbuild/pants/pull/4181>`_
+
+
 1.3.0.dev6 (1/06/2017)
------------------------
+----------------------
 
 API Changes
 ~~~~~~~~~~~

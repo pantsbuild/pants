@@ -8,7 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import namedtuple
 
+from pants.base.deprecated import deprecated_conditional
 from pants.util.strutil import strip_prefix
+
+
+# @ is reserved for configuring variant, see `addressable.parse_variants`
+BANNED_CHARS_IN_TARGET_NAME = frozenset('@')
 
 
 def parse_spec(spec, relative_to=None):
@@ -54,27 +59,6 @@ def parse_spec(spec, relative_to=None):
   def normalize_absolute_refs(ref):
     return strip_prefix(ref, '//')
 
-  def check_path(path):
-    # A root or relative spec is OK
-    if path == '':
-      return
-
-    normpath = os.path.normpath(path)
-    components = normpath.split(os.sep)
-    if components[0] in ('.', '..') or normpath != path:
-      raise ValueError('Spec {spec} has un-normalized path '
-                       'part {path}'.format(spec=spec, path=path))
-    if components[-1].startswith('BUILD'):
-      raise ValueError('Spec {spec} has {trailing} as the last path part and BUILD is '
-                       'reserved files'.format(spec=spec, trailing=components[-1]))
-    if os.path.isabs(path):
-      raise ValueError('Spec {spec} has absolute path {path}; expected a path relative '
-                       'to the build root.'.format(spec=spec, path=path))
-
-  def check_target_name(name):
-    if not name:
-      raise ValueError('Spec {spec} has no name part'.format(spec=spec))
-
   spec_parts = spec.rsplit(':', 1)
   if len(spec_parts) == 1:
     spec_path = normalize_absolute_refs(spec_parts[0])
@@ -85,8 +69,6 @@ def parse_spec(spec, relative_to=None):
       spec_path = relative_to
     spec_path = normalize_absolute_refs(spec_path)
 
-  check_path(spec_path)
-  check_target_name(target_name)
   return spec_path, target_name
 
 
@@ -99,6 +81,14 @@ class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
 
   :API: public
   """
+
+
+class InvalidSpecPath(ValueError):
+  """Indicate an invalid spec path for `Address`."""
+
+
+class InvalidTargetName(ValueError):
+  """Indicate an invalid target name for `Address`."""
 
 
 class Address(object):
@@ -133,13 +123,44 @@ class Address(object):
     spec_path, target_name = parse_spec(spec, relative_to=relative_to)
     return cls(spec_path, target_name)
 
+  @classmethod
+  def sanitize_path(cls, path):
+    # A root or relative spec is OK
+    if path == '':
+      return path
+
+    normpath = os.path.normpath(path)
+    components = normpath.split(os.sep)
+    if components[0] in ('.', '..') or normpath != path:
+      raise InvalidSpecPath("Spec has un-normalized path part '{path}'".format(path=path))
+    if components[-1].startswith('BUILD'):
+      raise InvalidSpecPath('Spec path {path} has {trailing} as the last path part and BUILD is '
+                            'reserved files'.format(path=path, trailing=components[-1]))
+    if os.path.isabs(path):
+      raise InvalidSpecPath('Spec has absolute path {path}; expected a path relative '
+                            'to the build root.'.format(path=path))
+    return normpath if normpath != '.' else ''
+
+  @classmethod
+  def check_target_name(cls, spec_path, name):
+    if not name:
+      raise InvalidTargetName('Spec {spec}:{name} has no name part'
+                                 .format(spec=spec_path, name=name))
+
+    banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(name)
+    # raise InvalidateTargetName after deprecation
+    deprecated_conditional(lambda: len(banned_chars) > 0, '1.4.0dev0',
+                           'banned chars found in target name',
+                           '{banned_chars} not allowed in target name: {name}'
+                           .format(banned_chars=banned_chars, name=name))
+
   def __init__(self, spec_path, target_name):
     """
     :param string spec_path: The path from the root of the repo to this Target.
     :param string target_name: The name of a target this Address refers to.
     """
-    norm_path = os.path.normpath(spec_path)
-    self._spec_path = norm_path if norm_path != '.' else ''
+    self._spec_path = self.sanitize_path(spec_path)
+    self.check_target_name(spec_path, target_name)
     self._target_name = target_name
     self._hash = hash((self._spec_path, self._target_name))
 

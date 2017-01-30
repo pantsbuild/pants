@@ -1,4 +1,5 @@
 mod core;
+mod context;
 mod externs;
 mod fs;
 mod graph;
@@ -11,6 +12,8 @@ mod types;
 
 extern crate fnv;
 extern crate glob;
+extern crate futures;
+extern crate futures_cpupool;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
@@ -22,10 +25,12 @@ use std::ffi::CStr;
 use std::mem;
 use std::os::raw;
 use std::path::Path;
-use std::ptr;
+use std::sync::Arc;
 
+use context::Core;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
+  Buffer,
   CloneValExtern,
   DropHandlesExtern,
   CreateExceptionExtern,
@@ -40,14 +45,12 @@ use externs::{
   StoreListExtern,
   StoreBytesExtern,
   LiftDirectoryListingExtern,
-  UTF8Buffer,
   ValForExtern,
   ValToStrExtern,
   with_vec,
 };
-use graph::Graph;
-use nodes::Complete;
-use scheduler::Scheduler;
+use nodes::{Failure, NodeResult};
+use scheduler::{Scheduler, ExecutionStat};
 use tasks::Tasks;
 use types::Types;
 
@@ -62,12 +65,6 @@ impl RawScheduler {
 }
 
 #[repr(C)]
-pub struct ExecutionStat {
-  runnable_count: usize,
-  scheduling_iterations: usize,
-}
-
-#[repr(C)]
 enum RawStateTag {
   Empty = 0,
   Return = 1,
@@ -79,39 +76,35 @@ enum RawStateTag {
 pub struct RawNode {
   subject: Key,
   product: TypeConstraint,
-  // The following values represent a union.
-  // TODO: switch to https://github.com/rust-lang/rfcs/pull/1444 when it is available in
-  // a stable release.
+  // The Value represents a union tagged with RawStateTag.
   state_tag: u8,
-  state_return: *const Value,
-  state_throw: *const Value,
-  state_noop: bool,
+  state_value: Value
 }
 
 impl RawNode {
-  fn new(subject: &Key, product: &TypeConstraint, state: Option<&Complete>) -> RawNode {
+  fn create(
+    externs: &Externs,
+    subject: &Key,
+    product: &TypeConstraint,
+    state: Option<NodeResult>,
+  ) -> RawNode {
+    let (state_tag, state_value) =
+      match state {
+        None =>
+          (RawStateTag::Empty as u8, externs.create_exception("No value")),
+        Some(Ok(v)) =>
+          (RawStateTag::Return as u8, v),
+        Some(Err(Failure::Throw(msg))) =>
+          (RawStateTag::Throw as u8, msg),
+        Some(Err(Failure::Noop(msg, _))) =>
+          (RawStateTag::Noop as u8, externs.create_exception(msg)),
+      };
+
     RawNode {
       subject: subject.clone(),
       product: product.clone(),
-      state_tag:
-        match state {
-          None => RawStateTag::Empty as u8,
-          Some(&Complete::Return(_)) => RawStateTag::Return as u8,
-          Some(&Complete::Throw(_)) => RawStateTag::Throw as u8,
-          Some(&Complete::Noop(_, _)) => RawStateTag::Noop as u8,
-        },
-      state_return: match state {
-        Some(&Complete::Return(ref v)) => v,
-        _ => ptr::null(),
-      },
-      state_throw: match state {
-        Some(&Complete::Throw(ref v)) => v,
-        _ => ptr::null(),
-      },
-      state_noop: match state {
-        Some(&Complete::Noop(_, _)) => true,
-        _ => false,
-      },
+      state_tag: state_tag,
+      state_value: state_value,
     }
   }
 }
@@ -123,11 +116,14 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn new(node_states: Vec<(&Key, &TypeConstraint, Option<&Complete>)>) -> Box<RawNodes> {
+  fn create(
+    externs: &Externs,
+    node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>
+  ) -> Box<RawNodes> {
     let nodes =
-      node_states.iter()
-        .map(|&(subject, product, state)|
-          RawNode::new(subject, product, state)
+      node_states.into_iter()
+        .map(|(subject, product, state)|
+          RawNode::create(externs, subject, product, state)
         )
         .collect();
     let mut raw_nodes =
@@ -190,7 +186,6 @@ pub extern fn scheduler_create(
     Box::new(
       RawScheduler {
         scheduler: Scheduler::new(
-          Graph::new(),
           Tasks::new(
             field_name,
             field_products,
@@ -290,27 +285,7 @@ pub extern fn execution_execute(
   scheduler_ptr: *mut RawScheduler,
 ) -> ExecutionStat {
   with_scheduler(scheduler_ptr, |raw| {
-    let mut runnable_count: usize = 0;
-    let mut scheduling_iterations: usize = 0;
-    let mut completed = Vec::new();
-    loop {
-      let runnable_batch = raw.scheduler.next(completed);
-      if runnable_batch.len() == 0 {
-        break;
-      }
-      runnable_count += runnable_batch.len();
-      completed =
-        runnable_batch.iter()
-          .map(|&(id, ref r)| {
-            match raw.scheduler.externs.invoke_runnable(r.func(), r.args(), r.cacheable()) {
-              Ok(v) => (id, Complete::Return(v)),
-              Err(v) => (id, Complete::Throw(v)),
-            }
-          })
-          .collect();
-      scheduling_iterations += 1;
-    }
-    ExecutionStat{runnable_count: runnable_count, scheduling_iterations: scheduling_iterations}
+    raw.scheduler.execute()
   })
 }
 
@@ -319,7 +294,12 @@ pub extern fn execution_roots(
   scheduler_ptr: *mut RawScheduler,
 ) -> *const RawNodes {
   with_scheduler(scheduler_ptr, |raw| {
-    Box::into_raw(RawNodes::new(raw.scheduler.root_states()))
+    Box::into_raw(
+      RawNodes::create(
+        &raw.scheduler.core.externs,
+        raw.scheduler.root_states()
+      )
+    )
   })
 }
 
@@ -331,8 +311,8 @@ pub extern fn intrinsic_task_add(
   input_constraint: TypeConstraint,
   output_constraint: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
   })
 }
 
@@ -342,8 +322,8 @@ pub extern fn singleton_task_add(
   func: Function,
   output_constraint: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.singleton_add(func, output_constraint);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.singleton_add(func, output_constraint);
   })
 }
 
@@ -353,8 +333,8 @@ pub extern fn task_add(
   func: Function,
   output_type: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.task_add(func, output_type);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.task_add(func, output_type);
   })
 }
 
@@ -363,8 +343,8 @@ pub extern fn task_add_select(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select(product, None);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select(product, None);
   })
 }
 
@@ -372,12 +352,12 @@ pub extern fn task_add_select(
 pub extern fn task_add_select_variant(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
-  variant_key_buf: UTF8Buffer,
+  variant_key_buf: Buffer,
 ) {
   let variant_key =
     variant_key_buf.to_string().expect("Failed to decode key for select_variant");
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select(product, Some(variant_key));
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select(product, Some(variant_key));
   })
 }
 
@@ -387,8 +367,8 @@ pub extern fn task_add_select_literal(
   subject: Key,
   product: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select_literal(subject, product);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_literal(subject, product);
   })
 }
 
@@ -400,8 +380,8 @@ pub extern fn task_add_select_dependencies(
   field: Field,
   transitive: bool,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select_dependencies(product, dep_product, field, transitive);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_dependencies(product, dep_product, field, transitive);
   })
 }
 
@@ -413,15 +393,15 @@ pub extern fn task_add_select_projection(
   field: Field,
   input_product: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.add_select_projection(product, projected_subject, field, input_product);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_projection(product, projected_subject, field, input_product);
   })
 }
 
 #[no_mangle]
 pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.tasks.task_end();
+  with_core(scheduler_ptr, |core| {
+    core.tasks.task_end();
   })
 }
 
@@ -434,7 +414,7 @@ pub extern fn graph_invalidate(
   with_scheduler(scheduler_ptr, |raw| {
    with_vec(subjects_ptr, subjects_len as usize, |subjects| {
       let subjects_set = subjects.iter().collect();
-      raw.scheduler.graph.invalidate(subjects_set) as u64
+      raw.scheduler.core.graph.invalidate(subjects_set) as u64
     })
   })
 }
@@ -442,7 +422,7 @@ pub extern fn graph_invalidate(
 #[no_mangle]
 pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.graph.len() as u64
+    raw.scheduler.core.graph.len() as u64
   })
 }
 
@@ -484,4 +464,23 @@ fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
   let t = f(&mut scheduler);
   mem::forget(scheduler);
   t
+}
+
+/**
+ * A helper to allow for mutation of the Tasks struct. This method is unsafe because
+ * it must only be called while the Scheduler is not executing any work (usually during
+ * initialization).
+ *
+ * TODO: An alternative to this method would be to move construction of the Tasks struct
+ * before construction of the Scheduler, which would allow it to be mutated before it
+ * needed to become atomic for usage in the Scheduler.
+ */
+fn with_core<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
+    where F: FnOnce(&mut Core)->T {
+  with_scheduler(scheduler_ptr, |raw| {
+    let core =
+      Arc::get_mut(&mut raw.scheduler.core)
+        .expect("The Core may not be mutated once the Scheduler has started.");
+    f(core)
+  })
 }

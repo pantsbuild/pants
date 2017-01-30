@@ -82,6 +82,8 @@ class ThriftLinter(NailgunTask):
       config_args.append('--ignore-errors')
 
     include_paths , paths = calculate_compile_sources([target], self._is_thrift)
+    if target.include_paths:
+      include_paths |= set(target.include_paths)
     for p in include_paths:
       config_args.extend(['--include-path', p])
 

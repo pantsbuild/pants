@@ -19,22 +19,27 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
+  CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext,
                                                                  strict_dependencies)
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
+from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (CompileErrorExtractor,
+                                                                           MissingDependencyFinder)
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
-from pants.base.workunit import WorkUnitLabel
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
+                                safe_walk)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_property
 
@@ -175,6 +180,15 @@ class JvmCompile(NailgunTaskBase):
              fingerprint=True,
              help='Controls whether unused deps are checked, and whether they cause warnings or '
                   'errors.')
+
+    register('--suggest-missing-deps', type=bool,
+             help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
+                  'deps for compilation failures that are due to class not found.')
+
+    register('--class-not-found-error-patterns', advanced=True, type=list,
+             default=CLASS_NOT_FOUND_ERROR_PATTERNS,
+             help='List of regular expression patterns that extract class not found '
+                  'compile errors.')
 
     register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True,
              help='Use jar files on the compile_classpath. Note: Using this option degrades '
@@ -360,6 +374,11 @@ class JvmCompile(NailgunTaskBase):
                                  self.context.products.get_data('runtime_classpath'),
                                  self.context.products.get_data('product_deps_by_src'))
 
+  @memoized_property
+  def _missing_deps_finder(self):
+    return MissingDependencyFinder(self._dep_analyzer, CompileErrorExtractor(
+      self.get_options().class_not_found_error_patterns))
+
   @property
   def _analysis_parser(self):
     return self._analysis_tools.parser
@@ -473,7 +492,7 @@ class JvmCompile(NailgunTaskBase):
     assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
 
     # This ensures the workunit for the worker pool is set before attempting to compile.
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self.name())) \
             as workunit:
       # This uses workunit.parent as the WorkerPool's parent so that child workunits
       # of different pools will show up in order in the html output. This way the current running
@@ -516,7 +535,7 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text.encode('utf-8'))
 
-  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
+  def _compile_vts(self, vts, target, sources, analysis_file, upstream_analysis, classpath, outdir,
                    log_file, progress_message, settings, fatal_warnings, zinc_file_manager,
                    counter):
     """Compiles sources for the given vts into the given output dir.
@@ -548,7 +567,7 @@ class JvmCompile(NailgunTaskBase):
         ' (',
         progress_message,
         ').')
-      with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]):
+      with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
         # The compiler may delete classfiles, then later exit on a compilation error. Then if the
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
@@ -558,9 +577,27 @@ class JvmCompile(NailgunTaskBase):
 
         # If compiling a plugin, don't try to use it on itself.
         javac_plugins_to_exclude = (t.plugin for t in vts.targets if isinstance(t, JavacPlugin))
-        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings, fatal_warnings, zinc_file_manager,
-                     javac_plugins_to_exclude)
+        try:
+          self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
+                       log_file, settings, fatal_warnings, zinc_file_manager,
+                       javac_plugins_to_exclude)
+        except TaskError:
+          if self.get_options().suggest_missing_deps:
+            logs = self._find_failed_compile_logs(compile_workunit)
+            if logs:
+              self._find_missing_deps('\n'.join([read_file(log) for log in logs]), target)
+          raise
+
+  def _find_failed_compile_logs(self, compile_workunit):
+    """One of the compile child workunits actually calls compiler, this is to locate its stdout."""
+    logs = []
+    for workunit in compile_workunit.children:
+      for output_name, outpath in workunit.output_paths().items():
+        # Workunit that runs compiler is id-ed by the task name.
+        if (workunit.name == self.name() and output_name in ('stdout', 'stderr')
+            and workunit.outcome() == WorkUnit.FAILURE):
+          logs.append(outpath)
+    return logs
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -665,6 +702,31 @@ class JvmCompile(NailgunTaskBase):
         self.context.log.warn('Target {} had {}\n'.format(
           compile_context.target.address.spec, unused_msg))
 
+  def _find_missing_deps(self, compile_failure_log, target):
+    with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
+      missing_dep_suggestions, no_suggestions = self._missing_deps_finder.find(
+        compile_failure_log, target)
+
+      if missing_dep_suggestions:
+        self.context.log.info('Found the following deps from target\'s transitive '
+                              'dependencies that provide the missing classes:')
+        suggested_deps = set()
+        for classname, candidates in missing_dep_suggestions.items():
+          suggested_deps.add(list(candidates)[0])
+          self.context.log.info('  {}: {}'.format(classname, ', '.join(candidates)))
+        suggestion_msg = (
+          '\nIf the above information is correct, '
+          'please add the following to the dependencies of ({}):\n  {}\n'
+            .format(target.address.spec, '\n  '.join(sorted(list(suggested_deps))))
+        )
+        self.context.log.info(suggestion_msg)
+
+      if no_suggestions:
+        self.context.log.debug('Unable to find any deps from target\'s transitive '
+                               'dependencies that provide the following missing classes:')
+        no_suggestion_msg = '\n   '.join(sorted(list(no_suggestions)))
+        self.context.log.debug('  {}'.format(no_suggestion_msg))
+
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
     # Reorganize the compile_contexts by class directory.
@@ -756,6 +818,7 @@ class JvmCompile(NailgunTaskBase):
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
         self._compile_vts(vts,
+                          ctx.target,
                           ctx.sources,
                           ctx.analysis_file,
                           upstream_analysis,

@@ -10,7 +10,7 @@ import sbt.internal.inc.{
   AnalyzingCompiler,
   CompileOutput,
   CompilerCache,
-  CompilerInterfaceProvider,
+  CompilerBridgeProvider,
   IncrementalCompilerImpl,
   RawCompiler,
   ScalaInstance,
@@ -72,8 +72,9 @@ object Compiler {
   def newScalaCompiler(instance: XScalaInstance, interfaceJar: File): AnalyzingCompiler =
     new AnalyzingCompiler(
       instance,
-      CompilerInterfaceProvider.constant(interfaceJar),
-      sbt.internal.inc.ClasspathOptionsUtil.auto
+      CompilerBridgeProvider.constant(interfaceJar),
+      sbt.internal.inc.ClasspathOptionsUtil.auto,
+      _ => (), None
     )
 
   /**

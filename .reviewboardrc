@@ -1,5 +1,0 @@
-REVIEWBOARD_URL = 'https://rbcommons.com/s/twitter/'
-REPOSITORY = 'pants'
-TARGET_GROUPS = 'pants-reviews'
-LAND_DEST_BRANCH = 'master'
-LAND_SQUASH = True

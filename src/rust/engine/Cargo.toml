@@ -3,11 +3,16 @@ version = "0.0.1"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
+[profile.release]
+debug = true
+
 [lib]
 crate-type = ["dylib"]
 
 [dependencies]
-fnv = "1.0.3"
+fnv = "1.0.5"
+futures = "0.1.9"
+futures-cpupool = "0.1.2"
 glob = "0.2.11"
 lazy_static = "0.2.2"
 ordermap = "0.2.7"

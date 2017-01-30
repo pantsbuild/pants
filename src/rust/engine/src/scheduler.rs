@@ -1,13 +1,17 @@
-use std::collections::{HashSet, VecDeque};
 
 use std::io;
 use std::path::Path;
+use std::sync::Arc;
 
-use core::{FNV, Field, Key, TypeConstraint};
+use futures::future::Future;
+use futures::future;
+use futures_cpupool::{CpuPool, CpuFuture};
+
+use context::Core;
+use core::{Field, Key, TypeConstraint};
 use externs::Externs;
 use graph::{EntryId, Graph};
-use handles::drain_handles;
-use nodes::{Complete, Node, Runnable, State};
+use nodes::{Node, NodeResult, Context, ContextFactory};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 use types::Types;
@@ -16,19 +20,9 @@ use types::Types;
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
 pub struct Scheduler {
-  pub graph: Graph,
-  pub tasks: Tasks,
-  pub types: Types,
-  pub externs: Externs,
+  pub core: Arc<Core>,
   // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Node>,
-  // Candidates for execution.
-  candidates: VecDeque<EntryId>,
-  // Outstanding ids. This will always contain at least as many entries as the `ready` set. If
-  // it contains more ids than the `ready` set, it is because entries that were previously
-  // declared to be ready are still outstanding.
-  outstanding: HashSet<EntryId, FNV>,
-  runnable: HashSet<EntryId, FNV>,
 }
 
 impl Scheduler {
@@ -36,30 +30,31 @@ impl Scheduler {
    * Creates a Scheduler with an initially empty set of roots.
    */
   pub fn new(
-    graph: Graph,
     tasks: Tasks,
     types: Types,
     externs: Externs,
   ) -> Scheduler {
     Scheduler {
-      graph: graph,
-      tasks: tasks,
-      types: types,
-      externs: externs,
+      core: Arc::new(
+        Core {
+          graph: Graph::new(),
+          tasks: tasks,
+          types: types,
+          externs: externs,
+          pool: CpuPool::new_num_cpus(),
+        }
+      ),
       roots: Vec::new(),
-      candidates: Default::default(),
-      outstanding: Default::default(),
-      runnable: Default::default(),
     }
   }
 
   pub fn visualize(&self, path: &Path) -> io::Result<()> {
-    self.graph.visualize(&self.roots, path, &self.externs)
+    self.core.graph.visualize(&self.roots, path, &self.core.externs)
   }
 
   pub fn trace(&self, path: &Path) -> io::Result<()> {
     for root in &self.roots {
-      let result = self.graph.trace(&root, path, &self.externs);
+      let result = self.core.graph.trace(&root, path, &self.core.externs);
       if result.is_err() {
         return result;
       }
@@ -69,15 +64,12 @@ impl Scheduler {
 
   pub fn reset(&mut self) {
     self.roots.clear();
-    self.candidates.clear();
-    self.outstanding.clear();
   }
 
-  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<&Complete>)> {
+  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<NodeResult>)> {
     self.roots.iter()
       .map(|root| {
-        let state = self.graph.entry(root).and_then(|e| e.state());
-        (root.subject(), root.product(), state)
+        (root.subject(), root.product(), self.core.graph.wait(root, &self.core.externs))
       })
       .collect()
   }
@@ -106,85 +98,54 @@ impl Scheduler {
 
   fn add_root(&mut self, node: Node) {
     self.roots.push(node.clone());
-    self.candidates.push_back(self.graph.ensure_entry(node));
   }
 
   /**
-   * Attempt to run a step with the currently available dependencies of the given Node. If
-   * a step runs, the new State of the Node will be returned.
+   * Starts running a Node, and returns a Future that will succeed regardless of the
+   * success of the node.
    */
-  fn attempt_step(&self, id: EntryId) -> Option<State<Node>> {
-    if !self.graph.is_ready_entry(id) {
-      return None;
-    }
-
-    // Run a step.
-    let entry = self.graph.entry_for_id(id);
-    Some(entry.node().step(entry, &self.graph, &self.tasks, &self.types, &self.externs))
+  fn launch(&self, node: Node) -> CpuFuture<(), ()> {
+    let core = self.core.clone();
+    self.core.pool.spawn_fn(move || core.graph.create(node, &core)
+      .then::<_, Result<(), ()>>(|_| Ok(()))
+    )
   }
 
   /**
-   * Continues execution after the given runnables have completed execution.
-   *
-   * Returns an ordered batch of `Staged<EntryId>` for which every `StagedArg::Promise` is
-   * satisfiable by an entry earlier in the list. This "mini graph" can be executed linearly, or in
-   * parallel as long as those promise dependencies are observed.
+   * Starting from existing roots, execute a graph to completion.
    */
-  pub fn next(&mut self, completed: Vec<(EntryId, Complete)>) -> Vec<(EntryId, Runnable)> {
-    let mut ready = Vec::new();
+  pub fn execute(&mut self) -> ExecutionStat {
+    // TODO: Restore counts.
+    let runnable_count = 0;
+    let scheduling_iterations = 0;
 
-    // Mark any completed entries as such.
-    for (id, state) in completed {
-      self.outstanding.remove(&id);
-      self.candidates.extend(self.graph.entry_for_id(id).dependents());
-      self.graph.complete(id, state);
+    // Bootstrap tasks for the roots, and then wait for all of them.
+    let roots_res =
+      future::join_all(
+        self.roots.iter()
+          .map(|root| self.launch(root.clone()))
+          .collect::<Vec<_>>()
+      );
+
+    // Wait for all roots to complete. Failure here should be impossible, because each
+    // individual Future in the join was mapped into success regardless of its result.
+    roots_res.wait().expect("Execution failed.");
+
+    ExecutionStat {
+      runnable_count: runnable_count,
+      scheduling_iterations: scheduling_iterations,
     }
-
-    // For each changed node, determine whether its dependents or itself are a candidate.
-    while let Some(entry_id) = self.candidates.pop_front() {
-      if self.outstanding.contains(&entry_id) {
-        // Already running.
-        continue;
-      }
-
-      // Attempt to run a step for the Node.
-      match self.attempt_step(entry_id) {
-        Some(State::Runnable(s)) => {
-          // The node is ready to run!
-          ready.push((entry_id, s));
-          self.outstanding.insert(entry_id);
-        },
-        Some(State::Complete(s)) => {
-          // Node completed statically; mark any dependents of the Node as candidates.
-          self.graph.complete(entry_id, s);
-          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
-        },
-        Some(State::Waiting(w)) => {
-          // Add the new dependencies.
-          self.graph.add_dependencies(entry_id, w);
-          let ref graph = self.graph;
-          let mut incomplete_deps =
-            self.graph.entry_for_id(entry_id).dependencies().iter()
-              .map(|&d| graph.entry_for_id(d))
-              .filter(|e| !e.is_complete())
-              .map(|e| e.id())
-              .peekable();
-          if incomplete_deps.peek().is_some() {
-            // Mark incomplete deps as candidates for steps.
-            self.candidates.extend(incomplete_deps);
-          } else {
-            // All newly declared deps are already completed: still a candidate.
-            self.candidates.push_front(entry_id);
-          }
-        },
-        None =>
-          // Not ready to step.
-          continue,
-      }
-    }
-
-    self.runnable.clear();
-    self.externs.drop_handles(drain_handles());
-    ready
   }
+}
+
+impl ContextFactory for Arc<Core> {
+  fn create(&self, entry_id: EntryId) -> Context {
+    Context::new(entry_id, self.clone())
+  }
+}
+
+#[repr(C)]
+pub struct ExecutionStat {
+  runnable_count: u64,
+  scheduling_iterations: u64,
 }

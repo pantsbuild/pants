@@ -1,11 +1,11 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::mem;
 use std::os::raw;
-use std::os::unix::ffi::OsStrExt;
+use std::os::unix::ffi::OsStringExt;
 use std::path::Path;
 use std::string::FromUtf8Error;
+use std::sync::RwLock;
 
 use fs::{Dir, File, Link, Stat};
 use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
@@ -17,7 +17,6 @@ pub type ExternContext = raw::c_void;
 pub type SatisfiedByExtern =
   extern "C" fn(*const ExternContext, *const TypeConstraint, *const TypeId) -> bool;
 
-#[derive(Clone)]
 pub struct Externs {
   context: *const ExternContext,
   key_for: KeyForExtern,
@@ -25,7 +24,7 @@ pub struct Externs {
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
-  satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
+  satisfied_by_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
   lift_directory_listing: LiftDirectoryListingExtern,
@@ -36,6 +35,10 @@ pub struct Externs {
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
 }
+
+// The pointer to the context is safe for sharing between threads.
+unsafe impl Sync for Externs {}
+unsafe impl Send for Externs {}
 
 impl Externs {
   pub fn new(
@@ -62,7 +65,7 @@ impl Externs {
       clone_val: clone_val,
       drop_handles: drop_handles,
       satisfied_by: satisfied_by,
-      satisfied_by_cache: RefCell::new(HashMap::new()),
+      satisfied_by_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       store_bytes: store_bytes,
       lift_directory_listing: lift_directory_listing,
@@ -92,7 +95,19 @@ impl Externs {
   }
 
   pub fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    self.satisfied_by_cache.borrow_mut().entry((*constraint, *cls))
+    let key = (*constraint, *cls);
+
+    // See if a value already exists.
+    {
+      let read = self.satisfied_by_cache.read().unwrap();
+      if let Some(v) = read.get(&key) {
+        return *v;
+      }
+    }
+
+    // If not, compute and insert.
+    let mut write = self.satisfied_by_cache.write().unwrap();
+    write.entry(key)
       .or_insert_with(||
         (self.satisfied_by)(self.context, constraint, cls)
       )
@@ -149,7 +164,7 @@ impl Externs {
     })
   }
 
-  pub fn create_exception(&self, msg: String) -> Value {
+  pub fn create_exception(&self, msg: &str) -> Value {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
 
@@ -206,7 +221,7 @@ pub enum RawStatTag {
 
 #[repr(C)]
 pub struct RawStat {
-  path: UTF8Buffer,
+  path: Buffer,
   tag: RawStatTag,
 }
 
@@ -229,39 +244,42 @@ pub struct RunnableComplete {
 pub struct ValueBuffer {
   values_ptr: *mut Value,
   values_len: u64,
+  // A Value handle to hold the underlying buffer alive.
+  handle_: Value,
 }
 
 pub type ProjectMultiExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field) -> ValueBuffer;
 
 #[repr(C)]
-pub struct UTF8Buffer {
-  str_ptr: *mut u8,
-  str_len: u64,
-  // A handle to hold the underlying string buffer alive.
-  _value: Value,
+pub struct Buffer {
+  bytes_ptr: *mut u8,
+  bytes_len: u64,
+  // A Value handle to hold the underlying buffer alive.
+  handle_: Value,
 }
 
-impl UTF8Buffer {
-  pub fn to_string(&self) -> Result<String, FromUtf8Error> {
-    with_vec(self.str_ptr, self.str_len as usize, |char_vec| {
-      // Attempt to decode from unicode.
-      String::from_utf8(char_vec.clone())
+impl Buffer {
+  pub fn to_bytes(&self) -> Vec<u8> {
+    with_vec(self.bytes_ptr, self.bytes_len as usize, |vec| {
+      vec.clone()
     })
   }
 
   pub fn to_os_string(&self) -> OsString {
-    with_vec(self.str_ptr, self.str_len as usize, |bytes_vec| {
-      OsStr::from_bytes(bytes_vec).to_owned()
-    })
+    OsString::from_vec(self.to_bytes())
+  }
+
+  pub fn to_string(&self) -> Result<String, FromUtf8Error> {
+    String::from_utf8(self.to_bytes())
   }
 }
 
 pub type IdToStrExtern =
-  extern "C" fn(*const ExternContext, Id) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, Id) -> Buffer;
 
 pub type ValToStrExtern =
-  extern "C" fn(*const ExternContext, *const Value) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;

@@ -5,35 +5,33 @@ use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
+use std::sync::RwLock;
+
+use futures::future::Future;
+use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Node, Complete};
+use nodes::{Failure, Node, NodeFuture, NodeResult, ContextFactory};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct EntryId(usize);
 
-pub type DepSet = Vec<EntryId>;
+pub type DepSet = HashSet<EntryId, FNV>;
 
 /**
  * An Entry and its adjacencies.
- *
- * The dependencies and cyclic_dependencies sets are stored as vectors in order to expose
- * them more easily via the C API, but they should never contain dupes.
- *
- * NB: The average number of dependencies for a Node is somewhere between 1 and 2, so Vec is
- * not too crazy (although maintaining sorted order and then binary-searching in sufficiently
- * large Vecs would make sense).
  */
-#[derive(Debug)]
 pub struct Entry {
   id: EntryId,
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  state: Option<Complete>,
+  // To avoid holding the Graph's lock longer than necessary, a Node initializes on a CpuPool.
+  // TODO: See comment in ensure_entry_internal.
+  state: NodeFuture,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
   dependents: DepSet,
@@ -42,39 +40,46 @@ pub struct Entry {
 }
 
 impl Entry {
-  pub fn id(&self) -> EntryId {
-    self.id
+  /**
+   * Returns the Future for this Node.
+   */
+  fn get(&self) -> &NodeFuture {
+    &self.state
   }
 
-  pub fn node(&self) -> &Node {
-    &self.node
+  /**
+   * Waits for the Future for this Node to have completed and returns a clone of its value.
+   */
+  fn wait(&self, externs: &Externs) -> NodeResult {
+    match self.get().clone().wait() {
+      Ok(ref v) => Ok(externs.clone_val(v)),
+      Err(shared_err) => {
+        match *shared_err {
+          Failure::Noop(msg, ref n) => Err(Failure::Noop(msg, n.clone())),
+          Failure::Throw(ref msg) => Err(Failure::Throw(externs.clone_val(msg))),
+        }
+      },
+    }
   }
 
-  pub fn state(&self) -> Option<&Complete> {
-    self.state.as_ref()
-  }
-
-  pub fn dependencies(&self) -> &DepSet {
+  fn dependencies(&self) -> &DepSet {
     &self.dependencies
   }
 
-  pub fn dependents(&self) -> &DepSet {
+  fn dependents(&self) -> &DepSet {
     &self.dependents
   }
 
-  pub fn cyclic_dependencies(&self) -> &DepSet {
+  fn cyclic_dependencies(&self) -> &DepSet {
     &self.cyclic_dependencies
-  }
-
-  pub fn is_complete(&self) -> bool {
-    self.state.is_some()
   }
 
   fn format(&self, externs: &Externs) -> String {
     let state =
-      match self.state {
-        Some(Complete::Return(ref v)) => externs.val_to_str(v),
-        ref x => format!("{:?}", x),
+      match self.wait(externs) {
+        Ok(ref v) => externs.val_to_str(v),
+        Err(Failure::Throw(ref v)) => externs.val_to_str(v),
+        Err(ref x) => format!("{:?}", x),
       };
     format!(
       "{}:{}:{} == {}",
@@ -89,64 +94,36 @@ impl Entry {
 type Nodes = HashMap<Node, EntryId, FNV>;
 type Entries = HashMap<EntryId, Entry, FNV>;
 
-/**
- * A DAG (enforced on mutation) of Entries.
- */
-pub struct Graph {
+struct InnerGraph {
   id_generator: usize,
   nodes: Nodes,
   entries: Entries,
-  cyclic_singleton: Complete,
+  cyclic_singleton: NodeFuture,
 }
 
-impl Graph {
-  pub fn new() -> Graph {
-    Graph {
-      id_generator: 0,
-      nodes: HashMap::default(),
-      entries: HashMap::default(),
-      cyclic_singleton: Complete::Noop("Dep would be cyclic.", None),
-    }
+impl InnerGraph {
+  fn cyclic_singleton(&self) -> NodeFuture {
+    self.cyclic_singleton.clone()
   }
 
-  pub fn cyclic_singleton(&self) -> &Complete {
-    &(self.cyclic_singleton)
-  }
-
-  pub fn len(&self) -> usize {
-    self.entries.len()
-  }
-
-  pub fn is_complete_entry(&self, id: EntryId) -> bool {
-    self.entry_for_id(id).is_complete()
-  }
-
-  pub fn is_ready_entry(&self, id: EntryId) -> bool {
-    !self.is_complete_entry(id) && self.dependencies_all(id, |e| e.is_complete())
-  }
-
-  pub fn dependencies_all<P>(&self, id: EntryId, predicate: P) -> bool
-      where P: Fn(&Entry)->bool {
-    self.entry_for_id(id).dependencies.iter().all(|&d| predicate(self.entry_for_id(d)))
-  }
-
-  pub fn entry(&self, node: &Node) -> Option<&Entry> {
+  fn entry(&self, node: &Node) -> Option<&Entry> {
     self.nodes.get(node).map(|&id| self.entry_for_id(id))
   }
 
-  pub fn entry_for_id(&self, id: EntryId) -> &Entry {
+  fn entry_for_id(&self, id: EntryId) -> &Entry {
     self.entries.get(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  pub fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
+  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
     self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  pub fn ensure_entry(&mut self, node: Node) -> EntryId {
-    Graph::ensure_entry_internal(
+  fn ensure_entry(&mut self, context: &ContextFactory, node: Node) -> EntryId {
+    InnerGraph::ensure_entry_internal(
       &mut self.entries,
       &mut self.nodes,
       &mut self.id_generator,
+      context,
       node
     )
   }
@@ -155,6 +132,7 @@ impl Graph {
     entries: &'a mut Entries,
     nodes: &mut Nodes,
     id_generator: &mut usize,
+    context_factory: &ContextFactory,
     node: Node
   ) -> EntryId {
     // See TODO on Entry.
@@ -169,62 +147,35 @@ impl Graph {
       return id;
     }
 
-    // New entry.
+    // New entry. Launch the Node on the pool.
+    // FIXME: It's necessary to call back to the pool here currently, because otherwise the work
+    // represented by the Node begins executing immediately on the current thread, which is
+    // undesirable because we are holding the graph lock. Fixing that would likely mean making
+    // the creation of an Entry's state an atomic operation outside of the Graph lock.
+    let context = context_factory.create(id);
+    let pool = context.core().pool.clone();
+    let pool_node = entry_node.clone();
+    let state =
+      future::Shared::new(
+        pool.spawn_fn(move || {
+          pool_node.step(context)
+        })
+        .boxed()
+      );
     *id_generator += 1;
     entries.insert(
       id,
       Entry {
         id: id,
         node: entry_node,
-        state: None,
-        dependencies: Vec::new(),
-        dependents: Vec::new(),
-        cyclic_dependencies: Vec::new(),
+        state: state,
+        dependencies: Default::default(),
+        dependents: Default::default(),
+        cyclic_dependencies: Default::default(),
       }
     );
 
     id
-  }
-
-  pub fn complete(&mut self, id: EntryId, state: Complete) {
-    assert!(self.is_ready_entry(id), "Node {:?} is already completed, or has incomplete deps.", self.entry_for_id(id));
-
-    self.entry_for_id_mut(id).state = Some(state);
-  }
-
-  /**
-   * Adds the given dst Nodes as dependencies of the src Node, and returns true if any of them
-   * were cyclic.
-   *
-   * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
-   */
-  pub fn add_dependencies(&mut self, src_id: EntryId, dst_nodes: Vec<Node>) {
-    assert!(
-      !self.is_complete_entry(src_id),
-      "Node {:?} is already completed, and may not have new dependencies added: {:?}",
-      src_id,
-      dst_nodes,
-    );
-
-    let dsts: Vec<EntryId> = dst_nodes.into_iter().map(|n| self.ensure_entry(n)).collect();
-
-    // Determine whether each awaited dep is cyclic.
-    let (deps, cyclic_deps): (DepSet, DepSet) = {
-      let src = self.entry_for_id(src_id);
-      dsts.into_iter()
-        .filter(|dst_id| !(src.dependencies.contains(dst_id) || src.cyclic_dependencies.contains(dst_id)))
-        .partition(|&dst_id| !self.detect_cycle(src_id, dst_id))
-    };
-
-    // Add the source as a dependent of each non-cyclic dep.
-    for &dep in &deps {
-      self.entry_for_id_mut(dep).dependents.push(src_id);
-    }
-
-    // Finally, add all deps to the source.
-    let src = self.entry_for_id_mut(src_id);
-    src.dependencies.extend(deps);
-    src.cyclic_dependencies.extend(cyclic_deps);
   }
 
   /**
@@ -233,16 +184,18 @@ impl Graph {
    * Returns true if a cycle would be created by adding an edge from src->dst.
    */
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
-    // If dst has no (incomplete) dependencies (a very common case), don't even allocate the
-    // structures to begin the walk.
-    if self.dependencies_all(dst_id, |e| e.is_complete()) {
-      return false;
-    }
+    // Search either forward from the dst, or backward from the src.
+    let (root, needle, dependents) =
+      if self.entry_for_id(dst_id).dependencies().len() < self.entry_for_id(src_id).dependents().len() {
+        (dst_id, src_id, false)
+      } else {
+        (src_id, dst_id, true)
+      };
 
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
-    roots.push_back(dst_id);
-    self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src_id)
+    roots.push_back(root);
+    self.walk(roots, { |_| true }, dependents).any(|e| e.id == needle)
   }
 
   /**
@@ -259,10 +212,10 @@ impl Graph {
     }
   }
 
-/**
- *  Begins a topological walk from the given roots. Provides both the current entry as well as the
- *  depth from the root.
- */
+  /**
+   * Begins a topological walk from the given roots. Provides both the current entry as well as the
+   * depth from the root.
+   */
   fn leveled_walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
     where P: Fn(&Entry, Level) -> bool {
     let rrr = roots.iter().map(|&r| (r, 0)).collect::<VecDeque<_>>();
@@ -278,7 +231,7 @@ impl Graph {
   /**
    * Finds all Nodes with the given subjects, and invalidates their transitive dependents.
    */
-  pub fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
+  fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
     // Collect all entries that will be deleted.
     let ids: HashSet<EntryId, FNV> = {
       let root_ids =
@@ -291,11 +244,11 @@ impl Graph {
             }
           })
           .collect();
-      self.walk(root_ids, { |_| true }, true).map(|e| e.id()).collect()
+      self.walk(root_ids, { |_| true }, true).map(|e| e.id).collect()
     };
 
     // Then remove all entries in one shot.
-    Graph::invalidate_internal(
+    InnerGraph::invalidate_internal(
       &mut self.entries,
       &mut self.nodes,
       &ids,
@@ -312,14 +265,10 @@ impl Graph {
 
     for &id in ids {
       // Remove the entries from their dependencies' dependents lists.
-      // FIXME: Because the lifetime of each Entry is the same as the lifetime of the entire Graph,
-      // I can't figure out how to iterate over one immutable Entry while mutating a different
-      // mutable Entry... so I clone() here. Perhaps this is completely sane, because what's to say
-      // they're not the same Entry after all? But regardless, less efficient than it could be.
       let dep_ids = entries[&id].dependencies.clone();
       for dep_id in dep_ids {
         entries.get_mut(&dep_id).map(|entry| {
-          entry.dependents.retain(|&dependent| dependent != id);
+          entry.dependents.remove(&id);
         });
       }
 
@@ -353,11 +302,10 @@ impl Graph {
     let viz_max_colors = 12;
     let mut format_color =
       |entry: &Entry| {
-        match entry.state {
-          None => "white".to_string(),
-          Some(Complete::Noop(_, _)) => "white".to_string(),
-          Some(Complete::Throw(_)) => "tomato".to_string(),
-          Some(Complete::Return(_)) => {
+        match entry.wait(externs) {
+          Err(Failure::Noop(_, _)) => "white".to_string(),
+          Err(Failure::Throw(_)) => "tomato".to_string(),
+          Ok(_) => {
             let viz_colors_len = viz_colors.len();
             viz_colors.entry(entry.node.product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
@@ -371,7 +319,7 @@ impl Graph {
     try!(f.write_all(b"  concentrate=true;\n"));
     try!(f.write_all(b"  rankdir=LR;\n"));
 
-    let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
+    let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
@@ -404,11 +352,10 @@ impl Graph {
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
-      match entry.state {
-        None => false,
-        Some(Complete::Throw(_)) => false,
-        Some(Complete::Noop(_, _)) => true,
-        Some(Complete::Return(_)) => true
+      match entry.wait(externs) {
+        Ok(_) => true,
+        Err(Failure::Throw(_)) => false,
+        Err(Failure::Noop(..)) => true,
       }
     };
 
@@ -436,11 +383,10 @@ impl Graph {
                            externs.id_to_str(entry.node.product().0),
                            externs.id_to_str(entry.node.subject().id()));
       if is_one_level_above_bottom(entry) {
-        let state_str = match entry.state {
-          Some(Complete::Return(ref x)) => format!("Return({})", externs.val_to_str(x)),
-          Some(Complete::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
-          Some(Complete::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
-          None => String::new(),
+        let state_str = match entry.wait(externs) {
+          Ok(ref x) => format!("Return({})", externs.val_to_str(x)),
+          Err(Failure::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
+          Err(Failure::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {
@@ -448,7 +394,7 @@ impl Graph {
       }
     };
 
-    let root_entries = vec![root].iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
+    let root_entries = vec![root].iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
     for t in self.leveled_walk(root_entries, |e,_| !is_bottom(e), false) {
       let (entry, level) = t;
       try!(write!(&mut f, "{}\n", _format(entry, level)));
@@ -465,11 +411,116 @@ impl Graph {
 }
 
 /**
+ * A DAG (enforced on mutation) of Entries.
+ */
+pub struct Graph {
+  inner: RwLock<InnerGraph>,
+}
+
+impl Graph {
+  pub fn new() -> Graph {
+    let inner =
+      InnerGraph {
+        id_generator: 0,
+        nodes: HashMap::default(),
+        entries: HashMap::default(),
+        cyclic_singleton:
+          future::Shared::new(future::err(Failure::Noop("Dep would be cyclic.", None)).boxed()),
+      };
+    Graph {
+      inner: RwLock::new(inner),
+    }
+  }
+
+  pub fn len(&self) -> usize {
+    let inner = self.inner.read().unwrap();
+    inner.entries.len()
+  }
+
+  /**
+   * Returns a clone of the state of the given Node.
+   */
+  pub fn wait(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
+    let inner = self.inner.read().unwrap();
+    inner.entry(node).map(|e| e.wait(externs))
+  }
+
+  /**
+   * In the context of the given src Node, declare a dependency on the given dst Node and
+   * begin its execution if it has not already started.
+   *
+   * TODO: Restore the invariant that completed Nodes may only depend on other completed Nodes
+   * to make cycle detection cheaper.
+   */
+  pub fn get(&self, src_id: EntryId, context: &ContextFactory, dst_node: &Node) -> NodeFuture {
+    // First, check whether the destination already exists, and the dep is already declared.
+    {
+      let inner = self.inner.read().unwrap();
+      let src_entry = inner.entry_for_id(src_id);
+      if let Some(dst_entry) = inner.entry(dst_node) {
+        if src_entry.dependencies().contains(&dst_entry.id) {
+          // Declared and valid.
+          return dst_entry.get().clone();
+        } else if src_entry.cyclic_dependencies().contains(&dst_entry.id) {
+          // Declared but cyclic.
+          return inner.cyclic_singleton();
+        }
+      }
+    }
+
+    // Get or create the destination, and then insert the dep.
+    // TODO: doing cycle detection under the writelock... unfortunate, but probably unavoidable
+    // without a much more complicated algorithm.
+    {
+      let mut inner = self.inner.write().unwrap();
+      let dst_id = inner.ensure_entry(context, dst_node.clone());
+      if inner.detect_cycle(src_id, dst_id) {
+        // Undeclared but cyclic.
+        inner.entry_for_id_mut(src_id).cyclic_dependencies.insert(dst_id);
+      } else {
+        // Undeclared and valid.
+        inner.entry_for_id_mut(src_id).dependencies.insert(dst_id);
+        inner.entry_for_id_mut(dst_id).dependents.insert(src_id);
+      }
+    }
+
+    // Recurse to retry (which should always succeed the first time).
+    // TODO: will look up the Node multiple times.
+    self.get(src_id, context, dst_node)
+  }
+
+  /**
+   * Create the given Node. If it does not already exist, this will cause it to begin executing
+   * immediately.
+   */
+  pub fn create(&self, node: Node, context: &ContextFactory) -> NodeFuture {
+    let mut inner = self.inner.write().unwrap();
+    let id = inner.ensure_entry(context, node);
+    inner.entry_for_id(id).get().clone()
+  }
+
+  pub fn invalidate(&self, subjects: HashSet<&Key, FNV>) -> usize {
+    let mut inner = self.inner.write().unwrap();
+    inner.invalidate(subjects)
+  }
+
+  pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
+    let inner = self.inner.read().unwrap();
+    inner.trace(root, path, externs)
+  }
+
+  pub fn visualize(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
+    let inner = self.inner.read().unwrap();
+    inner.visualize(roots, path, externs)
+  }
+}
+
+/**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
  */
 struct Walk<'a, P: Fn(&Entry)->bool> {
-  graph: &'a Graph,
+  graph: &'a InnerGraph,
   dependents: bool,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
@@ -505,12 +556,13 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
 }
 
 type Level = u32;
+
 /**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
  */
 struct LeveledWalk<'a, P: Fn(&Entry, Level)->bool> {
-  graph: &'a Graph,
+  graph: &'a InnerGraph,
   dependents: bool,
   deque: VecDeque<(EntryId, Level)>,
   walked: HashSet<EntryId, FNV>,
