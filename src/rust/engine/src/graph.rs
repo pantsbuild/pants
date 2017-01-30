@@ -21,12 +21,14 @@ pub struct EntryId(usize);
 pub type DepSet = HashSet<EntryId, FNV>;
 
 enum EntryState {
-  // Is running, or has not yet been explicitly `wait`ed to be marked finished.
+  // Has not yet started running. This state exists to make the launching of work lazy, such that
+  // it doesn't happen while the graph lock is held.
+  Pending(Node, Context),
+  // Has been started.
   Started(NodeFuture),
-  // Completed with the given result. Note that we always keep the underlying future
-  // around in order to pass it out to callers without initializing a new Shared future.
-  Finished(NodeResult, NodeFuture),
 }
+
+type EntryStateField = Arc<RwLock<EntryState>>;
 
 /**
  * An Entry and its adjacencies.
@@ -37,7 +39,8 @@ pub struct Entry {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  state: EntryState,
+  // To avoid holding the Graph's lock longer than necessary, a Node should initializes lazily.
+  state: EntryStateField,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
   dependents: DepSet,
@@ -60,6 +63,12 @@ impl Entry {
 
   fn dependents(&self) -> &DepSet {
     &self.dependents
+  }
+
+  fn getter(&self) -> EntryGetter {
+    EntryGetter {
+      state: self.state.clone()
+    }
   }
 
   fn cyclic_dependencies(&self) -> &DepSet {
@@ -97,6 +106,31 @@ impl Entry {
       state,
     ).replace("\"", "\\\"")
     */
+  }
+}
+
+/**
+ * Holds a reference to an Entry's state, to allow it to be lazily started while the Entry
+ * itself is not held.
+ */
+struct EntryGetter {
+  state: EntryStateField,
+}
+
+impl EntryGetter {
+  /**
+   * Returns a clone of the Future for this Node.
+   */
+  fn get(&self) -> NodeFuture {
+    let state = self.state.write().unwrap();
+    let next_state =
+      match *state {
+        EntryState::Pending(node, context) =>
+          node.step(context),
+        EntryState::Started(ref task) =>
+          return task.clone(),
+      };
+    *state = next_state;
   }
 }
 
