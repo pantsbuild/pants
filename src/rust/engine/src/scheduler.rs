@@ -100,7 +100,7 @@ impl Scheduler {
         tasks: self.tasks.clone(),
         pool: self.pool.clone(),
       };
-    self.pool.spawn_fn(move || context.graph.started(node, &context)
+    self.pool.spawn_fn(move || context.graph.create(node, &context)
       .then::<_, Result<(), ()>>(|_| Ok(()))
     )
   }
@@ -122,7 +122,7 @@ impl Scheduler {
       );
 
     // Wait for all roots to complete. Failure here should be impossible, because each
-    // individual Future in the join was mapped into succeed regardless of its result.
+    // individual Future in the join was mapped into success regardless of its result.
     roots_res.wait().expect("Execution failed.");
 
     ExecutionStat {

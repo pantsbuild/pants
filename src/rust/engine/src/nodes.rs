@@ -190,6 +190,14 @@ impl Context {
         Failure::Throw(self.clone_val(msg)),
     }
   }
+
+  fn ok(&self, value: Value) -> StepFuture {
+    future::ok(value).boxed()
+  }
+
+  fn err(&self, failure: Failure) -> StepFuture {
+    future::err(failure).boxed()
+  }
 }
 
 pub trait ContextFactory {
@@ -218,14 +226,6 @@ impl ContextFactory for Context {
  */
 trait Step {
   fn step(&self, context: Context) -> StepFuture;
-
-  fn ok(&self, value: Value) -> StepFuture {
-    future::ok(value).boxed()
-  }
-
-  fn err(&self, failure: Failure) -> StepFuture {
-    future::err(failure).boxed()
-  }
 }
 
 /**
@@ -352,7 +352,7 @@ impl Step for Select {
         Some(ref variant_key) => {
           let variant_value = self.variants.find(variant_key);
           if variant_value.is_none() {
-            return self.err(
+            return context.err(
               Failure::Noop("A matching variant key was not configured in variants.", None)
             );
           }
@@ -363,7 +363,7 @@ impl Step for Select {
 
     // If the Subject "is a" or "has a" Product, then we're done.
     if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), &variant_value) {
-      return self.ok(literal_value);
+      return context.ok(literal_value);
     }
 
     // Else, attempt to use the configured tasks to compute the value.
@@ -396,7 +396,7 @@ pub struct SelectLiteral {
 
 impl Step for SelectLiteral {
   fn step(&self, context: Context) -> StepFuture {
-    self.ok(context.val_for(&self.selector.subject))
+    context.ok(context.val_for(&self.selector.subject))
   }
 }
 
@@ -495,7 +495,7 @@ impl Step for SelectDependencies {
               .boxed()
           },
           Err(failure) =>
-            node.err(context.was_optional(failure, "No source of input product.")),
+            context.err(context.was_optional(failure, "No source of input product.")),
         }
       })
       .boxed()
@@ -550,7 +550,7 @@ impl Step for SelectProjection {
               .boxed()
           },
           Err(failure) =>
-            node.err(context.was_optional(failure, "No source of input product.")),
+            context.err(context.was_optional(failure, "No source of input product.")),
         }
       })
       .boxed()
