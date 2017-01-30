@@ -87,10 +87,8 @@ _FFI.cdef(
     typedef struct {
       Key             subject;
       TypeConstraint  product;
-      uint8_t         union_tag;
-      Value*          union_return;
-      Value*          union_throw;
-      bool            union_noop;
+      uint8_t         state_tag;
+      Value           state_value;
     } RawNode;
 
     typedef struct {
