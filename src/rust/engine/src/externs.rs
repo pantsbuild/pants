@@ -185,31 +185,38 @@ pub struct RunnableComplete {
 pub struct ValueBuffer {
   values_ptr: *mut Value,
   values_len: u64,
+  // A Value handle to hold the underlying buffer alive.
+  handle_: Value,
 }
 
 pub type ProjectMultiExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field) -> ValueBuffer;
 
 #[repr(C)]
-pub struct UTF8Buffer {
-  str_ptr: *mut u8,
-  str_len: u64,
+pub struct Buffer {
+  bytes_ptr: *mut u8,
+  bytes_len: u64,
+  // A Value handle to hold the underlying buffer alive.
+  handle_: Value,
 }
 
-impl UTF8Buffer {
-  pub fn to_string(&self) -> Result<String, FromUtf8Error> {
-    with_vec(self.str_ptr, self.str_len as usize, |char_vec| {
-      // Attempt to decode from unicode.
-      String::from_utf8(char_vec.clone())
+impl Buffer {
+  pub fn to_bytes(&self) -> Vec<u8> {
+    with_vec(self.bytes_ptr, self.bytes_len as usize, |vec| {
+      vec.clone()
     })
+  }
+
+  pub fn to_string(&self) -> Result<String, FromUtf8Error> {
+    String::from_utf8(self.to_bytes())
   }
 }
 
 pub type IdToStrExtern =
-  extern "C" fn(*const ExternContext, Id) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, Id) -> Buffer;
 
 pub type ValToStrExtern =
-  extern "C" fn(*const ExternContext, *const Value) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
