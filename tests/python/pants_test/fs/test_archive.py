@@ -75,7 +75,7 @@ class ArchiveTest(unittest.TestCase):
 
   def test_tar_dereference(self):
 
-    def round_trip(archive_format, dereference):
+    def check_archive_with_flags(archive_format, dereference):
       with temporary_dir() as fromdir:
         filename = os.path.join(fromdir, 'a')
         linkname = os.path.join(fromdir, 'link_to_a')
@@ -91,9 +91,9 @@ class ArchiveTest(unittest.TestCase):
             assertion(os.path.islink(extracted_linkname))
             assertion(os.path.samefile(extracted_linkname, os.path.join(todir, 'a')))
 
-    round_trip('tar', False)
-    round_trip('tar', True)
-    round_trip('tgz', False)
-    round_trip('tgz', True)
-    round_trip('tbz2', False)
-    round_trip('tbz2', True)
+    check_archive_with_flags('tar', False)
+    check_archive_with_flags('tar', True)
+    check_archive_with_flags('tgz', False)
+    check_archive_with_flags('tgz', True)
+    check_archive_with_flags('tbz2', False)
+    check_archive_with_flags('tbz2', True)
