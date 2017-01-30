@@ -17,7 +17,6 @@ use std::ffi::CStr;
 use std::mem;
 use std::os::raw;
 use std::path::Path;
-use std::ptr;
 use std::sync::Arc;
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value};

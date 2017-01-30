@@ -1,5 +1,4 @@
 
-use std::collections::{HashSet, VecDeque};
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
@@ -8,10 +7,9 @@ use futures::future::Future;
 use futures::future;
 use futures_cpupool::{CpuPool, CpuFuture};
 
-use core::{FNV, Field, Key, TypeConstraint};
+use core::{Field, Key, TypeConstraint};
 use graph::{EntryId, Graph};
-use handles::drain_handles;
-use nodes::{Failure, Node, NodeFuture, NodeResult, Runnable, Context, ContextFactory};
+use nodes::{Node, NodeResult, Context, ContextFactory};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
 
@@ -24,7 +22,6 @@ pub struct Scheduler {
   pool: CpuPool,
   // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Node>,
-  // Candidates for execution.
 }
 
 impl Scheduler {
@@ -112,8 +109,9 @@ impl Scheduler {
    * Starting from existing roots, execute a graph to completion.
    */
   pub fn execute(&mut self) -> ExecutionStat {
-    let mut runnable_count = 0;
-    let mut scheduling_iterations = 0;
+    // TODO: Restore counts.
+    let runnable_count = 0;
+    let scheduling_iterations = 0;
 
     // Bootstrap tasks for the roots, and then wait for all of them.
     let roots_res =
@@ -123,10 +121,10 @@ impl Scheduler {
           .collect::<Vec<_>>()
       );
 
-    // Wait for all roots to complete.
-    roots_res.wait();
+    // Wait for all roots to complete. Failure here should be impossible, because each
+    // individual Future in the join was mapped into succeed regardless of its result.
+    roots_res.wait().expect("Execution failed.");
 
-    // TODO: restore.
     ExecutionStat {
       runnable_count: runnable_count,
       scheduling_iterations: scheduling_iterations,

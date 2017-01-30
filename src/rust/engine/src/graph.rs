@@ -5,14 +5,14 @@ use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 use futures::future::Future;
 use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Failure, Node, NodeFuture, NodeResult, Context, ContextFactory};
+use nodes::{Failure, Node, NodeFuture, NodeResult, ContextFactory};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -39,14 +39,6 @@ pub struct Entry {
 }
 
 impl Entry {
-  fn id(&self) -> EntryId {
-    self.id
-  }
-
-  fn node(&self) -> &Node {
-    &self.node
-  }
-
   /**
    * Returns the Future for this Node.
    */
@@ -111,11 +103,6 @@ struct InnerGraph {
 impl InnerGraph {
   fn cyclic_singleton(&self) -> NodeFuture {
     self.cyclic_singleton.clone()
-  }
-
-  fn dependencies_all<P>(&self, id: EntryId, predicate: P) -> bool
-      where P: Fn(&Entry)->bool {
-    self.entry_for_id(id).dependencies.iter().all(|&d| predicate(self.entry_for_id(d)))
   }
 
   fn entry(&self, node: &Node) -> Option<&Entry> {
@@ -256,7 +243,7 @@ impl InnerGraph {
             }
           })
           .collect();
-      self.walk(root_ids, { |_| true }, true).map(|e| e.id()).collect()
+      self.walk(root_ids, { |_| true }, true).map(|e| e.id).collect()
     };
 
     // Then remove all entries in one shot.
@@ -331,7 +318,7 @@ impl InnerGraph {
     try!(f.write_all(b"  concentrate=true;\n"));
     try!(f.write_all(b"  rankdir=LR;\n"));
 
-    let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
+    let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
@@ -406,7 +393,7 @@ impl InnerGraph {
       }
     };
 
-    let root_entries = vec![root].iter().filter_map(|n| self.entry(n)).map(|e| e.id()).collect();
+    let root_entries = vec![root].iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
     for t in self.leveled_walk(root_entries, |e,_| !is_bottom(e), false) {
       let (entry, level) = t;
       try!(write!(&mut f, "{}\n", _format(entry, level)));

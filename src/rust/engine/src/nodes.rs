@@ -5,9 +5,10 @@ use futures::future::{BoxFuture, Future};
 use futures::future;
 use futures_cpupool::CpuPool;
 
-use graph::{EntryId, Graph};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
+use graph::{EntryId, Graph};
+use handles::drain_handles;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
@@ -15,23 +16,9 @@ use tasks::Tasks;
 
 #[derive(Debug)]
 pub struct Runnable {
-  func: Function,
-  args: Vec<Value>,
-  cacheable: bool,
-}
-
-impl Runnable {
-  pub fn func(&self) -> &Function {
-    &self.func
-  }
-
-  pub fn args(&self) -> &Vec<Value> {
-    &self.args
-  }
-
-  pub fn cacheable(&self) -> bool {
-    self.cacheable
-  }
+  pub func: Function,
+  pub args: Vec<Value>,
+  pub cacheable: bool,
 }
 
 #[derive(Debug)]
@@ -697,6 +684,9 @@ impl Node {
   }
 
   pub fn step(&self, context: Context) -> StepFuture {
+    // TODO: Odd place for this... could do it periodically in the background?
+    context.tasks.externs.drop_handles(drain_handles());
+
     match self {
       &Node::Select(ref n) => n.step(context),
       &Node::SelectDependencies(ref n) => n.step(context),
