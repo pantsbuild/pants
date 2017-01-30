@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import threading
+
 import pkg_resources
 from cffi import FFI
 
@@ -319,6 +321,10 @@ class ExternContext(object):
     self._resize_utf8(256)
     self._resize_keys(64)
 
+    # The native code will invoke externs concurrently, so locking is needed around
+    # datastructures in this context.
+    self._lock = threading.RLock()
+
     # Finally, create a handle to this object to ensure that the native wrapper survives
     # at least as long as this object.
     self.handle = _FFI.new_handle(self)
@@ -357,17 +363,18 @@ class ExternContext(object):
     self._handles -= set(handles)
 
   def put(self, obj):
-    # If we encounter an existing id, return it.
-    new_id = self._id_generator
-    _id = self._obj_to_id.setdefault(obj, new_id)
-    if _id is not new_id:
-      # Object already existed.
-      return _id
+    with self._lock:
+      # If we encounter an existing id, return it.
+      new_id = self._id_generator
+      _id = self._obj_to_id.setdefault(obj, new_id)
+      if _id is not new_id:
+        # Object already existed.
+        return _id
 
-    # Object is new/unique.
-    self._id_to_obj[_id] = obj
-    self._id_generator += 1
-    return _id
+      # Object is new/unique.
+      self._id_to_obj[_id] = obj
+      self._id_generator += 1
+      return _id
 
   def get(self, id_):
     return self._id_to_obj[id_]
