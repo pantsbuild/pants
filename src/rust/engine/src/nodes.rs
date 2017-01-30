@@ -739,7 +739,7 @@ impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> StepFuture {
     // Recursively expand PathGlobs into PathStats.
     context
-      .expand(&path_globs)
+      .expand(path_globs)
       .and_then(move |path_stats| {
         // And then create a Snapshot.
         let snapshot_res =

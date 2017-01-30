@@ -258,10 +258,19 @@ impl PathGlobs {
   }
 }
 
+struct PathGlobsExpansion {
+  // Globs that have yet to be expanded.
+  path_globs_stack: Vec<PathGlob>,
+  // Globs that have already been expanded.
+  path_globs_set: HashSet<PathGlob>,
+  // Paths that have been matched, in order.
+  outputs: OrderMap<PathStat, ()>,
+}
+
 /**
  * A context for filesystem operations parameterized on an error type 'E'.
  */
-pub trait FSContext<E> {
+pub trait FSContext<E: 'static> {
   fn read_link(&self, link: &Link) -> BoxFuture<Vec<PathGlob>, E>;
   fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, E>;
 
@@ -299,48 +308,39 @@ pub trait FSContext<E> {
   }
 
   fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Pattern) -> BoxFuture<Vec<PathStat>, E> {
-    // List the directory, match any relevant Stats, and join them into PathStats.
-    let matched =
-      self.scandir(canonical_dir).map_err(|k| vec![k])?.into_iter()
-        .filter(|stat| {
-          // Match relevant filenames.
-          stat.path().file_name()
-            .map(|file_name| wildcard.matches_path(Path::new(file_name)))
-            .unwrap_or(false)
-        })
-        .filter_map(|stat| {
-          // Append matched filenames.
-          stat.path().file_name()
-            .map(|file_name| {
-              symbolic_path.join(file_name)
+    // List the directory.
+    self.scandir(canonical_dir).map_err(|k| vec![k])
+      .and_then(|dir_listing| {
+        // Match any relevant Stats, and join them into PathStats.
+        future::join(
+          dir_listing.into_iter()
+            .filter(|stat| {
+              // Match relevant filenames.
+              stat.path().file_name()
+                .map(|file_name| wildcard.matches_path(Path::new(file_name)))
+                .unwrap_or(false)
             })
-            .map(|stat_symbolic_path| (stat_symbolic_path, stat))
-        });
-
-    // Batch-canonicalize matched PathStats.
-    let mut path_stats = Vec::new();
-    let mut continuations = Vec::new();
-    for (stat_symbolic_path, stat) in matched {
-      match stat {
-        Stat::Link(l) =>
-          match self.canonicalize(stat_symbolic_path.as_path(), &l) {
-            Ok(Some(ps)) => path_stats.push(ps),
-            Ok(None) => (),
-            Err(ks) => continuations.extend(ks),
-          },
-        Stat::Dir(d) =>
-          path_stats.push(PathStat::dir(stat_symbolic_path.to_owned(), d)),
-        Stat::File(f) =>
-          path_stats.push(PathStat::file(stat_symbolic_path.to_owned(), f)),
-      }
-    }
-
-    // If there were no continuations, all PathStats were completely expanded.
-    if continuations.is_empty() {
-      Ok(path_stats)
-    } else {
-      Err(continuations)
-    }
+            .filter_map(|stat| {
+              // Append matched filenames.
+              stat.path().file_name()
+                .map(|file_name| {
+                  (symbolic_path.join(file_name), stat)
+                })
+            })
+            .map(|(stat_symbolic_path, stat)| {
+              // Canonicalize matched PathStats.
+              match stat {
+                Stat::Link(l) =>
+                  self.canonicalize(stat_symbolic_path.as_path(), &l),
+                Stat::Dir(d) =>
+                  future::ok(PathStat::dir(stat_symbolic_path.to_owned(), d)),
+                Stat::File(f) =>
+                  future::ok(PathStat::file(stat_symbolic_path.to_owned(), f)),
+              }
+            })
+        )
+      })
+      .boxed()
   }
 
   /**
@@ -350,56 +350,64 @@ pub trait FSContext<E> {
    * TODO: Eventually, it would be nice to be able to apply excludes as we go, to
    * avoid walking into directories that aren't relevant.
    */
-  fn expand(&self, path_globs: &PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
-    match (self.expand_multi(&path_globs.include), self.expand_multi(&path_globs.exclude)) {
-      (Ok(include), Ok(exclude)) => {
+  fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
+    self.expand_multi(path_globs.include).join(self.expand_multi(path_globs.exclude))
+      .map(|(include, exclude)| {
         // Exclude matched paths.
         let exclude_set: HashSet<_> = exclude.into_iter().collect();
-        Ok(include.into_iter().filter(|i| !exclude_set.contains(i)).collect())
-      },
-      (Err(include_deps), Err(exclude_deps)) =>
-        // Both sets still need dependencies.
-        Err(include_deps.into_iter().chain(exclude_deps.into_iter()).collect()),
-      (include_res, exclude_res) =>
-        // A mix of success and failure: return the first set of dependencies.
-        include_res.and(exclude_res),
-    }
+        include.into_iter().filter(|i| !exclude_set.contains(i)).collect()
+      })
+      .boxed()
   }
 
   /**
    * Recursively expands PathGlobs into PathStats, building a set of relevant dependencies.
    */
-  fn expand_multi(&self, path_globs: &Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
-    let mut dependencies = Vec::new();
-    let mut path_globs_stack = path_globs.clone();
-    let mut path_globs_set: HashSet<PathGlob> = HashSet::default();
-    let mut outputs: OrderMap<PathStat, ()> = OrderMap::default();
-    while let Some(path_glob) = path_globs_stack.pop() {
-      if path_globs_set.contains(&path_glob) {
-        continue;
-      }
-
-      // Compute matching PathStats and additional PathGlobs for each PathGlob.
-      match self.expand_single(&path_glob) {
-        Ok((path_stats, path_globs)) => {
-          outputs.extend(path_stats.into_iter().map(|k| (k, ())));
-          path_globs_stack.extend(path_globs);
-        },
-        Err(nodes) => {
-          dependencies.extend(nodes);
-          continue;
-        },
+  fn expand_multi(&self, path_globs: Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
+    let init =
+      GlobsExpansion {
+        todo: path_globs,
+        completed: HashSet::default(),
+        outputs: OrderMap::default()
       };
+    future::loop_fn(init, |mut expansion| {
+      // Request the expansion of all outstanding PathGlobs as a batch.
+      let round =
+        future::join(
+          expansion.todo.drain(..)
+            .map(|path_glob| self.expand_single(&path_glob))
+            .collect::<Vec<_>>()
+        );
+      round
+        .map(move |pats_and_globs| {
+          // Gather the results and dedupe.
+          let (paths, globs) = stats_and_globs.into_iter().unzip();
 
-      // Ensure that we do not re-visit this PathGlob.
-      path_globs_set.insert(path_glob);
-    }
+          // Collect distinct new PathStats and PathGlobs
+          expansion.outputs.extend(paths);
+          expansion.todo.extend(
+            globs.into_iter()
+              .filter(|pg| expansion.completed.insert(pg.clone()))
+          );
 
-    if dependencies.is_empty() {
-      Ok(outputs.into_iter().map(|(k, _)| k).collect())
-    } else {
-      Err(dependencies)
-    }
+          // If there were any new PathGlobs, continue the expansion.
+          if expansion.todo.is_empty() {
+            Loop::Break(expansion)
+          } else {
+            Loop::Continue(expansion)
+          }
+        })
+    })
+    .map(|expansion| {
+      assert!(
+        expansion.todo.is_empty(),
+        "Loop shouldn't have exited with work to do: {:?}",
+        expansion
+      );
+      // Finally, capture the resulting PathStats from the expansion.
+      expansion.outputs
+    })
+    .boxed()
   }
 
   /**
@@ -410,7 +418,7 @@ pub trait FSContext<E> {
     match path_glob {
       &PathGlob::Root =>
         // Always results in a single PathStat.
-        future::ok(vec![PathGlob::root_stat()]).boxed(),
+        future::ok((vec![PathGlob::root_stat()], vec![])).boxed(),
       &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard)
