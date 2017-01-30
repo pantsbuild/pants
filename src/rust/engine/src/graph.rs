@@ -20,16 +20,6 @@ pub struct EntryId(usize);
 
 pub type DepSet = HashSet<EntryId, FNV>;
 
-enum EntryState {
-  // Has not yet started running. This state exists to make the launching of work lazy, such that
-  // it doesn't happen while the graph lock is held.
-  Pending(Node, Context),
-  // Has been started.
-  Started(NodeFuture),
-}
-
-type EntryStateField = Arc<RwLock<EntryState>>;
-
 /**
  * An Entry and its adjacencies.
  */
@@ -40,7 +30,7 @@ pub struct Entry {
   // maps is painful.
   node: Node,
   // To avoid holding the Graph's lock longer than necessary, a Node should initializes lazily.
-  state: EntryStateField,
+  state: NodeFuture,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
   dependents: DepSet,
@@ -57,18 +47,16 @@ impl Entry {
     &self.node
   }
 
+  fn get(&self) -> &NodeFuture {
+    &self.state
+  }
+
   fn dependencies(&self) -> &DepSet {
     &self.dependencies
   }
 
   fn dependents(&self) -> &DepSet {
     &self.dependents
-  }
-
-  fn getter(&self) -> EntryGetter {
-    EntryGetter {
-      state: self.state.clone()
-    }
   }
 
   fn cyclic_dependencies(&self) -> &DepSet {
@@ -106,31 +94,6 @@ impl Entry {
       state,
     ).replace("\"", "\\\"")
     */
-  }
-}
-
-/**
- * Holds a reference to an Entry's state, to allow it to be lazily started while the Entry
- * itself is not held.
- */
-struct EntryGetter {
-  state: EntryStateField,
-}
-
-impl EntryGetter {
-  /**
-   * Returns a clone of the Future for this Node.
-   */
-  fn get(&self) -> NodeFuture {
-    let state = self.state.write().unwrap();
-    let next_state =
-      match *state {
-        EntryState::Pending(node, context) =>
-          node.step(context),
-        EntryState::Started(ref task) =>
-          return task.clone(),
-      };
-    *state = next_state;
   }
 }
 
@@ -180,7 +143,7 @@ impl InnerGraph {
     entries: &'a mut Entries,
     nodes: &mut Nodes,
     id_generator: &mut usize,
-    context: &ContextFactory,
+    context_factory: &ContextFactory,
     node: Node
   ) -> EntryId {
     // See TODO on Entry.
@@ -195,14 +158,28 @@ impl InnerGraph {
       return id;
     }
 
-    // New entry. Launch the Node.
+    // New entry. Launch the Node on the pool.
+    // FIXME: It's necessary to call back to the pool here currently, because otherwise the work
+    // represented by the Node begins executing immediately on the current thread, which is
+    // undesirable, because we are holding the graph lock. Fixing that would likely mean making
+    // the creation of an Entry's state an atomic operation outside of the Graph lock.
+    let context = context_factory.create(id);
+    let pool = context.pool().clone();
+    let pool_node = entry_node.clone();
+    let state =
+      future::Shared::new(
+        pool.spawn_fn(move || {
+          pool_node.step(context.create(id))
+        })
+        .boxed()
+      );
     *id_generator += 1;
     entries.insert(
       id,
       Entry {
         id: id,
         node: entry_node,
-        state: EntryState::Pending(context.create(id)),
+        state: state,
         dependencies: Default::default(),
         dependents: Default::default(),
         cyclic_dependencies: Default::default(),
@@ -490,10 +467,14 @@ impl Graph {
     inner.entry(node)
       .map(|e| {
         // Wait for the Node, and then clone and convert its state
-        match e.get().wait() {
-          &Ok(ref v) => Ok(externs.clone_val(v)),
-          &Err(Failure::Noop(msg, ref n)) => Err(Failure::Noop(msg, n.clone())),
-          &Err(Failure::Throw(ref msg)) => Err(Failure::Throw(externs.clone_val(msg))),
+        match e.get().clone().wait() {
+          Ok(ref v) => Ok(externs.clone_val(v)),
+          Err(shared_err) => {
+            match *shared_err {
+              Failure::Noop(msg, ref n) => Err(Failure::Noop(msg, n.clone())),
+              Failure::Throw(ref msg) => Err(Failure::Throw(externs.clone_val(msg))),
+            }
+          },
         }
       })
   }
@@ -513,7 +494,7 @@ impl Graph {
       if let Some(dst_entry) = inner.entry(dst_node) {
         if src_entry.dependencies().contains(&dst_entry.id) {
           // Declared and valid.
-          return dst_entry.get();
+          return dst_entry.get().clone();
         } else if src_entry.cyclic_dependencies().contains(&dst_entry.id) {
           // Declared but cyclic.
           return inner.cyclic_singleton();
@@ -548,7 +529,7 @@ impl Graph {
   pub fn started(&self, node: Node, context: &ContextFactory) -> NodeFuture {
     let mut inner = self.inner.write().unwrap();
     let id = inner.ensure_entry(context, node);
-    inner.entry_for_id(id).get()
+    inner.entry_for_id(id).get().clone()
   }
 
   pub fn invalidate(&self, subjects: HashSet<&Key, FNV>) -> usize {

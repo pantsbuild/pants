@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use futures::future::{BoxFuture, Future};
 use futures::future;
+use futures_cpupool::CpuPool;
 
 use graph::{EntryId, Graph};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
@@ -51,15 +52,21 @@ pub struct Context {
   entry_id: EntryId,
   graph: Arc<Graph>,
   tasks: Arc<Tasks>,
+  pool: CpuPool,
 }
 
 impl Context {
-  pub fn new(entry_id: EntryId, graph: Arc<Graph>, tasks: Arc<Tasks>) -> Context {
+  pub fn new(entry_id: EntryId, graph: Arc<Graph>, tasks: Arc<Tasks>, pool: CpuPool) -> Context {
     Context {
       entry_id: entry_id,
       graph: graph,
       tasks: tasks,
+      pool: pool,
     }
+  }
+
+  pub fn pool(&self) -> &CpuPool {
+    &self.pool
   }
 
   /**
@@ -204,14 +211,17 @@ pub trait ContextFactory {
 
 impl ContextFactory for Context {
   /**
-   * Clones this Context for a new EntryId. Because `graph` and `tasks` are Arcs, this
-   * is a shallow clone.
+   * Clones this Context for a new EntryId. Because all of the members of the context
+   * are Arcs (CpuPool internally), this is a shallow clone.
+   *
+   * TODO: Consider reducing to a single Arc to hold the shareable portion of the context.
    */
   fn create(&self, entry_id: EntryId) -> Context {
     Context {
       entry_id: entry_id,
       graph: self.graph.clone(),
       tasks: self.tasks.clone(),
+      pool: self.pool.clone(),
     }
   }
 }
