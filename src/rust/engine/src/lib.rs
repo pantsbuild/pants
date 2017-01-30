@@ -21,6 +21,7 @@ use std::sync::Arc;
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
+  Buffer,
   CloneValExtern,
   DropHandlesExtern,
   CreateExceptionExtern,
@@ -33,7 +34,6 @@ use externs::{
   ProjectMultiExtern,
   SatisfiedByExtern,
   StoreListExtern,
-  UTF8Buffer,
   ValForExtern,
   ValToStrExtern,
   with_vec,
@@ -308,7 +308,7 @@ pub extern fn task_add_select(
 pub extern fn task_add_select_variant(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
-  variant_key_buf: UTF8Buffer,
+  variant_key_buf: Buffer,
 ) {
   let variant_key =
     variant_key_buf.to_string().expect("Failed to decode key for select_variant");
