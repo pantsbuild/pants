@@ -3,6 +3,9 @@ version = "0.0.1"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
+[profile.release]
+debug = true
+
 [lib]
 crate-type = ["dylib"]
 
