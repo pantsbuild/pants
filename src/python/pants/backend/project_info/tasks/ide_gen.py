@@ -11,7 +11,7 @@ import shutil
 from collections import defaultdict
 
 from pathspec import PathSpec
-from pathspec.gitignore import GitIgnorePattern
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -207,7 +207,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                       jvm_targets,
                       not self.intransitive,
                       self.TargetUtil(self.context),
-                      PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns))
+                      PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns))
 
     if self.python:
       python_source_paths = self.get_options().python_source_paths

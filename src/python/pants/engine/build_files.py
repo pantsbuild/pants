@@ -45,11 +45,14 @@ def filter_buildfile_paths(address_mapper, directory_listing):
   if not directory_listing.exists:
     raise ResolveError('Directory "{}" does not exist.'.format(directory_listing.directory.path))
 
-  build_pattern = address_mapper.build_pattern
   def match(stat):
-    # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
-    ignored = any(True for _ in address_mapper.build_ignore_patterns.match_files([stat.path]))
-    return (not ignored) and type(stat) is File and fnmatch(basename(stat.path), build_pattern)
+    # Short circuit for ignored paths.
+    if address_mapper.build_ignore_patterns.match_file(stat.path):
+      return False
+
+    return (type(stat) is File and any(fnmatch(basename(stat.path), pattern)
+                                       for pattern in address_mapper.build_patterns))
+
   build_files = tuple(Path(stat.path, stat)
                       for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)
@@ -238,13 +241,22 @@ def filter_build_dirs(address_mapper, build_files):
   return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
 
 
+def _pattern_yielder(pattern):
+  yield pattern
+  yield join('**', pattern)
+
+
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
 
   This allows us to limit our AddressFamily requests to directories that contain build files.
   """
-  pattern = address_mapper.build_pattern
-  return PathGlobs.create_from_specs(descendant_addresses.directory, [pattern, join('**', pattern)])
+  patterns = [
+    pattern
+    for build_pattern in address_mapper.build_patterns
+    for pattern in _pattern_yielder(build_pattern)
+  ]
+  return PathGlobs.create_from_specs(descendant_addresses.directory, patterns)
 
 
 def _recursive_dirname(f):
@@ -264,8 +276,11 @@ def _recursive_dirname(f):
 
 def ascendant_addresses_to_globs(address_mapper, ascendant_addresses):
   """Given an AscendantAddresses object, return a PathGlobs object for matching build files."""
-  pattern = address_mapper.build_pattern
-  patterns = [join(f, pattern) for f in _recursive_dirname(ascendant_addresses.directory)]
+  patterns = [
+    join(f, pattern)
+    for pattern in address_mapper.build_patterns
+    for f in _recursive_dirname(ascendant_addresses.directory)
+  ]
   return PathGlobs.create_from_specs('', patterns)
 
 
