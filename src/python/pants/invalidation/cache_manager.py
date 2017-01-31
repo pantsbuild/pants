@@ -157,8 +157,6 @@ class VersionedTarget(VersionedTargetSet):
   :API: public
   """
 
-  _STABLE_DIR_NAME = 'current'
-
   def __init__(self, cache_manager, target, cache_key):
     """
     :API: public
@@ -172,40 +170,10 @@ class VersionedTarget(VersionedTargetSet):
     super(VersionedTarget, self).__init__(cache_manager, [self])
     self.id = target.id
 
-  def _results_dir_prefix(self, root_dir):
-    """Return the prefix of the results directory path.
-
-    The prefix is qualified by the task version, and a stable symlink is
-    created to the currently active prefix, for convenience.  Note that this
-    stable symlink is distinct from the stable symlinks to specific results
-    directories under this prefix.
-    """
-    task_version = self._cache_manager.task_version
-    task_version_prefix = os.path.join(root_dir, sha1(task_version).hexdigest()[:12])
-    stable_prefix = os.path.join(root_dir, self._STABLE_DIR_NAME)
-    safe_mkdir(task_version_prefix)
-    safe_delete(stable_prefix)
-    relative_symlink(task_version_prefix, stable_prefix)
-    return task_version_prefix
-
-  def _results_dir_path(self, root_dir, key, stable):
-    """Return a results directory path for the given key.
-
-    :param key: A CacheKey to generate an id for.
-    :param stable: True to use a stable subdirectory, false to use a portion of the cache key to
-      generate a path unique to the key.
-    """
-    # TODO: Shorten cache_key hashes in general?
-    return os.path.join(
-      self._results_dir_prefix(root_dir),
-      key.id,
-      self._STABLE_DIR_NAME if stable else sha1(key.hash).hexdigest()[:12]
-    )
-
-  def create_results_dir(self, root_dir):
+  def create_results_dir(self):
     """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
-    self._current_results_dir = self._results_dir_path(root_dir, self.cache_key, stable=False)
-    self._results_dir = self._results_dir_path(root_dir, self.cache_key, stable=True)
+    self._current_results_dir = self._cache_manager.results_dir_path(self.cache_key, stable=False)
+    self._results_dir = self._cache_manager.results_dir_path(self.cache_key, stable=True)
 
     if not self.valid:
       # Clean the workspace for invalid vts.
@@ -222,7 +190,7 @@ class VersionedTarget(VersionedTargetSet):
     # TODO(mateo): This should probably be managed by the task, which manages the rest of the incremental support.
     if not self.previous_cache_key:
       return None
-    previous_path = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
+    previous_path = self._cache_manager.results_dir_path(self.previous_cache_key, stable=False)
     if os.path.isdir(previous_path):
       self.is_incremental = True
       safe_rmtree(self._current_results_dir)
@@ -267,7 +235,10 @@ class InvalidationCacheManager(object):
   class CacheValidationError(Exception):
     """Indicates a problem accessing the cache."""
 
+  _STABLE_DIR_NAME = 'current'
+
   def __init__(self,
+               results_dir_root,
                cache_key_generator,
                build_invalidator_dir,
                invalidate_dependents,
@@ -287,6 +258,13 @@ class InvalidationCacheManager(object):
     self._fingerprint_strategy = fingerprint_strategy
     self._artifact_write_callback = artifact_write_callback
     self.invalidation_report = invalidation_report
+
+    # Create the task-versioned prefix of the results dir, and a stable symlink to it (useful when debugging).
+    self._results_dir_prefix = os.path.join(results_dir_root, sha1(self._task_version).hexdigest()[:12])
+    safe_mkdir(self._results_dir_prefix)
+    stable_prefix = os.path.join(results_dir_root, self._STABLE_DIR_NAME)
+    safe_delete(stable_prefix)
+    relative_symlink(self._results_dir_prefix, stable_prefix)
 
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
@@ -330,9 +308,19 @@ class InvalidationCacheManager(object):
   def task_name(self):
     return self._task_name
 
-  @property
-  def task_version(self):
-    return self._task_version
+  def results_dir_path(self, key, stable):
+    """Return a results directory path for the given key.
+
+    :param key: A CacheKey to generate an id for.
+    :param stable: True to use a stable subdirectory, false to use a portion of the cache key to
+      generate a path unique to the key.
+    """
+    # TODO: Shorten cache_key hashes in general?
+    return os.path.join(
+      self._results_dir_prefix,
+      key.id,
+      self._STABLE_DIR_NAME if stable else sha1(key.hash).hexdigest()[:12]
+    )
 
   def wrap_targets(self, targets, topological_order=False):
     """Wrap targets and their computed cache keys in VersionedTargets.
