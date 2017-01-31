@@ -489,8 +489,10 @@ class GraphMaker(object):
     if not root_subject_types:
       raise ValueError('root_subject_types must not be empty')
     self.root_subject_types = root_subject_types
-    self.root_selector_fn = lambda p: Select(p)
     self.rule_index = rule_index
+
+  def _root_selector(self, product):
+    return Select(product)
 
   def new_graph_from_existing(self, root_subject_type, root_selector, existing_graph):
     root_rule = RootRuleGraphEntry(root_subject_type, root_selector)
@@ -509,8 +511,7 @@ class GraphMaker(object):
 
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
-    root_selector = self.root_selector_fn(requested_product)
-    root_rule = RootRuleGraphEntry(root_subject_type, root_selector)
+    root_rule = RootRuleGraphEntry(root_subject_type, self._root_selector(requested_product))
     root_rule_dependency_edges, edges, unfulfillable = self._construct_graph(root_rule)
     root_rule_dependency_edges, edges = self._remove_unfulfillable_rules_and_dependents(root_rule_dependency_edges,
                                                                                         edges, unfulfillable)
@@ -527,7 +528,7 @@ class GraphMaker(object):
     full_unfulfillable_rules = {}
     for root_subject_type in self.root_subject_types:
       for product in sorted(self.rule_index.all_produced_product_types(root_subject_type)):
-        beginning_root = RootRuleGraphEntry(root_subject_type, self.root_selector_fn(product))
+        beginning_root = RootRuleGraphEntry(root_subject_type, self._root_selector(product))
         root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(
           beginning_root,
           root_rule_dependency_edges=full_root_rule_dependency_edges,
