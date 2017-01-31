@@ -149,7 +149,6 @@ _FFI.cdef(
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
-    /*should not be void, but not sure about the return type yet. Also, might want to pass the root fn selector generators*/
     void run_validator(RawScheduler*, TypeId*, uint64_t);
 
     void nodes_destroy(RawNodes*);
