@@ -12,7 +12,7 @@ use externs::Externs;
 use fs::{Dir, File, FSContext, Link, PathGlobs, PathGlob, PathStat, Stat};
 use fs;
 use graph::EntryId;
-use handles::drain_handles;
+use handles::maybe_drain_handles;
 use selectors::Selector;
 use selectors;
 
@@ -900,7 +900,9 @@ impl Node {
 
   pub fn step(&self, context: Context) -> StepFuture {
     // TODO: Odd place for this... could do it periodically in the background?
-    context.core.externs.drop_handles(drain_handles());
+    maybe_drain_handles().map(|handles| {
+      context.core.externs.drop_handles(handles);
+    });
 
     match self {
       &Node::Select(ref n) => n.step(context),
