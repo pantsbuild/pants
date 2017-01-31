@@ -9,6 +9,7 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.fs import archive
+from pants.util import dirutil
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
@@ -34,6 +35,10 @@ class NodeBundle(NodeTask):
   def product_types(cls):
     return ['node_bundles', 'deployable_archives']
 
+  def prepare(cls, options, round_manager):
+    super(NodeBundle, cls).prepare(options, round_manager)
+    round_manager.require_data(NodePaths)
+
   def __init__(self, *args, **kwargs):
     super(NodeBundle, self).__init__(*args, **kwargs)
     self._outdir = self.get_options().pants_distdir
@@ -45,6 +50,7 @@ class NodeBundle(NodeTask):
     node_paths = self.context.products.get_data(NodePaths)
 
     bundle_archive_product = self.context.products.get('deployable_archives')
+    dirutil.safe_mkdir(self._outdir)  # Make sure dist dir is present.
 
     for target in self.context.target_roots:
       if self.is_node_module(target):

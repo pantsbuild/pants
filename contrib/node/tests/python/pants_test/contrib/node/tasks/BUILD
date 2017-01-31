@@ -29,6 +29,17 @@ target(
 )
 
 python_tests(
+  name='node_bundle',
+  sources=['test_node_bundle.py'],
+  dependencies=[
+    'contrib/node/src/python/pants/contrib/node/targets:node_module',
+    'contrib/node/src/python/pants/contrib/node/tasks:node_bundle',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+python_tests(
   name='node_bundle_integration',
   sources=['test_node_bundle_integration.py'],
   dependencies=[

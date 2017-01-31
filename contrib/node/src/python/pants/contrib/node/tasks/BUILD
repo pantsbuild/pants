@@ -24,6 +24,7 @@ python_library(
     ':node_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
+    'src/python/pants/util:dirutil',
   ]
 )
 
