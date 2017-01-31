@@ -304,7 +304,7 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
       .boxed()
   }
 
-  fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: &Path, wildcard: &Pattern) -> BoxFuture<Vec<PathStat>, E> {
+  fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: PathBuf, wildcard: Pattern) -> BoxFuture<Vec<PathStat>, E> {
     // List the directory.
     let context = self.clone();
     self.scandir(canonical_dir)
@@ -322,7 +322,10 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
               // Append matched filenames.
               stat.path().file_name()
                 .map(|file_name| {
-                  (symbolic_path.join(file_name), stat)
+                  symbolic_path.join(file_name)
+                })
+                .map(|symbolic_stat_path| {
+                  (symbolic_stat_path, stat)
                 })
             })
             .map(|(stat_symbolic_path, stat)| {
@@ -379,19 +382,21 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
     future::loop_fn(init, |mut expansion| {
       // Request the expansion of all outstanding PathGlobs as a batch.
       let round =
-        future::join_all(
+        future::join_all({
+          let context = &expansion.context;
           expansion.todo.drain(..)
-            .map(|path_glob| expansion.context.expand_single(path_glob))
+            .map(|path_glob| context.expand_single(path_glob))
             .collect::<Vec<_>>()
-        );
+        });
       round
         .map(move |paths_and_globs| {
           // Collect distinct new PathStats and PathGlobs
           for (paths, globs) in paths_and_globs.into_iter() {
             expansion.outputs.extend(paths.into_iter().map(|p| (p, ())));
+            let completed = &mut expansion.completed;
             expansion.todo.extend(
               globs.into_iter()
-                .filter(|pg| expansion.completed.insert(pg.clone()))
+                .filter(|pg| completed.insert(pg.clone()))
             );
           }
 
@@ -426,12 +431,12 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
         future::ok((vec![PathGlob::root_stat()], vec![])).boxed(),
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
-        self.directory_listing(&canonical_dir, symbolic_path.as_path(), &wildcard)
+        self.directory_listing(&canonical_dir, symbolic_path, wildcard)
           .map(|path_stats| (path_stats, vec![]))
           .boxed(),
       PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
-        self.directory_listing(&canonical_dir, symbolic_path.as_path(), &wildcard)
+        self.directory_listing(&canonical_dir, symbolic_path, wildcard)
           .map(move |path_stats| {
             path_stats.into_iter()
               .filter_map(|ps| {
