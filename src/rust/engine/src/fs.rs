@@ -260,7 +260,8 @@ impl PathGlobs {
 }
 
 #[derive(Debug)]
-struct PathGlobsExpansion {
+struct PathGlobsExpansion<T: Sized> {
+  context: T,
   // Globs that have yet to be expanded, in order.
   todo: Vec<PathGlob>,
   // Globs that have already been expanded.
@@ -272,7 +273,7 @@ struct PathGlobsExpansion {
 /**
  * A context for filesystem operations parameterized on an error type 'E'.
  */
-pub trait FSContext<E: Send + 'static> : Clone + Send + 'static {
+pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   fn read_link(&self, link: &Link) -> BoxFuture<Vec<PathGlob>, E>;
   fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, E>;
 
@@ -349,8 +350,7 @@ pub trait FSContext<E: Send + 'static> : Clone + Send + 'static {
   }
 
   /**
-   * Recursively expands PathGlobs into PathStats while applying excludes and building a set
-   * of relevant dependencies.
+   * Recursively expands PathGlobs into PathStats while applying excludes.
    *
    * TODO: Eventually, it would be nice to be able to apply excludes as we go, to
    * avoid walking into directories that aren't relevant.
@@ -366,11 +366,12 @@ pub trait FSContext<E: Send + 'static> : Clone + Send + 'static {
   }
 
   /**
-   * "Recursively" expands PathGlobs into PathStats, building a set of relevant dependencies.
+   * Recursively expands PathGlobs into PathStats.
    */
   fn expand_multi(&self, path_globs: Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
     let init =
       PathGlobsExpansion {
+        context: self.clone(),
         todo: path_globs,
         completed: HashSet::default(),
         outputs: OrderMap::default()
@@ -380,7 +381,7 @@ pub trait FSContext<E: Send + 'static> : Clone + Send + 'static {
       let round =
         future::join_all(
           expansion.todo.drain(..)
-            .map(|path_glob| self.expand_single(&path_glob))
+            .map(|path_glob| expansion.context.expand_single(path_glob))
             .collect::<Vec<_>>()
         );
       round
@@ -406,7 +407,7 @@ pub trait FSContext<E: Send + 'static> : Clone + Send + 'static {
       assert!(
         expansion.todo.is_empty(),
         "Loop shouldn't have exited with work to do: {:?}",
-        expansion
+        expansion.todo,
       );
       // Finally, capture the resulting PathStats from the expansion.
       expansion.outputs.into_iter().map(|(k, _)| k).collect()
@@ -418,25 +419,25 @@ pub trait FSContext<E: Send + 'static> : Clone + Send + 'static {
    * Apply a PathGlob, returning either PathStats and PathGlobs on success or continuations
    * if more information is needed.
    */
-  fn expand_single(&self, path_glob: &PathGlob) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
+  fn expand_single(&self, path_glob: PathGlob) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
     match path_glob {
-      &PathGlob::Root =>
+      PathGlob::Root =>
         // Always results in a single PathStat.
         future::ok((vec![PathGlob::root_stat()], vec![])).boxed(),
-      &PathGlob::Wildcard { ref canonical_dir, ref symbolic_path, ref wildcard } =>
+      PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
-        self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard)
+        self.directory_listing(&canonical_dir, symbolic_path.as_path(), &wildcard)
           .map(|path_stats| (path_stats, vec![]))
           .boxed(),
-      &PathGlob::DirWildcard { ref canonical_dir, ref symbolic_path, ref wildcard, ref remainder } =>
+      PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
-        self.directory_listing(canonical_dir, symbolic_path.as_path(), wildcard)
-          .map(|path_stats| {
+        self.directory_listing(&canonical_dir, symbolic_path.as_path(), &wildcard)
+          .map(move |path_stats| {
             path_stats.into_iter()
               .filter_map(|ps| {
                 match ps {
                   PathStat::Dir { ref path, ref stat } =>
-                    Some(PathGlob::parse_globs(stat, path.as_path(), remainder)),
+                    Some(PathGlob::parse_globs(stat, path.as_path(), &remainder)),
                   _ => None,
                 }
               })
