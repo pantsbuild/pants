@@ -8,12 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 from collections import defaultdict
 
-from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.specs import DescendantAddresses
 from pants.task.console_task import ConsoleTask
 
 
-class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
+class ReverseDepmap(ConsoleTask):
   """List all targets that depend on any of the input targets."""
 
   @classmethod
