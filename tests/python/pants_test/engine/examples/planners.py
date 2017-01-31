@@ -395,7 +395,7 @@ def setup_json_scheduler(build_root, native):
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
   address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                 build_pattern=('BLD.json',),
+                                 build_patterns=('BLD.json',),
                                  parser_cls=JsonParser)
   source_roots = SourceRoots(('src/java','src/scala'))
   scrooge_tool_address = Address.parse('src/scala/scrooge')
