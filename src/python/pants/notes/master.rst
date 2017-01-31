@@ -4,6 +4,27 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0.dev9 (1/27/2017)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Removes the slf4j implementation from the classpath when running Cobertura (#4198)
+  `PR #4198 <https://github.com/pantsbuild/pants/pull/4198>`_
+
+* Make open_zip print realpath when raising BadZipfile. (#4186)
+  `PR #4186 <https://github.com/pantsbuild/pants/pull/4186>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Shard testprojects integration tests (#4205)
+  `PR #4205 <https://github.com/pantsbuild/pants/pull/4205>`_
+
+* Resolve only stable releases by default. (#4201)
+  `PR #4201 <https://github.com/pantsbuild/pants/pull/4201>`_
+
 
 1.3.0.dev8 (1/20/2017)
 ----------------------

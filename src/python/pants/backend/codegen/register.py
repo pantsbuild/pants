@@ -5,8 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.antlr.java.antlr_gen import AntlrGen
+from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
+from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
 from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
@@ -48,7 +49,8 @@ def register_goals():
   # RB 592).
   task(name='protoc', action=ProtobufGen).install('gen')
 
-  task(name='antlr', action=AntlrGen).install('gen')
+  task(name='antlr-java', action=AntlrJavaGen).install('gen')
+  task(name='antlr-py', action=AntlrPyGen).install('gen')
   task(name='ragel', action=RagelGen).install('gen')
   task(name='jaxb', action=JaxbGen).install('gen')
   task(name='wire', action=WireGen).install('gen')

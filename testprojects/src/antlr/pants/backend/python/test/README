@@ -1,5 +1,0 @@
-This directory contains the canonical ANTLR example files,
-copied from http://www.antlr.org/wiki/display/ANTLR3/Example.
-We use these to test the python_antlr_library functionality in pants.
-Ideally this would live under tests/antlr, but pants currently
-doesn't support python_antlr_library targets there.
