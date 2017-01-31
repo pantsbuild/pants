@@ -23,6 +23,7 @@ target(
 target(
   name='unit',
   dependencies=[
+    ':node_bundle',
     ':node_task',
     ':node_resolve',
   ]
