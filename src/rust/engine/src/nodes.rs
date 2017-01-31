@@ -9,7 +9,7 @@ use futures::future;
 use context::Core;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
-use fs::{Dir, File, FSContext, Link, PathGlobs, PathGlob, PathStat, Stat};
+use fs::{Dir, File, FSContext, Link, PathGlobs, PathStat, Stat};
 use fs;
 use graph::EntryId;
 use handles::maybe_drain_handles;
@@ -242,7 +242,7 @@ impl Context {
 
   fn build_root(&self) -> Dir {
     // TODO
-    Dir(Path::new("").to_owned())
+    Dir(Path::new(".").to_owned())
   }
 
   fn type_path_globs(&self) -> &TypeConstraint {
@@ -731,8 +731,12 @@ pub struct Snapshot {
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> StepFuture {
     // Recursively expand PathGlobs into PathStats.
-    context
+    // TODO: Clean this up.
+    let pt = fs::ProjectTree::new(context.build_root().0.to_owned());
+    let context2 = context.clone();
+    pt
       .expand(path_globs)
+      .map_err(move |e| context2.throw(&format!("PathGlobs expansion failed: {:?}", e)))
       .and_then(move |path_stats| {
         // And then create a Snapshot.
         let snapshot_res =

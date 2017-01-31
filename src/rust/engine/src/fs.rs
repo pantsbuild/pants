@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::path;
 use std::{fmt, fs, io};
 
 use futures::future::{BoxFuture, Future};
@@ -262,19 +263,76 @@ struct PathGlobsExpansion<T: Sized> {
 }
 
 #[derive(Clone)]
-struct ProjectTree {
+pub struct ProjectTree {
   build_root: PathBuf,
-  // TODO
-  //ignore: Gitignore, 
+  // TODO: switch to Gitignore.
+  ignore: Pattern,
+}
+
+impl ProjectTree {
+  pub fn new(build_root: PathBuf) -> ProjectTree {
+    ProjectTree {
+      build_root: build_root,
+      ignore: Pattern::new("build-support/*.venv").unwrap(),
+    }
+  }
+
+  fn scandir_sync(&self, dir: &Dir) -> Result<Vec<Stat>, io::Error> {
+    if self.ignore.matches_path(dir.0.as_path()) {
+      return Ok(vec![]);
+    }
+
+    let mut stats = Vec::new();
+    for dir_entry_res in self.build_root.join(dir.0.as_path()).read_dir()? {
+      let dir_entry = dir_entry_res?;
+      let path = dir.0.join(dir_entry.file_name());
+      let file_type = dir_entry.file_type()?;
+      if file_type.is_dir() {
+        stats.push(Stat::Dir(Dir(path)));
+      } else if file_type.is_file() {
+        stats.push(Stat::File(File(path)));
+      } else if file_type.is_symlink() {
+        stats.push(Stat::Link(Link(path)));
+      }
+      // Else: ignore.
+    }
+    Ok(stats)
+  }
 }
 
 impl FSContext<io::Error> for ProjectTree {
   fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
-    future::result(link.0.read_link()).boxed()
+    future::result(
+      self.build_root.join(link.0.as_path())
+        .read_link()
+        .and_then(|path_buf| {
+          if path_buf.is_absolute() {
+            Err(
+              io::Error::new(
+                io::ErrorKind::InvalidData, format!("Absolute symlink: {:?}", link)
+              )
+            )
+          } else if path_buf.components().any(|c| c == path::Component::ParentDir) {
+            Err(
+              io::Error::new(
+                io::ErrorKind::Other, format!("TODO: Upward symlinks not supported {:?}", link)
+              )
+            )
+          } else {
+            link.0.parent()
+              .map(|parent| parent.join(path_buf))
+              .ok_or_else(|| {
+                io::Error::new(
+                  io::ErrorKind::InvalidData, format!("Symlink without a parent?: {:?}", link)
+                )
+              })
+          }
+        })
+    ).boxed()
   }
 
   fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
-
+    future::result(self.scandir_sync(dir)).boxed()
   }
 }
 
