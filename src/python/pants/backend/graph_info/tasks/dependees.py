@@ -9,6 +9,7 @@ import json
 from collections import defaultdict
 
 from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
+from pants.base.specs import DescendantAddresses
 from pants.task.console_task import ConsoleTask
 
 
@@ -35,11 +36,9 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
   def console_output(self, _):
     address_mapper = self.context.address_mapper
     build_graph = self.context.build_graph
-    dependees_by_target = defaultdict(set)
-    addresses = address_mapper.scan_addresses()
-    build_graph.inject_addresses_closure(addresses)
 
-    for address in addresses:
+    dependees_by_target = defaultdict(set)
+    for address in build_graph.inject_specs_closure([DescendantAddresses('')]):
       target = build_graph.get_target(address)
       # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
       # user vs. targets created by pants at runtime.

@@ -493,15 +493,6 @@ class BuildGraph(AbstractClass):
     """
 
   @abstractmethod
-  def inject_addresses_closure(self, addresses):
-    """Resolves, constructs and injects one or more Targets and its transitive closure of dependencies.
-
-    :API: public
-
-    :param iterable addresses: An iterable of Address objects to inject.
-    """
-
-  @abstractmethod
   def inject_specs_closure(self, specs, fail_fast=None):
     """Resolves, constructs and injects Targets and their transitive closures of dependencies.
 
